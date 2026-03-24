@@ -889,5 +889,94 @@ class TestSklearnDecisionTree(ExtTestCase):
         np.testing.assert_array_equal(ort_out[2], expected_leaves)
 
 
+@requires_sklearn("1.4")
+class TestConvertOptionsHas(ExtTestCase):
+    """Tests for ConvertOptions.has() name-based and callable filtering."""
+
+    def setUp(self):
+        from sklearn.tree import DecisionTreeClassifier
+        from sklearn.preprocessing import StandardScaler
+
+        self._dtc = DecisionTreeClassifier(max_depth=2, random_state=0)
+        self._ss = StandardScaler()
+
+    # ------------------------------------------------------------------
+    # String (class name) matching
+    # ------------------------------------------------------------------
+
+    def test_has_by_class_name_true(self):
+        opts = ConvertOptions(decision_leaf={"DecisionTreeClassifier"})
+        self.assertTrue(opts.has("decision_leaf", self._dtc))
+
+    def test_has_by_class_name_false_other(self):
+        opts = ConvertOptions(decision_leaf={"DecisionTreeClassifier"})
+        self.assertFalse(opts.has("decision_leaf", self._ss))
+
+    def test_has_by_class_name_false_empty_set(self):
+        opts = ConvertOptions(decision_leaf=set())
+        self.assertFalse(opts.has("decision_leaf", self._dtc))
+
+    # ------------------------------------------------------------------
+    # Type (class object) matching — existing behaviour preserved
+    # ------------------------------------------------------------------
+
+    def test_has_by_type_true(self):
+        from sklearn.tree import DecisionTreeClassifier
+
+        opts = ConvertOptions(decision_leaf={DecisionTreeClassifier})
+        self.assertTrue(opts.has("decision_leaf", self._dtc))
+
+    def test_has_by_type_false_other(self):
+        from sklearn.tree import DecisionTreeClassifier
+
+        opts = ConvertOptions(decision_leaf={DecisionTreeClassifier})
+        self.assertFalse(opts.has("decision_leaf", self._ss))
+
+    # ------------------------------------------------------------------
+    # Callable element in the set
+    # ------------------------------------------------------------------
+
+    def test_has_callable_in_set_true(self):
+        opts = ConvertOptions(decision_leaf={lambda est: hasattr(est, "decision_path")})
+        self.assertTrue(opts.has("decision_leaf", self._dtc))
+
+    def test_has_callable_in_set_false(self):
+        opts = ConvertOptions(decision_leaf={lambda est: False})
+        self.assertFalse(opts.has("decision_leaf", self._dtc))
+
+    def test_has_multiple_callables_any_true(self):
+        opts = ConvertOptions(
+            decision_leaf={lambda est: False, lambda est: hasattr(est, "decision_path")}
+        )
+        self.assertTrue(opts.has("decision_leaf", self._dtc))
+
+    # ------------------------------------------------------------------
+    # Boolean True/False — existing behaviour preserved
+    # ------------------------------------------------------------------
+
+    def test_has_true_matches_any_tree(self):
+        opts = ConvertOptions(decision_leaf=True)
+        self.assertTrue(opts.has("decision_leaf", self._dtc))
+
+    def test_has_false_matches_nothing(self):
+        opts = ConvertOptions(decision_leaf=False)
+        self.assertFalse(opts.has("decision_leaf", self._dtc))
+
+    # ------------------------------------------------------------------
+    # End-to-end: name-based set triggers extra output only for matching estimator
+    # ------------------------------------------------------------------
+
+    def test_decision_leaf_by_name_end_to_end(self):
+        """ConvertOptions with a class-name set enables the extra output."""
+        X, y = make_classification(n_samples=50, n_features=4, random_state=0)
+        X = X.astype(np.float32)
+        model = DecisionTreeClassifier(max_depth=3, random_state=0).fit(X, y)
+
+        opts = ConvertOptions(decision_leaf={"DecisionTreeClassifier"})
+        onx = to_onnx(model, (X,), convert_options=opts)
+        # label + proba + decision_leaf = 3 outputs
+        self.assertEqual(len(onx.graph.output), 3)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

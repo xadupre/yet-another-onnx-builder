@@ -87,9 +87,12 @@ class ConvertOptions(ConvertOptionsProtocol):
             strings listed in :attr:`OPTIONS`.  An :exc:`AssertionError` is
             raised when an unknown name is passed.
         :param piece: the fitted :class:`~sklearn.base.BaseEstimator` for which
-            the option is being queried.  Currently all estimators are treated
-            identically (the :class:`set`-based per-class filtering is not yet
-            implemented).
+            the option is being queried.  When the attribute value is a
+            :class:`set`, the set may contain types, integer object ids,
+            class-name strings, or callables.  A callable element is called
+            with *piece* as its sole argument and the option is considered
+            active if any callable returns ``True``.  A string element is
+            compared against ``type(piece).__name__``.
         :return: ``True`` when the option is enabled globally (the attribute
             value is ``True``), ``False`` when it is disabled (``False`` or any
             falsy value).
@@ -105,9 +108,14 @@ class ConvertOptions(ConvertOptionsProtocol):
         if value is True:
             return self.OPTIONS[option_name](piece)
         if isinstance(value, set):
-            if callable(value):
-                return value(piece)
-            return type(piece) in value or id(piece) in value
+            for item in value:
+                if callable(item) and not isinstance(item, type) and item(piece):
+                    return True
+            return (
+                type(piece) in value
+                or id(piece) in value
+                or type(piece).__name__ in value
+            )
         raise NotImplementedError(
             f"Not implemented with {option_name!r} is not a boolean but {value!r}."
         )
