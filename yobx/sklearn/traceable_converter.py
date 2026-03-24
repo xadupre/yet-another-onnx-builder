@@ -85,8 +85,9 @@ def sklearn_traceable_converter(
     if isinstance(args[0], NumpyArray):
         from ..xtracing import trace_numpy_function
 
-        return trace_numpy_function(
+        res = trace_numpy_function(
             g, sts, list(outputs) if outputs else None, estimator.transform, inputs, name=name
         )
+        return tuple(n.name for n in res) if isinstance(res, tuple) else res.name
 
     raise NotImplementedError(f"Unable to trace estimator {estimator}{g.get_debug_msg()}")

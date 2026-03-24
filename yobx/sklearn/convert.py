@@ -327,6 +327,12 @@ def to_onnx(
     else:
         out_names = fct(g, sts, output_names, estimator, *input_names, name="main")
 
+    assert isinstance(out_names, str) or (
+        isinstance(out_names, tuple) and all(isinstance(o, str) for o in out_names)
+    ), (
+        f"estimator={cls}, {fct=}, type mismatch, {input_names=}, {out_names=}, "
+        f"{is_container=}, {function_options=}, {estimator=}{g.get_debug_msg()}"
+    )
     assert (
         output_names is None
         or (out_names == output_names[0] and len(output_names) == 1)

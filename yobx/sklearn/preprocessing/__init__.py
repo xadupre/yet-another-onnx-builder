@@ -4,6 +4,7 @@ from .. import traceable_converter
 def register():
     from . import (
         binarizer,
+        function_transformer,
         kbins_discretizer,
         kernel_centerer,
         max_abs_scaler,

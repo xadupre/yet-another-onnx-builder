@@ -17,6 +17,7 @@ yobx.sklearn
     skl2onnx_converter
     sklearn_helper
     tests_helper
+    traceable_converter
 
 .. toctree::
     :maxdepth: 1
