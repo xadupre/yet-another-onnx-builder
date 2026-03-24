@@ -21,6 +21,25 @@ from .xla_call_module_parsing import (  # noqa: F401
     parse_mlir,
 )
 
+# ---------------------------------------------------------------------------
+# Structural ops handled directly (not via get_jax_cvt)
+# ---------------------------------------------------------------------------
+# Maps StableHLO op names to a tuple (onnx_op_or_None, description).
+# ``onnx_op`` is the ONNX op name for direct 1-op translations (used to
+# generate a hyperlink), or ``None`` for ops that have no single ONNX
+# counterpart.  ``description`` is a short human-readable label shown in
+# the coverage table.
+_STRUCTURAL_OPS: "dict[str, tuple[str | None, str]]" = {
+    "broadcast_in_dim": (None, "identity pass-through (ONNX broadcasting is implicit)"),
+    "call": (None, "inlined private function (no ONNX op emitted)"),
+    "constant": (None, "ONNX initializer (weight tensor)"),
+    "convert": ("Cast", "type cast"),
+    "dot_general": ("MatMul", "matrix multiply"),
+    "dynamic_broadcast_in_dim": (None, "identity pass-through (ONNX broadcasting is implicit)"),
+    "reduce_max": ("ReduceMax", "reduce along axes keeping dims"),
+    "reduce_sum": ("ReduceSum", "reduce along axes keeping dims"),
+}
+
 
 def _process_constant_layer(
     layer: dict, local_results: Dict[str, str], g: GraphBuilderExtendedProtocol

@@ -101,26 +101,40 @@ The following ``stablehlo`` ops are handled directly by the
 ``XlaCallModule`` converter in :mod:`yobx.tensorflow.ops.xla_call_module`
 and do not go through :func:`~yobx.tensorflow.ops.jax_ops.get_jax_cvt`:
 
-.. list-table::
-   :header-rows: 1
-   :widths: 40 60
+.. runpython::
+    :showcode:
+    :rst:
 
-   * - StableHLO op
-     - ONNX equivalent
-   * - `broadcast_in_dim <https://openxla.org/stablehlo/spec#broadcast_in_dim>`_
-     - identity pass-through (ONNX broadcasting is implicit)
-   * - `constant <https://openxla.org/stablehlo/spec#constant>`_
-     - ONNX initializer (weight tensor)
-   * - `convert <https://openxla.org/stablehlo/spec#convert>`_
-     - `Cast <https://onnx.ai/onnx/operators/onnx__Cast.html>`_
-   * - `dot_general <https://openxla.org/stablehlo/spec#dot_general>`_
-     - `MatMul <https://onnx.ai/onnx/operators/onnx__MatMul.html>`_
-   * - `dynamic_broadcast_in_dim <https://openxla.org/stablehlo/spec#dynamic_broadcast_in_dim>`_
-     - identity pass-through (ONNX broadcasting is implicit)
-   * - `reduce_max <https://openxla.org/stablehlo/spec#reduce>`_
-     - `ReduceMax <https://onnx.ai/onnx/operators/onnx__ReduceMax.html>`_
-   * - `reduce_sum <https://openxla.org/stablehlo/spec#reduce>`_
-     - `ReduceSum <https://onnx.ai/onnx/operators/onnx__ReduceSum.html>`_
+    from yobx.tensorflow.ops.xla_call_module import _STRUCTURAL_OPS
+
+    _ONNX_BASE = "https://onnx.ai/onnx/operators/onnx__{}.html"
+    _STABLEHLO_BASE = "https://openxla.org/stablehlo/spec#{}"
+
+    def _hlo_anchor(op):
+        # Use generic anchors for ops that share a spec section
+        _overrides = {
+            "reduce_max": "reduce",
+            "reduce_sum": "reduce",
+        }
+        return _overrides.get(op, op.replace("_", "-"))
+
+    print(".. list-table::")
+    print("   :header-rows: 1")
+    print("   :widths: 40 60")
+    print()
+    print("   * - StableHLO op")
+    print("     - ONNX equivalent")
+    for hlo_op, (onnx_op, desc) in sorted(_STRUCTURAL_OPS.items()):
+        hlo_url = _STABLEHLO_BASE.format(_hlo_anchor(hlo_op))
+        hlo_cell = f"`{hlo_op} <{hlo_url}>`_"
+        if onnx_op is not None:
+            onnx_url = _ONNX_BASE.format(onnx_op)
+            onnx_cell = f"`{onnx_op} <{onnx_url}>`_ — {desc}"
+        else:
+            onnx_cell = desc
+        print(f"   * - {hlo_cell}")
+        print(f"     - {onnx_cell}")
+    print()
 
 Adding a new JAX op mapping
 ----------------------------
