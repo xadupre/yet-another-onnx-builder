@@ -1,5 +1,5 @@
 import inspect
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Set, Tuple, Union
 import numpy as np
 from onnx import NodeProto
 from ...helpers.onnx_helper import element_wise_binary_op_types
@@ -9,6 +9,11 @@ from ..patterns_api import MatchResult, PatternOptimization
 
 class ReshapePattern(PatternOptimization):
     """Checks that a Reshape is really needed."""
+
+    @classmethod
+    def fast_op_type(cls) -> Set[str]:
+        "Starts matching with this node."
+        return {"Reshape"}
 
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
@@ -94,6 +99,11 @@ class ShapedBasedReshapePattern(ReshapePattern):
 
             class ID constNode
     """
+
+    @classmethod
+    def fast_op_type(cls) -> Set[str]:
+        "Starts matching with this node."
+        return {"Reshape"}
 
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
@@ -319,6 +329,11 @@ class ReshapeReshapePattern(PatternOptimization):
             class X ioNode
             class s2 ioNode
     """
+
+    @classmethod
+    def fast_op_type(cls) -> Set[str]:
+        "Starts matching with this node."
+        return {"Reshape"}
 
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
@@ -1048,6 +1063,11 @@ class ConcatReshapePattern(PatternOptimization):
             class Y ioNode
     """
 
+    @classmethod
+    def fast_op_type(cls) -> Set[str]:
+        "Starts matching with this node."
+        return {"Reshape"}
+
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
 
@@ -1220,6 +1240,11 @@ class StaticConcatReshapePattern(PatternOptimization):
             class Y ioNode
     """
 
+    @classmethod
+    def fast_op_type(cls) -> Set[str]:
+        "Starts matching with this node."
+        return {"Reshape"}
+
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
 
@@ -1371,6 +1396,11 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
             class X ioNode
             class Y ioNode
     """
+
+    @classmethod
+    def fast_op_type(cls) -> Set[str]:
+        "Starts matching with this node."
+        return {"Reshape"}
 
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
@@ -1745,6 +1775,11 @@ class UnsqueezeReshapePattern(PatternOptimization):
             class Z ioNode
     """
 
+    @classmethod
+    def fast_op_type(cls) -> Set[str]:
+        "Starts matching with this node."
+        return {"Reshape"}
+
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
 
@@ -1869,6 +1904,11 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
             class S3 ioNode
             class Z ioNode
     """
+
+    @classmethod
+    def fast_op_type(cls) -> Set[str]:
+        "Starts matching with this node."
+        return {"Reshape"}
 
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
