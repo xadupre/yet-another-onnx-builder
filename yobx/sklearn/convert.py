@@ -71,7 +71,7 @@ def _wrap_step_as_function(
     if function_input_names is None:
         function_output_names = out_names
     else:
-        function_output_names = tuple(function_output_names)
+        function_output_names = tuple(function_output_names)  # type: ignore
 
     # Register the sub-builder outputs.
     assert (
