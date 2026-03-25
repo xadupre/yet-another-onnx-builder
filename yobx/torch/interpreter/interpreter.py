@@ -1902,9 +1902,9 @@ class DynamoInterpreter:
                 isinstance(res, (tuple, list))
                 and len(res) == 1
                 and str(getattr(node, "target", None))
-                in {"scan", "aten.split_with_sizes.default"}
+                in {"scan", "while_loop", "aten.split_with_sizes.default"}
             ):
-                # Scan allows that
+                # Scan and while_loop allow that
                 name = output_names[0]
                 assert all(s.startswith(name) for s in res), (
                     f"Unexpected output_names={output_names}, "
