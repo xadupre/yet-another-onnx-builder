@@ -12,6 +12,9 @@ Export Tiny-LLM with 3 different ways
 
 import argparse
 import sys
+import matplotlib.pyplot as plt
+import numpy as np
+import onnx
 import onnxruntime
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer
@@ -161,6 +164,8 @@ exporters = args.exporter.split(",")
 copy_inputs = torch_deepcopy(inputs)
 expected = model(**copy_inputs)
 
+successful_exports: dict[str, str] = {}
+
 for exporter in exporters:
     filename = f"plot_many_exporter.{exporter}.onnx"
     print(f"-- run exporter {exporter!r}")
@@ -211,3 +216,59 @@ for exporter in exporters:
         print(f"-- discrepancies ok - {diff['abs']}")
     else:
         print(f"-- discrepancies = {diff}")
+    successful_exports[exporter] = filename
+
+# %%
+# Node frequencies
+# ----------------
+#
+# For each exporter that succeeded, load the exported ONNX model and count
+# how many times each ``op_type`` appears.  The counts are displayed as
+# grouped horizontal bar charts so that the exporters can be compared
+# side-by-side.
+
+if successful_exports:
+    # Collect node-type counts for every successful export.
+    all_op_types: list[str] = []
+    counts_per_exporter: dict[str, dict[str, int]] = {}
+    for exp_name, fname in successful_exports.items():
+        proto = onnx.load(fname)
+        freq: dict[str, int] = {}
+        for node in proto.graph.node:
+            freq[node.op_type] = freq.get(node.op_type, 0) + 1
+        counts_per_exporter[exp_name] = freq
+        for op in freq:
+            if op not in all_op_types:
+                all_op_types.append(op)
+
+    all_op_types = sorted(all_op_types)
+    n_ops = len(all_op_types)
+    n_exp = len(successful_exports)
+    colors = ["#4c72b0", "#dd8452", "#55a868", "#c44e52", "#8172b2"]
+
+    fig, ax = plt.subplots(figsize=(max(8, n_ops * 0.6 + 2), 4 + n_exp * 0.4))
+    x = np.arange(n_ops)
+    width = 0.8 / max(n_exp, 1)
+
+    for idx, (exp_name, freq) in enumerate(counts_per_exporter.items()):
+        vals = [freq.get(op, 0) for op in all_op_types]
+        offset = (idx - (n_exp - 1) / 2) * width
+        bars = ax.bar(x + offset, vals, width, label=exp_name, color=colors[idx % len(colors)])
+        for bar, val in zip(bars, vals):
+            if val > 0:
+                ax.text(
+                    bar.get_x() + bar.get_width() / 2,
+                    bar.get_height() + 0.3,
+                    str(val),
+                    ha="center",
+                    va="bottom",
+                    fontsize=7,
+                )
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(all_op_types, rotation=25, ha="right", fontsize=8)
+    ax.set_ylabel("Number of nodes")
+    ax.set_title("ONNX node frequencies per exporter", fontsize=10)
+    ax.legend(fontsize=9)
+    fig.tight_layout()
+    plt.show()
