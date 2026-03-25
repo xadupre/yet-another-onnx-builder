@@ -18,13 +18,6 @@ class TestFeatureHasher(ExtTestCase):
     contribute nothing to the output feature vector.
     """
 
-    _OPSET = {"": 18, "com.microsoft": 1}
-
-    def _to_onnx(self, estimator, X):
-        from yobx.sklearn import to_onnx
-
-        return to_onnx(estimator, (X,), target_opset=self._OPSET)
-
     # ------------------------------------------------------------------
     # Basic correctness
     # ------------------------------------------------------------------
@@ -32,6 +25,7 @@ class TestFeatureHasher(ExtTestCase):
     def test_basic_alternate_sign_true(self):
         """alternate_sign=True: signs match sklearn's murmurhash3_32 sign."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         docs = [["foo", "bar", "foo"], ["baz"], []]
         fh = FeatureHasher(n_features=16, input_type="string", alternate_sign=True)
@@ -39,7 +33,7 @@ class TestFeatureHasher(ExtTestCase):
 
         max_len = max((len(d) for d in docs), default=1)
         X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
         self.assertIn(("MurmurHash3", "com.microsoft"), op_types)
@@ -52,6 +46,7 @@ class TestFeatureHasher(ExtTestCase):
     def test_basic_alternate_sign_false(self):
         """alternate_sign=False: all contributions are +1."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         docs = [["foo", "bar", "foo"], ["baz"]]
         fh = FeatureHasher(n_features=16, input_type="string", alternate_sign=False)
@@ -59,7 +54,7 @@ class TestFeatureHasher(ExtTestCase):
 
         max_len = max(len(d) for d in docs)
         X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -69,6 +64,7 @@ class TestFeatureHasher(ExtTestCase):
     def test_float32_dtype(self):
         """dtype=np.float32 produces a FLOAT output tensor."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         docs = [["hello", "world"], ["test"]]
         fh = FeatureHasher(n_features=8, input_type="string", dtype=np.float32)
@@ -76,7 +72,7 @@ class TestFeatureHasher(ExtTestCase):
 
         max_len = max(len(d) for d in docs)
         X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -88,6 +84,7 @@ class TestFeatureHasher(ExtTestCase):
     def test_float64_dtype(self):
         """dtype=np.float64 (the sklearn default) produces a DOUBLE output tensor."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         docs = [["hello", "world"], ["test"]]
         fh = FeatureHasher(n_features=8, input_type="string", dtype=np.float64)
@@ -95,7 +92,7 @@ class TestFeatureHasher(ExtTestCase):
 
         max_len = max(len(d) for d in docs)
         X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -111,13 +108,14 @@ class TestFeatureHasher(ExtTestCase):
     def test_repeated_tokens_count(self):
         """Repeated tokens in a document are summed, not deduplicated."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         docs = [["a", "a", "a", "b"]]
         fh = FeatureHasher(n_features=32, input_type="string", alternate_sign=False)
         fh.fit([])
 
         X = np.array([docs[0]], dtype=object)
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -127,6 +125,7 @@ class TestFeatureHasher(ExtTestCase):
     def test_collision_two_tokens_same_bucket(self):
         """Tokens that hash to the same bucket accumulate correctly."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         # Use n_features=2 to force many collisions
         docs = [["alpha", "beta", "gamma", "delta", "epsilon"]]
@@ -134,7 +133,7 @@ class TestFeatureHasher(ExtTestCase):
         fh.fit([])
 
         X = np.array([docs[0]], dtype=object)
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -148,6 +147,7 @@ class TestFeatureHasher(ExtTestCase):
     def test_empty_document(self):
         """A document with no features produces an all-zero feature vector."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         docs = [["foo"], [], ["bar"]]
         fh = FeatureHasher(n_features=16, input_type="string", alternate_sign=True)
@@ -155,7 +155,7 @@ class TestFeatureHasher(ExtTestCase):
 
         max_len = max((len(d) for d in docs), default=1)
         X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -165,13 +165,14 @@ class TestFeatureHasher(ExtTestCase):
     def test_all_empty_documents(self):
         """All-empty documents produce an all-zero output."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         docs = [[], [], []]
         fh = FeatureHasher(n_features=8, input_type="string", alternate_sign=True)
         fh.fit([])
 
         X = np.array([[""]] * len(docs), dtype=object)
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -181,13 +182,14 @@ class TestFeatureHasher(ExtTestCase):
     def test_single_sample(self):
         """Single-sample batch works correctly."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         docs = [["hello", "world", "hello"]]
         fh = FeatureHasher(n_features=16, input_type="string", alternate_sign=True)
         fh.fit([])
 
         X = np.array([docs[0]], dtype=object)
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -201,13 +203,14 @@ class TestFeatureHasher(ExtTestCase):
     def test_n_features_power_of_two(self):
         """n_features=1024 (power of 2) works correctly."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         docs = [["cat", "dog", "bird", "cat", "fish"]]
         fh = FeatureHasher(n_features=1024, input_type="string", alternate_sign=True)
         fh.fit([])
 
         X = np.array([docs[0]], dtype=object)
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -217,6 +220,7 @@ class TestFeatureHasher(ExtTestCase):
     def test_n_features_non_power_of_two(self):
         """n_features=10 (non-power-of-two) produces correct modular hashing."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         docs = [["one", "two", "three"], ["four", "five"]]
         fh = FeatureHasher(n_features=10, input_type="string", alternate_sign=True)
@@ -224,7 +228,7 @@ class TestFeatureHasher(ExtTestCase):
 
         max_len = max(len(d) for d in docs)
         X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -244,7 +248,7 @@ class TestFeatureHasher(ExtTestCase):
         fh.fit([])
         X = np.array([["foo", "bar"]], dtype=object)
         with self.assertRaises(NotImplementedError):
-            to_onnx(fh, (X,), target_opset=self._OPSET)
+            to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
     def test_raises_without_com_microsoft_opset(self):
         """Converter raises RuntimeError when com.microsoft opset is absent."""
@@ -266,7 +270,7 @@ class TestFeatureHasher(ExtTestCase):
         fh.fit([])
         X_float = np.zeros((2, 3), dtype=np.float32)
         with self.assertRaises(NotImplementedError):
-            to_onnx(fh, (X_float,), target_opset=self._OPSET)
+            to_onnx(fh, (X_float,), target_opset={"": 18, "com.microsoft": 1})
 
 
 if __name__ == "__main__":

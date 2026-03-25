@@ -11,9 +11,6 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 
-# Opset including com.microsoft for MurmurHash3
-_OPSET = {"": 18, "com.microsoft": 1}
-
 # Sample documents from sklearn-onnx's FeatureHasher test suite
 _CORPUS = [
     "cat dog bird",
@@ -35,11 +32,6 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
     automatically on builds where OnnxRuntime does not provide that domain.
     """
 
-    def _to_onnx(self, estimator, X):
-        from yobx.sklearn import to_onnx
-
-        return to_onnx(estimator, (X,), target_opset=_OPSET)
-
     # ------------------------------------------------------------------
     # Mirrors test_model_feature_hasher_10 / test_model_feature_hasher_n_features
     # ------------------------------------------------------------------
@@ -47,6 +39,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
     def test_model_feature_hasher_n10(self):
         """n_features=10, alternate_sign=True on the standard corpus."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         token_lists = [doc.split() for doc in _CORPUS]
         fh = FeatureHasher(n_features=10, input_type="string")
@@ -56,7 +49,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         X = np.array(
             [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
         )
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
         self.assertIsNotNone(onx)
 
         sess = self.check_ort(onx)
@@ -67,6 +60,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
     def test_model_feature_hasher_n10_no_alt_sign(self):
         """n_features=10, alternate_sign=False on the standard corpus."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         token_lists = [doc.split() for doc in _CORPUS]
         fh = FeatureHasher(n_features=10, input_type="string", alternate_sign=False)
@@ -76,7 +70,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         X = np.array(
             [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
         )
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -86,6 +80,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
     def test_model_feature_hasher_large_n_features(self):
         """n_features=1024 matches sklearn on the standard corpus."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         token_lists = [doc.split() for doc in _CORPUS]
         fh = FeatureHasher(n_features=1024, input_type="string")
@@ -95,7 +90,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         X = np.array(
             [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
         )
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -109,6 +104,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
     def test_model_feature_hasher_float32(self):
         """dtype=float32 — output matches sklearn's float32-cast result."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         token_lists = [doc.split() for doc in _CORPUS]
         fh = FeatureHasher(n_features=10, input_type="string", dtype=np.float32)
@@ -118,7 +114,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         X = np.array(
             [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
         )
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -133,6 +129,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
     def test_model_feature_hasher_more_tokens(self):
         """Longer token lists — more padding needed."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         token_lists = [
             ["one", "two", "three", "four", "five", "six"],
@@ -147,7 +144,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         X = np.array(
             [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
         )
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -161,6 +158,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
     def test_model_feature_hasher_collision(self):
         """Forced collisions with n_features=2 accumulate correctly."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         token_lists = [
             ["apple", "banana", "cherry", "date"],
@@ -173,7 +171,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         X = np.array(
             [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
         )
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -187,6 +185,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
     def test_model_feature_hasher_empty_doc(self):
         """An empty document produces an all-zero feature vector."""
         from sklearn.feature_extraction import FeatureHasher
+        from yobx.sklearn import to_onnx
 
         token_lists = [["cat", "dog"], [], ["bird"]]
         fh = FeatureHasher(n_features=8, input_type="string")
@@ -196,7 +195,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         X = np.array(
             [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
         )
-        onx = self._to_onnx(fh, X)
+        onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X})[0]
@@ -226,7 +225,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         pipe = Pipeline([("fh", fh), ("clf", clf)])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,), target_opset=_OPSET)
+        onx = to_onnx(pipe, (X,), target_opset={"": 18, "com.microsoft": 1})
         self.assertIsNotNone(onx)
 
         sess = self.check_ort(onx)
