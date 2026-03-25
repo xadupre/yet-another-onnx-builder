@@ -414,8 +414,8 @@ A sub-graph can be exported as a reusable ONNX local function (a
 
 .. _l-graphbuilder-debugging-env:
 
-Debugging
-=========
+Debugging GraphBuilder with Environment Variables
+=================================================
 
 :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>` respects several
 environment variables that help narrow down construction or optimization
