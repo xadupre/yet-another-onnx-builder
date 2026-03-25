@@ -6,6 +6,7 @@ yobx.sklearn.feature_extraction
     :caption: modules
 
     count_vectorizer
+    feature_hasher
     patch_extractor
     tfidf_transformer
     tfidf_vectorizer

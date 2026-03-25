@@ -861,6 +861,8 @@ class TestSklearnConvertersBasicInvocation(ExtTestCase):
             # KernelPCA with n_components=None (default) triggers a converter bug
             # unrelated to this test
             "KernelPCA",
+            # STRING
+            "FeatureHasher",
         }
     )
 
@@ -871,9 +873,9 @@ class TestSklearnConvertersBasicInvocation(ExtTestCase):
 
         # Small float32 dataset suitable for most estimators.
         rng = np.random.default_rng(0)
-        self._X = rng.standard_normal((20, 4)).astype(np.float32)
+        self._X = np.abs(rng.standard_normal((20, 4)).astype(np.float32)) + 1
         self._y_bin = (rng.random(20) > 0.5).astype(np.int64)
-        self._y_reg = rng.standard_normal(20).astype(np.float32)
+        self._y_reg = np.abs(rng.standard_normal(20).astype(np.float32)) + 1
 
     def _make_graph_builder(self):
         from yobx.xbuilder import GraphBuilder
