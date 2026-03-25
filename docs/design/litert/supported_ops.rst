@@ -43,7 +43,7 @@ from the live converter registry.
         items = sorted(groups[mod], key=lambda x: x[0])
         if not items:
             continue
-        print(f"**{label}**")
+        print(f"**{label}** (:mod:`{mod}`)")
         print()
         for tflite_op, onnx_op, fn in items:
             link = f":func:`{fn.__name__} <{fn.__module__}.{fn.__name__}>`"
