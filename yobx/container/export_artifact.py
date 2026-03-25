@@ -458,6 +458,9 @@ class ExportArtifact(ExportArtifactProtocol):
             return
         import os
 
+        if not self.report.node_stats and isinstance(self.proto, onnx.ModelProto):
+            self.compute_node_stats()
+
         excel_path = os.path.splitext(onnx_path)[0] + ".xlsx"
         self.report.to_excel(excel_path)
 

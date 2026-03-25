@@ -455,6 +455,33 @@ class TestExportArtifact(ExtTestCase):
         if artifact.report is not None:
             self.assertEqual(artifact.report.node_stats, [])
 
+    @skipif_ci_windows("issue with excel")
+    def test_save_includes_node_stats_in_excel(self):
+        """save() should produce an Excel file with a node_stats sheet."""
+        try:
+            import openpyxl  # noqa: F401
+        except ImportError:
+            return
+        import pandas
+
+        artifact = ExportArtifact(
+            proto=_make_matmul_model(),
+            report=ExportReport(extra={"time_total": 0.1}),
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "model.onnx")
+            artifact.save(path)
+            excel_path = os.path.join(tmp, "model.xlsx")
+            self.assertTrue(os.path.exists(excel_path))
+            sheets = pandas.ExcelFile(excel_path).sheet_names
+            self.assertIn("node_stats", sheets)
+            df_ns = pandas.read_excel(excel_path, sheet_name="node_stats")
+            self.assertIn("op_type", df_ns.columns)
+            self.assertIn("count", df_ns.columns)
+            op_types = set(df_ns["op_type"].tolist())
+            self.assertIn("MatMul", op_types)
+            self.assertIn("Add", op_types)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
