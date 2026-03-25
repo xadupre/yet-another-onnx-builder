@@ -386,6 +386,56 @@ class TestTracedDataFramePipe(ExtTestCase):
 
 
 # ---------------------------------------------------------------------------
+# TracedDataFrame.copy
+# ---------------------------------------------------------------------------
+
+
+class TestTracedDataFrameCopy(ExtTestCase):
+    def _make(self):
+        columns = {c: TracedSeries(ColumnRef(c)) for c in ("a", "b")}
+        return TracedDataFrame(columns, source_columns=["a", "b"])
+
+    def test_copy_returns_traced_dataframe(self):
+        df = self._make()
+        result = df.copy()
+        self.assertIsInstance(result, TracedDataFrame)
+
+    def test_copy_is_new_object(self):
+        df = self._make()
+        result = df.copy()
+        self.assertIsNot(result, df)
+
+    def test_copy_preserves_columns(self):
+        df = self._make()
+        result = df.copy()
+        self.assertEqual(result.columns, df.columns)
+
+    def test_copy_deep_false_preserves_columns(self):
+        df = self._make()
+        result = df.copy(deep=False)
+        self.assertEqual(result.columns, df.columns)
+
+    def test_copy_does_not_share_ops_list(self):
+        df = self._make()
+        result = df.copy()
+        result._ops.append("sentinel")
+        self.assertNotIn("sentinel", df._ops)
+
+    def test_copy_in_pipeline(self):
+        """Verify that .copy() inside a traced function does not break tracing."""
+        import numpy as np
+        from yobx.xtracing.dataframe_trace import dataframe_to_onnx
+
+        def transform(df):
+            df2 = df.copy()
+            return df2.assign(total=(df2["a"] + df2["b"]).alias("total")).select(["total"])
+
+        dtypes = {"a": np.float32, "b": np.float32}
+        artifact = dataframe_to_onnx(transform, dtypes)
+        self.assertIsNotNone(artifact)
+
+
+# ---------------------------------------------------------------------------
 # TracedDataFrame.groupby / TracedGroupBy.agg
 # ---------------------------------------------------------------------------
 

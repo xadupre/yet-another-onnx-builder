@@ -28,6 +28,7 @@ Supported operations
 * **Column alias**: ``.alias(name)`` on a :class:`TracedSeries`
 * **Group-by**: :meth:`TracedDataFrame.groupby` + :meth:`TracedGroupBy.agg`
 * **Function chaining**: :meth:`TracedDataFrame.pipe`
+* **Copy**: :meth:`TracedDataFrame.copy`
 
 Example
 -------
@@ -468,6 +469,23 @@ class TracedDataFrame:
         :return: the result of ``func(self, *args, **kwargs)``.
         """
         return func(self, *args, **kwargs)
+
+    def copy(self, deep: bool = True) -> "TracedDataFrame":
+        """Return a copy of this :class:`TracedDataFrame`.
+
+        Because :class:`TracedDataFrame` holds immutable AST nodes rather than
+        actual data, both shallow and deep copies are equivalent: a new
+        :class:`TracedDataFrame` is returned with the same column expressions,
+        recorded operations, and source-column list.  This method exists so
+        that functions written for real ``pandas.DataFrame`` objects (which
+        routinely call ``.copy()`` to avoid unintentional mutation) can be
+        traced without modification.
+
+        :param deep: accepted for API compatibility with ``pandas.DataFrame.copy``
+            but has no effect.
+        :return: a new :class:`TracedDataFrame` representing the same query.
+        """
+        return TracedDataFrame(dict(self._columns), list(self._ops), list(self._source_columns))
 
     def join(
         self, right: "TracedDataFrame", left_key: str, right_key: str, join_type: str = "inner"
