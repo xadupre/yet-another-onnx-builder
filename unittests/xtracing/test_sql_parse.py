@@ -145,7 +145,8 @@ class TestParseSqlFilter(unittest.TestCase):
 
     def test_columns_collected_from_where(self):
         pq = parse_sql("SELECT a FROM t WHERE b > 0")
-        self.assertIn("b", pq.columns)
+        col_names = [c.column for c in pq.columns]
+        self.assertIn("b", col_names)
 
 
 class TestParseSqlGroupBy(unittest.TestCase):
@@ -198,7 +199,8 @@ class TestParseSqlJoin(unittest.TestCase):
 
     def test_join_column_collected(self):
         pq = parse_sql("SELECT x FROM t1 JOIN t2 ON t1.k = t2.k")
-        self.assertIn("k", pq.columns)
+        col_names = [c.column for c in pq.columns]
+        self.assertIn("k", col_names)
 
 
 class TestParsedQueryColumns(unittest.TestCase):
@@ -206,17 +208,31 @@ class TestParsedQueryColumns(unittest.TestCase):
 
     def test_columns_from_select(self):
         pq = parse_sql("SELECT a, b FROM t")
-        self.assertIn("a", pq.columns)
-        self.assertIn("b", pq.columns)
+        col_names = [c.column for c in pq.columns]
+        self.assertIn("a", col_names)
+        self.assertIn("b", col_names)
 
     def test_columns_deduped(self):
         pq = parse_sql("SELECT a, a FROM t")
-        self.assertEqual(pq.columns.count("a"), 1)
+        col_names = [c.column for c in pq.columns]
+        self.assertEqual(col_names.count("a"), 1)
 
     def test_columns_from_expression(self):
         pq = parse_sql("SELECT a + b AS total FROM t")
-        self.assertIn("a", pq.columns)
-        self.assertIn("b", pq.columns)
+        col_names = [c.column for c in pq.columns]
+        self.assertIn("a", col_names)
+        self.assertIn("b", col_names)
+
+    def test_columns_are_column_refs(self):
+        pq = parse_sql("SELECT a, b FROM t")
+        for col in pq.columns:
+            self.assertIsInstance(col, ColumnRef)
+
+    def test_columns_dtype_zero_from_sql_parser(self):
+        # SQL string parser does not set dtype; ColumnRef.dtype should be 0
+        pq = parse_sql("SELECT a, b FROM t")
+        for col in pq.columns:
+            self.assertEqual(col.dtype, 0)
 
 
 class TestParseSqlSubquery(unittest.TestCase):

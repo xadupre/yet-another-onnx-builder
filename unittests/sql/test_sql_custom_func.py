@@ -49,8 +49,9 @@ class TestFuncCallExprParsing(unittest.TestCase):
 
     def test_func_call_columns_collected(self):
         pq = parse_sql("SELECT my_func(a, b) AS r FROM t")
-        self.assertIn("a", pq.columns)
-        self.assertIn("b", pq.columns)
+        col_names = [c.column for c in pq.columns]
+        self.assertIn("a", col_names)
+        self.assertIn("b", col_names)
 
     def test_func_call_str_repr(self):
         pq = parse_sql("SELECT my_func(a) FROM t")

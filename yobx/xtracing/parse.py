@@ -210,8 +210,13 @@ class ParsedQuery:
         (if any) → ``SelectOp``.
     :param from_table: the primary (left) table name from the ``FROM`` clause,
         or the alias of the subquery when ``subquery`` is set.
-    :param columns: all column names referenced in the query, in the order
-        they appear (deduped).
+    :param columns: all column references in the query, in the order they
+        appear (deduped by column name).  Each entry is a :class:`ColumnRef`
+        whose ``dtype`` field is populated when the query was produced by
+        :func:`~yobx.xtracing.dataframe_trace.trace_dataframe` (i.e. the
+        dtype is known at tracing time); it is ``0``
+        (``onnx.TensorProto.UNDEFINED``) when the query was produced by the
+        SQL string parser.
     :param subquery: when the ``FROM`` clause contains a sub-select
         (``FROM (SELECT …)``), this holds the parsed inner query; otherwise
         ``None``.
@@ -219,7 +224,7 @@ class ParsedQuery:
 
     operations: List[SqlOperation] = field(default_factory=list)
     from_table: str = ""
-    columns: List[str] = field(default_factory=list)
+    columns: List[ColumnRef] = field(default_factory=list)
     subquery: Optional[ParsedQuery] = None
 
     def __repr__(self) -> str:
@@ -604,14 +609,29 @@ class _Parser:
 # ---------------------------------------------------------------------------
 
 
-def _collect_columns(operations: List[SqlOperation]) -> List[str]:
-    """Walk the operation tree and collect every distinct column name."""
-    seen: List[str] = []
+def _collect_columns(operations: List[SqlOperation]) -> List[ColumnRef]:
+    """Walk the operation tree and collect every distinct :class:`ColumnRef`.
+
+    Column references are deduped by column name.  When a column is first
+    encountered without dtype information (e.g. from a ``GROUP BY`` or
+    ``JOIN`` clause that stores only column name strings) and later seen as a
+    full :class:`ColumnRef` with a non-zero ``dtype`` (e.g. from the
+    ``SELECT`` list when the query was produced by the tracer), the stored
+    entry is updated so that dtype information is preserved.
+    """
+    seen_names: List[str] = []
+    seen: List[ColumnRef] = []
 
     def _visit(node: object) -> None:
         if isinstance(node, ColumnRef):
-            if node.column not in seen:
-                seen.append(node.column)
+            if node.column not in seen_names:
+                seen_names.append(node.column)
+                seen.append(node)
+            elif node.dtype != 0:
+                # Update an existing entry that was added without dtype info.
+                idx = seen_names.index(node.column)
+                if seen[idx].dtype == 0:
+                    seen[idx] = node
         elif isinstance(node, BinaryExpr):
             _visit(node.left)
             _visit(node.right)
@@ -633,12 +653,14 @@ def _collect_columns(operations: List[SqlOperation]) -> List[str]:
             _visit(node.condition)
         elif isinstance(node, GroupByOp):
             for col in node.columns:
-                if col not in seen:
-                    seen.append(col)
+                if col not in seen_names:
+                    seen_names.append(col)
+                    seen.append(ColumnRef(column=col))
         elif isinstance(node, JoinOp):
             for col in (node.left_key, node.right_key):
-                if col not in seen:
-                    seen.append(col)
+                if col not in seen_names:
+                    seen_names.append(col)
+                    seen.append(ColumnRef(column=col))
 
     for op in operations:
         _visit(op)
