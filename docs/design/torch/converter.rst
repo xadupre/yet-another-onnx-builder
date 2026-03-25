@@ -1,8 +1,8 @@
 .. _l-design-torch-converter:
 
-=====================================
-Torch Converter to ONNX
-=====================================
+========================
+Torch Converters to ONNX
+========================
 
 .. note::
     This section covers the core conversion pipeline that transforms a
