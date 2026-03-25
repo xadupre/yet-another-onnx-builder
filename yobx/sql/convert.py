@@ -239,10 +239,6 @@ def trace_numpy_to_onnx(
                 f"input_names has {len(resolved_input_names)} elements."
             )
 
-    resolved_output_names: List[str] = (
-        list(output_names) if output_names is not None else ["output_0"]
-    )
-
     g = GraphBuilder(opsets)
 
     for iname, arr in zip(resolved_input_names, inputs):
@@ -251,7 +247,17 @@ def trace_numpy_to_onnx(
         shape: Tuple = (batch_dim, *arr.shape[1:])  # type: ignore[assignment]
         g.make_tensor_input(iname, itype, shape)
 
-    trace_numpy_function(g, {}, resolved_output_names, func, resolved_input_names, name="trace")  # type: ignore
+    if output_names is not None:
+        resolved_output_names: List[str] = list(output_names)
+        trace_numpy_function(g, {}, resolved_output_names, func, resolved_input_names, name="trace")  # type: ignore
+    else:
+        # Auto-detect the number of outputs by passing an empty list and letting
+        # trace_numpy_function return whatever the traced function produced.
+        # Returns str for single output, tuple[str, ...] for multiple outputs.
+        raw_result = trace_numpy_function(g, {}, [], func, resolved_input_names, name="trace")  # type: ignore
+        resolved_output_names = (
+            [raw_result] if isinstance(raw_result, str) else list(raw_result)
+        )
 
     for out_name in resolved_output_names:
         g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
