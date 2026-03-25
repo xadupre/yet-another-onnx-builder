@@ -213,6 +213,7 @@ module = [
     "yobx.torch.interpreter.interpreter",
     "yobx.torch.model_eval_cases",
     "yobx.translate.*",
+    "yobx.xbuilder.graph_builder_opset",
     "yobx.xoptim.*",
     "yobx.xshape._shape_runtime",
     "yobx.xshape._builder_runtime",

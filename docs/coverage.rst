@@ -6,6 +6,13 @@ Coverage
 This page collects links to all coverage and supported-operator pages
 across the different conversion backends.
 
+SQL / DataFrame / Polars
+------------------------
+
+:ref:`l-design-sql-coverage` summarises which SQL constructs, DataFrame
+operations, and polars ``LazyFrame`` operations are currently supported
+when converting tabular data manipulations to ONNX.
+
 scikit-learn and compatible libraries
 --------------------------------------
 

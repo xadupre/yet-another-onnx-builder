@@ -42,7 +42,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         return missing
 
     @hide_stdout()
-    #@unittest.skip("missing patches")
+    # @unittest.skip("missing patches")
     def test_tiny_llm_to_onnx_24(self):
         import onnxruntime
 
@@ -138,7 +138,6 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         assert diff["abs"] <= 1e-5, f"diff={diff}"
 
     @hide_stdout()
-    #@unittest.skip("missing patches")
     def test_tiny_llm_to_onnx_ort_22(self):
         import onnxruntime
 
