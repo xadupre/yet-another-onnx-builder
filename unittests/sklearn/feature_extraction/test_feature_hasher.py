@@ -7,15 +7,6 @@ import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 
 
-def _pad_tokens(docs):
-    """Convert a list of token lists into a padded 2-D string array."""
-    if not docs or all(len(d) == 0 for d in docs):
-        return np.array([[""]] * len(docs), dtype=object)
-    max_len = max((len(d) for d in docs), default=1)
-    max_len = max(max_len, 1)
-    return np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
-
-
 @requires_sklearn("1.4")
 class TestFeatureHasher(ExtTestCase):
     """Tests for the FeatureHasher → ONNX converter.
@@ -46,7 +37,8 @@ class TestFeatureHasher(ExtTestCase):
         fh = FeatureHasher(n_features=16, input_type="string", alternate_sign=True)
         fh.fit([])
 
-        X = _pad_tokens(docs)
+        max_len = max((len(d) for d in docs), default=1)
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
         onx = self._to_onnx(fh, X)
 
         op_types = [(n.op_type, n.domain) for n in onx.proto.graph.node]
@@ -65,7 +57,8 @@ class TestFeatureHasher(ExtTestCase):
         fh = FeatureHasher(n_features=16, input_type="string", alternate_sign=False)
         fh.fit([])
 
-        X = _pad_tokens(docs)
+        max_len = max(len(d) for d in docs)
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -81,7 +74,8 @@ class TestFeatureHasher(ExtTestCase):
         fh = FeatureHasher(n_features=8, input_type="string", dtype=np.float32)
         fh.fit([])
 
-        X = _pad_tokens(docs)
+        max_len = max(len(d) for d in docs)
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -99,7 +93,8 @@ class TestFeatureHasher(ExtTestCase):
         fh = FeatureHasher(n_features=8, input_type="string", dtype=np.float64)
         fh.fit([])
 
-        X = _pad_tokens(docs)
+        max_len = max(len(d) for d in docs)
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -121,7 +116,7 @@ class TestFeatureHasher(ExtTestCase):
         fh = FeatureHasher(n_features=32, input_type="string", alternate_sign=False)
         fh.fit([])
 
-        X = _pad_tokens(docs)
+        X = np.array([docs[0]], dtype=object)
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -138,7 +133,7 @@ class TestFeatureHasher(ExtTestCase):
         fh = FeatureHasher(n_features=2, input_type="string", alternate_sign=True)
         fh.fit([])
 
-        X = _pad_tokens(docs)
+        X = np.array([docs[0]], dtype=object)
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -158,7 +153,8 @@ class TestFeatureHasher(ExtTestCase):
         fh = FeatureHasher(n_features=16, input_type="string", alternate_sign=True)
         fh.fit([])
 
-        X = _pad_tokens(docs)
+        max_len = max((len(d) for d in docs), default=1)
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -174,7 +170,7 @@ class TestFeatureHasher(ExtTestCase):
         fh = FeatureHasher(n_features=8, input_type="string", alternate_sign=True)
         fh.fit([])
 
-        X = _pad_tokens(docs)
+        X = np.array([[""]] * len(docs), dtype=object)
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -190,7 +186,7 @@ class TestFeatureHasher(ExtTestCase):
         fh = FeatureHasher(n_features=16, input_type="string", alternate_sign=True)
         fh.fit([])
 
-        X = _pad_tokens(docs)
+        X = np.array([docs[0]], dtype=object)
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -210,7 +206,7 @@ class TestFeatureHasher(ExtTestCase):
         fh = FeatureHasher(n_features=1024, input_type="string", alternate_sign=True)
         fh.fit([])
 
-        X = _pad_tokens(docs)
+        X = np.array([docs[0]], dtype=object)
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -226,7 +222,8 @@ class TestFeatureHasher(ExtTestCase):
         fh = FeatureHasher(n_features=10, input_type="string", alternate_sign=True)
         fh.fit([])
 
-        X = _pad_tokens(docs)
+        max_len = max(len(d) for d in docs)
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in docs], dtype=object)
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)

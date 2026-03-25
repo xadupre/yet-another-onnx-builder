@@ -23,21 +23,6 @@ _CORPUS = [
 ]
 
 
-def _tokenize(docs):
-    """Split each string document into whitespace-separated tokens."""
-    return [doc.split() for doc in docs]
-
-
-def _pad_tokens(token_lists):
-    """Convert a list of token lists into a padded 2-D string array."""
-    if not token_lists or all(len(d) == 0 for d in token_lists):
-        return np.array([[""]] * len(token_lists), dtype=object)
-    max_len = max((len(d) for d in token_lists), default=1)
-    return np.array(
-        [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
-    )
-
-
 @requires_sklearn("1.4")
 class TestSklearnFeatureHasherConverter(ExtTestCase):
     """Parity tests for the FeatureHasher ONNX converter.
@@ -63,11 +48,14 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         """n_features=10, alternate_sign=True on the standard corpus."""
         from sklearn.feature_extraction import FeatureHasher
 
-        token_lists = _tokenize(_CORPUS)
+        token_lists = [doc.split() for doc in _CORPUS]
         fh = FeatureHasher(n_features=10, input_type="string")
         fh.fit([])
 
-        X = _pad_tokens(token_lists)
+        max_len = max(len(d) for d in token_lists)
+        X = np.array(
+            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
+        )
         onx = self._to_onnx(fh, X)
         self.assertIsNotNone(onx)
 
@@ -80,11 +68,14 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         """n_features=10, alternate_sign=False on the standard corpus."""
         from sklearn.feature_extraction import FeatureHasher
 
-        token_lists = _tokenize(_CORPUS)
+        token_lists = [doc.split() for doc in _CORPUS]
         fh = FeatureHasher(n_features=10, input_type="string", alternate_sign=False)
         fh.fit([])
 
-        X = _pad_tokens(token_lists)
+        max_len = max(len(d) for d in token_lists)
+        X = np.array(
+            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
+        )
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -96,11 +87,14 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         """n_features=1024 matches sklearn on the standard corpus."""
         from sklearn.feature_extraction import FeatureHasher
 
-        token_lists = _tokenize(_CORPUS)
+        token_lists = [doc.split() for doc in _CORPUS]
         fh = FeatureHasher(n_features=1024, input_type="string")
         fh.fit([])
 
-        X = _pad_tokens(token_lists)
+        max_len = max(len(d) for d in token_lists)
+        X = np.array(
+            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
+        )
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -116,11 +110,14 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         """dtype=float32 — output matches sklearn's float32-cast result."""
         from sklearn.feature_extraction import FeatureHasher
 
-        token_lists = _tokenize(_CORPUS)
+        token_lists = [doc.split() for doc in _CORPUS]
         fh = FeatureHasher(n_features=10, input_type="string", dtype=np.float32)
         fh.fit([])
 
-        X = _pad_tokens(token_lists)
+        max_len = max(len(d) for d in token_lists)
+        X = np.array(
+            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
+        )
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -146,7 +143,10 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         fh = FeatureHasher(n_features=16, input_type="string")
         fh.fit([])
 
-        X = _pad_tokens(token_lists)
+        max_len = max((len(d) for d in token_lists), default=1)
+        X = np.array(
+            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
+        )
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -169,7 +169,10 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         fh = FeatureHasher(n_features=2, input_type="string", alternate_sign=True)
         fh.fit([])
 
-        X = _pad_tokens(token_lists)
+        max_len = max(len(d) for d in token_lists)
+        X = np.array(
+            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
+        )
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -189,7 +192,10 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         fh = FeatureHasher(n_features=8, input_type="string")
         fh.fit([])
 
-        X = _pad_tokens(token_lists)
+        max_len = max((len(d) for d in token_lists), default=1)
+        X = np.array(
+            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
+        )
         onx = self._to_onnx(fh, X)
 
         sess = self.check_ort(onx)
@@ -208,8 +214,11 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         from sklearn.pipeline import Pipeline
         from yobx.sklearn import to_onnx
 
-        token_lists = _tokenize(_CORPUS)
-        X = _pad_tokens(token_lists)
+        token_lists = [doc.split() for doc in _CORPUS]
+        max_len = max(len(d) for d in token_lists)
+        X = np.array(
+            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
+        )
         y = np.array([0, 1, 0, 1])
 
         fh = FeatureHasher(n_features=16, input_type="string", dtype=np.float32)
