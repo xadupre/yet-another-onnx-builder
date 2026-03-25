@@ -490,11 +490,6 @@ class TestTraceDataframe(ExtTestCase):
 
         self.assertTrue(callable(td))
 
-    def test_imported_from_xtracing_package(self):
-        from yobx.xtracing import dataframe_to_onnx as dtonnx  # noqa: F401
-
-        self.assertTrue(callable(dtonnx))
-
     def test_trace_dataframe_imported_from_xtracing_package(self):
         from yobx.xtracing import trace_dataframe as td  # noqa: F401
 

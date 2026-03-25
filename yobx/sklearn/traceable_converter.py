@@ -48,7 +48,7 @@ def build_traceable_inputs_from_inputs(
     ), f"Unexpected second dimension for unique shape={shape}{g.get_debug_msg()}"
 
     # dataframe
-    from ..sql import TracedDataFrame, TracedSeries
+    from ..xtracing import TracedDataFrame, TracedSeries
     from ..xtracing.parse import ColumnRef
 
     return (TracedDataFrame(dict(zip(inputs, [TracedSeries(ColumnRef(i)) for i in inputs]))),)
@@ -70,9 +70,8 @@ def sklearn_traceable_converter(
     """
     args = build_traceable_inputs_from_inputs(g, estimator, *inputs)
 
-    from ..sql import trace_dataframe, TracedDataFrame
+    from ..xtracing import trace_dataframe, TracedDataFrame, NumpyArray
     from ..sql.sql_convert import parsed_query_to_onnx_graph
-    from ..xtracing.numpy_array import NumpyArray
 
     if isinstance(args[0], TracedDataFrame):
         dtypes = dict(zip(inputs, [tensor_dtype_to_np_dtype(g.get_type(i)) for i in inputs]))

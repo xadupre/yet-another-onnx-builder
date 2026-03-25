@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import tensorflow as tf
@@ -257,16 +257,7 @@ def _process_convert_layer(
 #   [0] onnx_op   – ONNX op name used for the spec hyperlink, or ``None``.
 #   [1] description – short human-readable label for the coverage table.
 #   [2] handler   – callable(layer, local_results, g, decoded_module) -> None.
-_STRUCTURAL_OPS: Dict[
-    str,
-    Tuple[
-        str | None,
-        str,
-        Callable[
-            [Dict, Dict[str, str], Optional[GraphBuilderExtendedProtocol], Optional[str]], None
-        ],
-    ],
-] = {
+_STRUCTURAL_OPS = {
     "broadcast_in_dim": (
         None,
         "identity pass-through (ONNX broadcasting is implicit)",

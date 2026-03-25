@@ -13,7 +13,7 @@ class TestNumpyArray(ExtTestCase):
 
     def _run(self, func, *inputs, input_names=None, rtol=1e-5, atol=1e-5):
         """Helper: trace *func*, run it, and compare with numpy reference."""
-        from yobx.xtracing import trace_numpy_to_onnx
+        from yobx.sql import trace_numpy_to_onnx
 
         onx = trace_numpy_to_onnx(func, *inputs, input_names=input_names)
         feeds = {
@@ -334,7 +334,7 @@ class TestNumpyArray(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_ort_sqrt_abs(self):
-        from yobx.xtracing import trace_numpy_to_onnx
+        from yobx.sql import trace_numpy_to_onnx
 
         def f(X):
             return np.sqrt(np.abs(X) + np.float32(1))
