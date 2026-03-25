@@ -672,5 +672,136 @@ class TestDataframeArithmetic(ExtTestCase):
         np.testing.assert_allclose(out_b, (b + 1.0) * 2.0, rtol=1e-5)
 
 
+# ---------------------------------------------------------------------------
+# DataFrame as input_dtypes
+# ---------------------------------------------------------------------------
+
+
+class TestInputDtypesAsDataFrame(ExtTestCase):
+    """Tests that a pandas DataFrame can be passed as *input_dtypes* to all entry points."""
+
+    @classmethod
+    def _make_df(cls):
+        """Return a small two-column pandas DataFrame with float32 columns."""
+        try:
+            import pandas as pd
+        except ImportError:
+            return None
+        return pd.DataFrame(
+            {
+                "a": np.array([1.0, -2.0, 3.0], dtype=np.float32),
+                "b": np.array([4.0, 5.0, 6.0], dtype=np.float32),
+            }
+        )
+
+    def test_sql_to_onnx_with_dataframe(self):
+        """sql_to_onnx accepts a DataFrame instead of a dtype dict."""
+        from yobx.sql import sql_to_onnx
+
+        df = self._make_df()
+        if df is None:
+            self.skipTest("pandas not available")
+
+        artifact = sql_to_onnx("SELECT a + b AS total FROM t", df)
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+
+    def test_sql_to_onnx_with_dataframe_filter(self):
+        """sql_to_onnx with DataFrame input_dtypes and a WHERE clause."""
+        from yobx.sql import sql_to_onnx
+
+        df = self._make_df()
+        if df is None:
+            self.skipTest("pandas not available")
+
+        artifact = sql_to_onnx("SELECT a + b AS total FROM t WHERE a > 0", df)
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, np.array([5.0, 9.0], dtype=np.float32))
+
+    def test_dataframe_to_onnx_with_dataframe(self):
+        """dataframe_to_onnx accepts a DataFrame instead of a dtype dict."""
+        df = self._make_df()
+        if df is None:
+            self.skipTest("pandas not available")
+
+        def transform(traced_df):
+            return traced_df.select(
+                [(traced_df["a"] + traced_df["b"]).alias("total")]
+            )
+
+        artifact = dataframe_to_onnx(transform, df)
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+
+    def test_to_onnx_sql_with_dataframe(self):
+        """to_onnx(SQL string, DataFrame) works as expected."""
+        from yobx.sql import to_onnx
+
+        df = self._make_df()
+        if df is None:
+            self.skipTest("pandas not available")
+
+        artifact = to_onnx("SELECT a + b AS total FROM t WHERE a > 0", df)
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, np.array([5.0, 9.0], dtype=np.float32))
+
+    def test_to_onnx_callable_with_dataframe(self):
+        """to_onnx(callable, DataFrame) works as expected."""
+        from yobx.sql import to_onnx
+
+        df = self._make_df()
+        if df is None:
+            self.skipTest("pandas not available")
+
+        def transform(traced_df):
+            traced_df = traced_df.filter(traced_df["a"] > 0)
+            return traced_df.select(
+                [(traced_df["a"] + traced_df["b"]).alias("total")]
+            )
+
+        artifact = to_onnx(transform, df)
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, np.array([5.0, 9.0], dtype=np.float32))
+
+    def test_to_onnx_callable_with_list_of_dataframes(self):
+        """to_onnx(callable, [DataFrame, DataFrame]) works for multi-frame transforms."""
+        try:
+            import pandas as pd
+        except ImportError:
+            self.skipTest("pandas not available")
+
+        from yobx.sql import to_onnx
+
+        df1 = pd.DataFrame({"a": np.array([1.0, 2.0], dtype=np.float32)})
+        df2 = pd.DataFrame({"b": np.array([3.0, 4.0], dtype=np.float32)})
+
+        def transform(traced_df1, traced_df2):
+            return traced_df1.select(
+                [(traced_df1["a"] + traced_df2["b"]).alias("total")]
+            )
+
+        artifact = to_onnx(transform, [df1, df2])
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+
+
 if __name__ == "__main__":
     unittest.main()

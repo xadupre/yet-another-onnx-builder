@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
 from onnx import ValueInfoProto
 from ..typing import GraphBuilderExtendedProtocol
@@ -56,6 +56,19 @@ def is_arg_tuple_spec(arg: Any) -> bool:
 def _dataframe_columns(arg: Any) -> List[Any]:
     """Return the list of column names of a DataFrame (duck-type, no pandas import)."""
     return list(arg.columns)
+
+
+def _dataframe_to_dtypes(df: Any) -> Dict[str, Union[np.dtype, type]]:
+    """Convert a pandas-like DataFrame to a ``{column: dtype}`` mapping.
+
+    The conversion avoids importing pandas directly so that pandas remains an
+    optional dependency.  Every column's ``dtype`` attribute is extracted and
+    stored under the column name as a key.
+
+    :param df: a pandas-like :class:`~pandas.DataFrame`.
+    :return: a plain ``dict`` mapping each column name to its numpy dtype.
+    """
+    return {col: df[col].dtype for col in _dataframe_columns(df)}
 
 
 def _is_dataframe(arg: Any) -> bool:
