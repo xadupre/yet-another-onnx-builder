@@ -48,6 +48,7 @@ from onnx import TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
+from ..helpers.to_onnx_helper import _dataframe_to_dtypes, _is_dataframe
 from ..typing import GraphBuilderExtendedProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
@@ -182,10 +183,13 @@ def sql_to_onnx(
         ``WHERE`` clauses when registered via *custom_functions*.
     :param input_dtypes: a mapping from *left-table* column name to numpy
         dtype (``np.float32``, ``np.int64``, etc.).  Only columns actually
-        referenced in the query need to be listed.
+        referenced in the query need to be listed.  A pandas
+        :class:`~pandas.DataFrame` is also accepted; column names and dtypes
+        are extracted automatically.
     :param right_input_dtypes: if the query contains a ``JOIN``, a mapping
         from *right-table* column name to numpy dtype.  Defaults to
-        ``input_dtypes`` when ``None``.
+        ``input_dtypes`` when ``None``.  A pandas :class:`~pandas.DataFrame`
+        is also accepted.
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
     :param custom_functions: an optional mapping from function name (as it
@@ -241,6 +245,10 @@ def sql_to_onnx(
         cast to ``float64`` internally, which may lose precision for integers
         larger than 2^53.
     """
+    if _is_dataframe(input_dtypes):
+        input_dtypes = _dataframe_to_dtypes(input_dtypes)
+    if _is_dataframe(right_input_dtypes):
+        right_input_dtypes = _dataframe_to_dtypes(right_input_dtypes)
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
     sql_to_onnx_graph(g, sts, [], query, input_dtypes, right_input_dtypes=right_input_dtypes)
