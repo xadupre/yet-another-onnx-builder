@@ -366,7 +366,7 @@ class GraphBuilder(
         self._parameter_renaming: Dict[str, str] = {}
         self._parameter_norename: Set[str] = set()
         self.constants_: Dict[str, Any] = {}
-        self.op = Opset(self)  # type: ignore
+        self._op = Opset(self)  # type: ignore
         self.anyop = Opset(self, allow_unknown=True)
 
         self._debug_null_shape = int(os.environ.get("NULLSHAPE", "0"))
@@ -426,7 +426,7 @@ class GraphBuilder(
                 if isinstance(target_opset_or_existing_proto, int)
                 else target_opset_or_existing_proto
             )
-            self.input_names: List[str] = list(input_names) if input_names else []  # type: ignore
+            self._input_names: List[str] = list(input_names) if input_names else []
             self.current_input = 0
             self._unique_names = set(self.input_names)
         elif isinstance(
@@ -461,6 +461,14 @@ class GraphBuilder(
                 )
         else:
             raise NotImplementedError(f"{type(target_opset_or_existing_proto)} is not supported.")
+
+    @property
+    def op(self):
+        return self._op
+
+    @property
+    def input_names(self):
+        return self._input_names
 
     @property
     def convert_options(self) -> ConvertOptionsProtocol:
@@ -3457,7 +3465,7 @@ class GraphBuilder(
                     "Identity", [input_name], [name], name="make_tensor_input_id"
                 )
         else:
-            self.input_names.append(name)
+            self._input_names.append(name)
             input_name = name
 
         self.current_input += 1
@@ -3575,7 +3583,7 @@ class GraphBuilder(
                     "Identity", [input_name], [name], name="make_tensor_input_id"
                 )
         else:
-            self.input_names.append(name)
+            self._input_names.append(name)
             input_name = name
 
         self.current_input += 1
@@ -8202,7 +8210,7 @@ class GraphBuilder(
         if isinstance(proto_graph, GraphProto):
             self.inputs = list(proto_graph.input)
             self.outputs = list(proto_graph.output)
-            self.input_names = [i.name for i in proto_graph.input]  # type: ignore
+            self._input_names = [i.name for i in proto_graph.input]  # type: ignore
         else:
             assert isinstance(
                 proto_graph, FunctionProto
@@ -8215,7 +8223,7 @@ class GraphBuilder(
                 oh.make_tensor_value_info(name, self.TEMPLATE_TYPE, None)
                 for name in proto_graph.output
             ]
-            self.input_names = list(proto_graph.input)  # type: ignore
+            self._input_names = list(proto_graph.input)  # type: ignore
 
         available_shapes = (
             {v.name: v for v in proto_graph.value_info}
