@@ -87,6 +87,17 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_custom_nested_cond(self):
         evaluation(cases="ControlFlowNestCond", exporters="custom", quiet=False, dynamic=False)
 
+    def test_run_exporter_yobx_tracing_cond(self):
+        evaluation(cases="ControlFlowCond", exporters="yobx-tracing", quiet=False, dynamic=False)
+
+    def test_run_exporter_yobx_tracing_cond_2outputs(self):
+        evaluation(
+            cases="ControlFlowCond2Outputs",
+            exporters="yobx-tracing",
+            quiet=False,
+            dynamic=False,
+        )
+
     def test_run_exporter_crop_last_dim_tensor_content(self):
         evaluation(
             cases="CropLastDimensionWithTensorContent",

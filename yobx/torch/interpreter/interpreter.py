@@ -110,6 +110,7 @@ class DynamoInterpreter:
         self.module_name = module_name
         self.default_values = default_values or {}
         self._debug_aten_as_function = int(os.environ.get("ATENDEBUG", "0"))
+        self._cond_func_output_info: Dict[str, List[Any]] = {}
 
     def register_named_modules(
         self,
@@ -399,8 +400,12 @@ class DynamoInterpreter:
             else:
                 trace_init = init
 
+            # When the callable is used in a torch.cond call (tracing exporter path),
+            # try to pass input type/shape info so the local function's outputs are typed.
+            sub_args = self._get_cond_input_args_for_callable(node)
+
             builder, _args, _kwargs, output_names = self._interpret_sub_module(
-                trace_init, None, None, source_node=node, local_domain=f"{root}.{n}"
+                trace_init, sub_args, None, source_node=node, local_domain=f"{root}.{n}"
             )
             if output_names:
                 # If no output, then it cannot be used.
@@ -418,6 +423,8 @@ class DynamoInterpreter:
                     ),
                     optimize=self.optimize_submodules,
                 )
+                # Store output type/shape info for use when building the If node.
+                self._store_cond_func_output_info(node.name, builder)
             return None
 
         if isinstance(init, self.builder.torch.utils._pytree.TreeSpec):
@@ -496,6 +503,75 @@ class DynamoInterpreter:
             f"make_nn_module_with_callable not implemented for "
             f"{n} parameters{self.builder.get_debug_msg()}"
         )
+
+    def _get_cond_input_args_for_callable(
+        self, node: "torch.fx.Node"  # noqa: F821
+    ) -> Optional[List[VirtualTensor]]:
+        """
+        When a callable (get_attr node) is used in a :func:`torch.cond` call,
+        look up the type and shape of the cond's operand inputs from the builder
+        and return them as :class:`VirtualTensor` objects.  These are then
+        forwarded to :meth:`_interpret_sub_module` so the local-function builder
+        receives typed placeholders.
+
+        Returns *None* if the info cannot be determined.
+        """
+        for user_node in node.users:
+            if (
+                user_node.op == "call_function"
+                and hasattr(user_node.target, "__name__")
+                and user_node.target.__name__ == "cond"
+                and len(user_node.args) == 4
+            ):
+                # user_node.args = (pred, true_fn_node, false_fn_node, [input_nodes])
+                input_nodes = user_node.args[3]
+                sub_args = []
+                for inp_node in input_nodes:
+                    if not hasattr(inp_node, "name") or not self.builder.has_type(inp_node.name):
+                        sub_args = None
+                        break
+                    name = inp_node.name
+                    dtype = self.builder.get_type(name)
+                    if self.builder.has_shape(name):
+                        shape = self.builder.get_shape(name)
+                    elif self.builder.has_rank(name):
+                        shape = tuple(None for _ in range(self.builder.get_rank(name)))
+                    else:
+                        shape = None
+                    device = (
+                        self.builder.get_device(name)
+                        if self.builder.has_device(name)
+                        else None
+                    )
+                    sub_args.append(
+                        VirtualTensor(name=name, dtype=dtype, shape=shape, device=device)
+                    )
+                if sub_args is not None:
+                    return sub_args
+        return None
+
+    def _store_cond_func_output_info(
+        self, func_name: str, builder: "GraphBuilder"  # noqa: F821
+    ) -> None:
+        """
+        After a local function for a :func:`torch.cond` branch has been built,
+        store its output element-type and shape so that
+        :meth:`call_function` can set them on the corresponding ``If`` node
+        outputs.
+        """
+        output_info = []
+        for o in builder.outputs:
+            oname = o.name
+            dtype = builder.get_type(oname) if builder.has_type(oname) else 0
+            if builder.has_shape(oname):
+                shape = builder.get_shape(oname)
+            elif builder.has_rank(oname):
+                shape = tuple(None for _ in range(builder.get_rank(oname)))
+            else:
+                shape = None
+            output_info.append((dtype, shape))
+        if output_info:
+            self._cond_func_output_info[func_name] = output_info
 
     def _make_tensor_check(self, name: str, fake_tensor: bool, users: Any):
         if (
@@ -1680,6 +1756,20 @@ class DynamoInterpreter:
         else:
             res = fct(self.builder, can_set, output_names, *args, **fx_kwargs)
             allow_new_dynamic_dimension = False
+            # When aten_cond created an If node, propagate output type/shape
+            # from the branch-function local builders (stored in get_attr).
+            if aten_name == "aten_cond" and self._cond_func_output_info:
+                # args = [cond_name, true_fn_name, false_fn_name, [input_names]]
+                true_fn_name = args[1] if len(args) > 1 else None
+                if true_fn_name and true_fn_name in self._cond_func_output_info:
+                    res_list = list(res) if isinstance(res, (tuple, list)) else [res]
+                    for out_name, (dtype, shape) in zip(
+                        res_list, self._cond_func_output_info[true_fn_name]
+                    ):
+                        if dtype:
+                            self.builder.set_type(out_name, dtype)
+                        if shape is not None:
+                            self.builder.set_shape(out_name, shape)
 
         n_nodes_after = len(self.builder.nodes) + len(self.builder.initializers_dict)
         if res is None:
@@ -2266,6 +2356,8 @@ class DynamoInterpreter:
                         VirtualTensor(name=name, dtype=dtype, shape=shape, device=device)
                     )
                 elif isinstance(a, self.torch.Tensor):
+                    new_args.append(a)
+                elif isinstance(a, VirtualTensor):
                     new_args.append(a)
                 else:
                     raise NotImplementedError(
