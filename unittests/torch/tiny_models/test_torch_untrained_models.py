@@ -385,8 +385,8 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
-    @requires_torch("2.6", "dynamic shapes support")
-    @requires_transformers("4.57", "transformers patches support")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_default_opset_22(self):
         """
@@ -417,8 +417,8 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
-    @requires_torch("2.6", "dynamic shapes support")
-    @requires_transformers("4.57", "transformers patches support")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_default_opset_24(self):
         """
@@ -441,8 +441,8 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
-    @requires_torch("2.6", "dynamic shapes support")
-    @requires_transformers("4.57", "transformers patches support")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22(self):
         """
@@ -468,8 +468,8 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
-    @requires_torch("2.6", "dynamic shapes support")
-    @requires_transformers("4.57", "transformers patches support")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_24(self):
         """

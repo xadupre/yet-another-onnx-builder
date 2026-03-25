@@ -116,7 +116,7 @@ print("Number of nodes  :", len(onx.proto.graph.node))
 X_test_raw = rng.standard_normal((30, 4)).astype(np.float32)
 df_test = pd.DataFrame(X_test_raw, columns=df.columns)
 
-feed = {col: df_test[col].to_numpy() for col in df.columns}
+feed = {col: df_test[[col]].values for col in df.columns}
 
 sess = onnxruntime.InferenceSession(
     onx.proto.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -145,7 +145,7 @@ print("\nColumnTransformer ONNX inputs:")
 for inp in onx_ct.proto.graph.input:
     print(f"  {inp.name!r}")
 
-feed_ct = {col: df_test[col].to_numpy() for col in df.columns}
+feed_ct = {col: df_test[[col]].values for col in df.columns}
 (ct_out_onnx,) = onnxruntime.InferenceSession(
     onx_ct.proto.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, feed_ct)
