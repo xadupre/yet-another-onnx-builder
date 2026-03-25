@@ -68,6 +68,7 @@ from .sql_convert import (
 )
 from .polars_convert import lazyframe_to_onnx
 from .convert import to_onnx, dataframe_to_onnx, trace_numpy_to_onnx
+from .coverage import get_sql_coverage
 from yobx.xtracing.parse import (
     AggExpr,
     BinaryExpr,
@@ -130,6 +131,7 @@ __all__ = [
     "SelectItem",
     "SelectOp",
     "dataframe_to_onnx",
+    "get_sql_coverage",
     "lazyframe_to_onnx",
     "parse_sql",
     "parsed_query_to_onnx",
