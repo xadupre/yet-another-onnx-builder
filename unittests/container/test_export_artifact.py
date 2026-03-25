@@ -265,6 +265,119 @@ class TestExportReport(ExtTestCase):
             self.assertIn("MatMul", op_types)
             self.assertIn("Add", op_types)
 
+    # ------------------------------------------------------------------
+    # symbolic_flops tests
+    # ------------------------------------------------------------------
+
+    def test_symbolic_flops_empty_by_default(self):
+        r = ExportReport()
+        self.assertEqual(r.symbolic_flops, [])
+
+    def test_symbolic_flops_init(self):
+        rows = [{"op_type": "Relu", "node_name": "relu_0", "symbolic_flops": "batch*d"}]
+        r = ExportReport(symbolic_flops=rows)
+        self.assertEqual(len(r.symbolic_flops), 1)
+        self.assertEqual(r.symbolic_flops[0]["op_type"], "Relu")
+
+    def test_compute_symbolic_flops_static(self):
+        """Relu on a fully static shape should give an integer flops estimate."""
+        r = ExportReport()
+        r.compute_symbolic_flops(_make_relu_model())
+        self.assertEqual(len(r.symbolic_flops), 1)
+        row = r.symbolic_flops[0]
+        self.assertEqual(row["op_type"], "Relu")
+        # Relu is elementwise: 4*8 = 32 elements
+        self.assertEqual(row["symbolic_flops"], 32)
+
+    def test_compute_symbolic_flops_symbolic(self):
+        """Relu on a symbolic shape should give a non-None symbolic expression."""
+        X = oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, ["batch", "d"])
+        Y = oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, ["batch", "d"])
+        node = oh.make_node("Relu", ["X"], ["Y"])
+        graph = oh.make_graph([node], "g", [X], [Y])
+        model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 18)])
+
+        r = ExportReport()
+        r.compute_symbolic_flops(model)
+        self.assertEqual(len(r.symbolic_flops), 1)
+        row = r.symbolic_flops[0]
+        self.assertEqual(row["op_type"], "Relu")
+        # Should be a non-trivial string expression involving the symbolic dims
+        self.assertIsNotNone(row["symbolic_flops"])
+        self.assertIsInstance(row["symbolic_flops"], str)
+
+    def test_compute_symbolic_flops_matmul(self):
+        """MatMul and Add nodes should each appear with flops entries."""
+        r = ExportReport()
+        r.compute_symbolic_flops(_make_matmul_model())
+        self.assertEqual(len(r.symbolic_flops), 2)
+        op_types = [row["op_type"] for row in r.symbolic_flops]
+        self.assertIn("MatMul", op_types)
+        self.assertIn("Add", op_types)
+        for row in r.symbolic_flops:
+            self.assertIn("node_name", row)
+            self.assertIn("symbolic_flops", row)
+
+    def test_compute_symbolic_flops_chained(self):
+        """compute_symbolic_flops returns self (method chaining)."""
+        r = ExportReport()
+        result = r.compute_symbolic_flops(_make_relu_model())
+        self.assertIs(result, r)
+
+    def test_repr_includes_n_symbolic_flops(self):
+        rows = [{"op_type": "Relu", "node_name": "", "symbolic_flops": 32}]
+        r = ExportReport(symbolic_flops=rows)
+        text = repr(r)
+        self.assertIn("n_symbolic_flops=1", text)
+
+    def test_to_dict_includes_symbolic_flops(self):
+        rows = [{"op_type": "Add", "node_name": "", "symbolic_flops": "a*b"}]
+        r = ExportReport(symbolic_flops=rows)
+        d = r.to_dict()
+        self.assertIn("symbolic_flops", d)
+        self.assertEqual(len(d["symbolic_flops"]), 1)
+
+    def test_to_string_includes_symbolic_flops(self):
+        r = ExportReport()
+        r.compute_symbolic_flops(_make_relu_model())
+        text = r.to_string()
+        self.assertIn("symbolic_flops", text)
+        self.assertIn("Relu", text)
+
+    def test_update_merges_symbolic_flops(self):
+        r1 = ExportReport(
+            symbolic_flops=[{"op_type": "Relu", "node_name": "", "symbolic_flops": 32}]
+        )
+        r2 = ExportReport(
+            symbolic_flops=[{"op_type": "Add", "node_name": "", "symbolic_flops": 64}]
+        )
+        r1.update(r2)
+        self.assertEqual(len(r1.symbolic_flops), 2)
+
+    @skipif_ci_windows("issue with excel")
+    def test_to_excel_with_symbolic_flops(self):
+        try:
+            import openpyxl  # noqa: F401
+        except ImportError:
+            return
+        import pandas
+
+        r = ExportReport()
+        r.compute_symbolic_flops(_make_matmul_model())
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "report_sf.xlsx")
+            r.to_excel(path)
+            self.assertTrue(os.path.exists(path))
+            sheets = pandas.ExcelFile(path).sheet_names
+            self.assertIn("symbolic_flops", sheets)
+            df_sf = pandas.read_excel(path, sheet_name="symbolic_flops")
+            self.assertIn("op_type", df_sf.columns)
+            self.assertIn("node_name", df_sf.columns)
+            self.assertIn("symbolic_flops", df_sf.columns)
+            op_types = set(df_sf["op_type"].tolist())
+            self.assertIn("MatMul", op_types)
+            self.assertIn("Add", op_types)
+
 
 class TestExportArtifact(ExtTestCase):
     def _artifact(self):
@@ -455,9 +568,28 @@ class TestExportArtifact(ExtTestCase):
         if artifact.report is not None:
             self.assertEqual(artifact.report.node_stats, [])
 
+    def test_compute_symbolic_flops_on_artifact(self):
+        """ExportArtifact.compute_symbolic_flops populates report.symbolic_flops."""
+        artifact = ExportArtifact(proto=_make_matmul_model())
+        result = artifact.compute_symbolic_flops()
+        self.assertIs(result, artifact)
+        self.assertIsNotNone(artifact.report)
+        self.assertIsInstance(artifact.report, ExportReport)
+        self.assertGreater(len(artifact.report.symbolic_flops), 0)
+        op_types = [row["op_type"] for row in artifact.report.symbolic_flops]
+        self.assertIn("MatMul", op_types)
+        self.assertIn("Add", op_types)
+
+    def test_compute_symbolic_flops_no_op_on_function_proto(self):
+        """compute_symbolic_flops on a FunctionProto artifact does nothing."""
+        artifact = ExportArtifact(proto=onnx.FunctionProto())
+        artifact.compute_symbolic_flops()
+        if artifact.report is not None:
+            self.assertEqual(artifact.report.symbolic_flops, [])
+
     @skipif_ci_windows("issue with excel")
     def test_save_includes_node_stats_in_excel(self):
-        """save() should produce an Excel file with a node_stats sheet."""
+        """save() should produce an Excel file with both node_stats and symbolic_flops sheets populated automatically."""
         try:
             import openpyxl  # noqa: F401
         except ImportError:
@@ -481,6 +613,10 @@ class TestExportArtifact(ExtTestCase):
             op_types = set(df_ns["op_type"].tolist())
             self.assertIn("MatMul", op_types)
             self.assertIn("Add", op_types)
+            self.assertIn("symbolic_flops", sheets)
+            df_sf = pandas.read_excel(excel_path, sheet_name="symbolic_flops")
+            self.assertIn("op_type", df_sf.columns)
+            self.assertIn("symbolic_flops", df_sf.columns)
 
 
 if __name__ == "__main__":

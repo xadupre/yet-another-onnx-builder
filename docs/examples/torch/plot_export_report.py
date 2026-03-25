@@ -8,13 +8,13 @@ Every call to :func:`to_onnx <yobx.torch.interpreter.to_onnx>` with a
 *filename* argument saves two artifacts next to the ``.onnx`` file:
 
 * the ONNX model itself, and
-* a companion ``.xlsx`` workbook that contains up to **five sheets** covering
+* a companion ``.xlsx`` workbook that contains up to **six sheets** covering
   different aspects of the export process.
 
 This example exports a small model, reads the workbook back, and visualises
 the content of every sheet so you can see what each page looks like.
 
-The five sheets are:
+The six sheets are:
 
 ``stats``
     One row per optimisation rule application — pattern name, number of nodes
@@ -32,6 +32,11 @@ The five sheets are:
 ``node_stats``
     Per-op-type breakdown: how many nodes of each type are in the exported
     model and the estimated FLOPs for each type.
+``symbolic_flops``
+    Per-node symbolic FLOPs expressions computed by
+    :class:`~yobx.xshape.BasicShapeBuilder` with ``InferenceMode.COST``.
+    When the model's input shapes contain symbolic dimensions the values are
+    symbolic arithmetic strings; for fully static shapes they are integers.
 """
 
 # %%
@@ -101,7 +106,7 @@ for name, df in sheets.items():
 # the output.  Sheets that are absent (e.g. ``build_stats`` for a
 # standard-size model) are silently skipped.
 
-ordered_sheets = ["extra", "stats", "stats_agg", "node_stats", "build_stats"]
+ordered_sheets = ["extra", "stats", "stats_agg", "node_stats", "symbolic_flops", "build_stats"]
 present = [s for s in ordered_sheets if s in sheets]
 n = len(present)
 
