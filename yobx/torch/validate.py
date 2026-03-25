@@ -438,16 +438,17 @@ def _export(
     from .flatten import register_flattening_functions
     from .patch import apply_patches_for_model
 
+    model_name = model_id.replace("/", "-")
+    suffix = ".".join([exporter, str(opset), optimization or "", "patch" if patch else "t"])
+    filename = f"{model_name}.{suffix}.onnx"
     if dump_folder is not None:
         os.makedirs(dump_folder, exist_ok=True)
-        model_name = model_id.replace("/", "-")
-        filename = os.path.join(dump_folder, f"{model_name}.onnx")
+        filename = os.path.join(dump_folder, filename)
     else:
         import tempfile
 
         _tmpdir = tempfile.mkdtemp()
-        model_name = model_id.replace("/", "-")
-        filename = os.path.join(_tmpdir, f"{model_name}.onnx")
+        filename = os.path.join(_tmpdir, filename)
 
     collected_data.filename = filename
 
