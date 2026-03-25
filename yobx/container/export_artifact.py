@@ -40,11 +40,15 @@ class ExportReport:
         extra: Optional[Dict[str, Any]] = None,
         build_stats: Optional[BuildStats] = None,
         node_stats: Optional[List[Dict[str, Any]]] = None,
+        symbolic_flops: Optional[List[Dict[str, Any]]] = None,
     ):
         self.stats: List[Dict[str, Any]] = stats if stats is not None else []
         self.extra: Dict[str, Any] = extra if extra is not None else {}
         self.build_stats = build_stats
         self.node_stats: List[Dict[str, Any]] = node_stats if node_stats is not None else []
+        self.symbolic_flops: List[Dict[str, Any]] = (
+            symbolic_flops if symbolic_flops is not None else []
+        )
 
     def update(self, data: Any):
         """
@@ -66,6 +70,8 @@ class ExportReport:
                 self.update(data.build_stats)
             if data.node_stats:
                 self.node_stats.extend(data.node_stats)
+            if data.symbolic_flops:
+                self.symbolic_flops.extend(data.symbolic_flops)
         else:
             raise TypeError(f"Unexpected type {type(data)} for data.")
         return self
@@ -80,6 +86,7 @@ class ExportReport:
             "extra": self.extra,
             "build_stats": self.build_stats,
             "node_stats": self.node_stats,
+            "symbolic_flops": self.symbolic_flops,
         }
 
     def to_string(self) -> str:
@@ -153,12 +160,19 @@ class ExportReport:
             lines.append("-- node_stats --")
             lines.append(df_ns.to_string(index=False))
 
+        if self.symbolic_flops:
+            import pandas
+
+            df_sf = pandas.DataFrame(self.symbolic_flops)
+            lines.append("-- symbolic_flops --")
+            lines.append(df_sf.to_string(index=False))
+
         return "\n".join(lines)
 
     def to_excel(self, path: str) -> None:
         """Write the report contents to an Excel workbook at *path*.
 
-        The workbook contains up to five sheets:
+        The workbook contains up to six sheets:
 
         ``stats``
             Every row from :attr:`stats` as a raw :class:`~pandas.DataFrame`.
@@ -178,6 +192,11 @@ class ExportReport:
             Per-op-type node counts and estimated FLOPs from
             :attr:`node_stats`.  Only written when :attr:`node_stats` is
             non-empty.  Populated by :meth:`compute_node_stats`.
+        ``symbolic_flops``
+            Per-node symbolic FLOPs expressions from :attr:`symbolic_flops`.
+            Each row has ``op_type``, ``node_name``, and ``symbolic_flops``
+            columns.  Only written when :attr:`symbolic_flops` is non-empty.
+            Populated by :meth:`compute_symbolic_flops`.
 
         :param path: destination file path (e.g. ``"report.xlsx"``).
 
@@ -228,6 +247,10 @@ class ExportReport:
             if self.node_stats:
                 df_ns = pandas.DataFrame(self.node_stats)
                 df_ns.to_excel(writer, sheet_name="node_stats", index=False)
+
+            if self.symbolic_flops:
+                df_sf = pandas.DataFrame(self.symbolic_flops)
+                df_sf.to_excel(writer, sheet_name="symbolic_flops", index=False)
 
     def compute_node_stats(self, model: "onnx.ModelProto", verbose: int = 0) -> "ExportReport":
         """Compute per-op-type node counts and estimated FLOPs from *model*.
@@ -283,13 +306,78 @@ class ExportReport:
         self.node_stats = rows
         return self
 
+    def compute_symbolic_flops(
+        self, model: "onnx.ModelProto", verbose: int = 0
+    ) -> "ExportReport":
+        """Compute per-node symbolic FLOPs from *model* using symbolic shape inference.
+
+        Uses :class:`~yobx.xshape.BasicShapeBuilder` with
+        ``inference=InferenceMode.COST`` to walk every node and record the
+        FLOPs expression.  When the model's input shapes contain symbolic
+        dimensions (strings such as ``"batch"`` or ``"seq"``), the returned
+        expressions are symbolic arithmetic strings
+        (e.g. ``"2*batch*d_head*seq*seq"``).  For models with fully static
+        shapes the values are plain integers.  Operators whose cost cannot be
+        estimated produce ``None``.
+
+        Results are stored in :attr:`symbolic_flops` as a list of dicts with
+        the keys:
+
+        ``op_type``
+            ONNX operator type name (e.g. ``"MatMul"``).
+        ``node_name``
+            The name of the ONNX node (may be an empty string).
+        ``symbolic_flops``
+            Symbolic FLOPs expression (str), concrete integer, or ``None``
+            when the estimate is unavailable.
+
+        :param model: exported ONNX model proto.
+        :param verbose: verbosity level passed to
+            :class:`~yobx.xshape.BasicShapeBuilder`.
+        :return: ``self``, to allow method chaining.
+
+        .. runpython::
+            :showcode:
+
+            import onnx.helper as oh
+            import onnx
+            from yobx.container import ExportReport
+
+            X = oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, ["batch", "d"])
+            Y = oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, ["batch", "d"])
+            node = oh.make_node("Relu", ["X"], ["Y"])
+            graph = oh.make_graph([node], "g", [X], [Y])
+            model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 18)])
+
+            report = ExportReport()
+            report.compute_symbolic_flops(model)
+            print(report.symbolic_flops)
+        """
+        from ..xshape import BasicShapeBuilder, InferenceMode
+
+        bs = BasicShapeBuilder(verbose=verbose)
+        cost = bs.run_model(model, inference=InferenceMode.COST)
+
+        rows = []
+        for node, (op_type, flops, _) in zip(model.graph.node, cost):
+            rows.append(
+                {
+                    "op_type": op_type,
+                    "node_name": node.name,
+                    "symbolic_flops": flops,
+                }
+            )
+        self.symbolic_flops = rows
+        return self
+
     def __repr__(self) -> str:
         return (
             f"{self.__class__.__name__}("
             f"n_stats={len(self.stats)}, "
             f"extra={sorted(self.extra)}, "
             f"has_build_stats={self.build_stats is not None}, "
-            f"n_node_stats={len(self.node_stats)})"
+            f"n_node_stats={len(self.node_stats)}, "
+            f"n_symbolic_flops={len(self.symbolic_flops)})"
         )
 
 
@@ -452,6 +540,24 @@ class ExportArtifact(ExportArtifactProtocol):
         self.report.compute_node_stats(self.proto, verbose=verbose)
         return self
 
+    def compute_symbolic_flops(self, verbose: int = 0) -> "ExportArtifact":
+        """Compute per-node symbolic FLOPs and store them in the report.
+
+        Delegates to :meth:`ExportReport.compute_symbolic_flops` using this
+        artifact's :attr:`proto`.  Does nothing when :attr:`proto` is not a
+        :class:`~onnx.ModelProto`.
+
+        :param verbose: verbosity level passed to
+            :class:`~yobx.xshape.BasicShapeBuilder`.
+        :return: ``self``, to allow method chaining.
+        """
+        if not isinstance(self.proto, onnx.ModelProto):
+            return self
+        if self.report is None:
+            self.report = ExportReport()
+        self.report.compute_symbolic_flops(self.proto, verbose=verbose)
+        return self
+
     def save_report(self, onnx_path: str) -> None:
         """Save the report as an Excel file alongside *onnx_path* when available."""
         if self.report is None:
@@ -460,6 +566,9 @@ class ExportArtifact(ExportArtifactProtocol):
 
         if not self.report.node_stats and isinstance(self.proto, onnx.ModelProto):
             self.compute_node_stats()
+
+        if not self.report.symbolic_flops and isinstance(self.proto, onnx.ModelProto):
+            self.compute_symbolic_flops()
 
         excel_path = os.path.splitext(onnx_path)[0] + ".xlsx"
         self.report.to_excel(excel_path)
