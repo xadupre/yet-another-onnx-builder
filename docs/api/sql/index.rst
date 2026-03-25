@@ -4,7 +4,9 @@ yobx.sql
 SQL-to-ONNX converter: convert SQL queries into ONNX graphs.
 
 Every column referenced in the query is treated as a **distinct 1-D ONNX
-input** tensor.  See :ref:`l-design-sql` for the full design discussion.
+input** tensor.  See :ref:`l-design-sql-converter` for the full design
+discussion, :ref:`l-design-sql-dataframe` for the DataFrame tracer, and
+:ref:`l-design-sql-polars` for polars ``LazyFrame`` support.
 
 .. toctree::
     :maxdepth: 1

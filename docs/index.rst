@@ -75,11 +75,11 @@ query into ONNX.  A lightweight **DataFrame function tracer**
 operations on a DataFrame and compiles them to ONNX directly.
 
 +-----------------------------+----------------------------------+
-| sql                         | :ref:`l-design-sql`              |
+| sql                         | :ref:`l-design-sql-converter`    |
 +-----------------------------+----------------------------------+
-| :class:`polars.LazyFrame`   | :ref:`l-design-sql`              |
+| :class:`polars.LazyFrame`   | :ref:`l-design-sql-polars`       |
 +-----------------------------+----------------------------------+
-| :class:`pandas.DataFrame`   | :ref:`l-design-sql`              |
+| :class:`pandas.DataFrame`   | :ref:`l-design-sql-dataframe`    |
 +-----------------------------+----------------------------------+
 
 **deep learning**
