@@ -1,5 +1,5 @@
-yobx.sql.ops — register module
-================================
+yobx.sql.ops.register
+=====================
 
 .. automodule:: yobx.sql.ops.register
     :members:

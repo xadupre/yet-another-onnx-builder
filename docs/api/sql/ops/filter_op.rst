@@ -1,5 +1,5 @@
-yobx.sql.ops — filter_op module
-================================
+yobx.sql.ops.filter_op
+======================
 
 .. automodule:: yobx.sql.ops.filter_op
     :members:
