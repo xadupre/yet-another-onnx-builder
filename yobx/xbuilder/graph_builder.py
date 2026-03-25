@@ -2745,7 +2745,7 @@ class GraphBuilder(
                         value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
                     )
                 ):
-                    size = int(self.tensorflow.prod(shape)) if shape else 0
+                    size = int(self.tensorflow.math.reduce_prod(shape)) if shape else 0
                 else:
                     size = int(value.size)  # type: ignore
                 sh2 = (

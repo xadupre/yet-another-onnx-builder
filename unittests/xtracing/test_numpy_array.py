@@ -71,6 +71,21 @@ class TestNumpyArray(ExtTestCase):
     # Array functions
     # ------------------------------------------------------------------
 
+    def _run(self, func, *inputs, input_names=None, rtol=1e-5, atol=1e-5):
+        """Helper: trace *func*, run it, and compare with numpy reference."""
+        from yobx.sql import trace_numpy_to_onnx
+
+        onx = trace_numpy_to_onnx(func, *inputs, input_names=input_names)
+        feeds = {
+            (input_names[i] if input_names else ("X" if len(inputs) == 1 else f"X{i}")): inp
+            for i, inp in enumerate(inputs)
+        }
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, feeds)[0]
+        expected = func(*inputs)
+        self.assertEqualArray(expected, got, rtol=rtol, atol=atol)
+        return onx
+
     def test_concatenate(self):
         def f(A, B):
             return np.concatenate([A, B], axis=0)
