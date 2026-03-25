@@ -68,7 +68,7 @@ from .sql_convert import (
 )
 from .polars_convert import lazyframe_to_onnx
 from .convert import to_onnx, dataframe_to_onnx, trace_numpy_to_onnx
-from .coverage import get_sql_coverage
+from .coverage import get_sql_coverage, not_implemented_error
 from yobx.xtracing.parse import (
     AggExpr,
     BinaryExpr,
@@ -133,6 +133,7 @@ __all__ = [
     "dataframe_to_onnx",
     "get_sql_coverage",
     "lazyframe_to_onnx",
+    "not_implemented_error",
     "parse_sql",
     "parsed_query_to_onnx",
     "parsed_query_to_onnx_graph",

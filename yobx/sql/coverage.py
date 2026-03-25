@@ -9,6 +9,7 @@ documentation calls this function to build its tables programmatically.
 
 from __future__ import annotations
 
+import re as _re
 from typing import List, Tuple
 
 # Status symbols
@@ -175,3 +176,52 @@ def get_sql_coverage(section: str = "sql") -> str:
     if section == "polars":
         return _rst_table(POLARS_COVERAGE, "Polars operation")
     raise ValueError(f"Unknown section {section!r}; expected 'sql', 'dataframe', or 'polars'.")
+
+
+def _clean_construct(text: str) -> str:
+    """Strip RST inline-code backticks and normalise whitespace."""
+    return _re.sub(r"`+", "", text).strip().lower()
+
+
+def not_implemented_error(section: str, construct: str) -> NotImplementedError:
+    """Return a :class:`NotImplementedError` for *construct* in *section*.
+
+    Looks up *construct* in the coverage data for *section* and builds an
+    error message that includes the coverage notes, providing a consistent
+    message across all converters.
+
+    Matching is done by normalising both the *construct* argument and the
+    coverage table keys (stripping RST backticks, lowercasing) and then
+    checking whether the normalised needle is a substring of the normalised
+    key.  Only rows with ``_UNSUPPORTED`` or ``_PARTIAL`` status contribute
+    to the error message; if a matching row has a ``_SUPPORTED`` status it is
+    skipped and the search continues.  If no matching unsupported row is
+    found, a generic "not supported" message is returned.
+
+    .. note::
+        This helper is intended to be called only for constructs that the
+        converter knows it cannot handle.  Calling it for a fully-supported
+        construct will silently return a generic error message.
+
+    :param section: one of ``"sql"``, ``"dataframe"``, or ``"polars"``.
+    :param construct: human-readable construct name (e.g. ``"SELECT DISTINCT"``).
+    :return: :class:`NotImplementedError` ready to be raised.
+    """
+    if section == "sql":
+        rows: List[CoverageRow] = SQL_COVERAGE
+    elif section == "dataframe":
+        rows = DATAFRAME_COVERAGE
+    elif section == "polars":
+        rows = POLARS_COVERAGE
+    else:
+        rows = []
+
+    needle = _clean_construct(construct)
+    for raw_construct, status, notes in rows:
+        clean = _clean_construct(raw_construct)
+        if needle in clean:
+            if status in (_UNSUPPORTED, _PARTIAL):
+                return NotImplementedError(
+                    f"{construct!r} is not supported: {notes}"
+                )
+    return NotImplementedError(f"{construct!r} is not supported")

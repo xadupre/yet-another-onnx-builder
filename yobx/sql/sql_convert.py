@@ -51,6 +51,7 @@ from ..container import ExportArtifact
 from ..typing import GraphBuilderExtendedProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
+from .coverage import not_implemented_error
 from .ops import get_sql_op_converter
 from yobx.xtracing.parse import GroupByOp, JoinOp, ParsedQuery, SelectOp, parse_sql
 
@@ -558,9 +559,7 @@ def _populate_graph(
         raise ValueError("No SELECT clause found in the query.")
 
     if select_op.distinct:
-        raise NotImplementedError(
-            f"SELECT DISTINCT is not yet supported by the ONNX converter, {select_op=}"
-        )
+        raise not_implemented_error("sql", "SELECT DISTINCT")
 
     # Compute GROUP BY tensors when a GROUP BY clause is present.
     gb_inverse_indices: Optional[str] = None

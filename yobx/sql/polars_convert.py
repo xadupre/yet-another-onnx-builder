@@ -28,6 +28,7 @@ import numpy as np
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
 from ..xbuilder import GraphBuilder
+from .coverage import not_implemented_error
 from .sql_convert import sql_to_onnx
 
 # ---------------------------------------------------------------------------
@@ -358,6 +359,18 @@ def _parse_polars_plan(plan: str) -> _PolarsPlan:
                 result.source_cols = cols
             i += 1
             continue
+
+        # Detect unsupported operations — raise early rather than silently
+        # dropping the plan node (coverage data drives the error message).
+        _upper = stripped.upper()
+        if re.match(r"^(?:INNER\s+|LEFT\s+|RIGHT\s+|FULL\s+)?JOIN\b", _upper):
+            raise not_implemented_error("polars", "lf.join")
+        if _upper.startswith("SORT"):
+            raise not_implemented_error("polars", "lf.sort")
+        if _upper.startswith("UNIQUE"):
+            raise not_implemented_error("polars", "lf.unique")
+        if _upper.startswith("SLICE") or _upper.startswith("LIMIT"):
+            raise not_implemented_error("polars", "lf.limit")
 
         # FROM / END ... / other structural lines — skip
         i += 1

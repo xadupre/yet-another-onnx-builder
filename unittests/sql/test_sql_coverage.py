@@ -10,6 +10,7 @@ from yobx.sql.coverage import (
     SQL_COVERAGE,
     _rst_table,
     get_sql_coverage,
+    not_implemented_error,
 )
 
 
@@ -121,6 +122,85 @@ class TestGetSqlCoverage(unittest.TestCase):
             with self.subTest(section=section):
                 output = get_sql_coverage(section)
                 self.assertGreater(len(output), 100, f"section {section!r} output is too short")
+
+
+class TestNotImplementedError(unittest.TestCase):
+    """Tests for :func:`not_implemented_error`."""
+
+    def test_returns_not_implemented_error(self):
+        err = not_implemented_error("sql", "SELECT DISTINCT")
+        self.assertIsInstance(err, NotImplementedError)
+
+    def test_sql_select_distinct_includes_notes(self):
+        err = not_implemented_error("sql", "SELECT DISTINCT")
+        msg = str(err)
+        self.assertIn("SELECT DISTINCT", msg)
+        self.assertIn("not supported", msg.lower())
+        # Notes from SQL_COVERAGE should be included
+        self.assertIn("NotImplementedError", msg)
+
+    def test_polars_join_includes_notes(self):
+        err = not_implemented_error("polars", "lf.join")
+        msg = str(err)
+        self.assertIn("lf.join", msg)
+        self.assertIn("not supported", msg.lower())
+
+    def test_polars_sort_includes_notes(self):
+        err = not_implemented_error("polars", "lf.sort")
+        msg = str(err)
+        self.assertIn("lf.sort", msg)
+        self.assertIn("not supported", msg.lower())
+
+    def test_polars_unique_includes_notes(self):
+        err = not_implemented_error("polars", "lf.unique")
+        msg = str(err)
+        self.assertIn("lf.unique", msg)
+        self.assertIn("not supported", msg.lower())
+
+    def test_polars_limit_includes_notes(self):
+        err = not_implemented_error("polars", "lf.limit")
+        msg = str(err)
+        self.assertIn("lf.limit", msg)
+        self.assertIn("not supported", msg.lower())
+
+    def test_unknown_section_returns_generic_message(self):
+        err = not_implemented_error("nosuchsection", "foo")
+        msg = str(err)
+        self.assertIn("foo", msg)
+        self.assertIn("not supported", msg.lower())
+
+    def test_unknown_construct_returns_generic_message(self):
+        err = not_implemented_error("sql", "something_completely_unknown_xyz")
+        msg = str(err)
+        self.assertIn("something_completely_unknown_xyz", msg)
+        self.assertIn("not supported", msg.lower())
+
+    def test_all_unsupported_sql_constructs_have_notes(self):
+        """Every _UNSUPPORTED SQL row should produce a message with notes."""
+        from yobx.sql.coverage import _UNSUPPORTED
+
+        for construct, status, notes in SQL_COVERAGE:
+            if status != _UNSUPPORTED:
+                continue
+            with self.subTest(construct=construct):
+                err = not_implemented_error("sql", construct)
+                msg = str(err)
+                self.assertIn("not supported", msg.lower())
+                # The notes from the coverage table should appear in the message
+                self.assertIn(notes, msg)
+
+    def test_all_unsupported_polars_constructs_have_notes(self):
+        """Every _UNSUPPORTED polars row should produce a message with notes."""
+        from yobx.sql.coverage import _UNSUPPORTED
+
+        for construct, status, notes in POLARS_COVERAGE:
+            if status != _UNSUPPORTED:
+                continue
+            with self.subTest(construct=construct):
+                err = not_implemented_error("polars", construct)
+                msg = str(err)
+                self.assertIn("not supported", msg.lower())
+                self.assertIn(notes, msg)
 
 
 if __name__ == "__main__":
