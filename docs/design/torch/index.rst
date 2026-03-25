@@ -3,6 +3,14 @@
 Torch Export to ONNX
 ====================
 
+The official converter is :func:`torch.onnx.export`.
+This converter has been used to investigate when the first one is failing.
+It is designed to quickly fail and offers more tracing options
+to capture the :class:`torch.fx.Graph` such as symbolic tracing
+or different decomposition tables. First section exposes the differences.
+:ref:`l-design-torch-case-coverage` shows some of the differences
+on basic examples.
+
 .. toctree::
    :maxdepth: 1
 

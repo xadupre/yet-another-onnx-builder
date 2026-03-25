@@ -28,6 +28,7 @@ Supported operations
 * **Column alias**: ``.alias(name)`` on a :class:`TracedSeries`
 * **Group-by**: :meth:`TracedDataFrame.groupby` + :meth:`TracedGroupBy.agg`
 * **Function chaining**: :meth:`TracedDataFrame.pipe`
+* **Copy**: :meth:`TracedDataFrame.copy`
 
 Example
 -------
@@ -56,6 +57,7 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
+from onnx import TensorProto
 
 from .parse import (
     AggExpr,
@@ -71,6 +73,50 @@ from .parse import (
     SelectOp,
     _collect_columns,
 )
+
+# Mapping from numpy dtype to onnx.TensorProto integer element type.
+_NP_DTYPE_TO_TENSOR_PROTO: Dict[np.dtype, int] = {
+    np.dtype("float32"): TensorProto.FLOAT,
+    np.dtype("float64"): TensorProto.DOUBLE,
+    np.dtype("int8"): TensorProto.INT8,
+    np.dtype("int16"): TensorProto.INT16,
+    np.dtype("int32"): TensorProto.INT32,
+    np.dtype("int64"): TensorProto.INT64,
+    np.dtype("uint8"): TensorProto.UINT8,
+    np.dtype("uint16"): TensorProto.UINT16,
+    np.dtype("uint32"): TensorProto.UINT32,
+    np.dtype("uint64"): TensorProto.UINT64,
+    np.dtype("bool"): TensorProto.BOOL,
+    np.dtype("object"): TensorProto.STRING,
+}
+
+
+def _to_tensor_proto_dtype(dt: Union[np.dtype, type, str]) -> int:
+    """Convert a numpy dtype / type / string to an :data:`onnx.TensorProto` element type.
+
+    :param dt: a :class:`numpy.dtype`, a numpy scalar type (``np.float32``,
+        ``np.int64``, …), a Python built-in numeric type (``float`` maps to
+        ``DOUBLE``, ``int`` maps to ``INT64``), or a dtype string
+        (``"float32"``, ``"int64"``, …).  The value is first resolved via
+        :func:`numpy.dtype` before looking up in :data:`_NP_DTYPE_TO_TENSOR_PROTO`.
+    :return: the corresponding :data:`onnx.TensorProto` integer constant.
+    :raises ValueError: if the dtype is not recognised.
+
+    .. note::
+
+        ``np.dtype("object")`` is mapped to :data:`onnx.TensorProto.STRING`
+        following the same convention used elsewhere in this package
+        (see :data:`yobx.sql.sql_convert._NP_TO_ONNX`).  This assumes that
+        ``object`` columns contain string data.
+    """
+    resolved = np.dtype(dt)
+    result = _NP_DTYPE_TO_TENSOR_PROTO.get(resolved)
+    if result is None:
+        raise ValueError(
+            f"Cannot map numpy dtype {resolved!r} to an onnx.TensorProto element type."
+        )
+    return result
+
 
 # ---------------------------------------------------------------------------
 # Expression conversion helper
@@ -469,6 +515,23 @@ class TracedDataFrame:
         """
         return func(self, *args, **kwargs)
 
+    def copy(self, deep: bool = True) -> "TracedDataFrame":
+        """Return a copy of this :class:`TracedDataFrame`.
+
+        Because :class:`TracedDataFrame` holds immutable AST nodes rather than
+        actual data, both shallow and deep copies are equivalent: a new
+        :class:`TracedDataFrame` is returned with the same column expressions,
+        recorded operations, and source-column list.  This method exists so
+        that functions written for real ``pandas.DataFrame`` objects (which
+        routinely call ``.copy()`` to avoid unintentional mutation) can be
+        traced without modification.
+
+        :param deep: accepted for API compatibility with ``pandas.DataFrame.copy``
+            but has no effect.
+        :return: a new :class:`TracedDataFrame` representing the same query.
+        """
+        return TracedDataFrame(dict(self._columns), list(self._ops), list(self._source_columns))
+
     def join(
         self, right: "TracedDataFrame", left_key: str, right_key: str, join_type: str = "inner"
     ) -> "TracedDataFrame":
@@ -678,13 +741,20 @@ def trace_dataframe(
     if isinstance(input_dtypes, list):
         dfs = [
             TracedDataFrame(
-                {name: TracedSeries(ColumnRef(name)) for name in d}, source_columns=list(d.keys())
+                {
+                    name: TracedSeries(ColumnRef(name, dtype=_to_tensor_proto_dtype(d[name])))
+                    for name in d
+                },
+                source_columns=list(d.keys()),
             )
             for d in input_dtypes
         ]
         result = func(*dfs)
     else:
-        columns = {name: TracedSeries(ColumnRef(name)) for name in input_dtypes}
+        columns = {
+            name: TracedSeries(ColumnRef(name, dtype=_to_tensor_proto_dtype(input_dtypes[name])))
+            for name in input_dtypes
+        }
         df = TracedDataFrame(columns, source_columns=list(input_dtypes.keys()))
         result = func(df)
     if not isinstance(result, TracedDataFrame):

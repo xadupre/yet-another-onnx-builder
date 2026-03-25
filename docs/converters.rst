@@ -10,9 +10,17 @@ They all returns an instance of :class:`~yobx.container.ExportArtifact`.
 
 .. toctree::
    :maxdepth: 1
+   :caption: Common Pieces
 
    design/export_artifact
    coverage
+   debug
+   main_to_onnx
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Converters
+
    design/litert/index
    design/sklearn/index
    design/sql/index

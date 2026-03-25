@@ -34,7 +34,8 @@ yet-another-onnx-builder documentation
 
 `yet-another-onnx-builder on GitHub <https://github.com/xadupre/yet-another-onnx-builder>`_
 
-**yet-another-onnx-builder** (``yobx``) proposes a unique API to convert machine learning models
+**yet-another-onnx-builder** (``yobx``) proposes a unique API and a unique function
+:func:`yobx.to_onnx` to convert machine learning models
 to `ONNX <https://onnx.ai>`_ format and manipulating ONNX graphs programmatically.
 It can export from many libraries. Each converters relies on a common GraphBuider API
 (:class:`~yobx.typing.GraphBuiderExtendedProtocol`)
@@ -50,21 +51,21 @@ choose your own names.
 
 **standard machine learning**
 
-+---------------------------------------+------------------------------+
-| :epkg:`category_encoders`             | :ref:`l-sklearn-converter`   |
-+---------------------------------------+------------------------------+
-| :epkg:`imbalanced-learn`              | :ref:`l-sklearn-converter`   |
-+---------------------------------------+------------------------------+
-| :epkg:`lightgbm`                      | :ref:`l-sklearn-converter`   |
-+---------------------------------------+------------------------------+
-| :epkg:`scikit-learn`                  | :ref:`l-sklearn-converter`   |
-+---------------------------------------+------------------------------+
-| :epkg:`scikit-survival`               | :ref:`l-sklearn-converter`   |
-+---------------------------------------+------------------------------+
-| :epkg:`statsmodels`                   | :ref:`l-sklearn-converter`   |
-+---------------------------------------+------------------------------+
-| :epkg:`xgboost`                       | :ref:`l-sklearn-converter`   |
-+---------------------------------------+------------------------------+
++-------------------------------+--------------------------------+------------------------------+
+| :epkg:`category_encoders`     | :func:`yobx.sklearn.to_onnx`   | :ref:`l-sklearn-converter`   |
++-------------------------------+--------------------------------+------------------------------+
+| :epkg:`imbalanced-learn`      | :func:`yobx.sklearn.to_onnx`   | :ref:`l-sklearn-converter`   |
++-------------------------------+--------------------------------+------------------------------+
+| :epkg:`lightgbm`              | :func:`yobx.sklearn.to_onnx`   | :ref:`l-sklearn-converter`   |
++-------------------------------+--------------------------------+------------------------------+
+| :epkg:`scikit-learn`          | :func:`yobx.sklearn.to_onnx`   | :ref:`l-sklearn-converter`   |
++-------------------------------+--------------------------------+------------------------------+
+| :epkg:`scikit-survival`       | :func:`yobx.sklearn.to_onnx`   | :ref:`l-sklearn-converter`   |
++-------------------------------+--------------------------------+------------------------------+
+| :epkg:`statsmodels`           | :func:`yobx.sklearn.to_onnx`   | :ref:`l-sklearn-converter`   |
++-------------------------------+--------------------------------+------------------------------+
+| :epkg:`xgboost`               | :func:`yobx.sklearn.to_onnx`   | :ref:`l-sklearn-converter`   |
++-------------------------------+--------------------------------+------------------------------+
 
 **data manipulations**
 

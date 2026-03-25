@@ -1,5 +1,7 @@
-Command Lines
-=============
+CMDs
+====
+
+The library implements a couple of command lines.
 
 .. code-block:: bash
 

@@ -81,8 +81,7 @@ class CacheKeyValue:
         """Does the reverse operation."""
         assert self.key_cache is not None and self.value_cache is not None
         return make_dynamic_cache(
-            list(zip(self.key_cache, self.value_cache)),  # pyrefly: ignore[no-matching-overload]
-            cls_layers=self.cls_layers,  # pyrefly: ignore[no-matching-overload]
+            list(zip(self.key_cache, self.value_cache)), cls_layers=self.cls_layers  # type: ignore
         )
 
     @property

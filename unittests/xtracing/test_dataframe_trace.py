@@ -386,6 +386,56 @@ class TestTracedDataFramePipe(ExtTestCase):
 
 
 # ---------------------------------------------------------------------------
+# TracedDataFrame.copy
+# ---------------------------------------------------------------------------
+
+
+class TestTracedDataFrameCopy(ExtTestCase):
+    def _make(self):
+        columns = {c: TracedSeries(ColumnRef(c)) for c in ("a", "b")}
+        return TracedDataFrame(columns, source_columns=["a", "b"])
+
+    def test_copy_returns_traced_dataframe(self):
+        df = self._make()
+        result = df.copy()
+        self.assertIsInstance(result, TracedDataFrame)
+
+    def test_copy_is_new_object(self):
+        df = self._make()
+        result = df.copy()
+        self.assertIsNot(result, df)
+
+    def test_copy_preserves_columns(self):
+        df = self._make()
+        result = df.copy()
+        self.assertEqual(result.columns, df.columns)
+
+    def test_copy_deep_false_preserves_columns(self):
+        df = self._make()
+        result = df.copy(deep=False)
+        self.assertEqual(result.columns, df.columns)
+
+    def test_copy_does_not_share_ops_list(self):
+        df = self._make()
+        result = df.copy()
+        result._ops.append("sentinel")
+        self.assertNotIn("sentinel", df._ops)
+
+    def test_copy_in_pipeline(self):
+        """Verify that .copy() inside a traced function does not break tracing."""
+        import numpy as np
+        from yobx.sql import dataframe_to_onnx
+
+        def transform(df):
+            df2 = df.copy()
+            return df2.assign(total=(df2["a"] + df2["b"]).alias("total")).select(["total"])
+
+        dtypes = {"a": np.float32, "b": np.float32}
+        artifact = dataframe_to_onnx(transform, dtypes)
+        self.assertIsNotNone(artifact)
+
+
+# ---------------------------------------------------------------------------
 # TracedDataFrame.groupby / TracedGroupBy.agg
 # ---------------------------------------------------------------------------
 
@@ -599,6 +649,65 @@ class TestDataframeArithmetic(ExtTestCase):
         df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))}, source_columns=["a"])
         result = df + 1
         self.assertEqual(result._source_columns, ["a"])
+
+
+# ---------------------------------------------------------------------------
+# ColumnRef dtype field
+# ---------------------------------------------------------------------------
+
+
+class TestColumnRefDtype(ExtTestCase):
+    def test_dtype_defaults_to_zero(self):
+        cr = ColumnRef("a")
+        self.assertEqual(cr.dtype, 0)
+
+    def test_dtype_stored_as_tensor_proto_int(self):
+        from onnx import TensorProto
+
+        cr = ColumnRef("a", dtype=TensorProto.FLOAT)
+        self.assertEqual(cr.dtype, TensorProto.FLOAT)
+
+    def test_dtype_int64(self):
+        from onnx import TensorProto
+
+        cr = ColumnRef("a", dtype=TensorProto.INT64)
+        self.assertEqual(cr.dtype, TensorProto.INT64)
+
+    def test_dtype_independent_of_table(self):
+        from onnx import TensorProto
+
+        cr = ColumnRef("col", table="tbl", dtype=TensorProto.INT32)
+        self.assertEqual(cr.table, "tbl")
+        self.assertEqual(cr.dtype, TensorProto.INT32)
+
+    def test_trace_dataframe_propagates_dtype(self):
+        """ColumnRef nodes produced by trace_dataframe carry the TensorProto dtype."""
+        from onnx import TensorProto
+        from yobx.xtracing.parse import SelectOp
+
+        def transform(df):
+            return df.select([df["a"].alias("a")])
+
+        pq = trace_dataframe(transform, {"a": np.float32, "b": np.int64})
+        select_op = next(op for op in pq.operations if isinstance(op, SelectOp))
+        col_ref = select_op.items[0].expr
+        self.assertIsInstance(col_ref, ColumnRef)
+        self.assertEqual(col_ref.column, "a")
+        self.assertEqual(col_ref.dtype, TensorProto.FLOAT)
+
+    def test_trace_dataframe_multi_input_propagates_dtype(self):
+        """Dtypes are propagated for multi-input trace_dataframe calls."""
+        from onnx import TensorProto
+        from yobx.xtracing.parse import SelectOp
+
+        def transform(df1, df2):
+            return df1.select([df1["x"].alias("x")])
+
+        pq = trace_dataframe(transform, [{"x": np.float64}, {"y": np.int32}])
+        select_op = next(op for op in pq.operations if isinstance(op, SelectOp))
+        col_ref = select_op.items[0].expr
+        self.assertIsInstance(col_ref, ColumnRef)
+        self.assertEqual(col_ref.dtype, TensorProto.DOUBLE)
 
 
 if __name__ == "__main__":

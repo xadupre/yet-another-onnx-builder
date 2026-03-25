@@ -16,7 +16,8 @@ Yet another onnx builder, patches, flattening functions...
 
 **[Documentation](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/index.html)**
 
-**yet-another-onnx-builder** (`yobx`) proposes a unique API to convert machine learning models
+**yet-another-onnx-builder** (`yobx`) proposes a unique API and a unique function
+``yobx.to_onnx`` to convert machine learning models and other pipelines
 to [ONNX](https://onnx.ai) format from many libraries. Each converter relies on a common GraphBuider API
 to build the final ONNX model. One default implementation is provided but
 it can also be replaced by any implementation of your own

@@ -40,7 +40,7 @@ def wrap_step_as_function(
     :param name: node-name prefix passed to the converter
     """
     # Create an isolated sub-builder for the function body.
-    sub_g = GraphBuilder(g.opsets, as_function=True)
+    sub_g = GraphBuilder(g.opsets, as_function=True)  # type: ignore
 
     # Use stable, collision-free internal names for the function inputs so that
     # the sub-builder's namespace is never polluted by main-graph names (which

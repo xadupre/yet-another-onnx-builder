@@ -32,10 +32,22 @@ from typing import List, Optional, Tuple
 
 @dataclass
 class ColumnRef:
-    """A bare column reference, optionally qualified: ``table.column``."""
+    """A bare column reference, optionally qualified: ``table.column``.
+
+    :param column: the column name (lower-cased by the parser).
+    :param table: optional table qualifier (lower-cased by the parser).
+    :param dtype: ONNX element type for the column expressed as an
+        :data:`onnx.TensorProto` integer constant (e.g.
+        ``onnx.TensorProto.FLOAT``, ``onnx.TensorProto.INT64``).  Set by
+        :func:`~yobx.xtracing.dataframe_trace.trace_dataframe` when dtype
+        information is available at tracing time; defaults to
+        ``0`` (``onnx.TensorProto.UNDEFINED``) otherwise (e.g.
+        when the reference is produced by the SQL string parser).
+    """
 
     column: str
     table: Optional[str] = None
+    dtype: int = 0
 
     def __str__(self) -> str:
         if self.table:

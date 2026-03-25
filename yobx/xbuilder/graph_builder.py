@@ -39,7 +39,7 @@ import onnx.numpy_helper as onh
 from onnx.external_data_helper import uses_external_data
 from onnx.model_container import make_large_tensor_proto
 from onnx.shape_inference import infer_shapes as onnx_infer_shapes
-from ..typing import ConvertOptionsProtocol, DefaultConvertOptions
+from ..typing import ConvertOptionsProtocol, DefaultConvertOptions, GraphBuilderExtendedProtocol
 from ..container import ExportArtifact, ExportReport, ExtendedModelContainer, FunctionPieces
 from ..container.model_container import _get_type
 from ..helpers.mini_onnx_builder import proto_from_array
@@ -115,7 +115,13 @@ def _unset_fake_temporarily() -> Generator:
             torch._C._set_dispatch_mode(old)
 
 
-class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPackages):
+class GraphBuilder(
+    _BuilderRuntime,
+    _ShapeRuntime,
+    _InferenceRuntime,
+    _ExtraPackages,
+    GraphBuilderExtendedProtocol,
+):
     """
     Simplifies the creation of a model.
 
@@ -360,7 +366,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
         self._parameter_renaming: Dict[str, str] = {}
         self._parameter_norename: Set[str] = set()
         self.constants_: Dict[str, Any] = {}
-        self.op = Opset(self)
+        self._op = Opset(self)  # type: ignore
         self.anyop = Opset(self, allow_unknown=True)
 
         self._debug_null_shape = int(os.environ.get("NULLSHAPE", "0"))
@@ -420,7 +426,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                 if isinstance(target_opset_or_existing_proto, int)
                 else target_opset_or_existing_proto
             )
-            self.input_names: List[str] = list(input_names) if input_names else []
+            self._input_names: List[str] = list(input_names) if input_names else []
             self.current_input = 0
             self._unique_names = set(self.input_names)
         elif isinstance(
@@ -455,6 +461,14 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                 )
         else:
             raise NotImplementedError(f"{type(target_opset_or_existing_proto)} is not supported.")
+
+    @property
+    def op(self):
+        return self._op
+
+    @property
+    def input_names(self):
+        return self._input_names
 
     @property
     def convert_options(self) -> ConvertOptionsProtocol:
@@ -549,7 +563,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
         else:
             ds2 = (None,)
 
-        new_builder = GraphBuilder(
+        new_builder = GraphBuilder(  # type: ignore
             target_opset_or_existing_proto=self.opsets,
             input_names=input_names,
             as_function=True,
@@ -796,7 +810,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
             remove_duplicated_shape=False,
             patterns=None,
         )
-        g = GraphBuilder(
+        g = GraphBuilder(  # type: ignore
             self.opsets.copy(),
             verbose=self.verbose,
             ir_version=self.ir_version,
@@ -1739,7 +1753,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
         if dim not in self.dynamic_objects:
             self.add_dynamic_object(dim, dim)
 
-    def set_shape(
+    def set_shape(  # type: ignore
         self,
         name: str,
         shape: DYNAMIC_SHAPE,
@@ -1914,7 +1928,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
         ), f"Unknown device for name={name!r}{self.get_debug_msg()}"
         return self._known_devices[name]
 
-    def set_type(self, name: str, dtype: int, exc: bool = True):
+    def set_type(self, name: str, dtype: int, exc: bool = True):  # type: ignore
         """
         Sets the shape for a result. It is exists, it checks the new shape
         is equal to the existing one.
@@ -2011,7 +2025,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
             return f"{name}:{s}"
         return f"{name}:?"
 
-    def get_shape(self, name: str) -> DYNAMIC_SHAPE:
+    def get_shape(self, name: str) -> Tuple[Union[int, str], ...]:  #
         """Returns the shape of a result."""
         assert isinstance(name, str), f"Unexpected type {type(name)} for name."
         assert name in self._known_shapes, (
@@ -2604,7 +2618,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
         self._cache_shape[cache_key] = res
         return res
 
-    def make_initializer(
+    def make_initializer(  # type: ignore
         self,
         name: str,
         value: Any,
@@ -2731,7 +2745,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                         value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
                     )
                 ):
-                    size = int(np.prod(shape)) if shape else 0
+                    size = int(self.tensorflow.math.reduce_prod(shape)) if shape else 0
                 else:
                     size = int(value.size)  # type: ignore
                 sh2 = (
@@ -2741,11 +2755,14 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                 )
                 name = self.unique_name(f"init{itype}_s{sh}_{sh2}")
 
+        assert isinstance(shape, tuple) and all(
+            isinstance(s, int) for s in shape
+        ), f"{shape=} has unexpected types{self.get_debug_msg()}"
         self.add_initializer(
             name,
             value,
             itype=itype,
-            shape=shape,
+            shape=shape,  # type: ignore
             key=key,
             parameter_name=parameter_name,
             source=source,
@@ -3397,7 +3414,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
         ), f"{name!r} is already registered{self.get_debug_msg()}"
         self._registered_users[name] = set(users)
 
-    def make_tensor_input(
+    def make_tensor_input(  # type: ignore
         self,
         name: Union[str, Tuple[str]],
         elem_type: Optional[Any] = None,
@@ -3448,7 +3465,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                     "Identity", [input_name], [name], name="make_tensor_input_id"
                 )
         else:
-            self.input_names.append(name)
+            self._input_names.append(name)
             input_name = name
 
         self.current_input += 1
@@ -3566,7 +3583,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                     "Identity", [input_name], [name], name="make_tensor_input_id"
                 )
         else:
-            self.input_names.append(name)
+            self._input_names.append(name)
             input_name = name
 
         self.current_input += 1
@@ -4121,7 +4138,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
             output_names = [lower] if outputs == 1 else [f"{lower}_{i}" for i in range(outputs)]
         return [self.unique_name(o) for o in output_names]
 
-    def make_node(
+    def make_node(  # type: ignore
         self,
         op_type: str,
         inputs: Union[str, List[str]],
@@ -6448,7 +6465,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                     f"[GraphBuilder-{self._hash()}] optimizes attribute "
                     f"{att.name!r} from node {node.op_type!r}, name={node.name!r}"
                 )
-            g = GraphBuilder(
+            g = GraphBuilder(  # type: ignore
                 att.g,
                 optimization_options=self.optimization_options,
                 verbose=max(self.verbose - 1, 0),
@@ -7276,8 +7293,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
         """
         self._clean_values_cache()
         # make_initializer
+        begin_ = time.perf_counter()
         if self.verbose > 1:
-            begin_ = time.perf_counter()
             print(
                 f"[GraphBuilder-{self._hash()}.remove_identity_nodes] "
                 f"-- starts with {len(self.nodes)}"
@@ -8036,8 +8053,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
             proto, (GraphProto, ModelProto)
         ), f"Unexpected type {type(proto)} for proto"
         proto_graph = proto if isinstance(proto, GraphProto) else proto.graph
+        begin_ = time.perf_counter()
         if self.verbose > 1:
-            begin_ = time.perf_counter()
             print(
                 f"[GraphBuilder-{self._hash()}._update_shape_types_with_proto] -- starts with "
                 f"{len(self.nodes)} nodes and {len(getattr(proto_graph, 'value_info', []))} "  # type: ignore[arg-type]
@@ -8110,8 +8127,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
 
     def infer_shapes(self) -> Dict[str, Tuple[DYNAMIC_SHAPE, DYNAMIC_SHAPE]]:
         """Runs custom shape inference. Returns the updates."""
+        begin = time.perf_counter()
         if self.verbose > 1:
-            begin = time.perf_counter()
             print("[GraphBuilder.infer_shapes]")
         res: Dict[str, Tuple[DYNAMIC_SHAPE, DYNAMIC_SHAPE]] = {}
         for node in self.nodes:
@@ -8151,8 +8168,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
     ):
         """Updates the shapes and types for an existing model."""
         proto_graph = proto.graph if isinstance(proto, ModelProto) else proto
+        begin_ = time.perf_counter()
         if self.verbose > 1:
-            begin_ = time.perf_counter()
             print(
                 f"[GraphBuilder-{self._hash()}._update_structures_with_proto] -- starts with "
                 f"{len(proto_graph.node)} nodes"
@@ -8193,7 +8210,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
         if isinstance(proto_graph, GraphProto):
             self.inputs = list(proto_graph.input)
             self.outputs = list(proto_graph.output)
-            self.input_names = [i.name for i in proto_graph.input]
+            self._input_names = [i.name for i in proto_graph.input]  # type: ignore
         else:
             assert isinstance(
                 proto_graph, FunctionProto
@@ -8206,7 +8223,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                 oh.make_tensor_value_info(name, self.TEMPLATE_TYPE, None)
                 for name in proto_graph.output
             ]
-            self.input_names = list(proto_graph.input)
+            self._input_names = list(proto_graph.input)  # type: ignore
 
         available_shapes = (
             {v.name: v for v in proto_graph.value_info}

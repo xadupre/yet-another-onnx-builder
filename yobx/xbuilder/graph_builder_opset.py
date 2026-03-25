@@ -1,12 +1,13 @@
 from functools import partial
 from typing import cast, TYPE_CHECKING, Any, Callable, List, Optional, Tuple, Union
 import numpy as np
+from ..typing import OpsetProtocol
 
 if TYPE_CHECKING:
     from .graph_builder import GraphBuilder
 
 
-class Opset:
+class Opset(OpsetProtocol):
     """
     Makes it easier to write onnx graph.
     The method name is the node type.
@@ -91,17 +92,17 @@ class Opset:
         self.builder = builder
         self.allow_unknown = allow_unknown
 
-    def __getattr__(self, name):
-        if name in self._implemented:
-            n_outputs = self._implemented[name]
+    def __getattr__(self, op_type: str) -> Callable[..., Union[str, Tuple[str, ...]]]:
+        if op_type in self._implemented:
+            n_outputs = self._implemented[op_type]
             if n_outputs == 1:
-                return cast(Callable[..., str], partial(self.make_node, name))
+                return cast(Callable[..., str], partial(self.make_node, op_type))
             if n_outputs == 2:
-                return cast(Callable[..., Tuple[str, str]], partial(self.make_node, name))
-            return cast(Callable[..., Tuple[str, ...]], partial(self.make_node, name))
-        if name in self.__dict__:
-            return self.__dict__[name]
-        return partial(self._make_node, name)
+                return cast(Callable[..., Tuple[str, str]], partial(self.make_node, op_type))
+            return cast(Callable[..., Tuple[str, ...]], partial(self.make_node, op_type))
+        if op_type in self.__dict__:
+            return self.__dict__[op_type]
+        return partial(self._make_node, op_type)
 
     def _make_node(self, op_type, *args, outputs=None, **kwargs):
         if outputs is None:
