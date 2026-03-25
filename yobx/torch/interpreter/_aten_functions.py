@@ -9221,6 +9221,116 @@ def aten_scan(
     return outputs
 
 
+def aten_while_loop(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    cond_graph: str,
+    body_graph: str,
+    loop_vars: List[str],
+    additional_inputs: Optional[List[str]] = None,
+    name: str = "while_loop",
+) -> T:
+    "while_loop"
+    assert g.has_local_function(
+        cond_graph, g.local_domain
+    ), f"Unable to find local function for condition {cond_graph!r}{g.get_debug_msg()}"
+    assert g.has_local_function(
+        body_graph, g.local_domain
+    ), f"Unable to find local function for body {body_graph!r}{g.get_debug_msg()}"
+
+    def mkv(vname):
+        value_info_proto = ValueInfoProto()
+        value_info_proto.name = vname
+        return value_info_proto
+
+    body_loc = g.get_local_function(body_graph, g.local_domain)
+    n_vars = len(loop_vars)
+    assert len(body_loc.output) == n_vars, (
+        f"Body function {body_graph!r} should have {n_vars} outputs "
+        f"(one per loop variable) but has {len(body_loc.output)}"
+        f"{g.get_debug_msg()}"
+    )
+    assert len(outputs) == n_vars, (
+        f"Expected {n_vars} outputs but got {len(outputs)}{g.get_debug_msg()}"
+    )
+
+    # Protect additional_inputs from identity-removal optimisation.
+    if additional_inputs:
+        additional_inputs = [
+            g.op.Identity(
+                a,
+                name=f"_DONOTREMOVE_WhileLoop_hidden_input_{i}",
+                outputs=[g.unique_name(f"hidden_input_while_{i}_{a}")],
+            )
+            for i, a in enumerate(additional_inputs)
+        ]
+    else:
+        additional_inputs = []
+
+    # Names for loop variables *inside* the Loop body subgraph.
+    loop_var_names_in = [f"loop_in_{i}_{v}" for i, v in enumerate(loop_vars)]
+    loop_var_names_out = [f"loop_out_{i}" for i in range(n_vars)]
+    cond_out_name = "while_cond_out"
+    iter_name = "iter"
+    cond_in_name = "cond_in"
+
+    # Build Loop body subgraph:
+    #   1. call body_fn(*loop_vars_in, *additional_inputs) → *loop_vars_out
+    #   2. call cond_fn(*loop_vars_out, *additional_inputs) → cond_out
+    body_call_node = make_node(
+        body_graph,
+        [*loop_var_names_in, *additional_inputs],
+        loop_var_names_out,
+        domain=g.local_domain,
+    )
+    cond_call_node = make_node(
+        cond_graph,
+        [*loop_var_names_out, *additional_inputs],
+        [cond_out_name],
+        domain=g.local_domain,
+    )
+    body = make_graph(
+        [body_call_node, cond_call_node],
+        f"{name}_body",
+        [mkv(iter_name), mkv(cond_in_name), *[mkv(v) for v in loop_var_names_in]],
+        [mkv(cond_out_name), *[mkv(v) for v in loop_var_names_out]],
+    )
+
+    # Compute initial loop condition in the outer graph.
+    init_cond_name = g.unique_name(f"{name}_init_cond")
+    g.make_node(
+        cond_graph,
+        [*loop_vars, *additional_inputs],
+        [init_cond_name],
+        domain=g.local_domain,
+        name=f"{name}_init_cond",
+    )
+    g.set_type(init_cond_name, TensorProto.BOOL)
+    g.set_shape(init_cond_name, tuple())
+
+    # Use INT64_MAX as the trip count (effectively unbounded).
+    int64_max_name = g.unique_name(f"{name}_int64_max")
+    g.make_node(
+        "Constant",
+        [],
+        [int64_max_name],
+        value_int=int(np.iinfo(np.int64).max),
+        name=f"{name}_int64_max",
+    )
+    g.set_type(int64_max_name, TensorProto.INT64)
+    g.set_shape(int64_max_name, tuple())
+
+    g.make_node(
+        "Loop",
+        [int64_max_name, init_cond_name, *loop_vars],
+        outputs,
+        name=name,
+        body=body,
+    )
+    return outputs
+
+
 def aten_masked_scatter(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
