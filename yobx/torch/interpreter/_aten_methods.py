@@ -365,11 +365,20 @@ def aten_meth_sum(
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
     x: T,
-    axis: T,
+    axis: Optional[T] = None,
     keepdim: bool = False,
     dim: Optional[int] = None,
 ) -> T:
     "reducesum"
+    if axis is None:
+        # reduction on all dimension
+        res = g.op.ReduceSumAnyOpset(
+            x, outputs=outputs, keepdims=1 if keepdim else 0, name=".sum"
+        )
+        if not sts:
+            set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim)
+        return res
+
     if axis is not None and isinstance(axis, int):
         axes = np.array([axis], dtype=np.int64)
     elif dim is not None and isinstance(dim, int):
