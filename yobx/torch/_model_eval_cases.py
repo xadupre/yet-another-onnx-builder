@@ -902,7 +902,7 @@ class CropLastDimensionWithTensorShape(torch.nn.Module):
 
 class CropLastDimensionWithTensorContent(torch.nn.Module):
     def forward(self, x, shape):
-        return x[..., : shape[0]]
+        return x[..., : shape.item()]
 
     _inputs = [
         (torch.rand(3, 4, 4).to(torch.float32), torch.tensor([2], dtype=torch.int64)),
