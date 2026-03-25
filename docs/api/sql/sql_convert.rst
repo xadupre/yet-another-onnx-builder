@@ -1,5 +1,5 @@
-yobx.sql — sql\_convert module
-==============================
+yobx.sql.sql\_convert
+=====================
 
 .. automodule:: yobx.sql.sql_convert
     :members:

@@ -25,6 +25,7 @@ discussion, :ref:`l-design-sql-dataframe` for the DataFrame tracer, and
     :maxdepth: 1
     :caption: modules
 
+    coverage
     sql_convert
     polars_convert
     convert
