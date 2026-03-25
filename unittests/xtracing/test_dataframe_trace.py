@@ -601,5 +601,63 @@ class TestDataframeArithmetic(ExtTestCase):
         self.assertEqual(result._source_columns, ["a"])
 
 
+# ---------------------------------------------------------------------------
+# ColumnRef dtype field
+# ---------------------------------------------------------------------------
+
+
+class TestColumnRefDtype(ExtTestCase):
+    def test_dtype_defaults_to_none(self):
+        cr = ColumnRef("a")
+        self.assertIsNone(cr.dtype)
+
+    def test_dtype_stored_as_type(self):
+        cr = ColumnRef("a", dtype=np.float32)
+        self.assertIs(cr.dtype, np.float32)
+
+    def test_dtype_stored_as_dtype(self):
+        cr = ColumnRef("a", dtype=np.dtype("int64"))
+        self.assertEqual(cr.dtype, np.dtype("int64"))
+
+    def test_dtype_stored_as_string(self):
+        cr = ColumnRef("a", dtype="float64")
+        self.assertEqual(cr.dtype, "float64")
+
+    def test_dtype_independent_of_table(self):
+        cr = ColumnRef("col", table="tbl", dtype=np.int32)
+        self.assertEqual(cr.table, "tbl")
+        self.assertIs(cr.dtype, np.int32)
+
+    def test_trace_dataframe_propagates_dtype(self):
+        """ColumnRef nodes produced by trace_dataframe carry the input dtype."""
+
+        def transform(df):
+            return df.select([df["a"].alias("a")])
+
+        pq = trace_dataframe(transform, {"a": np.float32, "b": np.int64})
+        # The ParsedQuery's SelectOp items hold ColumnRef expressions.
+        from yobx.xtracing.parse import SelectOp
+
+        select_op = next(op for op in pq.operations if isinstance(op, SelectOp))
+        col_ref = select_op.items[0].expr
+        self.assertIsInstance(col_ref, ColumnRef)
+        self.assertEqual(col_ref.column, "a")
+        self.assertEqual(col_ref.dtype, np.float32)
+
+    def test_trace_dataframe_multi_input_propagates_dtype(self):
+        """Dtypes are propagated for multi-input trace_dataframe calls."""
+
+        def transform(df1, df2):
+            return df1.select([df1["x"].alias("x")])
+
+        pq = trace_dataframe(transform, [{"x": np.float64}, {"y": np.int32}])
+        from yobx.xtracing.parse import SelectOp
+
+        select_op = next(op for op in pq.operations if isinstance(op, SelectOp))
+        col_ref = select_op.items[0].expr
+        self.assertIsInstance(col_ref, ColumnRef)
+        self.assertEqual(col_ref.dtype, np.float64)
+
+
 if __name__ == "__main__":
     unittest.main()
