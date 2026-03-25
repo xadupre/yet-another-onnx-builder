@@ -1,12 +1,13 @@
 from functools import partial
 from typing import cast, TYPE_CHECKING, Any, Callable, List, Optional, Tuple, Union
 import numpy as np
+from ..typing import OpsetProtocol
 
 if TYPE_CHECKING:
     from .graph_builder import GraphBuilder
 
 
-class Opset:
+class Opset(OpsetProtocol):
     """
     Makes it easier to write onnx graph.
     The method name is the node type.
@@ -91,7 +92,7 @@ class Opset:
         self.builder = builder
         self.allow_unknown = allow_unknown
 
-    def __getattr__(self, name):
+    def __getattr__(self, name: str) -> Callable[..., Union[str, Tuple[str, ...]]]:
         if name in self._implemented:
             n_outputs = self._implemented[name]
             if n_outputs == 1:

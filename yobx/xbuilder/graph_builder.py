@@ -2017,7 +2017,7 @@ class GraphBuilder(
             return f"{name}:{s}"
         return f"{name}:?"
 
-    def get_shape(self, name: str) -> DYNAMIC_SHAPE:
+    def get_shape(self, name: str) -> Tuple[Union[int, str], ...]:  #
         """Returns the shape of a result."""
         assert isinstance(name, str), f"Unexpected type {type(name)} for name."
         assert name in self._known_shapes, (
@@ -2610,7 +2610,7 @@ class GraphBuilder(
         self._cache_shape[cache_key] = res
         return res
 
-    def make_initializer(
+    def make_initializer(  # type: ignore
         self,
         name: str,
         value: Any,
@@ -2754,7 +2754,7 @@ class GraphBuilder(
             name,
             value,
             itype=itype,
-            shape=shape,
+            shape=shape,  # type: ignore
             key=key,
             parameter_name=parameter_name,
             source=source,
@@ -3406,7 +3406,7 @@ class GraphBuilder(
         ), f"{name!r} is already registered{self.get_debug_msg()}"
         self._registered_users[name] = set(users)
 
-    def make_tensor_input(
+    def make_tensor_input(  # type: ignore
         self,
         name: Union[str, Tuple[str]],
         elem_type: Optional[Any] = None,
@@ -4130,7 +4130,7 @@ class GraphBuilder(
             output_names = [lower] if outputs == 1 else [f"{lower}_{i}" for i in range(outputs)]
         return [self.unique_name(o) for o in output_names]
 
-    def make_node(
+    def make_node(  # type: ignore
         self,
         op_type: str,
         inputs: Union[str, List[str]],
@@ -6457,7 +6457,7 @@ class GraphBuilder(
                     f"[GraphBuilder-{self._hash()}] optimizes attribute "
                     f"{att.name!r} from node {node.op_type!r}, name={node.name!r}"
                 )
-            g = GraphBuilder(
+            g = GraphBuilder(  # type: ignore
                 att.g,
                 optimization_options=self.optimization_options,
                 verbose=max(self.verbose - 1, 0),
@@ -8202,7 +8202,7 @@ class GraphBuilder(
         if isinstance(proto_graph, GraphProto):
             self.inputs = list(proto_graph.input)
             self.outputs = list(proto_graph.output)
-            self.input_names = [i.name for i in proto_graph.input]
+            self.input_names = [i.name for i in proto_graph.input]  # type: ignore
         else:
             assert isinstance(
                 proto_graph, FunctionProto
@@ -8215,7 +8215,7 @@ class GraphBuilder(
                 oh.make_tensor_value_info(name, self.TEMPLATE_TYPE, None)
                 for name in proto_graph.output
             ]
-            self.input_names = list(proto_graph.input)
+            self.input_names = list(proto_graph.input)  # type: ignore
 
         available_shapes = (
             {v.name: v for v in proto_graph.value_info}
