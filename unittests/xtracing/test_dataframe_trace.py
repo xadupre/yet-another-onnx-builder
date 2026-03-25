@@ -424,7 +424,7 @@ class TestTracedDataFrameCopy(ExtTestCase):
     def test_copy_in_pipeline(self):
         """Verify that .copy() inside a traced function does not break tracing."""
         import numpy as np
-        from yobx.xtracing.dataframe_trace import dataframe_to_onnx
+        from yobx.sql import dataframe_to_onnx
 
         def transform(df):
             df2 = df.copy()
