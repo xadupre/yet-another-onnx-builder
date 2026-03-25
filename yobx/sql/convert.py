@@ -12,13 +12,14 @@ delegates to :func:`~yobx.sql.sql_convert.sql_to_onnx`,
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
 
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
+from ..helpers.to_onnx_helper import _dataframe_to_dtypes, _is_dataframe
 from ..xbuilder import GraphBuilder
 from ..xtracing.dataframe_trace import trace_dataframe
 from ..xtracing.parse import JoinOp
@@ -28,6 +29,36 @@ from .sql_convert import sql_to_onnx, sql_to_onnx_graph  # noqa: F401 – re-exp
 
 #: Name used for the dynamic (batch) first dimension when none is specified.
 _BATCH_DIM = "batch"
+
+
+def _normalize_input_dtypes(
+    input_dtypes: Any,
+) -> Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]]:
+    """Normalise *input_dtypes* to a ``{column: dtype}`` dict or list thereof.
+
+    When *input_dtypes* is a pandas :class:`~pandas.DataFrame`, the column
+    names and per-column dtypes are extracted automatically.  A list of
+    DataFrames is converted to a list of dicts in the same way.  Any value
+    that is already in the expected dict / list-of-dicts format is returned
+    unchanged.
+
+    :param input_dtypes: either
+
+        * a ``{column: dtype}`` mapping,
+        * a list of ``{column: dtype}`` mappings,
+        * a pandas :class:`~pandas.DataFrame` (column names and dtypes are
+          extracted), or
+        * a list of pandas DataFrames.
+
+    :return: normalised dict or list of dicts.
+    """
+    if _is_dataframe(input_dtypes):
+        return _dataframe_to_dtypes(input_dtypes)
+    if isinstance(input_dtypes, (list, tuple)) and input_dtypes and all(
+        _is_dataframe(item) for item in input_dtypes
+    ):
+        return [_dataframe_to_dtypes(df) for df in input_dtypes]
+    return input_dtypes  # type: ignore[return-value]
 
 
 def dataframe_to_onnx(
@@ -62,6 +93,10 @@ def dataframe_to_onnx(
           For functions that simply share columns across multiple frames
           without a join, all mappings are merged into a single input-dtype
           dict.
+
+        A pandas :class:`~pandas.DataFrame` (or a list of DataFrames) is also
+        accepted; the column names and per-column dtypes are extracted
+        automatically from each DataFrame.
 
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
@@ -129,6 +164,7 @@ def dataframe_to_onnx(
     """
     from .sql_convert import parsed_query_to_onnx  # avoid top-level circular import
 
+    input_dtypes = _normalize_input_dtypes(input_dtypes)  # type: ignore[assignment]
     pq = trace_dataframe(func, input_dtypes)
     if isinstance(input_dtypes, list):
         has_join = any(isinstance(op, JoinOp) for op in pq.operations)
@@ -239,11 +275,7 @@ def trace_numpy_to_onnx(
                 f"input_names has {len(resolved_input_names)} elements."
             )
 
-    resolved_output_names: List[str] = (
-        list(output_names) if output_names is not None else ["output_0"]
-    )
-
-    g = GraphBuilder(opsets)
+    g = GraphBuilder(opsets)  # type: ignore
 
     for iname, arr in zip(resolved_input_names, inputs):
         itype = np_dtype_to_tensor_dtype(arr.dtype)
@@ -251,7 +283,17 @@ def trace_numpy_to_onnx(
         shape: Tuple = (batch_dim, *arr.shape[1:])  # type: ignore[assignment]
         g.make_tensor_input(iname, itype, shape)
 
-    trace_numpy_function(g, {}, resolved_output_names, func, resolved_input_names, name="trace")  # type: ignore
+    if output_names is not None:
+        resolved_output_names: List[str] = list(output_names)
+        trace_numpy_function(
+            g, {}, resolved_output_names, func, resolved_input_names, name="trace"
+        )
+    else:
+        # Auto-detect the number of outputs by passing an empty list and letting
+        # trace_numpy_function return whatever the traced function produced.
+        # Returns str for single output, tuple[str, ...] for multiple outputs.
+        raw_result = trace_numpy_function(g, {}, None, func, resolved_input_names, name="trace")
+        resolved_output_names = [raw_result] if isinstance(raw_result, str) else list(raw_result)
 
     for out_name in resolved_output_names:
         g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
@@ -314,6 +356,9 @@ def to_onnx(
         For SQL queries this maps *left-table* columns; for a ``LazyFrame``
         it maps the source DataFrame columns referenced in the plan.  Only
         columns that actually appear in the query / plan need to be listed.
+        A pandas :class:`~pandas.DataFrame` (or a list of DataFrames) is also
+        accepted; the column names and per-column dtypes are extracted
+        automatically.
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
     :param custom_functions: an optional mapping from function name (as it
@@ -417,6 +462,7 @@ def to_onnx(
             filename=filename,
             verbose=verbose,
         )
+    input_dtypes = _normalize_input_dtypes(input_dtypes)  # type: ignore[assignment]
     if isinstance(dataframe_or_query, str):
         return sql_to_onnx(
             dataframe_or_query,

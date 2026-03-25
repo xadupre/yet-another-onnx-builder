@@ -479,8 +479,8 @@ class ExportOptions:
             args0, kwargs0 = args, kwargs
             args = torch_deepcopy(args)
             kwargs = torch_deepcopy(kwargs)
+        t0 = time.perf_counter()
         if verbose:
-            t0 = time.perf_counter()
             print(
                 f"[ExportOptions.export] export start with strict={self.strict} "
                 f"backed_size_oblivious={self.backed_size_oblivious}"
