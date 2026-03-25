@@ -1,9 +1,11 @@
 """
 .. _l-plot-many-exporters:
 
-Export Tiny-LLM with 3 different ways
-=====================================
+Export Tiny-LLM with different ways
+===================================
 
+The example exports the same model with different ways
+and compares the model composition (the node distribution).
 """
 
 # %%
