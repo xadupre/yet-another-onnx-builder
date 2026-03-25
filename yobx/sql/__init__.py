@@ -129,10 +129,6 @@ __all__ = [
     "ParsedQuery",
     "SelectItem",
     "SelectOp",
-    "TracedCondition",
-    "TracedDataFrame",
-    "TracedGroupBy",
-    "TracedSeries",
     "dataframe_to_onnx",
     "lazyframe_to_onnx",
     "parse_sql",
@@ -141,6 +137,5 @@ __all__ = [
     "sql_to_onnx",
     "sql_to_onnx_graph",
     "to_onnx",
-    "trace_dataframe",
     "trace_numpy_to_onnx",
 ]
