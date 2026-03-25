@@ -539,9 +539,7 @@ class DynamoInterpreter:
                     else:
                         shape = None
                     device = (
-                        self.builder.get_device(name)
-                        if self.builder.has_device(name)
-                        else None
+                        self.builder.get_device(name) if self.builder.has_device(name) else None
                     )
                     sub_args.append(
                         VirtualTensor(name=name, dtype=dtype, shape=shape, device=device)
