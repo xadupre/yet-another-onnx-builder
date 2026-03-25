@@ -731,9 +731,7 @@ class TestInputDtypesAsDataFrame(ExtTestCase):
             self.skipTest("pandas not available")
 
         def transform(traced_df):
-            return traced_df.select(
-                [(traced_df["a"] + traced_df["b"]).alias("total")]
-            )
+            return traced_df.select([(traced_df["a"] + traced_df["b"]).alias("total")])
 
         artifact = dataframe_to_onnx(transform, df)
         ref = ExtendedReferenceEvaluator(artifact)
@@ -767,9 +765,7 @@ class TestInputDtypesAsDataFrame(ExtTestCase):
 
         def transform(traced_df):
             traced_df = traced_df.filter(traced_df["a"] > 0)
-            return traced_df.select(
-                [(traced_df["a"] + traced_df["b"]).alias("total")]
-            )
+            return traced_df.select([(traced_df["a"] + traced_df["b"]).alias("total")])
 
         artifact = to_onnx(transform, df)
         ref = ExtendedReferenceEvaluator(artifact)
@@ -791,9 +787,7 @@ class TestInputDtypesAsDataFrame(ExtTestCase):
         df2 = pd.DataFrame({"b": np.array([3.0, 4.0], dtype=np.float32)})
 
         def transform(traced_df1, traced_df2):
-            return traced_df1.select(
-                [(traced_df1["a"] + traced_df2["b"]).alias("total")]
-            )
+            return traced_df1.select([(traced_df1["a"] + traced_df2["b"]).alias("total")])
 
         artifact = to_onnx(transform, [df1, df2])
         ref = ExtendedReferenceEvaluator(artifact)

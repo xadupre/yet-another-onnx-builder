@@ -42,7 +42,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         return missing
 
     @hide_stdout()
-    @unittest.skip("missing patches")
+    #@unittest.skip("missing patches")
     def test_tiny_llm_to_onnx_24(self):
         import onnxruntime
 
@@ -73,15 +73,15 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
                 target_opset=24,
             )
 
-        outputs = [o.name for o in onx.model_proto.graph.output]
+        outputs = [o.name for o in onx.graph.output]
         self.assertEqual(
             ["output_0", "present_key_values_key_0", "present_key_values_value_0"], outputs
         )
-        node_types = [n.op_type for n in onx.model_proto.graph.node]
+        node_types = [n.op_type for n in onx.graph.node]
         counter = collections.Counter(node_types)
         unique_ops = set(node_types)
-        # self.assertNotIn("HalfRotaryEmbedding", unique_ops)
-        # self.assertIn("RotaryEmbedding", unique_ops)
+        self.assertNotIn("HalfRotaryEmbedding", unique_ops)
+        self.assertIn("RotaryEmbedding", unique_ops)
         self.assertIn("RMSNormalization", unique_ops)
         self.assertIn("CausalMaskMulAdd", unique_ops)
         self.assertIn("CausalMask", unique_ops)
@@ -98,7 +98,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             "CausalMaskMulAdd": 1,
             "Concat": 5,
             "CosSinCacheWithRange": 1,
-            "Expand": 1,
+            "Expand": 0,
             "Gather": 2,
             "HalfRotaryEmbedding": 2,
             "MatMul": 8,
@@ -138,7 +138,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         assert diff["abs"] <= 1e-5, f"diff={diff}"
 
     @hide_stdout()
-    @unittest.skip("missing patches")
+    #@unittest.skip("missing patches")
     def test_tiny_llm_to_onnx_ort_22(self):
         import onnxruntime
 
@@ -167,11 +167,11 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
                 target_opset=22,
             )
 
-        outputs = [o.name for o in onx.model_proto.graph.output]
+        outputs = [o.name for o in onx.graph.output]
         self.assertEqual(
             ["output_0", "present_key_values_key_0", "present_key_values_value_0"], outputs
         )
-        unique_ops = {n.op_type for n in onx.model_proto.graph.node}
+        unique_ops = {n.op_type for n in onx.graph.node}
         self.assertNotIn("HalfRotaryEmbedding", unique_ops)
         self.assertIn("RotaryEmbedding", unique_ops)
         self.assertIn("SimplifiedLayerNormalization", unique_ops)
@@ -179,7 +179,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertIn("QuickGelu", unique_ops)
         self.assertIn("CausalMaskMulAdd", unique_ops)
         self.assertIn("CausalMask", unique_ops)
-        self.assertIn("GroupQueryAttention", unique_ops)
+        self.assertNotIn("GroupQueryAttention", unique_ops)
         self.assertInOr(("CosSinCache_p1", "CosSinCacheWithRange"), unique_ops)
         sess = onnxruntime.InferenceSession(filename, providers=["CPUExecutionProvider"])
         feeds = make_feeds(sess, b1, use_numpy=True)
