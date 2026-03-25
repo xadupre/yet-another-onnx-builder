@@ -917,10 +917,26 @@ class DynamoInterpreter:
         output = declared[0]
         if hasattr(output, "name"):
             output = self._make_name(node, output.name, index=-1)
-            self.builder.make_node(
-                "Identity", [output], [output_name], check=False, name=".output"
-            )
-            outputs = [(output, output_name)]
+            # Handle multi-output cond in the tracing path: the single FX node (e.g.
+            # "cond") maps to multiple ONNX tensors "cond#0", "cond#1", etc.  This
+            # happens because CustomProxy.__torch_function__ always produces one proxy
+            # for torch.cond, but aten_cond expands it to N outputs when N > 1.
+            if not self.builder.has_name(output) and self.builder.has_name(f"{output}#0"):
+                outputs = []
+                output_index = 0
+                while self.builder.has_name(f"{output}#{output_index}"):
+                    sub_name = f"{output}#{output_index}"
+                    o = f"{output_name}_{output_index}"
+                    self.builder.make_node(
+                        "Identity", [sub_name], [o], check=False, name=".output"
+                    )
+                    outputs.append((sub_name, o))
+                    output_index += 1
+            else:
+                self.builder.make_node(
+                    "Identity", [output], [output_name], check=False, name=".output"
+                )
+                outputs = [(output, output_name)]
         else:
             outputs = []
             for i, a in enumerate(output):
