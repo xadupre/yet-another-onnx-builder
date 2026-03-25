@@ -10,13 +10,13 @@ input** tensor.  See :ref:`l-design-sql` for the full design discussion.
     :maxdepth: 1
     :caption: main functions
 
+    dataframe_to_onnx
     sql_to_onnx
     sql_to_onnx_graph
     parsed_query_to_onnx
     parsed_query_to_onnx_graph
     lazyframe_to_onnx
-    dataframe_to_onnx
-    trace_dataframe
+    trace_numpy_to_onnx
     to_onnx
 
 .. toctree::

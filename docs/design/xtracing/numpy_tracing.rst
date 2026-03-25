@@ -145,7 +145,7 @@ You can also use the tracing machinery outside of scikit-learn pipelines via
     :showcode:
 
     import numpy as np
-    from yobx.xtracing import trace_numpy_to_onnx
+    from yobx.sql import trace_numpy_to_onnx
     from yobx.helpers.onnx_helper import pretty_onnx
 
     def my_func(X):

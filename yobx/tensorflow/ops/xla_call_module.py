@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import tensorflow as tf
@@ -257,47 +257,23 @@ def _process_convert_layer(
 #   [0] onnx_op   – ONNX op name used for the spec hyperlink, or ``None``.
 #   [1] description – short human-readable label for the coverage table.
 #   [2] handler   – callable(layer, local_results, g, decoded_module) -> None.
-_STRUCTURAL_OPS: "dict[str, tuple[str | None, str, Callable[[dict, Dict[str, str], Optional[GraphBuilderExtendedProtocol], Optional[str]], None]]]" = {
+_STRUCTURAL_OPS = {
     "broadcast_in_dim": (
         None,
         "identity pass-through (ONNX broadcasting is implicit)",
         _process_broadcast_layer,
     ),
-    "call": (
-        None,
-        "inlined private function (no ONNX op emitted)",
-        _process_call_layer,
-    ),
-    "constant": (
-        None,
-        "ONNX initializer (weight tensor)",
-        _process_constant_layer,
-    ),
-    "convert": (
-        "Cast",
-        "type cast",
-        _process_convert_layer,
-    ),
-    "dot_general": (
-        "MatMul",
-        "matrix multiply",
-        _process_dot_general_layer,
-    ),
+    "call": (None, "inlined private function (no ONNX op emitted)", _process_call_layer),
+    "constant": (None, "ONNX initializer (weight tensor)", _process_constant_layer),
+    "convert": ("Cast", "type cast", _process_convert_layer),
+    "dot_general": ("MatMul", "matrix multiply", _process_dot_general_layer),
     "dynamic_broadcast_in_dim": (
         None,
         "identity pass-through (ONNX broadcasting is implicit)",
         _process_broadcast_layer,
     ),
-    "reduce_max": (
-        "ReduceMax",
-        "reduce along axes keeping dims",
-        _process_reduce_layer,
-    ),
-    "reduce_sum": (
-        "ReduceSum",
-        "reduce along axes keeping dims",
-        _process_reduce_layer,
-    ),
+    "reduce_max": ("ReduceMax", "reduce along axes keeping dims", _process_reduce_layer),
+    "reduce_sum": ("ReduceSum", "reduce along axes keeping dims", _process_reduce_layer),
 }
 
 

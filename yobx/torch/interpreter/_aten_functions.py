@@ -9251,9 +9251,9 @@ def aten_while_loop(
         f"(one per loop variable) but has {len(body_loc.output)}"
         f"{g.get_debug_msg()}"
     )
-    assert len(outputs) == n_vars, (
-        f"Expected {n_vars} outputs but got {len(outputs)}{g.get_debug_msg()}"
-    )
+    assert (
+        len(outputs) == n_vars
+    ), f"Expected {n_vars} outputs but got {len(outputs)}{g.get_debug_msg()}"
 
     # Protect additional_inputs from identity-removal optimisation.
     if additional_inputs:
@@ -9322,11 +9322,7 @@ def aten_while_loop(
     g.set_shape(int64_max_name, tuple())
 
     g.make_node(
-        "Loop",
-        [int64_max_name, init_cond_name, *loop_vars],
-        outputs,
-        name=name,
-        body=body,
+        "Loop", [int64_max_name, init_cond_name, *loop_vars], outputs, name=name, body=body
     )
     return outputs
 

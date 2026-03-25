@@ -33,7 +33,7 @@ from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
 from yobx.doc import plot_dot
 from yobx.sklearn import to_onnx
-from yobx.xtracing import trace_numpy_to_onnx
+from yobx.sql import trace_numpy_to_onnx
 
 # %%
 # 1. Standalone tracing with ``trace_numpy_to_onnx``
