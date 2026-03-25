@@ -245,9 +245,9 @@ def sql_to_onnx(
         cast to ``float64`` internally, which may lose precision for integers
         larger than 2^53.
     """
-    if _is_dataframe(input_dtypes):
+    if _is_dataframe(input_dtypes):  # type: ignore
         input_dtypes = _dataframe_to_dtypes(input_dtypes)
-    if _is_dataframe(right_input_dtypes):
+    if _is_dataframe(right_input_dtypes):  # type: ignore
         right_input_dtypes = _dataframe_to_dtypes(right_input_dtypes)
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
