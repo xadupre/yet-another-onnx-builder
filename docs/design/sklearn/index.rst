@@ -12,7 +12,6 @@ scikit-learn Export to ONNX
    supported_converters
    custom_converter
    contrib_ops
-   debug
    dataframe_pipeline
 
 .. seealso::

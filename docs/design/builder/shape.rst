@@ -345,8 +345,10 @@ This is useful for visualisation tools and downstream passes that rely on
     shape = tuple(d.dim_param if d.dim_param else d.dim_value for d in t.shape.dim)
     print(f"  {vi.name}: dtype={t.elem_type}  shape={shape}")
 
-Debugging
-=========
+.. _l-design-xshape-debugging:
+
+Debugging Shape Inference with Environment Variables
+====================================================
 
 :class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
 respects several environment variables that help narrow down shape-inference
