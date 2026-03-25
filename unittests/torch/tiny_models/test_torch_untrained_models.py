@@ -46,6 +46,8 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         for v in model_proto.graph.value_info:
             shape = tuple(d.dim_param or d.dim_value for d in v.type.tensor_type.shape.dim)
             for s in shape:
+                if isinstance(s, int):
+                    continue
                 assert "batch//batch" not in s, f"Wrong dimension in {shape=}, name={v.name!r}"
                 assert "batch//s61" not in s, f"Wrong dimension in {shape=}, name={v.name!r}"
 
