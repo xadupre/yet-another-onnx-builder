@@ -239,7 +239,7 @@ def trace_numpy_to_onnx(
                 f"input_names has {len(resolved_input_names)} elements."
             )
 
-    g = GraphBuilder(opsets)
+    g = GraphBuilder(opsets)  # type: ignore
 
     for iname, arr in zip(resolved_input_names, inputs):
         itype = np_dtype_to_tensor_dtype(arr.dtype)

@@ -366,7 +366,7 @@ class GraphBuilder(
         self._parameter_renaming: Dict[str, str] = {}
         self._parameter_norename: Set[str] = set()
         self.constants_: Dict[str, Any] = {}
-        self.op = Opset(self)
+        self.op = Opset(self)  # type: ignore
         self.anyop = Opset(self, allow_unknown=True)
 
         self._debug_null_shape = int(os.environ.get("NULLSHAPE", "0"))
@@ -426,7 +426,7 @@ class GraphBuilder(
                 if isinstance(target_opset_or_existing_proto, int)
                 else target_opset_or_existing_proto
             )
-            self.input_names: List[str] = list(input_names) if input_names else []
+            self.input_names: List[str] = list(input_names) if input_names else []  # type: ignore
             self.current_input = 0
             self._unique_names = set(self.input_names)
         elif isinstance(
@@ -555,7 +555,7 @@ class GraphBuilder(
         else:
             ds2 = (None,)
 
-        new_builder = GraphBuilder(
+        new_builder = GraphBuilder(  # type: ignore
             target_opset_or_existing_proto=self.opsets,
             input_names=input_names,
             as_function=True,
@@ -802,7 +802,7 @@ class GraphBuilder(
             remove_duplicated_shape=False,
             patterns=None,
         )
-        g = GraphBuilder(
+        g = GraphBuilder(  # type: ignore
             self.opsets.copy(),
             verbose=self.verbose,
             ir_version=self.ir_version,
@@ -1745,7 +1745,7 @@ class GraphBuilder(
         if dim not in self.dynamic_objects:
             self.add_dynamic_object(dim, dim)
 
-    def set_shape(
+    def set_shape(  # type: ignore
         self,
         name: str,
         shape: DYNAMIC_SHAPE,
@@ -1920,7 +1920,7 @@ class GraphBuilder(
         ), f"Unknown device for name={name!r}{self.get_debug_msg()}"
         return self._known_devices[name]
 
-    def set_type(self, name: str, dtype: int, exc: bool = True):
+    def set_type(self, name: str, dtype: int, exc: bool = True):  # type: ignore
         """
         Sets the shape for a result. It is exists, it checks the new shape
         is equal to the existing one.
