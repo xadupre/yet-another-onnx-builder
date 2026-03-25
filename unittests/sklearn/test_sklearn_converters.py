@@ -9,13 +9,7 @@ from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
-from yobx.ext_test_case import (
-    ExtTestCase,
-    requires_sklearn,
-    requires_pandas,
-    hide_stdout,
-    has_sklearn,
-)
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_pandas, hide_stdout
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 from yobx.typing import ConvertOptionsProtocol
@@ -868,7 +862,7 @@ class TestSklearnConvertersBasicInvocation(ExtTestCase):
             # unrelated to this test
             "KernelPCA",
             # STRING
-            "FeatureHasher" if not has_sklearn("1.8") else "",
+            "FeatureHasher",
         }
     )
 
@@ -879,9 +873,9 @@ class TestSklearnConvertersBasicInvocation(ExtTestCase):
 
         # Small float32 dataset suitable for most estimators.
         rng = np.random.default_rng(0)
-        self._X = rng.standard_normal((20, 4)).astype(np.float32)
+        self._X = np.abs(rng.standard_normal((20, 4)).astype(np.float32)) + 1
         self._y_bin = (rng.random(20) > 0.5).astype(np.int64)
-        self._y_reg = rng.standard_normal(20).astype(np.float32)
+        self._y_reg = np.abs(rng.standard_normal(20).astype(np.float32)) + 1
 
     def _make_graph_builder(self):
         from yobx.xbuilder import GraphBuilder
