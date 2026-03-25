@@ -84,13 +84,9 @@ from yobx.xtracing.parse import (
     parse_sql,
 )
 
-_DATAFRAME_TRACE_NAMES = frozenset([
-    "TracedCondition",
-    "TracedDataFrame",
-    "TracedGroupBy",
-    "TracedSeries",
-    "trace_dataframe",
-])
+_DATAFRAME_TRACE_NAMES = frozenset(
+    ["TracedCondition", "TracedDataFrame", "TracedGroupBy", "TracedSeries", "trace_dataframe"]
+)
 
 
 def __getattr__(name: str) -> object:
@@ -102,6 +98,7 @@ def __getattr__(name: str) -> object:
             TracedSeries,
             trace_dataframe,
         )
+
         _symbols = {
             "TracedCondition": TracedCondition,
             "TracedDataFrame": TracedDataFrame,
@@ -111,6 +108,7 @@ def __getattr__(name: str) -> object:
         }
         # Cache in module globals to avoid repeated __getattr__ calls.
         import sys as _sys
+
         _mod = _sys.modules[__name__]
         for _k, _v in _symbols.items():
             setattr(_mod, _k, _v)

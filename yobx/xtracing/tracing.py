@@ -11,7 +11,6 @@ graph, calls :func:`trace_numpy_function`, and returns a self-contained
 """
 
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-import numpy as np
 from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..typing import GraphBuilderExtendedProtocol
 from .numpy_array import NumpyArray

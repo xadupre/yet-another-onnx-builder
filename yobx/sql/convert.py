@@ -21,7 +21,6 @@ from ..container import ExportArtifact
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..xbuilder import GraphBuilder
 from ..xtracing.dataframe_trace import trace_dataframe
-from ..xtracing.numpy_array import NumpyArray
 from ..xtracing.parse import JoinOp
 from ..xtracing.tracing import trace_numpy_function
 from .polars_convert import lazyframe_to_onnx
@@ -264,7 +263,7 @@ def trace_numpy_to_onnx(
 def to_onnx(
     dataframe_or_query: Union[  # type: ignore
         str,
-        Callable[["TracedDataFrame"], "TracedDataFrame"],  # type: ignore
+        Callable[["TracedDataFrame"], "TracedDataFrame"],  # type: ignore # noqa: F821
         "polars.LazyFrame",  # type: ignore # noqa: F821
     ],
     input_dtypes: Union[
