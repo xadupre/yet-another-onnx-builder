@@ -1,5 +1,5 @@
 """
-Unit tests for yobx.xtracing (NumpyArray tracing and trace_numpy_to_onnx).
+Unit tests for trace_numpy_to_onnx (yobx.sql).
 """
 
 import unittest
