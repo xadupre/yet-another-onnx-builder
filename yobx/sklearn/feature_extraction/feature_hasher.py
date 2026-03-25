@@ -85,9 +85,9 @@ def sklearn_feature_hasher(
     :raises RuntimeError: if the ``com.microsoft`` ONNX domain is not registered
         in the graph builder
     """
-    assert isinstance(estimator, FeatureHasher), (
-        f"Unexpected type {type(estimator)} for estimator."
-    )
+    assert isinstance(
+        estimator, FeatureHasher
+    ), f"Unexpected type {type(estimator)} for estimator."
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     if estimator.input_type != "string":
@@ -130,12 +130,7 @@ def sklearn_feature_hasher(
     # MurmurHash3 (com.microsoft) hashes each string to a signed 32-bit int.
     # seed=0 and positive=0 match sklearn's murmurhash3_32(token, seed=0, positive=False).
     hashed_i32 = g.make_node(
-        "MurmurHash3",
-        [X],
-        domain="com.microsoft",
-        seed=0,
-        positive=0,
-        name=f"{name}_hash",
+        "MurmurHash3", [X], domain="com.microsoft", seed=0, positive=0, name=f"{name}_hash"
     )
     g.set_type(hashed_i32, onnx.TensorProto.INT32)
     if g.has_shape(X):
@@ -157,9 +152,7 @@ def sklearn_feature_hasher(
     else:
         # All values are +1: compute as (hashed * 0) + 1 to keep the shape dynamic
         raw_values = g.op.Add(
-            g.op.Mul(hashed, zero_i64, name=f"{name}_zero_mul"),
-            pos_one,
-            name=f"{name}_ones",
+            g.op.Mul(hashed, zero_i64, name=f"{name}_zero_mul"), pos_one, name=f"{name}_ones"
         )
 
     # ── Mask out empty-string padding ─────────────────────────────────────────
@@ -183,9 +176,7 @@ def sklearn_feature_hasher(
     nf_arr = np.array([n_features], dtype=np.int64)
     data_shape = g.op.Concat(batch_dim, nf_arr, axis=0, name=f"{name}_data_shape")
     zero_val = onh.from_array(np.array([0], dtype=np.int64))
-    zero_data = g.op.ConstantOfShape(
-        data_shape, value=zero_val, name=f"{name}_zero_data"
-    )
+    zero_data = g.op.ConstantOfShape(data_shape, value=zero_val, name=f"{name}_zero_data")
 
     # ── Accumulate contributions via ScatterElements (reduction='add') ────────
     # For each (sample i, token j): output[i, indices[i,j]] += values[i,j]

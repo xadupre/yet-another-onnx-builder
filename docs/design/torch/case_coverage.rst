@@ -1,8 +1,8 @@
 .. _l-design-torch-case-coverage:
 
-=========================
-Overview of Exportability
-=========================
+====================================
+Overview of Exportability Comparison
+====================================
 
 The following script shows the exported program for many short cases
 to retrieve an ONNX model equivalent to the original model.

@@ -19,7 +19,7 @@ They all returns an instance of :class:`~yobx.container.ExportArtifact`.
 
 .. toctree::
    :maxdepth: 1
-   :cpation: Converters
+   :caption: Converters
 
    design/litert/index
    design/sklearn/index

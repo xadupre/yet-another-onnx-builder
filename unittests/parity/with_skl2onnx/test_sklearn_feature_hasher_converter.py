@@ -12,12 +12,7 @@ import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 
 # Sample documents from sklearn-onnx's FeatureHasher test suite
-_CORPUS = [
-    "cat dog bird",
-    "cat cat fish",
-    "dog bird fish bird",
-    "ant bee",
-]
+_CORPUS = ["cat dog bird", "cat cat fish", "dog bird fish bird", "ant bee"]
 
 
 @requires_sklearn("1.4")
@@ -46,9 +41,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         fh.fit([])
 
         max_len = max(len(d) for d in token_lists)
-        X = np.array(
-            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
-        )
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object)
         onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
         self.assertIsNotNone(onx)
 
@@ -67,9 +60,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         fh.fit([])
 
         max_len = max(len(d) for d in token_lists)
-        X = np.array(
-            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
-        )
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object)
         onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
@@ -87,9 +78,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         fh.fit([])
 
         max_len = max(len(d) for d in token_lists)
-        X = np.array(
-            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
-        )
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object)
         onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
@@ -111,9 +100,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         fh.fit([])
 
         max_len = max(len(d) for d in token_lists)
-        X = np.array(
-            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
-        )
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object)
         onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
@@ -141,9 +128,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         fh.fit([])
 
         max_len = max((len(d) for d in token_lists), default=1)
-        X = np.array(
-            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
-        )
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object)
         onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
@@ -160,17 +145,12 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         from sklearn.feature_extraction import FeatureHasher
         from yobx.sklearn import to_onnx
 
-        token_lists = [
-            ["apple", "banana", "cherry", "date"],
-            ["fig", "grape", "honeydew"],
-        ]
+        token_lists = [["apple", "banana", "cherry", "date"], ["fig", "grape", "honeydew"]]
         fh = FeatureHasher(n_features=2, input_type="string", alternate_sign=True)
         fh.fit([])
 
         max_len = max(len(d) for d in token_lists)
-        X = np.array(
-            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
-        )
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object)
         onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
@@ -192,9 +172,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
         fh.fit([])
 
         max_len = max((len(d) for d in token_lists), default=1)
-        X = np.array(
-            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
-        )
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object)
         onx = to_onnx(fh, (X,), target_opset={"": 18, "com.microsoft": 1})
 
         sess = self.check_ort(onx)
@@ -215,9 +193,7 @@ class TestSklearnFeatureHasherConverter(ExtTestCase):
 
         token_lists = [doc.split() for doc in _CORPUS]
         max_len = max(len(d) for d in token_lists)
-        X = np.array(
-            [list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object
-        )
+        X = np.array([list(d) + [""] * (max_len - len(d)) for d in token_lists], dtype=object)
         y = np.array([0, 1, 0, 1])
 
         fh = FeatureHasher(n_features=16, input_type="string", dtype=np.float32)
