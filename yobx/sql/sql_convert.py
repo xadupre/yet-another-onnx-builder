@@ -52,6 +52,7 @@ from ..helpers.to_onnx_helper import _dataframe_to_dtypes, _is_dataframe
 from ..typing import GraphBuilderExtendedProtocol
 from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
+from .coverage import not_implemented_error
 from .ops import get_sql_op_converter
 from yobx.xtracing.parse import GroupByOp, JoinOp, ParsedQuery, SelectOp, parse_sql
 
@@ -244,9 +245,9 @@ def sql_to_onnx(
         cast to ``float64`` internally, which may lose precision for integers
         larger than 2^53.
     """
-    if _is_dataframe(input_dtypes):
+    if _is_dataframe(input_dtypes):  # type: ignore
         input_dtypes = _dataframe_to_dtypes(input_dtypes)
-    if _is_dataframe(right_input_dtypes):
+    if _is_dataframe(right_input_dtypes):  # type: ignore
         right_input_dtypes = _dataframe_to_dtypes(right_input_dtypes)
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
@@ -566,9 +567,7 @@ def _populate_graph(
         raise ValueError("No SELECT clause found in the query.")
 
     if select_op.distinct:
-        raise NotImplementedError(
-            f"SELECT DISTINCT is not yet supported by the ONNX converter, {select_op=}"
-        )
+        raise not_implemented_error("sql", "SELECT DISTINCT")
 
     # Compute GROUP BY tensors when a GROUP BY clause is present.
     gb_inverse_indices: Optional[str] = None

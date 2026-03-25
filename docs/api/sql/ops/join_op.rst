@@ -1,5 +1,5 @@
-yobx.sql.ops — join_op module
-==============================
+yobx.sql.ops.join_op
+====================
 
 .. automodule:: yobx.sql.ops.join_op
     :members:

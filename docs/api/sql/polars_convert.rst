@@ -1,5 +1,5 @@
-yobx.sql — polars\_convert module
-==================================
+yobx.sql.polars\_convert
+========================
 
 .. automodule:: yobx.sql.polars_convert
     :members:
