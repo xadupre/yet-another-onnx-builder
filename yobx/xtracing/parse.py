@@ -36,17 +36,18 @@ class ColumnRef:
 
     :param column: the column name (lower-cased by the parser).
     :param table: optional table qualifier (lower-cased by the parser).
-    :param dtype: optional ONNX element type for the column expressed as an
+    :param dtype: ONNX element type for the column expressed as an
         :data:`onnx.TensorProto` integer constant (e.g.
         ``onnx.TensorProto.FLOAT``, ``onnx.TensorProto.INT64``).  Set by
         :func:`~yobx.xtracing.dataframe_trace.trace_dataframe` when dtype
-        information is available at tracing time; ``None`` otherwise (e.g.
+        information is available at tracing time; defaults to
+        ``0`` (``onnx.TensorProto.UNDEFINED``) otherwise (e.g.
         when the reference is produced by the SQL string parser).
     """
 
     column: str
     table: Optional[str] = None
-    dtype: Optional[int] = None
+    dtype: int = 0
 
     def __str__(self) -> str:
         if self.table:

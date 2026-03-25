@@ -607,9 +607,9 @@ class TestDataframeArithmetic(ExtTestCase):
 
 
 class TestColumnRefDtype(ExtTestCase):
-    def test_dtype_defaults_to_none(self):
+    def test_dtype_defaults_to_zero(self):
         cr = ColumnRef("a")
-        self.assertIsNone(cr.dtype)
+        self.assertEqual(cr.dtype, 0)
 
     def test_dtype_stored_as_tensor_proto_int(self):
         from onnx import TensorProto
