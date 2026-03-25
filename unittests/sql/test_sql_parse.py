@@ -4,7 +4,7 @@ Unit tests for :mod:`yobx.sql.parse`.
 
 import unittest
 
-from yobx.sql.parse import (
+from yobx.xtracing.parse import (
     AggExpr,
     BinaryExpr,
     ColumnRef,

@@ -24,9 +24,9 @@ Architecture
 
 The conversion pipeline consists of two stages:
 
-1. **Parsing** (:func:`~yobx.sql.parse.parse_sql`) — turns the SQL string
-   into a :class:`~yobx.sql.parse.ParsedQuery` containing an ordered list of
-   :class:`~yobx.sql.parse.SqlOperation` objects, one per SQL clause.
+1. **Parsing** (:func:`~yobx.xtracing.parse.parse_sql`) — turns the SQL string
+   into a :class:`~yobx.xtracing.parse.ParsedQuery` containing an ordered list of
+   :class:`~yobx.xtracing.parse.SqlOperation` objects, one per SQL clause.
 
 2. **Emission** (:func:`~yobx.sql.sql_to_onnx`) — iterates over the
    operations in execution order and appends ONNX nodes to a
@@ -52,18 +52,18 @@ Supported SQL clauses
       - SqlOperation
       - ONNX nodes emitted
     * - ``SELECT expr [AS alias], …``
-      - :class:`~yobx.sql.parse.SelectOp`
+      - :class:`~yobx.xtracing.parse.SelectOp`
       - ``Identity``, ``Add``, ``Sub``, ``Mul``, ``Div``,
         ``ReduceSum``, ``ReduceMean``, ``ReduceMin``, ``ReduceMax``
     * - ``WHERE condition``
-      - :class:`~yobx.sql.parse.FilterOp`
+      - :class:`~yobx.xtracing.parse.FilterOp`
       - ``Compress``, ``Equal``, ``Less``, ``Greater``,
         ``LessOrEqual``, ``GreaterOrEqual``, ``And``, ``Or``, ``Not``
     * - ``GROUP BY col, …``
-      - :class:`~yobx.sql.parse.GroupByOp`
+      - :class:`~yobx.xtracing.parse.GroupByOp`
       - (groups are processed together with ``SelectOp`` aggregations)
     * - ``[INNER|LEFT|RIGHT|FULL] JOIN … ON col = col``
-      - :class:`~yobx.sql.parse.JoinOp`
+      - :class:`~yobx.xtracing.parse.JoinOp`
       - ``Unsqueeze``, ``Equal``, ``ArgMax``, ``ReduceMax``,
         ``Compress``, ``Gather``
 
@@ -117,14 +117,14 @@ Operations are applied in the following logical order:
 Parser design
 =============
 
-The parser (:mod:`yobx.sql.parse`) is a hand-written recursive-descent
+The parser (:mod:`yobx.xtracing.parse`) is a hand-written recursive-descent
 parser using a single-pass tokeniser.  No third-party SQL library is
 required.
 
 Tokens
 ------
 
-The tokeniser (:func:`yobx.sql.parse._tokenize`) classifies input characters
+The tokeniser (:func:`yobx.xtracing.parse._tokenize`) classifies input characters
 into four token kinds:
 
 * ``"num"`` — integer or floating-point literals.
@@ -206,11 +206,11 @@ In addition to accepting SQL strings and :class:`polars.LazyFrame` objects,
 ``yobx.sql`` provides a lightweight pandas-inspired API for tracing Python
 functions that operate on a virtual DataFrame.
 
-The tracer works by passing a :class:`~yobx.sql.dataframe_trace.TracedDataFrame`
+The tracer works by passing a :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame`
 proxy to the user function.  Every operation performed on the proxy —
 column access, arithmetic, filtering, aggregation — is recorded as an AST
 node rather than being executed.  The resulting AST is assembled into a
-:class:`~yobx.sql.parse.ParsedQuery` which is then compiled to ONNX by the
+:class:`~yobx.xtracing.parse.ParsedQuery` which is then compiled to ONNX by the
 existing SQL converter.
 
 .. code-block:: text
@@ -226,21 +226,21 @@ existing SQL converter.
 Key classes and functions
 -------------------------
 
-* :class:`~yobx.sql.dataframe_trace.TracedDataFrame` — proxy DataFrame with
+* :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame` — proxy DataFrame with
   ``.filter()``, ``.select()``, ``.assign()``, ``.groupby()`` operations.
-* :class:`~yobx.sql.dataframe_trace.TracedSeries` — proxy for a column or
+* :class:`~yobx.xtracing.dataframe_trace.TracedSeries` — proxy for a column or
   expression; supports arithmetic (``+``, ``-``, ``*``, ``/``),
   comparisons (``>``, ``<``, ``>=``, ``<=``, ``==``, ``!=``),
   aggregations (``.sum()``, ``.mean()``, ``.min()``, ``.max()``, ``.count()``)
   and ``.alias()``.
-* :class:`~yobx.sql.dataframe_trace.TracedCondition` — boolean predicate proxy;
+* :class:`~yobx.xtracing.dataframe_trace.TracedCondition` — boolean predicate proxy;
   supports ``&`` (AND) and ``|`` (OR) combination.
 * :func:`~yobx.sql.trace_dataframe` — traces a function and returns a
-  :class:`~yobx.sql.parse.ParsedQuery`.
+  :class:`~yobx.xtracing.parse.ParsedQuery`.
 * :func:`~yobx.sql.dataframe_to_onnx` — end-to-end converter: function →
   :class:`~yobx.container.ExportArtifact`.
 * :func:`~yobx.sql.parsed_query_to_onnx` — convert an already-built
-  :class:`~yobx.sql.parse.ParsedQuery` to ONNX (bypasses SQL string parsing).
+  :class:`~yobx.xtracing.parse.ParsedQuery` to ONNX (bypasses SQL string parsing).
 
 Example
 -------

@@ -661,7 +661,7 @@ def parse_sql(query: str) -> ParsedQuery:
     .. runpython::
         :showcode:
 
-        from yobx.sql.parse import parse_sql
+        from yobx.xtracing.parse import parse_sql
 
         pq = parse_sql("SELECT a, b FROM t WHERE a > 0")
         for op in pq.operations:

@@ -35,9 +35,9 @@ Public API
 * :class:`~yobx.sql.parse.FilterOp` — WHERE / filter clause operation
 * :class:`~yobx.sql.parse.GroupByOp` — GROUP BY clause operation
 * :class:`~yobx.sql.parse.JoinOp` — JOIN clause operation
-* :class:`~yobx.sql.dataframe_trace.TracedDataFrame` — proxy DataFrame for tracing
-* :class:`~yobx.sql.dataframe_trace.TracedSeries` — proxy column series for tracing
-* :class:`~yobx.sql.dataframe_trace.TracedCondition` — proxy boolean condition
+* :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame` — proxy DataFrame for tracing
+* :class:`~yobx.xtracing.dataframe_trace.TracedSeries` — proxy column series for tracing
+* :class:`~yobx.xtracing.dataframe_trace.TracedCondition` — proxy boolean condition
 
 Example
 -------
@@ -67,16 +67,8 @@ from .sql_convert import (
     parsed_query_to_onnx_graph,
 )
 from .polars_convert import lazyframe_to_onnx
-from .convert import to_onnx
-from .dataframe_trace import (
-    TracedCondition,
-    TracedDataFrame,
-    TracedGroupBy,
-    TracedSeries,
-    dataframe_to_onnx,
-    trace_dataframe,
-)
-from .parse import (
+from .convert import to_onnx, dataframe_to_onnx, trace_numpy_to_onnx
+from yobx.xtracing.parse import (
     AggExpr,
     BinaryExpr,
     ColumnRef,
@@ -91,6 +83,40 @@ from .parse import (
     SelectOp,
     parse_sql,
 )
+
+_DATAFRAME_TRACE_NAMES = frozenset([
+    "TracedCondition",
+    "TracedDataFrame",
+    "TracedGroupBy",
+    "TracedSeries",
+    "trace_dataframe",
+])
+
+
+def __getattr__(name: str) -> object:
+    if name in _DATAFRAME_TRACE_NAMES:
+        from yobx.xtracing.dataframe_trace import (  # noqa: PLC0415
+            TracedCondition,
+            TracedDataFrame,
+            TracedGroupBy,
+            TracedSeries,
+            trace_dataframe,
+        )
+        _symbols = {
+            "TracedCondition": TracedCondition,
+            "TracedDataFrame": TracedDataFrame,
+            "TracedGroupBy": TracedGroupBy,
+            "TracedSeries": TracedSeries,
+            "trace_dataframe": trace_dataframe,
+        }
+        # Cache in module globals to avoid repeated __getattr__ calls.
+        import sys as _sys
+        _mod = _sys.modules[__name__]
+        for _k, _v in _symbols.items():
+            setattr(_mod, _k, _v)
+        return _symbols[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "AggExpr",
@@ -118,4 +144,5 @@ __all__ = [
     "sql_to_onnx_graph",
     "to_onnx",
     "trace_dataframe",
+    "trace_numpy_to_onnx",
 ]

@@ -20,8 +20,8 @@ from yobx.sql import (
     dataframe_to_onnx,
     trace_dataframe,
 )
-from yobx.sql.dataframe_trace import _to_ast
-from yobx.sql.parse import AggExpr, BinaryExpr, ColumnRef, Condition, Literal
+from yobx.xtracing.dataframe_trace import _to_ast
+from yobx.xtracing.parse import AggExpr, BinaryExpr, ColumnRef, Condition, Literal
 
 
 def _ort_run(onx, feeds):
@@ -726,6 +726,29 @@ class TestDataframeToOnnx(ExtTestCase):
         from yobx.sql import trace_dataframe as td  # noqa: F401
 
         self.assertTrue(callable(td))
+
+    def test_imported_from_xtracing_package(self):
+        from yobx.xtracing import dataframe_to_onnx as dtonnx  # noqa: F401
+
+        self.assertTrue(callable(dtonnx))
+
+    def test_trace_dataframe_imported_from_xtracing_package(self):
+        from yobx.xtracing import trace_dataframe as td  # noqa: F401
+
+        self.assertTrue(callable(td))
+
+    def test_traced_classes_imported_from_xtracing(self):
+        from yobx.xtracing import (  # noqa: F401
+            TracedCondition,
+            TracedDataFrame,
+            TracedGroupBy,
+            TracedSeries,
+        )
+
+        self.assertTrue(issubclass(TracedDataFrame, object))
+        self.assertTrue(issubclass(TracedSeries, object))
+        self.assertTrue(issubclass(TracedCondition, object))
+        self.assertTrue(issubclass(TracedGroupBy, object))
 
     # ------------------------------------------------------------------
     # pipe — calling other functions that process a dataframe

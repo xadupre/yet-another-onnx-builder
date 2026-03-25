@@ -14,7 +14,7 @@ import numpy as np
 from yobx.ext_test_case import ExtTestCase, has_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sql import FuncCallExpr, sql_to_onnx
-from yobx.sql.parse import ColumnRef, SelectOp, parse_sql
+from yobx.xtracing.parse import ColumnRef, SelectOp, parse_sql
 
 
 def _ort_run(onx, feeds):
@@ -59,7 +59,7 @@ class TestFuncCallExprParsing(unittest.TestCase):
 
     def test_func_call_in_where(self):
         pq = parse_sql("SELECT a FROM t WHERE norm(a) > 0")
-        from yobx.sql.parse import FilterOp
+        from yobx.xtracing.parse import FilterOp
 
         filter_op = next(op for op in pq.operations if isinstance(op, FilterOp))
         cond = filter_op.condition

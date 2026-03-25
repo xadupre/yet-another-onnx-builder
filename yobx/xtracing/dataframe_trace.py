@@ -1,7 +1,7 @@
 """
 DataFrame function tracer — convert a Python function operating on a
 :class:`TracedDataFrame` into an ONNX model via
-:class:`yobx.sql.to_onnx`.
+:func:`yobx.sql.to_onnx`.
 
 The tracer provides a lightweight pandas-inspired API.  When you call
 :func:`dataframe_to_onnx` (or the lower-level :func:`trace_dataframe`), a
@@ -34,7 +34,7 @@ Example
 ::
 
     import numpy as np
-    from yobx.sql.dataframe_trace import dataframe_to_onnx
+    from yobx.xtracing.dataframe_trace import dataframe_to_onnx
     from yobx.reference import ExtendedReferenceEvaluator
 
     def transform(df):
@@ -57,9 +57,6 @@ from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
 
-from .. import DEFAULT_TARGET_OPSET
-from ..container import ExportArtifact
-from ..xbuilder import GraphBuilder
 from .parse import (
     AggExpr,
     BinaryExpr,
@@ -74,7 +71,6 @@ from .parse import (
     SelectOp,
     _collect_columns,
 )
-from .sql_convert import parsed_query_to_onnx
 
 # ---------------------------------------------------------------------------
 # Expression conversion helper
@@ -491,7 +487,7 @@ class TracedDataFrame:
         Example::
 
             import numpy as np
-            from yobx.sql.dataframe_trace import dataframe_to_onnx
+            from yobx.xtracing.dataframe_trace import dataframe_to_onnx
 
             def transform(df1, df2):
                 return df1.join(df2, left_key="cid", right_key="id")
@@ -657,7 +653,7 @@ def trace_dataframe(
     Example — single dataframe::
 
         import numpy as np
-        from yobx.sql.dataframe_trace import trace_dataframe
+        from yobx.xtracing.dataframe_trace import trace_dataframe
 
         def transform(df):
             df = df.filter(df["a"] > 0)
@@ -672,7 +668,7 @@ def trace_dataframe(
     Example — two dataframes::
 
         import numpy as np
-        from yobx.sql.dataframe_trace import trace_dataframe
+        from yobx.xtracing.dataframe_trace import trace_dataframe
 
         def transform(df1, df2):
             return df1.select([(df1["a"] + df2["b"]).alias("total")])
@@ -697,132 +693,3 @@ def trace_dataframe(
             f"got {type(result).__name__!r}"
         )
     return result.to_parsed_query()
-
-
-def dataframe_to_onnx(
-    func: Callable,
-    input_dtypes: Union[
-        Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
-    ],
-    target_opset: int = DEFAULT_TARGET_OPSET,
-    custom_functions: Optional[Dict[str, Callable]] = None,
-    builder_cls: Union[type, Callable] = GraphBuilder,
-    filename: Optional[str] = None,
-    verbose: int = 0,
-) -> ExportArtifact:
-    """Trace *func* and convert the resulting computation to ONNX.
-
-    Combines :func:`trace_dataframe` and
-    :func:`~yobx.sql.sql_convert.parsed_query_to_onnx` into a single call.
-
-    :param func: a callable that accepts one or more :class:`TracedDataFrame`
-        objects and returns a :class:`TracedDataFrame`.
-    :param input_dtypes: either
-
-        * a single ``{column: dtype}`` mapping — *func* is called with one
-          :class:`TracedDataFrame`; or
-        * a **list** of ``{column: dtype}`` mappings — *func* is called with
-          one :class:`TracedDataFrame` per mapping, in order.  When the traced
-          function contains a :class:`~yobx.sql.parse.JoinOp`, the first
-          mapping is used as the *left-table* dtypes and the second as the
-          *right-table* dtypes.  For functions that simply share columns
-          across multiple frames without a join, all mappings are merged into
-          a single input-dtype dict.
-
-    :param target_opset: ONNX opset version to target (default:
-        :data:`yobx.DEFAULT_TARGET_OPSET`).
-    :param custom_functions: optional mapping from function name to Python
-        callable.  Functions registered here can be called inside the traced
-        body via :class:`~yobx.sql.parse.FuncCallExpr` nodes if the traced
-        function constructs them directly (advanced usage).
-    :param builder_cls: graph-builder class or factory callable.  Defaults to
-        :class:`~yobx.xbuilder.GraphBuilder`.
-    :param filename: if set, the exported ONNX model is saved to this path and
-        the :class:`~yobx.container.ExportReport` is written as a companion
-        Excel file (same base name with ``.xlsx`` extension).
-    :param verbose: verbosity level (0 = silent).
-    :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
-        ONNX model together with an :class:`~yobx.container.ExportReport`.
-
-    Example — single dataframe::
-
-        import numpy as np
-        from yobx.sql.dataframe_trace import dataframe_to_onnx
-        from yobx.reference import ExtendedReferenceEvaluator
-
-        def transform(df):
-            df = df.filter(df["a"] > 0)
-            return df.select([(df["a"] + df["b"]).alias("total")])
-
-        dtypes = {"a": np.float32, "b": np.float32}
-        artifact = dataframe_to_onnx(transform, dtypes)
-
-        ref = ExtendedReferenceEvaluator(artifact)
-        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
-        b = np.array([4.0,  5.0, 6.0], dtype=np.float32)
-        (total,) = ref.run(None, {"a": a, "b": b})
-        # total == array([5., 9.], dtype=float32)  (rows where a > 0)
-
-    Example — two independent dataframes (no join)::
-
-        import numpy as np
-        from yobx.sql.dataframe_trace import dataframe_to_onnx
-        from yobx.reference import ExtendedReferenceEvaluator
-
-        def transform(df1, df2):
-            return df1.select([(df1["a"] + df2["b"]).alias("total")])
-
-        artifact = dataframe_to_onnx(transform, [{"a": np.float32}, {"b": np.float32}])
-
-        ref = ExtendedReferenceEvaluator(artifact)
-        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
-        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        (total,) = ref.run(None, {"a": a, "b": b})
-        # total == array([5., 7., 9.], dtype=float32)
-
-    Example — two dataframes joined on a key column::
-
-        import numpy as np
-        from yobx.sql.dataframe_trace import dataframe_to_onnx
-        from yobx.reference import ExtendedReferenceEvaluator
-
-        def transform(df1, df2):
-            return df1.join(df2, left_key="cid", right_key="id")
-
-        dtypes1 = {"cid": np.int64, "a": np.float32}
-        dtypes2 = {"id": np.int64, "b": np.float32}
-        artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
-    """
-    pq = trace_dataframe(func, input_dtypes)
-    if isinstance(input_dtypes, list):
-        has_join = any(isinstance(op, JoinOp) for op in pq.operations)
-        if has_join:
-            left_dtypes: Dict[str, Union[np.dtype, type, str]] = input_dtypes[0]
-            right_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = (
-                input_dtypes[1] if len(input_dtypes) > 1 else None
-            )
-        else:
-            # Merge all dtype dicts — columns come from a flat table.
-            left_dtypes = {}
-            for d in input_dtypes:
-                left_dtypes.update(d)
-            right_dtypes = None
-        return parsed_query_to_onnx(
-            pq,
-            left_dtypes,
-            right_input_dtypes=right_dtypes,
-            target_opset=target_opset,
-            custom_functions=custom_functions,
-            builder_cls=builder_cls,
-            filename=filename,
-            verbose=verbose,
-        )
-    return parsed_query_to_onnx(
-        pq,
-        input_dtypes,
-        target_opset=target_opset,
-        custom_functions=custom_functions,
-        builder_cls=builder_cls,
-        filename=filename,
-        verbose=verbose,
-    )

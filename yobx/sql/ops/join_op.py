@@ -10,7 +10,7 @@ import numpy as np
 from onnx import TensorProto
 
 from ...xbuilder import GraphBuilder
-from ..parse import JoinOp
+from ...xtracing.parse import JoinOp
 from .register import register_sql_op_converter
 
 
