@@ -21,6 +21,8 @@ class TestSimplifyExpressions(ExtTestCase):
 
     def test_simplify_expression_to_int(self):
         self.assertEqual(simplify_expression("2*batch//batch"), 2)
+        self.assertEqual(simplify_expression("2^2"), 2)
+        self.assertEqual(simplify_expression("2*batch//batch^2"), 2)
 
     def test_simplify_expression2(self):
         self.assertEqual(simplify_expression("5 + x - (2 + 3)"), "x")

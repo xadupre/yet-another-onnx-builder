@@ -210,4 +210,4 @@ for exporter in exporters:
     if diff["abs"] < 1e-2:
         print(f"-- discrepancies ok - {diff['abs']}")
     else:
-        print(f"-- dicrepancies = {diff}")
+        print(f"-- discrepancies = {diff}")
