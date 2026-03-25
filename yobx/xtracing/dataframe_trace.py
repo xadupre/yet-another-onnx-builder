@@ -116,6 +116,7 @@ def _to_tensor_proto_dtype(dt: Union[np.dtype, type, str]) -> int:
         )
     return result
 
+
 # ---------------------------------------------------------------------------
 # Expression conversion helper
 # ---------------------------------------------------------------------------
@@ -722,14 +723,20 @@ def trace_dataframe(
     if isinstance(input_dtypes, list):
         dfs = [
             TracedDataFrame(
-                {name: TracedSeries(ColumnRef(name, dtype=_to_tensor_proto_dtype(d[name]))) for name in d},
+                {
+                    name: TracedSeries(ColumnRef(name, dtype=_to_tensor_proto_dtype(d[name])))
+                    for name in d
+                },
                 source_columns=list(d.keys()),
             )
             for d in input_dtypes
         ]
         result = func(*dfs)
     else:
-        columns = {name: TracedSeries(ColumnRef(name, dtype=_to_tensor_proto_dtype(input_dtypes[name]))) for name in input_dtypes}
+        columns = {
+            name: TracedSeries(ColumnRef(name, dtype=_to_tensor_proto_dtype(input_dtypes[name])))
+            for name in input_dtypes
+        }
         df = TracedDataFrame(columns, source_columns=list(input_dtypes.keys()))
         result = func(df)
     if not isinstance(result, TracedDataFrame):
