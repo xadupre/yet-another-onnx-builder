@@ -58,6 +58,50 @@ class TestOnnxExportControlFlow(ExtTestCase):
             got = sess.run(None, {"x": _x.detach().numpy()})[0]
             self.assertEqualArray(expected, got, atol=1e-5)
 
+    @skipif_ci_windows("not yet supported on Windows")
+    @requires_torch("2.4")
+    @ignore_warnings(UserWarning)
+    def test_controlflow_cond_tracing(self):
+        """ControlFlowCond exported with ExportOptions(tracing=True)."""
+        import onnxruntime
+
+        cls, x = self.get_custom_model()
+        model = cls()
+        onx = to_onnx(model, (x,), inline=False, export_options=ExportOptions(tracing=True))
+        co = Counter([n.op_type for n in onx.graph.node])
+        self.assertIn("If", co)
+        ref = ExtendedReferenceEvaluator(onx)
+        sess = onnxruntime.InferenceSession(
+            onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+
+        for _x in (x, -x):
+            expected = model(_x)
+            got = ref.run(None, {"x": _x.detach().numpy()})[0]
+            self.assertEqualArray(expected, got, atol=1e-5)
+
+            got = sess.run(None, {"x": _x.detach().numpy()})[0]
+            self.assertEqualArray(expected, got, atol=1e-5)
+
+    @skipif_ci_windows("not yet supported on Windows")
+    @requires_torch("2.4")
+    @ignore_warnings(UserWarning)
+    def test_controlflow_cond_tracing_2outputs(self):
+        """ControlFlowCond2Outputs exported with ExportOptions(tracing=True)."""
+        cls, x = self.get_custom_model_2()
+        model = cls()
+        onx = to_onnx(model, (x,), inline=False, export_options=ExportOptions(tracing=True))
+        co = Counter([n.op_type for n in onx.graph.node])
+        self.assertIn("If", co)
+        ref = ExtendedReferenceEvaluator(onx)
+
+        for _x in (x, -x):
+            expected = model(_x)
+            got = ref.run(None, {"x": _x.detach().numpy()})
+            self.assertEqual(len(expected), len(got))
+            for e, g in zip(expected, got):
+                self.assertEqualArray(e, g, atol=1e-5)
+
     @classmethod
     def get_custom_model_2(cls):
         import torch
