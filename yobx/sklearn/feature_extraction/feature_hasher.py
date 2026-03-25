@@ -72,7 +72,8 @@ def sklearn_feature_hasher(
         └── Cast(dtype) → output  (N, n_features) FLOAT/DOUBLE
 
     :param g: graph builder to add nodes to
-    :param sts: shapes defined by :epkg:`scikit-learn`
+    :param sts: shapes defined by :epkg:`scikit-learn` (unused; present for
+        interface consistency)
     :param estimator: a fitted ``FeatureHasher`` instance
     :param outputs: desired output names
     :param X: input tensor name — a ``STRING`` tensor of shape
