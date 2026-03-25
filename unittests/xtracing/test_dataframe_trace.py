@@ -611,52 +611,53 @@ class TestColumnRefDtype(ExtTestCase):
         cr = ColumnRef("a")
         self.assertIsNone(cr.dtype)
 
-    def test_dtype_stored_as_type(self):
-        cr = ColumnRef("a", dtype=np.float32)
-        self.assertIs(cr.dtype, np.float32)
+    def test_dtype_stored_as_tensor_proto_int(self):
+        from onnx import TensorProto
 
-    def test_dtype_stored_as_dtype(self):
-        cr = ColumnRef("a", dtype=np.dtype("int64"))
-        self.assertEqual(cr.dtype, np.dtype("int64"))
+        cr = ColumnRef("a", dtype=TensorProto.FLOAT)
+        self.assertEqual(cr.dtype, TensorProto.FLOAT)
 
-    def test_dtype_stored_as_string(self):
-        cr = ColumnRef("a", dtype="float64")
-        self.assertEqual(cr.dtype, "float64")
+    def test_dtype_int64(self):
+        from onnx import TensorProto
+
+        cr = ColumnRef("a", dtype=TensorProto.INT64)
+        self.assertEqual(cr.dtype, TensorProto.INT64)
 
     def test_dtype_independent_of_table(self):
-        cr = ColumnRef("col", table="tbl", dtype=np.int32)
+        from onnx import TensorProto
+
+        cr = ColumnRef("col", table="tbl", dtype=TensorProto.INT32)
         self.assertEqual(cr.table, "tbl")
-        self.assertIs(cr.dtype, np.int32)
+        self.assertEqual(cr.dtype, TensorProto.INT32)
 
     def test_trace_dataframe_propagates_dtype(self):
-        """ColumnRef nodes produced by trace_dataframe carry the input dtype."""
+        """ColumnRef nodes produced by trace_dataframe carry the TensorProto dtype."""
+        from onnx import TensorProto
+        from yobx.xtracing.parse import SelectOp
 
         def transform(df):
             return df.select([df["a"].alias("a")])
 
         pq = trace_dataframe(transform, {"a": np.float32, "b": np.int64})
-        # The ParsedQuery's SelectOp items hold ColumnRef expressions.
-        from yobx.xtracing.parse import SelectOp
-
         select_op = next(op for op in pq.operations if isinstance(op, SelectOp))
         col_ref = select_op.items[0].expr
         self.assertIsInstance(col_ref, ColumnRef)
         self.assertEqual(col_ref.column, "a")
-        self.assertEqual(col_ref.dtype, np.float32)
+        self.assertEqual(col_ref.dtype, TensorProto.FLOAT)
 
     def test_trace_dataframe_multi_input_propagates_dtype(self):
         """Dtypes are propagated for multi-input trace_dataframe calls."""
+        from onnx import TensorProto
+        from yobx.xtracing.parse import SelectOp
 
         def transform(df1, df2):
             return df1.select([df1["x"].alias("x")])
 
         pq = trace_dataframe(transform, [{"x": np.float64}, {"y": np.int32}])
-        from yobx.xtracing.parse import SelectOp
-
         select_op = next(op for op in pq.operations if isinstance(op, SelectOp))
         col_ref = select_op.items[0].expr
         self.assertIsInstance(col_ref, ColumnRef)
-        self.assertEqual(col_ref.dtype, np.float64)
+        self.assertEqual(col_ref.dtype, TensorProto.DOUBLE)
 
 
 if __name__ == "__main__":
