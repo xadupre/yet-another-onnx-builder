@@ -369,7 +369,7 @@ def _parse_polars_plan(plan: str) -> _PolarsPlan:
             raise not_implemented_error("polars", "lf.sort")
         if _upper.startswith("UNIQUE"):
             raise not_implemented_error("polars", "lf.unique")
-        if _upper.startswith("SLICE") or _upper.startswith("LIMIT"):
+        if _upper.startswith(("SLICE", "LIMIT")):
             raise not_implemented_error("polars", "lf.limit")
 
         # FROM / END ... / other structural lines — skip

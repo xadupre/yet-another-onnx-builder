@@ -22,36 +22,16 @@ CoverageRow = Tuple[str, str, str]
 
 SQL_COVERAGE: List[CoverageRow] = [
     ("``SELECT col``", _SUPPORTED, "column pass-through via ``Identity``"),
-    (
-        "``SELECT expr AS alias``",
-        _SUPPORTED,
-        "arithmetic: ``Add``, ``Sub``, ``Mul``, ``Div``",
-    ),
-    (
-        "``SELECT AGG(col)``",
-        _SUPPORTED,
-        "``SUM``, ``AVG``, ``MIN``, ``MAX``, ``COUNT``",
-    ),
-    (
-        "``WHERE condition``",
-        _SUPPORTED,
-        "comparisons + ``AND`` / ``OR``",
-    ),
-    (
-        "``GROUP BY cols``",
-        _PARTIAL,
-        "whole-dataset aggregation only; no per-group rows",
-    ),
+    ("``SELECT expr AS alias``", _SUPPORTED, "arithmetic: ``Add``, ``Sub``, ``Mul``, ``Div``"),
+    ("``SELECT AGG(col)``", _SUPPORTED, "``SUM``, ``AVG``, ``MIN``, ``MAX``, ``COUNT``"),
+    ("``WHERE condition``", _SUPPORTED, "comparisons + ``AND`` / ``OR``"),
+    ("``GROUP BY cols``", _PARTIAL, "whole-dataset aggregation only; no per-group rows"),
     (
         "``[INNER|LEFT|RIGHT|FULL] JOIN … ON col = col``",
         _SUPPORTED,
         "equi-join on a single key column",
     ),
-    (
-        "``SELECT DISTINCT``",
-        _UNSUPPORTED,
-        "parsed but raises ``NotImplementedError``",
-    ),
+    ("``SELECT DISTINCT``", _UNSUPPORTED, "parsed but raises ``NotImplementedError``"),
     ("``HAVING``", _UNSUPPORTED, "not yet implemented"),
     ("``ORDER BY``", _UNSUPPORTED, "not yet implemented"),
     ("``LIMIT``", _UNSUPPORTED, "not yet implemented"),
@@ -64,7 +44,7 @@ SQL_COVERAGE: List[CoverageRow] = [
 ]
 
 DATAFRAME_COVERAGE: List[CoverageRow] = [
-    ("``df[\"col\"]``", _SUPPORTED, "column access"),
+    ('``df["col"]``', _SUPPORTED, "column access"),
     ("``df.filter(condition)``", _SUPPORTED, "maps to ``WHERE``"),
     ("``df.select([series, …])``", _SUPPORTED, "maps to ``SELECT``"),
     ("``df.assign(name=series)``", _SUPPORTED, "maps to ``SELECT … AS name``"),
@@ -85,7 +65,7 @@ DATAFRAME_COVERAGE: List[CoverageRow] = [
         "``ReduceSum``, ``ReduceMean``, ``ReduceMin``, ``ReduceMax``",
     ),
     ("``cond1 & cond2`` / ``cond1 | cond2``", _SUPPORTED, "``And``, ``Or``"),
-    ("``series.alias(\"name\")``", _SUPPORTED, "output rename"),
+    ('``series.alias("name")``', _SUPPORTED, "output rename"),
     (
         "Conditional branches (``if``/``else``)",
         _UNSUPPORTED,
@@ -94,21 +74,9 @@ DATAFRAME_COVERAGE: List[CoverageRow] = [
 ]
 
 POLARS_COVERAGE: List[CoverageRow] = [
-    (
-        "``lf.select([…])``",
-        _SUPPORTED,
-        "column selection and arithmetic expressions",
-    ),
-    (
-        "``lf.filter(condition)``",
-        _SUPPORTED,
-        "comparison and boolean predicates",
-    ),
-    (
-        "``lf.group_by(cols).agg([…])``",
-        _PARTIAL,
-        "whole-dataset aggregation only",
-    ),
+    ("``lf.select([…])``", _SUPPORTED, "column selection and arithmetic expressions"),
+    ("``lf.filter(condition)``", _SUPPORTED, "comparison and boolean predicates"),
+    ("``lf.group_by(cols).agg([…])``", _PARTIAL, "whole-dataset aggregation only"),
     (
         "Arithmetic (``+``, ``-``, ``*``, ``/``)",
         _SUPPORTED,
@@ -119,12 +87,8 @@ POLARS_COVERAGE: List[CoverageRow] = [
         _SUPPORTED,
         "``WHERE`` predicates",
     ),
-    (
-        "``&`` / ``|`` compound predicates",
-        _SUPPORTED,
-        "``AND`` / ``OR`` in ``WHERE``",
-    ),
-    ("``.alias(\"name\")``", _SUPPORTED, "output rename"),
+    ("``&`` / ``|`` compound predicates", _SUPPORTED, "``AND`` / ``OR`` in ``WHERE``"),
+    ('``.alias("name")``', _SUPPORTED, "output rename"),
     (
         "Aggregation methods (``.sum()``, ``.mean()``, ``.min()``, ``.max()``, ``.count()``)",
         _SUPPORTED,
@@ -221,7 +185,5 @@ def not_implemented_error(section: str, construct: str) -> NotImplementedError:
         clean = _clean_construct(raw_construct)
         if needle in clean:
             if status in (_UNSUPPORTED, _PARTIAL):
-                return NotImplementedError(
-                    f"{construct!r} is not supported: {notes}"
-                )
+                return NotImplementedError(f"{construct!r} is not supported: {notes}")
     return NotImplementedError(f"{construct!r} is not supported")

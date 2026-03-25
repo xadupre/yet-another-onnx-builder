@@ -64,10 +64,7 @@ class TestRstTable(unittest.TestCase):
         self.assertIn("some note", output)
 
     def test_multiple_rows(self):
-        rows = [
-            ("op_a", "✔ supported", "note a"),
-            ("op_b", "✘ not supported", "note b"),
-        ]
+        rows = [("op_a", "✔ supported", "note a"), ("op_b", "✘ not supported", "note b")]
         output = _rst_table(rows, "Operation")
         self.assertIn("op_a", output)
         self.assertIn("op_b", output)
