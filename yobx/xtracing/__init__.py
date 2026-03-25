@@ -23,7 +23,7 @@ Public API
 * :func:`trace_numpy_function` — converter-API function: trace a numpy function
   into an existing :class:`~yobx.xbuilder.GraphBuilder`
 * :func:`trace_numpy_to_onnx` — high-level entry point: convert a numpy
-  function to a standalone ONNX model
+  function to a standalone ONNX model (lives in :mod:`yobx.sql`)
 * :class:`TracedDataFrame` — proxy DataFrame that records SQL-like operations
 * :class:`TracedSeries` — proxy for a single column or computed expression
 * :class:`TracedCondition` — proxy for a boolean predicate
@@ -31,7 +31,7 @@ Public API
 * :func:`trace_dataframe` — trace a DataFrame function →
   :class:`~yobx.xtracing.parse.ParsedQuery`
 * :func:`dataframe_to_onnx` — high-level entry point: traced DataFrame
-  function → :class:`~yobx.container.ExportArtifact`
+  function → :class:`~yobx.container.ExportArtifact` (lives in :mod:`yobx.sql`)
 
 Example (numpy)
 ---------------
@@ -60,15 +60,34 @@ Example (DataFrame)
     artifact = dataframe_to_onnx(transform, {"a": np.float32, "b": np.float32})
 """
 
-from .tracing import trace_numpy_function, trace_numpy_to_onnx
+from .tracing import trace_numpy_function
 from .dataframe_trace import (
     TracedCondition,
     TracedDataFrame,
     TracedGroupBy,
     TracedSeries,
-    dataframe_to_onnx,
     trace_dataframe,
 )
+
+_ONNX_EXPORT_NAMES = frozenset(["dataframe_to_onnx", "trace_numpy_to_onnx"])
+
+
+def __getattr__(name: str) -> object:
+    if name in _ONNX_EXPORT_NAMES:
+        from yobx.sql.convert import dataframe_to_onnx, trace_numpy_to_onnx  # noqa: PLC0415
+
+        _symbols = {
+            "dataframe_to_onnx": dataframe_to_onnx,
+            "trace_numpy_to_onnx": trace_numpy_to_onnx,
+        }
+        import sys as _sys
+
+        _mod = _sys.modules[__name__]
+        for _k, _v in _symbols.items():
+            setattr(_mod, _k, _v)
+        return _symbols[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
 
 __all__ = [
     "TracedCondition",

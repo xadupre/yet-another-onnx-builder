@@ -67,7 +67,7 @@ from .sql_convert import (
     parsed_query_to_onnx_graph,
 )
 from .polars_convert import lazyframe_to_onnx
-from .convert import to_onnx
+from .convert import to_onnx, dataframe_to_onnx, trace_numpy_to_onnx
 from yobx.xtracing.parse import (
     AggExpr,
     BinaryExpr,
@@ -89,7 +89,6 @@ _DATAFRAME_TRACE_NAMES = frozenset([
     "TracedDataFrame",
     "TracedGroupBy",
     "TracedSeries",
-    "dataframe_to_onnx",
     "trace_dataframe",
 ])
 
@@ -101,7 +100,6 @@ def __getattr__(name: str) -> object:
             TracedDataFrame,
             TracedGroupBy,
             TracedSeries,
-            dataframe_to_onnx,
             trace_dataframe,
         )
         _symbols = {
@@ -109,7 +107,6 @@ def __getattr__(name: str) -> object:
             "TracedDataFrame": TracedDataFrame,
             "TracedGroupBy": TracedGroupBy,
             "TracedSeries": TracedSeries,
-            "dataframe_to_onnx": dataframe_to_onnx,
             "trace_dataframe": trace_dataframe,
         }
         # Cache in module globals to avoid repeated __getattr__ calls.
@@ -147,4 +144,5 @@ __all__ = [
     "sql_to_onnx_graph",
     "to_onnx",
     "trace_dataframe",
+    "trace_numpy_to_onnx",
 ]

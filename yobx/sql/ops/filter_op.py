@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 from ...typing import GraphBuilderExtendedProtocol
-from ..parse import FilterOp
+from ...xtracing.parse import FilterOp
 from .._expr import _ExprEmitter
 from .register import register_sql_op_converter
 
