@@ -178,7 +178,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertIn("QuickGelu", unique_ops)
         self.assertIn("CausalMaskMulAdd", unique_ops)
         self.assertIn("CausalMask", unique_ops)
-        self.assertNotIn("GroupQueryAttention", unique_ops)
+        self.assertIn("GroupQueryAttention", unique_ops)
         self.assertInOr(("CosSinCache_p1", "CosSinCacheWithRange"), unique_ops)
         sess = onnxruntime.InferenceSession(filename, providers=["CPUExecutionProvider"])
         feeds = make_feeds(sess, b1, use_numpy=True)

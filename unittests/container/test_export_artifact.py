@@ -465,8 +465,7 @@ class TestExportArtifact(ExtTestCase):
         import pandas
 
         artifact = ExportArtifact(
-            proto=_make_matmul_model(),
-            report=ExportReport(extra={"time_total": 0.1}),
+            proto=_make_matmul_model(), report=ExportReport(extra={"time_total": 0.1})
         )
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "model.onnx")

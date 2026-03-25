@@ -234,6 +234,8 @@ class ExpressionSimplifierAddVisitor(CommonVisitor):
             self.coeffs[s] += 1
 
     def make_simplified(self) -> str:
+        if not self.coeffs:
+            return self.const
         terms = []
         for var, coeff in self.coeffs.items():
             if coeff == 0:
@@ -353,6 +355,20 @@ class ExactMulDivConstantFolderTransformer(CommonTransformer):
         return out
 
 
+class StringToIntTransformer(CommonTransformer):
+    def visit_Constant(self, node):
+        # Only process string constants
+        if isinstance(node.value, str):
+            try:
+                # Try converting to int
+                new_value = int(node.value)
+                return ast.copy_location(ast.Constant(value=new_value), node)
+            except ValueError:
+                pass  # Leave unchanged if not convertible
+
+        return node
+
+
 def simplify_expression(expr: Union[str, int]) -> Union[str, int]:
     """Simplifies an expression."""
     if isinstance(expr, int):
@@ -367,7 +383,10 @@ def simplify_expression(expr: Union[str, int]) -> Union[str, int]:
         MaxToXorTransformer(expr=expr),
         SimplifyParensTransformer(expr=expr),
         ReorderCommutativeOpsTransformer(expr=expr),
+        StringToIntTransformer(expr=expr),
     ]
+    for tr in transformers:
+        tree = tr.visit(tree)
     for tr in transformers:
         tree = tr.visit(tree)
     ast.fix_missing_locations(tree.body)
