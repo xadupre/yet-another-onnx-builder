@@ -19,7 +19,7 @@ from .numpy_array import NumpyArray
 def trace_numpy_function(
     g: GraphBuilderExtendedProtocol,
     sts: Dict,
-    outputs: List[str],
+    outputs: Optional[List[str]],
     func: Callable,
     inputs: List[str],
     name: str = "trace",
