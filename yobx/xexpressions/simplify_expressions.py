@@ -233,7 +233,7 @@ class ExpressionSimplifierAddVisitor(CommonVisitor):
         else:
             self.coeffs[s] += 1
 
-    def make_simplified(self) -> str:
+    def make_simplified(self) -> Union[str, int]:
         if not self.coeffs:
             return self.const
         terms = []
