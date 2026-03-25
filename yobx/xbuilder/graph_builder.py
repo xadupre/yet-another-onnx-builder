@@ -39,7 +39,7 @@ import onnx.numpy_helper as onh
 from onnx.external_data_helper import uses_external_data
 from onnx.model_container import make_large_tensor_proto
 from onnx.shape_inference import infer_shapes as onnx_infer_shapes
-from ..typing import ConvertOptionsProtocol, DefaultConvertOptions
+from ..typing import ConvertOptionsProtocol, DefaultConvertOptions, GraphBuilderExtendedProtocol
 from ..container import ExportArtifact, ExportReport, ExtendedModelContainer, FunctionPieces
 from ..container.model_container import _get_type
 from ..helpers.mini_onnx_builder import proto_from_array
@@ -115,7 +115,13 @@ def _unset_fake_temporarily() -> Generator:
             torch._C._set_dispatch_mode(old)
 
 
-class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPackages):
+class GraphBuilder(
+    _BuilderRuntime,
+    _ShapeRuntime,
+    _InferenceRuntime,
+    _ExtraPackages,
+    GraphBuilderExtendedProtocol,
+):
     """
     Simplifies the creation of a model.
 
@@ -2731,7 +2737,7 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                         value, (self.tensorflow.Tensor, self.tensorflow.Variable)  # type: ignore
                     )
                 ):
-                    size = int(np.prod(shape)) if shape else 0
+                    size = int(self.tensorflow.prod(shape)) if shape else 0
                 else:
                     size = int(value.size)  # type: ignore
                 sh2 = (
@@ -2741,6 +2747,9 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
                 )
                 name = self.unique_name(f"init{itype}_s{sh}_{sh2}")
 
+        assert isinstance(shape, tuple) and all(
+            isinstance(s, int) for s in shape
+        ), f"{shape=} has unexpected types{self.get_debug_msg()}"
         self.add_initializer(
             name,
             value,
@@ -7276,8 +7285,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
         """
         self._clean_values_cache()
         # make_initializer
+        begin_ = time.perf_counter()
         if self.verbose > 1:
-            begin_ = time.perf_counter()
             print(
                 f"[GraphBuilder-{self._hash()}.remove_identity_nodes] "
                 f"-- starts with {len(self.nodes)}"
@@ -8036,8 +8045,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
             proto, (GraphProto, ModelProto)
         ), f"Unexpected type {type(proto)} for proto"
         proto_graph = proto if isinstance(proto, GraphProto) else proto.graph
+        begin_ = time.perf_counter()
         if self.verbose > 1:
-            begin_ = time.perf_counter()
             print(
                 f"[GraphBuilder-{self._hash()}._update_shape_types_with_proto] -- starts with "
                 f"{len(self.nodes)} nodes and {len(getattr(proto_graph, 'value_info', []))} "  # type: ignore[arg-type]
@@ -8110,8 +8119,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
 
     def infer_shapes(self) -> Dict[str, Tuple[DYNAMIC_SHAPE, DYNAMIC_SHAPE]]:
         """Runs custom shape inference. Returns the updates."""
+        begin = time.perf_counter()
         if self.verbose > 1:
-            begin = time.perf_counter()
             print("[GraphBuilder.infer_shapes]")
         res: Dict[str, Tuple[DYNAMIC_SHAPE, DYNAMIC_SHAPE]] = {}
         for node in self.nodes:
@@ -8151,8 +8160,8 @@ class GraphBuilder(_BuilderRuntime, _ShapeRuntime, _InferenceRuntime, _ExtraPack
     ):
         """Updates the shapes and types for an existing model."""
         proto_graph = proto.graph if isinstance(proto, ModelProto) else proto
+        begin_ = time.perf_counter()
         if self.verbose > 1:
-            begin_ = time.perf_counter()
             print(
                 f"[GraphBuilder-{self._hash()}._update_structures_with_proto] -- starts with "
                 f"{len(proto_graph.node)} nodes"

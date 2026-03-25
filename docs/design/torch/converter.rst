@@ -1,8 +1,8 @@
 .. _l-design-torch-converter:
 
-=====================================
-Torch Converter to ONNX
-=====================================
+========================
+Torch Converters to ONNX
+========================
 
 .. note::
     This section covers the core conversion pipeline that transforms a
@@ -70,7 +70,6 @@ different design priorities.
      - Rich set of environment variables (``ONNXSTOP``, ``ONNXSTOPSHAPE``,
        ``ONNXSTOPTYPE``, ``ONNXSTOPOUTPUT``, …) let you pinpoint exactly
        which node assigns a suspicious shape or type; see
-       :ref:`l-design-torch-debugging` and
        :ref:`l-graphbuilder-debugging-env`
      - Standard Python / PyTorch debugging tools
 
@@ -405,44 +404,6 @@ requiring code changes:
    * - ``PRINT_EXPORTED_PROGRAM=1``
      - Prints the :class:`~torch.export.ExportedProgram` before interpretation.
 
-.. _l-design-torch-debugging:
-
-Debugging when Exporting with GraphBuilder
-==========================================
-
-:class:`~yobx.xbuilder.GraphBuilder` reads several environment variables at
-construction time that raise an exception as soon as a named result is
-assigned a shape, type, or value.  Setting one of these is the fastest way to
-get a Python traceback pointing at the exact line that produces a suspicious
-tensor.
-
-.. list-table::
-   :widths: 35 65
-   :header-rows: 1
-
-   * - Variable
-     - Effect
-   * - ``ONNXSTOP=<name>``
-     - Raises when result ``<name>`` is created (type **or** shape assignment).
-       Example: ``ONNXSTOP=attn_output python script.py``
-   * - ``ONNXSTOPSHAPE=<name>``
-     - Raises when result ``<name>`` receives a shape.
-   * - ``ONNXSTOPTYPE=<name>``
-     - Raises when result ``<name>`` receives a type.
-   * - ``ONNXSTOPSEQUENCE=<name>``
-     - Raises when result ``<name>`` is assigned a sequence type.
-   * - ``ONNXSTOPVALUESHAPE=<name>``
-     - Enables extra logging in the shape-value computation path for ``<name>``.
-   * - ``ONNXSTOPOUTPUT=<name>``
-     - Raises when a node whose output contains ``<name>`` is appended to the graph.
-   * - ``ONNXDYNDIM=<name>``
-     - Raises when dynamic dimension ``<name>`` is referenced.
-   * - ``ONNXCST=1``
-     - Logs every constant that is evaluated during shape inference.
-   * - ``ONNXSHAPECOMPUTE=1``
-     - Raises when a shape cannot be inferred (instead of silently leaving it
-       unknown).
-
 See also
 ========
 
@@ -451,8 +412,6 @@ See also
   successful symbolic tracing.
 * :ref:`l-design-input-observer` — automatic inference of export arguments
   and dynamic shapes.
-* :ref:`l-design-torch-debugging` — environment variables for tracing
-  converter issues (this page).
 * :ref:`l-graphbuilder-debugging-env` — ``GraphBuilder`` debugging environment
   variables.
 * :class:`yobx.xbuilder.GraphBuilder` — the underlying ONNX graph builder.

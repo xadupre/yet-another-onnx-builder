@@ -730,8 +730,8 @@ Nodes
 
 .. _l-design-pattern-optimizer-debugging:
 
-Debugging Environment Variables
-================================
+Debugging Optimization with Environment Variables
+=================================================
 
 Several environment variables can be set to help debug the pattern optimizer.
 
