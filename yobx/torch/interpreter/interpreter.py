@@ -1623,7 +1623,12 @@ class DynamoInterpreter:
                     t = tokens.pop()
                     if t not in self.builder.dynamic_objects:
                         self.builder.add_dynamic_object(t, t)
-                        source = dict(axis=axis, input_name=dim)
+                        input_name = node.name
+                        assert isinstance(input_name, str), (
+                            f"Unexpected type for dim={dim!r}, axis={axis}, shape={shape}, "
+                            f"node.name={node.name!r}, t={t!r}"
+                        )
+                        source = dict(axis=axis, input_name=input_name)
                         if t in self.builder.dynamic_dimensions_source:
                             self.builder.dynamic_dimensions_source[t].append(source)
                         else:
