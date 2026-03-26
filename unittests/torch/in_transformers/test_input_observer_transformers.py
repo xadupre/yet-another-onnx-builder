@@ -1,6 +1,6 @@
 import unittest
 import pandas
-from yobx.ext_test_case import ExtTestCase, requires_transformers, has_transformers
+from yobx.ext_test_case import ExtTestCase, requires_transformers
 from yobx.torch import register_flattening_functions, get_tiny_model
 from yobx.torch.input_observer import InputObserver
 from yobx.torch import apply_patches_for_model
@@ -40,24 +40,18 @@ class TestInputObserverTransformers(ExtTestCase):
 
     @requires_transformers("5.2")
     def test_input_observer_attention_no_cache_position_no_position_ids(self):
-        # TODO: fix it
         self._common_test(["position_ids", "cache_position"], atol=0.5)
 
     @requires_transformers("5.2")
     def test_input_observer_attention_no_cache_position(self):
-        # TODO: fix it
-        if has_transformers("5.3"):
-            self.skipTest("cache_position does not appear anymore starting transformers>=5.3")
         self._common_test(["cache_position"], atol=0.5)
 
     @requires_transformers("5.2")
     def test_input_observer_attention_no_position_ids(self):
-        # TODO: fix it
         self._common_test(["position_ids"], atol=0.5)
 
     @requires_transformers("5.2")
     def test_input_observer_attention(self):
-        # TODO: fix it
         self._common_test([], atol=0.5)
 
 
