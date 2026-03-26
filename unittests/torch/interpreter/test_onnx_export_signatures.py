@@ -387,7 +387,6 @@ class TestOnnxExportSignatures(ExtTestCase):
         )
 
     @skipif_ci_windows("not working on windows")
-    @unittest.skip("broken test about tracing")
     @ignore_warnings(UserWarning)
     def test_signature_s1d_ls_r_tracing(self):
         class Neuron(torch.nn.Module):
@@ -422,7 +421,11 @@ class TestOnnxExportSignatures(ExtTestCase):
             "lx": [{0: torch.export.Dim("batch")}, {0: torch.export.Dim("batch")}],
         }
         sname = inspect.currentframe().f_code.co_name
-        sig_tracing = (("x", 1, ("batch", 3)), ("lx", [("lx", 1, ("batch", 1))]))
+        sig_tracing = (
+            ("x", 1, ("batch", 3)),
+            ("lx_0", 1, ("batch", 1)),
+            ("lx_1", 1, ("batch", 2)),
+        )
         self._check_exporter(
             sname,
             Neuron(),
@@ -430,6 +433,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             sig_tracing,
             dynamic_shapes=dyn,
             exporter="custom-tracing",
+            flatten_inputs=True,
             others=inputs2,
             atol=1e-4,
             verbose=0,
