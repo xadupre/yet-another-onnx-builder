@@ -55,15 +55,13 @@ class CustomProxy(torch.fx.proxy.Proxy):
     def __getattr__(self, k) -> "CustomAttribute":
         # note: not added to the graph yet, if this is a method call
         # we peephole optimize to the method invocation
-        if k in ("dtype", "device"):
-            # Return the concrete value so that dtype/device comparisons in
-            # control flow (e.g. ``if x.dtype == torch.int64:``) resolve to a
-            # plain Python bool instead of a proxy, which would raise
+        if k in ("dtype", "device", "shape", "ndim"):
+            # Return the concrete value so that comparisons in control flow
+            # (e.g. ``if x.dtype == torch.int64:`` or
+            # ``if x.shape[0] == y.shape[0]:``) resolve to a plain Python
+            # bool instead of a proxy, which would raise
             # ``TraceError: symbolically traced variables cannot be used as
             # inputs to control flow``.
-            # Only dtype and device are handled here because they are scalar
-            # values that are directly comparable; shape/ndim access in control
-            # flow is already handled for parameters via CustomParameterProxy.
             # Use __dict__ lookup to avoid triggering the lazy node property on
             # CustomAttribute subclasses (which would create unwanted graph nodes).
             node = self.__dict__.get("node")
