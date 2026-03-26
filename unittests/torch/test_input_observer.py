@@ -1685,7 +1685,7 @@ class TestInputObserver(ExtTestCase):
         self.assertNotIn("cache_position", args_after)
 
     def test_remove_inputs_not_in_signature_raises(self):
-        """Removing an input that is neither in candidates nor in the signature must raise."""
+        """Removing an input that is neither in candidates nor in the signature returns 0."""
 
         class Model(torch.nn.Module):
             def forward(self, x, y):
@@ -1699,8 +1699,9 @@ class TestInputObserver(ExtTestCase):
             for kwargs in inputs:
                 model(**kwargs)
 
-        with self.assertRaisesRegex(ValueError, "No input in all candidates was removed"):
-            observer.remove_inputs(["totally_unknown"])
+        # Silently succeeds (nothing to remove) and returns 0.
+        n = observer.remove_inputs(["totally_unknown"])
+        self.assertEqual(n, 0)
 
 
 if __name__ == "__main__":
