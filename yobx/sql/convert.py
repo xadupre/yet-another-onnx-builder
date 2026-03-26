@@ -22,7 +22,6 @@ from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..helpers.to_onnx_helper import _dataframe_to_dtypes, _is_dataframe
 from ..xbuilder import GraphBuilder
 from ..xtracing.dataframe_trace import trace_dataframe
-from ..xtracing.parse import JoinOp
 from ..xtracing.tracing import trace_numpy_function
 from .polars_convert import lazyframe_to_onnx
 from .sql_convert import sql_to_onnx, sql_to_onnx_graph  # noqa: F401 – re-exported
@@ -168,32 +167,8 @@ def dataframe_to_onnx(
 
     input_dtypes = _normalize_input_dtypes(input_dtypes)  # type: ignore[assignment]
     pq = trace_dataframe(func, input_dtypes)
-    if isinstance(input_dtypes, list):
-        has_join = any(isinstance(op, JoinOp) for op in pq.operations)
-        if has_join:
-            left_dtypes: Dict[str, Union[np.dtype, type, str]] = input_dtypes[0]
-            right_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = (
-                input_dtypes[1] if len(input_dtypes) > 1 else None
-            )
-        else:
-            # Merge all dtype dicts — columns come from a flat table.
-            left_dtypes = {}
-            for d in input_dtypes:
-                left_dtypes.update(d)
-            right_dtypes = None
-        return parsed_query_to_onnx(
-            pq,
-            left_dtypes,
-            right_input_dtypes=right_dtypes,
-            target_opset=target_opset,
-            custom_functions=custom_functions,
-            builder_cls=builder_cls,
-            filename=filename,
-            verbose=verbose,
-        )
     return parsed_query_to_onnx(
         pq,
-        input_dtypes,
         target_opset=target_opset,
         custom_functions=custom_functions,
         builder_cls=builder_cls,

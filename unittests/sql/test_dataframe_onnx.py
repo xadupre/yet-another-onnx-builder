@@ -462,12 +462,14 @@ class TestParsedQueryToOnnx(ExtTestCase):
     """Tests for :func:`~yobx.sql.sql_convert.parsed_query_to_onnx`."""
 
     def test_basic_select_add(self):
-        from yobx.sql import parse_sql
+        from yobx.xtracing.dataframe_trace import trace_dataframe
         from yobx.sql.sql_convert import parsed_query_to_onnx
 
-        pq = parse_sql("SELECT a + b AS total FROM t")
-        dtypes = {"a": np.float32, "b": np.float32}
-        artifact = parsed_query_to_onnx(pq, dtypes)
+        def transform(df):
+            return df.select([(df["a"] + df["b"]).alias("total")])
+
+        pq = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        artifact = parsed_query_to_onnx(pq)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
@@ -475,12 +477,15 @@ class TestParsedQueryToOnnx(ExtTestCase):
         np.testing.assert_allclose(total, a + b)
 
     def test_with_filter(self):
-        from yobx.sql import parse_sql
+        from yobx.xtracing.dataframe_trace import trace_dataframe
         from yobx.sql.sql_convert import parsed_query_to_onnx
 
-        pq = parse_sql("SELECT a + b AS total FROM t WHERE a > 0")
-        dtypes = {"a": np.float32, "b": np.float32}
-        artifact = parsed_query_to_onnx(pq, dtypes)
+        def transform(df):
+            df = df.filter(df["a"] > 0)
+            return df.select([(df["a"] + df["b"]).alias("total")])
+
+        pq = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        artifact = parsed_query_to_onnx(pq)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)

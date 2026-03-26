@@ -191,12 +191,29 @@ class JoinOp(SqlOperation):
     :param right_key: column name from the right table used in the equi-join.
     :param join_type: ``'inner'`` (default), ``'left'``, ``'right'``,
         or ``'full'``.
+    :param left_columns: columns belonging to the left-hand table, each as
+        a :class:`ColumnRef` carrying the column name and ONNX element type.
+        Populated by
+        :meth:`~yobx.xtracing.dataframe_trace.TracedDataFrame.join`.
+        Left empty when the join was produced by the SQL string parser.
+    :param right_columns: columns belonging to the right-hand table, each
+        as a :class:`ColumnRef` carrying the column name and ONNX element
+        type.  Populated by
+        :meth:`~yobx.xtracing.dataframe_trace.TracedDataFrame.join` so that
+        :func:`~yobx.sql.sql_convert._populate_graph` can classify columns
+        as left- or right-side and obtain their dtype without requiring a
+        separate ``right_input_dtypes`` argument.  Left empty when the join
+        was produced by the SQL string parser (in that case the caller must
+        supply ``right_input_dtypes`` to
+        :func:`~yobx.sql.sql_convert.sql_to_onnx_graph`).
     """
 
     right_table: str = ""
     left_key: str = ""
     right_key: str = ""
     join_type: str = "inner"
+    left_columns: List[ColumnRef] = field(default_factory=list)
+    right_columns: List[ColumnRef] = field(default_factory=list)
 
 
 @dataclass
