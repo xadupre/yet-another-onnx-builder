@@ -30,9 +30,11 @@ works and a comparison table with :func:`onnx.shape_inference.infer_shapes`.
 
 import numpy as np
 import onnx
+import onnx_ir as ir
 import onnxruntime
 import onnx.helper as oh
 import onnx.numpy_helper as onh
+from onnx_shape_inference import infer_symbolic_shapes
 from yobx.xshape import BasicShapeBuilder
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -110,27 +112,20 @@ for vi in (
 # the ``[0, 0, -1]`` constant shape tensor is not yet fully evaluated by this
 # library.
 
-try:
-    import onnx_ir as ir
-    from onnx_shape_inference import infer_symbolic_shapes
+ir_model = ir.serde.deserialize_model(model)
+ir_model = infer_symbolic_shapes(ir_model)
 
-    ir_model = ir.serde.deserialize_model(model)
-    ir_model = infer_symbolic_shapes(ir_model)
+# Build a name → shape mapping for all values in the graph.
+onnx_ir_shapes: dict[str, str] = {}
+for v in ir_model.graph.inputs:
+    onnx_ir_shapes[v.name] = str(v.shape)
+for node in ir_model.graph:
+    for out in node.outputs:
+        onnx_ir_shapes[out.name] = str(out.shape)
 
-    # Build a name → shape mapping for all values in the graph.
-    onnx_ir_shapes: dict[str, str] = {}
-    for v in ir_model.graph.inputs:
-        onnx_ir_shapes[v.name] = str(v.shape)
-    for node in ir_model.graph:
-        for out in node.outputs:
-            onnx_ir_shapes[out.name] = str(out.shape)
-
-    print("=== onnx-shape-inference (infer_symbolic_shapes) ===")
-    for name in ["X", "Y", "added", "concat_out", "Z"]:
-        print(f"  {name:15s}  shape={onnx_ir_shapes.get(name, 'unknown')}")
-except ImportError:
-    onnx_ir_shapes = None
-    print("onnx-shape-inference is not installed; skipping this section.")
+print("=== onnx-shape-inference (infer_symbolic_shapes) ===")
+for name in ["X", "Y", "added", "concat_out", "Z"]:
+    print(f"  {name:15s}  shape={onnx_ir_shapes.get(name, 'unknown')}")
 
 # %%
 # Shape inference with BasicShapeBuilder
@@ -216,25 +211,18 @@ for vi in (
 # Collect BasicShapeBuilder shapes as strings
 builder_shapes = {name: str(builder.get_shape(name)) for name in tensor_names}
 
-if onnx_ir_shapes is not None:
-    col_labels = ["tensor", "onnx.shape_inference", "onnx-shape-inference", "BasicShapeBuilder"]
-    table_data = [
-        [
-            name,
-            onnx_shapes.get(name, "—"),
-            onnx_ir_shapes.get(name, "—"),
-            builder_shapes.get(name, "—"),
-        ]
-        for name in tensor_names
+col_labels = ["tensor", "onnx.shape_inference", "onnx-shape-inference", "BasicShapeBuilder"]
+table_data = [
+    [
+        name,
+        onnx_shapes.get(name, "—"),
+        onnx_ir_shapes.get(name, "—"),
+        builder_shapes.get(name, "—"),
     ]
-    fig, ax = plt.subplots(figsize=(11, 2.5))
-else:
-    col_labels = ["tensor", "onnx.shape_inference", "BasicShapeBuilder"]
-    table_data = [
-        [name, onnx_shapes.get(name, "—"), builder_shapes.get(name, "—")]
-        for name in tensor_names
-    ]
-    fig, ax = plt.subplots(figsize=(8, 2.5))
+    for name in tensor_names
+]
+
+fig, ax = plt.subplots(figsize=(11, 2.5))
 
 ax.axis("off")
 tbl = ax.table(
