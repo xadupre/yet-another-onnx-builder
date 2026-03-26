@@ -69,6 +69,7 @@ from .parse import (
     JoinOp,
     Literal,
     ParsedQuery,
+    PivotTableOp,
     SelectItem,
     SelectOp,
     _collect_columns,
@@ -652,9 +653,108 @@ class TracedDataFrame:
             by = [by]
         return TracedGroupBy(self, list(by))
 
-    # ------------------------------------------------------------------
-    # Arithmetic operators (element-wise across all columns)
-    # ------------------------------------------------------------------
+    def pivot_table(
+        self,
+        values: str,
+        index: Union[str, List[str]],
+        columns: str,
+        aggfunc: str = "sum",
+        fill_value: float = 0.0,
+        column_values: Optional[List] = None,
+    ) -> "TracedDataFrame":
+        """Record a pivot-table aggregation for ONNX export.
+
+        Analogous to :func:`pandas.DataFrame.pivot_table`.  For each distinct
+        value in the *columns* column the *values* column is aggregated
+        (according to *aggfunc*) per *index* group, producing one output column
+        per distinct category value.
+
+        :param values: name of the column to aggregate.
+        :param index: column name(s) to use as the row index (group-by keys).
+        :param columns: name of the column whose distinct values become the
+            output column names.
+        :param aggfunc: aggregation function — ``'sum'`` (default),
+            ``'mean'``, ``'min'``, ``'max'``, or ``'count'``.
+        :param fill_value: value inserted for *(index, column)* combinations
+            that have no matching rows.  Defaults to ``0``.
+        :param column_values: the known set of distinct values that the
+            *columns* column may take.  **Required** for ONNX export since
+            ONNX graphs have a static structure.  Each entry yields one output
+            column named ``"<values>_<cv>"``.  Entries should be simple scalars
+            (strings, integers, or floats) without special characters to ensure
+            valid output column names.
+        :return: a new :class:`TracedDataFrame` with one column per entry in
+            *index* (unique row-key values) followed by one column per entry in
+            *column_values* (aggregated values).
+
+        Example::
+
+            import numpy as np
+            from yobx.xtracing.dataframe_trace import dataframe_to_onnx
+            from yobx.reference import ExtendedReferenceEvaluator
+
+            def transform(df):
+                return df.pivot_table(
+                    values="v",
+                    index="k",
+                    columns="cat",
+                    aggfunc="sum",
+                    column_values=["X", "Y"],
+                )
+
+            dtypes = {"k": np.int64, "cat": object, "v": np.float32}
+            artifact = dataframe_to_onnx(transform, dtypes)
+        """
+        if column_values is None:
+            raise ValueError(
+                "pivot_table() requires 'column_values' to be provided for ONNX export."
+            )
+        if isinstance(index, str):
+            index = [index]
+        index_list = list(index)
+        col_vals = list(column_values)
+
+        # Resolve ColumnRef objects with dtype info for all input columns.
+        index_col_refs: List[ColumnRef] = []
+        for idx_col in index_list:
+            ref = self._find_ref(idx_col)
+            if ref is None:
+                raise KeyError(f"pivot_table: index column {idx_col!r} not found in frame")
+            index_col_refs.append(ref)
+
+        columns_col_ref = self._find_ref(columns)
+        if columns_col_ref is None:
+            raise KeyError(f"pivot_table: columns column {columns!r} not found in frame")
+
+        values_col_ref = self._find_ref(values)
+        if values_col_ref is None:
+            raise KeyError(f"pivot_table: values column {values!r} not found in frame")
+
+        op = PivotTableOp(
+            index_refs=index_col_refs,
+            columns_ref=columns_col_ref,
+            values_ref=values_col_ref,
+            aggfunc=aggfunc,
+            column_values=col_vals,
+            fill_value=float(fill_value),
+        )
+        new_ops = list(self._ops) + [op]
+
+        # Build output ColumnRefs:
+        #   - Index column(s): carry through dtype from source
+        #   - Aggregated value columns: one per column_value, named "<values>_<cv>"
+        new_cols: Dict[ColumnRef, TracedSeries] = {}
+        for ref in index_col_refs:
+            new_cols[ref] = TracedSeries(ref)
+
+        val_dtype = values_col_ref.dtype
+        for cv in col_vals:
+            out_name = f"{values}_{cv}"
+            out_ref = ColumnRef(out_name, dtype=val_dtype)
+            new_cols[out_ref] = TracedSeries(out_ref)
+
+        return TracedDataFrame(new_cols, new_ops, list(self._source_columns))
+
 
     def _apply_elementwise(
         self, op: str, other: object, reversed: bool = False
@@ -738,7 +838,10 @@ class TracedDataFrame:
             conversion via :func:`~yobx.sql.sql_convert.parsed_query_to_onnx`.
         """
         ops = list(self._ops)
-        if not any(isinstance(op, SelectOp) for op in ops):
+        # When a PivotTableOp is present it acts as the terminal operation
+        # (replacing SelectOp), so no fallback SELECT should be appended.
+        has_pivot = any(isinstance(op, PivotTableOp) for op in ops)
+        if not has_pivot and not any(isinstance(op, SelectOp) for op in ops):
             items = [
                 SelectItem(series._expr, alias=ref.column)
                 for ref, series in self._columns.items()

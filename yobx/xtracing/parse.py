@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Small expression dataclasses used inside operations
@@ -179,6 +179,51 @@ class GroupByOp(SqlOperation):
     """
 
     columns: List[str] = field(default_factory=list)
+
+
+@dataclass
+class PivotTableOp(SqlOperation):
+    """Represents a ``pivot_table`` operation (similar to :func:`pandas.DataFrame.pivot_table`).
+
+    The *index* column(s) define the row grouping; the *columns* column provides
+    the category values that become output column headers; the *values* column is
+    aggregated for each *(index, column)* combination.
+
+    :param index_refs: :class:`ColumnRef` objects (with dtype) for the row-grouping
+        columns.
+    :param columns_ref: :class:`ColumnRef` (with dtype) for the pivot-header column.
+    :param values_ref: :class:`ColumnRef` (with dtype) for the column to aggregate.
+    :param aggfunc: aggregation function — ``'sum'``, ``'mean'``, ``'min'``,
+        ``'max'``, or ``'count'``.  Defaults to ``'sum'``.
+    :param column_values: the known distinct values that the *columns* column may
+        take.  Each entry yields one output column named ``"<values>_<cv>"``.
+        **Must be provided** since ONNX graphs have a static structure.
+    :param fill_value: value inserted for *(index, column)* combinations that have
+        no matching rows.  Defaults to ``0.0``.
+    """
+
+    index_refs: List[ColumnRef] = field(default_factory=list)
+    columns_ref: ColumnRef = field(default_factory=lambda: ColumnRef(""))
+    values_ref: ColumnRef = field(default_factory=lambda: ColumnRef(""))
+    aggfunc: str = "sum"
+    column_values: List[Any] = field(default_factory=list)
+    fill_value: float = 0.0
+
+    # Convenience read-only properties
+    @property
+    def index(self) -> List[str]:
+        """Column names used as the row grouping keys."""
+        return [r.column for r in self.index_refs]
+
+    @property
+    def columns(self) -> str:
+        """Name of the pivot-header column."""
+        return self.columns_ref.column
+
+    @property
+    def values(self) -> str:
+        """Name of the column to aggregate."""
+        return self.values_ref.column
 
 
 @dataclass
@@ -717,6 +762,17 @@ def _collect_columns(operations: List[SqlOperation]) -> List[ColumnRef]:
                 if col not in seen_names:
                     seen_names.append(col)
                     seen.append(ColumnRef(column=col))
+        elif isinstance(node, PivotTableOp):
+            # Collect the three input column refs (with dtype info).
+            for ref in (*node.index_refs, node.columns_ref, node.values_ref):
+                if ref.column and ref.column not in seen_names:
+                    seen_names.append(ref.column)
+                    seen.append(ref)
+                elif ref.column and ref.dtype != 0:
+                    # Update dtype info if we already saw this column without dtype.
+                    idx = seen_names.index(ref.column)
+                    if seen[idx].dtype == 0:
+                        seen[idx] = ref
         elif isinstance(node, JoinOp):
             for col in (*node.left_keys, *node.right_keys):
                 if col not in seen_names:
