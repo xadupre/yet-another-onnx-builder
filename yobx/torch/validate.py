@@ -514,6 +514,24 @@ def _check_discrepancies(
         summary.discrepancies = "OK" if n_ok == n_total else "FAILED"
         if verbose:
             print(f"[validate_model] discrepancies: {n_ok}/{n_total} OK")
+        if verbose >= 2:
+            for row in disc_data:
+                idx = row.get("index", "?")
+                ok = row.get("SUCCESS", False)
+                status = "OK" if ok else "FAILED"
+                if "error" in row:
+                    print(f"  [{idx}] {status}  error={row['error']}")
+                else:
+                    abs_diff = row.get("abs", float("nan"))
+                    rel_diff = row.get("rel", float("nan"))
+                    print(f"  [{idx}] {status}  abs={abs_diff:.3g}  rel={rel_diff:.3g}")
+                    if verbose >= 3:
+                        if "inputs" in row:
+                            print(f"       inputs:       {row['inputs']}")
+                        if "outputs_torch" in row:
+                            print(f"       outputs_torch: {row['outputs_torch']}")
+                        if "outputs_ort" in row:
+                            print(f"       outputs_ort:  {row['outputs_ort']}")
     except Exception as exc:
         summary.discrepancies = "FAILED"
         summary.error_discrepancies = str(exc)
@@ -568,7 +586,10 @@ def validate_model(
     :param optimization: Optimisation level applied after export.
         Passed directly to :func:`yobx.torch.to_onnx`.  ``None`` means no
         optimisation; ``"default"`` applies the default set.
-    :param verbose: Verbosity level (0 = silent).
+    :param verbose: Verbosity level.  ``0`` = silent; ``1`` = one-line
+        progress messages; ``2`` = per-input-set discrepancy summary
+        (index, SUCCESS, abs/rel diff); ``3`` = additionally prints the
+        input and output tensor shapes for every discrepancy row.
     :param dump_folder: When given, all artefacts (ONNX file, export logs …)
         are saved under this directory.
     :param opset: ONNX opset version to target (default 22).
