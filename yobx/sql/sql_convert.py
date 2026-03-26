@@ -265,7 +265,7 @@ def parsed_query_to_onnx_graph(
     sts: Optional[Dict],
     outputs: Optional[List[str]],
     pq: ParsedQuery,
-    input_dtypes: Dict[str, Union[np.dtype, type, str]],
+    input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     _finalize: bool = True,
 ) -> List[str]:
@@ -283,6 +283,10 @@ def parsed_query_to_onnx_graph(
     :param outputs: expected output column names (may be empty).
     :param pq: the parsed query to convert.
     :param input_dtypes: mapping from left-table column name to numpy dtype.
+        May be omitted when the query was produced by
+        :func:`~yobx.xtracing.dataframe_trace.trace_dataframe` and all
+        referenced :class:`~yobx.xtracing.parse.ColumnRef` objects already
+        carry their dtype in the ``dtype`` field.
     :param right_input_dtypes: mapping for right-table columns (JOIN queries).
     :param _finalize: when ``True`` (default) the SELECT output tensors are
         registered as ONNX model outputs via
@@ -306,7 +310,7 @@ def parsed_query_to_onnx_graph(
 
 def parsed_query_to_onnx(
     pq: ParsedQuery,
-    input_dtypes: Dict[str, Union[np.dtype, type, str]],
+    input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
@@ -327,6 +331,10 @@ def parsed_query_to_onnx(
         :func:`~yobx.sql.parse.parse_sql` or
         :func:`~yobx.sql.dataframe_trace.trace_dataframe`.
     :param input_dtypes: mapping from left-table column name to numpy dtype.
+        May be omitted when the query was produced by
+        :func:`~yobx.xtracing.dataframe_trace.trace_dataframe` and all
+        referenced :class:`~yobx.xtracing.parse.ColumnRef` objects already
+        carry their dtype in the ``dtype`` field.
     :param right_input_dtypes: mapping for right-table columns (JOIN queries).
     :param target_opset: ONNX opset version to target.
     :param custom_functions: optional mapping from function name to Python
@@ -461,7 +469,7 @@ def _build_group_by_tensors(
 def _populate_graph(
     g: GraphBuilderExtendedProtocol,
     pq: ParsedQuery,
-    input_dtypes: Dict[str, Union[np.dtype, type, str]],
+    input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]],
     right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]],
     custom_functions: Optional[Dict[str, Callable]] = None,
     desired_outputs: Optional[List[str]] = None,
@@ -476,8 +484,10 @@ def _populate_graph(
     """
     dim = "N"
 
-    # Resolve dtype dicts
-    left_dtypes: Dict[str, np.dtype] = {k: np.dtype(v) for k, v in input_dtypes.items()}
+    # Resolve dtype dicts (may be None when all dtypes come from ColumnRef.dtype)
+    left_dtypes: Dict[str, np.dtype] = (
+        {k: np.dtype(v) for k, v in input_dtypes.items()} if input_dtypes else {}
+    )
     if right_input_dtypes is not None:
         right_dtypes: Dict[str, np.dtype] = {
             k: np.dtype(v) for k, v in right_input_dtypes.items()
@@ -524,7 +534,10 @@ def _populate_graph(
                 join_op = op
                 break
 
-        for col in all_cols:
+        for col_ref in all_cols:
+            col = col_ref.column
+            # Determine ONNX element type: prefer dtype carried by the ColumnRef
+            # (set by the tracer), fall back to the caller-supplied dict.
             if col in left_dtypes:
                 onnx_type = _np_dtype_to_onnx(left_dtypes[col])
                 left_inputs.append((col, onnx_type, (dim,)))
@@ -532,6 +545,10 @@ def _populate_graph(
                 onnx_type = _np_dtype_to_onnx(right_dtypes[col])
                 right_inputs.append((col, onnx_type, (dim,)))
                 seen_right.append(col)
+            elif col_ref.dtype != 0:
+                # Dtype is known from the ColumnRef (tracer-produced query).
+                # Assign to the left side when no explicit dict entry is found.
+                left_inputs.append((col, col_ref.dtype, (dim,)))
 
         # If we have a join, make sure key columns are registered on the right side
         if join_op is not None and join_op.right_key not in seen_right:
