@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Any, List, Optional, Tuple, Union
 
 # ---------------------------------------------------------------------------
 # Small expression dataclasses used inside operations
@@ -179,6 +179,73 @@ class GroupByOp(SqlOperation):
     """
 
     columns: List[str] = field(default_factory=list)
+
+
+@dataclass
+class PivotTableOp(SqlOperation):
+    """Represents a ``pivot_table`` operation (similar to :func:`pandas.DataFrame.pivot_table`).
+
+    The *index* column(s) define the row grouping; the *columns* column(s) provide
+    the category values that become output column headers; the *values* column(s)
+    are aggregated for each *(index, column)* combination.
+
+    :param index_refs: :class:`ColumnRef` objects (with dtype) for the row-grouping
+        columns.  One or more columns are supported.
+    :param columns_refs: :class:`ColumnRef` objects (with dtype) for the pivot-header
+        column(s).  A single-element list produces a single category column; a
+        multi-element list creates a compound category key — in that case each
+        entry in *column_values* must be a tuple/list of scalars with one value
+        per column in *columns_refs*.
+    :param values_refs: :class:`ColumnRef` objects (with dtype) for the column(s) to
+        aggregate.  Each values column independently produces one output tensor per
+        *column_values* entry.
+    :param aggfunc: aggregation function — ``'sum'``, ``'mean'``, ``'min'``,
+        ``'max'``, or ``'count'``.  Defaults to ``'sum'``.
+    :param column_values: the known distinct values that the *columns* column(s)
+        may take.  Each entry yields one output column per values column, named
+        ``"<values>_<cv>"`` (single columns column) or
+        ``"<values>_<cv1>_<cv2>…"`` (multiple columns columns).
+        **Must be provided** since ONNX graphs have a static structure.
+    :param fill_value: value inserted for *(index, column)* combinations that have
+        no matching rows.  Defaults to ``0.0``.
+    """
+
+    index_refs: List[ColumnRef] = field(default_factory=list)
+    columns_refs: List[ColumnRef] = field(default_factory=list)
+    values_refs: List[ColumnRef] = field(default_factory=list)
+    aggfunc: str = "sum"
+    column_values: List[Any] = field(default_factory=list)
+    fill_value: float = 0.0
+
+    # Convenience read-only properties
+    @property
+    def index(self) -> List[str]:
+        """Column names used as the row grouping keys."""
+        return [r.column for r in self.index_refs]
+
+    @property
+    def columns(self) -> Union[str, List[str]]:
+        """Name(s) of the pivot-header column(s).
+
+        Returns a bare ``str`` when there is exactly one category column (the
+        common case), or a ``List[str]`` when multiple category columns were
+        specified.
+        """
+        if len(self.columns_refs) == 1:
+            return self.columns_refs[0].column
+        return [r.column for r in self.columns_refs]
+
+    @property
+    def values(self) -> Union[str, List[str]]:
+        """Name(s) of the column(s) to aggregate.
+
+        Returns a bare ``str`` when there is exactly one values column (the
+        common case), or a ``List[str]`` when multiple values columns were
+        specified.
+        """
+        if len(self.values_refs) == 1:
+            return self.values_refs[0].column
+        return [r.column for r in self.values_refs]
 
 
 @dataclass
@@ -717,6 +784,17 @@ def _collect_columns(operations: List[SqlOperation]) -> List[ColumnRef]:
                 if col not in seen_names:
                     seen_names.append(col)
                     seen.append(ColumnRef(column=col))
+        elif isinstance(node, PivotTableOp):
+            # Collect the input column refs (with dtype info).
+            for ref in (*node.index_refs, *node.columns_refs, *node.values_refs):
+                if ref.column and ref.column not in seen_names:
+                    seen_names.append(ref.column)
+                    seen.append(ref)
+                elif ref.column and ref.dtype != 0:
+                    # Update dtype info if we already saw this column without dtype.
+                    idx = seen_names.index(ref.column)
+                    if seen[idx].dtype == 0:
+                        seen[idx] = ref
         elif isinstance(node, JoinOp):
             for col in (*node.left_keys, *node.right_keys):
                 if col not in seen_names:

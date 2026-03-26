@@ -44,6 +44,7 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
+import onnx.numpy_helper as onh
 from onnx import TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
@@ -54,7 +55,7 @@ from ..xbuilder import GraphBuilder
 from ._expr import _ExprEmitter
 from .coverage import not_implemented_error
 from .ops import get_sql_op_converter
-from yobx.xtracing.parse import GroupByOp, JoinOp, ParsedQuery, SelectOp, parse_sql
+from yobx.xtracing.parse import GroupByOp, JoinOp, ParsedQuery, PivotTableOp, SelectOp, parse_sql
 
 # ---------------------------------------------------------------------------
 # Dtype helper
@@ -462,6 +463,342 @@ def _build_group_by_tensors(
     )
 
 
+def _build_pivot_table_tensors(
+    g: GraphBuilderExtendedProtocol,
+    pivot_op: "PivotTableOp",
+    col_map: Dict[str, str],
+    desired_outputs: Optional[List[str]] = None,
+) -> List[str]:
+    """Build ONNX tensors for a :class:`~yobx.xtracing.parse.PivotTableOp`.
+
+    Produces one output tensor for each index column (the sorted unique row-key
+    values) and one output tensor per *(values_col, column_values entry)* pair.
+
+    Algorithm
+    ---------
+    For each known column value *cv* (and for each values column):
+
+    1. Create a boolean mask ``cat == cv`` (for single category column) or
+       ``(cat1 == cv[0]) AND (cat2 == cv[1]) AND …`` (for multiple category
+       columns).
+    2. ``Compress`` the *values* column and the group-index vector to keep only
+       matching rows.
+    3. Aggregate the matching values into a ``(n_groups,)`` output tensor via
+       ``ScatterElements`` with the appropriate reduction.
+
+    For ``min`` / ``max`` the output is initialised with the first matching value
+    per group (so that the aggregation seed is never a non-matching value), then
+    ``ScatterElements(reduction='min'/'max')`` is applied over all matching rows.
+    Groups that have no matching rows keep the *fill_value*.
+
+    :param g: graph builder.
+    :param pivot_op: the operation descriptor.
+    :param col_map: current column-name → ONNX tensor-name mapping.
+    :param desired_outputs: optional list of preferred output tensor names.
+    :return: list of output tensor names (index column(s) first, then one per
+        *(values_col, column_values entry)* pair).
+    """
+    index_cols = pivot_op.index
+    col_col = pivot_op.columns
+    val_col = pivot_op.values
+    aggfunc = pivot_op.aggfunc
+    column_values = pivot_op.column_values
+    fill_value = pivot_op.fill_value
+
+    # Normalise to lists so the rest of the function is uniform.
+    col_cols: List[str] = [col_col] if isinstance(col_col, str) else list(col_col)
+    val_cols: List[str] = [val_col] if isinstance(val_col, str) else list(val_col)
+
+    if aggfunc not in ("sum", "mean", "min", "max", "count"):
+        raise ValueError(
+            f"pivot_table: unsupported aggfunc {aggfunc!r}. "
+            "Choose from 'sum', 'mean', 'min', 'max', 'count'."
+        )
+
+    # ------------------------------------------------------------------
+    # Step 1 — Unique groups for the index column(s) (row keys)
+    # ------------------------------------------------------------------
+    if len(index_cols) == 1:
+        idx_tensor = col_map[index_cols[0]]
+        unique_idx, _first_idx, inv_idx, _ = g.op.Unique(  # type: ignore[misc]
+            idx_tensor, sorted=1, outputs=4, name="pt_unique"
+        )
+        n_groups = g.op.Gather(
+            g.op.Shape(unique_idx, name="pt_shape"),
+            np.array(0, dtype=np.int64),
+            axis=0,
+            name="pt_n_groups",
+        )
+        unique_rows = None
+    else:
+        # Multi-column index: same technique as multi-column GROUP BY.
+        idx_tensors = [col_map[c] for c in index_cols]
+        cast_idx = [
+            g.op.Cast(t, to=TensorProto.DOUBLE, name=f"pt_cast_{c}")  # type: ignore[misc]
+            for t, c in zip(idx_tensors, index_cols)
+        ]
+        unsqueezed_idx = [
+            g.op.Unsqueeze(t, np.array([1], dtype=np.int64), name=f"pt_unsq_{c}")  # type: ignore[misc]
+            for t, c in zip(cast_idx, index_cols)
+        ]
+        stacked_idx = g.op.Concat(*unsqueezed_idx, axis=1, name="pt_stack")  # type: ignore[misc]
+        unique_rows, _first_idx, inv_idx, _ = g.op.Unique(  # type: ignore[misc]
+            stacked_idx, axis=0, sorted=1, outputs=4, name="pt_unique"
+        )
+        n_groups = g.op.Gather(
+            g.op.Shape(unique_rows, name="pt_shape"),
+            np.array(0, dtype=np.int64),
+            axis=0,
+            name="pt_n_groups",
+        )
+
+    n_groups_1d = g.op.Unsqueeze(n_groups, np.array([0], dtype=np.int64), name="pt_n_groups_1d")
+
+    cat_tensors = [col_map[c] for c in col_cols]
+
+    output_names: List[str] = []
+    used_tensor_names: Set[str] = set()
+    out_idx = 0
+
+    # ------------------------------------------------------------------
+    # Emit index-column output(s) — unique sorted row-key values
+    # ------------------------------------------------------------------
+    if len(index_cols) == 1:
+        if desired_outputs and out_idx < len(desired_outputs):
+            candidate = desired_outputs[out_idx]
+        else:
+            candidate = index_cols[0]
+        if g.has_name(candidate) or candidate in used_tensor_names:
+            candidate = f"output_{out_idx}"
+        g.op.Identity(unique_idx, outputs=[candidate], name=f"pt_out_{index_cols[0]}")  # type: ignore
+        output_names.append(candidate)
+        used_tensor_names.add(candidate)
+        out_idx += 1
+    else:
+        assert unique_rows is not None, "unique_rows must not be None"
+        for j, idx_col in enumerate(index_cols):
+            idx_col_unique_f64 = g.op.Gather(  # type: ignore[misc]
+                unique_rows, np.array(j, dtype=np.int64), axis=1, name=f"pt_col_{idx_col}_f64"
+            )
+            idx_col_unique = g.op.CastLike(  # type: ignore[misc]
+                idx_col_unique_f64, col_map[idx_col], name=f"pt_col_{idx_col}"
+            )
+            if desired_outputs and out_idx < len(desired_outputs):
+                candidate = desired_outputs[out_idx]
+            else:
+                candidate = idx_col
+            if g.has_name(candidate) or candidate in used_tensor_names:
+                candidate = f"output_{out_idx}"
+            g.op.Identity(idx_col_unique, outputs=[candidate], name=f"pt_out_{idx_col}")  # type: ignore
+            output_names.append(candidate)
+            used_tensor_names.add(candidate)
+            out_idx += 1
+
+    # ------------------------------------------------------------------
+    # Emit one aggregated-value column per (values_col, column_value) pair
+    # ------------------------------------------------------------------
+    for vi, vc in enumerate(val_cols):
+        val_tensor = col_map[vc]
+        for j, cv in enumerate(column_values):
+            # Build output column name — handle tuple cv for multi-col categories.
+            if isinstance(cv, (tuple, list)):
+                cv_str = "_".join(str(v) for v in cv)
+            else:
+                cv_str = str(cv)
+            out_col_name = f"{vc}_{cv_str}"
+            slot = f"v{vi}_j{j}"
+
+            if desired_outputs and out_idx < len(desired_outputs):
+                candidate = desired_outputs[out_idx]
+            else:
+                candidate = out_col_name
+            if g.has_name(candidate) or candidate in used_tensor_names:
+                candidate = f"output_{out_idx}"
+
+            # -- Mask for rows where cat == cv (or AND of equalities for multi-col) --
+            def _cv_cst(col_idx: int, scalar_cv: object, _slot: str = slot) -> str:
+                if isinstance(scalar_cv, str):
+                    arr = np.array([scalar_cv], dtype=object)
+                elif isinstance(scalar_cv, (float, np.floating)):
+                    arr = np.array([scalar_cv], dtype=np.float32)
+                elif isinstance(scalar_cv, (int, np.integer)):
+                    arr = np.array([scalar_cv], dtype=np.int64)
+                else:
+                    arr = np.array([scalar_cv])
+                return g.make_initializer(f"pt_cv_{_slot}_{col_idx}", arr, give_unique_name=True)
+
+            if len(col_cols) == 1:
+                cv_cst_name = _cv_cst(0, cv)
+                mask = g.op.Equal(cat_tensors[0], cv_cst_name, name=f"pt_mask_{slot}")  # type: ignore[misc]
+            else:
+                # Multi-column category: cv must be a tuple/list, one value per col.
+                cv_seq = list(cv) if isinstance(cv, (tuple, list)) else [cv]
+                partial_masks = [
+                    g.op.Equal(  # type: ignore[misc]
+                        cat_tensors[k], _cv_cst(k, cv_seq[k]), name=f"pt_mask_{slot}_c{k}"
+                    )
+                    for k in range(len(col_cols))
+                ]
+                mask = partial_masks[0]
+                for m in partial_masks[1:]:
+                    mask = g.op.And(mask, m, name=f"pt_and_{slot}")  # type: ignore[misc]
+
+            # Compress: keep only matching rows
+            matching_vals = g.op.Compress(val_tensor, mask, axis=0, name=f"pt_match_v_{slot}")  # type: ignore[misc]
+            matching_inv_idx = g.op.Compress(inv_idx, mask, axis=0, name=f"pt_match_idx_{slot}")  # type: ignore[misc]
+
+            # Count of matching rows per group (int64)
+            n_match = g.op.Gather(
+                g.op.Shape(matching_inv_idx, name=f"pt_match_sz_{slot}"),
+                np.array(0, dtype=np.int64),
+                axis=0,
+                name=f"pt_n_match_{slot}",
+            )
+            n_match_1d = g.op.Unsqueeze(
+                n_match, np.array([0], dtype=np.int64), name=f"pt_n_match_1d_{slot}"
+            )
+            zeros_i64 = g.op.ConstantOfShape(
+                n_groups_1d,
+                value=onh.from_array(np.array([0], dtype=np.int64)),
+                name=f"pt_zi64_{slot}",
+            )
+            ones_match = g.op.ConstantOfShape(
+                n_match_1d,
+                value=onh.from_array(np.array([1], dtype=np.int64)),
+                name=f"pt_ones_{slot}",
+            )
+            cnt = g.op.ScatterElements(  # type: ignore[misc]
+                zeros_i64,
+                matching_inv_idx,
+                ones_match,
+                reduction="add",
+                axis=0,
+                name=f"pt_cnt_{slot}",
+            )
+            has_data = g.op.Greater(  # type: ignore[misc]
+                cnt,
+                g.make_initializer(
+                    f"pt_zero_i64_{slot}", np.array([0], dtype=np.int64), give_unique_name=True
+                ),
+                name=f"pt_has_{slot}",
+            )
+
+            if aggfunc == "count":
+                result = cnt
+            else:
+                # Zero-filled buffer of shape (n_groups,) with val_tensor's dtype
+                zeros_val = g.op.CastLike(  # type: ignore[misc]
+                    g.op.ConstantOfShape(n_groups_1d, name=f"pt_zval_{slot}"),
+                    val_tensor,
+                    name=f"pt_zval_c_{slot}",
+                )
+
+                if aggfunc == "sum":
+                    sum_result = g.op.ScatterElements(  # type: ignore[misc]
+                        zeros_val,
+                        matching_inv_idx,
+                        matching_vals,
+                        reduction="add",
+                        axis=0,
+                        name=f"pt_sum_{slot}",
+                    )
+                    if fill_value != 0.0:
+                        fv_cast = g.op.CastLike(  # type: ignore[misc]
+                            g.make_initializer(
+                                f"pt_fv_{slot}",
+                                np.array([fill_value], dtype=np.float32),
+                                give_unique_name=True,
+                            ),
+                            sum_result,
+                            name=f"pt_fv_c_{slot}",
+                        )
+                        result = g.op.Where(has_data, sum_result, fv_cast, name=f"pt_r_{slot}")  # type: ignore[misc]
+                    else:
+                        result = sum_result
+
+                elif aggfunc == "mean":
+                    sum_vals = g.op.ScatterElements(  # type: ignore[misc]
+                        zeros_val,
+                        matching_inv_idx,
+                        matching_vals,
+                        reduction="add",
+                        axis=0,
+                        name=f"pt_sum_{slot}",
+                    )
+                    # Use ones as safe denominator for empty groups
+                    # (replaced by fill_value anyway)
+                    ones_f = g.op.CastLike(  # type: ignore[misc]
+                        g.op.ConstantOfShape(
+                            n_groups_1d,
+                            value=onh.from_array(np.array([1.0], dtype=np.float32)),
+                            name=f"pt_ones_f_{slot}",
+                        ),
+                        sum_vals,
+                        name=f"pt_ones_f_c_{slot}",
+                    )
+                    cnt_f = g.op.CastLike(cnt, sum_vals, name=f"pt_cnt_f_{slot}")  # type: ignore[misc]
+                    safe_cnt = g.op.Where(has_data, cnt_f, ones_f, name=f"pt_safe_cnt_{slot}")  # type: ignore[misc]
+                    mean_result = g.op.Div(sum_vals, safe_cnt, name=f"pt_mean_{slot}")  # type: ignore[misc]
+                    fv_cast = g.op.CastLike(  # type: ignore[misc]
+                        g.make_initializer(
+                            f"pt_fv_{slot}",
+                            np.array([fill_value], dtype=np.float32),
+                            give_unique_name=True,
+                        ),
+                        mean_result,
+                        name=f"pt_fv_c_{slot}",
+                    )
+                    result = g.op.Where(has_data, mean_result, fv_cast, name=f"pt_r_{slot}")  # type: ignore[misc]
+
+                elif aggfunc in ("min", "max"):
+                    # Initialise each group's cell with the first matching value so
+                    # that the ScatterElements seed is always a valid observation.
+                    # Groups with no matching rows are seeded with fill_value and
+                    # will never be overwritten by the scatter.
+                    fv_init = g.op.CastLike(  # type: ignore[misc]
+                        g.op.ConstantOfShape(
+                            n_groups_1d,
+                            value=onh.from_array(np.array([fill_value], dtype=np.float32)),
+                            name=f"pt_fv_init_{slot}",
+                        ),
+                        val_tensor,
+                        name=f"pt_fv_init_c_{slot}",
+                    )
+                    # Among matching rows, find the first occurrence of each group.
+                    unique_grp, first_in_match, _, _ = g.op.Unique(  # type: ignore[misc]
+                        matching_inv_idx, sorted=1, outputs=4, name=f"pt_umatch_{slot}"
+                    )
+                    first_match_vals = g.op.Gather(  # type: ignore[misc]
+                        matching_vals, first_in_match, axis=0, name=f"pt_first_mv_{slot}"
+                    )
+                    # Override fill_value with first matching value for groups that
+                    # have at least one matching row.
+                    init_seeded = g.op.ScatterElements(  # type: ignore[misc]
+                        fv_init, unique_grp, first_match_vals, axis=0, name=f"pt_init_s_{slot}"
+                    )
+                    reduction_name = "min" if aggfunc == "min" else "max"
+                    result = g.op.ScatterElements(  # type: ignore[misc]
+                        init_seeded,
+                        matching_inv_idx,
+                        matching_vals,
+                        reduction=reduction_name,
+                        axis=0,
+                        name=f"pt_{aggfunc}_{slot}",
+                    )
+                    # Groups with no matching rows still have fill_value — correct.
+
+                else:
+                    # Unreachable: the validation at the top of this function covers all cases.
+                    raise AssertionError(f"Unexpected aggfunc {aggfunc!r}")
+
+            g.op.Identity(result, outputs=[candidate], name=f"pt_out_{slot}")  # type: ignore
+            output_names.append(candidate)
+            used_tensor_names.add(candidate)
+            out_idx += 1
+
+    return output_names
+
+
 def _populate_graph(
     g: GraphBuilderExtendedProtocol,
     pq: ParsedQuery,
@@ -618,7 +955,7 @@ def _populate_graph(
                     new_right_inputs.append((onnx_name, tp, shape))
             right_inputs = new_right_inputs
         else:
-            sql_right_rename: Dict[str, str] = {}
+            sql_right_rename = {}
 
         all_inputs = left_inputs + right_inputs
 
@@ -655,6 +992,7 @@ def _populate_graph(
 
     select_op: Optional[SelectOp] = None
     _group_op: Optional[GroupByOp] = None
+    _pivot_op: Optional[PivotTableOp] = None
 
     for op in pq.operations:
         converter = get_sql_op_converter(type(op))
@@ -665,6 +1003,17 @@ def _populate_graph(
             _group_op = op  # retained for SelectOp aggregation
         elif isinstance(op, SelectOp):
             select_op = op
+        elif isinstance(op, PivotTableOp):
+            _pivot_op = op
+
+    # PivotTableOp is a terminal operation: it produces its own outputs,
+    # replacing the GroupBy + Select pattern.
+    if _pivot_op is not None:
+        output_names = _build_pivot_table_tensors(g, _pivot_op, col_map, desired_outputs)
+        if _finalize:
+            for out_name in output_names:
+                g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
+        return output_names
 
     if select_op is None:
         raise ValueError("No SELECT clause found in the query.")
@@ -691,7 +1040,7 @@ def _populate_graph(
         group_by_first_indices=gb_first_indices,
         group_by_n_groups=gb_n_groups,
     )
-    output_names: List[str] = []
+    output_names = []
     used_tensor_names: Set[str] = set()
     for i, item in enumerate(select_op.items):
         out_name = item.output_name()

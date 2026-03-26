@@ -6011,7 +6011,7 @@ class GraphBuilder(
                 continue
             if not shape:
                 continue
-            new_shape: List[Union[int, str]] = []
+            new_shape = []
             update = False
             for s in shape:
                 if isinstance(s, int):
@@ -6023,12 +6023,12 @@ class GraphBuilder(
                     dim_updates[s] = ns
                     update = True
             if update:
-                v_updates[name] = tuple(new_shape)
+                v_updates[name] = tuple(new_shape)  # type: ignore
         if v_updates:
             self._known_value_shape.update(v_updates)
         if dim_updates:
             self._dynamic_alias.update(dim_updates)
-        return dim_updates
+        return dim_updates  # type: ignore
 
     def _improves_dynamic_dimension_naming(self, apply_replacements: bool = False):
         """
