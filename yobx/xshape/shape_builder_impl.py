@@ -781,6 +781,7 @@ class BasicShapeBuilder(
         if inference == InferenceMode.TYPE:
             self._run_model_type_inference(graph, functions=functions, exc=exc)
         else:
+            original = set()
             res = []
             for i in graph.initializer:
                 self.set_constant(i.name, i)
@@ -788,6 +789,24 @@ class BasicShapeBuilder(
                 self.set_constant(i.values.name, i)
             for i in graph.input:
                 self.run_value_info(i, True)
+                shape = self.get_shape(i.name)
+                for s in shape:
+                    if isinstance(s, str):
+                        # A dynamic shape used to describe an input.
+                        # It must be kept.
+                        original.add(s)
+            for i in graph.output:
+                if (
+                    i.type
+                    and i.type.tensor_type
+                    and i.type.tensor_type.shape
+                    and i.type.tensor_type.shape.dim
+                ):
+                    for d in i.type.tensor_type.shape.dim:
+                        if d.dim_param:
+                            # A dynamic shape used to describe an input.
+                            # It must be kept.
+                            original.add(d.dim_param)
             for node in graph.node:
                 r = self.run_node(node, exc=exc, cost=inference == InferenceMode.COST)
                 if inference == InferenceMode.COST:
@@ -803,6 +822,9 @@ class BasicShapeBuilder(
                     )
             for i in graph.output:
                 self.run_value_info(i, False)
+
+            self._improves_dynamic_dimension_naming(original, True)
+
             if inference == InferenceMode.COST:
                 return res
 

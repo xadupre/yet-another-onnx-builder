@@ -262,7 +262,6 @@ class TestOnnxExportSignatures(ExtTestCase):
         )
 
     @skipif_ci_windows("not working on windows")
-    @unittest.skip("Something like [a:b, i] is not implemented yet.")
     def test_signature_s1d_i_r_v2(self):
         class Neuron(torch.nn.Module):
             def __init__(self, n_dims: int = 3, n_targets: int = 1):
@@ -274,11 +273,8 @@ class TestOnnxExportSignatures(ExtTestCase):
                 return torch.sigmoid(self.linear(x)) - self.buff + x[:, i]
 
         inputs = ((torch.arange(4 * 3) + 10).reshape((-1, 3)).to(torch.float32), 1)
-        sig = (("x", onnx.TensorProto.FLOAT, ("batch", 3)), ("i", onnx.TensorProto.INT64, (1,)))
-        dyn = {
-            "x": {0: torch.export.Dim("batch")},
-            "i": None,  # torch.export.Dim("ii", min=0, max=3)}
-        }
+        sig = (("x", onnx.TensorProto.FLOAT, ("batch", 3)), ("i", onnx.TensorProto.INT64, ()))
+        dyn = {"x": {0: torch.export.Dim("batch")}, "i": {}}
         sname = inspect.currentframe().f_code.co_name
         self._check_exporter(
             sname, Neuron(), inputs, sig, dynamic_shapes=dyn, exporter="custom-tracing"

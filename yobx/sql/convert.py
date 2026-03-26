@@ -285,9 +285,9 @@ def to_onnx(
         Callable[["TracedDataFrame"], "TracedDataFrame"],  # type: ignore # noqa: F821
         "polars.LazyFrame",  # type: ignore # noqa: F821
     ],
-    input_dtypes: Union[
-        Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
-    ],
+    args: Optional[
+        Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]]
+    ] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
@@ -326,7 +326,7 @@ def to_onnx(
           conversion.  See :func:`lazyframe_to_onnx` for details of supported
           operations.
 
-    :param input_dtypes: either a single ``{column: dtype}`` mapping or,
+    :param args: either a single ``{column: dtype}`` mapping or,
         when *dataframe_or_query* is a callable that accepts *multiple*
         :class:`~yobx.sql.dataframe_trace.TracedDataFrame` arguments, a
         **list** of ``{column: dtype}`` mappings — one per argument.
@@ -336,6 +336,9 @@ def to_onnx(
         A pandas :class:`~pandas.DataFrame` (or a list of DataFrames) is also
         accepted; the column names and per-column dtypes are extracted
         automatically.
+        Supported numpy dtypes: ``float16``, ``float32``, ``float64``,
+        ``int8``, ``int16``, ``int32``, ``int64``, ``uint8``, ``uint16``,
+        ``uint32``, ``uint64``, ``bool``, ``object`` (string).
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
     :param custom_functions: an optional mapping from function name (as it
@@ -432,18 +435,18 @@ def to_onnx(
     if callable(dataframe_or_query) and not isinstance(dataframe_or_query, str):
         return dataframe_to_onnx(
             dataframe_or_query,  # type: ignore
-            input_dtypes,
+            args,  # type: ignore
             target_opset=target_opset,
             custom_functions=custom_functions,
             builder_cls=builder_cls,
             filename=filename,
             verbose=verbose,
         )
-    input_dtypes = _normalize_input_dtypes(input_dtypes)  # type: ignore[assignment]
+    args = _normalize_input_dtypes(args)  # type: ignore[assignment]
     if isinstance(dataframe_or_query, str):
         return sql_to_onnx(
             dataframe_or_query,
-            input_dtypes,  # type: ignore
+            args,  # type: ignore
             target_opset=target_opset,
             custom_functions=custom_functions,
             builder_cls=builder_cls,
@@ -452,7 +455,7 @@ def to_onnx(
         )
     return lazyframe_to_onnx(
         dataframe_or_query,
-        input_dtypes,  # type: ignore
+        args,  # type: ignore
         target_opset=target_opset,
         builder_cls=builder_cls,
         filename=filename,

@@ -26,8 +26,12 @@ def convert_join_op(
     """
     Apply an equi-join between the left *col_map* and the right *right_col_map*.
 
-    Only inner-join semantics on a single key column are implemented.  For
-    each left row the converter finds the first matching right row by
+    Only inner-join semantics are implemented.  One or more key column pairs
+    can be specified via ``op.left_keys`` / ``op.right_keys``; when multiple
+    keys are given the match condition is the logical AND of all pairwise
+    equalities.
+
+    For each left row the converter finds the first matching right row by
     broadcasting an equality check over both key tensors, then uses
     ``Compress`` (to drop non-matching left rows) and ``Gather`` (to align
     right-table rows with their matching left-table rows).
@@ -42,13 +46,26 @@ def convert_join_op(
     :return: a merged col_map containing all columns from both tables, aligned
         on the join key.
     """
-    left_key_tensor = col_map[op.left_key]
-    right_key_tensor = right_col_map[op.right_key]
+    # Build the match matrix as the AND of per-key equality matrices.
+    # match_matrix[i, j] = True iff left row i matches right row j on ALL keys.
+    match_matrix = None
+    for idx, (lk, rk) in enumerate(zip(op.left_keys, op.right_keys)):
+        left_key_tensor = col_map[lk]
+        right_key_tensor = right_col_map[rk]
 
-    # Broadcast equality: match[i,j] = (left_key[i] == right_key[j])
-    lk_2d = g.op.Unsqueeze(left_key_tensor, np.array([1], dtype=np.int64), name="join_lk2d")
-    rk_2d = g.op.Unsqueeze(right_key_tensor, np.array([0], dtype=np.int64), name="join_rk2d")
-    match_matrix = g.op.Equal(lk_2d, rk_2d, name="join_match")
+        # Broadcast equality: eq[i,j] = (left_key[i] == right_key[j])
+        lk_2d = g.op.Unsqueeze(
+            left_key_tensor, np.array([1], dtype=np.int64), name=f"join_lk2d_{idx}"
+        )
+        rk_2d = g.op.Unsqueeze(
+            right_key_tensor, np.array([0], dtype=np.int64), name=f"join_rk2d_{idx}"
+        )
+        eq = g.op.Equal(lk_2d, rk_2d, name=f"join_eq_{idx}")
+
+        if match_matrix is None:
+            match_matrix = eq
+        else:
+            match_matrix = g.op.And(match_matrix, eq, name=f"join_and_{idx}")
 
     # Cast bool → int32 to use ArgMax; pick the first matching right index.
     # keepdims=0 so that right_indices has shape (N,) rather than (N, 1).

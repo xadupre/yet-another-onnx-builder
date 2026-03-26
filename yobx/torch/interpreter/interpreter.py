@@ -1167,6 +1167,7 @@ class DynamoInterpreter:
         shape_name = None
         end_name = None
         concat = False
+        squeeze_axes: List[int] = []
         for axis_, aslice in zip(axes, index_slice):
             axis = axis_
             if isinstance(aslice, int):
@@ -1179,12 +1180,29 @@ class DynamoInterpreter:
             assert isinstance(
                 aslice, (slice, int, self.torch.fx.Node)
             ), f"Unexpected type {type(aslice)} ({aslice}) in {index_slice}"
-            assert isinstance(aslice, slice), (
-                f"One index is given as an integer {aslice!r} but this requires "
-                f"to append a node 'Squeeze' after this one and this is not yet "
-                f"implemented. You can replace the integer by `i:i+1`"
-                f"{self.builder.get_debug_msg()}"
-            )
+            if isinstance(aslice, self.torch.fx.Node):
+                # Dynamic integer index: treat as i:i+1 slice and squeeze the axis afterwards.
+                starts.append(aslice)
+                slice_end_name = self.builder.unique_name(f"{node.name}_slice_end_{axis_}")
+                self.builder.make_node(
+                    "Add",
+                    [
+                        aslice.name,
+                        self.builder.make_initializer(
+                            "",
+                            np.array(1, dtype=np.int64),
+                            source="DynamoInterpreter._getitem_slice.int_end",
+                        ),
+                    ],
+                    [slice_end_name],
+                    name=f"{name}_int_end",
+                    sts=None,
+                )
+                ends.append(slice_end_name)
+                steps.append(1)
+                concat = True
+                squeeze_axes.append(axis_)
+                continue
 
             starts.append(aslice.start or 0)
 
@@ -1305,13 +1323,33 @@ class DynamoInterpreter:
             ),
         ]
 
-        if expand_axes:
+        if expand_axes and squeeze_axes:
+            sliced = self.builder.make_node("Slice", inputs, name=f"{name}F")
+            unsqueezed = self.builder.op.UnsqueezeAnyOpset(
+                sliced, np.array(expand_axes, dtype=np.int64), name=f"{name}F2"
+            )
+            res = self.builder.op.SqueezeAnyOpset(
+                unsqueezed,
+                np.array(squeeze_axes, dtype=np.int64),
+                outputs=[node.name],
+                name=f"{name}H",
+            )
+        elif expand_axes:
             sliced = self.builder.make_node("Slice", inputs, name=f"{name}F")
             res = self.builder.op.UnsqueezeAnyOpset(
                 sliced,
                 np.array(expand_axes, dtype=np.int64),
                 outputs=[node.name],
                 name=f"{name}F",
+            )
+        elif squeeze_axes:
+            slice_name = self.builder.unique_name(f"{node.name}_sliced")
+            self.builder.make_node("Slice", inputs, [slice_name], name=f"{name}G_sq")
+            res = self.builder.op.SqueezeAnyOpset(
+                slice_name,
+                np.array(squeeze_axes, dtype=np.int64),
+                outputs=[node.name],
+                name=f"{name}H_sq",
             )
         else:
             res = self.builder.make_node("Slice", inputs, [node.name], name=f"{name}G")
@@ -1334,6 +1372,11 @@ class DynamoInterpreter:
                     f"{self.builder.get_debug_msg()}"
                 )
                 self.builder.set_shape(node.name, new_shape)
+            elif squeeze_axes and self.builder.has_rank(inputs[0]):
+                # expand_axes is empty here (handled by the first branch above)
+                self.builder.set_rank(
+                    node.name, self.builder.get_rank(inputs[0]) - len(squeeze_axes)
+                )
             elif expand_axes:
                 self.builder.set_rank(
                     node.name, self.builder.get_rank(inputs[0]) + len(expand_axes)
@@ -1580,7 +1623,12 @@ class DynamoInterpreter:
                     t = tokens.pop()
                     if t not in self.builder.dynamic_objects:
                         self.builder.add_dynamic_object(t, t)
-                        source = dict(axis=axis, input_name=dim)
+                        input_name = node.name
+                        assert isinstance(input_name, str), (
+                            f"Unexpected type for dim={dim!r}, axis={axis}, shape={shape}, "
+                            f"node.name={node.name!r}, t={t!r}"
+                        )
+                        source = dict(axis=axis, input_name=input_name)
                         if t in self.builder.dynamic_dimensions_source:
                             self.builder.dynamic_dimensions_source[t].append(source)
                         else:

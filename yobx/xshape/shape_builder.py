@@ -282,7 +282,9 @@ class ShapeBuilder:
             return self.replacements_dimensions_[name]
         return self.get_shape(name)
 
-    def _improves_dynamic_dimension_naming(self, original: Set[str]) -> Dict[str, str]:
+    def _improves_dynamic_dimension_naming(
+        self, original: Set[str], apply_replacements: bool = False
+    ) -> Dict[str, str]:
         """
         Renames internal dynamic-dimension tokens (e.g. ``"s0"``, ``"DYN0"``) to
         user-visible names wherever the registered constraints allow it.
@@ -329,7 +331,71 @@ class ShapeBuilder:
                     )
                     for _ in v
                 )
+        if apply_replacements and replacements:
+            self._apply_shape_replacements(replacements)
         return replacements
+
+    def _apply_shape_replacements(self, replacements: Dict[str, str]) -> Dict[str, str]:
+        if not replacements:
+            return {}
+
+        # known_shapes
+        updates = {}
+        dim_updates = {}
+        for name, shape in self._known_shapes.items():
+            if not shape:
+                continue
+            new_shape = []
+            update = False
+            for s in shape:
+                if isinstance(s, int):
+                    new_shape.append(s)
+                    continue
+                ns = simplify_expression(rename_dynamic_expression(s, replacements))
+                new_shape.append(ns)
+                if ns != s:
+                    dim_updates[s] = ns
+                    update = True
+            if update:
+                updates[name] = tuple(new_shape)
+        if updates:
+            self._known_shapes.update(updates)
+
+        # known_values_shapes
+        v_updates = {}
+        for name, shape in self._known_value_shape.items():
+            if isinstance(shape, str):
+                ns = simplify_expression(rename_dynamic_expression(shape, replacements))
+                if ns != shape:
+                    dim_updates[shape] = ns
+                    update = True
+                    v_updates[name] = ns
+                continue
+            if not isinstance(shape, tuple):
+                continue
+            if not shape:
+                continue
+            new_shape = []
+            update = False
+            for s in shape:
+                if isinstance(s, int):
+                    new_shape.append(s)
+                    continue
+                ns = simplify_expression(rename_dynamic_expression(s, replacements))
+                new_shape.append(ns)
+                if ns != s:
+                    dim_updates[s] = ns
+                    update = True
+            if update:
+                v_updates[name] = tuple(new_shape)
+        if v_updates:
+            self._known_value_shape.update(v_updates)
+        if dim_updates:
+            # Ensure _dynamic_alias exists before updating it.
+            if not hasattr(self, "_dynamic_alias"):
+                self._dynamic_alias = {}
+            self._dynamic_alias.update(dim_updates)
+        return dim_updates
 
     def _hash(self) -> str:
         return make_hash(self)

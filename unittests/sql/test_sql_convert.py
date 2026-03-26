@@ -551,5 +551,101 @@ class TestSqlToOnnxSubquery(ExtTestCase):
         self.assertEqualArray(out, a + b, atol=1e-6)
 
 
+class TestSqlToOnnxJoin(ExtTestCase):
+    """Tests for ``JOIN … ON …`` conversion — single and multi-column keys."""
+
+    def _run(self, query, dtypes, feeds, *, right_dtypes=None):
+        onx = sql_to_onnx(query, dtypes, right_input_dtypes=right_dtypes)
+        ref = ExtendedReferenceEvaluator(onx)
+        ref_outputs = ref.run(None, feeds)
+        if has_onnxruntime():
+            ort_outputs = _ort_run(onx, feeds)
+            self.assertEqual(len(ref_outputs), len(ort_outputs))
+            for ref_out, ort_out in zip(ref_outputs, ort_outputs):
+                np.testing.assert_allclose(ort_out, ref_out, rtol=1e-5, atol=1e-6)
+        return ref_outputs
+
+    def test_single_key_join_different_names(self):
+        """Basic inner join on a single key with distinct column names on each side."""
+        sql = "SELECT a.x, b.y FROM a JOIN b ON a.id = b.rid"
+        left_dtypes = {"id": np.int64, "x": np.float32}
+        right_dtypes = {"rid": np.int64, "y": np.float32}
+        # Left: id=[1,2,3], x=[10,20,30]
+        # Right: rid=[2,3], y=[200,300]
+        # Match: id=2 (x=20,y=200) and id=3 (x=30,y=300)
+        feeds = {
+            "id": np.array([1, 2, 3], dtype=np.int64),
+            "x": np.array([10.0, 20.0, 30.0], dtype=np.float32),
+            "rid": np.array([2, 3], dtype=np.int64),
+            "y": np.array([200.0, 300.0], dtype=np.float32),
+        }
+        x_out, y_out = self._run(sql, left_dtypes, feeds, right_dtypes=right_dtypes)
+        np.testing.assert_allclose(x_out, np.array([20.0, 30.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([200.0, 300.0], dtype=np.float32))
+
+    def test_single_key_join_same_name(self):
+        """Inner join where the key column has the same name on both sides.
+
+        The right-side key is renamed to ``id_right`` in the ONNX model to
+        avoid clashing with the left-side ``id`` input.
+        """
+        sql = "SELECT a.x, b.y FROM a JOIN b ON a.id = b.id"
+        left_dtypes = {"id": np.int64, "x": np.float32}
+        right_dtypes = {"id": np.int64, "y": np.float32}
+        onx = sql_to_onnx(sql, left_dtypes, right_input_dtypes=right_dtypes)
+        self.assertIn("id_right", onx.input_names)
+        ref = ExtendedReferenceEvaluator(onx)
+        # Left: id=[1,2,3], Right: id=[2,3]
+        feeds = {
+            "id": np.array([1, 2, 3], dtype=np.int64),
+            "x": np.array([10.0, 20.0, 30.0], dtype=np.float32),
+            "id_right": np.array([2, 3], dtype=np.int64),
+            "y": np.array([200.0, 300.0], dtype=np.float32),
+        }
+        x_out, y_out = ref.run(None, feeds)
+        np.testing.assert_allclose(x_out, np.array([20.0, 30.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([200.0, 300.0], dtype=np.float32))
+
+    def test_multi_column_join_two_keys(self):
+        """Inner join on two AND-chained key columns with different names."""
+        sql = "SELECT a.x, b.y FROM a JOIN b ON a.company_id = b.cid AND a.dept_id = b.did"
+        left_dtypes = {"company_id": np.int64, "dept_id": np.int64, "x": np.float32}
+        right_dtypes = {"cid": np.int64, "did": np.int64, "y": np.float32}
+        # Left: (1,10,1.0), (2,20,2.0), (3,30,3.0)
+        # Right: (2,20,200.0), (3,30,300.0), (4,40,400.0)
+        # Matches: (2,20) → x=2.0, y=200.0 and (3,30) → x=3.0, y=300.0
+        feeds = {
+            "company_id": np.array([1, 2, 3], dtype=np.int64),
+            "dept_id": np.array([10, 20, 30], dtype=np.int64),
+            "x": np.array([1.0, 2.0, 3.0], dtype=np.float32),
+            "cid": np.array([2, 3, 4], dtype=np.int64),
+            "did": np.array([20, 30, 40], dtype=np.int64),
+            "y": np.array([200.0, 300.0, 400.0], dtype=np.float32),
+        }
+        x_out, y_out = self._run(sql, left_dtypes, feeds, right_dtypes=right_dtypes)
+        np.testing.assert_allclose(x_out, np.array([2.0, 3.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([200.0, 300.0], dtype=np.float32))
+
+    def test_multi_column_join_no_match_row_excluded(self):
+        """A row that matches only one of two key columns is excluded."""
+        sql = "SELECT a.x, b.y FROM a JOIN b ON a.k1 = b.rk1 AND a.k2 = b.rk2"
+        left_dtypes = {"k1": np.int64, "k2": np.int64, "x": np.float32}
+        right_dtypes = {"rk1": np.int64, "rk2": np.int64, "y": np.float32}
+        # Left: (1,10), (2,20), (3,30)
+        # Right: (2,99), (3,30)   — row (2,99) matches k1=2 but not k2=20 → excluded
+        feeds = {
+            "k1": np.array([1, 2, 3], dtype=np.int64),
+            "k2": np.array([10, 20, 30], dtype=np.int64),
+            "x": np.array([1.0, 2.0, 3.0], dtype=np.float32),
+            "rk1": np.array([2, 3], dtype=np.int64),
+            "rk2": np.array([99, 30], dtype=np.int64),
+            "y": np.array([99.0, 300.0], dtype=np.float32),
+        }
+        x_out, y_out = self._run(sql, left_dtypes, feeds, right_dtypes=right_dtypes)
+        # Only (3,30) matches both keys
+        np.testing.assert_allclose(x_out, np.array([3.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([300.0], dtype=np.float32))
+
+
 if __name__ == "__main__":
     unittest.main()

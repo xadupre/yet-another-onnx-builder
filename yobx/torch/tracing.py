@@ -55,15 +55,12 @@ class CustomProxy(torch.fx.proxy.Proxy):
     def __getattr__(self, k) -> "CustomAttribute":
         # note: not added to the graph yet, if this is a method call
         # we peephole optimize to the method invocation
-        if k in ("dtype", "device"):
+        if k in ("dtype", "device", "ndim"):
             # Return the concrete value so that dtype/device comparisons in
             # control flow (e.g. ``if x.dtype == torch.int64:``) resolve to a
             # plain Python bool instead of a proxy, which would raise
             # ``TraceError: symbolically traced variables cannot be used as
             # inputs to control flow``.
-            # Only dtype and device are handled here because they are scalar
-            # values that are directly comparable; shape/ndim access in control
-            # flow is already handled for parameters via CustomParameterProxy.
             # Use __dict__ lookup to avoid triggering the lazy node property on
             # CustomAttribute subclasses (which would create unwanted graph nodes).
             node = self.__dict__.get("node")
@@ -71,6 +68,21 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 val = node.meta["val"]
                 if isinstance(val, torch.Tensor):
                     return getattr(val, k)
+        elif k == "shape":
+            # Return the concrete shape only when every dimension is a plain
+            # Python int (static shape).  If any dimension is symbolic
+            # (torch.SymInt, i.e. a dynamic dimension), fall through to the
+            # CustomAttribute proxy path so that comparisons like
+            # ``x.shape[0] == y.shape[0]`` correctly raise TraceError at
+            # trace time instead of silently succeeding or raising a less
+            # informative symbolic-guards error.
+            node = self.__dict__.get("node")
+            if node is not None and "val" in node.meta:
+                val = node.meta["val"]
+                if isinstance(val, torch.Tensor):
+                    shape = val.shape
+                    if all(isinstance(d, int) for d in shape):
+                        return shape
         return CustomAttribute(self, k)
 
     @classmethod

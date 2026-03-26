@@ -60,3 +60,6 @@ Size of the package:
     df = pandas.DataFrame(statistics_on_folder(os.path.dirname(__file__), aggregation=1))
     gr = df[["dir", "ext", "files", "lines", "chars"]].groupby(["ext", "dir"]).sum()
     print(gr)
+    total = gr[["files", "lines", "chars"]].sum()
+    print()
+    print(f"Total: files={int(total['files'])}, lines={int(total['lines'])}, chars={int(total['chars'])}")

@@ -97,3 +97,6 @@ Tests
 
 Core tests live directly under ``unittests/``. Each library has its own subfolder
 and CI file.
+
+See :ref:`l-design-env-variables` for a reference of all environment variables
+that can be set to control test execution and enable extra diagnostic output.

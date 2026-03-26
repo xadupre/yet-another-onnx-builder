@@ -249,6 +249,10 @@ class ExtendedModelContainer(ModelContainer):
         ), "Not implemented when the model contains sparse initializers."
         new_inits = []
         for tensor in copy.graph.initializer:
+            if not uses_external_data(tensor):
+                # Inline initializers (e.g. string tensors) are kept as-is.
+                new_inits.append(tensor)
+                continue
             prop = self.get_prop(tensor)
             np_tensor = self.large_initializers[prop.value]
             tensor_bytes = self.get_raw_data(np_tensor)
@@ -256,7 +260,7 @@ class ExtendedModelContainer(ModelContainer):
             new_tensor.name = tensor.name
             new_tensor.raw_data = tensor_bytes
             new_tensor.data_type = tensor.data_type
-            new_tensor.dims = tensor.dims
+            new_tensor.dims.extend(tensor.dims)
             new_tensor.doc_string = tensor.doc_string
             new_tensor.metadata_props.extend(tensor.metadata_props)
             new_inits.append(new_tensor)

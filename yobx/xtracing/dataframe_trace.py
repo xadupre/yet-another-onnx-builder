@@ -345,9 +345,13 @@ class TracedGroupBy:
         select_items = [s.to_select_item() for s in series_list]
         new_ops.append(SelectOp(items=select_items))
 
-        new_cols = {
-            item.output_name(): TracedSeries(item.expr, item.alias) for item in select_items
-        }
+        new_cols: Dict[ColumnRef, TracedSeries] = {}
+        for item in select_items:
+            # Use dtype from ColumnRef when available; otherwise TensorProto.UNDEFINED (0).
+            dtype = item.expr.dtype if isinstance(item.expr, ColumnRef) else 0
+            new_cols[ColumnRef(item.output_name(), dtype=dtype)] = TracedSeries(
+                item.expr, item.alias
+            )
         return TracedDataFrame(new_cols, new_ops, list(self._df._source_columns))
 
 
@@ -360,28 +364,49 @@ class TracedDataFrame:
     """Proxy for a DataFrame that records SQL-like operations for ONNX export.
 
     Create a :class:`TracedDataFrame` via :func:`trace_dataframe` (recommended)
-    or construct it directly with a column-name → dtype mapping.  Apply
-    operations (``filter``, ``select``, arithmetic on columns) to build up the
-    computation graph.  Convert to an ONNX model via :func:`dataframe_to_onnx`.
+    or construct it directly with a :class:`~yobx.xtracing.parse.ColumnRef` →
+    :class:`TracedSeries` mapping.  Apply operations (``filter``, ``select``,
+    arithmetic on columns) to build up the computation graph.  Convert to an
+    ONNX model via :func:`dataframe_to_onnx`.
 
-    :param columns: mapping from column name to :class:`TracedSeries`.
+    :param columns: mapping from :class:`~yobx.xtracing.parse.ColumnRef` to
+        :class:`TracedSeries`.
     :param ops: accumulated list of :class:`~yobx.sql.parse.SqlOperation`
         objects (usually starts empty).
     :param source_columns: ordered list of original source column names (those
-        that will become ONNX inputs).  Defaults to ``list(columns.keys())``.
+        that will become ONNX inputs).  Defaults to the column names extracted
+        from the keys of *columns*.
     """
 
     def __init__(
         self,
-        columns: Dict[str, TracedSeries],
+        columns: Dict[ColumnRef, TracedSeries],
         ops: Optional[List] = None,
         source_columns: Optional[List[str]] = None,
     ) -> None:
-        self._columns: Dict[str, TracedSeries] = columns
+        self._columns: Dict[ColumnRef, TracedSeries] = columns
         self._ops: List = list(ops) if ops is not None else []
         self._source_columns: List[str] = (
-            list(source_columns) if source_columns is not None else list(columns.keys())
+            list(source_columns)
+            if source_columns is not None
+            else [ref.column for ref in columns]
         )
+
+    # ------------------------------------------------------------------
+    # Internal helpers for string-based column lookup
+    # ------------------------------------------------------------------
+
+    def _find_ref(self, name: str) -> Optional[ColumnRef]:
+        """Return the :class:`ColumnRef` key whose ``.column`` matches *name*."""
+        for ref in self._columns:
+            if ref.column == name:
+                return ref
+        return None
+
+    def _get_series_by_name(self, name: str) -> Optional[TracedSeries]:
+        """Return the :class:`TracedSeries` for the column named *name*."""
+        ref = self._find_ref(name)
+        return self._columns[ref] if ref is not None else None
 
     # ------------------------------------------------------------------
     # Column access
@@ -391,9 +416,10 @@ class TracedDataFrame:
         self, key: Union[str, List[str], TracedCondition]
     ) -> Union[TracedSeries, TracedDataFrame]:
         if isinstance(key, str):
-            if key not in self._columns:
+            series = self._get_series_by_name(key)
+            if series is None:
                 raise KeyError(f"Column {key!r} not found in traced DataFrame")
-            return self._columns[key]
+            return series
         if isinstance(key, list):
             return self.select(key)  # type: ignore
         if isinstance(key, TracedCondition):
@@ -407,16 +433,18 @@ class TracedDataFrame:
         if name.startswith("_"):
             raise AttributeError(name)
         cols = object.__getattribute__(self, "_columns")
-        if name in cols:
-            return cols[name]
+        for ref, series in cols.items():
+            if ref.column == name:
+                return series
         raise AttributeError(
-            f"TracedDataFrame has no column {name!r}. Available columns: {list(cols.keys())}"
+            f"TracedDataFrame has no column {name!r}. "
+            f"Available columns: {[ref.column for ref in cols]}"
         )
 
     @property
     def columns(self) -> List[str]:
         """Return the ordered list of column names in the current frame."""
-        return list(self._columns.keys())
+        return [ref.column for ref in self._columns]
 
     # ------------------------------------------------------------------
     # Operations
@@ -453,9 +481,10 @@ class TracedDataFrame:
             series_list = []
             for e in exprs:
                 if isinstance(e, str):
-                    if e not in self._columns:
+                    series = self._get_series_by_name(e)
+                    if series is None:
                         raise KeyError(f"Column {e!r} not found in traced DataFrame")
-                    series_list.append(self._columns[e])
+                    series_list.append(series)
                 elif isinstance(e, TracedSeries):
                     series_list.append(e)
                 else:
@@ -467,9 +496,13 @@ class TracedDataFrame:
 
         select_items = [s.to_select_item() for s in series_list]
         new_ops = [*self._ops, SelectOp(items=select_items)]
-        new_cols = {
-            item.output_name(): TracedSeries(item.expr, item.alias) for item in select_items
-        }
+        new_cols: Dict[ColumnRef, TracedSeries] = {}
+        for item in select_items:
+            # Use dtype from ColumnRef when available; otherwise TensorProto.UNDEFINED (0).
+            dtype = item.expr.dtype if isinstance(item.expr, ColumnRef) else 0
+            new_cols[ColumnRef(item.output_name(), dtype=dtype)] = TracedSeries(
+                item.expr, item.alias
+            )
         return TracedDataFrame(new_cols, new_ops, list(self._source_columns))
 
     def assign(self, **kwargs: TracedSeries) -> TracedDataFrame:
@@ -487,7 +520,11 @@ class TracedDataFrame:
                     f"assign() expects TracedSeries values, "
                     f"got {type(expr).__name__!r} for {name!r}"
                 )
-            new_cols[name] = TracedSeries(expr._expr, alias=name)
+            # Remove an existing key with the same column name, if any.
+            existing_ref = self._find_ref(name)
+            if existing_ref is not None:
+                del new_cols[existing_ref]
+            new_cols[ColumnRef(name)] = TracedSeries(expr._expr, alias=name)
         return TracedDataFrame(new_cols, list(self._ops), list(self._source_columns))
 
     def pipe(
@@ -533,15 +570,20 @@ class TracedDataFrame:
         return TracedDataFrame(dict(self._columns), list(self._ops), list(self._source_columns))
 
     def join(
-        self, right: "TracedDataFrame", left_key: str, right_key: str, join_type: str = "inner"
+        self,
+        right: "TracedDataFrame",
+        left_key: Union[str, List[str]],
+        right_key: Union[str, List[str]],
+        join_type: str = "inner",
     ) -> "TracedDataFrame":
         """Record an equi-join with another :class:`TracedDataFrame`.
 
         :param right: the right-hand :class:`TracedDataFrame` to join with.
-        :param left_key: column name from *this* (left) frame used in the join
-            predicate.
-        :param right_key: column name from *right* frame used in the join
-            predicate.
+        :param left_key: column name (or list of names) from *this* (left) frame
+            used in the join predicate.
+        :param right_key: column name (or list of names) from *right* frame
+            used in the join predicate.  Must have the same length as
+            *left_key* when both are lists.
         :param join_type: join type — ``'inner'`` (default), ``'left'``,
             ``'right'``, or ``'full'``.
         :return: a new :class:`TracedDataFrame` containing columns from both
@@ -560,34 +602,39 @@ class TracedDataFrame:
             artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
         """
 
+        # Normalise keys to lists.
+        left_keys: List[str] = [left_key] if isinstance(left_key, str) else list(left_key)
+        right_keys: List[str] = [right_key] if isinstance(right_key, str) else list(right_key)
+        if len(left_keys) != len(right_keys):
+            raise ValueError(
+                f"left_key and right_key must have the same length, "
+                f"got {len(left_keys)} and {len(right_keys)}"
+            )
+
         # Build ColumnRef lists for both sides so that _populate_graph can
         # classify and type columns (including join-key columns that may not
         # appear in any SELECT expression) without requiring input_dtypes.
         def _col_refs_from(frame: "TracedDataFrame") -> "List[ColumnRef]":
             refs: List[ColumnRef] = []
             for _name in frame._source_columns:
-                _series = frame._columns.get(_name)
-                _dtype = (
-                    _series._expr.dtype
-                    if _series is not None and isinstance(_series._expr, ColumnRef)
-                    else 0
-                )
+                _ref = frame._find_ref(_name)
+                _dtype = _ref.dtype if _ref is not None else 0
                 refs.append(ColumnRef(column=_name, dtype=_dtype))
             return refs
 
         join_op = JoinOp(
             right_table="r",
-            left_key=left_key,
-            right_key=right_key,
+            left_keys=left_keys,
+            right_keys=right_keys,
             join_type=join_type,
             left_columns=_col_refs_from(self),
             right_columns=_col_refs_from(right),
         )
         # Merge columns: left columns take priority on name collision.
         merged_cols = dict(self._columns)
-        for name, series in right._columns.items():
-            if name not in merged_cols:
-                merged_cols[name] = series
+        for ref, series in right._columns.items():
+            if not any(k.column == ref.column for k in merged_cols):
+                merged_cols[ref] = series
         new_ops = [*self._ops, join_op]
         left_source_set = set(self._source_columns)
         all_source_cols = list(self._source_columns) + [
@@ -623,22 +670,23 @@ class TracedDataFrame:
         :return: a new :class:`TracedDataFrame` whose column expressions
             embed the arithmetic.
         """
-        new_cols: Dict[str, TracedSeries] = {}
-        for name, series in self._columns.items():
+        new_cols: Dict[ColumnRef, TracedSeries] = {}
+        for ref, series in self._columns.items():
             if isinstance(other, TracedDataFrame):
-                if name not in other._columns:
+                other_series = other._get_series_by_name(ref.column)
+                if other_series is None:
                     raise KeyError(
-                        f"Column {name!r} not found in right DataFrame. "
-                        f"Available columns: {list(other._columns.keys())}"
+                        f"Column {ref.column!r} not found in right DataFrame. "
+                        f"Available columns: {[r.column for r in other._columns]}"
                     )
-                right_expr = other._columns[name]._expr
+                right_expr = other_series._expr
             else:
                 right_expr = _to_ast(other)
             if reversed:
                 expr: object = BinaryExpr(right_expr, op, series._expr)
             else:
                 expr = BinaryExpr(series._expr, op, right_expr)
-            new_cols[name] = TracedSeries(expr)
+            new_cols[ref] = TracedSeries(expr)
         return TracedDataFrame(new_cols, list(self._ops), list(self._source_columns))
 
     def __add__(self, other: object) -> "TracedDataFrame":
@@ -691,7 +739,10 @@ class TracedDataFrame:
         """
         ops = list(self._ops)
         if not any(isinstance(op, SelectOp) for op in ops):
-            items = [SelectItem(series._expr, alias=col) for col, series in self._columns.items()]
+            items = [
+                SelectItem(series._expr, alias=ref.column)
+                for ref, series in self._columns.items()
+            ]
             ops.append(SelectOp(items=items))
         columns = _collect_columns(ops)
         # Fill in missing dtypes for join-key columns (created by
@@ -708,13 +759,18 @@ class TracedDataFrame:
                     if col_ref.dtype != 0:
                         join_col_dtypes[col_ref.column] = col_ref.dtype
         if join_col_dtypes:
-            for col_ref in columns:
-                if col_ref.dtype == 0 and col_ref.column in join_col_dtypes:
-                    col_ref.dtype = join_col_dtypes[col_ref.column]
+            columns = [
+                (
+                    ColumnRef(col_ref.column, col_ref.table, join_col_dtypes[col_ref.column])
+                    if col_ref.dtype == 0 and col_ref.column in join_col_dtypes
+                    else col_ref
+                )
+                for col_ref in columns
+            ]
         return ParsedQuery(operations=ops, from_table="t", columns=columns)
 
     def __repr__(self) -> str:
-        return f"TracedDataFrame(columns={list(self._columns.keys())!r})"
+        return f"TracedDataFrame(columns={[ref.column for ref in self._columns]!r})"
 
 
 # ---------------------------------------------------------------------------
@@ -777,22 +833,19 @@ def trace_dataframe(
         pq = trace_dataframe(transform, [{"a": np.float32}, {"b": np.float32}])
     """
     if isinstance(input_dtypes, list):
-        dfs = [
-            TracedDataFrame(
-                {
-                    name: TracedSeries(ColumnRef(name, dtype=_to_tensor_proto_dtype(d[name])))
-                    for name in d
-                },
-                source_columns=list(d.keys()),
-            )
-            for d in input_dtypes
-        ]
+        dfs = []
+        for d in input_dtypes:
+            cols: Dict[ColumnRef, TracedSeries] = {}
+            for name in d:
+                ref = ColumnRef(name, dtype=_to_tensor_proto_dtype(d[name]))
+                cols[ref] = TracedSeries(ref)
+            dfs.append(TracedDataFrame(cols, source_columns=list(d.keys())))
         result = func(*dfs)
     else:
-        columns = {
-            name: TracedSeries(ColumnRef(name, dtype=_to_tensor_proto_dtype(input_dtypes[name])))
-            for name in input_dtypes
-        }
+        columns: Dict[ColumnRef, TracedSeries] = {}
+        for name in input_dtypes:
+            ref = ColumnRef(name, dtype=_to_tensor_proto_dtype(input_dtypes[name]))
+            columns[ref] = TracedSeries(ref)
         df = TracedDataFrame(columns, source_columns=list(input_dtypes.keys()))
         result = func(df)
     if not isinstance(result, TracedDataFrame):
