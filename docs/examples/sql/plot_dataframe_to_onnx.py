@@ -28,11 +28,14 @@ This example covers:
 6. **Two dataframes joined on a key column** — the ``join`` method.
 7. **Graph visualisation** — inspecting the produced ONNX model.
 
-.. note::
-   The transform functions use the TracedDataFrame API (``df.select()``,
-   ``df.filter()``, ``series.alias()``), which is not part of the standard
-   :class:`pandas.DataFrame` interface.  Reference values are therefore
-   computed with numpy directly on the raw arrays.
+In each section the **same function** that is passed to
+:func:`~yobx.sql.dataframe_to_onnx` is also called directly on a real
+:class:`pandas.DataFrame` to compute the reference values used to validate
+the ONNX output.  Because the TracedDataFrame API (``df.select()``,
+``df.filter()``, ``series.alias()``, and ``series.sum()/.mean()/.min()/.max()``)
+is not part of the standard pandas interface, these methods are added to pandas
+at the top of the script so that the **exact same function** works for both
+tracing and reference execution.
 
 See :ref:`l-plot-sql-to-onnx` for the equivalent SQL-string API and
 :ref:`l-plot-lazyframe-to-onnx` for the Polars LazyFrame API.
@@ -43,6 +46,69 @@ import onnxruntime
 import pandas as pd
 from yobx.helpers.onnx_helper import pretty_onnx
 from yobx.sql import dataframe_to_onnx
+
+# ---------------------------------------------------------------------------
+# Extend pandas with TracedDataFrame-compatible methods so that the transform
+# functions can be executed on a *real* DataFrame (for reference values) using
+# the exact same code path that is used for ONNX tracing.
+# ---------------------------------------------------------------------------
+
+# series.alias("name") → renamed Series (mirroring TracedSeries.alias)
+pd.Series.alias = lambda self, name: self.rename(name)
+
+
+# df.filter(boolean_series) → row-filtered DataFrame (mirroring TracedDataFrame.filter)
+_pd_filter_orig = pd.DataFrame.filter
+
+
+def _pd_filter_compat(self, cond=None, **kwargs):
+    if isinstance(cond, pd.Series) and pd.api.types.is_bool_dtype(cond):
+        return self.loc[cond]
+    return _pd_filter_orig(self, cond, **kwargs)
+
+
+pd.DataFrame.filter = _pd_filter_compat
+
+
+# df.select([series, ...]) → DataFrame with those columns
+def _pd_df_select(self, exprs):
+    return pd.DataFrame({e.name: e.values for e in exprs if isinstance(e, pd.Series)})
+
+
+pd.DataFrame.select = _pd_df_select
+
+
+# series.sum()/.mean()/.min()/.max() → scalar-with-alias so that
+# .alias("col_name") returns a named one-element Series usable in select().
+class _Scalar(float):
+    """float subclass that additionally supports ``.alias()`` for aggregations."""
+
+    def alias(self, name):
+        return pd.Series([float(self)], name=name)
+
+
+def _make_agg(orig_fn):
+    def _agg(self, *args, **kw):
+        return _Scalar(orig_fn(self, *args, **kw))
+
+    return _agg
+
+
+for method_name in ("sum", "mean", "min", "max"):
+    setattr(pd.Series, method_name, _make_agg(getattr(pd.Series, method_name)))
+
+# df.join(other, left_key=..., right_key=...) → merged DataFrame
+_pd_join_orig = pd.DataFrame.join
+
+
+def _pd_join_compat(self, other, left_key=None, right_key=None, **kwargs):
+    # TracedDataFrame.join() also uses inner join semantics.
+    if left_key is not None and right_key is not None:
+        return pd.merge(self, other, left_on=left_key, right_on=right_key, how="inner")
+    return _pd_join_orig(self, other, **kwargs)
+
+
+pd.DataFrame.join = _pd_join_compat
 
 # %%
 # 1. Basic SELECT — arithmetic expression
@@ -65,8 +131,8 @@ def transform_add(df):
 
 artifact_add = dataframe_to_onnx(transform_add, df)
 
-# Reference: numpy equivalent.
-ref_total = a + b
+# Reference: call the same transform function on the real DataFrame.
+ref_total = transform_add(df)["total"].to_numpy()
 (ort_total,) = onnxruntime.InferenceSession(
     artifact_add.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, {"a": a, "b": b})
@@ -90,8 +156,11 @@ def transform_multi(df):
 
 artifact_multi = dataframe_to_onnx(transform_multi, df)
 
-# Reference: numpy equivalents.
-ref_a, ref_b, ref_prod = a, b, a * b
+# Reference: call the same transform function on the real DataFrame.
+ref = transform_multi(df)
+ref_a = ref["a"].to_numpy()
+ref_b = ref["b"].to_numpy()
+ref_prod = ref["product"].to_numpy()
 ort_a, ort_b, ort_prod = onnxruntime.InferenceSession(
     artifact_multi.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, {"a": a, "b": b})
@@ -122,9 +191,10 @@ def transform_filter(df):
 
 artifact_filter = dataframe_to_onnx(transform_filter, df)
 
-# Reference: numpy mask.
-mask = a > 1.5
-ref_af, ref_bf = a[mask], b[mask]
+# Reference: call the same transform function on the real DataFrame.
+ref_filter = transform_filter(df)
+ref_af = ref_filter["a"].to_numpy()
+ref_bf = ref_filter["b"].to_numpy()
 ort_af, ort_bf = onnxruntime.InferenceSession(
     artifact_filter.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, {"a": a, "b": b})
@@ -149,9 +219,8 @@ def transform_filter_add(df):
 
 artifact_filter_add = dataframe_to_onnx(transform_filter_add, df2)
 
-# Reference: numpy mask + arithmetic.
-mask2 = a2 > 0
-ref_total2 = (a2 + b2)[mask2]
+# Reference: call the same transform function on the real DataFrame.
+ref_total2 = transform_filter_add(df2)["total"].to_numpy()
 (ort_total2,) = onnxruntime.InferenceSession(
     artifact_filter_add.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, {"a": a2, "b": b2})
@@ -168,13 +237,9 @@ print(pretty_onnx(artifact_filter_add.proto))
 #
 # Column-level aggregation methods — ``sum()``, ``mean()``, ``min()``,
 # ``max()`` — map to ``ReduceSum``, ``ReduceMean``, ``ReduceMin``, and
-# ``ReduceMax`` ONNX nodes respectively.
-#
-# .. note::
-#    The TracedDataFrame aggregation syntax ``df["a"].sum().alias("sum_a")`` is
-#    specific to the tracing API (``df["a"].sum()`` on a real DataFrame returns
-#    a scalar, not a chainable series).  Reference values are therefore
-#    computed directly from numpy.
+# ``ReduceMax`` ONNX nodes respectively.  The compatibility shim installed
+# above makes these methods return a scalar-with-``.alias()`` so that the
+# same function works on a real DataFrame.
 
 
 def transform_agg(df):
@@ -190,11 +255,12 @@ def transform_agg(df):
 
 artifact_agg = dataframe_to_onnx(transform_agg, df)
 
-# Reference: numpy reductions.
-ref_sum_a = float(np.sum(a))
-ref_mean_b = float(np.mean(b))
-ref_min_a = float(np.min(a))
-ref_max_b = float(np.max(b))
+# Reference: call the same transform function on the real DataFrame.
+ref_agg = transform_agg(df)
+ref_sum_a = float(ref_agg["sum_a"].iloc[0])
+ref_mean_b = float(ref_agg["mean_b"].iloc[0])
+ref_min_a = float(ref_agg["min_a"].iloc[0])
+ref_max_b = float(ref_agg["max_b"].iloc[0])
 
 sum_a, mean_b, min_a, max_b = onnxruntime.InferenceSession(
     artifact_agg.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -227,8 +293,8 @@ df_a = pd.DataFrame({"a": a})
 df_b = pd.DataFrame({"b": b})
 artifact_two = dataframe_to_onnx(transform_two, [df_a, df_b])
 
-# Reference: numpy equivalent.
-ref_two = a + b
+# Reference: call the same transform function on the real DataFrames.
+ref_two = transform_two(df_a, df_b)["total"].to_numpy()
 (ort_two,) = onnxruntime.InferenceSession(
     artifact_two.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, {"a": a, "b": b})
@@ -241,12 +307,8 @@ print("df1['a'] + df2['b'] =", ort_two)
 #
 # Use the ``join`` method to perform an inner join on a shared key.  The left
 # frame's key column is specified with ``left_key`` and the right frame's
-# key column with ``right_key``.
-#
-# .. note::
-#    The TracedDataFrame ``join`` API uses ``left_key``/``right_key`` which
-#    differs from :meth:`pandas.DataFrame.merge` (``left_on``/``right_on``).
-#    Reference values are verified directly against the known input arrays.
+# key column with ``right_key``.  The compatibility shim maps this to
+# :func:`pandas.merge` so the same function works on real data.
 
 cid = np.array([1, 2, 3], dtype=np.int64)
 vals_a = np.array([10.0, 20.0, 30.0], dtype=np.float32)
@@ -266,11 +328,12 @@ feeds = {"cid": cid, "a": vals_a, "id": id_, "b": vals_b}
 ort_join = onnxruntime.InferenceSession(
     artifact_join.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, feeds)
-# Verify each output column matches the known input data (identity join on cid==id).
-np.testing.assert_array_equal(ort_join[0], cid)
-np.testing.assert_allclose(ort_join[1], vals_a, rtol=1e-5)
-np.testing.assert_array_equal(ort_join[2], id_)
-np.testing.assert_allclose(ort_join[3], vals_b, rtol=1e-5)
+# Reference: call the same transform function on the real DataFrames.
+ref_join = transform_join(df_left, df_right)
+np.testing.assert_array_equal(ref_join["cid"].to_numpy(), ort_join[0])
+np.testing.assert_allclose(ref_join["a"].to_numpy(), ort_join[1], rtol=1e-5)
+np.testing.assert_array_equal(ref_join["id"].to_numpy(), ort_join[2])
+np.testing.assert_allclose(ref_join["b"].to_numpy(), ort_join[3], rtol=1e-5)
 print("join outputs:")
 for col_name, col_val in zip(["cid", "a", "id", "b"], ort_join):
     print(f"  {col_name} = {col_val}")
