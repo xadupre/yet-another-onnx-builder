@@ -145,5 +145,29 @@ class TestTargetEncoder(ExtTestCase):
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
 
+    def test_string_basic(self):
+        """String categorical columns with TargetEncoder."""
+        from category_encoders import TargetEncoder
+        from yobx.sklearn import to_onnx
+
+        X_df = pd.DataFrame(
+            {
+                "cat1": ["a", "b", "c", "a", "b", "c"],
+                "cat2": ["x", "y", "x", "z", "y", "x"],
+            }
+        )
+        y = np.array([0, 1, 1, 0, 1, 0])
+        enc = TargetEncoder(cols=["cat1", "cat2"])
+        enc.fit(X_df, y)
+        X_np = X_df.values  # dtype=object
+
+        onx = to_onnx(enc, (X_np,))
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X_np})[0]
+
+        expected = enc.transform(X_df).values.astype(np.float32)
+        self.assertEqualArray(expected, ort_result, atol=1e-5)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

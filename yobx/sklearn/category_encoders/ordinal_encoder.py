@@ -1,6 +1,7 @@
 from typing import Dict, List
 
 import numpy as np
+import onnx
 import pandas as pd
 from category_encoders import OrdinalEncoder
 
@@ -63,6 +64,11 @@ def category_encoders_ordinal_encoder(
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
 
+    is_string = itype == onnx.TensorProto.STRING
+    # For string inputs the output is always float32 (ordinal values are numeric).
+    out_itype = onnx.TensorProto.FLOAT if is_string else itype
+    out_dtype = np.float32 if is_string else dtype
+
     handle_unknown = getattr(estimator, "handle_unknown", "value")
     handle_missing = getattr(estimator, "handle_missing", "value")
 
@@ -86,12 +92,12 @@ def category_encoders_ordinal_encoder(
         for orig_val, ordinal in ord_map.items():
             if pd.isna(orig_val):
                 continue
-            known_vals_list.append(float(orig_val))
+            known_vals_list.append(str(orig_val) if is_string else float(orig_val))
             known_ord_list.append(float(ordinal))
 
         col_lookup[col] = {
             "known_vals": np.array(known_vals_list, dtype=dtype),
-            "known_ord": np.array(known_ord_list, dtype=dtype),
+            "known_ord": np.array(known_ord_list, dtype=out_dtype),
         }
 
     n_features = len(estimator.feature_names_in_)
@@ -114,8 +120,9 @@ def category_encoders_ordinal_encoder(
                 info["known_ord"],
                 unknown_is_nan,
                 missing_is_nan,
-                dtype,
+                out_dtype,
                 f"{name}_col{col_i}",
+                is_string=is_string,
             )
         else:
             # Non-categorical column: pass through as-is.
@@ -128,7 +135,7 @@ def category_encoders_ordinal_encoder(
     else:
         res = g.op.Concat(*col_tensors, axis=1, name=name, outputs=outputs)
 
-    g.set_type_shape_unary_op(res, X)
+    g.set_type_shape_unary_op(res, X, itype=out_itype)
     return res
 
 
@@ -141,25 +148,28 @@ def _ordinal_encode_column(
     missing_is_nan: bool,
     dtype: np.dtype,
     name: str,
+    is_string: bool = False,
 ) -> str:
     """Emit ONNX nodes that apply ordinal encoding to a single column tensor.
 
     For each input value the output is determined by the following priority:
 
     1. If the value is NaN → ``nan_ordinal`` (``-2.0`` or ``NaN`` depending on
-       ``missing_is_nan``)
+       ``missing_is_nan``; skipped for string inputs)
     2. If the value matches a known category → the corresponding ordinal integer
     3. Otherwise (unknown category) → ``unknown_ordinal`` (``-1.0`` or ``NaN``
        depending on ``unknown_is_nan``)
 
     :param g: graph builder
     :param col_tensor: ONNX tensor name for a single-column slice, shape ``(N, 1)``
-    :param known_vals: 1-D numpy array of known category values (float)
+    :param known_vals: 1-D numpy array of known category values; dtype ``object``
+        for string inputs, float otherwise
     :param known_ord: 1-D numpy array of corresponding ordinal integers (float)
     :param unknown_is_nan: if ``True``, unknown categories produce ``NaN``
     :param missing_is_nan: if ``True``, missing (NaN) inputs produce ``NaN``
-    :param dtype: numpy dtype for all float constants
+    :param dtype: numpy dtype for output (float) constants
     :param name: node name prefix
+    :param is_string: if ``True``, skip ``IsNaN`` handling (strings cannot be NaN)
     :return: ONNX tensor name, shape ``(N, 1)``
     """
     unknown_val = float("nan") if unknown_is_nan else -1.0
@@ -168,15 +178,17 @@ def _ordinal_encode_column(
 
     # For each known category, Where(Equal(col, cat), ordinal, result)
     for i, (cat_val, ord_val) in enumerate(zip(known_vals, known_ord)):
-        cat_const = np.array([[cat_val]], dtype=dtype)
+        # Use the dtype of known_vals for category constants (object for strings).
+        cat_const = np.array([[cat_val]], dtype=known_vals.dtype)
         eq = g.op.Equal(col_tensor, cat_const, name=f"{name}_eq{i}")
         ord_const = np.array([[ord_val]], dtype=dtype)
         result = g.op.Where(eq, ord_const, result, name=f"{name}_where{i}")
 
-    # Handle NaN inputs: IsNaN(col) → nan_val
-    nan_val = float("nan") if missing_is_nan else -2.0
-    is_nan = g.op.IsNaN(col_tensor, name=f"{name}_isnan")
-    nan_const = np.array([[nan_val]], dtype=dtype)
-    result = g.op.Where(is_nan, nan_const, result, name=f"{name}_where_nan")
+    if not is_string:
+        # Handle NaN inputs: IsNaN(col) → nan_val (not applicable to string tensors)
+        nan_val = float("nan") if missing_is_nan else -2.0
+        is_nan = g.op.IsNaN(col_tensor, name=f"{name}_isnan")
+        nan_const = np.array([[nan_val]], dtype=dtype)
+        result = g.op.Where(is_nan, nan_const, result, name=f"{name}_where_nan")
 
     return result

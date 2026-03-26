@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional
 import numpy as np
+import onnx
 from sklearn.preprocessing import OneHotEncoder
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
@@ -66,9 +67,9 @@ def sklearn_one_hot_encoder(
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
 
-    # Determine the output float type to use for Cast.
-    # We always cast to the same floating-point type as the input.
-    float_onnx_type = int(itype)
+    is_string = itype == onnx.TensorProto.STRING
+    # For string inputs the output is always float32 (indicator values are numeric).
+    float_onnx_type = onnx.TensorProto.FLOAT if is_string else int(itype)
 
     drop_idx: Optional[np.ndarray] = estimator.drop_idx_
 

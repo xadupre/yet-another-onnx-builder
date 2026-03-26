@@ -1301,6 +1301,8 @@ def size_type(dtype: Any) -> int:
             return 1
         if dtype in {TensorProto.COMPLEX128}:
             return 16
+        if dtype == TensorProto.STRING:
+            return 1
         from .onnx_helper import onnx_dtype_name
 
         raise AssertionError(

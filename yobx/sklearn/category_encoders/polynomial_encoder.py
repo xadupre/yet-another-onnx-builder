@@ -1,6 +1,7 @@
 from typing import Dict, List
 
 import numpy as np
+import onnx
 import pandas as pd
 from category_encoders import PolynomialEncoder
 
@@ -18,24 +19,27 @@ def _polynomial_encode_column(
     nan_contrast: np.ndarray,
     dtype: np.dtype,
     name: str,
+    is_string: bool = False,
 ) -> List[str]:
     """Emit ONNX nodes that apply polynomial (contrast) encoding to a single column tensor.
 
     For each input value the output row is determined by the following priority:
 
-    1. If the value is NaN → *nan_contrast*
+    1. If the value is NaN → *nan_contrast* (skipped for string inputs)
     2. If the value matches a known category → the corresponding contrast row
     3. Otherwise (unknown category) → *unknown_contrast*
 
     :param g: graph builder
     :param col_tensor: ONNX tensor name for a single-column slice, shape ``(N, 1)``
-    :param known_vals: 1-D numpy array of known original category values (float)
+    :param known_vals: 1-D numpy array of known original category values; dtype
+        ``object`` for string inputs, float otherwise
     :param known_contrast: 2-D numpy array of contrast values, shape ``(n_known, n_contrasts)``
     :param unknown_contrast: 1-D numpy array of values for unknown categories,
         shape ``(n_contrasts,)``
     :param nan_contrast: 1-D numpy array of values for NaN inputs, shape ``(n_contrasts,)``
-    :param dtype: numpy dtype for all float constants
+    :param dtype: numpy dtype for output (float) constants
     :param name: node name prefix
+    :param is_string: if ``True``, skip ``IsNaN`` handling (strings cannot be NaN)
     :return: list of ONNX tensor names, each shape ``(N, 1)``, one per contrast column
     """
     n_contrasts = known_contrast.shape[1]
@@ -43,12 +47,13 @@ def _polynomial_encode_column(
     # Pre-compute Equal masks for all known categories (shared across contrasts)
     eq_masks = []
     for i, cat_val in enumerate(known_vals):
-        cat_const = np.array([[cat_val]], dtype=dtype)
+        cat_const = np.array([[cat_val]], dtype=known_vals.dtype)
         eq = g.op.Equal(col_tensor, cat_const, name=f"{name}_eq{i}")
         eq_masks.append(eq)
 
-    # Pre-compute IsNaN mask (shared across contrasts)
-    is_nan = g.op.IsNaN(col_tensor, name=f"{name}_isnan")
+    # Pre-compute IsNaN mask (shared across contrasts; skipped for string inputs)
+    if not is_string:
+        is_nan = g.op.IsNaN(col_tensor, name=f"{name}_isnan")
 
     results = []
     for j in range(n_contrasts):
@@ -60,9 +65,10 @@ def _polynomial_encode_column(
             c_const = np.array([[contrast_val]], dtype=dtype)
             result = g.op.Where(eq_mask, c_const, result, name=f"{name}_where{i}_c{j}")
 
-        # Handle NaN: IsNaN(col) → nan_contrast_j
-        nan_const = np.array([[nan_contrast[j]]], dtype=dtype)
-        result = g.op.Where(is_nan, nan_const, result, name=f"{name}_where_nan_c{j}")
+        if not is_string:
+            # Handle NaN: IsNaN(col) → nan_contrast_j (not applicable to string tensors)
+            nan_const = np.array([[nan_contrast[j]]], dtype=dtype)
+            result = g.op.Where(is_nan, nan_const, result, name=f"{name}_where_nan_c{j}")
 
         results.append(result)
 
@@ -121,6 +127,11 @@ def category_encoders_polynomial_encoder(
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
 
+    is_string = itype == onnx.TensorProto.STRING
+    # For string inputs the output is always float32 (contrast values are numeric).
+    out_itype = onnx.TensorProto.FLOAT if is_string else itype
+    out_dtype = np.float32 if is_string else dtype
+
     # Build a mapping from feature name to column index.
     feat_idx = {feat: i for i, feat in enumerate(estimator.feature_names_in_)}
 
@@ -142,9 +153,9 @@ def category_encoders_polynomial_encoder(
         assert contrast_df is not None, f"No mapping found for column {col!r}"
 
         # unknown_contrast is the row indexed by -1 (unknown category ordinal)
-        unknown_contrast = contrast_df.loc[-1].values.astype(dtype)
+        unknown_contrast = contrast_df.loc[-1].values.astype(out_dtype)
         # nan_contrast is the row indexed by -2 (NaN ordinal)
-        nan_contrast = contrast_df.loc[-2].values.astype(dtype)
+        nan_contrast = contrast_df.loc[-2].values.astype(out_dtype)
 
         # Build lookup for all known (non-NaN) original values
         known_vals_list = []
@@ -152,15 +163,15 @@ def category_encoders_polynomial_encoder(
         for orig_val, ordinal in ord_map.items():
             if pd.isna(orig_val):
                 continue
-            known_vals_list.append(float(orig_val))
-            known_contrast_rows.append(contrast_df.loc[ordinal].values.astype(dtype))
+            known_vals_list.append(str(orig_val) if is_string else float(orig_val))
+            known_contrast_rows.append(contrast_df.loc[ordinal].values.astype(out_dtype))
 
         col_lookup[col] = {
             "known_vals": np.array(known_vals_list, dtype=dtype),
             "known_contrast": (
                 np.stack(known_contrast_rows, axis=0)
                 if known_contrast_rows
-                else np.zeros((0, len(unknown_contrast)), dtype=dtype)
+                else np.zeros((0, len(unknown_contrast)), dtype=out_dtype)
             ),
             "unknown_contrast": unknown_contrast,
             "nan_contrast": nan_contrast,
@@ -187,8 +198,9 @@ def category_encoders_polynomial_encoder(
                 info["known_contrast"],
                 info["unknown_contrast"],
                 info["nan_contrast"],
-                dtype,
+                out_dtype,
                 f"{name}_col{col_i}",
+                is_string=is_string,
             )
             col_tensors.extend(contrast_tensors)
         else:
@@ -201,7 +213,7 @@ def category_encoders_polynomial_encoder(
     else:
         res = g.op.Concat(*col_tensors, axis=1, name=name, outputs=outputs)
 
-    g.set_type(res, itype)
+    g.set_type(res, out_itype)
     if g.has_shape(X):
         shape = g.get_shape(X)
         g.set_shape(res, (shape[0], n_out))

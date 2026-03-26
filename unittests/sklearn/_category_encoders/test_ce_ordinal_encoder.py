@@ -27,6 +27,18 @@ class TestCEOrdinalEncoder(ExtTestCase):
         ort_result = sess.run(None, {"X": X_np})[0]
         self.assertEqualArray(expected, ort_result, atol=atol)
 
+    def _run_string_test(self, enc, X_df, X_np, atol=1e-6):
+        """Run test with string input; output is always float32."""
+        from yobx.sklearn import to_onnx
+
+        onx = to_onnx(enc, (X_np,))
+
+        expected = enc.transform(X_df).values.astype(np.float32)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X_np})[0]
+        self.assertEqualArray(expected, ort_result, atol=atol)
+
     def test_basic_float32(self):
         """Two categorical columns, one numeric, float32."""
         from category_encoders import OrdinalEncoder
@@ -187,6 +199,51 @@ class TestCEOrdinalEncoder(ExtTestCase):
 
         expected = pipe.predict(X_df).astype(np.float32).reshape(-1, 1)
         self.assertEqualArray(expected, ort_result, atol=1e-4)
+
+
+    def test_string_basic(self):
+        """Two string categorical columns with OrdinalEncoder."""
+        from category_encoders import OrdinalEncoder
+
+        X_df = pd.DataFrame(
+            {
+                "cat1": ["a", "b", "c", "a", "b"],
+                "cat2": ["x", "y", "x", "z", "y"],
+            }
+        )
+        enc = OrdinalEncoder(cols=["cat1", "cat2"])
+        enc.fit(X_df)
+        X_np = X_df.values  # dtype=object (string array)
+        self._run_string_test(enc, X_df, X_np)
+
+    def test_string_single_column(self):
+        """Single string categorical column."""
+        from category_encoders import OrdinalEncoder
+
+        X_df = pd.DataFrame({"cat": ["apple", "banana", "cherry", "apple", "banana"]})
+        enc = OrdinalEncoder(cols=["cat"])
+        enc.fit(X_df)
+        X_np = X_df.values
+        self._run_string_test(enc, X_df, X_np)
+
+    def test_string_unknown_category(self):
+        """Unknown string categories produce -1 (handle_unknown='value')."""
+        from category_encoders import OrdinalEncoder
+        from yobx.sklearn import to_onnx
+
+        X_df = pd.DataFrame({"cat": ["a", "b", "c"]})
+        enc = OrdinalEncoder(cols=["cat"], handle_unknown="value")
+        enc.fit(X_df)
+
+        X_test_df = pd.DataFrame({"cat": ["a", "unknown_cat", "b"]})
+        X_np = X_test_df.values
+
+        onx = to_onnx(enc, (X_np,))
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X_np})[0]
+
+        expected = enc.transform(X_test_df).values.astype(np.float32)
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
 
 
 if __name__ == "__main__":

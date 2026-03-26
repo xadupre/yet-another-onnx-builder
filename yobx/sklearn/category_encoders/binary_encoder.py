@@ -13,7 +13,7 @@ from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 def _binary_encode_column(
     g: GraphBuilderExtendedProtocol,
     col_tensor: str,
-    known_cats: List[Tuple[float, int]],
+    known_cats: List[Tuple],
     n_bits: int,
     dtype: np.dtype,
     itype: int,
@@ -21,6 +21,7 @@ def _binary_encode_column(
     handle_unknown: str = "value",
     handle_missing: str = "value",
     is_float_input: bool = True,
+    cat_dtype: np.dtype = None,
 ) -> str:
     """Emit ONNX nodes that apply binary encoding to a single column tensor.
 
@@ -29,6 +30,7 @@ def _binary_encode_column(
 
     1. If the value matches a known category → binary representation of its ordinal
     2. If the value is NaN and *handle_missing* is ``'return_nan'`` → NaN for all bits
+       (skipped when *is_float_input* is ``False``)
     3. If the value is an unknown category and *handle_unknown* is ``'return_nan'``
        → NaN for all bits
     4. Otherwise (unknown or NaN with ``'value'``) → 0 for all bits
@@ -38,15 +40,19 @@ def _binary_encode_column(
     :param known_cats: list of ``(cat_val, ordinal)`` pairs for known categories
         (ordinal ≥ 1); NaN entries are excluded
     :param n_bits: number of output bits (columns) per row
-    :param dtype: numpy dtype for float constants
-    :param itype: ONNX integer type code for this tensor
+    :param dtype: numpy dtype for float output constants
+    :param itype: ONNX integer type code for the output float tensor
     :param name: node name prefix
     :param handle_unknown: ``'value'`` (→ 0) or ``'return_nan'`` (→ NaN)
     :param handle_missing: ``'value'`` (→ 0) or ``'return_nan'`` (→ NaN)
     :param is_float_input: ``True`` if the input tensor is floating-point
-        (required for ``IsNaN`` support)
+        (required for ``IsNaN`` support); set to ``False`` for string inputs
+    :param cat_dtype: numpy dtype for category value constants; defaults to
+        *dtype* when ``None``; use ``object`` for string inputs
     :return: ONNX tensor name, shape ``(N, n_bits)``
     """
+    if cat_dtype is None:
+        cat_dtype = dtype
     nan_const = np.array([[float("nan")]], dtype=dtype)
 
     # Build one bit column per output position (MSB first).
@@ -60,7 +66,7 @@ def _binary_encode_column(
         # For every known category that has this bit set, conditionally put 1.0.
         for cat_idx, (cat_val, ordinal) in enumerate(known_cats):
             if (int(ordinal) >> bit_pos) & 1:
-                cat_const = np.array([[cat_val]], dtype=dtype)
+                cat_const = np.array([[cat_val]], dtype=cat_dtype)
                 eq = g.op.Equal(col_tensor, cat_const, name=f"{name}_eq_b{j}_c{cat_idx}")
                 one_const = np.ones((1, 1), dtype=dtype)
                 result = g.op.Where(eq, one_const, result, name=f"{name}_where_b{j}_c{cat_idx}")
@@ -80,7 +86,7 @@ def _binary_encode_column(
         # Compute a float indicator: 1.0 if *any* known category matched.
         eq_indicators = []
         for i, (cat_val, _) in enumerate(known_cats):
-            cat_const = np.array([[cat_val]], dtype=dtype)
+            cat_const = np.array([[cat_val]], dtype=cat_dtype)
             eq = g.op.Equal(col_tensor, cat_const, name=f"{name}_equk{i}")
             eq_float = g.op.Cast(eq, to=itype, name=f"{name}_castuk{i}")
             eq_indicators.append(eq_float)
@@ -187,6 +193,11 @@ def category_encoders_binary_encoder(
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
 
+    is_string = itype == onnx.TensorProto.STRING
+    # For string inputs the output is always float32 (bit values are numeric).
+    out_itype = onnx.TensorProto.FLOAT if is_string else itype
+    out_dtype = np.float32 if is_string else dtype
+
     # Detect floating-point input (required for IsNaN support).
     _FLOAT_TYPES = {onnx.TensorProto.FLOAT, onnx.TensorProto.FLOAT16, onnx.TensorProto.DOUBLE}
     is_float_input = itype in _FLOAT_TYPES
@@ -207,12 +218,13 @@ def category_encoders_binary_encoder(
         col = col_info_item["col"]
         ord_map = col_info_item["mapping"]  # pandas Series: orig_val → ordinal
 
-        known_cats: List[Tuple[float, int]] = []
+        known_cats: List[Tuple] = []
         max_ordinal = 0
         for orig_val, ordinal in ord_map.items():
             if pd.isna(orig_val):
                 continue
-            known_cats.append((float(orig_val), int(ordinal)))
+            cat_val = str(orig_val) if is_string else float(orig_val)
+            known_cats.append((cat_val, int(ordinal)))
             max_ordinal = max(max_ordinal, int(ordinal))
 
         # Number of bits = bit_length of the largest ordinal (e.g. 4 → 3 bits).
@@ -248,12 +260,13 @@ def category_encoders_binary_encoder(
             col_slice,
             known_cats,
             n_bits,
-            dtype,
-            itype,
+            out_dtype,
+            out_itype,
             f"{name}_col{col_i}",
             handle_unknown=handle_unknown,
             handle_missing=handle_missing,
             is_float_input=is_float_input,
+            cat_dtype=dtype,
         )
         col_tensors.append(block)
         n_out += n_bits

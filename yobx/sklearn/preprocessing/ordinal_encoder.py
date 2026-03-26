@@ -70,12 +70,17 @@ def sklearn_ordinal_encoder(
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
 
+    is_string = itype == onnx.TensorProto.STRING
+    # For string inputs the output is always float32 (ordinal values are numeric).
+    out_itype = onnx.TensorProto.FLOAT if is_string else itype
+    out_dtype = np.float32 if is_string else dtype
+
     handle_unknown = estimator.handle_unknown
     unknown_value = getattr(estimator, "unknown_value", None)
     encoded_missing_value = getattr(estimator, "encoded_missing_value", np.nan)
 
     emv_is_nan = isinstance(encoded_missing_value, float) and math.isnan(encoded_missing_value)
-    nan_val = np.array([[np.nan if emv_is_nan else float(encoded_missing_value)]], dtype=dtype)
+    nan_val = np.array([[np.nan if emv_is_nan else float(encoded_missing_value)]], dtype=out_dtype)
 
     unk_is_nan = (
         isinstance(unknown_value, float) and math.isnan(unknown_value)
@@ -83,7 +88,7 @@ def sklearn_ordinal_encoder(
         else False
     )
     if handle_unknown == "use_encoded_value":
-        unk_val = np.array([[np.nan if unk_is_nan else float(unknown_value)]], dtype=dtype)
+        unk_val = np.array([[np.nan if unk_is_nan else float(unknown_value)]], dtype=out_dtype)
     else:
         unk_val = None  # unused when handle_unknown == 'error'
 
@@ -98,7 +103,7 @@ def sklearn_ordinal_encoder(
         # 2. Compare col_i against every known category: shape (N, K) bool.
         #    Unknown values (including NaN) produce an all-False row.
         # ------------------------------------------------------------------
-        cats_row = cats.astype(dtype).reshape(1, -1)  # (1, K)
+        cats_row = cats.astype(dtype).reshape(1, -1)  # (1, K); object dtype for strings
         eq = g.op.Equal(col_i, cats_row, name=f"{name}_eq{i}")
 
         # ------------------------------------------------------------------
@@ -113,7 +118,7 @@ def sklearn_ordinal_encoder(
         ordinal_i64 = g.op.ArgMax(eq_int, axis=1, keepdims=1, name=f"{name}_argmax{i}")
 
         # Cast ordinal to the output float dtype.
-        ordinal = g.op.Cast(ordinal_i64, to=int(itype), name=f"{name}_cast_ord{i}")
+        ordinal = g.op.Cast(ordinal_i64, to=int(out_itype), name=f"{name}_cast_ord{i}")
 
         # ------------------------------------------------------------------
         # 5. Detect whether any category matched: ReduceMax → (N, 1) int64.
@@ -133,10 +138,11 @@ def sklearn_ordinal_encoder(
             ordinal = g.op.Where(any_match_bool, ordinal, unk_val, name=f"{name}_unk{i}")
 
         # ------------------------------------------------------------------
-        # 7. Override NaN inputs with encoded_missing_value.
+        # 7. Override NaN inputs with encoded_missing_value (float inputs only).
         # ------------------------------------------------------------------
-        is_nan = g.op.IsNaN(col_i, name=f"{name}_isnan{i}")
-        ordinal = g.op.Where(is_nan, nan_val, ordinal, name=f"{name}_nan{i}")
+        if not is_string:
+            is_nan = g.op.IsNaN(col_i, name=f"{name}_isnan{i}")
+            ordinal = g.op.Where(is_nan, nan_val, ordinal, name=f"{name}_nan{i}")
 
         col_tensors.append(ordinal)
 
@@ -146,5 +152,5 @@ def sklearn_ordinal_encoder(
     else:
         res = g.op.Concat(*col_tensors, axis=1, name=name, outputs=outputs)
 
-    g.set_type_shape_unary_op(res, X)
+    g.set_type_shape_unary_op(res, X, itype=out_itype)
     return res
