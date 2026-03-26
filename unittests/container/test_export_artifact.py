@@ -589,7 +589,8 @@ class TestExportArtifact(ExtTestCase):
 
     @skipif_ci_windows("issue with excel")
     def test_save_includes_node_stats_in_excel(self):
-        """save() should produce an Excel file with both node_stats and symbolic_flops sheets populated automatically."""
+        """save() should produce an Excel file with both node_stats
+        and symbolic_flops sheets populated automatically."""
         try:
             import openpyxl  # noqa: F401
         except ImportError:
@@ -597,8 +598,7 @@ class TestExportArtifact(ExtTestCase):
         import pandas
 
         artifact = ExportArtifact(
-            proto=_make_matmul_model(),
-            report=ExportReport(extra={"time_total": 0.1}),
+            proto=_make_matmul_model(), report=ExportReport(extra={"time_total": 0.1})
         )
         with tempfile.TemporaryDirectory() as tmp:
             path = os.path.join(tmp, "model.onnx")
