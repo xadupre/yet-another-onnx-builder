@@ -6103,6 +6103,9 @@ class GraphBuilder(
                     continue
                 shape = self.get_shape(input_name)
                 axis = where["axis"]
+                if axis is None:
+                    # the shape is empty.
+                    continue
                 existing_name = shape[axis]
                 if dim_name != existing_name:
                     # We register a new constraints.
