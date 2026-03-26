@@ -3273,6 +3273,46 @@ class TestPositionMsg(ExtTestCase):
         shape = [d.dim_param or d.dim_value for d in tmp_vi.type.tensor_type.shape.dim]
         self.assertEqual(shape, ["batch", 3])
 
+    def test_optimize_applies_dynamic_dimension_renaming(self):
+        """optimize() calls _improves_dynamic_dimension_naming(apply_replacements=True),
+        which must update get_shape() and get_shape_renamed() to reflect user-visible
+        dimension names instead of internal symbolic tokens."""
+        # Build a minimal single-Relu graph with internal dim tokens "s0" / "s1".
+        g = GraphBuilder(
+            18,
+            ir_version=9,
+            optimization_options=OptimizationOptions(passes=[], patterns=None),
+        )
+        g.make_tensor_input("X", TFLOAT, ("s0", "s1"))
+        g.make_node("Relu", ["X"], ["Y"])
+        g.make_tensor_output("Y", TFLOAT, ("s0", "s1"), indexed=False)
+
+        # Register bidirectional constraints linking internal tokens to user names.
+        g.add_to_constraints("s0", "batch")
+        g.add_to_constraints("batch", "s0")
+        g.add_to_constraints("s1", "seq")
+        g.add_to_constraints("seq", "s1")
+
+        # Declare the user-visible names so that _improves_dynamic_dimension_naming
+        # treats "batch" and "seq" as the preferred (original) names.
+        g.dynamic_dimensions_source["batch"] = [{"input_name": "X", "axis": 0}]
+        g.dynamic_dimensions_source["seq"] = [{"input_name": "X", "axis": 1}]
+
+        # Verify shapes use internal tokens before optimization.
+        self.assertEqual(g.get_shape("X"), ("s0", "s1"))
+        self.assertEqual(g.get_shape("Y"), ("s0", "s1"))
+
+        # Run optimize() — this triggers _improves_dynamic_dimension_naming(apply_replacements=True).
+        g.optimize()
+
+        # After optimize(), get_shape() must reflect the user-visible names.
+        self.assertEqual(g.get_shape("X"), ("batch", "seq"))
+        self.assertEqual(g.get_shape("Y"), ("batch", "seq"))
+
+        # get_shape_renamed() must also return the user-visible names.
+        self.assertEqual(g.get_shape_renamed("X"), ("batch", "seq"))
+        self.assertEqual(g.get_shape_renamed("Y"), ("batch", "seq"))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
