@@ -559,23 +559,28 @@ class TracedDataFrame:
             dtypes2 = {"id": np.int64, "b": np.float32}
             artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
         """
-        # Collect ONNX dtypes for all columns from both sides so that
-        # join-key columns (which may not appear in any SELECT expression)
-        # can be registered with their correct type in _populate_graph.
-        all_col_dtypes: dict = {}
-        for _name, _series in self._columns.items():
-            if isinstance(_series._expr, ColumnRef) and _series._expr.dtype != 0:
-                all_col_dtypes[_name] = _series._expr.dtype
-        for _name, _series in right._columns.items():
-            if isinstance(_series._expr, ColumnRef) and _series._expr.dtype != 0:
-                all_col_dtypes[_name] = _series._expr.dtype
+        # Build ColumnRef lists for both sides so that _populate_graph can
+        # classify and type columns (including join-key columns that may not
+        # appear in any SELECT expression) without requiring input_dtypes.
+        def _col_refs_from(frame: "TracedDataFrame") -> "List[ColumnRef]":
+            refs: List[ColumnRef] = []
+            for _name in frame._source_columns:
+                _series = frame._columns.get(_name)
+                _dtype = (
+                    _series._expr.dtype
+                    if _series is not None and isinstance(_series._expr, ColumnRef)
+                    else 0
+                )
+                refs.append(ColumnRef(column=_name, dtype=_dtype))
+            return refs
+
         join_op = JoinOp(
             right_table="r",
             left_key=left_key,
             right_key=right_key,
             join_type=join_type,
-            right_columns=list(right._source_columns),
-            column_dtypes=all_col_dtypes,
+            left_columns=_col_refs_from(self),
+            right_columns=_col_refs_from(right),
         )
         # Merge columns: left columns take priority on name collision.
         merged_cols = dict(self._columns)
@@ -689,12 +694,18 @@ class TracedDataFrame:
             ops.append(SelectOp(items=items))
         columns = _collect_columns(ops)
         # Fill in missing dtypes for join-key columns (created by
-        # _collect_columns with dtype=0 from JoinOp node strings) using the
-        # column_dtypes stored in any JoinOp in the operation list.
+        # _collect_columns with dtype=0 from JoinOp strings) using the
+        # dtype stored in the ColumnRef objects in JoinOp.left_columns and
+        # JoinOp.right_columns.
         join_col_dtypes: dict = {}
         for op in ops:
-            if isinstance(op, JoinOp) and op.column_dtypes:
-                join_col_dtypes.update(op.column_dtypes)
+            if isinstance(op, JoinOp):
+                for col_ref in op.left_columns:
+                    if col_ref.dtype != 0:
+                        join_col_dtypes[col_ref.column] = col_ref.dtype
+                for col_ref in op.right_columns:
+                    if col_ref.dtype != 0:
+                        join_col_dtypes[col_ref.column] = col_ref.dtype
         if join_col_dtypes:
             for col_ref in columns:
                 if col_ref.dtype == 0 and col_ref.column in join_col_dtypes:

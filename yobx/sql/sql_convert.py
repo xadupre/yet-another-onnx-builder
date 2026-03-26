@@ -536,7 +536,9 @@ def _populate_graph(
                 join_op = op
                 break
 
-        right_col_set: Set[str] = set(join_op.right_columns) if join_op is not None else set()
+        right_col_set: Set[str] = (
+            {cr.column for cr in join_op.right_columns} if join_op is not None else set()
+        )
 
         for col_ref in all_cols:
             col = col_ref.column
