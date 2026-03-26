@@ -345,6 +345,24 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertFalse(b.has_shape("Y"))
         self.assertFalse(b.has_rank("Y"))
 
+    def test_set_type_shape_reshape_dynamic_input_neg1(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", ("N",))
+        # 1-D input with one dynamic dim; reshape(-1, 1) → the -1 should be propagated
+        set_type_shape_reshape(b, "Y", "X", (-1, 1))
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), ("N", 1))
+
+    def test_set_type_shape_reshape_dynamic_input_neg1_fallback(self):
+        b = BasicShapeBuilder()
+        b.set_type("X", TFLOAT)
+        b.set_shape("X", ("N", "M"))
+        # 2-D input with two dynamic dims; cannot resolve -1 → only rank set
+        set_type_shape_reshape(b, "Y", "X", (-1, 3))
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_rank("Y"), 2)
+
     # ------------------------------------------------------------------
     # set_type_shape_unary_op
     # ------------------------------------------------------------------
