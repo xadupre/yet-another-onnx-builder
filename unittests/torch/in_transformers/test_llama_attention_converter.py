@@ -452,6 +452,117 @@ class TestLlamaAttentionConverter(ExtTestCase):
         self.assertIn("Attention", op_types)
 
 
+@requires_transformers("5.0.7")
+class TestLlamaAttentionTracingDispatcher(ExtTestCase):
+    """Tests for exporting a model via tracing + Dispatcher with LlamaAttention."""
+
+    @staticmethod
+    def _make_flat_model(hidden_size=64, num_attention_heads=4, num_key_value_heads=2, head_dim=16):
+        """Returns (model, hs, cos, sin) ready for export."""
+        import torch
+        from transformers import LlamaConfig
+        from transformers.models.llama.modeling_llama import LlamaAttention
+
+        config = LlamaConfig(
+            hidden_size=hidden_size,
+            num_attention_heads=num_attention_heads,
+            num_key_value_heads=num_key_value_heads,
+            head_dim=head_dim,
+        )
+
+        class FlatLlamaAttention(torch.nn.Module):
+            def __init__(self, attn):
+                super().__init__()
+                self.attn = attn
+
+            def forward(self, hidden_states, cos, sin):
+                out, _ = self.attn(hidden_states, position_embeddings=(cos, sin))
+                return out
+
+        class SimpleLayer(torch.nn.Module):
+            def __init__(self, config):
+                super().__init__()
+                self.attn = FlatLlamaAttention(LlamaAttention(config, layer_idx=0).eval())
+
+            def forward(self, hidden_states, cos, sin):
+                return self.attn(hidden_states, cos, sin)
+
+        model = SimpleLayer(config).eval()
+        hs = torch.randn(2, 10, hidden_size)
+        cos = torch.randn(2, 10, head_dim)
+        sin = torch.randn(2, 10, head_dim)
+        return model, hs, cos, sin
+
+    def _export_with_dispatcher(self, model, hs, cos, sin, target_opset=22):
+        """Runs ``to_onnx`` with tracing + Dispatcher and returns the artifact."""
+        import torch
+        from yobx.torch import to_onnx, ExportOptions
+        from yobx.torch.interpreter import Dispatcher
+        from yobx.torch.in_transformers.classes.llama_attention import llama_attention_to_onnx
+
+        # Identify the FlatLlamaAttention class inside the model.
+        flat_attn_cls = type(model.attn)
+
+        def flat_llama_to_onnx(g, module, hidden_states, cos, sin):
+            return llama_attention_to_onnx(g, module.attn, hidden_states, cos, sin)
+
+        dispatcher = Dispatcher({flat_attn_cls: flat_llama_to_onnx})
+
+        return to_onnx(
+            model,
+            kwargs={"hidden_states": hs, "cos": cos, "sin": sin},
+            export_options=ExportOptions(
+                tracing=True,
+                tracing_module_leaves={
+                    flat_attn_cls: lambda m, module_qualified_name=None: True
+                },
+            ),
+            dispatcher=dispatcher,
+            target_opset=target_opset,
+        )
+
+    def test_tracing_dispatcher_opset22_ref_eval(self):
+        """Tracing + Dispatcher opset 22: output matches PyTorch (ref evaluator)."""
+        import torch
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        model, hs, cos, sin = self._make_flat_model()
+        with torch.no_grad():
+            expected = model(hs, cos, sin).numpy()
+
+        artifact = self._export_with_dispatcher(model, hs, cos, sin, target_opset=22)
+        feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
+        got = ExtendedReferenceEvaluator(artifact).run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=1e-4)
+
+    @requires_onnxruntime("1.0")
+    def test_tracing_dispatcher_opset22_ort(self):
+        """Tracing + Dispatcher opset 22: output matches PyTorch (OnnxRuntime)."""
+        import torch
+        import onnxruntime as ort
+
+        model, hs, cos, sin = self._make_flat_model()
+        with torch.no_grad():
+            expected = model(hs, cos, sin).numpy()
+
+        artifact = self._export_with_dispatcher(model, hs, cos, sin, target_opset=22)
+        feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
+        sess = ort.InferenceSession(
+            artifact.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got = sess.run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=1e-4)
+
+    def test_tracing_dispatcher_produces_onnx_nodes_not_custom(self):
+        """Tracing + Dispatcher: all nodes use the standard ONNX domain."""
+        artifact = self._export_with_dispatcher(*self._make_flat_model(), target_opset=22)
+        domains = {n.domain for n in artifact.graph.node}
+        self.assertNotIn("FlatLlamaAttention", domains)
+        self.assertNotIn("attn.lib", domains)
+        # Should only use the default ("") domain
+        self.assertTrue(all(d == "" for d in domains), msg=f"unexpected domains: {domains}")
+
+
 @requires_transformers("")
 class TestLlamaAttentionRegistration(ExtTestCase):
     """Tests for the :mod:`yobx.torch.in_transformers` converter registry."""

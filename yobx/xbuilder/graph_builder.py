@@ -5376,7 +5376,15 @@ class GraphBuilder(
                 else:
                     kwargs[k] = node
 
-            res = fct(self, {}, None, *args, **kwargs)
+            # The dispatcher function (e.g. llama_attention_to_onnx) may call
+            # make_initializer without a source string.  Relax the check so that
+            # direct ONNX converter functions work here without modification.
+            saved_check = self.check_empty_source
+            self.check_empty_source = False
+            try:
+                res = fct(self, graph_module, *args, **kwargs)
+            finally:
+                self.check_empty_source = saved_check
             if isinstance(res, str):
                 res = [res]
             for o in res:
