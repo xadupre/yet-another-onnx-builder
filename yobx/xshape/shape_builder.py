@@ -391,6 +391,9 @@ class ShapeBuilder:
         if v_updates:
             self._known_value_shape.update(v_updates)
         if dim_updates:
+            # Ensure _dynamic_alias exists before updating it.
+            if not hasattr(self, "_dynamic_alias"):
+                self._dynamic_alias = {}
             self._dynamic_alias.update(dim_updates)
         return dim_updates
 
