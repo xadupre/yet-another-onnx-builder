@@ -1691,9 +1691,7 @@ class TestInputObserver(ExtTestCase):
             def forward(self, x, y):
                 return x + y
 
-        inputs = [
-            dict(x=torch.randn((5, 6)), y=torch.randn((1, 6))),
-        ]
+        inputs = [dict(x=torch.randn((5, 6)), y=torch.randn((1, 6)))]
 
         model = Model()
         observer = InputObserver()

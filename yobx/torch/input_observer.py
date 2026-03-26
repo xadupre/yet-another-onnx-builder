@@ -1063,7 +1063,8 @@ class InputObserverInfo:
             )
             if not signature_match_count:
                 raise ValueError(
-                    f"No input in all candidates was removed from {input_names=}, last candidate is "
+                    f"No input in all candidates was removed from {input_names=}, "
+                    f"last candidate is "
                     f"{string_type(self.inputs[-1].args, with_shape=True)}, "
                     f"{string_type(self.inputs[-1].kwargs, with_shape=True)}"
                 )
