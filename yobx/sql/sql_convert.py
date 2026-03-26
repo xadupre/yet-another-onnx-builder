@@ -44,6 +44,7 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
+import onnx.numpy_helper as onh
 from onnx import TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
@@ -496,8 +497,6 @@ def _build_pivot_table_tensors(
     :return: list of output tensor names (index column(s) first, then one per
         *column_values* entry).
     """
-    import onnx.numpy_helper as onh
-
     index_cols = pivot_op.index
     col_col = pivot_op.columns
     val_col = pivot_op.values
