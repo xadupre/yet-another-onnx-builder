@@ -31,31 +31,7 @@ See :ref:`l-plot-sql-to-onnx` for the equivalent SQL-string API and
 import numpy as np
 import onnxruntime
 from yobx.helpers.onnx_helper import pretty_onnx
-from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sql import dataframe_to_onnx
-
-# %%
-# Helper
-# ------
-#
-# A small helper runs a model with both the reference evaluator and
-# onnxruntime and verifies the results agree.
-
-
-def run(artifact, feeds):
-    """Run *artifact* through the reference evaluator and ORT; return ref outputs."""
-    ref = ExtendedReferenceEvaluator(artifact)
-    ref_outputs = ref.run(None, feeds)
-
-    sess = onnxruntime.InferenceSession(
-        artifact.SerializeToString(), providers=["CPUExecutionProvider"]
-    )
-    ort_outputs = sess.run(None, feeds)
-
-    for r, o in zip(ref_outputs, ort_outputs):
-        np.testing.assert_allclose(r, o, rtol=1e-5, atol=1e-6)
-    return ref_outputs
-
 
 # %%
 # 1. Basic SELECT — arithmetic expression
@@ -69,14 +45,15 @@ a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
 b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
 dtypes = {"a": np.float32, "b": np.float32}
 
+artifact_add = dataframe_to_onnx(
+    lambda df: df.select([(df["a"] + df["b"]).alias("total")]),
+    dtypes,
+)
 
-def transform_add(df):
-    return df.select([(df["a"] + df["b"]).alias("total")])
-
-
-artifact_add = dataframe_to_onnx(transform_add, dtypes)
-
-(total,) = run(artifact_add, {"a": a, "b": b})
+sess = onnxruntime.InferenceSession(
+    artifact_add.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+(total,) = sess.run(None, {"a": a, "b": b})
 print("a + b =", total)
 np.testing.assert_allclose(total, a + b)
 
@@ -91,13 +68,14 @@ print(pretty_onnx(artifact_add.proto))
 # Functions can produce several output columns at once.  Here we pass
 # both source columns through unchanged and add a computed ``product`` column.
 
-def transform_multi(df):
-    return df.select([df["a"], df["b"], (df["a"] * df["b"]).alias("product")])
+artifact_multi = dataframe_to_onnx(
+    lambda df: df.select([df["a"], df["b"], (df["a"] * df["b"]).alias("product")]),
+    dtypes,
+)
 
-
-artifact_multi = dataframe_to_onnx(transform_multi, dtypes)
-
-a_out, b_out, product = run(artifact_multi, {"a": a, "b": b})
+a_out, b_out, product = onnxruntime.InferenceSession(
+    artifact_multi.SerializeToString(), providers=["CPUExecutionProvider"]
+).run(None, {"a": a, "b": b})
 print("a      =", a_out)
 print("b      =", b_out)
 print("a * b  =", product)
@@ -115,14 +93,14 @@ print(pretty_onnx(artifact_multi.proto))
 # ``Compress`` nodes that select only the matching rows from every output
 # column.
 
-def transform_filter(df):
-    df = df.filter(df["a"] > 1.5)
-    return df.select([df["a"], df["b"]])
+artifact_filter = dataframe_to_onnx(
+    lambda df: df.filter(df["a"] > 1.5).select([df["a"], df["b"]]),
+    dtypes,
+)
 
-
-artifact_filter = dataframe_to_onnx(transform_filter, dtypes)
-
-a_filt, b_filt = run(artifact_filter, {"a": a, "b": b})
+a_filt, b_filt = onnxruntime.InferenceSession(
+    artifact_filter.SerializeToString(), providers=["CPUExecutionProvider"]
+).run(None, {"a": a, "b": b})
 print("rows where a > 1.5:")
 print("  a =", a_filt)
 print("  b =", b_filt)
@@ -131,17 +109,17 @@ np.testing.assert_allclose(a_filt, np.array([2.0, 3.0], dtype=np.float32))
 # %%
 # Filter and arithmetic can be chained freely:
 
-def transform_filter_add(df):
-    df = df.filter(df["a"] > 0)
-    return df.select([(df["a"] + df["b"]).alias("total")])
-
-
 a2 = np.array([1.0, -2.0, 3.0], dtype=np.float32)
 b2 = np.array([4.0, 5.0, 6.0], dtype=np.float32)
 
-artifact_filter_add = dataframe_to_onnx(transform_filter_add, dtypes)
+artifact_filter_add = dataframe_to_onnx(
+    lambda df: df.filter(df["a"] > 0).select([(df["a"] + df["b"]).alias("total")]),
+    dtypes,
+)
 
-(total2,) = run(artifact_filter_add, {"a": a2, "b": b2})
+(total2,) = onnxruntime.InferenceSession(
+    artifact_filter_add.SerializeToString(), providers=["CPUExecutionProvider"]
+).run(None, {"a": a2, "b": b2})
 print("(a + b) WHERE a > 0 =", total2)
 np.testing.assert_allclose(total2, np.array([5.0, 9.0], dtype=np.float32))
 
@@ -157,20 +135,21 @@ print(pretty_onnx(artifact_filter_add.proto))
 # ``max()`` — map to ``ReduceSum``, ``ReduceMean``, ``ReduceMin``, and
 # ``ReduceMax`` ONNX nodes respectively.
 
-def transform_agg(df):
-    return df.select(
+artifact_agg = dataframe_to_onnx(
+    lambda df: df.select(
         [
             df["a"].sum().alias("sum_a"),
             df["b"].mean().alias("mean_b"),
             df["a"].min().alias("min_a"),
             df["b"].max().alias("max_b"),
         ]
-    )
+    ),
+    dtypes,
+)
 
-
-artifact_agg = dataframe_to_onnx(transform_agg, dtypes)
-
-sum_a, mean_b, min_a, max_b = run(artifact_agg, {"a": a, "b": b})
+sum_a, mean_b, min_a, max_b = onnxruntime.InferenceSession(
+    artifact_agg.SerializeToString(), providers=["CPUExecutionProvider"]
+).run(None, {"a": a, "b": b})
 print(f"sum(a)  = {float(sum_a):.1f}  (expected 6.0)")
 print(f"mean(b) = {float(mean_b):.1f}  (expected 5.0)")
 print(f"min(a)  = {float(min_a):.1f}  (expected 1.0)")
@@ -189,13 +168,14 @@ print(pretty_onnx(artifact_agg.proto))
 # When *func* accepts two arguments, pass a **list** of dtype dicts.  The
 # columns of both frames are merged into a single ONNX input set (no join).
 
-def transform_two(df1, df2):
-    return df1.select([(df1["a"] + df2["b"]).alias("total")])
+artifact_two = dataframe_to_onnx(
+    lambda df1, df2: df1.select([(df1["a"] + df2["b"]).alias("total")]),
+    [{"a": np.float32}, {"b": np.float32}],
+)
 
-
-artifact_two = dataframe_to_onnx(transform_two, [{"a": np.float32}, {"b": np.float32}])
-
-(total_two,) = run(artifact_two, {"a": a, "b": b})
+(total_two,) = onnxruntime.InferenceSession(
+    artifact_two.SerializeToString(), providers=["CPUExecutionProvider"]
+).run(None, {"a": a, "b": b})
 print("df1['a'] + df2['b'] =", total_two)
 np.testing.assert_allclose(total_two, a + b)
 
@@ -207,21 +187,22 @@ np.testing.assert_allclose(total_two, a + b)
 # frame's key column is specified with ``left_key`` and the right frame's
 # key column with ``right_key``.
 
-def transform_join(df1, df2):
-    return df1.join(df2, left_key="cid", right_key="id")
-
-
 dtypes1 = {"cid": np.int64, "a": np.float32}
 dtypes2 = {"id": np.int64, "b": np.float32}
 
-artifact_join = dataframe_to_onnx(transform_join, [dtypes1, dtypes2])
+artifact_join = dataframe_to_onnx(
+    lambda df1, df2: df1.join(df2, left_key="cid", right_key="id"),
+    [dtypes1, dtypes2],
+)
 
 cid = np.array([1, 2, 3], dtype=np.int64)
 vals_a = np.array([10.0, 20.0, 30.0], dtype=np.float32)
 id_ = np.array([1, 2, 3], dtype=np.int64)
 vals_b = np.array([100.0, 200.0, 300.0], dtype=np.float32)
 
-join_out = run(artifact_join, {"cid": cid, "a": vals_a, "id": id_, "b": vals_b})
+join_out = onnxruntime.InferenceSession(
+    artifact_join.SerializeToString(), providers=["CPUExecutionProvider"]
+).run(None, {"cid": cid, "a": vals_a, "id": id_, "b": vals_b})
 print("join outputs:")
 for col_name, col_val in zip(["cid", "a", "id", "b"], join_out):
     print(f"  {col_name} = {col_val}")
