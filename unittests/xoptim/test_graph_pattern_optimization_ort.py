@@ -2117,7 +2117,6 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         )
         return model, inputs, ds, expected
 
-    @unittest.skip("TODO: fix it later")
     @requires_torch()
     @ignore_warnings((UserWarning, FutureWarning))
     @hide_stdout()
@@ -2139,7 +2138,6 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         got = ort.run(None, feeds)
         self.assertEqualArray(expected, got[0], 1e-5)
 
-    @unittest.skip("TODO: fix it later")
     @requires_torch()
     @ignore_warnings((UserWarning, FutureWarning))
     @hide_stdout()
@@ -2162,7 +2160,6 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         got = ort.run(None, feeds)
         self.assertEqualArray(expected, got[0], 1e-5)
 
-    @unittest.skip("TODO: fix it later")
     @requires_torch()
     @ignore_warnings((UserWarning, FutureWarning))
     @hide_stdout()
