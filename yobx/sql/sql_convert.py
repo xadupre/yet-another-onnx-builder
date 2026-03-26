@@ -575,7 +575,7 @@ def _build_pivot_table_tensors(
         used_tensor_names.add(candidate)
         out_idx += 1
     else:
-        assert unique_rows is not None, "unique_rows must noe be None"
+        assert unique_rows is not None, "unique_rows must not be None"
         for j, idx_col in enumerate(index_cols):
             idx_col_unique_f64 = g.op.Gather(  # type: ignore[misc]
                 unique_rows, np.array(j, dtype=np.int64), axis=1, name=f"pt_col_{idx_col}_f64"
@@ -955,7 +955,7 @@ def _populate_graph(
                     new_right_inputs.append((onnx_name, tp, shape))
             right_inputs = new_right_inputs
         else:
-            sql_right_rename: Dict[str, str] = {}
+            sql_right_rename = {}
 
         all_inputs = left_inputs + right_inputs
 
@@ -1040,7 +1040,7 @@ def _populate_graph(
         group_by_first_indices=gb_first_indices,
         group_by_n_groups=gb_n_groups,
     )
-    output_names: List[str] = []
+    output_names = []
     used_tensor_names: Set[str] = set()
     for i, item in enumerate(select_op.items):
         out_name = item.output_name()
