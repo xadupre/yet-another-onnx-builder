@@ -2855,7 +2855,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.zeros((6, 5), dtype=torch.float32)
         expected = model(x)
         DYN = torch.export.Dim.DYNAMIC
-        onx = to_onnx(model, (x,), dynamic_shapes=({0: DYN, 1: DYN},))
+        onx = to_onnx(model, (x,), dynamic_shapes=({0: DYN},))
         self.dump_onnx("test_aten_unbind.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x,))
 
