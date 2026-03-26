@@ -164,47 +164,22 @@ directly from the live dispatch tables in
     :showcode:
     :rst:
 
+    import re
     import numpy as np
     from yobx.xtracing.numpy_array import _HANDLED_FUNCTIONS
 
     _NP_BASE = "https://numpy.org/doc/stable/reference/generated/numpy.{}.html"
     _ONNX_BASE = "https://onnx.ai/onnx/operators/onnx__{}.html"
 
-    # Known ONNX mappings for array functions
-    _func_onnx = {
-        "reshape": "Reshape",
-        "transpose": "Transpose",
-        "sum": "ReduceSum",
-        "mean": "ReduceMean",
-        "amax": "ReduceMax",
-        "amin": "ReduceMin",
-        "prod": "ReduceProd",
-        "clip": "Clip",
-        "where": "Where",
-        "concatenate": "Concat",
-        "stack": "Unsqueeze + Concat",
-        "expand_dims": "Unsqueeze",
-        "squeeze": "Squeeze",
-        "matmul": "MatMul",
-        "dot": "MatMul",
-        "abs": "Abs",
-        "sqrt": "Sqrt",
-        "exp": "Exp",
-        "log": "Log",
-        "log1p": "Add + Log",
-        "expm1": "Exp + Sub",
-    }
-
-    def _onnx_cell(name):
-        mapping = _func_onnx.get(name)
-        if mapping is None:
+    def _onnx_cell_from_doc(fn):
+        """Extract ONNX ops from the function docstring (``ONNX: Op1, Op2``)."""
+        doc = fn.__doc__ or ""
+        m = re.search(r"ONNX:\s*([\w,\s]+)", doc)
+        if not m:
             return "*(see source)*"
-        # If it's a composite description (contains spaces), return as-is
-        if " " in mapping:
-            parts = mapping.split(" + ")
-            links = [f"`{p} <{_ONNX_BASE.format(p)}>`_" for p in parts]
-            return " + ".join(links)
-        return f"`{mapping} <{_ONNX_BASE.format(mapping)}>`_"
+        ops = [op.strip() for op in m.group(1).split(",") if op.strip()]
+        links = [f"`{op} <{_ONNX_BASE.format(op)}>`_" for op in ops]
+        return ", ".join(links)
 
     print(".. list-table::")
     print("   :header-rows: 1")
@@ -215,7 +190,7 @@ directly from the live dispatch tables in
     for k in sorted(_HANDLED_FUNCTIONS.keys(), key=lambda x: x.__name__):
         np_url = _NP_BASE.format(k.__name__)
         np_cell = f"`np.{k.__name__} <{np_url}>`_"
-        onnx = _onnx_cell(k.__name__)
+        onnx = _onnx_cell_from_doc(_HANDLED_FUNCTIONS[k])
         print(f"   * - {np_cell}")
         print(f"     - {onnx}")
     print()
