@@ -202,6 +202,47 @@ class TestParseSqlJoin(unittest.TestCase):
         col_names = [c.column for c in pq.columns]
         self.assertIn("k", col_names)
 
+    # ------------------------------------------------------------------
+    # Multi-column (AND) join parsing
+    # ------------------------------------------------------------------
+
+    def test_multi_column_join_two_keys(self):
+        """ON clause with two AND-chained key pairs."""
+        pq = parse_sql(
+            "SELECT a.x, b.y FROM a JOIN b ON a.company_id = b.cid AND a.dept_id = b.did"
+        )
+        join = next(op for op in pq.operations if isinstance(op, JoinOp))
+        self.assertEqual(join.left_keys, ["company_id", "dept_id"])
+        self.assertEqual(join.right_keys, ["cid", "did"])
+
+    def test_multi_column_join_three_keys(self):
+        """ON clause with three AND-chained key pairs."""
+        pq = parse_sql(
+            "SELECT a.x FROM a JOIN b ON a.k1 = b.k1 AND a.k2 = b.k2 AND a.k3 = b.k3"
+        )
+        join = next(op for op in pq.operations if isinstance(op, JoinOp))
+        self.assertEqual(join.left_keys, ["k1", "k2", "k3"])
+        self.assertEqual(join.right_keys, ["k1", "k2", "k3"])
+
+    def test_multi_column_join_single_key_lists(self):
+        """Single-key ON clause: left_keys/right_keys are one-element lists."""
+        pq = parse_sql("SELECT x FROM t1 JOIN t2 ON t1.id = t2.id")
+        join = next(op for op in pq.operations if isinstance(op, JoinOp))
+        self.assertEqual(join.left_keys, ["id"])
+        self.assertEqual(join.right_keys, ["id"])
+        # Backward-compat properties still work.
+        self.assertEqual(join.left_key, "id")
+        self.assertEqual(join.right_key, "id")
+
+    def test_multi_column_join_columns_collected(self):
+        """All key columns from a multi-column ON appear in pq.columns."""
+        pq = parse_sql(
+            "SELECT x FROM t1 JOIN t2 ON t1.company_id = t2.cid AND t1.dept_id = t2.did"
+        )
+        col_names = [c.column for c in pq.columns]
+        for col in ("company_id", "dept_id", "cid", "did"):
+            self.assertIn(col, col_names)
+
 
 class TestParsedQueryColumns(unittest.TestCase):
     """Tests for the column collection logic."""
