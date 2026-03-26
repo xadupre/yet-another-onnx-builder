@@ -320,6 +320,16 @@ class ComplexPolar(torch.nn.Module):
     _dynamic = {"x": {0: DIM("batch")}, "angle": {0: DIM("batch")}}
 
 
+class ControFlowRanks(torch.nn.Module):
+    def forward(self, x):
+        if x.ndim() == 2:
+            return x.clone()
+        return x / x.ndim()
+
+    _inputs = [(torch.rand(3, 4),), (torch.rand(5, 4),)]
+    _dynamic = {"x": {0: DIM("batch")}}
+
+
 class ControlFlowCond(torch.nn.Module):
     def forward(self, x):
         def true_fn(x):

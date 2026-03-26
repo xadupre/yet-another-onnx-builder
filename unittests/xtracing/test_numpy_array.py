@@ -202,7 +202,6 @@ class TestNumpyArray(ExtTestCase):
         self.assertEqualArray(X * np.float32(2), got[1], atol=1e-5)
         self.assertEqualArray(np.abs(X), got[2], atol=1e-5)
 
-
     def test_handled_functions_have_onnx_docstring(self):
         """Every function registered in _HANDLED_FUNCTIONS must carry an 'ONNX: ...' docstring."""
         import re
@@ -212,9 +211,7 @@ class TestNumpyArray(ExtTestCase):
         for np_func, impl_func in _HANDLED_FUNCTIONS.items():
             doc = impl_func.__doc__ or ""
             if not re.search(r"ONNX:\s*[\w,\s]+", doc):
-                missing.append(
-                    f"{np_func.__name__} -> {impl_func.__name__} (doc={doc!r})"
-                )
+                missing.append(f"{np_func.__name__} -> {impl_func.__name__} (doc={doc!r})")
 
         self.assertEqual(
             [],
