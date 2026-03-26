@@ -652,6 +652,33 @@ class TestSqlToOnnxJoin(ExtTestCase):
         np.testing.assert_allclose(x_out, np.array([3.0], dtype=np.float32))
         np.testing.assert_allclose(y_out, np.array([300.0], dtype=np.float32))
 
+    def test_three_table_join(self):
+        """SQL query with two JOIN clauses (three tables)."""
+        sql = (
+            "SELECT a.x, b.y, c.z "
+            "FROM a JOIN b ON a.id = b.bid JOIN c ON a.id = c.cid"
+        )
+        left_dtypes = {"id": np.int64, "x": np.float32}
+        # All right-table columns passed together in one flat dict.
+        right_dtypes = {"bid": np.int64, "y": np.float32, "cid": np.int64, "z": np.float32}
+        # Table a: id=[1,2,3], x=[10,20,30]
+        # Table b: bid=[2,3], y=[200,300]
+        # Table c: cid=[1,3], z=[1000,3000]
+        # After a⋈b: id=[2,3], x=[20,30], y=[200,300]
+        # After ⋈c on id=cid: id=3 matches cid=3 → x=[30], y=[300], z=[3000]
+        feeds = {
+            "id": np.array([1, 2, 3], dtype=np.int64),
+            "x": np.array([10.0, 20.0, 30.0], dtype=np.float32),
+            "bid": np.array([2, 3], dtype=np.int64),
+            "y": np.array([200.0, 300.0], dtype=np.float32),
+            "cid": np.array([1, 3], dtype=np.int64),
+            "z": np.array([1000.0, 3000.0], dtype=np.float32),
+        }
+        x_out, y_out, z_out = self._run(sql, left_dtypes, feeds, right_dtypes=right_dtypes)
+        np.testing.assert_allclose(x_out, np.array([30.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([300.0], dtype=np.float32))
+        np.testing.assert_allclose(z_out, np.array([3000.0], dtype=np.float32))
+
 
 if __name__ == "__main__":
     unittest.main()

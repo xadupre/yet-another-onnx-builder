@@ -554,6 +554,36 @@ class TestMultiDataframe(ExtTestCase):
                 [{"k1": np.int64, "k2": np.int64, "a": np.float32}, {"k1": np.int64, "b": np.float32}],
             )
 
+    def test_join_three_frames(self):
+        """Inner join across three tables (two JOIN clauses)."""
+
+        def transform(df1, df2, df3):
+            j1 = df1.join(df2, left_key="cid", right_key="id")
+            j2 = j1.join(df3, left_key="cid", right_key="gid")
+            return j2.select([j2["x"], j2["y"], j2["z"]])
+
+        # Table a: cid=[1,2,3], x=[10,20,30]
+        # Table b: id=[2,3], y=[200,300]
+        # Table c: gid=[1,3], z=[1000,3000]
+        # After join a⋈b: cid=[2,3], x=[20,30], y=[200,300]
+        # After join ⋈c on cid=gid: cid=3 matches gid=3 → x=[30], y=[300], z=[3000]
+        cid = np.array([1, 2, 3], dtype=np.int64)
+        x = np.array([10.0, 20.0, 30.0], dtype=np.float32)
+        id_ = np.array([2, 3], dtype=np.int64)
+        y = np.array([200.0, 300.0], dtype=np.float32)
+        gid = np.array([1, 3], dtype=np.int64)
+        z = np.array([1000.0, 3000.0], dtype=np.float32)
+
+        dtypes1 = {"cid": np.int64, "x": np.float32}
+        dtypes2 = {"id": np.int64, "y": np.float32}
+        dtypes3 = {"gid": np.int64, "z": np.float32}
+        artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2, dtypes3])
+        ref = ExtendedReferenceEvaluator(artifact)
+        x_out, y_out, z_out = ref.run(None, {"cid": cid, "x": x, "id": id_, "y": y, "gid": gid, "z": z})
+        np.testing.assert_allclose(x_out, np.array([30.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([300.0], dtype=np.float32))
+        np.testing.assert_allclose(z_out, np.array([3000.0], dtype=np.float32))
+
 
 
     # ------------------------------------------------------------------
