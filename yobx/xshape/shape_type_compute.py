@@ -189,16 +189,31 @@ def set_type_shape_reshape(g: ShapeBuilder, name: str, input_name: str, new_shap
     elif min(new_shape) == -1:
         if g.has_shape(input_name):
             shape = list(g.get_shape(input_name))
-            arg_size = np.prod([a for a in new_shape if a >= 0])
-            size = np.prod(shape)
-            index = new_shape.index(-1)
-            new_shape = list(new_shape)
-            if arg_size == 0:
-                assert size == 0, f"Unable to reshape {shape} into {new_shape}"
-                new_shape[index] = 1
+            if not all_int(shape):
+                # Input shape contains dynamic dimensions (strings); we cannot compute
+                # the product statically.  Try to propagate a single dynamic dim when
+                # arg_size == 1 and the input is effectively 1-D (one dynamic dim,
+                # all other dims == 1).  Fall back to rank-only otherwise.
+                arg_size = np.prod([a for a in new_shape if a >= 0])
+                non_one = [d for d in shape if not isinstance(d, int) or d != 1]
+                if arg_size == 1 and len(non_one) == 1 and not isinstance(non_one[0], int):
+                    index = new_shape.index(-1)
+                    new_shape = list(new_shape)
+                    new_shape[index] = non_one[0]
+                    g.set_shape(name, tuple(new_shape))
+                else:
+                    g.set_rank(name, len(new_shape))
             else:
-                new_shape[index] = int(size // arg_size)
-            g.set_shape(name, tuple(new_shape))
+                arg_size = np.prod([a for a in new_shape if a >= 0])
+                size = np.prod(shape)
+                index = new_shape.index(-1)
+                new_shape = list(new_shape)
+                if arg_size == 0:
+                    assert size == 0, f"Unable to reshape {shape} into {new_shape}"
+                    new_shape[index] = 1
+                else:
+                    new_shape[index] = int(size // arg_size)
+                g.set_shape(name, tuple(new_shape))
         else:
             g.set_rank(name, len(new_shape))
     else:

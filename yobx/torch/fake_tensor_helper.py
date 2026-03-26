@@ -224,16 +224,18 @@ class FakeTensorContext:
                     s = dynamic_shapes[idim]
                     if s.__class__.__name__ == "Dim":
                         s = s.__name__
-                    assert isinstance(s, str), (
-                        f"Unexpected type {type(s)} in dynamic_shapes={dynamic_shapes} "
-                        f"at index {idim}, self._mapping_str={self._mapping_str}"
-                    )
-                    if s in self._mapping_str:
-                        dim = self._mapping_str[s]
+                    if isinstance(s, str):
+                        if s in self._mapping_str:
+                            dim = self._mapping_str[s]
+                        else:
+                            i = self._unique()
+                            self._mapping_str[s] = i
+                            dim = i
                     else:
-                        i = self._unique()
-                        self._mapping_str[s] = i
-                        dim = i
+                        # torch.export.Dim.DYNAMIC, torch.export.Dim.AUTO, and other
+                        # _DimHint values are unnamed dynamic dimensions; treat each
+                        # occurrence as an independent dimension with a fresh unique size.
+                        dim = self._unique()
                 assert isinstance(dim, int), (
                     f"Unexpected type {type(dim)}, dynamic_shapes={dynamic_shapes} "
                     f"at index {idim}, dim={dim}"

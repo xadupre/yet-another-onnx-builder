@@ -589,6 +589,8 @@ class TestExportArtifact(ExtTestCase):
 
     @skipif_ci_windows("issue with excel")
     def test_save_includes_node_stats_in_excel(self):
+        """save() should produce an Excel file with both node_stats
+        and symbolic_flops sheets populated automatically."""
         try:
             import openpyxl  # noqa: F401
         except ImportError:

@@ -487,6 +487,23 @@ class TestParsedQueryToOnnx(ExtTestCase):
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, np.array([5.0, 9.0], dtype=np.float32))
 
+    def test_no_input_dtypes_when_traced(self):
+        """parsed_query_to_onnx works without input_dtypes for tracer-produced queries."""
+        from yobx.xtracing.dataframe_trace import trace_dataframe
+        from yobx.sql.sql_convert import parsed_query_to_onnx
+
+        def transform(df):
+            return df.select([(df["a"] + df["b"]).alias("total")])
+
+        pq = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        # No input_dtypes argument — dtype info comes from ColumnRef.dtype
+        artifact = parsed_query_to_onnx(pq)
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+
     def test_imported_from_sql_package(self):
         from yobx.sql import parsed_query_to_onnx  # noqa: F401
 

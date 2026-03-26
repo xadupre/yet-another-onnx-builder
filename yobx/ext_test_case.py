@@ -889,7 +889,7 @@ def requires_onnxscript(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
-def has_onnxscript(version: str) -> Callable:
+def has_onnxscript(version: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxscript` is not recent enough."""
     try:
         import onnxscript
@@ -900,7 +900,48 @@ def has_onnxscript(version: str) -> Callable:
         # development version
         return True
 
+    if not version:
+        return True
+
     if PvVersion(onnxscript.__version__) < PvVersion(version):
+        return False
+    return True
+
+
+def has_onnx_ir(version: str = "") -> Callable:
+    """Skips a unit test if `ir-py` is not recent enough."""
+    try:
+        import onnx_ir
+    except ImportError:
+        return False
+
+    if not version:
+        return True
+
+    if not hasattr(onnx_ir, "__version__"):
+        # development version
+        return True
+
+    if PvVersion(onnx_ir.__version__) < PvVersion(version):
+        return False
+    return True
+
+
+def has_onnx_shape_inference(version: str = "") -> Callable:
+    """Skips a unit test if `onnx-shape-inference`."""
+    try:
+        import onnx_shape_inference
+    except ImportError:
+        return False
+
+    if not version:
+        return True
+
+    if not hasattr(onnx_shape_inference, "__version__"):
+        # development version
+        return True
+
+    if PvVersion(onnx_shape_inference.__version__) < PvVersion(version):
         return False
     return True
 
