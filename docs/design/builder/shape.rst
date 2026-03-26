@@ -31,10 +31,10 @@ The whole algorithm relies on four components:
 * A very **simple runtime** able to run a short list of kernels usually used to
   handle shapes (Add, Sub, Mul, Div, Concat, Squeeze, Unsqueeze, Shape, Size, Reshape),
 * An algorithm solving **constraints** after infering function was run.
-  A unknown dimension may be known or at least constrained to a short set of values
+  An unknown dimension may be known or at least constrained to a short set of values
   after a binary operator (or any other) was processed. The constraint mechanism is
   put in place to implement a kind of backward pass where output dimensions
-  restricts the number of possible values for input dimnensions.
+  restricts the number of possible values for input dimensions.
 
 Class Hierarchy
 ===============
