@@ -145,17 +145,13 @@ class TestQuantileEncoder(ExtTestCase):
         expected = pipe.predict(X_df[:8]).astype(np.float32).reshape(-1, 1)
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
-
     def test_string_basic(self):
         """String categorical columns with QuantileEncoder."""
         from category_encoders import QuantileEncoder
         from yobx.sklearn import to_onnx
 
         X_df = pd.DataFrame(
-            {
-                "cat1": ["a", "b", "c", "a", "b", "c"],
-                "cat2": ["x", "y", "x", "z", "y", "x"],
-            }
+            {"cat1": ["a", "b", "c", "a", "b", "c"], "cat2": ["x", "y", "x", "z", "y", "x"]}
         )
         y = np.array([1.0, 2.0, 3.0, 1.5, 2.5, 3.5])
         enc = QuantileEncoder(cols=["cat1", "cat2"])

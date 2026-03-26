@@ -121,7 +121,6 @@ class TestOrdinalEncoder(ExtTestCase):
         expected = pipe.predict(X).astype(np.float32).reshape(-1, 1)
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
-
     def test_ordinal_encoder_string_input(self):
         """OrdinalEncoder with string categorical input (dtype=object)."""
         from sklearn.preprocessing import OrdinalEncoder

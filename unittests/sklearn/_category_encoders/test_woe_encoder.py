@@ -143,17 +143,13 @@ class TestWOEEncoder(ExtTestCase):
         expected = pipe.predict(X_df[:8]).astype(np.float32).reshape(-1, 1)
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
-
     def test_string_basic(self):
         """String categorical columns with WOEEncoder."""
         from category_encoders import WOEEncoder
         from yobx.sklearn import to_onnx
 
         X_df = pd.DataFrame(
-            {
-                "cat1": ["a", "b", "c", "a", "b", "c"],
-                "cat2": ["x", "y", "x", "z", "y", "x"],
-            }
+            {"cat1": ["a", "b", "c", "a", "b", "c"], "cat2": ["x", "y", "x", "z", "y", "x"]}
         )
         y = np.array([0, 1, 1, 0, 1, 0])
         enc = WOEEncoder(cols=["cat1", "cat2"])

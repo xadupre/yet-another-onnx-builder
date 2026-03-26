@@ -168,17 +168,13 @@ class TestCEOneHotEncoder(ExtTestCase):
         expected = pipe.predict(X_df).astype(np.float32).reshape(-1, 1)
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
-
     def test_string_basic(self):
         """Two string categorical columns with category_encoders OneHotEncoder."""
         from category_encoders import OneHotEncoder
         from yobx.sklearn import to_onnx
 
         X_df = pd.DataFrame(
-            {
-                "cat1": ["a", "b", "c", "a", "b"],
-                "cat2": ["x", "y", "x", "z", "y"],
-            }
+            {"cat1": ["a", "b", "c", "a", "b"], "cat2": ["x", "y", "x", "z", "y"]}
         )
         enc = OneHotEncoder(cols=["cat1", "cat2"])
         enc.fit(X_df)

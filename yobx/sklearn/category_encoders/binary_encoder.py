@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import onnx
@@ -21,7 +21,7 @@ def _binary_encode_column(
     handle_unknown: str = "value",
     handle_missing: str = "value",
     is_float_input: bool = True,
-    cat_dtype: np.dtype = None,
+    cat_dtype: Optional[np.dtype] = None,
 ) -> str:
     """Emit ONNX nodes that apply binary encoding to a single column tensor.
 

@@ -211,17 +211,13 @@ class TestCEBinaryEncoder(ExtTestCase):
         expected = pipe.predict(X_df[:8]).astype(np.float32).reshape(-1, 1)
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
-
     def test_string_basic(self):
         """Two string categorical columns with BinaryEncoder."""
         from category_encoders import BinaryEncoder
         from yobx.sklearn import to_onnx
 
         X_df = pd.DataFrame(
-            {
-                "cat1": ["a", "b", "c", "a", "b"],
-                "cat2": ["x", "y", "x", "z", "y"],
-            }
+            {"cat1": ["a", "b", "c", "a", "b"], "cat2": ["x", "y", "x", "z", "y"]}
         )
         enc = BinaryEncoder(cols=["cat1", "cat2"])
         enc.fit(X_df)
@@ -239,9 +235,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         from category_encoders import BinaryEncoder
         from yobx.sklearn import to_onnx
 
-        X_df = pd.DataFrame(
-            {"cat": ["alpha", "beta", "gamma", "delta", "alpha", "beta"]}
-        )
+        X_df = pd.DataFrame({"cat": ["alpha", "beta", "gamma", "delta", "alpha", "beta"]})
         enc = BinaryEncoder(cols=["cat"])
         enc.fit(X_df)
         X_np = X_df.values

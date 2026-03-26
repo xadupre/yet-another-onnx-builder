@@ -86,7 +86,9 @@ def sklearn_ordinal_encoder(
     encoded_missing_value = getattr(estimator, "encoded_missing_value", np.nan)
 
     emv_is_nan = isinstance(encoded_missing_value, float) and math.isnan(encoded_missing_value)
-    nan_val = np.array([[np.nan if emv_is_nan else float(encoded_missing_value)]], dtype=out_dtype)
+    nan_val = np.array(
+        [[np.nan if emv_is_nan else float(encoded_missing_value)]], dtype=out_dtype
+    )
 
     unk_is_nan = (
         isinstance(unknown_value, float) and math.isnan(unknown_value)

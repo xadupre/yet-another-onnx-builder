@@ -54,6 +54,8 @@ def _polynomial_encode_column(
     # Pre-compute IsNaN mask (shared across contrasts; skipped for string inputs)
     if not is_string:
         is_nan = g.op.IsNaN(col_tensor, name=f"{name}_isnan")
+    else:
+        is_nan = None
 
     results = []
     for j in range(n_contrasts):
@@ -67,6 +69,7 @@ def _polynomial_encode_column(
 
         if not is_string:
             # Handle NaN: IsNaN(col) → nan_contrast_j (not applicable to string tensors)
+            assert is_nan is not None, "impossible configuratio"
             nan_const = np.array([[nan_contrast[j]]], dtype=dtype)
             result = g.op.Where(is_nan, nan_const, result, name=f"{name}_where_nan_c{j}")
 

@@ -200,16 +200,12 @@ class TestCEOrdinalEncoder(ExtTestCase):
         expected = pipe.predict(X_df).astype(np.float32).reshape(-1, 1)
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
-
     def test_string_basic(self):
         """Two string categorical columns with OrdinalEncoder."""
         from category_encoders import OrdinalEncoder
 
         X_df = pd.DataFrame(
-            {
-                "cat1": ["a", "b", "c", "a", "b"],
-                "cat2": ["x", "y", "x", "z", "y"],
-            }
+            {"cat1": ["a", "b", "c", "a", "b"], "cat2": ["x", "y", "x", "z", "y"]}
         )
         enc = OrdinalEncoder(cols=["cat1", "cat2"])
         enc.fit(X_df)

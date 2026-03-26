@@ -5902,10 +5902,7 @@ class GraphBuilder(
                     np.prod(t.dims)
                     * size_type(t.data_type if isinstance(t, TensorProto) else t.values.data_type)
                     for t in initializers
-                    if (
-                        isinstance(t, TensorProto) and t.data_type != TensorProto.STRING
-                        or not isinstance(t, TensorProto)
-                    )
+                    if not isinstance(t, TensorProto) or t.data_type != TensorProto.STRING
                 )
             ),
             size_large_initializers=sum(self._get_size(t) for t in large_initializers.values()),
