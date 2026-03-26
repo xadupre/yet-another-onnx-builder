@@ -504,6 +504,24 @@ class TestParsedQueryToOnnx(ExtTestCase):
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b)
 
+    def test_columnref_dtype_preferred_over_input_dtypes(self):
+        """ColumnRef.dtype takes precedence over input_dtypes when both are present."""
+        from onnx import TensorProto
+        from yobx.xtracing.dataframe_trace import trace_dataframe
+        from yobx.sql.sql_convert import parsed_query_to_onnx
+
+        def transform(df):
+            return df.select([df["a"].alias("a")])
+
+        # Trace with float32 — ColumnRef.dtype will be TensorProto.FLOAT
+        pq = trace_dataframe(transform, {"a": np.float32})
+        # Supply input_dtypes with a conflicting dtype (float64)
+        # ColumnRef.dtype (float32) should win
+        artifact = parsed_query_to_onnx(pq, {"a": np.float64})
+        # The model input should have been registered as FLOAT (from ColumnRef), not DOUBLE
+        input_type = artifact.proto.graph.input[0].type.tensor_type.elem_type
+        self.assertEqual(input_type, TensorProto.FLOAT)
+
     def test_imported_from_sql_package(self):
         from yobx.sql import parsed_query_to_onnx  # noqa: F401
 

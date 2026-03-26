@@ -539,10 +539,10 @@ def _populate_graph(
             # Determine ONNX element type: prefer dtype carried by the ColumnRef
             # (set by the tracer), fall back to the caller-supplied dict.
             if col in left_dtypes:
-                onnx_type = _np_dtype_to_onnx(left_dtypes[col])
+                onnx_type = col_ref.dtype if col_ref.dtype != 0 else _np_dtype_to_onnx(left_dtypes[col])
                 left_inputs.append((col, onnx_type, (dim,)))
             elif col in right_dtypes and join_op is not None:
-                onnx_type = _np_dtype_to_onnx(right_dtypes[col])
+                onnx_type = col_ref.dtype if col_ref.dtype != 0 else _np_dtype_to_onnx(right_dtypes[col])
                 right_inputs.append((col, onnx_type, (dim,)))
                 seen_right.append(col)
             elif col_ref.dtype != 0:
