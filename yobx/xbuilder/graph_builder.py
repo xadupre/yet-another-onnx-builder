@@ -315,8 +315,11 @@ class GraphBuilder(
         self.output_dynamic_shapes = self._pre_process_dynamic_shape(
             output_dynamic_shapes, unique_names  # type: ignore
         )
+
         self.dynamic_objects: Dict[str, Any] = {}
         self.dynamic_objects_rev: Dict[str, Any] = {}
+        self._dynamic_alias: Dict[str, str] = {}
+
         self.functions: Dict[Tuple[str, str], FunctionProto] = {}
         self.functions_builder: Dict[Any, Any] = {}
         self.value_info: List[ValueInfoProto] = []
@@ -325,7 +328,6 @@ class GraphBuilder(
         self.constants_computed_: Dict[str, Any] = {}
         self._cache_shape: Dict[Any, str] = {}
         self._values: Dict[Any, str] = {}
-        self._dynamic_alias: Dict[str, str] = {}
         self.constants_node_: Dict[bytes, NodeProto] = {}
         self.constants_alias_: Dict[str, str] = {}
         self.graph_module = graph_module
@@ -5962,10 +5964,70 @@ class GraphBuilder(
                 )
         return obj
 
-    def _improves_dynamic_dimension_naming(self):
+    def _apply_shape_replacements(self, replacements: Dict[str, Set[str]]) -> Dict[str, str]:
+        if not replacements:
+            return
+
+        # known_shapes
+        updates = {}
+        dim_updates = {}
+        for name, shape in self._known_shapes.items():
+            if not shape:
+                continue
+            new_shape = []
+            update = False
+            for s in shape:
+                if isinstance(s, int):
+                    new_shape.append(s)
+                    continue
+                ns = simplify_expression(rename_dynamic_expression(s, replacements))
+                new_shape.append(ns)
+                if ns != s:
+                    dim_updates[s] = ns
+                    update = True
+            if update:
+                updates[name] = tuple(new_shape)
+        if updates:
+            self._known_shapes.update(updates)
+
+        # known_values_shapes
+        v_updates = {}
+        for name, shape in self._known_value_shape.items():
+            if isinstance(shape, str):
+                ns = simplify_expression(rename_dynamic_expression(shape, replacements))
+                if ns != shape:
+                    dim_updates[shape] = ns
+                    update = True
+                    v_updates[name] = ns
+                continue
+            if not isinstance(shape, tuple):
+                continue
+            if not shape:
+                continue
+            new_shape = []
+            update = False
+            for s in shape:
+                if isinstance(s, int):
+                    new_shape.append(s)
+                    continue
+                ns = simplify_expression(rename_dynamic_expression(s, replacements))
+                new_shape.append(ns)
+                if ns != s:
+                    dim_updates[s] = ns
+                    update = True
+            if update:
+                v_updates[name] = tuple(new_shape)
+        if v_updates:
+            self._known_value_shape.update(v_updates)
+        if dim_updates:
+            self._dynamic_alias.update(dim_updates)
+        return dim_updates
+
+    def _improves_dynamic_dimension_naming(self, apply_replacements: bool = False):
         """
         Improves the naming of the dynamic dimnesion based on what
-        the user gave.
+        the user gave. It returns a list of replacements to operator but does
+        not do it.
         """
         if self._debug_dyn_dim:
             print(
@@ -6149,6 +6211,8 @@ class GraphBuilder(
                     )
                     for _ in v
                 )
+        if apply_replacements and replacements:
+            self._apply_shape_replacements(replacements)
         return replacements
 
     def get_shape_renamed(self, name: str) -> DYNAMIC_SHAPE:
@@ -6537,7 +6601,8 @@ class GraphBuilder(
         main_begin = time.perf_counter()
 
         begin = time.perf_counter()
-        self._improves_dynamic_dimension_naming()
+
+        self._improves_dynamic_dimension_naming(apply_replacements=True)
         self._another_pass_at_shape_inference()
         statistics.append(
             dict(

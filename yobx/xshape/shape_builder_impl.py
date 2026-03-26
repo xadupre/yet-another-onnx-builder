@@ -803,6 +803,9 @@ class BasicShapeBuilder(
                     )
             for i in graph.output:
                 self.run_value_info(i, False)
+
+            self._improves_dynamic_dimension_naming(True)
+
             if inference == InferenceMode.COST:
                 return res
 
