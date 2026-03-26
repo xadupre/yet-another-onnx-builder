@@ -12210,23 +12210,28 @@ def aten_unbind_int(
     assert not use_sequence, f"Not implemented for use_sequence={use_sequence}"
     assert g.has_shape(x), f"Not implemented when the input {x!r} has no shape{g.get_debug_msg()}"
     shape = g.get_shape(x)
-    assert isinstance(shape[dim], int), (
-        f"Not implemented when shape on this axis is dynamic "
-        f"dim={dim}, name={name!r}, shape={shape!r}{g.get_debug_msg()}"
-    )
+    if isinstance(shape[dim], int):
+        n = shape[dim]
+    elif len(outputs) > 1:
+        n = len(outputs)
+    else:
+        raise AssertionError(
+            f"Not implemented when shape on this axis is dynamic "
+            f"dim={dim}, name={name!r}, shape={shape!r}{g.get_debug_msg()}"
+        )
 
-    if shape[dim] == 1:
+    if n == 1:
         return g.op.Identity(x, outputs=outputs, name=name)
 
     if len(outputs) == 1:
         o = outputs[0]
-        unbind_outputs = [f"{o}_u{i}" for i in range(shape[dim])]
-        new_outputs = [g.unique_name(f"{o}#{i}") for i in range(shape[dim])]
+        unbind_outputs = [f"{o}_u{i}" for i in range(n)]
+        new_outputs = [g.unique_name(f"{o}#{i}") for i in range(n)]
     else:
         unbind_outputs = [g.unique_name(f"{o}{i}") for i, o in enumerate(outputs)]
         new_outputs = outputs
 
-    g.make_node("Split", [x], unbind_outputs, axis=dim, num_outputs=shape[dim], name=name)
+    g.make_node("Split", [x], unbind_outputs, axis=dim, num_outputs=n, name=name)
     dim_np = g.make_initializer(
         "", np.array([dim], dtype=np.int64), source="aten_unbind_int.dim_np"
     )

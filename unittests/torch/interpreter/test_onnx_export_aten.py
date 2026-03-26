@@ -2843,7 +2843,6 @@ class TestOnnxExportAten(ExtTestCase):
         self.dump_onnx("test_aten_flip.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x,))
 
-    @unittest.skip("unbind not ready yet")
     def test_aten_unbind(self):
         import torch
 
