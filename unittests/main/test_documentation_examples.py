@@ -10,6 +10,8 @@ from yobx.ext_test_case import (
     is_windows,
     ignore_errors,
     has_jax,
+    has_onnx_ir,
+    has_onnx_shape_inference,
     has_sklearn,
     has_sksurv,
     has_spox,
@@ -162,6 +164,13 @@ class TestDocumentationExamples(ExtTestCase):
 
             if not reason and not has_jax() and "jax" in name:
                 reason = "jax not installed"
+
+            if (
+                not reason
+                and (not has_onnx_ir() or not has_onnx_shape_inference())
+                and name in {"plot_computed_shapes.py"}
+            ):
+                reason = "onnx_ir is missing"
 
             if reason:
 
