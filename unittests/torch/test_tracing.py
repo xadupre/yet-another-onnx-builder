@@ -1293,12 +1293,29 @@ class TestTracingControlFlow(ExtTestCase):
 
         model = Model()
         x, y = torch.rand((3, 4)), torch.rand((3, 4))
-        art = to_onnx(
-            model,
-            (x, y),
-            export_options=ExportOptions(tracing=True),
-        )
+        art = to_onnx(model, (x, y), export_options=ExportOptions(tracing=True))
         self.assertEqual(["Add"], [n.op_type for n in art.graph.node])
+
+    def test_tracing_obvious_control_flow_shape_should_fail(self):
+        from yobx.torch import to_onnx, ExportOptions
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                if x.shape[0] == y.shape[0]:
+                    return x + y
+                return x + y.sum(axis=0, keepdim=True)
+
+        model = Model()
+        x, y = torch.rand((3, 4)), torch.rand((3, 4))
+        self.assertRaise(
+            lambda: to_onnx(
+                model,
+                (x, y),
+                export_options=ExportOptions(tracing=True),
+                dynamic_shapes=({0: "batch"}, {0: "batch2"}),
+            ),
+            torch.fx.proxy.TraceError,
+        )
 
 
 if __name__ == "__main__":
