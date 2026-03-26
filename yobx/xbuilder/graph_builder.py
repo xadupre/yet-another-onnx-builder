@@ -2445,6 +2445,9 @@ class GraphBuilder(
         source = self.dynamic_dimensions_source[name][0]
         axis = source["axis"]
         input_name = source["input_name"]
+        assert isinstance(
+            input_name, str
+        ), f"Unexpected type for input_name={input_name!r}{self.get_debug_msg()}"
         shape_name = self.unique_name(f"_onx_shape_{name}")
         self.make_node("Shape", [input_name], [shape_name], name="_get_dimension_as_result")
         axis_name = self.make_initializer(
@@ -6091,16 +6094,21 @@ class GraphBuilder(
 
         for dim_name, wheres in self.dynamic_dimensions_source.items():
             for where in wheres:
-                if not self.has_shape(where["input_name"]):
+                input_name = where["input_name"]
+                if not isinstance(input_name, str):
+                    # let's drop for the time until we need it
+                    # input_name = ("past_key_value", k), the kth tensor from this input
                     continue
-                shape = self.get_shape(where["input_name"])
+                if not self.has_shape(input_name):
+                    continue
+                shape = self.get_shape(input_name)
                 axis = where["axis"]
                 existing_name = shape[axis]
                 if dim_name != existing_name:
                     # We register a new constraints.
                     new_shape = list(shape)
                     new_shape[axis] = dim_name
-                    self.set_shape(where["input_name"], tuple(new_shape))
+                    self.set_shape(input_name, tuple(new_shape))
                     self.add_to_constraints(existing_name, dim_name)
                     self.add_to_constraints(dim_name, existing_name)
 
