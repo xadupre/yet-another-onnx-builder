@@ -133,7 +133,7 @@ class TestOrdinalEncoder(ExtTestCase):
         enc.fit(X_train)
 
         onx = to_onnx(enc, (X_train,))
-        expected = enc.transform(X_test).astype(np.float32)
+        expected = enc.transform(X_test)
 
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_test})[0]
@@ -149,7 +149,7 @@ class TestOrdinalEncoder(ExtTestCase):
         enc.fit(X)
 
         onx = to_onnx(enc, (X,))
-        expected = enc.transform(X).astype(np.float32)
+        expected = enc.transform(X)
 
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X})[0]

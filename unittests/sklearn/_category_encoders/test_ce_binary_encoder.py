@@ -231,7 +231,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
-        expected = enc.transform(X_df).values.astype(np.float32)
+        expected = enc.transform(X_df).values
         self.assertEqualArray(expected, ort_result, atol=1e-6)
 
     def test_string_single_column(self):
@@ -250,7 +250,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
-        expected = enc.transform(X_df).values.astype(np.float32)
+        expected = enc.transform(X_df).values
         self.assertEqualArray(expected, ort_result, atol=1e-6)
 
 

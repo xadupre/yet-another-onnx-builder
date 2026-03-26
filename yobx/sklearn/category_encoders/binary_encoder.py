@@ -53,7 +53,8 @@ def _binary_encode_column(
     """
     if cat_dtype is None:
         cat_dtype = dtype
-    nan_const = np.array([[float("nan")]], dtype=dtype)
+    is_float_dtype = np.issubdtype(dtype, np.floating)
+    nan_const = np.array([[float("nan")]], dtype=dtype) if is_float_dtype else None
 
     # Build one bit column per output position (MSB first).
     bit_cols = []
@@ -82,7 +83,8 @@ def _binary_encode_column(
         ]
 
     # Apply handle_unknown='return_nan': unknown inputs → NaN for all bits.
-    if handle_unknown == "return_nan" and known_cats:
+    # Only applicable for floating-point inputs (NaN cannot be represented in integer dtype).
+    if handle_unknown == "return_nan" and known_cats and is_float_input:
         # Compute a float indicator: 1.0 if *any* known category matched.
         eq_indicators = []
         for i, (cat_val, _) in enumerate(known_cats):
@@ -194,9 +196,9 @@ def category_encoders_binary_encoder(
     dtype = tensor_dtype_to_np_dtype(itype)
 
     is_string = itype == onnx.TensorProto.STRING
-    # For string inputs the output is always float32 (bit values are numeric).
-    out_itype = onnx.TensorProto.FLOAT if is_string else itype
-    out_dtype = np.float32 if is_string else dtype
+    # For string inputs the output is int64, matching BinaryEncoder.transform() output dtype.
+    out_itype = onnx.TensorProto.INT64 if is_string else itype
+    out_dtype = np.int64 if is_string else dtype
 
     # Detect floating-point input (required for IsNaN support).
     _FLOAT_TYPES = {onnx.TensorProto.FLOAT, onnx.TensorProto.FLOAT16, onnx.TensorProto.DOUBLE}

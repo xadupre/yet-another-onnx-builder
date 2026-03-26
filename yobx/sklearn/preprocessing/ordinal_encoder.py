@@ -71,9 +71,15 @@ def sklearn_ordinal_encoder(
     dtype = tensor_dtype_to_np_dtype(itype)
 
     is_string = itype == onnx.TensorProto.STRING
-    # For string inputs the output is always float32 (ordinal values are numeric).
-    out_itype = onnx.TensorProto.FLOAT if is_string else itype
-    out_dtype = np.float32 if is_string else dtype
+    if is_string:
+        # For string inputs, use the dtype the estimator is configured to produce.
+        from ...helpers.onnx_helper import dtype_to_tensor_dtype
+
+        out_itype = dtype_to_tensor_dtype(np.dtype(estimator.dtype))
+        out_dtype = np.dtype(estimator.dtype).type
+    else:
+        out_itype = itype
+        out_dtype = dtype
 
     handle_unknown = estimator.handle_unknown
     unknown_value = getattr(estimator, "unknown_value", None)
