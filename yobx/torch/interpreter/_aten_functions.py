@@ -12231,13 +12231,14 @@ def aten_unbind_int(
         unbind_outputs = [g.unique_name(f"{o}{i}") for i, o in enumerate(outputs)]
         new_outputs = outputs
 
-    g.make_node("Split", [x], unbind_outputs, axis=dim, num_outputs=n, name=name)
+    res = g.make_node("Split", [x], unbind_outputs, axis=dim, num_outputs=n, name=name)
     dim_np = g.make_initializer(
         "", np.array([dim], dtype=np.int64), source="aten_unbind_int.dim_np"
     )
-    for o, u in zip(new_outputs, unbind_outputs):
-        g.make_node("Squeeze", [u, dim_np], [o], name=name)
-    res = new_outputs
+    final = []
+    for o, u in zip(new_outputs, res):
+        final.append(g.make_node("Squeeze", [u, dim_np], [o], name=name))
+    res = tuple(final)
     if not sts:
         shape = g.get_shape(x)
         new_shape = list(shape)
