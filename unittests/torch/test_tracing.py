@@ -1268,7 +1268,7 @@ class TestCustomParameterProxy(ExtTestCase):
 
 
 class TestTracingControlFlow(ExtTestCase):
-    def test_tracing_obvious_control_flow(self):
+    def test_tracing_obvious_control_flow_dtype(self):
         from yobx.torch import to_onnx, ExportOptions
 
         class Model(torch.nn.Module):
@@ -1280,6 +1280,24 @@ class TestTracingControlFlow(ExtTestCase):
         model = Model()
         x, y = torch.rand((3, 4)), torch.rand((3, 4))
         art = to_onnx(model, (x, y), export_options=ExportOptions(tracing=True))
+        self.assertEqual(["Add"], [n.op_type for n in art.graph.node])
+
+    def test_tracing_obvious_control_flow_shape(self):
+        from yobx.torch import to_onnx, ExportOptions
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                if x.shape[0] == y.shape[0]:
+                    return x + y
+                return x + y.sum(axis=0, keepdim=True)
+
+        model = Model()
+        x, y = torch.rand((3, 4)), torch.rand((3, 4))
+        art = to_onnx(
+            model,
+            (x, y),
+            export_options=ExportOptions(tracing=True),
+        )
         self.assertEqual(["Add"], [n.op_type for n in art.graph.node])
 
 
