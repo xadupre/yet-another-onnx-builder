@@ -28,32 +28,7 @@ import numpy as np
 import onnxruntime
 import polars as pl
 from yobx.helpers.onnx_helper import pretty_onnx
-from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sql import lazyframe_to_onnx
-
-# %%
-# Helper
-# ------
-#
-# A small helper runs a model with both the reference evaluator and
-# onnxruntime and verifies that both give the same results.
-
-
-def run(artifact, feeds):
-    """Run *artifact* through the reference evaluator and ORT; return outputs."""
-    ref = ExtendedReferenceEvaluator(artifact)
-    ref_outputs = ref.run(None, feeds)
-
-    onx = artifact.proto
-    sess = onnxruntime.InferenceSession(
-        onx.SerializeToString(), providers=["CPUExecutionProvider"]
-    )
-    ort_outputs = sess.run(None, feeds)
-
-    for r, o in zip(ref_outputs, ort_outputs):
-        np.testing.assert_allclose(r, o, rtol=1e-5, atol=1e-6)
-    return ref_outputs
-
 
 # %%
 # 1. Basic SELECT — arithmetic expression
@@ -71,7 +46,10 @@ artifact_add = lazyframe_to_onnx(lf_add, dtypes)
 
 a = np.array([1.0, 2.0, 3.0], dtype=np.float64)
 b = np.array([4.0, 5.0, 6.0], dtype=np.float64)
-(total,) = run(artifact_add, {"a": a, "b": b})
+sess = onnxruntime.InferenceSession(
+    artifact_add.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+(total,) = sess.run(None, {"a": a, "b": b})
 print("a + b =", total)
 np.testing.assert_allclose(total, a + b)
 
@@ -90,7 +68,10 @@ lf_where = pl.LazyFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
 lf_where = lf_where.filter(pl.col("a") > 1.5).select([pl.col("a"), pl.col("b")])
 
 artifact_where = lazyframe_to_onnx(lf_where, dtypes)
-a_filt, b_filt = run(artifact_where, {"a": a, "b": b})
+sess = onnxruntime.InferenceSession(
+    artifact_where.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+a_filt, b_filt = sess.run(None, {"a": a, "b": b})
 
 print("rows where a > 1.5:")
 print("  a =", a_filt)
@@ -119,7 +100,10 @@ lf_agg = lf_agg.select(
 
 dtypes_agg = {"a": np.float64, "b": np.float64}
 artifact_agg = lazyframe_to_onnx(lf_agg, dtypes_agg)
-s_arr, m_arr = run(artifact_agg, {"a": a, "b": b})
+sess = onnxruntime.InferenceSession(
+    artifact_agg.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+s_arr, m_arr = sess.run(None, {"a": a, "b": b})
 s = float(s_arr)
 m = float(m_arr)
 
@@ -148,7 +132,10 @@ a2 = np.array([1.0, -2.0, 3.0], dtype=np.float64)
 b2 = np.array([4.0, 5.0, 6.0], dtype=np.float64)
 
 artifact_combined = lazyframe_to_onnx(lf_combined, dtypes)
-(total2,) = run(artifact_combined, {"a": a2, "b": b2})
+sess = onnxruntime.InferenceSession(
+    artifact_combined.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+(total2,) = sess.run(None, {"a": a2, "b": b2})
 print("(a + b) WHERE a > 0 =", total2)
 np.testing.assert_allclose(total2, np.array([5.0, 9.0]))
 
