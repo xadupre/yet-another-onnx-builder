@@ -1052,7 +1052,10 @@ def requires_onnxruntime(version: str, msg: str = "") -> Callable:
 
 def has_onnxruntime(version: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not recent enough."""
-    import onnxruntime
+    try:
+        import onnxruntime
+    except ImportError:
+        return False
 
     if not hasattr(onnxruntime, "__version__"):
         # development version

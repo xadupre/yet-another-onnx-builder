@@ -187,8 +187,12 @@ class JoinOp(SqlOperation):
     Represents a ``JOIN`` clause.
 
     :param right_table: the name of the right-hand table being joined.
-    :param left_key: column name from the left table used in the equi-join.
-    :param right_key: column name from the right table used in the equi-join.
+    :param left_keys: list of column names from the left table used in the
+        equi-join predicate.  A single-element list is a single-column join;
+        a multi-element list produces ``col1 = col2 AND col3 = col4 …``
+        semantics.
+    :param right_keys: list of column names from the right table used in the
+        equi-join predicate.  Must have the same length as *left_keys*.
     :param join_type: ``'inner'`` (default), ``'left'``, ``'right'``,
         or ``'full'``.
     :param left_columns: columns belonging to the left-hand table, each as
@@ -209,11 +213,25 @@ class JoinOp(SqlOperation):
     """
 
     right_table: str = ""
-    left_key: str = ""
-    right_key: str = ""
+    left_keys: List[str] = field(default_factory=list)
+    right_keys: List[str] = field(default_factory=list)
     join_type: str = "inner"
     left_columns: List[ColumnRef] = field(default_factory=list)
     right_columns: List[ColumnRef] = field(default_factory=list)
+
+    # ------------------------------------------------------------------
+    # Backward-compatibility properties for single-key joins
+    # ------------------------------------------------------------------
+
+    @property
+    def left_key(self) -> str:
+        """Return the first left join key (single-key backward compat)."""
+        return self.left_keys[0] if self.left_keys else ""
+
+    @property
+    def right_key(self) -> str:
+        """Return the first right join key (single-key backward compat)."""
+        return self.right_keys[0] if self.right_keys else ""
 
 
 @dataclass
@@ -290,6 +308,10 @@ _KEYWORDS = {
 
 _COMPARISON_OPS = {"=", "<", ">", "<=", ">=", "<>", "!="}
 _ARITH_OPS = {"+", "-", "*", "/"}
+
+# Keywords that mark the start of a new SQL clause; used in _parse_join to
+# distinguish AND-chained join conditions from WHERE predicates.
+_NON_JOIN_KEYWORDS = _KEYWORDS - {"on"}
 
 # Regex for a single token
 _TOKEN_RE = re.compile(
@@ -535,26 +557,48 @@ class _Parser:
         return table, None
 
     def _parse_join(self, join_type: str = "inner") -> Optional[JoinOp]:
-        """Parse ``[INNER|LEFT|RIGHT|FULL] JOIN … ON …``."""
+        """Parse ``[INNER|LEFT|RIGHT|FULL] JOIN … ON col = col [AND col = col …]``."""
         _, right_table = self._consume()
         self._expect("on")
-        left_expr = self._parse_expr()
-        self._expect("=")
-        right_expr = self._parse_expr()
 
-        # Resolve key names
-        if isinstance(left_expr, ColumnRef):
-            left_key = left_expr.column
-        else:
-            left_key = str(left_expr)
+        left_keys: List[str] = []
+        right_keys: List[str] = []
 
-        if isinstance(right_expr, ColumnRef):
-            right_key = right_expr.column
-        else:
-            right_key = str(right_expr)
+        while True:
+            left_expr = self._parse_expr()
+            self._expect("=")
+            right_expr = self._parse_expr()
+
+            left_keys.append(
+                left_expr.column if isinstance(left_expr, ColumnRef) else str(left_expr)
+            )
+            right_keys.append(
+                right_expr.column if isinstance(right_expr, ColumnRef) else str(right_expr)
+            )
+
+            # Continue consuming AND-chained join conditions.
+            # Only consume "and" when followed by another equality condition
+            # (not a WHERE-style predicate), so we stop at keywords that
+            # indicate the next clause (WHERE, GROUP, ORDER, HAVING, LIMIT).
+            if self._peek_value() != "and":
+                break
+            # Speculatively consume "and" and check if the next token looks
+            # like a column reference (i.e. the next condition in the ON
+            # predicate).  If the peek after "and" is a keyword other than an
+            # identifier, we leave the "and" for the WHERE parser.
+            saved_pos = self._pos
+            self._consume()  # consume "and"
+            next_tok = self._peek()
+            if next_tok is None or next_tok[0] != "id" or next_tok[1] in _NON_JOIN_KEYWORDS:
+                # Not a join condition — restore position and stop.
+                self._pos = saved_pos
+                break
 
         return JoinOp(
-            right_table=right_table, left_key=left_key, right_key=right_key, join_type=join_type
+            right_table=right_table,
+            left_keys=left_keys,
+            right_keys=right_keys,
+            join_type=join_type,
         )
 
     def _parse_query(self) -> ParsedQuery:
@@ -674,7 +718,7 @@ def _collect_columns(operations: List[SqlOperation]) -> List[ColumnRef]:
                     seen_names.append(col)
                     seen.append(ColumnRef(column=col))
         elif isinstance(node, JoinOp):
-            for col in (node.left_key, node.right_key):
+            for col in (*node.left_keys, *node.right_keys):
                 if col not in seen_names:
                     seen_names.append(col)
                     seen.append(ColumnRef(column=col))

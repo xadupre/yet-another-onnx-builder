@@ -570,15 +570,20 @@ class TracedDataFrame:
         return TracedDataFrame(dict(self._columns), list(self._ops), list(self._source_columns))
 
     def join(
-        self, right: "TracedDataFrame", left_key: str, right_key: str, join_type: str = "inner"
+        self,
+        right: "TracedDataFrame",
+        left_key: Union[str, List[str]],
+        right_key: Union[str, List[str]],
+        join_type: str = "inner",
     ) -> "TracedDataFrame":
         """Record an equi-join with another :class:`TracedDataFrame`.
 
         :param right: the right-hand :class:`TracedDataFrame` to join with.
-        :param left_key: column name from *this* (left) frame used in the join
-            predicate.
-        :param right_key: column name from *right* frame used in the join
-            predicate.
+        :param left_key: column name (or list of names) from *this* (left) frame
+            used in the join predicate.
+        :param right_key: column name (or list of names) from *right* frame
+            used in the join predicate.  Must have the same length as
+            *left_key* when both are lists.
         :param join_type: join type — ``'inner'`` (default), ``'left'``,
             ``'right'``, or ``'full'``.
         :return: a new :class:`TracedDataFrame` containing columns from both
@@ -597,6 +602,15 @@ class TracedDataFrame:
             artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
         """
 
+        # Normalise keys to lists.
+        left_keys: List[str] = [left_key] if isinstance(left_key, str) else list(left_key)
+        right_keys: List[str] = [right_key] if isinstance(right_key, str) else list(right_key)
+        if len(left_keys) != len(right_keys):
+            raise ValueError(
+                f"left_key and right_key must have the same length, "
+                f"got {len(left_keys)} and {len(right_keys)}"
+            )
+
         # Build ColumnRef lists for both sides so that _populate_graph can
         # classify and type columns (including join-key columns that may not
         # appear in any SELECT expression) without requiring input_dtypes.
@@ -610,8 +624,8 @@ class TracedDataFrame:
 
         join_op = JoinOp(
             right_table="r",
-            left_key=left_key,
-            right_key=right_key,
+            left_keys=left_keys,
+            right_keys=right_keys,
             join_type=join_type,
             left_columns=_col_refs_from(self),
             right_columns=_col_refs_from(right),

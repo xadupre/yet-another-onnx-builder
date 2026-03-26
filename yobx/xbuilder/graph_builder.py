@@ -4808,6 +4808,10 @@ class GraphBuilder(
                 f"{self.get_debug_msg()}"
             )
             shape = vshape
+            if itype == TensorProto.STRING:
+                # String initializers have no fixed binary size; never externalize them.
+                new_inits[k] = v
+                continue
             size = int(np.prod(shape)) * self.elem_size(itype)  # type: ignore
             if size < external_threshold:
                 new_inits[k] = v
