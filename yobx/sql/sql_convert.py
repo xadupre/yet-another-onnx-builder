@@ -472,14 +472,15 @@ def _build_pivot_table_tensors(
     """Build ONNX tensors for a :class:`~yobx.xtracing.parse.PivotTableOp`.
 
     Produces one output tensor for each index column (the sorted unique row-key
-    values) and one output tensor per entry in :attr:`~yobx.xtracing.parse.PivotTableOp.column_values`
-    (the per-group aggregated values).
+    values) and one output tensor per *(values_col, column_values entry)* pair.
 
     Algorithm
     ---------
-    For each known column value *cv*:
+    For each known column value *cv* (and for each values column):
 
-    1. Create a boolean mask ``cat == cv``.
+    1. Create a boolean mask ``cat == cv`` (for single category column) or
+       ``(cat1 == cv[0]) AND (cat2 == cv[1]) AND …`` (for multiple category
+       columns).
     2. ``Compress`` the *values* column and the group-index vector to keep only
        matching rows.
     3. Aggregate the matching values into a ``(n_groups,)`` output tensor via
@@ -495,7 +496,7 @@ def _build_pivot_table_tensors(
     :param col_map: current column-name → ONNX tensor-name mapping.
     :param desired_outputs: optional list of preferred output tensor names.
     :return: list of output tensor names (index column(s) first, then one per
-        *column_values* entry).
+        *(values_col, column_values entry)* pair).
     """
     index_cols = pivot_op.index
     col_col = pivot_op.columns
@@ -503,6 +504,10 @@ def _build_pivot_table_tensors(
     aggfunc = pivot_op.aggfunc
     column_values = pivot_op.column_values
     fill_value = pivot_op.fill_value
+
+    # Normalise to lists so the rest of the function is uniform.
+    col_cols: List[str] = [col_col] if isinstance(col_col, str) else list(col_col)
+    val_cols: List[str] = [val_col] if isinstance(val_col, str) else list(val_col)
 
     if aggfunc not in ("sum", "mean", "min", "max", "count"):
         raise ValueError(
@@ -550,8 +555,7 @@ def _build_pivot_table_tensors(
         n_groups, np.array([0], dtype=np.int64), name="pt_n_groups_1d"
     )
 
-    cat_tensor = col_map[col_col]
-    val_tensor = col_map[val_col]
+    cat_tensors = [col_map[c] for c in col_cols]
 
     output_names: List[str] = []
     used_tensor_names: Set[str] = set()
@@ -594,173 +598,200 @@ def _build_pivot_table_tensors(
             out_idx += 1
 
     # ------------------------------------------------------------------
-    # Emit one aggregated-value column per known column_value
+    # Emit one aggregated-value column per (values_col, column_value) pair
     # ------------------------------------------------------------------
-    for j, cv in enumerate(column_values):
-        out_col_name = f"{val_col}_{cv}"
-        if desired_outputs and out_idx < len(desired_outputs):
-            candidate = desired_outputs[out_idx]
-        else:
-            candidate = out_col_name
-        if g.has_name(candidate) or candidate in used_tensor_names:
-            candidate = f"output_{out_idx}"
+    for vi, vc in enumerate(val_cols):
+        val_tensor = col_map[vc]
+        for j, cv in enumerate(column_values):
+            # Build output column name — handle tuple cv for multi-col categories.
+            if isinstance(cv, (tuple, list)):
+                cv_str = "_".join(str(v) for v in cv)
+            else:
+                cv_str = str(cv)
+            out_col_name = f"{vc}_{cv_str}"
+            slot = f"v{vi}_j{j}"
 
-        # -- Mask for rows where cat == cv --
-        if isinstance(cv, str):
-            cv_arr = np.array([cv], dtype=object)
-        elif isinstance(cv, float) or isinstance(cv, np.floating):
-            cv_arr = np.array([cv], dtype=np.float32)
-        elif isinstance(cv, (int, np.integer)):
-            cv_arr = np.array([cv], dtype=np.int64)
-        else:
-            cv_arr = np.array([cv])
-        cv_cst = g.make_initializer(f"pt_cv_{j}", cv_arr, give_unique_name=True)
-        mask = g.op.Equal(cat_tensor, cv_cst, name=f"pt_mask_{j}")  # type: ignore[misc]
+            if desired_outputs and out_idx < len(desired_outputs):
+                candidate = desired_outputs[out_idx]
+            else:
+                candidate = out_col_name
+            if g.has_name(candidate) or candidate in used_tensor_names:
+                candidate = f"output_{out_idx}"
 
-        # Compress: keep only matching rows
-        matching_vals = g.op.Compress(val_tensor, mask, axis=0, name=f"pt_match_v_{j}")  # type: ignore[misc]
-        matching_inv_idx = g.op.Compress(inv_idx, mask, axis=0, name=f"pt_match_idx_{j}")  # type: ignore[misc]
+            # -- Mask for rows where cat == cv (or AND of equalities for multi-col) --
+            def _cv_cst(col_idx: int, scalar_cv: object, _slot: str = slot) -> str:
+                if isinstance(scalar_cv, str):
+                    arr = np.array([scalar_cv], dtype=object)
+                elif isinstance(scalar_cv, float) or isinstance(scalar_cv, np.floating):
+                    arr = np.array([scalar_cv], dtype=np.float32)
+                elif isinstance(scalar_cv, (int, np.integer)):
+                    arr = np.array([scalar_cv], dtype=np.int64)
+                else:
+                    arr = np.array([scalar_cv])
+                return g.make_initializer(f"pt_cv_{_slot}_{col_idx}", arr, give_unique_name=True)
 
-        # Count of matching rows per group (int64)
-        n_match = g.op.Gather(
-            g.op.Shape(matching_inv_idx, name=f"pt_match_sz_{j}"),
-            np.array(0, dtype=np.int64),
-            axis=0,
-            name=f"pt_n_match_{j}",
-        )
-        n_match_1d = g.op.Unsqueeze(
-            n_match, np.array([0], dtype=np.int64), name=f"pt_n_match_1d_{j}"
-        )
-        zeros_i64 = g.op.ConstantOfShape(
-            n_groups_1d,
-            value=onh.from_array(np.array([0], dtype=np.int64)),
-            name=f"pt_zi64_{j}",
-        )
-        ones_match = g.op.ConstantOfShape(
-            n_match_1d,
-            value=onh.from_array(np.array([1], dtype=np.int64)),
-            name=f"pt_ones_{j}",
-        )
-        cnt = g.op.ScatterElements(  # type: ignore[misc]
-            zeros_i64, matching_inv_idx, ones_match, reduction="add", axis=0, name=f"pt_cnt_{j}"
-        )
-        has_data = g.op.Greater(  # type: ignore[misc]
-            cnt,
-            g.make_initializer(f"pt_zero_i64_{j}", np.array([0], dtype=np.int64), give_unique_name=True),
-            name=f"pt_has_{j}",
-        )
+            if len(col_cols) == 1:
+                cv_cst_name = _cv_cst(0, cv)
+                mask = g.op.Equal(cat_tensors[0], cv_cst_name, name=f"pt_mask_{slot}")  # type: ignore[misc]
+            else:
+                # Multi-column category: cv must be a tuple/list, one value per col.
+                cv_seq = list(cv) if isinstance(cv, (tuple, list)) else [cv]
+                partial_masks = [
+                    g.op.Equal(  # type: ignore[misc]
+                        cat_tensors[k],
+                        _cv_cst(k, cv_seq[k]),
+                        name=f"pt_mask_{slot}_c{k}",
+                    )
+                    for k in range(len(col_cols))
+                ]
+                mask = partial_masks[0]
+                for m in partial_masks[1:]:
+                    mask = g.op.And(mask, m, name=f"pt_and_{slot}")  # type: ignore[misc]
 
-        if aggfunc == "count":
-            result = cnt
-        else:
-            # Zero-filled buffer of shape (n_groups,) with val_tensor's dtype
-            zeros_val = g.op.CastLike(  # type: ignore[misc]
-                g.op.ConstantOfShape(n_groups_1d, name=f"pt_zval_{j}"),
-                val_tensor,
-                name=f"pt_zval_c_{j}",
+            # Compress: keep only matching rows
+            matching_vals = g.op.Compress(val_tensor, mask, axis=0, name=f"pt_match_v_{slot}")  # type: ignore[misc]
+            matching_inv_idx = g.op.Compress(inv_idx, mask, axis=0, name=f"pt_match_idx_{slot}")  # type: ignore[misc]
+
+            # Count of matching rows per group (int64)
+            n_match = g.op.Gather(
+                g.op.Shape(matching_inv_idx, name=f"pt_match_sz_{slot}"),
+                np.array(0, dtype=np.int64),
+                axis=0,
+                name=f"pt_n_match_{slot}",
+            )
+            n_match_1d = g.op.Unsqueeze(
+                n_match, np.array([0], dtype=np.int64), name=f"pt_n_match_1d_{slot}"
+            )
+            zeros_i64 = g.op.ConstantOfShape(
+                n_groups_1d,
+                value=onh.from_array(np.array([0], dtype=np.int64)),
+                name=f"pt_zi64_{slot}",
+            )
+            ones_match = g.op.ConstantOfShape(
+                n_match_1d,
+                value=onh.from_array(np.array([1], dtype=np.int64)),
+                name=f"pt_ones_{slot}",
+            )
+            cnt = g.op.ScatterElements(  # type: ignore[misc]
+                zeros_i64, matching_inv_idx, ones_match, reduction="add", axis=0, name=f"pt_cnt_{slot}"
+            )
+            has_data = g.op.Greater(  # type: ignore[misc]
+                cnt,
+                g.make_initializer(f"pt_zero_i64_{slot}", np.array([0], dtype=np.int64), give_unique_name=True),
+                name=f"pt_has_{slot}",
             )
 
-            if aggfunc == "sum":
-                sum_result = g.op.ScatterElements(  # type: ignore[misc]
-                    zeros_val,
-                    matching_inv_idx,
-                    matching_vals,
-                    reduction="add",
-                    axis=0,
-                    name=f"pt_sum_{j}",
+            if aggfunc == "count":
+                result = cnt
+            else:
+                # Zero-filled buffer of shape (n_groups,) with val_tensor's dtype
+                zeros_val = g.op.CastLike(  # type: ignore[misc]
+                    g.op.ConstantOfShape(n_groups_1d, name=f"pt_zval_{slot}"),
+                    val_tensor,
+                    name=f"pt_zval_c_{slot}",
                 )
-                if fill_value != 0.0:
+
+                if aggfunc == "sum":
+                    sum_result = g.op.ScatterElements(  # type: ignore[misc]
+                        zeros_val,
+                        matching_inv_idx,
+                        matching_vals,
+                        reduction="add",
+                        axis=0,
+                        name=f"pt_sum_{slot}",
+                    )
+                    if fill_value != 0.0:
+                        fv_cast = g.op.CastLike(  # type: ignore[misc]
+                            g.make_initializer(
+                                f"pt_fv_{slot}",
+                                np.array([fill_value], dtype=np.float32),
+                                give_unique_name=True,
+                            ),
+                            sum_result,
+                            name=f"pt_fv_c_{slot}",
+                        )
+                        result = g.op.Where(has_data, sum_result, fv_cast, name=f"pt_r_{slot}")  # type: ignore[misc]
+                    else:
+                        result = sum_result
+
+                elif aggfunc == "mean":
+                    sum_vals = g.op.ScatterElements(  # type: ignore[misc]
+                        zeros_val,
+                        matching_inv_idx,
+                        matching_vals,
+                        reduction="add",
+                        axis=0,
+                        name=f"pt_sum_{slot}",
+                    )
+                    # Use ones as safe denominator for empty groups (replaced by fill_value anyway)
+                    ones_f = g.op.CastLike(  # type: ignore[misc]
+                        g.op.ConstantOfShape(
+                            n_groups_1d,
+                            value=onh.from_array(np.array([1.0], dtype=np.float32)),
+                            name=f"pt_ones_f_{slot}",
+                        ),
+                        sum_vals,
+                        name=f"pt_ones_f_c_{slot}",
+                    )
+                    cnt_f = g.op.CastLike(cnt, sum_vals, name=f"pt_cnt_f_{slot}")  # type: ignore[misc]
+                    safe_cnt = g.op.Where(has_data, cnt_f, ones_f, name=f"pt_safe_cnt_{slot}")  # type: ignore[misc]
+                    mean_result = g.op.Div(sum_vals, safe_cnt, name=f"pt_mean_{slot}")  # type: ignore[misc]
                     fv_cast = g.op.CastLike(  # type: ignore[misc]
                         g.make_initializer(
-                            f"pt_fv_{j}",
+                            f"pt_fv_{slot}",
                             np.array([fill_value], dtype=np.float32),
                             give_unique_name=True,
                         ),
-                        sum_result,
-                        name=f"pt_fv_c_{j}",
+                        mean_result,
+                        name=f"pt_fv_c_{slot}",
                     )
-                    result = g.op.Where(has_data, sum_result, fv_cast, name=f"pt_r_{j}")  # type: ignore[misc]
+                    result = g.op.Where(has_data, mean_result, fv_cast, name=f"pt_r_{slot}")  # type: ignore[misc]
+
+                elif aggfunc in ("min", "max"):
+                    # Initialise each group's cell with the first matching value so
+                    # that the ScatterElements seed is always a valid observation.
+                    # Groups with no matching rows are seeded with fill_value and
+                    # will never be overwritten by the scatter.
+                    fv_init = g.op.CastLike(  # type: ignore[misc]
+                        g.op.ConstantOfShape(
+                            n_groups_1d,
+                            value=onh.from_array(np.array([fill_value], dtype=np.float32)),
+                            name=f"pt_fv_init_{slot}",
+                        ),
+                        val_tensor,
+                        name=f"pt_fv_init_c_{slot}",
+                    )
+                    # Among matching rows, find the first occurrence of each group.
+                    unique_grp, first_in_match, _, _ = g.op.Unique(  # type: ignore[misc]
+                        matching_inv_idx, sorted=1, outputs=4, name=f"pt_umatch_{slot}"
+                    )
+                    first_match_vals = g.op.Gather(  # type: ignore[misc]
+                        matching_vals, first_in_match, axis=0, name=f"pt_first_mv_{slot}"
+                    )
+                    # Override fill_value with first matching value for groups that
+                    # have at least one matching row.
+                    init_seeded = g.op.ScatterElements(  # type: ignore[misc]
+                        fv_init, unique_grp, first_match_vals, axis=0, name=f"pt_init_s_{slot}"
+                    )
+                    reduction_name = "min" if aggfunc == "min" else "max"
+                    result = g.op.ScatterElements(  # type: ignore[misc]
+                        init_seeded,
+                        matching_inv_idx,
+                        matching_vals,
+                        reduction=reduction_name,
+                        axis=0,
+                        name=f"pt_{aggfunc}_{slot}",
+                    )
+                    # Groups with no matching rows still have fill_value — correct.
+
                 else:
-                    result = sum_result
+                    # Unreachable: the validation at the top of this function covers all cases.
+                    raise AssertionError(f"Unexpected aggfunc {aggfunc!r}")
 
-            elif aggfunc == "mean":
-                sum_vals = g.op.ScatterElements(  # type: ignore[misc]
-                    zeros_val,
-                    matching_inv_idx,
-                    matching_vals,
-                    reduction="add",
-                    axis=0,
-                    name=f"pt_sum_{j}",
-                )
-                # Use ones as safe denominator for empty groups (replaced by fill_value anyway)
-                ones_f = g.op.CastLike(  # type: ignore[misc]
-                    g.op.ConstantOfShape(
-                        n_groups_1d,
-                        value=onh.from_array(np.array([1.0], dtype=np.float32)),
-                        name=f"pt_ones_f_{j}",
-                    ),
-                    sum_vals,
-                    name=f"pt_ones_f_c_{j}",
-                )
-                cnt_f = g.op.CastLike(cnt, sum_vals, name=f"pt_cnt_f_{j}")  # type: ignore[misc]
-                safe_cnt = g.op.Where(has_data, cnt_f, ones_f, name=f"pt_safe_cnt_{j}")  # type: ignore[misc]
-                mean_result = g.op.Div(sum_vals, safe_cnt, name=f"pt_mean_{j}")  # type: ignore[misc]
-                fv_cast = g.op.CastLike(  # type: ignore[misc]
-                    g.make_initializer(
-                        f"pt_fv_{j}",
-                        np.array([fill_value], dtype=np.float32),
-                        give_unique_name=True,
-                    ),
-                    mean_result,
-                    name=f"pt_fv_c_{j}",
-                )
-                result = g.op.Where(has_data, mean_result, fv_cast, name=f"pt_r_{j}")  # type: ignore[misc]
-
-            elif aggfunc in ("min", "max"):
-                # Initialise each group's cell with the first matching value so
-                # that the ScatterElements seed is always a valid observation.
-                # Groups with no matching rows are seeded with fill_value and
-                # will never be overwritten by the scatter.
-                fv_init = g.op.CastLike(  # type: ignore[misc]
-                    g.op.ConstantOfShape(
-                        n_groups_1d,
-                        value=onh.from_array(np.array([fill_value], dtype=np.float32)),
-                        name=f"pt_fv_init_{j}",
-                    ),
-                    val_tensor,
-                    name=f"pt_fv_init_c_{j}",
-                )
-                # Among matching rows, find the first occurrence of each group.
-                unique_grp, first_in_match, _, _ = g.op.Unique(  # type: ignore[misc]
-                    matching_inv_idx, sorted=1, outputs=4, name=f"pt_umatch_{j}"
-                )
-                first_match_vals = g.op.Gather(  # type: ignore[misc]
-                    matching_vals, first_in_match, axis=0, name=f"pt_first_mv_{j}"
-                )
-                # Override fill_value with first matching value for groups that
-                # have at least one matching row.
-                init_seeded = g.op.ScatterElements(  # type: ignore[misc]
-                    fv_init, unique_grp, first_match_vals, axis=0, name=f"pt_init_s_{j}"
-                )
-                reduction_name = "min" if aggfunc == "min" else "max"
-                result = g.op.ScatterElements(  # type: ignore[misc]
-                    init_seeded,
-                    matching_inv_idx,
-                    matching_vals,
-                    reduction=reduction_name,
-                    axis=0,
-                    name=f"pt_{aggfunc}_{j}",
-                )
-                # Groups with no matching rows still have fill_value — correct.
-
-            else:
-                # Unreachable: the validation at the top of this function covers all cases.
-                raise AssertionError(f"Unexpected aggfunc {aggfunc!r}")
-
-        g.op.Identity(result, outputs=[candidate], name=f"pt_out_{j}")  # type: ignore
-        output_names.append(candidate)
-        used_tensor_names.add(candidate)
-        out_idx += 1
+            g.op.Identity(result, outputs=[candidate], name=f"pt_out_{slot}")  # type: ignore
+            output_names.append(candidate)
+            used_tensor_names.add(candidate)
+            out_idx += 1
 
     return output_names
 

@@ -71,6 +71,24 @@ class TestPivotTableTracing(ExtTestCase):
         )
         self.assertEqual(result.columns, ["k1", "k2", "v_A"])
 
+    def test_output_columns_multi_values(self):
+        """Multiple values columns produce separate output columns per (val, cv) pair."""
+        df = self._make_df("k", "cat", "v1", "v2")
+        result = df.pivot_table(
+            values=["v1", "v2"], index="k", columns="cat", column_values=["X", "Y"]
+        )
+        # Expected: k, v1_X, v1_Y, v2_X, v2_Y
+        self.assertEqual(result.columns, ["k", "v1_X", "v1_Y", "v2_X", "v2_Y"])
+
+    def test_output_columns_multi_category_columns(self):
+        """Multi-column category uses tuple column_values → <val>_<cv1>_<cv2> names."""
+        df = self._make_df("k", "cat1", "cat2", "v")
+        result = df.pivot_table(
+            values="v", index="k", columns=["cat1", "cat2"],
+            column_values=[("A", "X"), ("B", "Y")]
+        )
+        self.assertEqual(result.columns, ["k", "v_A_X", "v_B_Y"])
+
     def test_ops_recorded(self):
         df = self._make_df("k", "cat", "v")
         result = df.pivot_table(
@@ -83,6 +101,29 @@ class TestPivotTableTracing(ExtTestCase):
         self.assertEqual(op.columns, "cat")
         self.assertEqual(op.values, "v")
         self.assertEqual(op.column_values, ["X"])
+
+    def test_ops_recorded_multi_values(self):
+        """PivotTableOp stores multiple values columns as a list."""
+        df = self._make_df("k", "cat", "v1", "v2")
+        result = df.pivot_table(
+            values=["v1", "v2"], index="k", columns="cat", column_values=["X"]
+        )
+        pivot_ops = [op for op in result._ops if isinstance(op, PivotTableOp)]
+        self.assertEqual(len(pivot_ops), 1)
+        op = pivot_ops[0]
+        self.assertEqual(op.values, ["v1", "v2"])
+
+    def test_ops_recorded_multi_columns(self):
+        """PivotTableOp stores multiple category columns as a list."""
+        df = self._make_df("k", "cat1", "cat2", "v")
+        result = df.pivot_table(
+            values="v", index="k", columns=["cat1", "cat2"],
+            column_values=[("A", "X")]
+        )
+        pivot_ops = [op for op in result._ops if isinstance(op, PivotTableOp)]
+        self.assertEqual(len(pivot_ops), 1)
+        op = pivot_ops[0]
+        self.assertEqual(op.columns, ["cat1", "cat2"])
 
     def test_aggfunc_stored(self):
         df = self._make_df("k", "cat", "v")
@@ -389,8 +430,113 @@ class TestPivotTableMultiIndex(ExtTestCase):
 
 
 # ---------------------------------------------------------------------------
-# Exported API test
+# ONNX execution tests — multiple values columns
 # ---------------------------------------------------------------------------
+
+
+class TestPivotTableMultiValues(ExtTestCase):
+    """Tests for pivot_table with multiple values columns."""
+
+    def test_two_values_columns_sum(self):
+        """Two independent values columns are each pivoted and output separately."""
+        def transform(df):
+            return df.pivot_table(
+                values=["v1", "v2"], index="k", columns="cat", aggfunc="sum",
+                column_values=["X", "Y"]
+            )
+
+        feeds = {
+            "k": np.array([1, 1, 2, 2], dtype=np.int64),
+            "cat": np.array(["X", "Y", "X", "Y"], dtype=object),
+            "v1": np.array([1.0, 2.0, 3.0, 4.0], dtype=np.float32),
+            "v2": np.array([10.0, 20.0, 30.0, 40.0], dtype=np.float32),
+        }
+        dtypes = {"k": np.int64, "cat": object, "v1": np.float32, "v2": np.float32}
+        # Output order: k, v1_X, v1_Y, v2_X, v2_Y
+        k_out, v1X, v1Y, v2X, v2Y = _run(transform, dtypes, feeds)
+        order = np.argsort(k_out)
+        # k=1: v1_X=1, v1_Y=2, v2_X=10, v2_Y=20
+        # k=2: v1_X=3, v1_Y=4, v2_X=30, v2_Y=40
+        np.testing.assert_allclose(v1X[order], [1.0, 3.0], atol=1e-5)
+        np.testing.assert_allclose(v1Y[order], [2.0, 4.0], atol=1e-5)
+        np.testing.assert_allclose(v2X[order], [10.0, 30.0], atol=1e-5)
+        np.testing.assert_allclose(v2Y[order], [20.0, 40.0], atol=1e-5)
+
+    def test_two_values_columns_mean(self):
+        """mean aggfunc works independently for each values column."""
+        def transform(df):
+            return df.pivot_table(
+                values=["v1", "v2"], index="k", columns="cat", aggfunc="mean",
+                column_values=["X"]
+            )
+
+        feeds = {
+            "k": np.array([1, 1, 2], dtype=np.int64),
+            "cat": np.array(["X", "X", "X"], dtype=object),
+            "v1": np.array([2.0, 4.0, 6.0], dtype=np.float32),
+            "v2": np.array([10.0, 20.0, 30.0], dtype=np.float32),
+        }
+        dtypes = {"k": np.int64, "cat": object, "v1": np.float32, "v2": np.float32}
+        k_out, v1X, v2X = _run(transform, dtypes, feeds)
+        order = np.argsort(k_out)
+        # k=1: v1_X=mean(2,4)=3, v2_X=mean(10,20)=15  k=2: v1_X=6, v2_X=30
+        np.testing.assert_allclose(v1X[order], [3.0, 6.0], atol=1e-5)
+        np.testing.assert_allclose(v2X[order], [15.0, 30.0], atol=1e-5)
+
+
+# ---------------------------------------------------------------------------
+# ONNX execution tests — multiple category columns
+# ---------------------------------------------------------------------------
+
+
+class TestPivotTableMultiColumns(ExtTestCase):
+    """Tests for pivot_table with multiple category columns."""
+
+    def test_two_category_columns_sum(self):
+        """Compound category key (cat1, cat2) filters rows by AND of equalities."""
+        def transform(df):
+            return df.pivot_table(
+                values="v", index="k", columns=["cat1", "cat2"], aggfunc="sum",
+                column_values=[("A", "X"), ("A", "Y"), ("B", "X")]
+            )
+
+        feeds = {
+            "k": np.array([1, 1, 1, 2, 2], dtype=np.int64),
+            "cat1": np.array(["A", "A", "B", "A", "B"], dtype=object),
+            "cat2": np.array(["X", "Y", "X", "X", "X"], dtype=object),
+            "v": np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float32),
+        }
+        dtypes = {"k": np.int64, "cat1": object, "cat2": object, "v": np.float32}
+        # Outputs: k, v_A_X, v_A_Y, v_B_X
+        k_out, vAX, vAY, vBX = _run(transform, dtypes, feeds)
+        order = np.argsort(k_out)
+        # k=1: A_X=1, A_Y=2, B_X=3;  k=2: A_X=4, A_Y=0, B_X=5
+        np.testing.assert_allclose(vAX[order], [1.0, 4.0], atol=1e-5)
+        np.testing.assert_allclose(vAY[order], [2.0, 0.0], atol=1e-5)
+        np.testing.assert_allclose(vBX[order], [3.0, 5.0], atol=1e-5)
+
+    def test_two_category_columns_fill_value(self):
+        """fill_value applied to (index, compound-category) combinations with no rows."""
+        def transform(df):
+            return df.pivot_table(
+                values="v", index="k", columns=["cat1", "cat2"], aggfunc="sum",
+                fill_value=-1.0, column_values=[("A", "X"), ("B", "Y")]
+            )
+
+        feeds = {
+            "k": np.array([1, 2], dtype=np.int64),
+            "cat1": np.array(["A", "A"], dtype=object),
+            "cat2": np.array(["X", "X"], dtype=object),
+            "v": np.array([7.0, 8.0], dtype=np.float32),
+        }
+        dtypes = {"k": np.int64, "cat1": object, "cat2": object, "v": np.float32}
+        k_out, vAX, vBY = _run(transform, dtypes, feeds)
+        order = np.argsort(k_out)
+        np.testing.assert_allclose(vAX[order], [7.0, 8.0], atol=1e-5)
+        # No rows match (B, Y) for either group → fill_value
+        np.testing.assert_allclose(vBY[order], [-1.0, -1.0], atol=1e-5)
+
+
 
 
 class TestPivotTableExport(ExtTestCase):
@@ -408,8 +554,8 @@ class TestPivotTableExport(ExtTestCase):
         v_ref = ColumnRef("v", dtype=1)
         op = PivotTableOp(
             index_refs=[k_ref],
-            columns_ref=cat_ref,
-            values_ref=v_ref,
+            columns_refs=[cat_ref],
+            values_refs=[v_ref],
             aggfunc="sum",
             column_values=["X", "Y"],
             fill_value=0.0,
@@ -418,6 +564,24 @@ class TestPivotTableExport(ExtTestCase):
         self.assertEqual(op.columns, "cat")
         self.assertEqual(op.values, "v")
         self.assertEqual(op.column_values, ["X", "Y"])
+
+    def test_pivot_table_op_multi_fields(self):
+        """PivotTableOp with multiple values and columns refs."""
+        k_ref = ColumnRef("k", dtype=7)
+        cat1_ref = ColumnRef("cat1", dtype=8)
+        cat2_ref = ColumnRef("cat2", dtype=8)
+        v1_ref = ColumnRef("v1", dtype=1)
+        v2_ref = ColumnRef("v2", dtype=1)
+        op = PivotTableOp(
+            index_refs=[k_ref],
+            columns_refs=[cat1_ref, cat2_ref],
+            values_refs=[v1_ref, v2_ref],
+            aggfunc="sum",
+            column_values=[("A", "X"), ("B", "Y")],
+            fill_value=0.0,
+        )
+        self.assertEqual(op.columns, ["cat1", "cat2"])
+        self.assertEqual(op.values, ["v1", "v2"])
 
 
 if __name__ == "__main__":
