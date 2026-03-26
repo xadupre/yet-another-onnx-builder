@@ -337,7 +337,7 @@ class ShapeBuilder:
 
     def _apply_shape_replacements(self, replacements: Dict[str, str]) -> Dict[str, str]:
         if not replacements:
-            return
+            return {}
 
         # known_shapes
         updates = {}
