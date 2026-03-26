@@ -85,7 +85,7 @@ def sklearn_traceable_converter(
         from ..xtracing import trace_numpy_function
 
         return trace_numpy_function(
-            g, sts, list(outputs) if outputs else None, estimator.transform, inputs, name=name
+            g, sts, list(outputs) if outputs else None, estimator.transform, inputs, name=name  # type: ignore
         )
 
     raise NotImplementedError(f"Unable to trace estimator {estimator}{g.get_debug_msg()}")

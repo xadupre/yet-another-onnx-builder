@@ -233,7 +233,9 @@ class ExpressionSimplifierAddVisitor(CommonVisitor):
         else:
             self.coeffs[s] += 1
 
-    def make_simplified(self) -> str:
+    def make_simplified(self) -> Union[str, int]:
+        if not self.coeffs:
+            return self.const
         terms = []
         for var, coeff in self.coeffs.items():
             if coeff == 0:
@@ -295,6 +297,7 @@ class ExactMulDivConstantFolderTransformer(CommonTransformer):
 
         if not isinstance(node, ast.BinOp):
             return node
+
         if not isinstance(node.op, (ast.Mult, ast.FloorDiv)):
             return node
 
@@ -353,6 +356,43 @@ class ExactMulDivConstantFolderTransformer(CommonTransformer):
         return out
 
 
+class StringToIntTransformer(CommonTransformer):
+    """Replaces integer in strings by integers."""
+
+    def visit_Constant(self, node):
+        # Only process string constants
+        if isinstance(node.value, str):
+            try:
+                # Try converting to int
+                new_value = int(node.value)
+                return ast.copy_location(ast.Constant(value=new_value), node)
+            except ValueError:
+                pass  # Leave unchanged if not convertible
+
+        return node
+
+
+class MaxIntTransformer(CommonTransformer):
+    """Replaces 2^2 by 2, the actual result."""
+
+    def visit_BinOp(self, node):
+        self.generic_visit(node)
+
+        if isinstance(node.op, ast.BitXor):
+            # Only transform if both sides are integer constants
+            if (
+                isinstance(node.left, ast.Constant)
+                and isinstance(node.right, ast.Constant)
+                and isinstance(node.left.value, int)
+                and isinstance(node.right.value, int)
+            ):
+                return ast.copy_location(
+                    ast.Constant(value=max(node.left.value, node.right.value)), node
+                )
+
+        return node
+
+
 def simplify_expression(expr: Union[str, int]) -> Union[str, int]:
     """Simplifies an expression."""
     if isinstance(expr, int):
@@ -367,7 +407,11 @@ def simplify_expression(expr: Union[str, int]) -> Union[str, int]:
         MaxToXorTransformer(expr=expr),
         SimplifyParensTransformer(expr=expr),
         ReorderCommutativeOpsTransformer(expr=expr),
+        StringToIntTransformer(expr=expr),
+        MaxIntTransformer(expr=expr),
     ]
+    for tr in transformers:
+        tree = tr.visit(tree)
     for tr in transformers:
         tree = tr.visit(tree)
     ast.fix_missing_locations(tree.body)
