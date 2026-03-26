@@ -156,11 +156,18 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
             if g.builder.evaluate_dimension_equality_with_constraints(
                 input_shape[-1], cos_shape[-1], "+", sin_shape[-1]
             ):
-                shape = g.get_shape(node.input[0])
+                shape = g.get_shape_renamed(node.input[0])
                 self._info.append((node.input[0], shape))
                 if not isinstance(shape[1], int):
                     # Number of heads is not fixed"
-                    return self.none(node, inspect.currentframe().f_lineno)
+                    return self.none(
+                        node,
+                        inspect.currentframe().f_lineno,
+                        msg=lambda: (
+                            f"number of head (shape[1]) is not fixed for {node.input[0]!r}, "
+                            f"{shape=}, renamed shape={g.get_shape_renamed(node.input[0])}"
+                        ),
+                    )
                 # No split before, no concat after but there could be still position ids
                 return self._match_last_part(
                     g,
@@ -338,13 +345,13 @@ class ContribRotaryEmbeddingPattern(PatternOptimization):
     ) -> List[NodeProto]:
         if split_node is None:
             rotary_dim = None
-            shape = g.get_shape(half_node.input[0])
+            shape = g.get_shape_renamed(half_node.input[0])
             main_input = half_node.input[0]
             main_output = half_node.output[0]
         else:
             cst = g.get_computed_constant(split_node.input[1])
             rotary_dim = int(cst[0])
-            shape = g.get_shape(split_node.input[0])
+            shape = g.get_shape_renamed(split_node.input[0])
             main_input = split_node.input[0]
             main_output = concat_node.output[0]
 

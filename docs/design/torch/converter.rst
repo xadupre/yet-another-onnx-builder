@@ -70,15 +70,14 @@ different design priorities.
      - Rich set of environment variables (``ONNXSTOP``, ``ONNXSTOPSHAPE``,
        ``ONNXSTOPTYPE``, ``ONNXSTOPOUTPUT``, …) let you pinpoint exactly
        which node assigns a suspicious shape or type; see
-       :ref:`l-graphbuilder-debugging-env`
+       :ref:`l-design-sklearn-debug-env-vars`
      - Standard Python / PyTorch debugging tools
 
 In short: if you need the officially supported PyTorch exporter, use
 :func:`torch.onnx.export`.  If you need finer control over the
 ATen → ONNX translation, built-in graph optimization, advanced export
 strategies such as fake-tensor mode or automatic dynamic-shape inference,
-or rich debugging capabilities (:ref:`l-design-torch-debugging`,
-:ref:`l-graphbuilder-debugging-env`),
+or rich debugging capabilities (:ref:`l-design-sklearn-debug-env-vars`),
 :func:`yobx.torch.interpreter.to_onnx` may be a better fit.
 
 The entry point for converting a PyTorch model to ONNX is

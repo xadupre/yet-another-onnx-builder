@@ -7,6 +7,7 @@ rm test*.data
 rm test*.xlsx
 rm test*.onnx
 rm dummy*.onnx
+rm onnx*.md
 rm *.ep
 rm *.ep.graph
 
