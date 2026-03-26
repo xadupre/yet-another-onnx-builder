@@ -927,13 +927,7 @@ def _populate_graph(
         if join_op is not None and not join_op.right_columns:
             for rk in join_op.right_keys:
                 if rk not in seen_right and rk in right_dtypes:
-                    right_inputs.append(
-                        (
-                            rk,
-                            _np_dtype_to_onnx(right_dtypes[rk]),
-                            (dim,),
-                        )
-                    )
+                    right_inputs.append((rk, _np_dtype_to_onnx(right_dtypes[rk]), (dim,)))
                     seen_right.append(rk)
 
         # For SQL-string JOINs, ensure all LEFT key columns are in left_inputs
@@ -975,9 +969,7 @@ def _populate_graph(
         if right_col_onnx_name:
             # tracer path: use the explicit rename mapping
             right_col_map = {
-                col: right_col_onnx_name[col]
-                for col in right_col_onnx_name
-                if col in seen_right
+                col: right_col_onnx_name[col] for col in right_col_onnx_name if col in seen_right
             }
             # also include right-key columns added in the "SQL-string JOIN" block
             for rk in (join_op.right_keys if join_op else []):

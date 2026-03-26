@@ -274,10 +274,7 @@ class TestOnnxExportSignatures(ExtTestCase):
 
         inputs = ((torch.arange(4 * 3) + 10).reshape((-1, 3)).to(torch.float32), 1)
         sig = (("x", onnx.TensorProto.FLOAT, ("batch", 3)), ("i", onnx.TensorProto.INT64, ()))
-        dyn = {
-            "x": {0: torch.export.Dim("batch")},
-            "i": {},
-        }
+        dyn = {"x": {0: torch.export.Dim("batch")}, "i": {}}
         sname = inspect.currentframe().f_code.co_name
         self._check_exporter(
             sname, Neuron(), inputs, sig, dynamic_shapes=dyn, exporter="custom-tracing"

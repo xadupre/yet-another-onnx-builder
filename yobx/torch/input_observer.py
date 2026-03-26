@@ -1039,7 +1039,13 @@ class InputObserverInfo:
         return auto_dim_names
 
     def remove_inputs(self, input_names: Sequence[str | int]) -> int:
-        """Lets the users drops inputs. Returns the number of removals."""
+        """Lets the users drops inputs. Returns the number of removals.
+
+        Names that are absent from both the captured candidates and the signature
+        are silently ignored (return value reflects only actual removals).
+        This lets callers write version-agnostic code: requesting removal of an
+        input that was dropped in a newer model version simply becomes a no-op.
+        """
         if not self.inputs:
             raise RuntimeError("No captured candidates.")
         if self.args_name_and_position is not None:
@@ -1051,12 +1057,6 @@ class InputObserverInfo:
         r = 0
         for candidate in self.inputs:
             r += candidate.remove_inputs(input_names)
-        if not r:
-            raise ValueError(
-                f"No input in all candidates was removed from {input_names=}, last candidate is "
-                f"{string_type(self.inputs[-1].args, with_shape=True)}, "
-                f"{string_type(self.inputs[-1].kwargs, with_shape=True)}"
-            )
         if self._best_candidate:
             self._best_candidate.remove_inputs(input_names)
 
@@ -1497,8 +1497,8 @@ class InputObserver:
             data.append(diff)
         return data
 
-    def remove_inputs(self, input_names: Sequence[str | int]):
+    def remove_inputs(self, input_names: Sequence[str | int]) -> int:
         """Lets the users drops inputs."""
         if self.info is None:
             raise RuntimeError("No input was captured.")
-        self.info.remove_inputs(input_names)
+        return self.info.remove_inputs(input_names)

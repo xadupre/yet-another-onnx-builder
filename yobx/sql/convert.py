@@ -435,7 +435,7 @@ def to_onnx(
     if callable(dataframe_or_query) and not isinstance(dataframe_or_query, str):
         return dataframe_to_onnx(
             dataframe_or_query,  # type: ignore
-            args,
+            args,  # type: ignore
             target_opset=target_opset,
             custom_functions=custom_functions,
             builder_cls=builder_cls,

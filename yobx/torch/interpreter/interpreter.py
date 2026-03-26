@@ -1326,9 +1326,7 @@ class DynamoInterpreter:
         if expand_axes and squeeze_axes:
             sliced = self.builder.make_node("Slice", inputs, name=f"{name}F")
             unsqueezed = self.builder.op.UnsqueezeAnyOpset(
-                sliced,
-                np.array(expand_axes, dtype=np.int64),
-                name=f"{name}F2",
+                sliced, np.array(expand_axes, dtype=np.int64), name=f"{name}F2"
             )
             res = self.builder.op.SqueezeAnyOpset(
                 unsqueezed,
@@ -1377,8 +1375,7 @@ class DynamoInterpreter:
             elif squeeze_axes and self.builder.has_rank(inputs[0]):
                 # expand_axes is empty here (handled by the first branch above)
                 self.builder.set_rank(
-                    node.name,
-                    self.builder.get_rank(inputs[0]) - len(squeeze_axes),
+                    node.name, self.builder.get_rank(inputs[0]) - len(squeeze_axes)
                 )
             elif expand_axes:
                 self.builder.set_rank(
@@ -1626,7 +1623,12 @@ class DynamoInterpreter:
                     t = tokens.pop()
                     if t not in self.builder.dynamic_objects:
                         self.builder.add_dynamic_object(t, t)
-                        source = dict(axis=axis, input_name=dim)
+                        input_name = node.name
+                        assert isinstance(input_name, str), (
+                            f"Unexpected type for dim={dim!r}, axis={axis}, shape={shape}, "
+                            f"node.name={node.name!r}, t={t!r}"
+                        )
+                        source = dict(axis=axis, input_name=input_name)
                         if t in self.builder.dynamic_dimensions_source:
                             self.builder.dynamic_dimensions_source[t].append(source)
                         else:

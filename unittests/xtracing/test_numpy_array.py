@@ -203,5 +203,26 @@ class TestNumpyArray(ExtTestCase):
         self.assertEqualArray(np.abs(X), got[2], atol=1e-5)
 
 
+    def test_handled_functions_have_onnx_docstring(self):
+        """Every function registered in _HANDLED_FUNCTIONS must carry an 'ONNX: ...' docstring."""
+        import re
+        from yobx.xtracing.numpy_array import _HANDLED_FUNCTIONS
+
+        missing = []
+        for np_func, impl_func in _HANDLED_FUNCTIONS.items():
+            doc = impl_func.__doc__ or ""
+            if not re.search(r"ONNX:\s*[\w,\s]+", doc):
+                missing.append(
+                    f"{np_func.__name__} -> {impl_func.__name__} (doc={doc!r})"
+                )
+
+        self.assertEqual(
+            [],
+            missing,
+            msg="The following _HANDLED_FUNCTIONS entries are missing an 'ONNX: ...' docstring:\n"
+            + "\n".join(missing),
+        )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
