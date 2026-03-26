@@ -608,10 +608,7 @@ class TestSqlToOnnxJoin(ExtTestCase):
 
     def test_multi_column_join_two_keys(self):
         """Inner join on two AND-chained key columns with different names."""
-        sql = (
-            "SELECT a.x, b.y FROM a JOIN b "
-            "ON a.company_id = b.cid AND a.dept_id = b.did"
-        )
+        sql = "SELECT a.x, b.y FROM a JOIN b ON a.company_id = b.cid AND a.dept_id = b.did"
         left_dtypes = {"company_id": np.int64, "dept_id": np.int64, "x": np.float32}
         right_dtypes = {"cid": np.int64, "did": np.int64, "y": np.float32}
         # Left: (1,10,1.0), (2,20,2.0), (3,30,3.0)
@@ -631,10 +628,7 @@ class TestSqlToOnnxJoin(ExtTestCase):
 
     def test_multi_column_join_no_match_row_excluded(self):
         """A row that matches only one of two key columns is excluded."""
-        sql = (
-            "SELECT a.x, b.y FROM a JOIN b "
-            "ON a.k1 = b.rk1 AND a.k2 = b.rk2"
-        )
+        sql = "SELECT a.x, b.y FROM a JOIN b ON a.k1 = b.rk1 AND a.k2 = b.rk2"
         left_dtypes = {"k1": np.int64, "k2": np.int64, "x": np.float32}
         right_dtypes = {"rk1": np.int64, "rk2": np.int64, "y": np.float32}
         # Left: (1,10), (2,20), (3,30)
@@ -655,4 +649,3 @@ class TestSqlToOnnxJoin(ExtTestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -217,9 +217,7 @@ class TestParseSqlJoin(unittest.TestCase):
 
     def test_multi_column_join_three_keys(self):
         """ON clause with three AND-chained key pairs."""
-        pq = parse_sql(
-            "SELECT a.x FROM a JOIN b ON a.k1 = b.k1 AND a.k2 = b.k2 AND a.k3 = b.k3"
-        )
+        pq = parse_sql("SELECT a.x FROM a JOIN b ON a.k1 = b.k1 AND a.k2 = b.k2 AND a.k3 = b.k3")
         join = next(op for op in pq.operations if isinstance(op, JoinOp))
         self.assertEqual(join.left_keys, ["k1", "k2", "k3"])
         self.assertEqual(join.right_keys, ["k1", "k2", "k3"])
