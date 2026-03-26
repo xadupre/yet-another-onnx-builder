@@ -5964,9 +5964,9 @@ class GraphBuilder(
                 )
         return obj
 
-    def _apply_shape_replacements(self, replacements: Dict[str, Set[str]]) -> Dict[str, str]:
+    def _apply_shape_replacements(self, replacements: Dict[str, str]) -> Dict[str, str]:
         if not replacements:
-            return
+            return {}
 
         # known_shapes
         updates = {}
