@@ -52,15 +52,14 @@ from yobx.sql import dataframe_to_onnx
 
 a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
 b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-dtypes = {"a": np.float32, "b": np.float32}
+pl_df = pl.DataFrame({"a": a, "b": b})
 
 def transform_add(df):
     return df.select([(df["a"] + df["b"]).alias("total")])
 
-artifact_add = dataframe_to_onnx(transform_add, dtypes)
+artifact_add = dataframe_to_onnx(transform_add, pl_df)
 
-# Execute the function directly on a polars DataFrame to get the reference.
-pl_df = pl.DataFrame({"a": a, "b": b})
+# Execute the same function on the polars DataFrame to get the reference.
 ref_total = transform_add(pl_df)["total"].to_numpy()
 (ort_total,) = onnxruntime.InferenceSession(
     artifact_add.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -82,7 +81,7 @@ print(pretty_onnx(artifact_add.proto))
 def transform_multi(df):
     return df.select([df["a"], df["b"], (df["a"] * df["b"]).alias("product")])
 
-artifact_multi = dataframe_to_onnx(transform_multi, dtypes)
+artifact_multi = dataframe_to_onnx(transform_multi, pl_df)
 
 # Execute the same function on the polars DataFrame to get the reference.
 ref_multi = transform_multi(pl_df)
@@ -117,7 +116,7 @@ def transform_filter(df):
     return df.select([df["a"], df["b"]])
 
 
-artifact_filter = dataframe_to_onnx(transform_filter, dtypes)
+artifact_filter = dataframe_to_onnx(transform_filter, pl_df)
 
 # Execute the same function on the polars DataFrame to get the reference.
 ref_filter = transform_filter(pl_df)
@@ -137,6 +136,7 @@ print("  b =", ort_bf)
 
 a2 = np.array([1.0, -2.0, 3.0], dtype=np.float32)
 b2 = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+pl_df2 = pl.DataFrame({"a": a2, "b": b2})
 
 
 def transform_filter_add(df):
@@ -144,9 +144,8 @@ def transform_filter_add(df):
     return df.select([(df["a"] + df["b"]).alias("total")])
 
 
-artifact_filter_add = dataframe_to_onnx(transform_filter_add, dtypes)
+artifact_filter_add = dataframe_to_onnx(transform_filter_add, pl_df2)
 
-pl_df2 = pl.DataFrame({"a": a2, "b": b2})
 ref_total2 = transform_filter_add(pl_df2)["total"].to_numpy()
 (ort_total2,) = onnxruntime.InferenceSession(
     artifact_filter_add.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -184,7 +183,7 @@ def transform_agg(df):
     )
 
 
-artifact_agg = dataframe_to_onnx(transform_agg, dtypes)
+artifact_agg = dataframe_to_onnx(transform_agg, pl_df)
 
 # Reference: numpy equivalents (polars/pandas are not compatible with the
 # TracedDataFrame aggregation API).
@@ -219,11 +218,11 @@ print(pretty_onnx(artifact_agg.proto))
 def transform_two(df1, df2):
     return df1.select([(df1["a"] + df2["b"]).alias("total")])
 
-artifact_two = dataframe_to_onnx(transform_two, [{"a": np.float32}, {"b": np.float32}])
-
-# Execute the same function on two polars DataFrames to get the reference.
 pl_df_a = pl.DataFrame({"a": a})
 pl_df_b = pl.DataFrame({"b": b})
+artifact_two = dataframe_to_onnx(transform_two, [pl_df_a, pl_df_b])
+
+# Execute the same function on the two polars DataFrames to get the reference.
 ref_two = transform_two(pl_df_a, pl_df_b)["total"].to_numpy()
 (ort_two,) = onnxruntime.InferenceSession(
     artifact_two.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -244,18 +243,18 @@ print("df1['a'] + df2['b'] =", ort_two)
 #    differs from polars (``left_on``/``right_on``).  Reference values are
 #    verified directly against the known input arrays.
 
-dtypes1 = {"cid": np.int64, "a": np.float32}
-dtypes2 = {"id": np.int64, "b": np.float32}
-
-def transform_join(df1, df2):
-    return df1.join(df2, left_key="cid", right_key="id")
-
-artifact_join = dataframe_to_onnx(transform_join, [dtypes1, dtypes2])
-
 cid = np.array([1, 2, 3], dtype=np.int64)
 vals_a = np.array([10.0, 20.0, 30.0], dtype=np.float32)
 id_ = np.array([1, 2, 3], dtype=np.int64)
 vals_b = np.array([100.0, 200.0, 300.0], dtype=np.float32)
+pl_df_left = pl.DataFrame({"cid": cid, "a": vals_a})
+pl_df_right = pl.DataFrame({"id": id_, "b": vals_b})
+
+def transform_join(df1, df2):
+    return df1.join(df2, left_key="cid", right_key="id")
+
+artifact_join = dataframe_to_onnx(transform_join, [pl_df_left, pl_df_right])
+
 feeds = {"cid": cid, "a": vals_a, "id": id_, "b": vals_b}
 
 ort_join = onnxruntime.InferenceSession(

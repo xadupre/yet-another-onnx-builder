@@ -59,23 +59,33 @@ def _dataframe_columns(arg: Any) -> List[Any]:
 
 
 def _dataframe_to_dtypes(df: Any) -> Dict[str, Union[np.dtype, type]]:
-    """Convert a pandas-like DataFrame to a ``{column: dtype}`` mapping.
+    """Convert a pandas-like or polars-like DataFrame to a ``{column: dtype}`` mapping.
 
-    The conversion avoids importing pandas directly so that pandas remains an
-    optional dependency.  Every column's ``dtype`` attribute is extracted and
-    stored under the column name as a key.
+    The conversion avoids importing pandas or polars directly so that both
+    remain optional dependencies.  For pandas, ``series.dtype`` already returns
+    a :class:`numpy.dtype`.  For polars the series dtype is a polars-specific
+    object; in that case the numpy dtype is retrieved via
+    ``series.to_numpy().dtype``.
 
-    :param df: a pandas-like :class:`~pandas.DataFrame`.
+    :param df: a pandas- or polars-like :class:`~pandas.DataFrame`.
     :return: a plain ``dict`` mapping each column name to its numpy dtype.
     """
-    return {col: df[col].dtype for col in _dataframe_columns(df)}
+    result = {}
+    for col in _dataframe_columns(df):
+        dtype = df[col].dtype
+        if not isinstance(dtype, np.dtype):
+            # polars (and other non-pandas) DataFrames return a library-specific
+            # dtype object; fall back to extracting it from the numpy array.
+            dtype = df[col].to_numpy().dtype
+        result[col] = dtype
+    return result
 
 
 def _is_dataframe(arg: Any) -> bool:
-    """Return ``True`` when *arg* is a pandas DataFrame (duck-type check).
+    """Return ``True`` when *arg* is a pandas or polars DataFrame (duck-type check).
 
-    The check avoids importing pandas directly so that pandas remains an
-    optional dependency.  A DataFrame is identified by the presence of a
+    The check avoids importing pandas or polars directly so that both remain
+    optional dependencies.  A DataFrame is identified by the presence of a
     ``dtypes`` attribute (per-column dtype series) combined with the absence
     of a plain ``dtype`` attribute (which numpy arrays carry) and the
     presence of a ``to_numpy`` method.

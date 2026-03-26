@@ -35,8 +35,8 @@ def _normalize_input_dtypes(
 ) -> Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]]:
     """Normalise *input_dtypes* to a ``{column: dtype}`` dict or list thereof.
 
-    When *input_dtypes* is a pandas :class:`~pandas.DataFrame`, the column
-    names and per-column dtypes are extracted automatically.  A list of
+    When *input_dtypes* is a pandas or polars :class:`~pandas.DataFrame`, the
+    column names and per-column dtypes are extracted automatically.  A list of
     DataFrames is converted to a list of dicts in the same way.  Any value
     that is already in the expected dict / list-of-dicts format is returned
     unchanged.
@@ -45,9 +45,9 @@ def _normalize_input_dtypes(
 
         * a ``{column: dtype}`` mapping,
         * a list of ``{column: dtype}`` mappings,
-        * a pandas :class:`~pandas.DataFrame` (column names and dtypes are
-          extracted), or
-        * a list of pandas DataFrames.
+        * a pandas or polars :class:`~pandas.DataFrame` (column names and
+          dtypes are extracted), or
+        * a list of pandas or polars DataFrames.
 
     :return: normalised dict or list of dicts.
     """
@@ -95,9 +95,9 @@ def dataframe_to_onnx(
           without a join, all mappings are merged into a single input-dtype
           dict.
 
-        A pandas :class:`~pandas.DataFrame` (or a list of DataFrames) is also
-        accepted; the column names and per-column dtypes are extracted
-        automatically from each DataFrame.
+        A pandas or polars :class:`~pandas.DataFrame` (or a list of
+        DataFrames) is also accepted; the column names and per-column dtypes
+        are extracted automatically from each DataFrame.
 
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
