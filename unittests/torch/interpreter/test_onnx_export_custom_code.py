@@ -248,33 +248,6 @@ class TestOnnxExportCustomCode(ExtTestCase):
         names = [(t if isinstance(t, str) else t.name()) for t in targets]
         self.assertEqual(names, ["x", "testlib::twice", "aten::mul.Tensor", "output"])
 
-    @unittest.skip(reason="custom_ops fails with torch.script")
-    def test_custom_code_script_2_fn(self):
-        import torch
-
-        cls, x = self.get_custom_model_export_fn()
-        model = cls()
-        expected = model(x)
-        self.assertNotEmpty(expected)
-        filename = "test_custom_code_script_2_fn.onnx"
-        torch.onnx.export(
-            model,
-            (x,),
-            filename,
-            input_names=["x"],
-            opset_version=18,
-            dynamo=False,
-            fallback=False,
-        )
-        with open(filename, "rb") as f:
-            onx = onnx.load(f)
-        co = Counter([n.op_type for n in onx.graph.node])
-        self.assertEqual(co, {"Add": 2, "Mul": 1})
-        ref = ExtendedReferenceEvaluator(onx)
-        got = ref.run(None, {"x": x.detach().numpy()})[0]
-        expected = (x + x + x) * x
-        self.assertEqualArray(expected, got)
-
     @classmethod
     def get_custom_model_export_fn_onnxscript(cls):
         import torch
@@ -306,37 +279,6 @@ class TestOnnxExportCustomCode(ExtTestCase):
         onnxscript_twice = onnxscript.values.TracedOnnxFunction(opset, twice_onnx_impl)
 
         return DummyModel, torch.rand(5, 3), onnxscript_twice
-
-    @unittest.skip("No ONNX function found for <OpOverload(op='testlib.twice')>")
-    def test_custom_code_dynamo_2_fn_registry(self):
-        import torch
-
-        cls, x, onnxscript_twice = self.get_custom_model_export_fn_onnxscript()
-        model = cls()
-        expected = model(x)
-        registry = torch.onnx.OnnxRegistry()
-        registry.register_op(function=onnxscript_twice, namespace="testlib", op_name="twice_onnx")
-
-        self.assertNotEmpty(expected)
-        filename = "test_custom_code_dynamo_2_fn_registry.onnx"
-        torch.onnx.export(
-            model,
-            (x,),
-            filename,
-            input_names=["x"],
-            opset_version=18,
-            dynamo=True,
-            fallback=False,
-            registry=registry,
-        )
-        with open(filename, "rb") as f:
-            onx = onnx.load(f)
-        co = Counter([n.op_type for n in onx.graph.node])
-        self.assertEqual(co, {"Add": 2, "Mul": 1})
-        ref = ExtendedReferenceEvaluator(onx)
-        got = ref.run(None, {"x": x.detach().numpy()})[0]
-        expected = (x + x + x) * x
-        self.assertEqualArray(expected, got)
 
     @requires_torch("2.5", "module 'torch.library' has no attribute 'infer_schema'")
     def test_custom_code_custom(self):
