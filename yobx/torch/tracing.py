@@ -55,22 +55,6 @@ class CustomProxy(torch.fx.proxy.Proxy):
     def __getattr__(self, k) -> "CustomAttribute":
         # note: not added to the graph yet, if this is a method call
         # we peephole optimize to the method invocation
-        if k in ("dtype", "device"):
-            # Return the concrete value so that dtype/device comparisons in
-            # control flow (e.g. ``if x.dtype == torch.int64:``) resolve to a
-            # plain Python bool instead of a proxy, which would raise
-            # ``TraceError: symbolically traced variables cannot be used as
-            # inputs to control flow``.
-            # Only dtype and device are handled here because they are scalar
-            # values that are directly comparable; shape/ndim access in control
-            # flow is already handled for parameters via CustomParameterProxy.
-            # Use __dict__ lookup to avoid triggering the lazy node property on
-            # CustomAttribute subclasses (which would create unwanted graph nodes).
-            node = self.__dict__.get("node")
-            if node is not None and "val" in node.meta:
-                val = node.meta["val"]
-                if isinstance(val, torch.Tensor):
-                    return getattr(val, k)
         return CustomAttribute(self, k)
 
     @classmethod
@@ -515,20 +499,6 @@ class CustomTracer(torch.fx.Tracer):
 
     def _proxy_placeholder(self, name, concrete_args, sig, fn_for_analysis):
         res = torch.fx.Tracer._proxy_placeholder(self, name, concrete_args, sig, fn_for_analysis)
-        # Pre-populate node meta with the fake tensor so that CustomProxy.__getattr__
-        # can resolve static attributes (dtype, device) to concrete values during
-        # tracing, enabling dtype/device-based control flow without TraceError.
-        # Only handles the dict case; when _traced_concrete_args is a flat list
-        # (pytree-wrapped models), the wrapped parameter names differ from the
-        # originals and the mapping is handled post-trace in the trace() loop.
-        if (
-            self._traced_concrete_args is not None
-            and isinstance(self._traced_concrete_args, dict)
-            and name in self._traced_concrete_args
-        ):
-            fake = self._traced_concrete_args[name]
-            if isinstance(fake, torch.Tensor):
-                res.node.meta["val"] = fake
         return res
 
     def create_args_for_root(self, root_fn, is_module, concrete_args=None):
