@@ -110,30 +110,90 @@ unary ``-``).
 
 The full list of supported ufuncs and array functions is generated below
 directly from the live dispatch tables in
-:mod:`yobx.xtracing.numpy_array`.
+:mod:`yobx.xtracing.numpy_array`.  Each numpy name links to the
+:epkg:`numpy` reference documentation, and each ONNX op name links to the
+:epkg:`ONNX Operators` specification.
+
+**Ufuncs** (via ``__array_ufunc__``)
 
 .. runpython::
     :showcode:
     :rst:
 
     import numpy as np
-    from yobx.xtracing.numpy_array import _UFUNC_TO_ONNX, _HANDLED_FUNCTIONS
+    from yobx.xtracing.numpy_array import _UFUNC_TO_ONNX
 
-    rows_ufunc = []
+    _NP_BASE = "https://numpy.org/doc/stable/reference/generated/numpy.{}.html"
+    _ONNX_BASE = "https://onnx.ai/onnx/operators/onnx__{}.html"
+
+    # Descriptions for composite (sentinel-string) mappings
+    def _onnx_link(op):
+        return f"`{op} <{_ONNX_BASE.format(op)}>`_"
+
+    _composite_desc = {
+        "floor_divide": f"{_onnx_link('Floor')} ( {_onnx_link('Div')} (a, b) )",
+        "not_equal": f"{_onnx_link('Not')} ( {_onnx_link('Equal')} (a, b) )",
+        "maximum": f"`Max <{_ONNX_BASE.format('Max')}>`_ (a, b)",
+        "minimum": f"`Min <{_ONNX_BASE.format('Min')}>`_ (a, b)",
+        "log1p": f"{_onnx_link('Log')} ( {_onnx_link('Add')} (x, 1) )",
+        "expm1": f"{_onnx_link('Sub')} ( {_onnx_link('Exp')} (x), 1 )",
+    }
+
+    print(".. list-table::")
+    print("   :header-rows: 1")
+    print("   :widths: 40 60")
+    print()
+    print("   * - NumPy ufunc")
+    print("     - ONNX op")
     for k in sorted(_UFUNC_TO_ONNX.keys(), key=lambda x: x.__name__):
         v = _UFUNC_TO_ONNX[k]
-        onnx_op = v[0] if isinstance(v, tuple) else v
-        rows_ufunc.append(f"* ``np.{k.__name__}`` → ``{onnx_op}``")
-
-    rows_func = []
-    for k in sorted(_HANDLED_FUNCTIONS.keys(), key=lambda x: x.__name__):
-        rows_func.append(f"* ``np.{k.__name__}``")
-
-    print("**Ufuncs** (via ``__array_ufunc__``)\n")
-    print("\n".join(rows_ufunc))
+        np_url = _NP_BASE.format(k.__name__)
+        np_cell = f"`np.{k.__name__} <{np_url}>`_"
+        if isinstance(v, tuple):
+            onnx_op = v[0]
+            onnx_cell = f"`{onnx_op} <{_ONNX_BASE.format(onnx_op)}>`_"
+        else:
+            onnx_cell = _composite_desc.get(v, f"*(see source: {v})*")
+        print(f"   * - {np_cell}")
+        print(f"     - {onnx_cell}")
     print()
-    print("**Array functions** (via ``__array_function__``)\n")
-    print("\n".join(rows_func))
+
+**Array functions** (via ``__array_function__``)
+
+.. runpython::
+    :showcode:
+    :rst:
+
+    import re
+    import numpy as np
+    from yobx.xtracing.numpy_array import _HANDLED_FUNCTIONS
+
+    _NP_BASE = "https://numpy.org/doc/stable/reference/generated/numpy.{}.html"
+    _ONNX_BASE = "https://onnx.ai/onnx/operators/onnx__{}.html"
+
+    def _onnx_cell_from_doc(fn):
+        """Extract ONNX ops from the function docstring (``ONNX: Op1, Op2``)."""
+        doc = fn.__doc__ or ""
+        m = re.search(r"ONNX:\s*([\w,\s]+)", doc)
+        if not m:
+            return "*(see source)*"
+        ops = [op.strip() for op in m.group(1).split(",") if op.strip()]
+        links = [f"`{op} <{_ONNX_BASE.format(op)}>`_" for op in ops]
+        return ", ".join(links)
+
+    print(".. list-table::")
+    print("   :header-rows: 1")
+    print("   :widths: 40 60")
+    print()
+    print("   * - NumPy function")
+    print("     - ONNX op")
+    for k in sorted(_HANDLED_FUNCTIONS.keys(), key=lambda x: x.__name__):
+        np_url = _NP_BASE.format(k.__name__)
+        np_cell = f"`np.{k.__name__} <{np_url}>`_"
+        onnx = _onnx_cell_from_doc(_HANDLED_FUNCTIONS[k])
+        print(f"   * - {np_cell}")
+        print(f"     - {onnx}")
+    print()
 
 Standalone usage
 ================

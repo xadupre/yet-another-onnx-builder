@@ -552,6 +552,7 @@ class NumpyArray:
 
 @_implements(np.reshape)
 def _reshape(a, newshape, order="C"):
+    """ONNX: Reshape"""
     if order != "C":
         raise NotImplementedError(
             f"reshape with order={order!r} is not supported for ONNX tracing."
@@ -563,6 +564,7 @@ def _reshape(a, newshape, order="C"):
 
 @_implements(np.transpose)
 def _transpose(a, axes=None):
+    """ONNX: Transpose"""
     if axes is None:
         return a._transpose_no_perm(a._name)
     res = a._g.op.Transpose(a._name, perm=list(axes), name=a._g.unique_name("transpose"))
@@ -571,6 +573,7 @@ def _transpose(a, axes=None):
 
 @_implements(np.sum)
 def _sum(a, axis=None, dtype=None, out=None, keepdims=False, initial=None, where=None):
+    """ONNX: ReduceSum"""
     if initial is not None or where is not None or out is not None:
         return NotImplemented
     return a._reduce("ReduceSum", axis=axis, keepdims=keepdims)
@@ -578,6 +581,7 @@ def _sum(a, axis=None, dtype=None, out=None, keepdims=False, initial=None, where
 
 @_implements(np.mean)
 def _mean(a, axis=None, dtype=None, out=None, keepdims=False, where=None):
+    """ONNX: ReduceMean"""
     if where is not None or out is not None:
         return NotImplemented
     return a._reduce("ReduceMean", axis=axis, keepdims=keepdims)
@@ -585,6 +589,7 @@ def _mean(a, axis=None, dtype=None, out=None, keepdims=False, where=None):
 
 @_implements(np.amax)
 def _amax(a, axis=None, out=None, keepdims=False, initial=None, where=None):
+    """ONNX: ReduceMax"""
     if initial is not None or where is not None or out is not None:
         return NotImplemented
     return a._reduce("ReduceMax", axis=axis, keepdims=keepdims)
@@ -592,6 +597,7 @@ def _amax(a, axis=None, out=None, keepdims=False, initial=None, where=None):
 
 @_implements(np.amin)
 def _amin(a, axis=None, out=None, keepdims=False, initial=None, where=None):
+    """ONNX: ReduceMin"""
     if initial is not None or where is not None or out is not None:
         return NotImplemented
     return a._reduce("ReduceMin", axis=axis, keepdims=keepdims)
@@ -605,6 +611,7 @@ _HANDLED_FUNCTIONS[np.min] = _amin  # type: ignore[assignment]
 
 @_implements(np.prod)
 def _prod(a, axis=None, dtype=None, out=None, keepdims=False, initial=None, where=None):
+    """ONNX: ReduceProd"""
     if initial is not None or where is not None or out is not None:
         return NotImplemented
     return a._reduce("ReduceProd", axis=axis, keepdims=keepdims)
@@ -612,6 +619,7 @@ def _prod(a, axis=None, dtype=None, out=None, keepdims=False, initial=None, wher
 
 @_implements(np.clip)
 def _clip(a, a_min=None, a_max=None, out=None, **kwargs):
+    """ONNX: Clip"""
     if out is not None:
         return NotImplemented
     # numpy 2.x introduced min/max aliases; support both naming styles.
@@ -624,6 +632,7 @@ def _clip(a, a_min=None, a_max=None, out=None, **kwargs):
 
 @_implements(np.where)
 def _where(condition, x=None, y=None):
+    """ONNX: Where"""
     if x is None or y is None:
         return NotImplemented
     g = _get_g(condition, x, y)
@@ -641,6 +650,7 @@ def _where(condition, x=None, y=None):
 
 @_implements(np.concatenate)
 def _concatenate(arrays, axis=0, out=None, dtype=None, casting="same_kind"):
+    """ONNX: Concat"""
     if out is not None:
         return NotImplemented
     g = _get_g(*arrays)
@@ -653,6 +663,7 @@ def _concatenate(arrays, axis=0, out=None, dtype=None, casting="same_kind"):
 
 @_implements(np.stack)
 def _stack(arrays, axis=0, out=None, dtype=None, casting="same_kind"):
+    """ONNX: Unsqueeze, Concat"""
     if out is not None:
         return NotImplemented
     g = _get_g(*arrays)
@@ -670,6 +681,7 @@ def _stack(arrays, axis=0, out=None, dtype=None, casting="same_kind"):
 
 @_implements(np.expand_dims)
 def _expand_dims(a, axis):
+    """ONNX: Unsqueeze"""
     axes_arr = np.array([axis] if isinstance(axis, int) else list(axis), dtype=np.int64)
     res = a._g.op.Unsqueeze(a._name, axes_arr, name=a._g.unique_name("unsqueeze"))
     return NumpyArray(res, a._g)
@@ -677,6 +689,7 @@ def _expand_dims(a, axis):
 
 @_implements(np.squeeze)
 def _squeeze(a, axis=None):
+    """ONNX: Squeeze"""
     if axis is None:
         res = a._g.op.Squeeze(a._name, name=a._g.unique_name("squeeze"))
     else:
@@ -687,6 +700,7 @@ def _squeeze(a, axis=None):
 
 @_implements(np.matmul)
 def _matmul(a, b, out=None, **kwargs):
+    """ONNX: MatMul"""
     if out is not None:
         return NotImplemented
     g = _get_g(a, b)
@@ -703,6 +717,7 @@ def _matmul(a, b, out=None, **kwargs):
 
 @_implements(np.dot)
 def _dot(a, b, out=None):
+    """ONNX: MatMul"""
     if out is not None:
         return NotImplemented
     g = _get_g(a, b)
@@ -719,6 +734,7 @@ def _dot(a, b, out=None):
 
 @_implements(np.abs)
 def _abs(x, out=None, **kwargs):
+    """ONNX: Abs"""
     if out is not None:
         return NotImplemented
     res = x._g.op.Abs(x._name, name=x._g.unique_name("abs"))
@@ -727,6 +743,7 @@ def _abs(x, out=None, **kwargs):
 
 @_implements(np.sqrt)
 def _sqrt(x, out=None, **kwargs):
+    """ONNX: Sqrt"""
     if out is not None:
         return NotImplemented
     res = x._g.op.Sqrt(x._name, name=x._g.unique_name("sqrt"))
@@ -735,6 +752,7 @@ def _sqrt(x, out=None, **kwargs):
 
 @_implements(np.exp)
 def _exp(x, out=None, **kwargs):
+    """ONNX: Exp"""
     if out is not None:
         return NotImplemented
     res = x._g.op.Exp(x._name, name=x._g.unique_name("exp"))
@@ -743,6 +761,7 @@ def _exp(x, out=None, **kwargs):
 
 @_implements(np.log)
 def _log(x, out=None, **kwargs):
+    """ONNX: Log"""
     if out is not None:
         return NotImplemented
     res = x._g.op.Log(x._name, name=x._g.unique_name("log"))
@@ -751,6 +770,7 @@ def _log(x, out=None, **kwargs):
 
 @_implements(np.log1p)
 def _log1p(x, out=None, **kwargs):
+    """ONNX: Add, Log"""
     if out is not None:
         return NotImplemented
     # log1p(x) = log(1 + x)
@@ -763,6 +783,7 @@ def _log1p(x, out=None, **kwargs):
 
 @_implements(np.expm1)
 def _expm1(x, out=None, **kwargs):
+    """ONNX: Exp, Sub"""
     if out is not None:
         return NotImplemented
     # expm1(x) = exp(x) - 1
