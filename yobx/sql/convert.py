@@ -12,6 +12,7 @@ delegates to :func:`~yobx.sql.sql_convert.sql_to_onnx`,
 
 from __future__ import annotations
 
+import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -285,14 +286,15 @@ def to_onnx(
         Callable[["TracedDataFrame"], "TracedDataFrame"],  # type: ignore # noqa: F821
         "polars.LazyFrame",  # type: ignore # noqa: F821
     ],
-    input_dtypes: Union[
-        Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
-    ],
+    args: Optional[
+        Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]]
+    ] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
     filename: Optional[str] = None,
     verbose: int = 0,
+    **kwargs: Any,
 ) -> ExportArtifact:
     """Convert a SQL string, a DataFrame-tracing function, or a polars LazyFrame to ONNX.
 
@@ -326,7 +328,7 @@ def to_onnx(
           conversion.  See :func:`lazyframe_to_onnx` for details of supported
           operations.
 
-    :param input_dtypes: either a single ``{column: dtype}`` mapping or,
+    :param args: either a single ``{column: dtype}`` mapping or,
         when *dataframe_or_query* is a callable that accepts *multiple*
         :class:`~yobx.sql.dataframe_trace.TracedDataFrame` arguments, a
         **list** of ``{column: dtype}`` mappings — one per argument.
@@ -336,6 +338,9 @@ def to_onnx(
         A pandas :class:`~pandas.DataFrame` (or a list of DataFrames) is also
         accepted; the column names and per-column dtypes are extracted
         automatically.
+        Supported numpy dtypes: ``float16``, ``float32``, ``float64``,
+        ``int8``, ``int16``, ``int32``, ``int64``, ``uint8``, ``uint16``,
+        ``uint32``, ``uint64``, ``bool``, ``object`` (string).
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
     :param custom_functions: an optional mapping from function name (as it
@@ -429,21 +434,42 @@ def to_onnx(
         cast to ``float64`` internally, which may lose precision for integers
         larger than 2^53.
     """
+    # Backward compatibility: accept the old ``input_dtypes`` keyword argument.
+    if "input_dtypes" in kwargs:
+        warnings.warn(
+            "The 'input_dtypes' parameter of to_onnx() has been renamed to 'args'. "
+            "Please update your code; 'input_dtypes' will be removed in a future release.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        if args is None:
+            args = kwargs.pop("input_dtypes")
+        else:
+            kwargs.pop("input_dtypes")
+            warnings.warn(
+                "Both 'args' and 'input_dtypes' were supplied to to_onnx(); "
+                "'args' takes precedence and 'input_dtypes' is ignored.",
+                UserWarning,
+                stacklevel=2,
+            )
+    if kwargs:
+        raise TypeError(f"to_onnx() got unexpected keyword arguments: {list(kwargs)!r}")
+
     if callable(dataframe_or_query) and not isinstance(dataframe_or_query, str):
         return dataframe_to_onnx(
             dataframe_or_query,  # type: ignore
-            input_dtypes,
+            args,
             target_opset=target_opset,
             custom_functions=custom_functions,
             builder_cls=builder_cls,
             filename=filename,
             verbose=verbose,
         )
-    input_dtypes = _normalize_input_dtypes(input_dtypes)  # type: ignore[assignment]
+    args = _normalize_input_dtypes(args)  # type: ignore[assignment]
     if isinstance(dataframe_or_query, str):
         return sql_to_onnx(
             dataframe_or_query,
-            input_dtypes,  # type: ignore
+            args,  # type: ignore
             target_opset=target_opset,
             custom_functions=custom_functions,
             builder_cls=builder_cls,
@@ -452,7 +478,7 @@ def to_onnx(
         )
     return lazyframe_to_onnx(
         dataframe_or_query,
-        input_dtypes,  # type: ignore
+        args,  # type: ignore
         target_opset=target_opset,
         builder_cls=builder_cls,
         filename=filename,
