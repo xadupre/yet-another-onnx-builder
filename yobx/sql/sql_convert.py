@@ -559,10 +559,18 @@ def _populate_graph(
 
         # For SQL-string JOINs, make sure the right key column is registered
         # on the right side even if it was not referenced in the SELECT list.
-        if join_op is not None and not join_op.right_columns and join_op.right_key not in seen_right:
+        if (
+            join_op is not None
+            and not join_op.right_columns
+            and join_op.right_key not in seen_right
+        ):
             if join_op.right_key in right_dtypes:
                 right_inputs.append(
-                    (join_op.right_key, _np_dtype_to_onnx(right_dtypes[join_op.right_key]), (dim,))
+                    (
+                        join_op.right_key,
+                        _np_dtype_to_onnx(right_dtypes[join_op.right_key]),
+                        (dim,),
+                    )
                 )
 
         all_inputs = left_inputs + right_inputs

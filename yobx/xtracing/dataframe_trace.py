@@ -559,6 +559,7 @@ class TracedDataFrame:
             dtypes2 = {"id": np.int64, "b": np.float32}
             artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
         """
+
         # Build ColumnRef lists for both sides so that _populate_graph can
         # classify and type columns (including join-key columns that may not
         # appear in any SELECT expression) without requiring input_dtypes.
