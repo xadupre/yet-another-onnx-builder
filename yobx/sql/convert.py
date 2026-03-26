@@ -12,7 +12,6 @@ delegates to :func:`~yobx.sql.sql_convert.sql_to_onnx`,
 
 from __future__ import annotations
 
-import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import numpy as np
@@ -294,7 +293,6 @@ def to_onnx(
     builder_cls: Union[type, Callable] = GraphBuilder,
     filename: Optional[str] = None,
     verbose: int = 0,
-    **kwargs: Any,
 ) -> ExportArtifact:
     """Convert a SQL string, a DataFrame-tracing function, or a polars LazyFrame to ONNX.
 
@@ -434,27 +432,6 @@ def to_onnx(
         cast to ``float64`` internally, which may lose precision for integers
         larger than 2^53.
     """
-    # Backward compatibility: accept the old ``input_dtypes`` keyword argument.
-    if "input_dtypes" in kwargs:
-        warnings.warn(
-            "The 'input_dtypes' parameter of to_onnx() has been renamed to 'args'. "
-            "Please update your code; 'input_dtypes' will be removed in a future release.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        if args is None:
-            args = kwargs.pop("input_dtypes")
-        else:
-            kwargs.pop("input_dtypes")
-            warnings.warn(
-                "Both 'args' and 'input_dtypes' were supplied to to_onnx(); "
-                "'args' takes precedence and 'input_dtypes' is ignored.",
-                UserWarning,
-                stacklevel=2,
-            )
-    if kwargs:
-        raise TypeError(f"to_onnx() got unexpected keyword arguments: {list(kwargs)!r}")
-
     if callable(dataframe_or_query) and not isinstance(dataframe_or_query, str):
         return dataframe_to_onnx(
             dataframe_or_query,  # type: ignore
