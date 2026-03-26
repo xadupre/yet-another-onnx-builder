@@ -91,12 +91,7 @@ print(pretty_onnx(artifact_where.proto))
 # ``ReduceMin``, and ``ReduceMax`` ONNX nodes.
 
 lf_agg = pl.LazyFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
-lf_agg = lf_agg.select(
-    [
-        pl.col("a").sum().alias("s"),
-        pl.col("b").mean().alias("m"),
-    ]
-)
+lf_agg = lf_agg.select([pl.col("a").sum().alias("s"), pl.col("b").mean().alias("m")])
 
 dtypes_agg = {"a": np.float64, "b": np.float64}
 artifact_agg = lazyframe_to_onnx(lf_agg, dtypes_agg)
