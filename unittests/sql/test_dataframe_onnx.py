@@ -767,6 +767,42 @@ class TestDataframeArithmetic(ExtTestCase):
         (out_a,) = _run_multi(transform, [{"a": np.float32}, {"a": np.float32}], {"a": a})
         np.testing.assert_allclose(out_a, a + a, rtol=1e-5)
 
+    def test_df_sub_dataframe_onnx(self):
+        """df1 - df2 subtracts matching columns element-wise (same column names)."""
+
+        def transform(df1, df2):
+            return df1 - df2
+
+        a = np.array([5.0, 6.0, 7.0], dtype=np.float32)
+        b = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        out_a, out_b = _run_multi(
+            transform,
+            [{"a": np.float32, "b": np.float32}, {"a": np.float32, "b": np.float32}],
+            {"a": a, "b": b},
+        )
+        np.testing.assert_allclose(out_a, a - a, rtol=1e-5)
+        np.testing.assert_allclose(out_b, b - b, rtol=1e-5)
+
+    def test_df_mul_dataframe_onnx(self):
+        """df1 * df2 multiplies matching columns element-wise (same column names)."""
+
+        def transform(df1, df2):
+            return df1 * df2
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out_a,) = _run_multi(transform, [{"a": np.float32}, {"a": np.float32}], {"a": a})
+        np.testing.assert_allclose(out_a, a * a, rtol=1e-5)
+
+    def test_df_div_dataframe_onnx(self):
+        """df1 / df2 divides matching columns element-wise (same column names)."""
+
+        def transform(df1, df2):
+            return df1 / df2
+
+        a = np.array([2.0, 4.0, 8.0], dtype=np.float32)
+        (out_a,) = _run_multi(transform, [{"a": np.float32}, {"a": np.float32}], {"a": a})
+        np.testing.assert_allclose(out_a, a / a, rtol=1e-5)
+
     def test_df_add_scalar_two_columns_onnx(self):
         """df + scalar with two columns: both columns are incremented."""
 
