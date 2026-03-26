@@ -13,6 +13,10 @@ performed on that proxy is recorded as an ONNX node.
 Each input column becomes a **separate 1-D ONNX input tensor**.  The outputs
 correspond to the columns produced by the final ``select`` (or ``join``) call.
 
+A :class:`pandas.DataFrame` can be passed as the second argument to
+:func:`~yobx.sql.dataframe_to_onnx` so that column names and dtypes are
+inferred automatically from the data you already have.
+
 This example covers:
 
 1. **Basic SELECT** — column pass-through and arithmetic expression.
@@ -24,10 +28,11 @@ This example covers:
 6. **Two dataframes joined on a key column** — the ``join`` method.
 7. **Graph visualisation** — inspecting the produced ONNX model.
 
-In each section the **same function** that is given to
-:func:`~yobx.sql.dataframe_to_onnx` is also executed directly on a
-:class:`polars.DataFrame` (or via numpy for aggregation functions) to produce
-the reference values used to validate the ONNX output.
+.. note::
+   The transform functions use the TracedDataFrame API (``df.select()``,
+   ``df.filter()``, ``series.alias()``), which is not part of the standard
+   :class:`pandas.DataFrame` interface.  Reference values are therefore
+   computed with numpy directly on the raw arrays.
 
 See :ref:`l-plot-sql-to-onnx` for the equivalent SQL-string API and
 :ref:`l-plot-lazyframe-to-onnx` for the Polars LazyFrame API.
@@ -35,7 +40,7 @@ See :ref:`l-plot-sql-to-onnx` for the equivalent SQL-string API and
 
 import numpy as np
 import onnxruntime
-import polars as pl
+import pandas as pd
 from yobx.helpers.onnx_helper import pretty_onnx
 from yobx.sql import dataframe_to_onnx
 
@@ -47,20 +52,21 @@ from yobx.sql import dataframe_to_onnx
 # :func:`~yobx.sql.dataframe_to_onnx` traces the function with proxy
 # objects and produces a single ``Add`` ONNX node.
 #
-# The same function is first executed on a :class:`polars.DataFrame` to
-# obtain reference values, then on the ONNX model via onnxruntime.
+# A :class:`pandas.DataFrame` is passed as the second argument so that
+# column names and dtypes are inferred automatically.
 
 a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
 b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-pl_df = pl.DataFrame({"a": a, "b": b})
+df = pd.DataFrame({"a": a, "b": b})
 
 def transform_add(df):
     return df.select([(df["a"] + df["b"]).alias("total")])
 
-artifact_add = dataframe_to_onnx(transform_add, pl_df)
 
-# Execute the same function on the polars DataFrame to get the reference.
-ref_total = transform_add(pl_df)["total"].to_numpy()
+artifact_add = dataframe_to_onnx(transform_add, df)
+
+# Reference: numpy equivalent.
+ref_total = a + b
 (ort_total,) = onnxruntime.InferenceSession(
     artifact_add.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, {"a": a, "b": b})
@@ -81,13 +87,11 @@ print(pretty_onnx(artifact_add.proto))
 def transform_multi(df):
     return df.select([df["a"], df["b"], (df["a"] * df["b"]).alias("product")])
 
-artifact_multi = dataframe_to_onnx(transform_multi, pl_df)
 
-# Execute the same function on the polars DataFrame to get the reference.
-ref_multi = transform_multi(pl_df)
-ref_a = ref_multi["a"].to_numpy()
-ref_b = ref_multi["b"].to_numpy()
-ref_prod = ref_multi["product"].to_numpy()
+artifact_multi = dataframe_to_onnx(transform_multi, df)
+
+# Reference: numpy equivalents.
+ref_a, ref_b, ref_prod = a, b, a * b
 ort_a, ort_b, ort_prod = onnxruntime.InferenceSession(
     artifact_multi.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, {"a": a, "b": b})
@@ -116,12 +120,11 @@ def transform_filter(df):
     return df.select([df["a"], df["b"]])
 
 
-artifact_filter = dataframe_to_onnx(transform_filter, pl_df)
+artifact_filter = dataframe_to_onnx(transform_filter, df)
 
-# Execute the same function on the polars DataFrame to get the reference.
-ref_filter = transform_filter(pl_df)
-ref_af = ref_filter["a"].to_numpy()
-ref_bf = ref_filter["b"].to_numpy()
+# Reference: numpy mask.
+mask = a > 1.5
+ref_af, ref_bf = a[mask], b[mask]
 ort_af, ort_bf = onnxruntime.InferenceSession(
     artifact_filter.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, {"a": a, "b": b})
@@ -136,7 +139,7 @@ print("  b =", ort_bf)
 
 a2 = np.array([1.0, -2.0, 3.0], dtype=np.float32)
 b2 = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-pl_df2 = pl.DataFrame({"a": a2, "b": b2})
+df2 = pd.DataFrame({"a": a2, "b": b2})
 
 
 def transform_filter_add(df):
@@ -144,9 +147,11 @@ def transform_filter_add(df):
     return df.select([(df["a"] + df["b"]).alias("total")])
 
 
-artifact_filter_add = dataframe_to_onnx(transform_filter_add, pl_df2)
+artifact_filter_add = dataframe_to_onnx(transform_filter_add, df2)
 
-ref_total2 = transform_filter_add(pl_df2)["total"].to_numpy()
+# Reference: numpy mask + arithmetic.
+mask2 = a2 > 0
+ref_total2 = (a2 + b2)[mask2]
 (ort_total2,) = onnxruntime.InferenceSession(
     artifact_filter_add.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, {"a": a2, "b": b2})
@@ -167,9 +172,9 @@ print(pretty_onnx(artifact_filter_add.proto))
 #
 # .. note::
 #    The TracedDataFrame aggregation syntax ``df["a"].sum().alias("sum_a")`` is
-#    specific to the tracing API (``df["a"].sum()`` on a real polars/pandas
-#    DataFrame returns a scalar, not a chainable series).  Reference values are
-#    therefore computed directly from numpy.
+#    specific to the tracing API (``df["a"].sum()`` on a real DataFrame returns
+#    a scalar, not a chainable series).  Reference values are therefore
+#    computed directly from numpy.
 
 
 def transform_agg(df):
@@ -183,10 +188,9 @@ def transform_agg(df):
     )
 
 
-artifact_agg = dataframe_to_onnx(transform_agg, pl_df)
+artifact_agg = dataframe_to_onnx(transform_agg, df)
 
-# Reference: numpy equivalents (polars/pandas are not compatible with the
-# TracedDataFrame aggregation API).
+# Reference: numpy reductions.
 ref_sum_a = float(np.sum(a))
 ref_mean_b = float(np.mean(b))
 ref_min_a = float(np.min(a))
@@ -212,18 +216,19 @@ print(pretty_onnx(artifact_agg.proto))
 # 5. Two independent dataframes
 # ------------------------------
 #
-# When *func* accepts two arguments, pass a **list** of dtype dicts.  The
+# When *func* accepts two arguments, pass a **list** of DataFrames.  The
 # columns of both frames are merged into a single ONNX input set (no join).
 
 def transform_two(df1, df2):
     return df1.select([(df1["a"] + df2["b"]).alias("total")])
 
-pl_df_a = pl.DataFrame({"a": a})
-pl_df_b = pl.DataFrame({"b": b})
-artifact_two = dataframe_to_onnx(transform_two, [pl_df_a, pl_df_b])
 
-# Execute the same function on the two polars DataFrames to get the reference.
-ref_two = transform_two(pl_df_a, pl_df_b)["total"].to_numpy()
+df_a = pd.DataFrame({"a": a})
+df_b = pd.DataFrame({"b": b})
+artifact_two = dataframe_to_onnx(transform_two, [df_a, df_b])
+
+# Reference: numpy equivalent.
+ref_two = a + b
 (ort_two,) = onnxruntime.InferenceSession(
     artifact_two.SerializeToString(), providers=["CPUExecutionProvider"]
 ).run(None, {"a": a, "b": b})
@@ -240,20 +245,21 @@ print("df1['a'] + df2['b'] =", ort_two)
 #
 # .. note::
 #    The TracedDataFrame ``join`` API uses ``left_key``/``right_key`` which
-#    differs from polars (``left_on``/``right_on``).  Reference values are
-#    verified directly against the known input arrays.
+#    differs from :meth:`pandas.DataFrame.merge` (``left_on``/``right_on``).
+#    Reference values are verified directly against the known input arrays.
 
 cid = np.array([1, 2, 3], dtype=np.int64)
 vals_a = np.array([10.0, 20.0, 30.0], dtype=np.float32)
 id_ = np.array([1, 2, 3], dtype=np.int64)
 vals_b = np.array([100.0, 200.0, 300.0], dtype=np.float32)
-pl_df_left = pl.DataFrame({"cid": cid, "a": vals_a})
-pl_df_right = pl.DataFrame({"id": id_, "b": vals_b})
+df_left = pd.DataFrame({"cid": cid, "a": vals_a})
+df_right = pd.DataFrame({"id": id_, "b": vals_b})
 
 def transform_join(df1, df2):
     return df1.join(df2, left_key="cid", right_key="id")
 
-artifact_join = dataframe_to_onnx(transform_join, [pl_df_left, pl_df_right])
+
+artifact_join = dataframe_to_onnx(transform_join, [df_left, df_right])
 
 feeds = {"cid": cid, "a": vals_a, "id": id_, "b": vals_b}
 
