@@ -4,6 +4,7 @@ from functools import partial
 from typing import Any, Callable, Dict, Generator, List, Optional, Sequence, Set, Union, Tuple
 import numpy as np
 import onnx
+from onnx import TensorProto
 from onnx import numpy_helper as onnx_numpy_helper
 from onnx.model_container import make_large_tensor_proto
 import onnx_ir as ir
@@ -662,6 +663,10 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
         large_initializers: Dict[str, np.ndarray] = {}
         new_initializers = []
         for init in proto.graph.initializer:
+            if init.data_type == TensorProto.STRING:
+                # String initializers have no fixed binary size; never externalize them.
+                new_initializers.append(init)
+                continue
             size = int(np.prod(init.dims) if init.dims else 1) * size_type(init.data_type)
             if size >= external_threshold:
                 # The location must start with '#' so that onnx's check_model
