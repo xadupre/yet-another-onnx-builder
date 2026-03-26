@@ -634,6 +634,30 @@ class TestDataframeArithmetic(ExtTestCase):
         self.assertIsInstance(expr, BinaryExpr)
         self.assertEqual(expr.op, "+")
 
+    def test_sub_dataframe_column_wise(self):
+        df1 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
+        df2 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("b"))})
+        result = df1 - df2
+        expr = result["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "-")
+
+    def test_mul_dataframe_column_wise(self):
+        df1 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
+        df2 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("b"))})
+        result = df1 * df2
+        expr = result["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "*")
+
+    def test_div_dataframe_column_wise(self):
+        df1 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
+        df2 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("b"))})
+        result = df1 / df2
+        expr = result["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "/")
+
     def test_add_dataframe_missing_column_raises(self):
         df1 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
         df2 = TracedDataFrame({ColumnRef("b"): TracedSeries(ColumnRef("b"))})
