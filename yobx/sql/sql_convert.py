@@ -520,7 +520,7 @@ def _build_pivot_table_tensors(
     # ------------------------------------------------------------------
     if len(index_cols) == 1:
         idx_tensor = col_map[index_cols[0]]
-        unique_idx, first_idx, inv_idx, _ = g.op.Unique(  # type: ignore[misc]
+        unique_idx, _first_idx, inv_idx, _ = g.op.Unique(  # type: ignore[misc]
             idx_tensor, sorted=1, outputs=4, name="pt_unique"
         )
         n_groups = g.op.Gather(
@@ -529,6 +529,7 @@ def _build_pivot_table_tensors(
             axis=0,
             name="pt_n_groups",
         )
+        unique_rows = None
     else:
         # Multi-column index: same technique as multi-column GROUP BY.
         idx_tensors = [col_map[c] for c in index_cols]
@@ -541,7 +542,7 @@ def _build_pivot_table_tensors(
             for t, c in zip(cast_idx, index_cols)
         ]
         stacked_idx = g.op.Concat(*unsqueezed_idx, axis=1, name="pt_stack")  # type: ignore[misc]
-        unique_rows, first_idx, inv_idx, _ = g.op.Unique(  # type: ignore[misc]
+        unique_rows, _first_idx, inv_idx, _ = g.op.Unique(  # type: ignore[misc]
             stacked_idx, axis=0, sorted=1, outputs=4, name="pt_unique"
         )
         n_groups = g.op.Gather(
@@ -551,9 +552,7 @@ def _build_pivot_table_tensors(
             name="pt_n_groups",
         )
 
-    n_groups_1d = g.op.Unsqueeze(
-        n_groups, np.array([0], dtype=np.int64), name="pt_n_groups_1d"
-    )
+    n_groups_1d = g.op.Unsqueeze(n_groups, np.array([0], dtype=np.int64), name="pt_n_groups_1d")
 
     cat_tensors = [col_map[c] for c in col_cols]
 
@@ -576,12 +575,10 @@ def _build_pivot_table_tensors(
         used_tensor_names.add(candidate)
         out_idx += 1
     else:
+        assert unique_rows is not None, "unique_rows must noe be None"
         for j, idx_col in enumerate(index_cols):
             idx_col_unique_f64 = g.op.Gather(  # type: ignore[misc]
-                unique_rows,
-                np.array(j, dtype=np.int64),
-                axis=1,
-                name=f"pt_col_{idx_col}_f64",
+                unique_rows, np.array(j, dtype=np.int64), axis=1, name=f"pt_col_{idx_col}_f64"
             )
             idx_col_unique = g.op.CastLike(  # type: ignore[misc]
                 idx_col_unique_f64, col_map[idx_col], name=f"pt_col_{idx_col}"
@@ -622,7 +619,7 @@ def _build_pivot_table_tensors(
             def _cv_cst(col_idx: int, scalar_cv: object, _slot: str = slot) -> str:
                 if isinstance(scalar_cv, str):
                     arr = np.array([scalar_cv], dtype=object)
-                elif isinstance(scalar_cv, float) or isinstance(scalar_cv, np.floating):
+                elif isinstance(scalar_cv, (float, np.floating)):
                     arr = np.array([scalar_cv], dtype=np.float32)
                 elif isinstance(scalar_cv, (int, np.integer)):
                     arr = np.array([scalar_cv], dtype=np.int64)
@@ -638,9 +635,7 @@ def _build_pivot_table_tensors(
                 cv_seq = list(cv) if isinstance(cv, (tuple, list)) else [cv]
                 partial_masks = [
                     g.op.Equal(  # type: ignore[misc]
-                        cat_tensors[k],
-                        _cv_cst(k, cv_seq[k]),
-                        name=f"pt_mask_{slot}_c{k}",
+                        cat_tensors[k], _cv_cst(k, cv_seq[k]), name=f"pt_mask_{slot}_c{k}"
                     )
                     for k in range(len(col_cols))
                 ]
@@ -673,11 +668,18 @@ def _build_pivot_table_tensors(
                 name=f"pt_ones_{slot}",
             )
             cnt = g.op.ScatterElements(  # type: ignore[misc]
-                zeros_i64, matching_inv_idx, ones_match, reduction="add", axis=0, name=f"pt_cnt_{slot}"
+                zeros_i64,
+                matching_inv_idx,
+                ones_match,
+                reduction="add",
+                axis=0,
+                name=f"pt_cnt_{slot}",
             )
             has_data = g.op.Greater(  # type: ignore[misc]
                 cnt,
-                g.make_initializer(f"pt_zero_i64_{slot}", np.array([0], dtype=np.int64), give_unique_name=True),
+                g.make_initializer(
+                    f"pt_zero_i64_{slot}", np.array([0], dtype=np.int64), give_unique_name=True
+                ),
                 name=f"pt_has_{slot}",
             )
 
@@ -723,7 +725,8 @@ def _build_pivot_table_tensors(
                         axis=0,
                         name=f"pt_sum_{slot}",
                     )
-                    # Use ones as safe denominator for empty groups (replaced by fill_value anyway)
+                    # Use ones as safe denominator for empty groups
+                    # (replaced by fill_value anyway)
                     ones_f = g.op.CastLike(  # type: ignore[misc]
                         g.op.ConstantOfShape(
                             n_groups_1d,

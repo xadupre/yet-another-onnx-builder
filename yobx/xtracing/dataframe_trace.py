@@ -757,7 +757,7 @@ class TracedDataFrame:
             column_values=col_vals,
             fill_value=float(fill_value),
         )
-        new_ops = list(self._ops) + [op]
+        new_ops = [*self._ops, op]
 
         # Build output ColumnRefs:
         #   - Index column(s): carry through dtype from source

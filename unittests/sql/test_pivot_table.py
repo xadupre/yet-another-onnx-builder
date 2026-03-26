@@ -22,9 +22,7 @@ def _run(func, dtypes, feeds):
         from onnxruntime import InferenceSession
 
         proto = artifact.proto if isinstance(artifact, ExportArtifact) else artifact
-        sess = InferenceSession(
-            proto.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = InferenceSession(proto.SerializeToString(), providers=["CPUExecutionProvider"])
         ort_outputs = sess.run(None, feeds)
         assert len(ref_outputs) == len(ort_outputs)
         for ro, oo in zip(ref_outputs, ort_outputs):
@@ -53,8 +51,7 @@ class TestPivotTableSum(ExtTestCase):
     def test_sum_basic(self):
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns="cat", aggfunc="sum",
-                column_values=["X", "Y"]
+                values="v", index="k", columns="cat", aggfunc="sum", column_values=["X", "Y"]
             )
 
         feeds = self._feeds()
@@ -67,10 +64,15 @@ class TestPivotTableSum(ExtTestCase):
 
     def test_sum_fill_value(self):
         """fill_value is used for (index, column) combinations with no rows."""
+
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns="cat", aggfunc="sum",
-                fill_value=-99.0, column_values=["X", "Z"]
+                values="v",
+                index="k",
+                columns="cat",
+                aggfunc="sum",
+                fill_value=-99.0,
+                column_values=["X", "Z"],
             )
 
         feeds = {
@@ -86,10 +88,10 @@ class TestPivotTableSum(ExtTestCase):
 
     def test_sum_int_column_values(self):
         """Pivot on integer column values (not strings)."""
+
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns="cat", aggfunc="sum",
-                column_values=[10, 20]
+                values="v", index="k", columns="cat", aggfunc="sum", column_values=[10, 20]
             )
 
         feeds = {
@@ -105,11 +107,11 @@ class TestPivotTableSum(ExtTestCase):
 
     def test_sum_with_filter(self):
         """filter() applied before pivot_table()."""
+
         def transform(df):
             df2 = df.filter(df["v"] > 2.0)
             return df2.pivot_table(
-                values="v", index="k", columns="cat", aggfunc="sum",
-                column_values=["X"]
+                values="v", index="k", columns="cat", aggfunc="sum", column_values=["X"]
             )
 
         feeds = {
@@ -144,8 +146,7 @@ class TestPivotTableAggFuncs(ExtTestCase):
     def test_mean(self):
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns="cat", aggfunc="mean",
-                column_values=["X", "Y"]
+                values="v", index="k", columns="cat", aggfunc="mean", column_values=["X", "Y"]
             )
 
         k_out, vX, vY = _run(transform, self._dtypes(), self._feeds())
@@ -156,10 +157,15 @@ class TestPivotTableAggFuncs(ExtTestCase):
 
     def test_mean_fill_value(self):
         """Groups with no matching rows receive fill_value for mean."""
+
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns="cat", aggfunc="mean",
-                fill_value=-1.0, column_values=["X", "Z"]
+                values="v",
+                index="k",
+                columns="cat",
+                aggfunc="mean",
+                fill_value=-1.0,
+                column_values=["X", "Z"],
             )
 
         feeds = {
@@ -175,8 +181,7 @@ class TestPivotTableAggFuncs(ExtTestCase):
     def test_min(self):
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns="cat", aggfunc="min",
-                column_values=["X", "Y"]
+                values="v", index="k", columns="cat", aggfunc="min", column_values=["X", "Y"]
             )
 
         k_out, vX, vY = _run(transform, self._dtypes(), self._feeds())
@@ -187,10 +192,15 @@ class TestPivotTableAggFuncs(ExtTestCase):
 
     def test_min_fill_value(self):
         """Groups with no matching rows get fill_value for min."""
+
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns="cat", aggfunc="min",
-                fill_value=-99.0, column_values=["X", "Y"]
+                values="v",
+                index="k",
+                columns="cat",
+                aggfunc="min",
+                fill_value=-99.0,
+                column_values=["X", "Y"],
             )
 
         feeds = {
@@ -206,8 +216,7 @@ class TestPivotTableAggFuncs(ExtTestCase):
     def test_max(self):
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns="cat", aggfunc="max",
-                column_values=["X", "Y"]
+                values="v", index="k", columns="cat", aggfunc="max", column_values=["X", "Y"]
             )
 
         k_out, vX, vY = _run(transform, self._dtypes(), self._feeds())
@@ -219,8 +228,7 @@ class TestPivotTableAggFuncs(ExtTestCase):
     def test_count(self):
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns="cat", aggfunc="count",
-                column_values=["X", "Y"]
+                values="v", index="k", columns="cat", aggfunc="count", column_values=["X", "Y"]
             )
 
         k_out, vX, vY = _run(transform, self._dtypes(), self._feeds())
@@ -232,16 +240,19 @@ class TestPivotTableAggFuncs(ExtTestCase):
     def test_invalid_aggfunc_raises(self):
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns="cat", aggfunc="median",
-                column_values=["X"]
+                values="v", index="k", columns="cat", aggfunc="median", column_values=["X"]
             )
 
         with self.assertRaises(ValueError):
-            _run(transform, {"k": np.int64, "cat": object, "v": np.float32}, {
-                "k": np.array([1], dtype=np.int64),
-                "cat": np.array(["X"], dtype=object),
-                "v": np.array([1.0], dtype=np.float32),
-            })
+            _run(
+                transform,
+                {"k": np.int64, "cat": object, "v": np.float32},
+                {
+                    "k": np.array([1], dtype=np.int64),
+                    "cat": np.array(["X"], dtype=object),
+                    "v": np.array([1.0], dtype=np.float32),
+                },
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -255,8 +266,11 @@ class TestPivotTableMultiIndex(ExtTestCase):
     def test_two_column_index_sum(self):
         def transform(df):
             return df.pivot_table(
-                values="v", index=["k1", "k2"], columns="cat", aggfunc="sum",
-                column_values=["X", "Y"]
+                values="v",
+                index=["k1", "k2"],
+                columns="cat",
+                aggfunc="sum",
+                column_values=["X", "Y"],
             )
 
         feeds = {
@@ -266,7 +280,7 @@ class TestPivotTableMultiIndex(ExtTestCase):
             "v": np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float32),
         }
         dtypes = {"k1": np.int64, "k2": np.int64, "cat": object, "v": np.float32}
-        k1_out, k2_out, vX, vY = _run(transform, dtypes, feeds)
+        k1_out, _k2_out, vX, vY = _run(transform, dtypes, feeds)
         # Unique (k1,k2) combos: (1,1), (1,2), (2,2)
         self.assertEqual(len(k1_out), 3)
         self.assertEqual(len(vX), 3)
@@ -284,10 +298,14 @@ class TestPivotTableMultiValues(ExtTestCase):
 
     def test_two_values_columns_sum(self):
         """Two independent values columns are each pivoted and output separately."""
+
         def transform(df):
             return df.pivot_table(
-                values=["v1", "v2"], index="k", columns="cat", aggfunc="sum",
-                column_values=["X", "Y"]
+                values=["v1", "v2"],
+                index="k",
+                columns="cat",
+                aggfunc="sum",
+                column_values=["X", "Y"],
             )
 
         feeds = {
@@ -309,10 +327,10 @@ class TestPivotTableMultiValues(ExtTestCase):
 
     def test_two_values_columns_mean(self):
         """mean aggfunc works independently for each values column."""
+
         def transform(df):
             return df.pivot_table(
-                values=["v1", "v2"], index="k", columns="cat", aggfunc="mean",
-                column_values=["X"]
+                values=["v1", "v2"], index="k", columns="cat", aggfunc="mean", column_values=["X"]
             )
 
         feeds = {
@@ -339,10 +357,14 @@ class TestPivotTableMultiColumns(ExtTestCase):
 
     def test_two_category_columns_sum(self):
         """Compound category key (cat1, cat2) filters rows by AND of equalities."""
+
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns=["cat1", "cat2"], aggfunc="sum",
-                column_values=[("A", "X"), ("A", "Y"), ("B", "X")]
+                values="v",
+                index="k",
+                columns=["cat1", "cat2"],
+                aggfunc="sum",
+                column_values=[("A", "X"), ("A", "Y"), ("B", "X")],
             )
 
         feeds = {
@@ -362,10 +384,15 @@ class TestPivotTableMultiColumns(ExtTestCase):
 
     def test_two_category_columns_fill_value(self):
         """fill_value applied to (index, compound-category) combinations with no rows."""
+
         def transform(df):
             return df.pivot_table(
-                values="v", index="k", columns=["cat1", "cat2"], aggfunc="sum",
-                fill_value=-1.0, column_values=[("A", "X"), ("B", "Y")]
+                values="v",
+                index="k",
+                columns=["cat1", "cat2"],
+                aggfunc="sum",
+                fill_value=-1.0,
+                column_values=[("A", "X"), ("B", "Y")],
             )
 
         feeds = {

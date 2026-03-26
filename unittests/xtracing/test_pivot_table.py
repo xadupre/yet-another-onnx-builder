@@ -1,13 +1,7 @@
-"""Tests for pivot_table tracing layer (TracedDataFrame API and PivotTableOp)."""
-
 import unittest
-
-import numpy as np
-
 from yobx.ext_test_case import ExtTestCase
 from yobx.sql import PivotTableOp
 from yobx.xtracing.parse import ColumnRef
-
 
 # ---------------------------------------------------------------------------
 # TracedDataFrame.pivot_table — API / tracing tests
@@ -27,16 +21,12 @@ class TestPivotTableTracing(ExtTestCase):
         from yobx.xtracing.dataframe_trace import TracedDataFrame
 
         df = self._make_df("k", "cat", "v")
-        result = df.pivot_table(
-            values="v", index="k", columns="cat", column_values=["X", "Y"]
-        )
+        result = df.pivot_table(values="v", index="k", columns="cat", column_values=["X", "Y"])
         self.assertIsInstance(result, TracedDataFrame)
 
     def test_output_columns_single_index(self):
         df = self._make_df("k", "cat", "v")
-        result = df.pivot_table(
-            values="v", index="k", columns="cat", column_values=["X", "Y"]
-        )
+        result = df.pivot_table(values="v", index="k", columns="cat", column_values=["X", "Y"])
         # Output columns: index "k" + "v_X", "v_Y"
         self.assertEqual(result.columns, ["k", "v_X", "v_Y"])
 
@@ -60,16 +50,16 @@ class TestPivotTableTracing(ExtTestCase):
         """Multi-column category uses tuple column_values → <val>_<cv1>_<cv2> names."""
         df = self._make_df("k", "cat1", "cat2", "v")
         result = df.pivot_table(
-            values="v", index="k", columns=["cat1", "cat2"],
-            column_values=[("A", "X"), ("B", "Y")]
+            values="v",
+            index="k",
+            columns=["cat1", "cat2"],
+            column_values=[("A", "X"), ("B", "Y")],
         )
         self.assertEqual(result.columns, ["k", "v_A_X", "v_B_Y"])
 
     def test_ops_recorded(self):
         df = self._make_df("k", "cat", "v")
-        result = df.pivot_table(
-            values="v", index="k", columns="cat", column_values=["X"]
-        )
+        result = df.pivot_table(values="v", index="k", columns="cat", column_values=["X"])
         pivot_ops = [op for op in result._ops if isinstance(op, PivotTableOp)]
         self.assertEqual(len(pivot_ops), 1)
         op = pivot_ops[0]
@@ -93,8 +83,7 @@ class TestPivotTableTracing(ExtTestCase):
         """PivotTableOp stores multiple category columns as a list."""
         df = self._make_df("k", "cat1", "cat2", "v")
         result = df.pivot_table(
-            values="v", index="k", columns=["cat1", "cat2"],
-            column_values=[("A", "X")]
+            values="v", index="k", columns=["cat1", "cat2"], column_values=[("A", "X")]
         )
         pivot_ops = [op for op in result._ops if isinstance(op, PivotTableOp)]
         self.assertEqual(len(pivot_ops), 1)
@@ -126,18 +115,14 @@ class TestPivotTableTracing(ExtTestCase):
     def test_unknown_index_col_raises(self):
         df = self._make_df("k", "cat", "v")
         with self.assertRaises(KeyError):
-            df.pivot_table(
-                values="v", index="missing", columns="cat", column_values=["X"]
-            )
+            df.pivot_table(values="v", index="missing", columns="cat", column_values=["X"])
 
     def test_no_select_op_added(self):
         """to_parsed_query() must NOT append a fallback SelectOp after PivotTableOp."""
         from yobx.xtracing.parse import SelectOp
 
         df = self._make_df("k", "cat", "v")
-        result = df.pivot_table(
-            values="v", index="k", columns="cat", column_values=["X"]
-        )
+        result = df.pivot_table(values="v", index="k", columns="cat", column_values=["X"])
         pq = result.to_parsed_query()
         select_ops = [op for op in pq.operations if isinstance(op, SelectOp)]
         self.assertEqual(len(select_ops), 0, "No SelectOp should be added after PivotTableOp")
@@ -149,11 +134,13 @@ class TestPivotTableTracing(ExtTestCase):
         k_ref = ColumnRef("k", dtype=7)  # int64
         cat_ref = ColumnRef("cat", dtype=8)  # string
         v_ref = ColumnRef("v", dtype=1)  # float32
-        columns = {k_ref: TracedSeries(k_ref), cat_ref: TracedSeries(cat_ref), v_ref: TracedSeries(v_ref)}
+        columns = {
+            k_ref: TracedSeries(k_ref),
+            cat_ref: TracedSeries(cat_ref),
+            v_ref: TracedSeries(v_ref),
+        }
         df = TracedDataFrame(columns, source_columns=["k", "cat", "v"])
-        result = df.pivot_table(
-            values="v", index="k", columns="cat", column_values=["X"]
-        )
+        result = df.pivot_table(values="v", index="k", columns="cat", column_values=["X"])
         pq = result.to_parsed_query()
         col_names = [c.column for c in pq.columns]
         self.assertIn("k", col_names)
