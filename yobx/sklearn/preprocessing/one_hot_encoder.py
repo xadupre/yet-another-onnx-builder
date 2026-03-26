@@ -68,8 +68,13 @@ def sklearn_one_hot_encoder(
     dtype = tensor_dtype_to_np_dtype(itype)
 
     is_string = itype == onnx.TensorProto.STRING
-    # For string inputs the output is always float32 (indicator values are numeric).
-    float_onnx_type = onnx.TensorProto.FLOAT if is_string else int(itype)
+    if is_string:
+        # For string inputs, cast indicators to the dtype the estimator produces.
+        from ...helpers.onnx_helper import dtype_to_tensor_dtype
+
+        float_onnx_type = dtype_to_tensor_dtype(np.dtype(estimator.dtype))
+    else:
+        float_onnx_type = int(itype)
 
     drop_idx: Optional[np.ndarray] = estimator.drop_idx_
 
