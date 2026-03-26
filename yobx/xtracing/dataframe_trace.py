@@ -559,8 +559,23 @@ class TracedDataFrame:
             dtypes2 = {"id": np.int64, "b": np.float32}
             artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
         """
+        # Collect ONNX dtypes for all columns from both sides so that
+        # join-key columns (which may not appear in any SELECT expression)
+        # can be registered with their correct type in _populate_graph.
+        all_col_dtypes: dict = {}
+        for _name, _series in self._columns.items():
+            if isinstance(_series._expr, ColumnRef) and _series._expr.dtype != 0:
+                all_col_dtypes[_name] = _series._expr.dtype
+        for _name, _series in right._columns.items():
+            if isinstance(_series._expr, ColumnRef) and _series._expr.dtype != 0:
+                all_col_dtypes[_name] = _series._expr.dtype
         join_op = JoinOp(
-            right_table="r", left_key=left_key, right_key=right_key, join_type=join_type
+            right_table="r",
+            left_key=left_key,
+            right_key=right_key,
+            join_type=join_type,
+            right_columns=list(right._source_columns),
+            column_dtypes=all_col_dtypes,
         )
         # Merge columns: left columns take priority on name collision.
         merged_cols = dict(self._columns)
@@ -673,6 +688,17 @@ class TracedDataFrame:
             items = [SelectItem(series._expr, alias=col) for col, series in self._columns.items()]
             ops.append(SelectOp(items=items))
         columns = _collect_columns(ops)
+        # Fill in missing dtypes for join-key columns (created by
+        # _collect_columns with dtype=0 from JoinOp node strings) using the
+        # column_dtypes stored in any JoinOp in the operation list.
+        join_col_dtypes: dict = {}
+        for op in ops:
+            if isinstance(op, JoinOp) and op.column_dtypes:
+                join_col_dtypes.update(op.column_dtypes)
+        if join_col_dtypes:
+            for col_ref in columns:
+                if col_ref.dtype == 0 and col_ref.column in join_col_dtypes:
+                    col_ref.dtype = join_col_dtypes[col_ref.column]
         return ParsedQuery(operations=ops, from_table="t", columns=columns)
 
     def __repr__(self) -> str:

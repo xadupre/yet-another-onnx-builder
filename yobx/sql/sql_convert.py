@@ -265,8 +265,6 @@ def parsed_query_to_onnx_graph(
     sts: Optional[Dict],
     outputs: Optional[List[str]],
     pq: ParsedQuery,
-    input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
-    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     _finalize: bool = True,
 ) -> List[str]:
     """
@@ -274,20 +272,18 @@ def parsed_query_to_onnx_graph(
     into an existing graph builder *g*.
 
     This is the low-level companion to :func:`sql_to_onnx_graph` for callers
-    that have already obtained a :class:`~yobx.sql.parse.ParsedQuery` (e.g.
-    via :func:`~yobx.sql.dataframe_trace.trace_dataframe`) and do not want to
-    re-serialise it to a SQL string.
+    that have already obtained a :class:`~yobx.sql.parse.ParsedQuery` produced
+    by :func:`~yobx.xtracing.dataframe_trace.trace_dataframe`.  All type
+    information is read from the :attr:`~yobx.xtracing.parse.ColumnRef.dtype`
+    fields that the tracer populates; no ``input_dtypes`` argument is needed.
 
     :param g: an existing graph builder.
     :param sts: context dictionary; may contain a ``"custom_functions"`` key.
     :param outputs: expected output column names (may be empty).
-    :param pq: the parsed query to convert.
-    :param input_dtypes: mapping from left-table column name to numpy dtype.
-        May be omitted when the query was produced by
-        :func:`~yobx.xtracing.dataframe_trace.trace_dataframe` and all
-        referenced :class:`~yobx.xtracing.parse.ColumnRef` objects already
-        carry their dtype in the ``dtype`` field.
-    :param right_input_dtypes: mapping for right-table columns (JOIN queries).
+    :param pq: the parsed query to convert.  Must have been produced by
+        :func:`~yobx.xtracing.dataframe_trace.trace_dataframe` so that all
+        :class:`~yobx.xtracing.parse.ColumnRef` objects carry a non-zero
+        ``dtype``.
     :param _finalize: when ``True`` (default) the SELECT output tensors are
         registered as ONNX model outputs via
         :meth:`~yobx.xbuilder.GraphBuilder.make_tensor_output`.  Pass
@@ -300,8 +296,6 @@ def parsed_query_to_onnx_graph(
     return _populate_graph(
         g,
         pq,
-        input_dtypes=input_dtypes,
-        right_input_dtypes=right_input_dtypes,
         custom_functions=custom_functions,
         desired_outputs=outputs or None,
         _finalize=_finalize,
@@ -310,8 +304,6 @@ def parsed_query_to_onnx_graph(
 
 def parsed_query_to_onnx(
     pq: ParsedQuery,
-    input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
-    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
@@ -321,21 +313,16 @@ def parsed_query_to_onnx(
     """
     Convert an already-parsed :class:`~yobx.sql.parse.ParsedQuery` to ONNX.
 
-    This is the companion to :func:`sql_to_onnx` for callers that already have
-    a :class:`~yobx.sql.parse.ParsedQuery` object (produced by
-    :func:`~yobx.sql.parse.parse_sql` or by
-    :func:`~yobx.sql.dataframe_trace.trace_dataframe`) and do not need to
-    re-serialise it to a SQL string.
+    The query must have been produced by
+    :func:`~yobx.xtracing.dataframe_trace.trace_dataframe` so that all
+    :class:`~yobx.xtracing.parse.ColumnRef` objects carry a non-zero
+    :attr:`~yobx.xtracing.parse.ColumnRef.dtype`.  Type information is read
+    exclusively from those ``dtype`` fields; no ``input_dtypes`` argument is
+    needed.  For queries produced by :func:`~yobx.xtracing.parse.parse_sql`
+    (which do not carry dtype information) use :func:`sql_to_onnx` instead.
 
     :param pq: a :class:`~yobx.sql.parse.ParsedQuery` produced by
-        :func:`~yobx.sql.parse.parse_sql` or
-        :func:`~yobx.sql.dataframe_trace.trace_dataframe`.
-    :param input_dtypes: mapping from left-table column name to numpy dtype.
-        May be omitted when the query was produced by
-        :func:`~yobx.xtracing.dataframe_trace.trace_dataframe` and all
-        referenced :class:`~yobx.xtracing.parse.ColumnRef` objects already
-        carry their dtype in the ``dtype`` field.
-    :param right_input_dtypes: mapping for right-table columns (JOIN queries).
+        :func:`~yobx.xtracing.dataframe_trace.trace_dataframe`.
     :param target_opset: ONNX opset version to target.
     :param custom_functions: optional mapping from function name to Python
         callable.  Each callable is traced via
@@ -351,13 +338,15 @@ def parsed_query_to_onnx(
     Example::
 
         import numpy as np
-        from yobx.sql import parse_sql
+        from yobx.xtracing.dataframe_trace import trace_dataframe
         from yobx.sql.sql_convert import parsed_query_to_onnx
         from yobx.reference import ExtendedReferenceEvaluator
 
-        pq = parse_sql("SELECT a + b AS total FROM t WHERE a > 0")
-        dtypes = {"a": np.float32, "b": np.float32}
-        artifact = parsed_query_to_onnx(pq, dtypes)
+        def transform(df):
+            return df.select([(df["a"] + df["b"]).alias("total")])
+
+        pq = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        artifact = parsed_query_to_onnx(pq)
 
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
@@ -366,7 +355,7 @@ def parsed_query_to_onnx(
     """
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
-    parsed_query_to_onnx_graph(g, sts, [], pq, input_dtypes, right_input_dtypes)
+    parsed_query_to_onnx_graph(g, sts, [], pq)
     artifact = g.to_onnx(return_optimize_report=True)
     if filename:
         if verbose:
@@ -469,8 +458,8 @@ def _build_group_by_tensors(
 def _populate_graph(
     g: GraphBuilderExtendedProtocol,
     pq: ParsedQuery,
-    input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]],
-    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]],
+    input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
+    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     custom_functions: Optional[Dict[str, Callable]] = None,
     desired_outputs: Optional[List[str]] = None,
     _finalize: bool = True,
@@ -478,13 +467,26 @@ def _populate_graph(
     """
     Populates *g* with ONNX nodes for *pq* and return the output tensor names.
 
+    Type information is read from :attr:`~yobx.xtracing.parse.ColumnRef.dtype`
+    when the query was produced by the tracer.  For SQL-string-parsed queries
+    (where ``col_ref.dtype == 0``), *input_dtypes* and *right_input_dtypes*
+    serve as fallback.
+
+    Left/right classification for JOIN queries follows this priority:
+
+    1. When :attr:`~yobx.xtracing.parse.JoinOp.right_columns` is non-empty
+       (tracer-produced join): columns listed there go to the right side.
+    2. Otherwise (SQL-string join): columns found in *right_input_dtypes* go
+       to the right side, those in *input_dtypes* go to the left side.
+
     :param _finalize: when ``True`` (default) the SELECT output tensors are
         registered as ONNX model outputs.  Pass ``False`` when processing an
         inner subquery so that its outputs remain intermediate tensors.
     """
     dim = "N"
 
-    # Resolve dtype dicts (may be None when all dtypes come from ColumnRef.dtype)
+    # Resolve dtype dicts — used only for SQL-string-parsed queries where
+    # col_ref.dtype is 0 for every column.
     left_dtypes: Dict[str, np.dtype] = (
         {k: np.dtype(v) for k, v in input_dtypes.items()} if input_dtypes else {}
     )
@@ -521,8 +523,8 @@ def _populate_graph(
         }
         right_col_map: Dict[str, str] = {}
     else:
-        # Build list of inputs needed for left table
-        # (only columns that appear in the query)
+        # Build list of inputs needed for left and right tables
+        # (only columns that appear in the query).
         all_cols = pq.columns
         left_inputs: List[Tuple[str, int, Tuple]] = []
         right_inputs: List[Tuple[str, int, Tuple]] = []
@@ -534,31 +536,36 @@ def _populate_graph(
                 join_op = op
                 break
 
+        right_col_set: Set[str] = set(join_op.right_columns) if join_op is not None else set()
+
         for col_ref in all_cols:
             col = col_ref.column
-            # Determine ONNX element type: prefer dtype carried by the ColumnRef
-            # (set by the tracer), fall back to the caller-supplied dict.
-            if col in left_dtypes:
-                onnx_type = col_ref.dtype if col_ref.dtype != 0 else _np_dtype_to_onnx(left_dtypes[col])
-                left_inputs.append((col, onnx_type, (dim,)))
-            elif col in right_dtypes and join_op is not None:
-                onnx_type = col_ref.dtype if col_ref.dtype != 0 else _np_dtype_to_onnx(right_dtypes[col])
-                right_inputs.append((col, onnx_type, (dim,)))
+            if right_col_set and col in right_col_set:
+                # Tracer-produced JOIN: column is explicitly listed as right-side.
+                right_inputs.append((col, col_ref.dtype, (dim,)))
                 seen_right.append(col)
             elif col_ref.dtype != 0:
-                # Dtype is known from the ColumnRef (tracer-produced query).
-                # Assign to the left side when no explicit dict entry is found.
+                # Tracer-produced query (no join, or left-side join column).
                 left_inputs.append((col, col_ref.dtype, (dim,)))
+            elif col in right_dtypes and join_op is not None:
+                # SQL-string JOIN: column found in right_input_dtypes.
+                right_inputs.append((col, _np_dtype_to_onnx(right_dtypes[col]), (dim,)))
+                seen_right.append(col)
+            elif col in left_dtypes:
+                # SQL-string: column found in input_dtypes.
+                left_inputs.append((col, _np_dtype_to_onnx(left_dtypes[col]), (dim,)))
 
-        # If we have a join, make sure key columns are registered on the right side
-        if join_op is not None and join_op.right_key not in seen_right:
+        # For SQL-string JOINs, make sure the right key column is registered
+        # on the right side even if it was not referenced in the SELECT list.
+        if join_op is not None and not join_op.right_columns and join_op.right_key not in seen_right:
             if join_op.right_key in right_dtypes:
-                onnx_type = _np_dtype_to_onnx(right_dtypes[join_op.right_key])
-                right_inputs.append((join_op.right_key, onnx_type, (dim,)))
+                right_inputs.append(
+                    (join_op.right_key, _np_dtype_to_onnx(right_dtypes[join_op.right_key]), (dim,))
+                )
 
         all_inputs = left_inputs + right_inputs
 
-        # Add inputs to the graph only when not already registered
+        # Add inputs to the graph only when not already registered.
         for inp_name, inp_type, inp_shape in all_inputs:
             if not g.has_name(inp_name):
                 g.make_tensor_input(inp_name, inp_type, inp_shape)

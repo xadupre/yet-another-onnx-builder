@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 # ---------------------------------------------------------------------------
 # Small expression dataclasses used inside operations
@@ -191,12 +191,30 @@ class JoinOp(SqlOperation):
     :param right_key: column name from the right table used in the equi-join.
     :param join_type: ``'inner'`` (default), ``'left'``, ``'right'``,
         or ``'full'``.
+    :param right_columns: column names that belong to the right-hand table.
+        Populated by :meth:`~yobx.xtracing.dataframe_trace.TracedDataFrame.join`
+        so that :func:`~yobx.sql.sql_convert._populate_graph` can classify
+        columns as left- or right-side without requiring a separate
+        ``right_input_dtypes`` argument.  Left empty when the join was
+        produced by the SQL string parser (in that case the caller must
+        supply ``right_input_dtypes`` to :func:`~yobx.sql.sql_convert.sql_to_onnx_graph`).
+    :param column_dtypes: mapping from column name to ONNX element type
+        (a :data:`onnx.TensorProto` integer constant) for every column in
+        the join (both left and right sides).  Populated by
+        :meth:`~yobx.xtracing.dataframe_trace.TracedDataFrame.join` from
+        the :attr:`~yobx.xtracing.parse.ColumnRef.dtype` fields of the
+        source :class:`~yobx.xtracing.dataframe_trace.TracedSeries` objects.
+        Used to recover dtype information for join-key columns that may not
+        appear in any ``SELECT`` expression and would otherwise have
+        ``dtype=0`` after :func:`~yobx.xtracing.parse._collect_columns`.
     """
 
     right_table: str = ""
     left_key: str = ""
     right_key: str = ""
     join_type: str = "inner"
+    right_columns: List[str] = field(default_factory=list)
+    column_dtypes: Dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
