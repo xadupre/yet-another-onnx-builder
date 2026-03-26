@@ -29,6 +29,7 @@ works and a comparison table with :func:`onnx.shape_inference.infer_shapes`.
 """
 
 import numpy as np
+import pandas
 import onnx
 import onnx_ir as ir
 import onnxruntime
@@ -175,9 +176,14 @@ session = onnxruntime.InferenceSession(
 )
 outputs = session.run(None, feeds)
 result = builder.compare_with_true_inputs(feeds, outputs)
-print("\n=== shape comparison (expr, expected, computed) ===")
+print("\n=== shape comparison ===")
+data = []
 for name, dims in result.items():
-    print(f"  {name}: {dims}")
+    obs = dict(result=name)
+    for i, dim in enumerate(dims):
+        for c, v in zip(["expression", "expected", "computed"], dim):
+            data.append(dict(result=name, dimension=i, col=c, value=v))
+print(pandas.DataFrame(data).pivot(index=["result", "dimension"], columns="col", values="value"))
 
 # %%
 # Plot: symbolic vs inferred shapes
@@ -225,9 +231,7 @@ table_data = [
 fig, ax = plt.subplots(figsize=(11, 2.5))
 
 ax.axis("off")
-tbl = ax.table(
-    cellText=table_data, colLabels=col_labels, loc="center", cellLoc="center"
-)
+tbl = ax.table(cellText=table_data, colLabels=col_labels, loc="center", cellLoc="center")
 tbl.auto_set_font_size(False)
 tbl.set_fontsize(9)
 tbl.auto_set_column_width(list(range(len(col_labels))))
@@ -236,9 +240,7 @@ for col in range(len(col_labels)):
     tbl[0, col].set_facecolor("#4c72b0")
     tbl[0, col].set_text_props(color="white", fontweight="bold")
 ax.set_title(
-    "Shape inference: onnx vs onnx-shape-inference vs BasicShapeBuilder",
-    fontsize=10,
-    pad=8,
+    "Shape inference: onnx vs onnx-shape-inference vs BasicShapeBuilder", fontsize=10, pad=8
 )
 plt.tight_layout()
 plt.show()
