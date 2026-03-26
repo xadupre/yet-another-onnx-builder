@@ -51,7 +51,7 @@ def build_traceable_inputs_from_inputs(
     from ..xtracing import TracedDataFrame, TracedSeries
     from ..xtracing.parse import ColumnRef
 
-    return (TracedDataFrame(dict(zip(inputs, [TracedSeries(ColumnRef(i)) for i in inputs]))),)
+    return (TracedDataFrame({ColumnRef(i): TracedSeries(ColumnRef(i)) for i in inputs}),)
 
 
 def sklearn_traceable_converter(

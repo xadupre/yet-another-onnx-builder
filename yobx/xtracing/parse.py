@@ -30,7 +30,7 @@ from typing import List, Optional, Tuple
 # ---------------------------------------------------------------------------
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class ColumnRef:
     """A bare column reference, optionally qualified: ``table.column``.
 
