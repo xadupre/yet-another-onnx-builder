@@ -59,7 +59,7 @@ def _normalize_input_dtypes(
         and input_dtypes
         and all(_is_dataframe(item) for item in input_dtypes)  # type: ignore
     ):
-        return [_dataframe_to_dtypes(df) for df in input_dtypes]
+        return [_dataframe_to_dtypes(df) for df in input_dtypes]  # type: ignore
     return input_dtypes  # type: ignore[return-value]
 
 

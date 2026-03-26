@@ -502,8 +502,9 @@ class TestToParsedQuery(ExtTestCase):
         df = self._make()
         result = df.select([(df["a"] + df["b"]).alias("total")])
         pq = result.to_parsed_query()
-        self.assertIn("a", pq.columns)
-        self.assertIn("b", pq.columns)
+        col_names = [c.column for c in pq.columns]
+        self.assertIn("a", col_names)
+        self.assertIn("b", col_names)
 
 
 # ---------------------------------------------------------------------------

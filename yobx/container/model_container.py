@@ -90,7 +90,9 @@ class ExtendedModelContainer(ModelContainer):
             self._load_large_initializers(file_path)
         return self
 
-    def get_raw_data(self, np_tensor: Union[np.ndarray, "torch.Tensor"]) -> bytes:  # noqa: F821
+    def get_raw_data(
+        self, np_tensor: Union[np.ndarray, "torch.Tensor", "tensorflow.Tensor"]  # noqa: F821
+    ) -> bytes:
         """Returns the raw data of a specific tensor whatever it is."""
         if sys.byteorder == "big":
             # Convert endian from little to big
@@ -104,44 +106,36 @@ class ExtendedModelContainer(ModelContainer):
         elif isinstance(np_tensor, onnx.TensorProto):
             tensor_bytes = np_tensor.raw_data
             assert len(tensor_bytes) > 0, f"One tensor is null, np_tensor={np_tensor}."
-        else:
-            # Check for TensorFlow tensors/variables first.
-            _tf_handled = False
-            try:
-                import tensorflow as _tf
+        elif hasattr(np_tensor, "ref"):
+            # It should be a tensorflow tensor.
+            begin = time.perf_counter()
+            tensor_bytes = np_tensor.numpy().tobytes()
+            self._stats["time_export_tobytes"] += time.perf_counter() - begin
+        elif hasattr(np_tensor, "detach"):
+            # It should be a torch.Tensor.
+            import torch
 
-                if hasattr(_tf, "__version__") and isinstance(
-                    np_tensor, (_tf.Tensor, _tf.Variable)
-                ):
-                    begin = time.perf_counter()
-                    tensor_bytes = np_tensor.numpy().tobytes()
-                    self._stats["time_export_tobytes"] += time.perf_counter() - begin
-                    _tf_handled = True
-            except ImportError:
-                pass
-
-            if not _tf_handled:
-                import torch
-
-                if isinstance(np_tensor, torch.nn.Parameter):
-                    pt = np_tensor.data
-                elif isinstance(np_tensor, torch.Tensor):
-                    pt = np_tensor
-                else:
-                    raise NotImplementedError(
-                        f"Handling of type {type(np_tensor)} as large initializer "
-                        f"is not implemented yet."
-                    )
-
-                begin = time.perf_counter()
-                proto = proto_from_array(pt, name="dummy")
-                self._stats["time_export_proto_from_array"] += time.perf_counter() - begin
-                tensor_bytes = proto.raw_data
-                assert pt.dtype != torch.float32 or len(tensor_bytes) == np.prod(pt.shape) * 4, (
-                    f"Unexpected size mismatch, buffer size is {len(tensor_bytes)}, "
-                    f"but tensor size={np.prod(pt.shape) * 4}, "
-                    f"shape={pt.shape}, dtype={pt.dtype}"
+            if isinstance(np_tensor, torch.nn.Parameter):
+                pt = np_tensor.data
+            elif isinstance(np_tensor, torch.Tensor):
+                pt = np_tensor
+            else:
+                raise NotImplementedError(
+                    f"Handling of type {type(np_tensor)} as large initializer "
+                    f"is not implemented yet."
                 )
+
+            begin = time.perf_counter()
+            proto = proto_from_array(pt, name="dummy")
+            self._stats["time_export_proto_from_array"] += time.perf_counter() - begin
+            tensor_bytes = proto.raw_data
+            assert pt.dtype != torch.float32 or len(tensor_bytes) == np.prod(pt.shape) * 4, (
+                f"Unexpected size mismatch, buffer size is {len(tensor_bytes)}, "
+                f"but tensor size={np.prod(pt.shape) * 4}, "
+                f"shape={pt.shape}, dtype={pt.dtype}"
+            )
+        else:
+            raise TypeError(f"Unsupported type {type(np_tensor)}.")
         return tensor_bytes
 
     def get_prop(self, tensor: onnx.TensorProto) -> onnx.StringStringEntryProto:

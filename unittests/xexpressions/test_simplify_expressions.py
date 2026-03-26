@@ -17,7 +17,12 @@ class TestSimplifyExpressions(ExtTestCase):
         self.assertEqual(simplify_expression("5 + x - 2 + 3"), "x+6")
         self.assertEqual(simplify_expression("x - x"), "0")
         self.assertEqual(simplify_expression("Max(x,y)"), "x^y")
-        self.assertEqual(simplify_expression("2*batch//batch"), "2")
+        self.assertEqual(str(simplify_expression("2*batch//batch")), "2")
+
+    def test_simplify_expression_to_int(self):
+        self.assertEqual(simplify_expression("2*batch//batch"), 2)
+        self.assertEqual(simplify_expression("2^2"), 2)
+        self.assertEqual(simplify_expression("2*batch//batch^2"), 2)
 
     def test_simplify_expression2(self):
         self.assertEqual(simplify_expression("5 + x - (2 + 3)"), "x")
