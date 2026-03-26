@@ -17,3 +17,4 @@ that maintain code across the project.
    design/xtracing/index
    design/misc/index
    design/ci
+   design/env_variables
