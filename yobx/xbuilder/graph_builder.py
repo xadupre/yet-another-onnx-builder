@@ -5974,7 +5974,7 @@ class GraphBuilder(
         for name, shape in self._known_shapes.items():
             if not shape:
                 continue
-            new_shape = []
+            new_shape: List[Union[int, str]] = []
             update = False
             for s in shape:
                 if isinstance(s, int):
@@ -6004,7 +6004,7 @@ class GraphBuilder(
                 continue
             if not shape:
                 continue
-            new_shape = []
+            new_shape: List[Union[int, str]] = []
             update = False
             for s in shape:
                 if isinstance(s, int):
@@ -6084,6 +6084,21 @@ class GraphBuilder(
                                 ), f"unexpected type {type(sh)} for shape {names!r}"
                                 self.add_to_constraints(dim_name, sh)
                                 self.add_to_constraints(sh, dim_name)
+
+        for dim_name, wheres in self.dynamic_dimensions_source.items():
+            for where in wheres:
+                if not self.has_shape(where["input_name"]):
+                    continue
+                shape = self.get_shape(where["input_name"])
+                axis = where["axis"]
+                existing_name = shape[axis]
+                if dim_name != existing_name:
+                    # We register a new constraints.
+                    new_shape = list(shape)
+                    new_shape[axis] = dim_name
+                    self.set_shape(where["input_name"], tuple(new_shape))
+                    self.add_to_constraints(existing_name, dim_name)
+                    self.add_to_constraints(dim_name, existing_name)
 
         _update(self.dynamic_dimensions_source_flat, self.input_names)
         _update(self.output_dynamic_dimensions_source_flat, self.output_names)

@@ -335,7 +335,7 @@ class TestOnnxExportShape(ExtTestCase):
 
         class Model(torch.nn.Module):
             def forward(self, x):
-                return torch.nonzero(x)
+                return torch.nonzero(x + 1)
 
         model = Model()
         xs = (torch.randn((2, 4)),)
@@ -354,7 +354,7 @@ class TestOnnxExportShape(ExtTestCase):
             verbose=0,
         )
         onx = onnx.load(model_path)
-        self.assertEqual(["NonZero", "Transpose"], [n.op_type for n in onx.graph.node])
+        self.assertEqual(["Add", "NonZero", "Transpose"], [n.op_type for n in onx.graph.node])
         self.assertEqual(onx.graph.output[0].name, "Y")
         shape_x = [d.dim_param for d in onx.graph.input[0].type.tensor_type.shape.dim]
         self.assertEqual(["dx", "dy"], shape_x)

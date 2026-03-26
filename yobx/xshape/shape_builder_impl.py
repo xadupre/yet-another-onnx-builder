@@ -795,6 +795,18 @@ class BasicShapeBuilder(
                         # A dynamic shape used to describe an input.
                         # It must be kept.
                         original.add(s)
+            for i in graph.output:
+                if (
+                    i.type
+                    and i.type.tensor_type
+                    and i.type.tensor_type.shape
+                    and i.type.tensor_type.shape.dim
+                ):
+                    for d in i.type.tensor_type.shape.dim:
+                        if d.dim_param:
+                            # A dynamic shape used to describe an input.
+                            # It must be kept.
+                            original.add(d.dim_param)
             for node in graph.node:
                 r = self.run_node(node, exc=exc, cost=inference == InferenceMode.COST)
                 if inference == InferenceMode.COST:

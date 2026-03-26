@@ -3279,9 +3279,7 @@ class TestPositionMsg(ExtTestCase):
         dimension names instead of internal symbolic tokens."""
         # Build a minimal single-Relu graph with internal dim tokens "s0" / "s1".
         g = GraphBuilder(
-            18,
-            ir_version=9,
-            optimization_options=OptimizationOptions(passes=[], patterns=None),
+            18, ir_version=9, optimization_options=OptimizationOptions(passes=[], patterns=None)
         )
         g.make_tensor_input("X", TFLOAT, ("s0", "s1"))
         g.make_node("Relu", ["X"], ["Y"])
@@ -3302,7 +3300,8 @@ class TestPositionMsg(ExtTestCase):
         self.assertEqual(g.get_shape("X"), ("s0", "s1"))
         self.assertEqual(g.get_shape("Y"), ("s0", "s1"))
 
-        # Run optimize() — this triggers _improves_dynamic_dimension_naming(apply_replacements=True).
+        # Run optimize()
+        # this triggers _improves_dynamic_dimension_naming(apply_replacements=True).
         g.optimize()
 
         # After optimize(), get_shape() must reflect the user-visible names.
