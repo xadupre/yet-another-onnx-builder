@@ -438,11 +438,7 @@ class TestMultiDataframe(ExtTestCase):
         """Multi-column join where key columns have different names on each side."""
 
         def transform(df1, df2):
-            return df1.join(
-                df2,
-                left_key=["company_id", "dept_id"],
-                right_key=["cid", "did"],
-            )
+            return df1.join(df2, left_key=["company_id", "dept_id"], right_key=["cid", "did"])
 
         # Left: company_id=[1,2,3], dept_id=[10,20,30], a=[1,2,3]
         # Right: cid=[2,3,4], did=[20,30,40], b=[200,300,400]
@@ -468,7 +464,7 @@ class TestMultiDataframe(ExtTestCase):
         }
         results = ref.run(None, feeds)
         # Output columns: company_id, dept_id, a, cid, did, b
-        company_out, dept_out, a_out, cid_out, did_out, b_out = results
+        company_out, dept_out, a_out, _cid_out, _did_out, b_out = results
         np.testing.assert_array_equal(company_out, np.array([2, 3], dtype=np.int64))
         np.testing.assert_array_equal(dept_out, np.array([20, 30], dtype=np.int64))
         np.testing.assert_allclose(a_out, np.array([2.0, 3.0], dtype=np.float32))
@@ -495,16 +491,11 @@ class TestMultiDataframe(ExtTestCase):
         artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
         # The right-side key columns are renamed to "k1_right" / "k2_right" in
         # the ONNX model to avoid clashing with the left-side inputs.
-        self.assertEqual(sorted(artifact.input_names), ["a", "b", "k1", "k1_right", "k2", "k2_right"])
+        self.assertEqual(
+            sorted(artifact.input_names), ["a", "b", "k1", "k1_right", "k2", "k2_right"]
+        )
         ref = ExtendedReferenceEvaluator(artifact)
-        feeds = {
-            "k1": k1_l,
-            "k2": k2_l,
-            "a": a,
-            "k1_right": k1_r,
-            "k2_right": k2_r,
-            "b": b,
-        }
+        feeds = {"k1": k1_l, "k2": k2_l, "a": a, "k1_right": k1_r, "k2_right": k2_r, "b": b}
         k1_out, k2_out, a_out, b_out = ref.run(None, feeds)
         np.testing.assert_array_equal(k1_out, np.array([2, 3], dtype=np.int64))
         np.testing.assert_array_equal(k2_out, np.array([20, 30], dtype=np.int64))
@@ -515,9 +506,7 @@ class TestMultiDataframe(ExtTestCase):
         """Multi-column join followed by a SELECT expression."""
 
         def transform(df1, df2):
-            joined = df1.join(
-                df2, left_key=["company_id", "dept_id"], right_key=["cid", "did"]
-            )
+            joined = df1.join(df2, left_key=["company_id", "dept_id"], right_key=["cid", "did"])
             return joined.select([(joined["a"] + joined["b"]).alias("total")])
 
         company_id = np.array([1, 2, 3], dtype=np.int64)
@@ -551,10 +540,11 @@ class TestMultiDataframe(ExtTestCase):
         with self.assertRaises(ValueError):
             dataframe_to_onnx(
                 transform,
-                [{"k1": np.int64, "k2": np.int64, "a": np.float32}, {"k1": np.int64, "b": np.float32}],
+                [
+                    {"k1": np.int64, "k2": np.int64, "a": np.float32},
+                    {"k1": np.int64, "b": np.float32},
+                ],
             )
-
-
 
     # ------------------------------------------------------------------
     # to_onnx dispatcher (callable path)
