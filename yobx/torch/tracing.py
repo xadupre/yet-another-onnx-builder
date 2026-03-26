@@ -280,6 +280,11 @@ def replace_problematic_function_before_tracing() -> Generator:
     """
     Replaces function that cannot be traced with the default tracer
     such as :func:`torch.cat`.
+
+    This also patches :func:`torch.compiler.is_exporting` to return ``True``
+    so that models using it for static control flow bypass select the correct
+    code path (the one designed for export/tracing) rather than the plain
+    Python fallback.
     """
     saved = {"cat": torch.cat, "cond": torch.cond}
     newf = {"cat": CustomProxy.cat, "cond": CondCCOp()}
@@ -288,6 +293,8 @@ def replace_problematic_function_before_tracing() -> Generator:
             setattr(k[0], k[1], v)
         else:
             setattr(torch, k, v)
+    saved_is_exporting = torch.compiler.is_exporting
+    torch.compiler.is_exporting = lambda: True
     try:
         yield
     finally:
@@ -296,6 +303,7 @@ def replace_problematic_function_before_tracing() -> Generator:
                 setattr(k[0], k[1], v)
             else:
                 setattr(torch, k, v)
+        torch.compiler.is_exporting = saved_is_exporting
 
 
 _AUTOWRAP_FUNCTIONS: Tuple[Callable, ...] = (

@@ -127,6 +127,16 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_vmap_python_yobx(self):
         evaluation(cases="VmapPython", exporters="yobx", quiet=False, dynamic=True)
 
+    @requires_torch("2.7", "scan")
+    @ignore_warnings((UserWarning, FutureWarning))
+    def test_run_exporter_yobx_tracing_scan_decomposition(self):
+        evaluation(
+            cases="ControlFlowScanDecomposition_151564",
+            exporters="yobx-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

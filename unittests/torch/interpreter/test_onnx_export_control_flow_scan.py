@@ -338,6 +338,33 @@ class TestOnnxExportControlFlow(ExtTestCase):
                     got = sess.run(None, feeds)
                     self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @ignore_warnings((UserWarning, FutureWarning))
+    def test_scan_loop_static_bypass_tracing(self):
+        """Test that torch.compiler.is_exporting() returns True during tracing mode,
+        enabling models to bypass static control flow for export-friendly code paths."""
+        import torch
+        from yobx.torch._model_eval_cases import ControlFlowScanDecomposition_151564
+
+        model = ControlFlowScanDecomposition_151564()
+        x, y = ControlFlowScanDecomposition_151564._inputs[0]
+        expected = model(x, y)
+
+        name = self.get_dump_file("test_scan_loop_static_bypass_tracing.onnx")
+        to_onnx(
+            model,
+            (x, y),
+            filename=name,
+            dynamic_shapes={"images": {0: "batch", 1: "maxdim"}, "position": {0: "batch"}},
+            export_options=ExportOptions(tracing=True),
+            verbose=0,
+        )
+        import onnxruntime
+
+        sess = onnxruntime.InferenceSession(name, providers=["CPUExecutionProvider"])
+        feeds = {"images": x.numpy(), "position": y.numpy()}
+        got = sess.run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=1e-5)
+
     @unittest.skip("TODO: investigate later")
     def test_scan_loop_inplace(self):
         import torch
