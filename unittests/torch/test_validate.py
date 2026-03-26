@@ -156,6 +156,73 @@ class TestValidateModel(ExtTestCase):
         # Export may succeed or fail depending on torch version; both are acceptable.
         self.assertIsNotNone(summary.export)
 
+    def test_check_discrepancies_verbose_2(self):
+        """_check_discrepancies prints per-row detail lines when verbose >= 2."""
+        import io
+        import sys
+        import torch
+        from yobx.torch.validate import validate_model
+
+        tokenized = {
+            "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
+            "attention_mask": torch.ones(1, 5, dtype=torch.int64),
+        }
+        buf = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = buf
+        try:
+            summary, data = validate_model(
+                "arnir0/Tiny-LLM",
+                tokenized_inputs=tokenized,
+                random_weights=True,
+                max_new_tokens=3,
+                do_run=True,
+                quiet=True,
+                verbose=2,
+            )
+        finally:
+            sys.stdout = old_stdout
+
+        output = buf.getvalue()
+        # Verbose >= 1 should always print the summary line.
+        self.assertIn("[validate_model] discrepancies:", output)
+        # Verbose >= 2 should print per-row status lines.
+        if data.discrepancies:
+            self.assertIn("[0]", output)
+
+    def test_check_discrepancies_verbose_3(self):
+        """_check_discrepancies prints tensor shapes when verbose >= 3."""
+        import io
+        import sys
+        import torch
+        from yobx.torch.validate import validate_model
+
+        tokenized = {
+            "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
+            "attention_mask": torch.ones(1, 5, dtype=torch.int64),
+        }
+        buf = io.StringIO()
+        old_stdout = sys.stdout
+        sys.stdout = buf
+        try:
+            summary, data = validate_model(
+                "arnir0/Tiny-LLM",
+                tokenized_inputs=tokenized,
+                random_weights=True,
+                max_new_tokens=3,
+                do_run=True,
+                quiet=True,
+                verbose=3,
+            )
+        finally:
+            sys.stdout = old_stdout
+
+        output = buf.getvalue()
+        self.assertIn("[validate_model] discrepancies:", output)
+        # Verbose >= 3: tensor shape strings should appear when discrepancies exist.
+        if data.discrepancies and data.discrepancies[0].get("inputs"):
+            self.assertIn("inputs:", output)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
