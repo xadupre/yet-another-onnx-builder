@@ -656,5 +656,147 @@ class TestExtendedModelContainerTF(ExtTestCase):
             self.assertEqual(weight.shape, data_np.shape)
 
 
+class TestExtendedModelContainerString(ExtTestCase):
+    """Tests for string tensor handling in ExtendedModelContainer."""
+
+    TSTRING = onnx.TensorProto.STRING
+
+    def _make_string_initializer_model(self):
+        """Helper to create a model with a string tensor initializer."""
+        strings = np.array(["hello", "world", "foo"], dtype=object)
+        string_init = onh.from_array(strings, name="vocab")
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Identity", ["vocab"], ["out"])],
+                "test",
+                [],
+                [oh.make_tensor_value_info("out", self.TSTRING, [3])],
+                initializer=[string_init],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        return model
+
+    def _make_mixed_initializer_model(self):
+        """Helper to create a model with both float and string initializers."""
+        strings = np.array(["hello", "world"], dtype=object)
+        string_init = onh.from_array(strings, name="labels")
+        float_init = onh.from_array(np.ones((2,), dtype=np.float32), name="weights")
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Identity", ["labels"], ["out_labels"]),
+                    oh.make_node("Identity", ["weights"], ["out_weights"]),
+                ],
+                "test",
+                [],
+                [
+                    oh.make_tensor_value_info("out_labels", self.TSTRING, [2]),
+                    oh.make_tensor_value_info("out_weights", onnx.TensorProto.FLOAT, [2]),
+                ],
+                initializer=[string_init, float_init],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        return model
+
+    def test_save_load_string_initializer(self):
+        """String tensor initializer stays inline (not externalized) after save/load."""
+        from yobx.container import ExtendedModelContainer
+
+        model = self._make_string_initializer_model()
+        container = ExtendedModelContainer()
+        container.model_proto = model
+        container.large_initializers = {}
+
+        with tempfile.TemporaryDirectory() as tmp:
+            file_path = os.path.join(tmp, "model.onnx")
+            saved = container.save(file_path)
+            self.assertIsInstance(saved, onnx.ModelProto)
+
+            loaded = ExtendedModelContainer().load(file_path)
+            # String tensors are inline, so no large_initializers
+            self.assertEqual(len(loaded.large_initializers), 0)
+            # The string initializer is preserved inline
+            init = loaded.model_proto.graph.initializer[0]
+            self.assertEqual(init.data_type, self.TSTRING)
+            back = onh.to_array(init)
+            np.testing.assert_array_equal(back, np.array(["hello", "world", "foo"]))
+
+    def test_get_model_with_data_preserves_string_initializer(self):
+        """get_model_with_data keeps inline string initializers intact."""
+        from yobx.container import ExtendedModelContainer
+
+        model = self._make_string_initializer_model()
+        container = ExtendedModelContainer()
+        container.model_proto = model
+        container.large_initializers = {}
+
+        result = container.get_model_with_data()
+        self.assertIsInstance(result, onnx.ModelProto)
+        self.assertEqual(len(result.graph.initializer), 1)
+        init = result.graph.initializer[0]
+        self.assertEqual(init.data_type, self.TSTRING)
+        back = onh.to_array(init)
+        np.testing.assert_array_equal(back, np.array(["hello", "world", "foo"]))
+
+    def test_get_model_with_data_mixed_initializers(self):
+        """get_model_with_data handles mixed inline (string) and external (float) initializers."""
+        from yobx.container import ExtendedModelContainer
+
+        data = np.ones((2,), dtype=np.float32)
+        strings = np.array(["hello", "world"], dtype=object)
+
+        # Build the string initializer inline
+        string_init = onh.from_array(strings, name="labels")
+
+        # Build the float initializer as external
+        float_ext = onnx.TensorProto()
+        float_ext.data_type = onnx.TensorProto.FLOAT
+        float_ext.name = "weights"
+        float_ext.data_location = onnx.TensorProto.EXTERNAL
+        float_ext.dims.extend([2])
+        ext = float_ext.external_data.add()
+        ext.key = "location"
+        ext.value = "#weights"
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Identity", ["labels"], ["out_labels"]),
+                    oh.make_node("Identity", ["weights"], ["out_weights"]),
+                ],
+                "test",
+                [],
+                [
+                    oh.make_tensor_value_info("out_labels", self.TSTRING, [2]),
+                    oh.make_tensor_value_info("out_weights", onnx.TensorProto.FLOAT, [2]),
+                ],
+                initializer=[string_init, float_ext],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+
+        container = ExtendedModelContainer()
+        container.model_proto = model
+        container.large_initializers = {"#weights": data}
+
+        result = container.get_model_with_data()
+        self.assertIsInstance(result, onnx.ModelProto)
+        self.assertEqual(len(result.graph.initializer), 2)
+        by_name = {init.name: init for init in result.graph.initializer}
+        # String initializer is kept as-is
+        self.assertEqual(by_name["labels"].data_type, self.TSTRING)
+        np.testing.assert_array_equal(
+            onh.to_array(by_name["labels"]), np.array(["hello", "world"])
+        )
+        # Float initializer is embedded from external data
+        self.assertEqual(by_name["weights"].data_type, onnx.TensorProto.FLOAT)
+        np.testing.assert_array_equal(onh.to_array(by_name["weights"]), data)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
