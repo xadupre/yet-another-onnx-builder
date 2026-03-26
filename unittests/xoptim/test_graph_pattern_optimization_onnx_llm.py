@@ -815,7 +815,6 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         )
         return model, inputs, ds, expected
 
-    @unittest.skip("TODO: fix it later")
     @requires_torch("2.9")
     @hide_stdout()
     def test_local_attention_gqa_0(self):
