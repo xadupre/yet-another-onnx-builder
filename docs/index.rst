@@ -78,15 +78,15 @@ operations on a DataFrame and compiles them to ONNX directly.
 +-----------------------------+------------------------------------+----------------------------------+
 | sql                         | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-converter`    |
 +-----------------------------+------------------------------------+----------------------------------+
-| :class:`polars.LazyFrame`   | :func:`yobx.sql.lazyframe_to_onnx` | :ref:`l-design-sql-polars`       |
+| :class:`polars.LazyFrame`   | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-polars`       |
 +-----------------------------+------------------------------------+----------------------------------+
-| :class:`pandas.DataFrame`   | :func:`yobx.sql.dataframe_to_onnx` | :ref:`l-design-sql-dataframe`    |
+| :class:`pandas.DataFrame`   | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-dataframe`    |
 +-----------------------------+------------------------------------+----------------------------------+
 
 **deep learning**
 
 +---------------------------------------+------------------------------------------+----------------------------------------+
-| :epkg:`jax` *in progress*             | :ref:`l-plot-jax-to-onnx`                |                                        |
+| :epkg:`jax` *in progress*             | :func:`yobx.tensorflow.to_onnx`          | :ref:`l-plot-jax-to-onnx`              |
 +---------------------------------------+------------------------------------------+----------------------------------------+
 | :epkg:`tensorflow`                    | :func:`yobx.tensorflow.to_onnx`          | :ref:`l-design-tensorflow-converter`   |
 +---------------------------------------+------------------------------------------+----------------------------------------+
