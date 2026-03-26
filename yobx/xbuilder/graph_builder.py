@@ -6025,7 +6025,7 @@ class GraphBuilder(
 
     def _improves_dynamic_dimension_naming(self, apply_replacements: bool = False):
         """
-        Improves the naming of the dynamic dimnesion based on what
+        Improves the naming of the dynamic dimension based on what
         the user gave. It returns a list of replacements to operator but does
         not do it.
         """
