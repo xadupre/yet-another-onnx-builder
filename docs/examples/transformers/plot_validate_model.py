@@ -41,10 +41,7 @@ All steps after step 2 can be exercised offline::
 
 import argparse
 import sys
-
 import pandas
-import torch
-
 from yobx.torch.validate import validate_model, ValidateSummary, ValidateData
 
 # %%
@@ -131,7 +128,8 @@ for k, v in sorted(summary.items()):
 #
 # :attr:`ValidateData.discrepancies <yobx.torch.validate.ValidateData>` is the
 # raw list of dicts returned by
-# :meth:`InputObserver.check_discrepancies <yobx.torch.input_observer.InputObserver.check_discrepancies>`.
+# :meth:`InputObserver.check_discrepancies
+# <yobx.torch.input_observer.InputObserver.check_discrepancies>`.
 # Each row corresponds to one forward call captured during ``model.generate``.
 # The most important columns are:
 #

@@ -171,7 +171,7 @@ class TestValidateModel(ExtTestCase):
         old_stdout = sys.stdout
         sys.stdout = buf
         try:
-            summary, data = validate_model(
+            _summary, data = validate_model(
                 "arnir0/Tiny-LLM",
                 tokenized_inputs=tokenized,
                 random_weights=True,
@@ -205,7 +205,7 @@ class TestValidateModel(ExtTestCase):
         old_stdout = sys.stdout
         sys.stdout = buf
         try:
-            summary, data = validate_model(
+            _summary, data = validate_model(
                 "arnir0/Tiny-LLM",
                 tokenized_inputs=tokenized,
                 random_weights=True,
