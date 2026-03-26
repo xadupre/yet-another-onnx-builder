@@ -1497,8 +1497,8 @@ class InputObserver:
             data.append(diff)
         return data
 
-    def remove_inputs(self, input_names: Sequence[str | int]):
+    def remove_inputs(self, input_names: Sequence[str | int]) -> int:
         """Lets the users drops inputs."""
         if self.info is None:
             raise RuntimeError("No input was captured.")
-        self.info.remove_inputs(input_names)
+        return self.info.remove_inputs(input_names)
