@@ -34,6 +34,8 @@ docs = [
     "black",
     "matplotlib",
     "onnx-diagnostic",
+    "onnx-ir",
+    "onnx-shape-inference",
     "openpyxl",
     "pandas",
     "pydata-sphinx-theme",
