@@ -61,10 +61,17 @@ from yobx.xtracing.parse import GroupByOp, JoinOp, ParsedQuery, SelectOp, parse_
 # ---------------------------------------------------------------------------
 
 _NP_TO_ONNX: Dict[np.dtype, int] = {
+    np.dtype("float16"): TensorProto.FLOAT16,
     np.dtype("float32"): TensorProto.FLOAT,
     np.dtype("float64"): TensorProto.DOUBLE,
+    np.dtype("int8"): TensorProto.INT8,
+    np.dtype("int16"): TensorProto.INT16,
     np.dtype("int32"): TensorProto.INT32,
     np.dtype("int64"): TensorProto.INT64,
+    np.dtype("uint8"): TensorProto.UINT8,
+    np.dtype("uint16"): TensorProto.UINT16,
+    np.dtype("uint32"): TensorProto.UINT32,
+    np.dtype("uint64"): TensorProto.UINT64,
     np.dtype("bool"): TensorProto.BOOL,
     np.dtype("object"): TensorProto.STRING,
 }
