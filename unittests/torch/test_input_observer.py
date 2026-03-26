@@ -1649,6 +1649,61 @@ class TestInputObserver(ExtTestCase):
         # Batch dimension is the same label for both.
         self.assertEqual(ids_shape[0], mask_shape[0])
 
+    def test_remove_inputs_not_in_any_candidate_but_in_signature(self):
+        """Removing an input that is in the signature but was never passed should succeed.
+
+        Regression test for: ValueError: No input in all candidates was removed from
+        input_names=['cache_position'] when cache_position is absent from all captured
+        forward calls (e.g. attention module in newer transformers versions).
+        """
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y, cache_position=None):
+                # cache_position is never supplied by callers in this scenario
+                return x + y
+
+        inputs = [
+            dict(x=torch.randn((5, 6)), y=torch.randn((1, 6))),
+            dict(x=torch.randn((7, 7)), y=torch.randn((1, 7))),
+        ]
+
+        model = Model()
+        observer = InputObserver()
+        with observer(model):
+            for kwargs in inputs:
+                model(**kwargs)
+
+        # cache_position is in the signature but was never passed — removal must not raise.
+        observer.remove_inputs(["cache_position"])
+
+        ds_after = observer.infer_dynamic_shapes()
+        self.assertNotIn("cache_position", ds_after)
+        self.assertIn("x", ds_after)
+        self.assertIn("y", ds_after)
+
+        args_after = observer.infer_arguments()
+        self.assertNotIn("cache_position", args_after)
+
+    def test_remove_inputs_not_in_signature_raises(self):
+        """Removing an input that is neither in candidates nor in the signature must raise."""
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        inputs = [
+            dict(x=torch.randn((5, 6)), y=torch.randn((1, 6))),
+        ]
+
+        model = Model()
+        observer = InputObserver()
+        with observer(model):
+            for kwargs in inputs:
+                model(**kwargs)
+
+        with self.assertRaisesRegex(ValueError, "No input in all candidates was removed"):
+            observer.remove_inputs(["totally_unknown"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

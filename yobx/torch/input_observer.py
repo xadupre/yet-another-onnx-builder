@@ -1052,11 +1052,21 @@ class InputObserverInfo:
         for candidate in self.inputs:
             r += candidate.remove_inputs(input_names)
         if not r:
-            raise ValueError(
-                f"No input in all candidates was removed from {input_names=}, last candidate is "
-                f"{string_type(self.inputs[-1].args, with_shape=True)}, "
-                f"{string_type(self.inputs[-1].kwargs, with_shape=True)}"
+            # An input may be in the signature but never passed (e.g. has a default value
+            # and was never supplied during the observed forward calls).  In that case it
+            # is still valid to remove it – it just isn't present in any captured candidate.
+            signature_match_count = sum(
+                1
+                for n in input_names
+                if (isinstance(n, str) and n in self.signature_names)
+                or (isinstance(n, int) and 0 <= n < len(self.signature_names))
             )
+            if not signature_match_count:
+                raise ValueError(
+                    f"No input in all candidates was removed from {input_names=}, last candidate is "
+                    f"{string_type(self.inputs[-1].args, with_shape=True)}, "
+                    f"{string_type(self.inputs[-1].kwargs, with_shape=True)}"
+                )
         if self._best_candidate:
             self._best_candidate.remove_inputs(input_names)
 
