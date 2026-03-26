@@ -745,9 +745,12 @@ class TracedDataFrame:
                     if col_ref.dtype != 0:
                         join_col_dtypes[col_ref.column] = col_ref.dtype
         if join_col_dtypes:
-            for col_ref in columns:
-                if col_ref.dtype == 0 and col_ref.column in join_col_dtypes:
-                    col_ref.dtype = join_col_dtypes[col_ref.column]
+            columns = [
+                ColumnRef(col_ref.column, col_ref.table, join_col_dtypes[col_ref.column])
+                if col_ref.dtype == 0 and col_ref.column in join_col_dtypes
+                else col_ref
+                for col_ref in columns
+            ]
         return ParsedQuery(operations=ops, from_table="t", columns=columns)
 
     def __repr__(self) -> str:
