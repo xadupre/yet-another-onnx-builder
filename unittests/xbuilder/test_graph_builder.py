@@ -3282,7 +3282,7 @@ class TestPositionMsg(ExtTestCase):
             18, ir_version=9, optimization_options=OptimizationOptions(passes=[], patterns=None)
         )
         g.make_tensor_input("X", TFLOAT, ("s0", "s1"))
-        g.make_node("Relu", ["X"], ["Y"])
+        g.make_node("Relu", ["X"], ["Y"], name="A")
         g.make_tensor_output("Y", TFLOAT, ("s0", "s1"), indexed=False)
 
         # Register bidirectional constraints linking internal tokens to user names.
