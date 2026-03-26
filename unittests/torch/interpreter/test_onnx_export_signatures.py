@@ -262,7 +262,6 @@ class TestOnnxExportSignatures(ExtTestCase):
         )
 
     @skipif_ci_windows("not working on windows")
-    @unittest.skip("Something like [a:b, i] is not implemented yet.")
     def test_signature_s1d_i_r_v2(self):
         class Neuron(torch.nn.Module):
             def __init__(self, n_dims: int = 3, n_targets: int = 1):
@@ -274,10 +273,10 @@ class TestOnnxExportSignatures(ExtTestCase):
                 return torch.sigmoid(self.linear(x)) - self.buff + x[:, i]
 
         inputs = ((torch.arange(4 * 3) + 10).reshape((-1, 3)).to(torch.float32), 1)
-        sig = (("x", onnx.TensorProto.FLOAT, ("batch", 3)), ("i", onnx.TensorProto.INT64, (1,)))
+        sig = (("x", onnx.TensorProto.FLOAT, ("batch", 3)), ("i", onnx.TensorProto.INT64, ()))
         dyn = {
             "x": {0: torch.export.Dim("batch")},
-            "i": None,  # torch.export.Dim("ii", min=0, max=3)}
+            "i": {},
         }
         sname = inspect.currentframe().f_code.co_name
         self._check_exporter(
@@ -387,7 +386,6 @@ class TestOnnxExportSignatures(ExtTestCase):
         )
 
     @skipif_ci_windows("not working on windows")
-    @unittest.skip("broken test about tracing")
     @ignore_warnings(UserWarning)
     def test_signature_s1d_ls_r_tracing(self):
         class Neuron(torch.nn.Module):
@@ -422,7 +420,11 @@ class TestOnnxExportSignatures(ExtTestCase):
             "lx": [{0: torch.export.Dim("batch")}, {0: torch.export.Dim("batch")}],
         }
         sname = inspect.currentframe().f_code.co_name
-        sig_tracing = (("x", 1, ("batch", 3)), ("lx", [("lx", 1, ("batch", 1))]))
+        sig_tracing = (
+            ("x", 1, ("batch", 3)),
+            ("lx_0", 1, ("batch", 1)),
+            ("lx_1", 1, ("batch", 2)),
+        )
         self._check_exporter(
             sname,
             Neuron(),
@@ -430,6 +432,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             sig_tracing,
             dynamic_shapes=dyn,
             exporter="custom-tracing",
+            flatten_inputs=True,
             others=inputs2,
             atol=1e-4,
             verbose=0,

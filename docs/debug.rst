@@ -21,3 +21,4 @@ or a pattern is triggered or not triggered.
 * :ref:`l-design-xshape-debugging`
 * :ref:`l-design-pattern-optimizer-debugging`
 * :ref:`l-graphbuilder-debugging-env`
+* :ref:`l-design-env-variables` — complete reference of all environment variables

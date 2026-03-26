@@ -1,6 +1,7 @@
 from typing import Dict, List
 
 import numpy as np
+import onnx
 import pandas as pd
 from category_encoders import TargetEncoder
 
@@ -18,23 +19,26 @@ def _target_encode_column(
     nan_target: float,
     dtype: np.dtype,
     name: str,
+    is_string: bool = False,
 ) -> str:
     """Emit ONNX nodes that apply target encoding to a single column tensor.
 
     For each input value the output is determined by the following priority:
 
-    1. If the value is NaN → *nan_target*
+    1. If the value is NaN → *nan_target* (skipped for string inputs)
     2. If the value matches a known category → the corresponding target mean
     3. Otherwise (unknown category) → *unknown_target*
 
     :param g: graph builder
     :param col_tensor: ONNX tensor name for a single-column slice, shape ``(N, 1)``
-    :param known_vals: 1-D numpy array of known category values (float)
+    :param known_vals: 1-D numpy array of known category values; dtype ``object``
+        for string inputs, float otherwise
     :param known_target: 1-D numpy array of corresponding target mean values (float)
     :param unknown_target: target mean for unknown categories
     :param nan_target: target mean for missing (NaN) inputs
-    :param dtype: numpy dtype for all float constants
+    :param dtype: numpy dtype for output (float) constants
     :param name: node name prefix
+    :param is_string: if ``True``, skip ``IsNaN`` handling (strings cannot be NaN)
     :return: ONNX tensor name, shape ``(N, 1)``
     """
     # Start with the default (unknown) value
@@ -42,15 +46,16 @@ def _target_encode_column(
 
     # For each known category, Where(Equal(col, cat), target_val, result)
     for i, (cat_val, target_val) in enumerate(zip(known_vals, known_target)):
-        cat_const = np.array([[cat_val]], dtype=dtype)
+        cat_const = np.array([[cat_val]], dtype=known_vals.dtype)
         eq = g.op.Equal(col_tensor, cat_const, name=f"{name}_eq{i}")
         target_const = np.array([[target_val]], dtype=dtype)
         result = g.op.Where(eq, target_const, result, name=f"{name}_where{i}")
 
-    # Handle NaN: IsNaN(col) → nan_target
-    is_nan = g.op.IsNaN(col_tensor, name=f"{name}_isnan")
-    nan_const = np.array([[nan_target]], dtype=dtype)
-    result = g.op.Where(is_nan, nan_const, result, name=f"{name}_where_nan")
+    if not is_string:
+        # Handle NaN: IsNaN(col) → nan_target (not applicable to string tensors)
+        is_nan = g.op.IsNaN(col_tensor, name=f"{name}_isnan")
+        nan_const = np.array([[nan_target]], dtype=dtype)
+        result = g.op.Where(is_nan, nan_const, result, name=f"{name}_where_nan")
 
     return result
 
@@ -106,6 +111,11 @@ def category_encoders_target_encoder(
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
 
+    is_string = itype == onnx.TensorProto.STRING
+    # For string inputs the output is always float32 (target mean values are numeric).
+    out_itype = onnx.TensorProto.FLOAT if is_string else itype
+    out_dtype = np.float32 if is_string else dtype
+
     # Build a mapping from feature name to column index.
     feat_idx = {feat: i for i, feat in enumerate(estimator.feature_names_in_)}
 
@@ -127,12 +137,12 @@ def category_encoders_target_encoder(
         for orig_val, ordinal in ord_map.items():
             if pd.isna(orig_val):
                 continue
-            known_vals_list.append(float(orig_val))
+            known_vals_list.append(str(orig_val) if is_string else float(orig_val))
             known_target_list.append(float(target_map[ordinal]))
 
         col_lookup[col] = {
             "known_vals": np.array(known_vals_list, dtype=dtype),
-            "known_target": np.array(known_target_list, dtype=dtype),
+            "known_target": np.array(known_target_list, dtype=out_dtype),
             "unknown_target": unknown_target,
             "nan_target": nan_target,
         }
@@ -158,8 +168,9 @@ def category_encoders_target_encoder(
                 info["known_target"],
                 info["unknown_target"],
                 info["nan_target"],
-                dtype,
+                out_dtype,
                 f"{name}_col{col_i}",
+                is_string=is_string,
             )
         else:
             # Non-categorical column: pass through as-is.
@@ -172,5 +183,5 @@ def category_encoders_target_encoder(
     else:
         res = g.op.Concat(*col_tensors, axis=1, name=name, outputs=outputs)
 
-    g.set_type_shape_unary_op(res, X)
+    g.set_type_shape_unary_op(res, X, itype=out_itype)
     return res

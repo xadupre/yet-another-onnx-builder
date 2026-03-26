@@ -152,6 +152,54 @@ class TestOneHotEncoder(ExtTestCase):
         self.assertEqualArray(expected_label, ort_results[0])
         self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
+    def test_one_hot_encoder_string_input(self):
+        """OneHotEncoder with string categorical input (dtype=object)."""
+        from sklearn.preprocessing import OneHotEncoder
+        from yobx.sklearn import to_onnx
+
+        X = np.array([["a", "x"], ["b", "y"], ["c", "x"], ["a", "z"], ["b", "y"]], dtype=object)
+        enc = OneHotEncoder(sparse_output=False)
+        enc.fit(X)
+
+        onx = to_onnx(enc, (X,))
+        expected = enc.transform(X)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
+    def test_one_hot_encoder_string_input_float32(self):
+        """OneHotEncoder with string input and explicit float32 output dtype."""
+        from sklearn.preprocessing import OneHotEncoder
+        from yobx.sklearn import to_onnx
+
+        X = np.array([["a", "x"], ["b", "y"], ["c", "x"], ["a", "z"], ["b", "y"]], dtype=object)
+        enc = OneHotEncoder(sparse_output=False, dtype=np.float32)
+        enc.fit(X)
+
+        onx = to_onnx(enc, (X,))
+        expected = enc.transform(X)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
+    def test_one_hot_encoder_string_single_feature(self):
+        """OneHotEncoder with a single string feature column."""
+        from sklearn.preprocessing import OneHotEncoder
+        from yobx.sklearn import to_onnx
+
+        X = np.array([["apple"], ["banana"], ["cherry"], ["apple"], ["banana"]], dtype=object)
+        enc = OneHotEncoder(sparse_output=False)
+        enc.fit(X)
+
+        onx = to_onnx(enc, (X,))
+        expected = enc.transform(X)
+
+        sess = self.check_ort(onx)
+        ort_result = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(expected, ort_result, atol=1e-6)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

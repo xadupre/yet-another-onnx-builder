@@ -202,7 +202,7 @@ class TestTracedCondition(ExtTestCase):
 
 class TestTracedDataFrameConstruction(ExtTestCase):
     def _make(self, cols=("a", "b")):
-        columns = {c: TracedSeries(ColumnRef(c)) for c in cols}
+        columns = {ColumnRef(c): TracedSeries(ColumnRef(c)) for c in cols}
         return TracedDataFrame(columns)
 
     def test_columns_property(self):
@@ -254,7 +254,7 @@ class TestTracedDataFrameConstruction(ExtTestCase):
 
 class TestTracedDataFrameFilter(ExtTestCase):
     def _make(self):
-        columns = {c: TracedSeries(ColumnRef(c)) for c in ("a", "b")}
+        columns = {ColumnRef(c): TracedSeries(ColumnRef(c)) for c in ("a", "b")}
         return TracedDataFrame(columns, source_columns=["a", "b"])
 
     def test_filter_records_op(self):
@@ -277,7 +277,7 @@ class TestTracedDataFrameFilter(ExtTestCase):
 
 class TestTracedDataFrameSelect(ExtTestCase):
     def _make(self):
-        columns = {c: TracedSeries(ColumnRef(c)) for c in ("a", "b")}
+        columns = {ColumnRef(c): TracedSeries(ColumnRef(c)) for c in ("a", "b")}
         return TracedDataFrame(columns, source_columns=["a", "b"])
 
     def test_select_list_of_strings(self):
@@ -320,7 +320,7 @@ class TestTracedDataFrameSelect(ExtTestCase):
 
 class TestTracedDataFrameAssign(ExtTestCase):
     def _make(self):
-        columns = {c: TracedSeries(ColumnRef(c)) for c in ("a", "b")}
+        columns = {ColumnRef(c): TracedSeries(ColumnRef(c)) for c in ("a", "b")}
         return TracedDataFrame(columns, source_columns=["a", "b"])
 
     def test_assign_adds_column(self):
@@ -342,7 +342,7 @@ class TestTracedDataFrameAssign(ExtTestCase):
 
 class TestTracedDataFramePipe(ExtTestCase):
     def _make(self):
-        columns = {c: TracedSeries(ColumnRef(c)) for c in ("a", "b")}
+        columns = {ColumnRef(c): TracedSeries(ColumnRef(c)) for c in ("a", "b")}
         return TracedDataFrame(columns, source_columns=["a", "b"])
 
     def test_pipe_returns_traced_dataframe(self):
@@ -392,7 +392,7 @@ class TestTracedDataFramePipe(ExtTestCase):
 
 class TestTracedDataFrameCopy(ExtTestCase):
     def _make(self):
-        columns = {c: TracedSeries(ColumnRef(c)) for c in ("a", "b")}
+        columns = {ColumnRef(c): TracedSeries(ColumnRef(c)) for c in ("a", "b")}
         return TracedDataFrame(columns, source_columns=["a", "b"])
 
     def test_copy_returns_traced_dataframe(self):
@@ -442,7 +442,7 @@ class TestTracedDataFrameCopy(ExtTestCase):
 
 class TestTracedGroupBy(ExtTestCase):
     def _make(self):
-        columns = {c: TracedSeries(ColumnRef(c)) for c in ("k", "v")}
+        columns = {ColumnRef(c): TracedSeries(ColumnRef(c)) for c in ("k", "v")}
         return TracedDataFrame(columns, source_columns=["k", "v"])
 
     def test_groupby_returns_traced_groupby(self):
@@ -479,7 +479,7 @@ class TestTracedGroupBy(ExtTestCase):
 
 class TestToParsedQuery(ExtTestCase):
     def _make(self):
-        columns = {c: TracedSeries(ColumnRef(c)) for c in ("a", "b")}
+        columns = {ColumnRef(c): TracedSeries(ColumnRef(c)) for c in ("a", "b")}
         return TracedDataFrame(columns, source_columns=["a", "b"])
 
     def test_no_select_appends_passthrough(self):
@@ -564,90 +564,114 @@ class TestDataframeArithmetic(ExtTestCase):
     """Tests for element-wise arithmetic operators on :class:`TracedDataFrame`."""
 
     def test_add_scalar_returns_dataframe(self):
-        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        df = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
         result = df + 1
         self.assertIsInstance(result, TracedDataFrame)
         self.assertIn("a", result.columns)
-        expr = result._columns["a"]._expr
+        expr = result["a"]._expr
         self.assertIsInstance(expr, BinaryExpr)
         self.assertEqual(expr.op, "+")
 
     def test_sub_scalar_returns_dataframe(self):
-        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        df = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
         result = df - 1
         self.assertIsInstance(result, TracedDataFrame)
-        expr = result._columns["a"]._expr
+        expr = result["a"]._expr
         self.assertIsInstance(expr, BinaryExpr)
         self.assertEqual(expr.op, "-")
 
     def test_mul_scalar_returns_dataframe(self):
-        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        df = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
         result = df * 2
-        expr = result._columns["a"]._expr
+        expr = result["a"]._expr
         self.assertIsInstance(expr, BinaryExpr)
         self.assertEqual(expr.op, "*")
 
     def test_div_scalar_returns_dataframe(self):
-        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        df = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
         result = df / 2
-        expr = result._columns["a"]._expr
+        expr = result["a"]._expr
         self.assertIsInstance(expr, BinaryExpr)
         self.assertEqual(expr.op, "/")
 
     def test_radd_scalar_reversed(self):
-        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        df = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
         result = 1 + df
-        expr = result._columns["a"]._expr
+        expr = result["a"]._expr
         self.assertIsInstance(expr, BinaryExpr)
         self.assertEqual(expr.op, "+")
         self.assertIsInstance(expr.left, Literal)
 
     def test_rsub_scalar_reversed(self):
-        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        df = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
         result = 10 - df
-        expr = result._columns["a"]._expr
+        expr = result["a"]._expr
         self.assertIsInstance(expr, BinaryExpr)
         self.assertEqual(expr.op, "-")
         self.assertIsInstance(expr.left, Literal)
 
     def test_rmul_scalar_reversed(self):
-        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        df = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
         result = 3 * df
-        expr = result._columns["a"]._expr
+        expr = result["a"]._expr
         self.assertIsInstance(expr, BinaryExpr)
         self.assertEqual(expr.op, "*")
         self.assertIsInstance(expr.left, Literal)
 
     def test_rtruediv_scalar_reversed(self):
-        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        df = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
         result = 1.0 / df
-        expr = result._columns["a"]._expr
+        expr = result["a"]._expr
         self.assertIsInstance(expr, BinaryExpr)
         self.assertEqual(expr.op, "/")
         self.assertIsInstance(expr.left, Literal)
 
     def test_add_dataframe_column_wise(self):
-        df1 = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
-        df2 = TracedDataFrame({"a": TracedSeries(ColumnRef("b"))})
+        df1 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
+        df2 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("b"))})
         result = df1 + df2
-        expr = result._columns["a"]._expr
+        expr = result["a"]._expr
         self.assertIsInstance(expr, BinaryExpr)
         self.assertEqual(expr.op, "+")
 
+    def test_sub_dataframe_column_wise(self):
+        df1 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
+        df2 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("b"))})
+        result = df1 - df2
+        expr = result["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "-")
+
+    def test_mul_dataframe_column_wise(self):
+        df1 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
+        df2 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("b"))})
+        result = df1 * df2
+        expr = result["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "*")
+
+    def test_div_dataframe_column_wise(self):
+        df1 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
+        df2 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("b"))})
+        result = df1 / df2
+        expr = result["a"]._expr
+        self.assertIsInstance(expr, BinaryExpr)
+        self.assertEqual(expr.op, "/")
+
     def test_add_dataframe_missing_column_raises(self):
-        df1 = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
-        df2 = TracedDataFrame({"b": TracedSeries(ColumnRef("b"))})
+        df1 = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
+        df2 = TracedDataFrame({ColumnRef("b"): TracedSeries(ColumnRef("b"))})
         with self.assertRaises(KeyError):
             _ = df1 + df2
 
     def test_ops_list_unchanged(self):
         """Arithmetic should not add SelectOp to the ops list."""
-        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))})
+        df = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))})
         result = df + 1
         self.assertEqual(len(result._ops), 0)
 
     def test_source_columns_preserved(self):
-        df = TracedDataFrame({"a": TracedSeries(ColumnRef("a"))}, source_columns=["a"])
+        df = TracedDataFrame({ColumnRef("a"): TracedSeries(ColumnRef("a"))}, source_columns=["a"])
         result = df + 1
         self.assertEqual(result._source_columns, ["a"])
 

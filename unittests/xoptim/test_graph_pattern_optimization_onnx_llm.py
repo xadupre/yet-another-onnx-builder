@@ -815,7 +815,6 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         )
         return model, inputs, ds, expected
 
-    @unittest.skip("TODO: fix it later")
     @requires_torch("2.9")
     @hide_stdout()
     def test_local_attention_gqa_0(self):
@@ -848,7 +847,6 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         self.assertEqual(["LocalAttentionSW_to1"], [f.name for f in onx.functions])
         self.assertIn("LocalAttentionSW_to1", [n.op_type for n in onx.graph.node])
 
-    @unittest.skip("TODO: fix it later")
     @requires_torch("2.9")
     @hide_stdout()
     def test_local_attention_gqa_1(self):
@@ -881,7 +879,6 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         self.assertEqual(["LocalAttentionGQASW_to1"], [f.name for f in onx.functions])
         self.assertIn("LocalAttentionGQASW_to1", [n.op_type for n in onx.graph.node])
 
-    @unittest.skip("TODO: fix it later")
     @requires_torch("2.9")
     @hide_stdout()
     def test_local_attention_gqa_2(self):
@@ -1032,7 +1029,6 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         )
         return model, inputs, ds, expected
 
-    @unittest.skip("TODO: fix it later")
     @requires_torch("2.9")
     @ignore_warnings((UserWarning, FutureWarning))
     @hide_stdout()
@@ -1056,7 +1052,6 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
         got = ort.run(None, feeds)
         self.assertEqualArray(expected, got[0], 1e-5)
 
-    @unittest.skip("TODO: fix it later")
     @requires_torch("2.9")
     @requires_onnxruntime("1.24")
     @ignore_warnings((UserWarning, FutureWarning))

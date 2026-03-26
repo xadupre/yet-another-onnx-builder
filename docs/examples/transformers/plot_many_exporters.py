@@ -248,28 +248,28 @@ if successful_exports:
     n_exp = len(successful_exports)
     colors = ["#4c72b0", "#dd8452", "#55a868", "#c44e52", "#8172b2"]
 
-    fig, ax = plt.subplots(figsize=(max(8, n_ops * 0.6 + 2), 4 + n_exp * 0.4))
-    x = np.arange(n_ops)
-    width = 0.8 / max(n_exp, 1)
+    fig, ax = plt.subplots(figsize=(6 + n_exp * 0.4, max(4, n_ops * 0.4 + 2)))
+    y = np.arange(n_ops)
+    height = 0.8 / max(n_exp, 1)
 
     for idx, (exp_name, freq) in enumerate(counts_per_exporter.items()):
         vals = [freq.get(op, 0) for op in all_op_types]
-        offset = (idx - (n_exp - 1) / 2) * width
-        bars = ax.bar(x + offset, vals, width, label=exp_name, color=colors[idx % len(colors)])
+        offset = (idx - (n_exp - 1) / 2) * height
+        bars = ax.barh(y + offset, vals, height, label=exp_name, color=colors[idx % len(colors)])
         for bar, val in zip(bars, vals):
             if val > 0:
                 ax.text(
-                    bar.get_x() + bar.get_width() / 2,
-                    bar.get_height() + 0.3,
+                    bar.get_width() + 0.3,
+                    bar.get_y() + bar.get_height() / 2,
                     str(val),
-                    ha="center",
-                    va="bottom",
+                    ha="left",
+                    va="center",
                     fontsize=7,
                 )
 
-    ax.set_xticks(x)
-    ax.set_xticklabels(all_op_types, rotation=25, ha="right", fontsize=8)
-    ax.set_ylabel("Number of nodes")
+    ax.set_yticks(y)
+    ax.set_yticklabels(all_op_types, fontsize=8)
+    ax.set_xlabel("Number of nodes")
     ax.set_title("ONNX node frequencies per exporter", fontsize=10)
     ax.legend(fontsize=9)
     fig.tight_layout()

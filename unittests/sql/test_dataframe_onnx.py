@@ -434,6 +434,128 @@ class TestMultiDataframe(ExtTestCase):
         (sum_ab,) = ref.run(None, {"cid": cid, "a": a, "id": id_, "b": b})
         np.testing.assert_allclose(sum_ab, np.array([220.0, 330.0], dtype=np.float32))
 
+    def test_join_multi_column_different_key_names(self):
+        """Multi-column join where key columns have different names on each side."""
+
+        def transform(df1, df2):
+            return df1.join(
+                df2,
+                left_key=["company_id", "dept_id"],
+                right_key=["cid", "did"],
+            )
+
+        # Left: company_id=[1,2,3], dept_id=[10,20,30], a=[1,2,3]
+        # Right: cid=[2,3,4], did=[20,30,40], b=[200,300,400]
+        # Matching pairs: (2,20) and (3,30).
+        company_id = np.array([1, 2, 3], dtype=np.int64)
+        dept_id = np.array([10, 20, 30], dtype=np.int64)
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        cid = np.array([2, 3, 4], dtype=np.int64)
+        did = np.array([20, 30, 40], dtype=np.int64)
+        b = np.array([200.0, 300.0, 400.0], dtype=np.float32)
+
+        dtypes1 = {"company_id": np.int64, "dept_id": np.int64, "a": np.float32}
+        dtypes2 = {"cid": np.int64, "did": np.int64, "b": np.float32}
+        artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
+        ref = ExtendedReferenceEvaluator(artifact)
+        feeds = {
+            "company_id": company_id,
+            "dept_id": dept_id,
+            "a": a,
+            "cid": cid,
+            "did": did,
+            "b": b,
+        }
+        results = ref.run(None, feeds)
+        # Output columns: company_id, dept_id, a, cid, did, b
+        company_out, dept_out, a_out, cid_out, did_out, b_out = results
+        np.testing.assert_array_equal(company_out, np.array([2, 3], dtype=np.int64))
+        np.testing.assert_array_equal(dept_out, np.array([20, 30], dtype=np.int64))
+        np.testing.assert_allclose(a_out, np.array([2.0, 3.0], dtype=np.float32))
+        np.testing.assert_allclose(b_out, np.array([200.0, 300.0], dtype=np.float32))
+
+    def test_join_multi_column_same_key_names(self):
+        """Multi-column join where key columns share names across both frames."""
+
+        def transform(df1, df2):
+            return df1.join(df2, left_key=["k1", "k2"], right_key=["k1", "k2"])
+
+        # Left: k1=[1,2,3], k2=[10,20,30], a=[1,2,3]
+        # Right: k1=[2,3,4], k2=[20,30,40], b=[200,300,400]
+        # Matching pairs: (k1=2,k2=20) and (k1=3,k2=30).
+        k1_l = np.array([1, 2, 3], dtype=np.int64)
+        k2_l = np.array([10, 20, 30], dtype=np.int64)
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        k1_r = np.array([2, 3, 4], dtype=np.int64)
+        k2_r = np.array([20, 30, 40], dtype=np.int64)
+        b = np.array([200.0, 300.0, 400.0], dtype=np.float32)
+
+        dtypes1 = {"k1": np.int64, "k2": np.int64, "a": np.float32}
+        dtypes2 = {"k1": np.int64, "k2": np.int64, "b": np.float32}
+        artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
+        # The right-side key columns are renamed to "k1_right" / "k2_right" in
+        # the ONNX model to avoid clashing with the left-side inputs.
+        self.assertEqual(sorted(artifact.input_names), ["a", "b", "k1", "k1_right", "k2", "k2_right"])
+        ref = ExtendedReferenceEvaluator(artifact)
+        feeds = {
+            "k1": k1_l,
+            "k2": k2_l,
+            "a": a,
+            "k1_right": k1_r,
+            "k2_right": k2_r,
+            "b": b,
+        }
+        k1_out, k2_out, a_out, b_out = ref.run(None, feeds)
+        np.testing.assert_array_equal(k1_out, np.array([2, 3], dtype=np.int64))
+        np.testing.assert_array_equal(k2_out, np.array([20, 30], dtype=np.int64))
+        np.testing.assert_allclose(a_out, np.array([2.0, 3.0], dtype=np.float32))
+        np.testing.assert_allclose(b_out, np.array([200.0, 300.0], dtype=np.float32))
+
+    def test_join_multi_column_with_select(self):
+        """Multi-column join followed by a SELECT expression."""
+
+        def transform(df1, df2):
+            joined = df1.join(
+                df2, left_key=["company_id", "dept_id"], right_key=["cid", "did"]
+            )
+            return joined.select([(joined["a"] + joined["b"]).alias("total")])
+
+        company_id = np.array([1, 2, 3], dtype=np.int64)
+        dept_id = np.array([10, 20, 30], dtype=np.int64)
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        cid = np.array([2, 3, 4], dtype=np.int64)
+        did = np.array([20, 30, 40], dtype=np.int64)
+        b = np.array([200.0, 300.0, 400.0], dtype=np.float32)
+
+        dtypes1 = {"company_id": np.int64, "dept_id": np.int64, "a": np.float32}
+        dtypes2 = {"cid": np.int64, "did": np.int64, "b": np.float32}
+        artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
+        ref = ExtendedReferenceEvaluator(artifact)
+        feeds = {
+            "company_id": company_id,
+            "dept_id": dept_id,
+            "a": a,
+            "cid": cid,
+            "did": did,
+            "b": b,
+        }
+        (total,) = ref.run(None, feeds)
+        np.testing.assert_allclose(total, np.array([202.0, 303.0], dtype=np.float32))
+
+    def test_join_multi_column_mismatch_raises(self):
+        """Passing left_key and right_key lists of different lengths raises ValueError."""
+
+        def transform(df1, df2):
+            return df1.join(df2, left_key=["k1", "k2"], right_key=["k1"])
+
+        with self.assertRaises(ValueError):
+            dataframe_to_onnx(
+                transform,
+                [{"k1": np.int64, "k2": np.int64, "a": np.float32}, {"k1": np.int64, "b": np.float32}],
+            )
+
+
+
     # ------------------------------------------------------------------
     # to_onnx dispatcher (callable path)
     # ------------------------------------------------------------------
@@ -462,12 +584,14 @@ class TestParsedQueryToOnnx(ExtTestCase):
     """Tests for :func:`~yobx.sql.sql_convert.parsed_query_to_onnx`."""
 
     def test_basic_select_add(self):
-        from yobx.sql import parse_sql
+        from yobx.xtracing.dataframe_trace import trace_dataframe
         from yobx.sql.sql_convert import parsed_query_to_onnx
 
-        pq = parse_sql("SELECT a + b AS total FROM t")
-        dtypes = {"a": np.float32, "b": np.float32}
-        artifact = parsed_query_to_onnx(pq, dtypes)
+        def transform(df):
+            return df.select([(df["a"] + df["b"]).alias("total")])
+
+        pq = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        artifact = parsed_query_to_onnx(pq)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
@@ -475,12 +599,15 @@ class TestParsedQueryToOnnx(ExtTestCase):
         np.testing.assert_allclose(total, a + b)
 
     def test_with_filter(self):
-        from yobx.sql import parse_sql
+        from yobx.xtracing.dataframe_trace import trace_dataframe
         from yobx.sql.sql_convert import parsed_query_to_onnx
 
-        pq = parse_sql("SELECT a + b AS total FROM t WHERE a > 0")
-        dtypes = {"a": np.float32, "b": np.float32}
-        artifact = parsed_query_to_onnx(pq, dtypes)
+        def transform(df):
+            df = df.filter(df["a"] > 0)
+            return df.select([(df["a"] + df["b"]).alias("total")])
+
+        pq = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        artifact = parsed_query_to_onnx(pq)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
@@ -639,6 +766,42 @@ class TestDataframeArithmetic(ExtTestCase):
         # The result is a + a.
         (out_a,) = _run_multi(transform, [{"a": np.float32}, {"a": np.float32}], {"a": a})
         np.testing.assert_allclose(out_a, a + a, rtol=1e-5)
+
+    def test_df_sub_dataframe_onnx(self):
+        """df1 - df2 subtracts matching columns element-wise (same column names)."""
+
+        def transform(df1, df2):
+            return df1 - df2
+
+        a = np.array([5.0, 6.0, 7.0], dtype=np.float32)
+        b = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        out_a, out_b = _run_multi(
+            transform,
+            [{"a": np.float32, "b": np.float32}, {"a": np.float32, "b": np.float32}],
+            {"a": a, "b": b},
+        )
+        np.testing.assert_allclose(out_a, a - a, rtol=1e-5)
+        np.testing.assert_allclose(out_b, b - b, rtol=1e-5)
+
+    def test_df_mul_dataframe_onnx(self):
+        """df1 * df2 multiplies matching columns element-wise (same column names)."""
+
+        def transform(df1, df2):
+            return df1 * df2
+
+        a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        (out_a,) = _run_multi(transform, [{"a": np.float32}, {"a": np.float32}], {"a": a})
+        np.testing.assert_allclose(out_a, a * a, rtol=1e-5)
+
+    def test_df_div_dataframe_onnx(self):
+        """df1 / df2 divides matching columns element-wise (same column names)."""
+
+        def transform(df1, df2):
+            return df1 / df2
+
+        a = np.array([2.0, 4.0, 8.0], dtype=np.float32)
+        (out_a,) = _run_multi(transform, [{"a": np.float32}, {"a": np.float32}], {"a": a})
+        np.testing.assert_allclose(out_a, a / a, rtol=1e-5)
 
     def test_df_add_scalar_two_columns_onnx(self):
         """df + scalar with two columns: both columns are incremented."""
