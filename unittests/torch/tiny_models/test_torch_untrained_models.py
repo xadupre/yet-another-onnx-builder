@@ -52,7 +52,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
                 assert "batch//s61" not in s, f"Wrong dimension in {shape=}, name={v.name!r}"
 
     @hide_stdout()
-    @requires_transformers("4.57")
+    @requires_transformers("5.2")
     def test_tiny_llm_to_onnx_22_no_opt(self):
         import onnxruntime
 
@@ -119,7 +119,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         # self._chech_shape(onx.get_proto(include_weights=False))
 
     @hide_stdout()
-    @requires_transformers("4.57")
+    @requires_transformers("5.2")
     def test_tiny_llm_to_onnx_22_opt(self):
         import onnxruntime
 
