@@ -22,6 +22,20 @@ in :class:`_BuilderRuntime <yobx.xshape._builder_runtime._BuilderRuntime>`.
 This is used by :class:`_ShapeRuntime <yobx.xshape._shape_runtime._ShapeRuntime>`
 to deduce some shapes.
 
+The whole algorithm relies on four components:
+
+* An **analyser for expressions** able to parse and simplify numerical expressions
+  built upon name for the dynamic dimension sets of the inputs,
+* A list of **functions infering shapes**, including the numerical
+  expressions for every ONNX operator,
+* A very **simple runtime** able to run a short list of kernels usually used to
+  handle shapes (Add, Sub, Mul, Div, Concat, Squeeze, Unsqueeze, Shape, Size, Reshape),
+* An algorithm solving **constraints** after infering function was run.
+  A unknown dimension may be known or at least constrained to a short set of values
+  after a binary operator (or any other) was processed. The constraint mechanism is
+  put in place to implement a kind of backward pass where output dimensions
+  restricts the number of possible values for input dimnensions.
+
 Class Hierarchy
 ===============
 
