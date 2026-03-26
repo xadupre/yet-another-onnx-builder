@@ -11,5 +11,6 @@ yobx.sklearn.ensemble
     hist_gradient_boosting
     isolation_forest
     random_forest
+    random_trees_embedding
     stacking
     voting
