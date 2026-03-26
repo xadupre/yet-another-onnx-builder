@@ -6025,9 +6025,15 @@ class GraphBuilder(
 
     def _improves_dynamic_dimension_naming(self, apply_replacements: bool = False):
         """
-        Improves the naming of the dynamic dimension based on what
-        the user gave. It returns a list of replacements to operator but does
-        not do it.
+        Improves the naming of the dynamic dimension based on what the user gave.
+        Returns a dictionary mapping old dimension names to new (improved) names.
+
+        :param apply_replacements: if True, also applies the computed replacements
+            to the internal shape state by calling :meth:`_apply_shape_replacements`,
+            mutating ``_known_value_shape`` and ``_dynamic_alias`` in-place.
+            If False (default), the replacements are computed and returned but
+            internal state is not modified.
+        :return: dictionary of replacements ``{old_name: new_name}``
         """
         if self._debug_dyn_dim:
             print(
