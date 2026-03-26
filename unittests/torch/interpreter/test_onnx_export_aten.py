@@ -2874,6 +2874,23 @@ class TestOnnxExportAten(ExtTestCase):
         self.dump_onnx("test_aten_unbind_dynamic.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x,))
 
+    def test_aten_unbind_dynamic2(self):
+        # torch.export infers that the unbind dimension (dim=1) must be static
+        # because it determines the number of outputs; marking it as DYNAMIC
+        # therefore raises a ValueError from torch.export itself.
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                u = torch.unbind(x, dim=1)
+                return torch.cat(u, dim=0)
+
+        model = Model()
+        x = torch.zeros((6, 5), dtype=torch.float32)
+        DYN = torch.export.Dim.DYNAMIC
+        with self.assertRaises(ValueError):
+            to_onnx(model, (x,), dynamic_shapes=({0: DYN, 1: DYN},))
+
     def test_aten_unique_consecutive(self):
         import torch
 
