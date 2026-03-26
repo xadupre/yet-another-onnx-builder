@@ -8,7 +8,9 @@ This example shows how :class:`BasicShapeBuilder
 <yobx.xshape.shape_builder_impl.BasicShapeBuilder>` tracks symbolic dimension
 expressions through a sequence of ``Add``, ``Concat``, and ``Reshape`` nodes,
 and compares the result with the standard
-:func:`onnx.shape_inference.infer_shapes`.
+:func:`onnx.shape_inference.infer_shapes` and the
+`onnx-shape-inference <https://pypi.org/project/onnx-shape-inference/>`_
+package from PyPI.
 
 The key difference is that ``onnx.shape_inference.infer_shapes`` can only
 propagate shapes when dimensions are statically known integers.  When the
@@ -17,16 +19,23 @@ model contains dynamic (symbolic) dimensions it typically assigns ``None``
 keeps the dimensions as symbolic arithmetic expressions so that output shapes
 are expressed in terms of the input dimension names.
 
+The ``onnx-shape-inference`` package also performs symbolic shape inference
+using `SymPy <https://www.sympy.org>`_ to track dimension expressions across
+nodes.  It operates on the :pypi:`onnx-ir` representation of the model.
+
 See :ref:`l-design-shape` for a detailed description of how
 :class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
 works and a comparison table with :func:`onnx.shape_inference.infer_shapes`.
 """
 
 import numpy as np
+import pandas
 import onnx
+import onnx_ir as ir
 import onnxruntime
 import onnx.helper as oh
 import onnx.numpy_helper as onh
+from onnx_shape_inference import infer_symbolic_shapes
 from yobx.xshape import BasicShapeBuilder
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -90,6 +99,36 @@ for vi in (
     print(f"  {vi.name:15s}  shape={shape}")
 
 # %%
+# Shape inference with onnx-shape-inference (PyPI)
+# --------------------------------------------------
+#
+# The `onnx-shape-inference <https://pypi.org/project/onnx-shape-inference/>`_
+# package offers a second symbolic approach.  It works on the
+# :class:`onnx_ir.Model` representation and uses SymPy to track dimension
+# expressions.  Install it with ``pip install onnx-shape-inference``.
+#
+# Compared with ``onnx.shape_inference.infer_shapes``, it successfully
+# resolves the ``Concat`` output to ``(batch, seq, 2*d_model)``.  The
+# ``Reshape`` output receives a freshly-generated symbol (``_d0``) because
+# the ``[0, 0, -1]`` constant shape tensor is not yet fully evaluated by this
+# library.
+
+ir_model = ir.serde.deserialize_model(model)
+ir_model = infer_symbolic_shapes(ir_model)
+
+# Build a name → shape mapping for all values in the graph.
+onnx_ir_shapes: dict[str, str] = {}
+for v in ir_model.graph.inputs:
+    onnx_ir_shapes[v.name] = str(v.shape)
+for node in ir_model.graph:
+    for out in node.outputs:
+        onnx_ir_shapes[out.name] = str(out.shape)
+
+print("=== onnx-shape-inference (infer_symbolic_shapes) ===")
+for name in ["X", "Y", "added", "concat_out", "Z"]:
+    print(f"  {name:15s}  shape={onnx_ir_shapes.get(name, 'unknown')}")
+
+# %%
 # Shape inference with BasicShapeBuilder
 # ----------------------------------------
 #
@@ -137,9 +176,14 @@ session = onnxruntime.InferenceSession(
 )
 outputs = session.run(None, feeds)
 result = builder.compare_with_true_inputs(feeds, outputs)
-print("\n=== shape comparison (expr, expected, computed) ===")
+print("\n=== shape comparison ===")
+data = []
 for name, dims in result.items():
-    print(f"  {name}: {dims}")
+    obs = dict(result=name)
+    for i, dim in enumerate(dims):
+        for c, v in zip(["expression", "expected", "computed"], dim):
+            data.append(dict(result=name, dimension=i, col=c, value=v))
+print(pandas.DataFrame(data).pivot(index=["result", "dimension"], columns="col", values="value"))
 
 # %%
 # Plot: symbolic vs inferred shapes
@@ -147,7 +191,8 @@ for name, dims in result.items():
 #
 # The table below compares the shapes reported by
 # ``onnx.shape_inference.infer_shapes`` (which may leave dimensions as
-# ``None`` for dynamic axes) with the symbolic expressions computed by
+# ``None`` for dynamic axes), the ``onnx-shape-inference`` package (which uses
+# SymPy for symbolic propagation), and the symbolic expressions computed by
 # :class:`BasicShapeBuilder`.
 
 import matplotlib.pyplot as plt  # noqa: E402
@@ -172,21 +217,30 @@ for vi in (
 # Collect BasicShapeBuilder shapes as strings
 builder_shapes = {name: str(builder.get_shape(name)) for name in tensor_names}
 
-col_labels = ["tensor", "onnx.shape_inference", "BasicShapeBuilder"]
+col_labels = ["tensor", "onnx.shape_inference", "onnx-shape-inference", "BasicShapeBuilder"]
 table_data = [
-    [name, onnx_shapes.get(name, "—"), builder_shapes.get(name, "—")] for name in tensor_names
+    [
+        name,
+        onnx_shapes.get(name, "—"),
+        onnx_ir_shapes.get(name, "—"),
+        builder_shapes.get(name, "—"),
+    ]
+    for name in tensor_names
 ]
 
-fig, ax = plt.subplots(figsize=(8, 2.5))
+fig, ax = plt.subplots(figsize=(11, 2.5))
+
 ax.axis("off")
 tbl = ax.table(cellText=table_data, colLabels=col_labels, loc="center", cellLoc="center")
 tbl.auto_set_font_size(False)
 tbl.set_fontsize(9)
-tbl.auto_set_column_width([0, 1, 2])
+tbl.auto_set_column_width(list(range(len(col_labels))))
 # Highlight header
-for col in range(3):
+for col in range(len(col_labels)):
     tbl[0, col].set_facecolor("#4c72b0")
     tbl[0, col].set_text_props(color="white", fontweight="bold")
-ax.set_title("Shape inference: onnx vs BasicShapeBuilder", fontsize=10, pad=8)
+ax.set_title(
+    "Shape inference: onnx vs onnx-shape-inference vs BasicShapeBuilder", fontsize=10, pad=8
+)
 plt.tight_layout()
 plt.show()

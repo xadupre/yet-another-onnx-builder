@@ -5690,10 +5690,14 @@ class GraphBuilder(
 
     def _get_size(self, t: Union["torch.Tensor", np.ndarray, TensorProto]) -> int:
         if hasattr(t, "shape"):
+            if t.dtype == object:  # type: ignore[union-attr]
+                return 0
             return int(np.prod(t.shape)) * size_type(t.dtype)  # type: ignore
         assert isinstance(t, TensorProto), f"Unexpected type {type(t)}"
         shape = tuple(t.dims)
         dtype = t.data_type
+        if dtype == TensorProto.STRING:
+            return 0
         return int(np.prod(shape)) * size_type(dtype)
 
     def _add_hidden_inputs_to_nodes(self, nodes: Optional[List[Optional[NodeProto]]] = None):
@@ -5898,6 +5902,7 @@ class GraphBuilder(
                     np.prod(t.dims)
                     * size_type(t.data_type if isinstance(t, TensorProto) else t.values.data_type)
                     for t in initializers
+                    if not isinstance(t, TensorProto) or t.data_type != TensorProto.STRING
                 )
             ),
             size_large_initializers=sum(self._get_size(t) for t in large_initializers.values()),

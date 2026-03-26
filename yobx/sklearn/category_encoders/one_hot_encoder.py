@@ -73,7 +73,11 @@ def category_encoders_one_hot_encoder(
 
     itype = g.get_type(X)
     dtype = tensor_dtype_to_np_dtype(itype)
-    float_onnx_type = int(itype)
+
+    is_string = itype == onnx.TensorProto.STRING
+    # For string inputs the indicators are cast to float32.
+    float_onnx_type = onnx.TensorProto.FLOAT if is_string else int(itype)
+    float_dtype = np.float32 if is_string else dtype
 
     # Detect floating-point input (required for IsNaN handling).
     _FLOAT_TYPES = {onnx.TensorProto.FLOAT, onnx.TensorProto.FLOAT16, onnx.TensorProto.DOUBLE}
@@ -121,6 +125,7 @@ def category_encoders_one_hot_encoder(
         # Emit one Equal+Cast node per category.
         cast_list = []
         for cat_idx, (cat_val, _ordinal) in enumerate(known_cats):
+            # Use input dtype (object for strings, float for numeric) for constants.
             cat_const = np.array([[cat_val]], dtype=dtype)
             eq_k = g.op.Equal(col_slice, cat_const, name=f"{name}_eq{col_i}_{cat_idx}")
             cast_k = g.op.Cast(eq_k, to=float_onnx_type, name=f"{name}_cast{col_i}_{cat_idx}")
@@ -140,7 +145,7 @@ def category_encoders_one_hot_encoder(
                 stacked, np.array([1], dtype=np.int64), keepdims=1, name=f"{name}_anymax{col_i}"
             )  # (N, 1)
             # Threshold at 0.5 to convert from float indicator (0.0 or 1.0) to bool.
-            half = np.array([[0.5]], dtype=dtype)
+            half = np.array([[0.5]], dtype=float_dtype)
             any_match = g.op.Greater(
                 any_match_val, half, name=f"{name}_anymatch{col_i}"
             )  # (N, 1) bool
@@ -152,7 +157,7 @@ def category_encoders_one_hot_encoder(
             else:
                 unknown_mask = g.op.Not(any_match, name=f"{name}_unknown{col_i}")
 
-            nan_scalar = np.array([[float("nan")]], dtype=dtype)
+            nan_scalar = np.array([[float("nan")]], dtype=float_dtype)
             result_list = [
                 g.op.Where(
                     unknown_mask, nan_scalar, cast_k, name=f"{name}_where{col_i}_{cat_idx}"
