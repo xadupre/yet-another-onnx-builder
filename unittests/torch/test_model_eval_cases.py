@@ -108,6 +108,14 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    def test_run_exporter_crop_last_dim_tensor_content_tracing(self):
+        evaluation(
+            cases="CropLastDimensionWithTensorContent",
+            exporters="yobx-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_dimension0(self):
         evaluation(
             cases="ExportWithDimension0",
