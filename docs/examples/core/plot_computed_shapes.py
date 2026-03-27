@@ -275,10 +275,25 @@ TINT64 = onnx.TensorProto.INT64
 # With no dimension names declared on the graph output, the second dimension
 # receives the internal placeholder ``NEWDIM_nonzero_0`` and no constraint is
 # stored.
+#
+# The graph below pre-processes the input through four operations before feeding
+# it into ``NonZero``, making the pipeline five nodes in total:
+#
+# 1. ``Abs``    — take the absolute value (all non-negative)
+# 2. ``Relu``   — zero out any values already zero (no-op here, illustrative)
+# 3. ``Add``    — add the absolute value to the relu output (doubles positives)
+# 4. ``Mul``    — multiply element-wise with the relu output
+# 5. ``NonZero`` — collect indices of non-zero elements
 
 nz_model_anon = oh.make_model(
     oh.make_graph(
-        [oh.make_node("NonZero", ["X"], ["nz"])],
+        [
+            oh.make_node("Abs", ["X"], ["abs_out"]),
+            oh.make_node("Relu", ["abs_out"], ["relu_out"]),
+            oh.make_node("Add", ["relu_out", "relu_out"], ["double_out"]),
+            oh.make_node("Mul", ["double_out", "relu_out"], ["mul_out"]),
+            oh.make_node("NonZero", ["mul_out"], ["nz"]),
+        ],
         "nonzero_anon",
         [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq"])],
         [oh.make_tensor_value_info("nz", TINT64, [None, None])],
@@ -305,7 +320,13 @@ print(f"  Constraints: {builder_anon.get_registered_constraints()}")
 
 nz_model_named = oh.make_model(
     oh.make_graph(
-        [oh.make_node("NonZero", ["X"], ["nz"])],
+        [
+            oh.make_node("Abs", ["X"], ["abs_out"]),
+            oh.make_node("Relu", ["abs_out"], ["relu_out"]),
+            oh.make_node("Add", ["relu_out", "relu_out"], ["double_out"]),
+            oh.make_node("Mul", ["double_out", "relu_out"], ["mul_out"]),
+            oh.make_node("NonZero", ["mul_out"], ["nz"]),
+        ],
         "nonzero_named",
         [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq"])],
         [oh.make_tensor_value_info("nz", TINT64, ["rank", "nnz"])],
