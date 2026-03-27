@@ -154,6 +154,7 @@ if substring:
 epkg_dictionary = {
     "aten functions": "https://pytorch.org/cppdocs/api/namespace_at.html#functions",
     "azure pipeline": "https://azure.microsoft.com/en-us/products/devops/pipelines",
+    "guard_size_oblivious": "https://docs.pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.guard_size_oblivious.html",
     "black": "https://github.com/psf/black",
     "category_encoders": "https://contrib.scikit-learn.org/category_encoders/",
     "Custom Backends": "https://docs.pytorch.org/docs/stable/torch.compiler_custom_backends.html",
@@ -238,6 +239,7 @@ epkg_dictionary = {
     "torch.onnx": "https://docs.pytorch.org/docs/stable/onnx.html",
     "tqdm": "https://github.com/tqdm/tqdm",
     "transformers": "https://huggingface.co/docs/transformers/en/index",
+    "vibe coding": "https://en.wikipedia.org/wiki/Vibe_coding",
     "vocos": "https://github.com/gemelo-ai/vocos",
     "Windows": "https://www.microsoft.com/windows",
     "xgboost": "https://xgboost.readthedocs.io/en/stable/get_started.html",

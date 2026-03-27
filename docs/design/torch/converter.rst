@@ -39,8 +39,11 @@ different design priorities.
        ``strict``, ``nostrict``, ``tracing``, ``fake``, …
        The ``tracing`` strategy uses
        :class:`~yobx.torch.tracing.CustomTracer` (symbolic tracing) and can
-       handle models where ``torch.export.export`` fails.
-     - Dynamo-based (``torch.export.export`` or ``torch._dynamo.export``)
+       handle models where ``torch.export.export`` fails. It offers
+       the possibility to keep modules as leave, and does not decompose them
+       into aten operators.
+     - Dynamo-based ``torch.export.export``, if the default mode fails, it tries
+       with ``strict=True`` a second time.
    * - **Graph decomposition**
      - The graph is **not** decomposed by default (unless
        ``decomposition_table`` is set in
@@ -55,6 +58,9 @@ different design priorities.
      - Supports any kind of pattern matching, multiple outputs, variable number of
        nodes, outputs, types.
      - Supports a fixed number of outputs.
+   * - **Dummy dimension equal to 0 or 1**
+     - Option :epkg:`guard_size_oblivious` is determined before exporting.
+     - Option :epkg:`guard_size_oblivious` is always used even if not needed.
    * - **Shape & type propagation**
      - Every intermediate result is typed and (when possible) given a concrete
        or symbolic shape inside the builder, enabling richer optimization and
