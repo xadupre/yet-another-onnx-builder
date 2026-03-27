@@ -244,3 +244,169 @@ ax.set_title(
 )
 plt.tight_layout()
 plt.show()
+
+# %%
+# Impact of named output shapes on constraints (NonZero)
+# -------------------------------------------------------
+#
+# Some operators—such as ``NonZero``—introduce a *fresh* symbolic dimension for
+# their output because the number of results depends on the *values* of the
+# input tensor, not merely its shape.  :class:`BasicShapeBuilder` assigns an
+# internal name like ``NEWDIM_nonzero_0`` to that dimension.
+#
+# When the graph output is declared **without** named dimensions (all ``None``),
+# the internal name is kept as-is and no constraint is registered.
+#
+# When the graph output is declared **with** named dimensions (e.g.
+# ``["rank", "nnz"]``), :meth:`run_value_info
+# <yobx.xshape.shape_builder_impl.BasicShapeBuilder.run_value_info>` detects
+# the mismatch between the computed internal name ``NEWDIM_nonzero_0`` and the
+# user-supplied name ``nnz``, and registers the constraint
+# ``NEWDIM_nonzero_0 = nnz``.  The dimension naming step then renames the
+# internal token to the user-visible name across all shapes.
+
+TINT64 = onnx.TensorProto.INT64
+
+# %%
+# Without named output shape
+# ~~~~~~~~~~~~~~~~~~~~~~~~~~
+#
+# The output of ``NonZero`` has shape ``(rank_of_input, num_nonzero_elements)``.
+# With no dimension names declared on the graph output, the second dimension
+# receives the internal placeholder ``NEWDIM_nonzero_0`` and no constraint is
+# stored.
+
+nz_model_anon = oh.make_model(
+    oh.make_graph(
+        [oh.make_node("NonZero", ["X"], ["nz"])],
+        "nonzero_anon",
+        [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq"])],
+        [oh.make_tensor_value_info("nz", TINT64, [None, None])],
+    ),
+    opset_imports=[oh.make_opsetid("", 18)],
+    ir_version=10,
+)
+
+builder_anon = BasicShapeBuilder()
+builder_anon.run_model(nz_model_anon)
+
+print("=== NonZero — anonymous output shape ===")
+print(f"  {'nz':5s}  shape={builder_anon.get_shape('nz')}")
+print(f"  Constraints: {builder_anon.get_registered_constraints()}")
+
+# %%
+# With named output shape
+# ~~~~~~~~~~~~~~~~~~~~~~~
+#
+# Declaring the output shape as ``["rank", "nnz"]`` causes
+# :meth:`run_value_info` to register the constraint
+# ``NEWDIM_nonzero_0 = nnz``.  The naming step then replaces the internal
+# token throughout all tracked shapes so the user sees ``nnz`` everywhere.
+
+nz_model_named = oh.make_model(
+    oh.make_graph(
+        [oh.make_node("NonZero", ["X"], ["nz"])],
+        "nonzero_named",
+        [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq"])],
+        [oh.make_tensor_value_info("nz", TINT64, ["rank", "nnz"])],
+    ),
+    opset_imports=[oh.make_opsetid("", 18)],
+    ir_version=10,
+)
+
+builder_named = BasicShapeBuilder()
+builder_named.run_model(nz_model_named)
+
+print("\n=== NonZero — named output shape ===")
+print(f"  {'nz':5s}  shape={builder_named.get_shape('nz')}")
+print(f"  Constraints: {builder_named.get_registered_constraints()}")
+
+# %%
+# Plot: named vs anonymous output shape for NonZero
+# --------------------------------------------------
+#
+# The table below contrasts what each shape-inference tool reports for the
+# ``NonZero`` output under both configurations.
+
+nz_inferred_anon = onnx.shape_inference.infer_shapes(nz_model_anon)
+nz_inferred_named = onnx.shape_inference.infer_shapes(nz_model_named)
+
+# onnx.shape_inference shapes
+nz_onnx_shapes: dict[str, str] = {}
+for _model, _key in [(nz_inferred_anon, "anon"), (nz_inferred_named, "named")]:
+    for vi in list(_model.graph.output):
+        t = vi.type.tensor_type
+        if t.HasField("shape"):
+            shape = tuple(
+                d.dim_param if d.dim_param else (d.dim_value if d.dim_value else "?")
+                for d in t.shape.dim
+            )
+        else:
+            shape = ("unknown",)
+        nz_onnx_shapes[_key] = str(shape)
+
+# onnx-shape-inference shapes
+nz_ir_shapes: dict[str, str] = {}
+for _model, _key in [(nz_model_anon, "anon"), (nz_model_named, "named")]:
+    _ir_model = ir.serde.deserialize_model(_model)
+    _ir_model = infer_symbolic_shapes(_ir_model)
+    for node in _ir_model.graph:
+        for out in node.outputs:
+            nz_ir_shapes[_key] = str(out.shape)
+
+# BasicShapeBuilder shapes
+nz_builder_shapes = {
+    "anon": str(builder_anon.get_shape("nz")),
+    "named": str(builder_named.get_shape("nz")),
+}
+nz_constraints = {
+    "anon": str(builder_anon.get_registered_constraints()),
+    "named": str(builder_named.get_registered_constraints()),
+}
+
+col_labels_nz = [
+    "output declaration",
+    "onnx.shape_inference",
+    "onnx-shape-inference",
+    "BasicShapeBuilder",
+    "constraints",
+]
+table_data_nz = [
+    [
+        "[None, None]",
+        nz_onnx_shapes.get("anon", "—"),
+        nz_ir_shapes.get("anon", "—"),
+        nz_builder_shapes["anon"],
+        nz_constraints["anon"],
+    ],
+    [
+        '["rank", "nnz"]',
+        nz_onnx_shapes.get("named", "—"),
+        nz_ir_shapes.get("named", "—"),
+        nz_builder_shapes["named"],
+        nz_constraints["named"],
+    ],
+]
+
+fig, ax = plt.subplots(figsize=(14, 2.0))
+ax.axis("off")
+tbl_nz = ax.table(
+    cellText=table_data_nz,
+    colLabels=col_labels_nz,
+    loc="center",
+    cellLoc="center",
+)
+tbl_nz.auto_set_font_size(False)
+tbl_nz.set_fontsize(8)
+tbl_nz.auto_set_column_width(list(range(len(col_labels_nz))))
+for col in range(len(col_labels_nz)):
+    tbl_nz[0, col].set_facecolor("#4c72b0")
+    tbl_nz[0, col].set_text_props(color="white", fontweight="bold")
+# Highlight the row where the constraint is registered
+for col in range(len(col_labels_nz)):
+    tbl_nz[2, col].set_facecolor("#d5e8d4")
+ax.set_title(
+    "NonZero: impact of named output shapes on constraints", fontsize=10, pad=8
+)
+plt.tight_layout()
+plt.show()
