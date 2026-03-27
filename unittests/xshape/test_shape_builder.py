@@ -801,6 +801,53 @@ class TestShapeBuilder(ExtTestCase):
         b._improves_dynamic_dimension_naming({"batch"})
         self.assertEqual(b.get_shape_renamed("X"), ("batch",))
 
+    def test_run_value_info_nonzero_registers_constraint_with_named_output(self):
+        # NonZero introduces an internal dimension name (NEWDIM_nonzero_0).
+        # When the graph output is declared with a user-visible symbolic name,
+        # run_value_info should register a constraint linking the two names and
+        # rename the internal placeholder throughout.
+        model_named = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("NonZero", ["X"], ["nz"])],
+                "nonzero_named",
+                [_mkv_("X", TFLOAT, ["batch", "seq"])],
+                [_mkv_("nz", TINT64, ["rank", "nnz"])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        builder = BasicShapeBuilder()
+        builder.run_model(model_named)
+
+        # The internal placeholder should have been renamed to the user name.
+        self.assertEqual(builder.get_shape("nz"), (2, "nnz"))
+        # A constraint linking the internal name to the user name must be registered.
+        constraints = builder.get_registered_constraints()
+        self.assertIn("NEWDIM_nonzero_0", constraints)
+        self.assertIn("nnz", constraints["NEWDIM_nonzero_0"])
+
+    def test_run_value_info_nonzero_anonymous_output_no_constraint(self):
+        # Without named output dimensions, no constraint should be registered
+        # and the internal placeholder is kept as-is.
+        model_anon = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("NonZero", ["X"], ["nz"])],
+                "nonzero_anon",
+                [_mkv_("X", TFLOAT, ["batch", "seq"])],
+                [_mkv_("nz", TINT64, [None, None])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        builder = BasicShapeBuilder()
+        builder.run_model(model_anon)
+
+        shape = builder.get_shape("nz")
+        self.assertEqual(shape[0], 2)
+        self.assertIsInstance(shape[1], str)
+        self.assertIn("NEWDIM_nonzero", shape[1])
+        self.assertEqual(builder.get_registered_constraints(), {})
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
