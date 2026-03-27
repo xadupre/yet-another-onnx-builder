@@ -13,7 +13,7 @@ This example walks through several common patterns:
 
 * **Concat** — adds dimension names to produce ``"seq1+seq2"``
 * **Reshape with -1** — uses floor-division to produce ``"c//2"``
-* **Split** — introduces ceiling-division via ``CeilToInt(…)``
+* **Split** — introduces ceiling-division via ``(dim+n-1)//n``
 * **Automatic simplification** — ``d + f - f`` → ``d``, ``2*x//2`` → ``x``
 * **Evaluation** — resolving symbolic shapes to concrete integers once the
   actual dimension values are known
@@ -133,8 +133,8 @@ print("shape of Xr :", builder_reshape.get_shape("Xr"))  # ('a', 'b', 2, 'c//2')
 # ``Split`` with ``num_outputs=2`` and no explicit ``split`` attribute
 # divides the axis dimension as evenly as possible.  When the dimension is
 # odd the two halves differ by one, which is captured by the expression
-# ``CeilToInt(b+c, 2)`` for the first output and
-# ``b+c - CeilToInt(b+c, 2)`` for the second.
+# ``(b+c+1)//2`` for the first output and
+# ``b+c - (b+c+1)//2`` for the second.
 
 model_split = oh.make_model(
     oh.make_graph(
@@ -198,8 +198,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 rows = [
     ["Concat (Z, axis=1)", "('batch', 'seq1+seq2')"],
     ["Reshape (Xr)", "('a', 'b', 2, 'c//2')"],
-    ["Split S1", "('a', 'CeilToInt(b+c,2)')"],
-    ["Split S2", "('a', 'b+c-CeilToInt(b+c,2)')"],
+    ["Split S1", "('a', '(1+b+c)//2')"],
+    ["Split S2", "('a', 'b+c-(1+b+c)//2')"],
 ]
 simplify_rows = [[expr, simplify_expression(expr)] for expr in examples]
 

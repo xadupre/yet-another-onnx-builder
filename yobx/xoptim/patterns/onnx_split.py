@@ -373,8 +373,8 @@ class SplitConcatPattern(PatternOptimization):
             Concat_1[["Concat(., ., axis=-1)"]]
 
             I_X -->|"FLOAT(a, b)"| Split_0
-            Split_0 -->|"FLOAT(a, CeilToInt(b,2))"| Concat_1
-            Split_0 -->|"FLOAT(a, b-CeilToInt(b,2))"| Concat_1
+            Split_0 -->|"FLOAT(a, (1+b)//2)"| Concat_1
+            Split_0 -->|"FLOAT(a, b-(1+b)//2)"| Concat_1
 
             O_Y(["Y FLOAT(a, b)"])
             Concat_1 --> O_Y
