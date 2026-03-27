@@ -646,6 +646,208 @@ class TestSqlToOnnxJoin(ExtTestCase):
         np.testing.assert_allclose(x_out, np.array([3.0], dtype=np.float32))
         np.testing.assert_allclose(y_out, np.array([300.0], dtype=np.float32))
 
+    def test_three_table_join(self):
+        """Three-table join using a list of per-join right_input_dtypes."""
+        sql = "SELECT a.x, b.y, c.z FROM a JOIN b ON a.bid = b.bid JOIN c ON a.cid = c.cid"
+        left_dtypes = {"bid": np.int64, "cid": np.int64, "x": np.float32}
+        right_dtypes_b = {"bid": np.int64, "y": np.float32}
+        right_dtypes_c = {"cid": np.int64, "z": np.float32}
+        # a: bid=[1,2,3], cid=[10,20,30], x=[1,2,3]
+        # b: bid=[2,3], y=[200,300]  → a[1] and a[2] match first join
+        # c: cid=[20,30], z=[20,30]  → after first join, a[1] (cid=20) and a[2] (cid=30) match
+        # Both a[1] and a[2] survive both joins.
+        onx = sql_to_onnx(sql, left_dtypes, right_input_dtypes=[right_dtypes_b, right_dtypes_c])
+        ref = ExtendedReferenceEvaluator(onx)
+        feeds = {
+            "bid": np.array([1, 2, 3], dtype=np.int64),
+            "cid": np.array([10, 20, 30], dtype=np.int64),
+            "x": np.array([1.0, 2.0, 3.0], dtype=np.float32),
+            "bid_right": np.array([2, 3], dtype=np.int64),
+            "y": np.array([200.0, 300.0], dtype=np.float32),
+            "cid_right": np.array([20, 30], dtype=np.int64),
+            "z": np.array([20.0, 30.0], dtype=np.float32),
+        }
+        x_out, y_out, z_out = ref.run(None, feeds)
+        np.testing.assert_allclose(x_out, np.array([2.0, 3.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([200.0, 300.0], dtype=np.float32))
+        np.testing.assert_allclose(z_out, np.array([20.0, 30.0], dtype=np.float32))
+
+    def test_three_table_join_partial_match(self):
+        """Three-table join where some rows are excluded by the second join."""
+        sql = "SELECT a.x, b.y, c.z FROM a JOIN b ON a.bid = b.bid JOIN c ON a.cid = c.cid"
+        left_dtypes = {"bid": np.int64, "cid": np.int64, "x": np.float32}
+        right_dtypes_b = {"bid": np.int64, "y": np.float32}
+        right_dtypes_c = {"cid": np.int64, "z": np.float32}
+        # a[1] passes first join (bid=2 matches b) but not second (cid=20 not in c).
+        # a[2] passes both joins.
+        onx = sql_to_onnx(sql, left_dtypes, right_input_dtypes=[right_dtypes_b, right_dtypes_c])
+        ref = ExtendedReferenceEvaluator(onx)
+        feeds = {
+            "bid": np.array([1, 2, 3], dtype=np.int64),
+            "cid": np.array([10, 20, 30], dtype=np.int64),
+            "x": np.array([1.0, 2.0, 3.0], dtype=np.float32),
+            "bid_right": np.array([2, 3], dtype=np.int64),
+            "y": np.array([200.0, 300.0], dtype=np.float32),
+            "cid_right": np.array([30], dtype=np.int64),
+            "z": np.array([30.0], dtype=np.float32),
+        }
+        x_out, y_out, z_out = ref.run(None, feeds)
+        np.testing.assert_allclose(x_out, np.array([3.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([300.0], dtype=np.float32))
+        np.testing.assert_allclose(z_out, np.array([30.0], dtype=np.float32))
+
+    def test_four_table_join(self):
+        """Four-table join using a list of three per-join right_input_dtypes."""
+        sql = (
+            "SELECT a.x, b.y, c.z, d.w "
+            "FROM a "
+            "JOIN b ON a.bid = b.bid "
+            "JOIN c ON a.cid = c.cid "
+            "JOIN d ON a.did = d.did"
+        )
+        left_dtypes = {
+            "bid": np.int64,
+            "cid": np.int64,
+            "did": np.int64,
+            "x": np.float32,
+        }
+        right_dtypes_b = {"bid": np.int64, "y": np.float32}
+        right_dtypes_c = {"cid": np.int64, "z": np.float32}
+        right_dtypes_d = {"did": np.int64, "w": np.float32}
+        # a: bid=[1,2,3], cid=[10,20,30], did=[100,200,300], x=[1,2,3]
+        # b: bid=[2,3]    → a[0] excluded
+        # c: cid=[20,30]  → a[0] excluded (already), a[1] and a[2] survive
+        # d: did=[200]    → only a[1] (did=200) survives all three joins
+        onx = sql_to_onnx(
+            sql,
+            left_dtypes,
+            right_input_dtypes=[right_dtypes_b, right_dtypes_c, right_dtypes_d],
+        )
+        ref = ExtendedReferenceEvaluator(onx)
+        feeds = {
+            "bid": np.array([1, 2, 3], dtype=np.int64),
+            "cid": np.array([10, 20, 30], dtype=np.int64),
+            "did": np.array([100, 200, 300], dtype=np.int64),
+            "x": np.array([1.0, 2.0, 3.0], dtype=np.float32),
+            "bid_right": np.array([2, 3], dtype=np.int64),
+            "y": np.array([200.0, 300.0], dtype=np.float32),
+            "cid_right": np.array([20, 30], dtype=np.int64),
+            "z": np.array([20.0, 30.0], dtype=np.float32),
+            "did_right": np.array([200], dtype=np.int64),
+            "w": np.array([2000.0], dtype=np.float32),
+        }
+        x_out, y_out, z_out, w_out = ref.run(None, feeds)
+        np.testing.assert_allclose(x_out, np.array([2.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([200.0], dtype=np.float32))
+        np.testing.assert_allclose(z_out, np.array([20.0], dtype=np.float32))
+        np.testing.assert_allclose(w_out, np.array([2000.0], dtype=np.float32))
+
+
+class TestSqlToOnnxTracerJoin(ExtTestCase):
+    """Tests for 3+ table joins via the dataframe tracer path."""
+
+    def _run_tracer(self, func, dtypes_list, feeds):
+        from yobx.sql import dataframe_to_onnx
+
+        artifact = dataframe_to_onnx(func, dtypes_list)
+        ref = ExtendedReferenceEvaluator(artifact)
+        model_feeds = {k: v for k, v in feeds.items() if k in artifact.input_names}
+        outputs = ref.run(None, model_feeds)
+        if has_onnxruntime():
+            ort_outputs = _ort_run(artifact, model_feeds)
+            self.assertEqual(len(outputs), len(ort_outputs))
+            for r, o in zip(outputs, ort_outputs):
+                np.testing.assert_allclose(o, r, rtol=1e-5, atol=1e-6)
+        return outputs
+
+    def test_tracer_three_table_join(self):
+        """Three-table join via the dataframe tracer."""
+
+        def transform(df1, df2, df3):
+            result = df1.join(df2, left_key="bid", right_key="bid")
+            result = result.join(df3, left_key="cid", right_key="cid")
+            return result[["x", "y", "z"]]
+
+        dtypes1 = {"bid": np.int64, "cid": np.int64, "x": np.float32}
+        dtypes2 = {"bid": np.int64, "y": np.float32}
+        dtypes3 = {"cid": np.int64, "z": np.float32}
+
+        feeds = {
+            "bid": np.array([1, 2, 3], dtype=np.int64),
+            "cid": np.array([10, 20, 30], dtype=np.int64),
+            "x": np.array([1.0, 2.0, 3.0], dtype=np.float32),
+            "bid_right": np.array([2, 3], dtype=np.int64),
+            "y": np.array([200.0, 300.0], dtype=np.float32),
+            "cid_right": np.array([20, 30], dtype=np.int64),
+            "z": np.array([20.0, 30.0], dtype=np.float32),
+        }
+        x_out, y_out, z_out = self._run_tracer(transform, [dtypes1, dtypes2, dtypes3], feeds)
+        np.testing.assert_allclose(x_out, np.array([2.0, 3.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([200.0, 300.0], dtype=np.float32))
+        np.testing.assert_allclose(z_out, np.array([20.0, 30.0], dtype=np.float32))
+
+    def test_tracer_three_table_join_partial_match(self):
+        """Three-table join via tracer — some rows excluded by the second join."""
+
+        def transform(df1, df2, df3):
+            result = df1.join(df2, left_key="bid", right_key="bid")
+            result = result.join(df3, left_key="cid", right_key="cid")
+            return result[["x", "y", "z"]]
+
+        dtypes1 = {"bid": np.int64, "cid": np.int64, "x": np.float32}
+        dtypes2 = {"bid": np.int64, "y": np.float32}
+        dtypes3 = {"cid": np.int64, "z": np.float32}
+
+        feeds = {
+            "bid": np.array([1, 2, 3], dtype=np.int64),
+            "cid": np.array([10, 20, 30], dtype=np.int64),
+            "x": np.array([1.0, 2.0, 3.0], dtype=np.float32),
+            "bid_right": np.array([2, 3], dtype=np.int64),
+            "y": np.array([200.0, 300.0], dtype=np.float32),
+            # c has only cid=30 → a[1] (cid=20) excluded from second join
+            "cid_right": np.array([30], dtype=np.int64),
+            "z": np.array([30.0], dtype=np.float32),
+        }
+        x_out, y_out, z_out = self._run_tracer(transform, [dtypes1, dtypes2, dtypes3], feeds)
+        np.testing.assert_allclose(x_out, np.array([3.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([300.0], dtype=np.float32))
+        np.testing.assert_allclose(z_out, np.array([30.0], dtype=np.float32))
+
+    def test_tracer_four_table_join(self):
+        """Four-table join via the dataframe tracer."""
+
+        def transform(df1, df2, df3, df4):
+            result = df1.join(df2, left_key="bid", right_key="bid")
+            result = result.join(df3, left_key="cid", right_key="cid")
+            result = result.join(df4, left_key="did", right_key="did")
+            return result[["x", "y", "z", "w"]]
+
+        dtypes1 = {"bid": np.int64, "cid": np.int64, "did": np.int64, "x": np.float32}
+        dtypes2 = {"bid": np.int64, "y": np.float32}
+        dtypes3 = {"cid": np.int64, "z": np.float32}
+        dtypes4 = {"did": np.int64, "w": np.float32}
+
+        feeds = {
+            "bid": np.array([1, 2, 3], dtype=np.int64),
+            "cid": np.array([10, 20, 30], dtype=np.int64),
+            "did": np.array([100, 200, 300], dtype=np.int64),
+            "x": np.array([1.0, 2.0, 3.0], dtype=np.float32),
+            "bid_right": np.array([2, 3], dtype=np.int64),
+            "y": np.array([200.0, 300.0], dtype=np.float32),
+            "cid_right": np.array([20, 30], dtype=np.int64),
+            "z": np.array([20.0, 30.0], dtype=np.float32),
+            # d has only did=200 → only a[1] survives all joins
+            "did_right": np.array([200], dtype=np.int64),
+            "w": np.array([2000.0], dtype=np.float32),
+        }
+        x_out, y_out, z_out, w_out = self._run_tracer(
+            transform, [dtypes1, dtypes2, dtypes3, dtypes4], feeds
+        )
+        np.testing.assert_allclose(x_out, np.array([2.0], dtype=np.float32))
+        np.testing.assert_allclose(y_out, np.array([200.0], dtype=np.float32))
+        np.testing.assert_allclose(z_out, np.array([20.0], dtype=np.float32))
+        np.testing.assert_allclose(w_out, np.array([2000.0], dtype=np.float32))
+
 
 if __name__ == "__main__":
     unittest.main()
