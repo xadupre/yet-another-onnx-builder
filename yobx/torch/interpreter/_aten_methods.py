@@ -43,7 +43,7 @@ def aten_meth_add_(
     name: str = "meth_add_",
 ) -> T:
     "``add_``"
-    raise RuntimeError("This should not happend.")
+    raise RuntimeError(f"This should not happend.\n{g.get_debug_msg()}")
 
 
 def aten_meth_clamp_max(
