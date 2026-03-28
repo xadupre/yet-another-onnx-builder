@@ -9204,9 +9204,9 @@ def aten_scan(
     # Body inputs: carry states keep the init-state element type; scan inputs
     # keep the corresponding scan-input element type.
     # elem_type 0 means unknown/untyped; mkv_typed falls back to untyped mkv in that case.
-    body_input_elem_types = [
-        g.get_type(s) if g.has_type(s) else 0 for s in scan_inits
-    ] + [g.get_type(s) if g.has_type(s) else 0 for s in scan_inputs]
+    body_input_elem_types = [g.get_type(s) if g.has_type(s) else 0 for s in scan_inits] + [
+        g.get_type(s) if g.has_type(s) else 0 for s in scan_inputs
+    ]
 
     # Body outputs: try to read from the local function builder's output types.
     loc_builder = (

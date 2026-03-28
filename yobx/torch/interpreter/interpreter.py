@@ -587,7 +587,9 @@ class DynamoInterpreter:
                 dtype = self.builder.get_type(name)
                 if self.builder.has_shape(name):
                     full_shape = self.builder.get_shape(name)
-                    shape = full_shape[1:] if strip_first_dim and len(full_shape) > 1 else full_shape
+                    shape = (
+                        full_shape[1:] if strip_first_dim and len(full_shape) > 1 else full_shape
+                    )
                 elif self.builder.has_rank(name):
                     rank = self.builder.get_rank(name)
                     n = max(0, rank - 1) if strip_first_dim else rank
