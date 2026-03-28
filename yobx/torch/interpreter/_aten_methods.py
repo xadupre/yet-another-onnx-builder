@@ -12,6 +12,7 @@ from ...xshape.shape_type_compute import (
 )
 from ._aten_functions import (
     torch_dtype_to_onnx_dtype,
+    aten_add__Tensor,
     aten_clamp_max,
     aten_clamp_min,
     aten_cos,
@@ -30,6 +31,19 @@ def aten_meth_bool(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List
     import torch
 
     return aten_meth_to(g, sts, outputs, x, dtype=torch.bool)
+
+
+def aten_meth_add_(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    alpha: Optional[Any] = None,
+    name: str = "meth_add_",
+) -> T:
+    "``add_``"
+    return aten_add__Tensor(g, sts, outputs, x, y, alpha=alpha, name=name)
 
 
 def aten_meth_clamp_max(
