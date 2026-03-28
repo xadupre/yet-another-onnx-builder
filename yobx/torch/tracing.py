@@ -115,6 +115,42 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 )
                 return root.tracer.proxy(node)
 
+            if isinstance(orig_method, ScanCCOp):
+                # args = (f, init_states, scan_inputs, additional_inputs[, dim, reverse])
+                # Find a root proxy from the tensor lists so we can access the tracer.
+                root = None
+                for lst in (args[1], args[2], args[3] if len(args) > 3 else []):
+                    if not isinstance(lst, (list, tuple)):
+                        continue
+                    for a in lst:
+                        if isinstance(a, CustomProxy):
+                            root = a
+                            break
+                    if root is not None:
+                        break
+                assert (
+                    root is not None
+                ), f"Unable to find a proxy in scan args={args}, orig_method={orig_method}"
+                scan_fn = args[0]
+                init_states = args[1]
+                scan_inputs = args[2]
+                additional_inputs = (
+                    args[3] if len(args) > 3 else (kwargs or {}).get("additional_inputs", [])
+                )
+                scan_fn_node = root.tracer.register_callable("scan", scan_fn)
+                init_nodes = [a.node if hasattr(a, "node") else a for a in init_states]
+                scan_nodes = [a.node if hasattr(a, "node") else a for a in scan_inputs]
+                add_nodes = [
+                    a.node if hasattr(a, "node") else a for a in (additional_inputs or [])
+                ]
+                node = root.tracer.create_node(
+                    "call_function",
+                    orig_method,
+                    args=(scan_fn_node, init_nodes, scan_nodes, add_nodes),
+                    kwargs={},
+                )
+                return root.tracer.proxy(node)
+
         return torch.fx.proxy.Proxy.__torch_function__(
             orig_method, types, args=args, kwargs=kwargs
         )
@@ -303,6 +339,33 @@ class CondCCOp(torch._ops.HigherOrderOperator):
         return super().__call__(pred, true_fn, false_fn, operands)
 
 
+class ScanCCOp(torch._ops.HigherOrderOperator):
+    """
+    Replacement for :func:`torch.ops.higher_order.scan` during FX symbolic
+    tracing. The real scan operator cannot be called with :class:`CustomProxy`
+    arguments because it tries to execute the body function eagerly. This proxy
+    operator defers to :meth:`CustomProxy.__torch_function__` which records the
+    scan call as a FX ``call_function`` node instead.
+    """
+
+    def __init__(self):
+        # use "scancc" to avoid shadowing the real "scan" operator
+        super().__init__("scancc")
+
+    def __call__(
+        self,
+        f: Callable,
+        init_states: List,
+        scan_inputs: List,
+        additional_inputs: Optional[List] = None,
+        dim: int = 0,
+        reverse: bool = False,
+    ):
+        return super().__call__(
+            f, init_states, scan_inputs, additional_inputs or [], dim, reverse
+        )
+
+
 def _vmap_for_tracing(func: Callable, in_dims: Any = 0, out_dims: Any = 0, **kwargs) -> Callable:
     """
     Replacement for :func:`torch.vmap` during FX symbolic tracing.
@@ -339,8 +402,12 @@ def replace_problematic_function_before_tracing() -> Generator:
     Replaces function that cannot be traced with the default tracer
     such as :func:`torch.cat`.
     """
+    _scan_op = getattr(torch.ops.higher_order, "scan", None)
     saved = {"cat": torch.cat, "cond": torch.cond, "vmap": torch.vmap}
     newf = {"cat": CustomProxy.cat, "cond": CondCCOp(), "vmap": _vmap_for_tracing}
+    if _scan_op is not None:
+        saved[(torch.ops.higher_order, "scan")] = _scan_op
+        newf[(torch.ops.higher_order, "scan")] = ScanCCOp()
     for k, v in newf.items():
         if isinstance(k, tuple):
             setattr(k[0], k[1], v)
@@ -850,6 +917,9 @@ class CustomTracer(torch.fx.Tracer):
                 elif isinstance(node.target, CondCCOp):
                     n += 1
                     node.target = torch.ops.higher_order.cond
+                elif isinstance(node.target, ScanCCOp):
+                    n += 1
+                    node.target = torch.ops.higher_order.scan
         return n
 
     @classmethod
