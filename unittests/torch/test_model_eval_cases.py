@@ -146,6 +146,12 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_vmap_tracing(self):
         evaluation(cases="Vmap", exporters="yobx-tracing", quiet=False, dynamic=True)
 
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_yobx_tracing_scan_cdist(self):
+        evaluation(
+            cases="ControlFlowScanCDist", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

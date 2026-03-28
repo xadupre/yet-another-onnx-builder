@@ -9157,6 +9157,12 @@ def aten_scan(
         return value_info_proto
 
     loc = g.get_local_function(scan_graph, g.local_domain)
+    # When the tracing-based exporter is used, _get_output_names produces a
+    # single output name because node.meta["val"] is not set.  Expand it to
+    # match the number of outputs in the body function, using the same "#i"
+    # suffix convention as aten_cond.
+    if len(outputs) == 1 and len(loc.output) != 1:
+        outputs = [f"{outputs[0]}#{i}" for i in range(len(loc.output))]
     assert len(loc.output) == len(outputs), (
         f"Mismatched number of outputs loc.output={loc.output}, "
         f"outputs={outputs}{g.get_debug_msg()}"
@@ -9218,7 +9224,7 @@ def aten_scan(
         scan_output_axes=[dim for _ in range(n_outputs)],
         scan_output_directions=[(1 if reverse else 0) for _ in range(n_outputs)],
     )
-    return outputs
+    return tuple(outputs) if len(outputs) > 1 else outputs
 
 
 def aten_while_loop(
