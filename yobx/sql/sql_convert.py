@@ -92,10 +92,7 @@ def sql_to_onnx_graph(
     query: str,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[
-        Union[
-            Dict[str, Union[np.dtype, type, str]],
-            List[Dict[str, Union[np.dtype, type, str]]],
-        ]
+        Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]]
     ] = None,
 ) -> List[str]:
     """
@@ -167,10 +164,7 @@ def sql_to_onnx(
     query: str,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
     right_input_dtypes: Optional[
-        Union[
-            Dict[str, Union[np.dtype, type, str]],
-            List[Dict[str, Union[np.dtype, type, str]]],
-        ]
+        Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]]
     ] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
@@ -270,7 +264,7 @@ def sql_to_onnx(
     if _is_dataframe(input_dtypes):  # type: ignore
         input_dtypes = _dataframe_to_dtypes(input_dtypes)  # type: ignore
     if isinstance(right_input_dtypes, list):
-        right_input_dtypes = [
+        right_input_dtypes = [  # type: ignore
             _dataframe_to_dtypes(rd) if _is_dataframe(rd) else rd  # type: ignore
             for rd in right_input_dtypes
         ]
@@ -823,10 +817,7 @@ def _populate_graph(
     pq: ParsedQuery,
     input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
     right_input_dtypes: Optional[
-        Union[
-            Dict[str, Union[np.dtype, type, str]],
-            List[Dict[str, Union[np.dtype, type, str]]],
-        ]
+        Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]]
     ] = None,
     custom_functions: Optional[Dict[str, Callable]] = None,
     desired_outputs: Optional[List[str]] = None,
@@ -987,7 +978,7 @@ def _populate_graph(
                 # of at least one JoinOp.  Find its join and use that join's
                 # rename map to get the ONNX tensor name.
                 onnx_name = col
-                for ji, jop in enumerate(join_ops):
+                for ji, _jop in enumerate(join_ops):
                     if col in per_join_right_col_onnx_name[ji]:
                         onnx_name = per_join_right_col_onnx_name[ji][col]
                         break
@@ -1096,7 +1087,7 @@ def _populate_graph(
                 per_join_right_col_maps.append(rcm)
         elif sql_per_join_rename:
             # SQL-string path with per-join right dtypes or same-name clash.
-            for ji, jop in enumerate(join_ops):
+            for ji, _jop in enumerate(join_ops):
                 jrd = _per_join_right_dtypes(ji)
                 rename_i = sql_per_join_rename[ji] if ji < len(sql_per_join_rename) else {}
                 rcm = {}

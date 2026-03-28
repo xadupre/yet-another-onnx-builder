@@ -705,12 +705,7 @@ class TestSqlToOnnxJoin(ExtTestCase):
             "JOIN c ON a.cid = c.cid "
             "JOIN d ON a.did = d.did"
         )
-        left_dtypes = {
-            "bid": np.int64,
-            "cid": np.int64,
-            "did": np.int64,
-            "x": np.float32,
-        }
+        left_dtypes = {"bid": np.int64, "cid": np.int64, "did": np.int64, "x": np.float32}
         right_dtypes_b = {"bid": np.int64, "y": np.float32}
         right_dtypes_c = {"cid": np.int64, "z": np.float32}
         right_dtypes_d = {"did": np.int64, "w": np.float32}
@@ -719,9 +714,7 @@ class TestSqlToOnnxJoin(ExtTestCase):
         # c: cid=[20,30]  → a[0] excluded (already), a[1] and a[2] survive
         # d: did=[200]    → only a[1] (did=200) survives all three joins
         onx = sql_to_onnx(
-            sql,
-            left_dtypes,
-            right_input_dtypes=[right_dtypes_b, right_dtypes_c, right_dtypes_d],
+            sql, left_dtypes, right_input_dtypes=[right_dtypes_b, right_dtypes_c, right_dtypes_d]
         )
         ref = ExtendedReferenceEvaluator(onx)
         feeds = {
