@@ -120,6 +120,10 @@ class MulDivCancellerTransformer(CommonTransformer):
         den_counter = Counter(denom_keys)
 
         common_keys = set(num_counter.keys()) & set(den_counter.keys())
+        if not common_keys:
+            # Nothing to cancel; return the node unchanged to preserve the
+            # original expression structure (e.g. a*(b//c) ≠ (a*b)//c).
+            return node
         for k in common_keys:
             cancel = min(num_counter[k], den_counter[k])
             num_counter[k] -= cancel
@@ -156,6 +160,29 @@ class MaxToXorTransformer(CommonTransformer):
         ):
             a, b = node.args
             return ast.BinOp(left=a, op=ast.BitXor(), right=b)
+
+        return node
+
+
+class CeilToIntTransformer(CommonTransformer):
+    """Replaces ``CeilToInt(x, n)`` by ``(x+n-1)//n`` (ceiling division)."""
+
+    def visit_Call(self, node):
+        node = self.generic_visit(node)
+
+        if (
+            isinstance(node.func, ast.Name)
+            and node.func.id == "CeilToInt"
+            and len(node.args) == 2
+        ):
+            x, n = node.args
+            # Fold constant: when n is a literal integer, use (x + (n-1)) directly
+            if isinstance(n, ast.Constant) and isinstance(n.value, int):
+                n_minus_1 = ast.Constant(value=n.value - 1)
+            else:
+                n_minus_1 = ast.BinOp(left=n, op=ast.Sub(), right=ast.Constant(value=1))
+            numerator = ast.BinOp(left=x, op=ast.Add(), right=n_minus_1)
+            return ast.BinOp(left=numerator, op=ast.FloorDiv(), right=n)
 
         return node
 
@@ -233,6 +260,24 @@ class ExpressionSimplifierAddVisitor(CommonVisitor):
         else:
             self.coeffs[s] += 1
 
+    @staticmethod
+    def _needs_mul_parens(var: str) -> bool:
+        """Returns True if *var* contains ``//`` or ``%`` outside balanced
+        parentheses, meaning it must be wrapped in ``(…)`` when used as a
+        multiplicand to preserve the intended operator precedence."""
+        depth = 0
+        i = 0
+        while i < len(var):
+            c = var[i]
+            if c == "(":
+                depth += 1
+            elif c == ")":
+                depth -= 1
+            elif depth == 0 and (var[i : i + 2] in ("//",) or c == "%"):
+                return True
+            i += 1
+        return False
+
     def make_simplified(self) -> Union[str, int]:
         if not self.coeffs:
             return self.const
@@ -245,7 +290,12 @@ class ExpressionSimplifierAddVisitor(CommonVisitor):
             elif coeff == -1:
                 terms.append(f"-{var}")
             else:
-                terms.append(f"{'+' if coeff > 0 else ''}{coeff}*{var}")
+                # Wrap the variable in parentheses when it contains a
+                # floor-division or modulo at the top level: ``*`` and ``//``
+                # share the same precedence, so ``k*a//n`` is ``(k*a)//n``
+                # rather than ``k*(a//n)``.
+                wrapped = f"({var})" if self._needs_mul_parens(var) else var
+                terms.append(f"{'+' if coeff > 0 else ''}{coeff}*{wrapped}")
         if self.const != 0:
             terms.append(f"{'+' if self.const > 0 else ''}{self.const}")
         result = "".join(terms)
@@ -400,6 +450,7 @@ def simplify_expression(expr: Union[str, int]) -> Union[str, int]:
     assert isinstance(expr, str), f"Unexpected type {expr} for the expression."
     tree = ast.parse(expr, mode="eval")
     transformers = [
+        CeilToIntTransformer(expr=expr),
         SimpleSimpliflyTransformer(expr=expr),
         MulDivCancellerTransformer(expr=expr),
         ExactMulDivConstantFolderTransformer(expr=expr),

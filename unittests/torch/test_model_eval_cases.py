@@ -106,6 +106,14 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    def test_run_exporter_crop_last_dim_tensor_content_tracing(self):
+        evaluation(
+            cases="CropLastDimensionWithTensorContent",
+            exporters="yobx-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_dimension0(self):
         evaluation(
             cases="ExportWithDimension0",
@@ -134,6 +142,9 @@ class TestModelEvalCases(ExtTestCase):
     @requires_torch("2.7", "scan")
     def test_run_exporter_vmap_python_yobx(self):
         evaluation(cases="VmapPython", exporters="yobx", quiet=False, dynamic=True)
+
+    def test_run_exporter_vmap_tracing(self):
+        evaluation(cases="Vmap", exporters="yobx-tracing", quiet=False, dynamic=True)
 
 
 if __name__ == "__main__":

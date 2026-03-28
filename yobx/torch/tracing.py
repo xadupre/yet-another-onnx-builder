@@ -303,14 +303,44 @@ class CondCCOp(torch._ops.HigherOrderOperator):
         return super().__call__(pred, true_fn, false_fn, operands)
 
 
+def _vmap_for_tracing(func: Callable, in_dims: Any = 0, out_dims: Any = 0, **kwargs) -> Callable:
+    """
+    Replacement for :func:`torch.vmap` during FX symbolic tracing.
+
+    During tracing all model arguments are :class:`torch.fx.proxy.Proxy` objects,
+    so the real vmap dispatch cannot run. This wrapper traces through the body of
+    *func* directly with the (still-batched) proxy arguments.
+
+    :param func: the function to be mapped over the batch dimension
+    :param in_dims: accepted for API compatibility with :func:`torch.vmap` but ignored
+        during tracing — the full batched tensors are passed directly to *func*
+    :param out_dims: accepted for API compatibility with :func:`torch.vmap` but ignored
+        during tracing
+    :param kwargs: any additional keyword arguments accepted for API compatibility
+        but ignored during tracing
+
+    .. warning::
+        This replacement is only correct when *func* applies element-wise operations
+        so that ``func(x_batch)`` is equivalent to ``vmap(func)(x_batch)`` (i.e. the
+        function commutes with batching).  Non-element-wise functions — for example
+        those that call :func:`torch.mm` across the batch axis — will produce an
+        incorrect trace.
+    """
+
+    def wrapped(*args):
+        return func(*args)
+
+    return wrapped
+
+
 @contextlib.contextmanager
 def replace_problematic_function_before_tracing() -> Generator:
     """
     Replaces function that cannot be traced with the default tracer
     such as :func:`torch.cat`.
     """
-    saved = {"cat": torch.cat, "cond": torch.cond}
-    newf = {"cat": CustomProxy.cat, "cond": CondCCOp()}
+    saved = {"cat": torch.cat, "cond": torch.cond, "vmap": torch.vmap}
+    newf = {"cat": CustomProxy.cat, "cond": CondCCOp(), "vmap": _vmap_for_tracing}
     for k, v in newf.items():
         if isinstance(k, tuple):
             setattr(k[0], k[1], v)

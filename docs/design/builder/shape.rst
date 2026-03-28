@@ -519,11 +519,6 @@ The registry is also used by
 internal opaque tokens (e.g. ``"s0"``, ``"DYN0"``) with user-visible names
 once the relationships between them are known.
 
-.. seealso::
-
-    :ref:`l-plot-shape-constraints` — sphinx-gallery example demonstrating the
-    constraint mechanism end-to-end.
-
 Implementing a new shape function
 ==================================
 

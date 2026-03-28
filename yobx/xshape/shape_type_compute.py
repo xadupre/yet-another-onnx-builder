@@ -1467,11 +1467,11 @@ def _set_shape_type_op_any_split(self: ShapeBuilder, node: NodeProto):
                     dims = [d for i in range(no - 1)]
                     dims.append(dim - d * (no - 1))
             else:
-                dims = [f"CeilToInt({dim},{no})" for i in range(no)]
+                dims = [f"({dim}+{no-1})//{no}" for i in range(no)]
                 dims[-1] = (
-                    f"{dim}-{no-1}*CeilToInt({dim},{no})"
+                    f"{dim}-{no-1}*(({dim}+{no-1})//{no})"
                     if no > 2
-                    else f"{dim}-CeilToInt({dim},{no})"
+                    else f"{dim}-({dim}+{no-1})//{no}"
                 )
             li = list(self.get_shape(node.input[0]))
             for d, o in zip(dims, node.output):
