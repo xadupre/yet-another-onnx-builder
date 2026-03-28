@@ -1006,6 +1006,48 @@ class TestInputDtypesAsDataFrame(ExtTestCase):
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b)
 
+    def test_to_onnx_callable_with_tuple_of_dataframe(self):
+        """to_onnx(callable, (DataFrame,)) works — the primary form requested in the issue."""
+        from yobx.sql import to_onnx
+
+        df = self._make_df()
+        if df is None:
+            self.skipTest("pandas not available")
+
+        def transform(traced_df):
+            traced_df = traced_df.filter(traced_df["a"] > 0)
+            return traced_df.select([(traced_df["a"] + traced_df["b"]).alias("total")])
+
+        # tuple wrapping a single DataFrame — should behave identically to passing df directly
+        artifact = to_onnx(transform, (df,))
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, np.array([5.0, 9.0], dtype=np.float32))
+
+    def test_to_onnx_callable_with_tuple_of_two_dataframes(self):
+        """to_onnx(callable, (df1, df2)) works for multi-frame transforms."""
+        try:
+            import pandas as pd
+        except ImportError:
+            self.skipTest("pandas not available")
+
+        from yobx.sql import to_onnx
+
+        df1 = pd.DataFrame({"a": np.array([1.0, 2.0], dtype=np.float32)})
+        df2 = pd.DataFrame({"b": np.array([3.0, 4.0], dtype=np.float32)})
+
+        def transform(traced_df1, traced_df2):
+            return traced_df1.select([(traced_df1["a"] + traced_df2["b"]).alias("total")])
+
+        artifact = to_onnx(transform, (df1, df2))
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+
 
 if __name__ == "__main__":
     unittest.main()

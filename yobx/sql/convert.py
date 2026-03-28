@@ -302,6 +302,8 @@ def to_onnx(
         Union[
             np.ndarray,
             Tuple[np.ndarray, ...],
+            "pandas.DataFrame",  # type: ignore # noqa: F821
+            Tuple["pandas.DataFrame", ...],  # type: ignore # noqa: F821
             Dict[str, Union[np.dtype, type, str]],
             List[Dict[str, Union[np.dtype, type, str]]],
         ]
