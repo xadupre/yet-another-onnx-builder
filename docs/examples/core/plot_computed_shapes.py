@@ -43,6 +43,50 @@ TFLOAT = onnx.TensorProto.FLOAT
 
 
 # %%
+# Helper functions for shape inference
+# --------------------------------------
+#
+# The three shape-inference approaches used throughout this example are each
+# wrapped in a small helper so the same logic can be reused without repetition.
+
+
+def infer_shapes_onnx(model: onnx.ModelProto) -> dict:
+    """Run :func:`onnx.shape_inference.infer_shapes`; return ``{name: shape}``."""
+    inferred = onnx.shape_inference.infer_shapes(model)
+    shapes = {}
+    for vi in [*inferred.graph.input, *inferred.graph.value_info, *inferred.graph.output]:
+        t = vi.type.tensor_type
+        if t.HasField("shape"):
+            shapes[vi.name] = tuple(
+                d.dim_param if d.dim_param else (d.dim_value if d.dim_value else None)
+                for d in t.shape.dim
+            )
+        else:
+            shapes[vi.name] = "unknown"
+    return shapes
+
+
+def infer_shapes_onnx_ir(model: onnx.ModelProto) -> dict:
+    """Run onnx-shape-inference :func:`infer_symbolic_shapes`; return ``{name: shape}``."""
+    ir_model = ir.serde.deserialize_model(model)
+    ir_model = infer_symbolic_shapes(ir_model)
+    shapes = {}
+    for v in ir_model.graph.inputs:
+        shapes[v.name] = str(v.shape)
+    for node in ir_model.graph:
+        for out in node.outputs:
+            shapes[out.name] = str(out.shape)
+    return shapes
+
+
+def infer_shapes_basic(model: onnx.ModelProto) -> BasicShapeBuilder:
+    """Run :class:`BasicShapeBuilder` over *model*; return the populated builder."""
+    b = BasicShapeBuilder()
+    b.run_model(model)
+    return b
+
+
+# %%
 # Build a small model
 # --------------------
 #
@@ -83,19 +127,9 @@ model = oh.make_model(
 # For dynamic dimensions the inferred shapes for intermediate results are
 # often unknown (``None``).
 
-inferred = onnx.shape_inference.infer_shapes(model)
-
 print("=== onnx.shape_inference.infer_shapes ===")
-for vi in [*inferred.graph.input, *inferred.graph.value_info, *inferred.graph.output]:
-    t = vi.type.tensor_type
-    if t.HasField("shape"):
-        shape = tuple(
-            d.dim_param if d.dim_param else (d.dim_value if d.dim_value else None)
-            for d in t.shape.dim
-        )
-    else:
-        shape = "unknown"
-    print(f"  {vi.name:15s}  shape={shape}")
+for name, shape in infer_shapes_onnx(model).items():
+    print(f"  {name:15s}  shape={shape}")
 
 # %%
 # Shape inference with onnx-shape-inference (PyPI)
@@ -112,16 +146,7 @@ for vi in [*inferred.graph.input, *inferred.graph.value_info, *inferred.graph.ou
 # the ``[0, 0, -1]`` constant shape tensor is not yet fully evaluated by this
 # library.
 
-ir_model = ir.serde.deserialize_model(model)
-ir_model = infer_symbolic_shapes(ir_model)
-
-# Build a name → shape mapping for all values in the graph.
-onnx_ir_shapes: dict[str, str] = {}
-for v in ir_model.graph.inputs:
-    onnx_ir_shapes[v.name] = str(v.shape)
-for node in ir_model.graph:
-    for out in node.outputs:
-        onnx_ir_shapes[out.name] = str(out.shape)
+onnx_ir_shapes = infer_shapes_onnx_ir(model)
 
 print("=== onnx-shape-inference (infer_symbolic_shapes) ===")
 for name in ["X", "Y", "added", "concat_out", "Z"]:
@@ -137,8 +162,7 @@ for name in ["X", "Y", "added", "concat_out", "Z"]:
 # the output shape as a function of the input dimensions.
 
 
-builder = BasicShapeBuilder()
-builder.run_model(model)
+builder = infer_shapes_basic(model)
 
 print("\n=== BasicShapeBuilder ===")
 for name in ["X", "Y", "added", "concat_out", "Z"]:
@@ -252,8 +276,7 @@ nz_model_anon = oh.make_model(
     ir_version=10,
 )
 
-builder_anon = BasicShapeBuilder()
-builder_anon.run_model(nz_model_anon)
+builder_anon = infer_shapes_basic(nz_model_anon)
 
 print("=== NonZero — anonymous output shape ===")
 print(f"  {'nz':10s}  shape={builder_anon.get_shape('nz')}")
@@ -291,8 +314,7 @@ nz_model_named = oh.make_model(
     ir_version=10,
 )
 
-builder_named = BasicShapeBuilder()
-builder_named.run_model(nz_model_named)
+builder_named = infer_shapes_basic(nz_model_named)
 
 print("\n=== NonZero — named output shape ===")
 print(f"  {'nz':10s}  shape={builder_named.get_shape('nz')}")
@@ -306,34 +328,16 @@ print(f"  Constraints: {builder_named.get_registered_constraints()}")
 # The table below contrasts what each shape-inference tool reports for the
 # ``NonZero`` output under both configurations.
 
-nz_inferred_anon = onnx.shape_inference.infer_shapes(nz_model_anon)
-nz_inferred_named = onnx.shape_inference.infer_shapes(nz_model_named)
-
-# onnx.shape_inference shapes (for the 'nz' output specifically)
-nz_onnx_shapes: dict[str, str] = {}
-for _model, _key in [(nz_inferred_anon, "anon"), (nz_inferred_named, "named")]:
-    for vi in _model.graph.output:
-        if vi.name != "nz":
-            continue
-        t = vi.type.tensor_type
-        if t.HasField("shape"):
-            shape = tuple(
-                d.dim_param if d.dim_param else (d.dim_value if d.dim_value else "?")
-                for d in t.shape.dim
-            )
-        else:
-            shape = ("unknown",)
-        nz_onnx_shapes[_key] = str(shape)
+nz_onnx_shapes = {
+    "anon": str(infer_shapes_onnx(nz_model_anon).get("nz", "—")),
+    "named": str(infer_shapes_onnx(nz_model_named).get("nz", "—")),
+}
 
 # onnx-shape-inference shapes (for the 'nz' node output specifically)
-nz_ir_shapes: dict[str, str] = {}
-for _model, _key in [(nz_model_anon, "anon"), (nz_model_named, "named")]:
-    _ir_model = ir.serde.deserialize_model(_model)
-    _ir_model = infer_symbolic_shapes(_ir_model)
-    for node in _ir_model.graph:
-        for out in node.outputs:
-            if out.name == "nz":
-                nz_ir_shapes[_key] = str(out.shape)
+nz_ir_shapes = {
+    "anon": infer_shapes_onnx_ir(nz_model_anon).get("nz", "—"),
+    "named": infer_shapes_onnx_ir(nz_model_named).get("nz", "—"),
+}
 
 # BasicShapeBuilder shapes
 nz_builder_shapes = {
