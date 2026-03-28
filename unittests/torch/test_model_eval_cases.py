@@ -154,6 +154,14 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_inplace_add2_tracing(self):
         evaluation(cases="InplaceAdd2", exporters="yobx-tracing", quiet=False, dynamic=True)
 
+    def test_run_exporter_inplace_add_mul_tracing(self):
+        evaluation(cases="InplaceAdd_Mul", exporters="yobx-tracing", quiet=False, dynamic=True)
+
+    def test_run_exporter_inplace_clone_add_tracing(self):
+        evaluation(
+            cases="InplaceCloneAdd_", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
