@@ -29,7 +29,6 @@ works and a comparison table with :func:`onnx.shape_inference.infer_shapes`.
 """
 
 import numpy as np
-import matplotlib.pyplot as plt
 import pandas
 import onnx
 import onnx_ir as ir
@@ -40,6 +39,7 @@ from onnx_shape_inference import infer_symbolic_shapes
 from yobx.xshape import BasicShapeBuilder
 
 TFLOAT = onnx.TensorProto.FLOAT
+TINT64 = onnx.TensorProto.INT64
 
 
 # %%
@@ -228,69 +228,6 @@ print(pandas.DataFrame(data).pivot(index=["result", "dimension"], columns="col",
 # ``NEWDIM_nonzero_0 = nnz``.  The dimension naming step then renames the
 # internal token to the user-visible name across all shapes.
 
-TINT64 = onnx.TensorProto.INT64
-
-# %%
-# Without named output shape
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~
-#
-# The output of ``NonZero`` has shape ``(rank_of_input, num_nonzero_elements)``.
-# With no dimension names declared on the graph output, the second dimension
-# receives the internal placeholder ``NEWDIM_nonzero_0`` and no constraint is
-# stored.
-#
-# The graph surrounds ``NonZero`` with additional operators to form a realistic
-# seven-node pipeline — four pre-processing operators feed into ``NonZero`` and
-# two post-processing operators consume its output:
-#
-# 1. ``Abs``       — take the absolute value of the input
-# 2. ``Relu``      — keep positive elements, zero out others
-# 3. ``Add``       — double the positive values
-# 4. ``Mul``       — square the doubled values
-# 5. ``NonZero``   — collect indices of non-zero elements (output: ``nz``)
-# 6. ``Transpose`` — swap axes of the index matrix (``[rank, nnz]`` → ``[nnz, rank]``)
-# 7. ``Cast``      — convert the INT64 indices to FLOAT (output: ``nz_float``)
-#
-# Both ``nz`` (the NonZero output) and ``nz_float`` (the final FLOAT output) are
-# exposed as graph outputs so that shape constraints can be declared on ``nz``.
-
-nz_model_anon = oh.make_model(
-    oh.make_graph(
-        [
-            oh.make_node("Abs", ["X"], ["abs_out"]),
-            oh.make_node("Relu", ["abs_out"], ["relu_out"]),
-            oh.make_node("Add", ["relu_out", "relu_out"], ["double_out"]),
-            oh.make_node("Mul", ["double_out", "relu_out"], ["mul_out"]),
-            oh.make_node("NonZero", ["mul_out"], ["nz"]),
-            oh.make_node("Transpose", ["nz"], ["transposed_nz"]),
-            oh.make_node("Cast", ["transposed_nz"], ["nz_float"], to=TFLOAT),
-        ],
-        "nonzero_anon",
-        [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq"])],
-        [
-            oh.make_tensor_value_info("nz", TINT64, [None, None]),
-            oh.make_tensor_value_info("nz_float", TFLOAT, [None, None]),
-        ],
-    ),
-    opset_imports=[oh.make_opsetid("", 18)],
-    ir_version=10,
-)
-
-builder_anon = infer_shapes_basic(nz_model_anon)
-
-print("=== NonZero — anonymous output shape ===")
-print(f"  {'nz':10s}  shape={builder_anon.get_shape('nz')}")
-print(f"  {'nz_float':10s}  shape={builder_anon.get_shape('nz_float')}")
-print(f"  Constraints: {builder_anon.get_registered_constraints()}")
-
-# %%
-# With named output shape
-# ~~~~~~~~~~~~~~~~~~~~~~~
-#
-# Declaring the output shape as ``["rank", "nnz"]`` causes
-# :meth:`run_value_info` to register the constraint
-# ``NEWDIM_nonzero_0 = nnz``.  The naming step then replaces the internal
-# token throughout all tracked shapes so the user sees ``nnz`` everywhere.
 
 nz_model_named = oh.make_model(
     oh.make_graph(
@@ -307,84 +244,33 @@ nz_model_named = oh.make_model(
         [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq"])],
         [
             oh.make_tensor_value_info("nz", TINT64, ["rank", "nnz"]),
-            oh.make_tensor_value_info("nz_float", TFLOAT, [None, None]),
+            oh.make_tensor_value_info("nz_float", TFLOAT, ["do1", "do2"]),
         ],
     ),
     opset_imports=[oh.make_opsetid("", 18)],
     ir_version=10,
 )
 
-builder_named = infer_shapes_basic(nz_model_named)
+# %%
+# with onnx.shape_inference.infer_shapes
+print("=== onnx.shape_inference.infer_shapes ===")
+for name, shape in infer_shapes_onnx(nz_model_named).items():
+    print(f"  {name:15s}  shape={shape}")
 
-print("\n=== NonZero — named output shape ===")
-print(f"  {'nz':10s}  shape={builder_named.get_shape('nz')}")
-print(f"  {'nz_float':10s}  shape={builder_named.get_shape('nz_float')}")
-print(f"  Constraints: {builder_named.get_registered_constraints()}")
 
 # %%
-# Plot: named vs anonymous output shape for NonZero
-# --------------------------------------------------
-#
-# The table below contrasts what each shape-inference tool reports for the
-# ``NonZero`` output under both configurations.
+# with onnx-shape-inference
 
-nz_onnx_shapes = {
-    "anon": str(infer_shapes_onnx(nz_model_anon).get("nz", "—")),
-    "named": str(infer_shapes_onnx(nz_model_named).get("nz", "—")),
-}
+onnx_ir_shapes = infer_shapes_onnx_ir(nz_model_named)
 
-# onnx-shape-inference shapes (for the 'nz' node output specifically)
-nz_ir_shapes = {
-    "anon": infer_shapes_onnx_ir(nz_model_anon).get("nz", "—"),
-    "named": infer_shapes_onnx_ir(nz_model_named).get("nz", "—"),
-}
+print("=== onnx-shape-inference (infer_symbolic_shapes) ===")
+for name in ["X", "Y", "added", "concat_out", "Z"]:
+    print(f"  {name:15s}  shape={onnx_ir_shapes.get(name, 'unknown')}")
 
-# BasicShapeBuilder shapes
-nz_builder_shapes = {
-    "anon": str(builder_anon.get_shape("nz")),
-    "named": str(builder_named.get_shape("nz")),
-}
-nz_constraints = {
-    "anon": str(builder_anon.get_registered_constraints()),
-    "named": str(builder_named.get_registered_constraints()),
-}
+# %%
+# With BasicShapeBuilder
+builder = infer_shapes_basic(nz_model_named)
 
-col_labels_nz = [
-    "output declaration",
-    "onnx.shape_inference",
-    "onnx-shape-inference",
-    "BasicShapeBuilder",
-    "constraints",
-]
-table_data_nz = [
-    [
-        "[None, None]",
-        nz_onnx_shapes.get("anon", "—"),
-        nz_ir_shapes.get("anon", "—"),
-        nz_builder_shapes["anon"],
-        nz_constraints["anon"],
-    ],
-    [
-        '["rank", "nnz"]',
-        nz_onnx_shapes.get("named", "—"),
-        nz_ir_shapes.get("named", "—"),
-        nz_builder_shapes["named"],
-        nz_constraints["named"],
-    ],
-]
-
-fig, ax = plt.subplots(figsize=(14, 2.0))
-ax.axis("off")
-tbl_nz = ax.table(cellText=table_data_nz, colLabels=col_labels_nz, loc="center", cellLoc="center")
-tbl_nz.auto_set_font_size(False)
-tbl_nz.set_fontsize(8)
-tbl_nz.auto_set_column_width(list(range(len(col_labels_nz))))
-for col in range(len(col_labels_nz)):
-    tbl_nz[0, col].set_facecolor("#4c72b0")
-    tbl_nz[0, col].set_text_props(color="white", fontweight="bold")
-# Highlight the row where the constraint is registered
-for col in range(len(col_labels_nz)):
-    tbl_nz[2, col].set_facecolor("#d5e8d4")
-ax.set_title("NonZero: impact of named output shapes on constraints", fontsize=10, pad=8)
-plt.tight_layout()
-plt.show()
+print("\n=== BasicShapeBuilder ===")
+for name in ["X", "Y", "added", "concat_out", "Z"]:
+    print(f"  {name:15s}  shape={builder.get_shape(name)}")
