@@ -215,14 +215,20 @@ TINT64 = onnx.TensorProto.INT64
 # receives the internal placeholder ``NEWDIM_nonzero_0`` and no constraint is
 # stored.
 #
-# The graph below pre-processes the input through four operations before feeding
-# it into ``NonZero``, making the pipeline five nodes in total:
+# The graph surrounds ``NonZero`` with additional operators to form a realistic
+# seven-node pipeline — four pre-processing operators feed into ``NonZero`` and
+# two post-processing operators consume its output:
 #
-# 1. ``Abs``    — take the absolute value (all non-negative)
-# 2. ``Relu``   — zero out any values already zero (no-op here, illustrative)
-# 3. ``Add``    — add the absolute value to the relu output (doubles positives)
-# 4. ``Mul``    — multiply element-wise with the relu output
-# 5. ``NonZero`` — collect indices of non-zero elements
+# 1. ``Abs``       — take the absolute value of the input
+# 2. ``Relu``      — keep positive elements, zero out others
+# 3. ``Add``       — double the positive values
+# 4. ``Mul``       — square the doubled values
+# 5. ``NonZero``   — collect indices of non-zero elements (output: ``nz``)
+# 6. ``Transpose`` — swap axes of the index matrix (``[rank, nnz]`` → ``[nnz, rank]``)
+# 7. ``Cast``      — convert the INT64 indices to FLOAT (output: ``nz_float``)
+#
+# Both ``nz`` (the NonZero output) and ``nz_float`` (the final FLOAT output) are
+# exposed as graph outputs so that shape constraints can be declared on ``nz``.
 
 nz_model_anon = oh.make_model(
     oh.make_graph(
@@ -232,10 +238,15 @@ nz_model_anon = oh.make_model(
             oh.make_node("Add", ["relu_out", "relu_out"], ["double_out"]),
             oh.make_node("Mul", ["double_out", "relu_out"], ["mul_out"]),
             oh.make_node("NonZero", ["mul_out"], ["nz"]),
+            oh.make_node("Transpose", ["nz"], ["transposed_nz"]),
+            oh.make_node("Cast", ["transposed_nz"], ["nz_float"], to=TFLOAT),
         ],
         "nonzero_anon",
         [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq"])],
-        [oh.make_tensor_value_info("nz", TINT64, [None, None])],
+        [
+            oh.make_tensor_value_info("nz", TINT64, [None, None]),
+            oh.make_tensor_value_info("nz_float", TFLOAT, [None, None]),
+        ],
     ),
     opset_imports=[oh.make_opsetid("", 18)],
     ir_version=10,
@@ -245,7 +256,8 @@ builder_anon = BasicShapeBuilder()
 builder_anon.run_model(nz_model_anon)
 
 print("=== NonZero — anonymous output shape ===")
-print(f"  {'nz':5s}  shape={builder_anon.get_shape('nz')}")
+print(f"  {'nz':10s}  shape={builder_anon.get_shape('nz')}")
+print(f"  {'nz_float':10s}  shape={builder_anon.get_shape('nz_float')}")
 print(f"  Constraints: {builder_anon.get_registered_constraints()}")
 
 # %%
@@ -265,10 +277,15 @@ nz_model_named = oh.make_model(
             oh.make_node("Add", ["relu_out", "relu_out"], ["double_out"]),
             oh.make_node("Mul", ["double_out", "relu_out"], ["mul_out"]),
             oh.make_node("NonZero", ["mul_out"], ["nz"]),
+            oh.make_node("Transpose", ["nz"], ["transposed_nz"]),
+            oh.make_node("Cast", ["transposed_nz"], ["nz_float"], to=TFLOAT),
         ],
         "nonzero_named",
         [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq"])],
-        [oh.make_tensor_value_info("nz", TINT64, ["rank", "nnz"])],
+        [
+            oh.make_tensor_value_info("nz", TINT64, ["rank", "nnz"]),
+            oh.make_tensor_value_info("nz_float", TFLOAT, [None, None]),
+        ],
     ),
     opset_imports=[oh.make_opsetid("", 18)],
     ir_version=10,
@@ -278,7 +295,8 @@ builder_named = BasicShapeBuilder()
 builder_named.run_model(nz_model_named)
 
 print("\n=== NonZero — named output shape ===")
-print(f"  {'nz':5s}  shape={builder_named.get_shape('nz')}")
+print(f"  {'nz':10s}  shape={builder_named.get_shape('nz')}")
+print(f"  {'nz_float':10s}  shape={builder_named.get_shape('nz_float')}")
 print(f"  Constraints: {builder_named.get_registered_constraints()}")
 
 # %%
@@ -291,10 +309,12 @@ print(f"  Constraints: {builder_named.get_registered_constraints()}")
 nz_inferred_anon = onnx.shape_inference.infer_shapes(nz_model_anon)
 nz_inferred_named = onnx.shape_inference.infer_shapes(nz_model_named)
 
-# onnx.shape_inference shapes
+# onnx.shape_inference shapes (for the 'nz' output specifically)
 nz_onnx_shapes: dict[str, str] = {}
 for _model, _key in [(nz_inferred_anon, "anon"), (nz_inferred_named, "named")]:
-    for vi in list(_model.graph.output):
+    for vi in _model.graph.output:
+        if vi.name != "nz":
+            continue
         t = vi.type.tensor_type
         if t.HasField("shape"):
             shape = tuple(
@@ -305,14 +325,15 @@ for _model, _key in [(nz_inferred_anon, "anon"), (nz_inferred_named, "named")]:
             shape = ("unknown",)
         nz_onnx_shapes[_key] = str(shape)
 
-# onnx-shape-inference shapes
+# onnx-shape-inference shapes (for the 'nz' node output specifically)
 nz_ir_shapes: dict[str, str] = {}
 for _model, _key in [(nz_model_anon, "anon"), (nz_model_named, "named")]:
     _ir_model = ir.serde.deserialize_model(_model)
     _ir_model = infer_symbolic_shapes(_ir_model)
     for node in _ir_model.graph:
         for out in node.outputs:
-            nz_ir_shapes[_key] = str(out.shape)
+            if out.name == "nz":
+                nz_ir_shapes[_key] = str(out.shape)
 
 # BasicShapeBuilder shapes
 nz_builder_shapes = {
