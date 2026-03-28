@@ -86,6 +86,22 @@ def infer_shapes_basic(model: onnx.ModelProto) -> BasicShapeBuilder:
     return b
 
 
+def print_shapes(shapes, names: list) -> None:
+    """Print shapes for *names* from *shapes*.
+
+    *shapes* may be either a ``{name: shape}`` dict (as returned by
+    :func:`infer_shapes_onnx` and :func:`infer_shapes_onnx_ir`) or a
+    :class:`BasicShapeBuilder` instance (as returned by
+    :func:`infer_shapes_basic`).
+    """
+    for name in names:
+        if isinstance(shapes, dict):
+            shape = shapes.get(name, "unknown")
+        else:
+            shape = shapes.get_shape(name)
+        print(f"  {name:15s}  shape={shape}")
+
+
 # %%
 # Build a small model
 # --------------------
@@ -149,8 +165,7 @@ for name, shape in infer_shapes_onnx(model).items():
 onnx_ir_shapes = infer_shapes_onnx_ir(model)
 
 print("=== onnx-shape-inference (infer_symbolic_shapes) ===")
-for name in ["X", "Y", "added", "concat_out", "Z"]:
-    print(f"  {name:15s}  shape={onnx_ir_shapes.get(name, 'unknown')}")
+print_shapes(onnx_ir_shapes, ["X", "Y", "added", "concat_out", "Z"])
 
 # %%
 # Shape inference with BasicShapeBuilder
@@ -165,8 +180,7 @@ for name in ["X", "Y", "added", "concat_out", "Z"]:
 builder = infer_shapes_basic(model)
 
 print("\n=== BasicShapeBuilder ===")
-for name in ["X", "Y", "added", "concat_out", "Z"]:
-    print(f"  {name:15s}  shape={builder.get_shape(name)}")
+print_shapes(builder, ["X", "Y", "added", "concat_out", "Z"])
 
 # %%
 # Evaluate symbolic shapes with concrete values
@@ -264,13 +278,11 @@ for name, shape in infer_shapes_onnx(nz_model_named).items():
 onnx_ir_shapes = infer_shapes_onnx_ir(nz_model_named)
 
 print("=== onnx-shape-inference (infer_symbolic_shapes) ===")
-for name in ["X", "Y", "added", "concat_out", "Z"]:
-    print(f"  {name:15s}  shape={onnx_ir_shapes.get(name, 'unknown')}")
+print_shapes(onnx_ir_shapes, ["X", "abs_out", "relu_out", "double_out", "mul_out", "nz", "transposed_nz", "nz_float"])
 
 # %%
 # With BasicShapeBuilder
 builder = infer_shapes_basic(nz_model_named)
 
 print("\n=== BasicShapeBuilder ===")
-for name in ["X", "Y", "added", "concat_out", "Z"]:
-    print(f"  {name:15s}  shape={builder.get_shape(name)}")
+print_shapes(builder, ["X", "abs_out", "relu_out", "double_out", "mul_out", "nz", "transposed_nz", "nz_float"])
