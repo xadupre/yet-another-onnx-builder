@@ -45,7 +45,7 @@ class Div_1(OpRunBinary):
             torch.uint8,
             torch.uint16,
         }:
-            return OpRunTensor(x.tensor // y.tensor)
+            return OpRunTensor(torch.div(x.tensor, y.tensor, rounding_mode="trunc"))
         return OpRunTensor(x.tensor / y.tensor)
 
 
