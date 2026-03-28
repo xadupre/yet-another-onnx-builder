@@ -294,7 +294,7 @@ def to_onnx(
         Callable[[TracedDataFrame], TracedDataFrame],  # type: ignore # noqa: F821
         "polars.LazyFrame",  # type: ignore # noqa: F821
     ],
-    args: Optional[
+    args: Optional[  # type: ignore
         Union[
             np.ndarray,
             Tuple[np.ndarray, ...],
