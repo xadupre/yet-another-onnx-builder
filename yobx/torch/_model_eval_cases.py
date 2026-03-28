@@ -330,6 +330,16 @@ class ControlFlowRanks(torch.nn.Module):
     _dynamic = {"x": {0: DIM("batch")}}
 
 
+class ControlFlowRanksType(torch.nn.Module):
+    def forward(self, x):
+        if x.ndim == 2 and (x.dtype == torch.float32 or x.dtype == torch.float16):
+            return x.clone()
+        return (x / x.ndim).to(torch.float32)
+
+    _inputs = [(torch.rand(3, 4),), (torch.rand(5, 4),)]
+    _dynamic = {"x": {0: DIM("batch")}}
+
+
 class ControlFlowCond(torch.nn.Module):
     def forward(self, x):
         def true_fn(x):

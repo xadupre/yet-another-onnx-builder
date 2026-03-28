@@ -98,6 +98,11 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_yobx_tracing_controlflow_rank(self):
         evaluation(cases="ControlFlowRanks", exporters="yobx-tracing", quiet=False, dynamic=False)
 
+    def test_run_exporter_yobx_tracing_controlflow_rank_type(self):
+        evaluation(
+            cases="ControlFlowRanksType", exporters="yobx-tracing", quiet=False, dynamic=False
+        )
+
     def test_run_exporter_crop_last_dim_tensor_content(self):
         evaluation(
             cases="CropLastDimensionWithTensorContent",
@@ -151,6 +156,9 @@ class TestModelEvalCases(ExtTestCase):
         evaluation(
             cases="ControlFlowScanCDist", exporters="yobx-tracing", quiet=False, dynamic=True
         )
+
+    def test_run_exporter_inplace_add2_tracing(self):
+        evaluation(cases="InplaceAdd2", exporters="yobx-tracing", quiet=False, dynamic=True)
 
 
 if __name__ == "__main__":

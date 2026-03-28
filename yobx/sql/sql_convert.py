@@ -91,7 +91,9 @@ def sql_to_onnx_graph(
     outputs: Optional[List[str]],
     query: str,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
-    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
+    right_input_dtypes: Optional[
+        Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]]
+    ] = None,
 ) -> List[str]:
     """
     Build ONNX nodes for a SQL *query* into an existing graph builder *g*.
@@ -161,7 +163,9 @@ def sql_to_onnx_graph(
 def sql_to_onnx(
     query: str,
     input_dtypes: Dict[str, Union[np.dtype, type, str]],
-    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
+    right_input_dtypes: Optional[
+        Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]]
+    ] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
@@ -194,10 +198,14 @@ def sql_to_onnx(
         referenced in the query need to be listed.  A pandas
         :class:`~pandas.DataFrame` is also accepted; column names and dtypes
         are extracted automatically.
-    :param right_input_dtypes: if the query contains a ``JOIN``, a mapping
-        from *right-table* column name to numpy dtype.  Defaults to
-        ``input_dtypes`` when ``None``.  A pandas :class:`~pandas.DataFrame`
-        is also accepted.
+    :param right_input_dtypes: for queries with a single ``JOIN``, a mapping
+        from *right-table* column name to numpy dtype.  For queries with
+        **multiple JOINs**, pass a list of such mappings where the *i*-th dict
+        covers the *i*-th right table (in JOIN order).  A single dict may also
+        be used with multiple JOINs when all right tables share the same column
+        schema (backward compatible).  Defaults to ``input_dtypes`` when
+        ``None``.  A pandas :class:`~pandas.DataFrame` (or a list thereof) is
+        also accepted; column names and dtypes are extracted automatically.
     :param target_opset: ONNX opset version to target (default:
         :data:`yobx.DEFAULT_TARGET_OPSET`).
     :param custom_functions: an optional mapping from function name (as it
@@ -255,7 +263,12 @@ def sql_to_onnx(
     """
     if _is_dataframe(input_dtypes):  # type: ignore
         input_dtypes = _dataframe_to_dtypes(input_dtypes)  # type: ignore
-    if _is_dataframe(right_input_dtypes):  # type: ignore
+    if isinstance(right_input_dtypes, list):
+        right_input_dtypes = [  # type: ignore
+            _dataframe_to_dtypes(rd) if _is_dataframe(rd) else rd  # type: ignore
+            for rd in right_input_dtypes
+        ]
+    elif _is_dataframe(right_input_dtypes):  # type: ignore
         right_input_dtypes = _dataframe_to_dtypes(right_input_dtypes)  # type: ignore
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
@@ -803,7 +816,9 @@ def _populate_graph(
     g: GraphBuilderExtendedProtocol,
     pq: ParsedQuery,
     input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
-    right_input_dtypes: Optional[Dict[str, Union[np.dtype, type, str]]] = None,
+    right_input_dtypes: Optional[
+        Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]]
+    ] = None,
     custom_functions: Optional[Dict[str, Callable]] = None,
     desired_outputs: Optional[List[str]] = None,
     _finalize: bool = True,
@@ -822,6 +837,8 @@ def _populate_graph(
        (tracer-produced join): columns listed there go to the right side.
     2. Otherwise (SQL-string join): columns found in *right_input_dtypes* go
        to the right side, those in *input_dtypes* go to the left side.
+       For queries with multiple JOINs, *right_input_dtypes* may be a list
+       of dicts (one per JOIN, in order).
 
     :param _finalize: when ``True`` (default) the SELECT output tensors are
         registered as ONNX model outputs.  Pass ``False`` when processing an
@@ -834,11 +851,22 @@ def _populate_graph(
     left_dtypes: Dict[str, np.dtype] = (
         {k: np.dtype(v) for k, v in input_dtypes.items()} if input_dtypes else {}
     )
-    if right_input_dtypes is not None:
-        right_dtypes: Dict[str, np.dtype] = {
-            k: np.dtype(v) for k, v in right_input_dtypes.items()
-        }
+    # right_input_dtypes may now be a List[Dict] (one per JOIN) or a single Dict.
+    # Build a flat merged dict for backward-compat code paths that still need it,
+    # and also store the structured per-join list for the multi-join path.
+    if isinstance(right_input_dtypes, list):
+        # Per-join dtypes: build a flat merged dict for compat + store list.
+        _right_per_join_raw: List[Optional[Dict]] = list(right_input_dtypes)
+        right_dtypes: Dict[str, np.dtype] = {}
+        for _rd in right_input_dtypes:
+            if _rd is not None:
+                for _k, _v in _rd.items():
+                    right_dtypes[_k] = np.dtype(_v)
+    elif right_input_dtypes is not None:
+        _right_per_join_raw = [right_input_dtypes]
+        right_dtypes = {k: np.dtype(v) for k, v in right_input_dtypes.items()}
     else:
+        _right_per_join_raw = []
         right_dtypes = left_dtypes
 
     resolved_custom_functions = custom_functions or {}
@@ -866,6 +894,7 @@ def _populate_graph(
             for item, tensor_name in zip(inner_select_op.items, inner_output_names)
         }
         right_col_map: Dict[str, str] = {}
+        per_join_right_col_maps: List[Dict[str, str]] = []
     else:
         # Build list of inputs needed for left and right tables
         # (only columns that appear in the query).
@@ -873,47 +902,96 @@ def _populate_graph(
         left_inputs: List[Tuple[str, int, Tuple]] = []
         right_inputs: List[Tuple[str, int, Tuple]] = []
 
+        # Collect ALL JoinOps (not just the first).
+        join_ops: List[JoinOp] = [op for op in pq.operations if isinstance(op, JoinOp)]
+        join_op: Optional[JoinOp] = join_ops[0] if join_ops else None
+
+        # ---------------------------------------------------------------
+        # Tracer path — every JoinOp carries explicit right_columns lists.
+        # Build per-join rename maps (col → ONNX tensor name) for all joins.
+        # ---------------------------------------------------------------
+        # combined set of all right-side columns across all JoinOps
+        combined_right_col_set: Set[str] = set()
+        # per-join: column name → ONNX tensor name (handles clashes)
+        per_join_right_col_onnx_name: List[Dict[str, str]] = []
+
+        for jop in join_ops:
+            if jop.right_columns:
+                # Use the JoinOp's left_columns to determine the accumulated
+                # left side at this join step (includes all previously merged cols).
+                left_set_at_join: Set[str] = {cr.column for cr in jop.left_columns}
+                rcm_i: Dict[str, str] = {}
+                for cr in jop.right_columns:
+                    col = cr.column
+                    combined_right_col_set.add(col)
+                    # Suffix right column if its name clashes with an accumulated
+                    # left-side column at this join step.
+                    rcm_i[col] = f"{col}_right" if col in left_set_at_join else col
+                per_join_right_col_onnx_name.append(rcm_i)
+            else:
+                per_join_right_col_onnx_name.append({})
+
+        # ---------------------------------------------------------------
+        # Per-join right dtype lookup for the SQL-string path.
+        # _right_per_join_raw is [] (no right_input_dtypes), [single_dict]
+        # (backward-compat), or a list with one dict per join.
+        # ---------------------------------------------------------------
+        def _per_join_right_dtypes(join_idx: int) -> Dict[str, np.dtype]:
+            if join_idx < len(_right_per_join_raw):
+                rd = _right_per_join_raw[join_idx]
+                if rd is None:
+                    return left_dtypes
+                return {k: np.dtype(v) for k, v in rd.items()}
+            # Fallback: if fewer dicts were supplied than JoinOps, use the
+            # last-supplied dict (or left_dtypes if none was supplied).
+            if _right_per_join_raw:
+                last = _right_per_join_raw[-1]
+                if last is None:
+                    return left_dtypes
+                return {k: np.dtype(v) for k, v in last.items()}
+            return left_dtypes
+
+        # ---------------------------------------------------------------
+        # Input classification: assign each column to left or right side.
+        # ---------------------------------------------------------------
         seen_right: List[str] = []
-        join_op: Optional[JoinOp] = None
-        for op in pq.operations:
-            if isinstance(op, JoinOp):
-                join_op = op
-                break
 
-        right_col_set: Set[str] = (
-            {cr.column for cr in join_op.right_columns} if join_op is not None else set()
-        )
-
-        # For tracer-produced joins, also track which columns belong to the left
-        # frame.  When a column name appears in BOTH left and right frames the
-        # right-side input must be given a distinct ONNX tensor name so that the
-        # two data sources remain separate in the ONNX graph.
-        left_col_set_from_join: Set[str] = (
-            {cr.column for cr in join_op.left_columns}
-            if join_op is not None and join_op.left_columns
-            else set()
-        )
-        # right_col_onnx_name: maps right-frame column name → ONNX input tensor name.
-        # When a right column name clashes with a left column name, append "_right"
-        # to produce a unique ONNX input name.
-        right_col_onnx_name: Dict[str, str] = {}
-        if right_col_set:
-            for col in right_col_set:
-                right_col_onnx_name[col] = (
-                    f"{col}_right" if col in left_col_set_from_join else col
-                )
+        # For SQL-string path with per-join dtypes: we need to know which
+        # columns belong to which join so we can register them separately.
+        # Build a mapping: column → join index (first join that owns the col).
+        sql_col_to_join_idx: Dict[str, int] = {}
+        if not combined_right_col_set:  # SQL-string path
+            for ji, jop in enumerate(join_ops):
+                jrd = _per_join_right_dtypes(ji)
+                for col in jrd:
+                    if col not in sql_col_to_join_idx:
+                        sql_col_to_join_idx[col] = ji
+                # Also register the right keys even if not in the dtypes
+                for rk in jop.right_keys:
+                    if rk not in sql_col_to_join_idx and rk in jrd:
+                        sql_col_to_join_idx[rk] = ji
 
         for col_ref in all_cols:
             col = col_ref.column
-            if right_col_set and col in right_col_set:
-                # Tracer-produced JOIN: column is explicitly listed as right-side.
-                onnx_name = right_col_onnx_name[col]
+            if combined_right_col_set and col in combined_right_col_set:
+                # Tracer-produced JOIN: column is explicitly listed as right-side
+                # of at least one JoinOp.  Find its join and use that join's
+                # rename map to get the ONNX tensor name.
+                onnx_name = col
+                for ji, _jop in enumerate(join_ops):
+                    if col in per_join_right_col_onnx_name[ji]:
+                        onnx_name = per_join_right_col_onnx_name[ji][col]
+                        break
                 right_inputs.append((onnx_name, col_ref.dtype, (dim,)))
                 seen_right.append(col)
-                # If this column also exists in the left frame (name clash), it
-                # must appear in left_inputs as well with its original name.
-                if col in left_col_set_from_join and col_ref.dtype != 0:
-                    left_inputs.append((col, col_ref.dtype, (dim,)))
+                # If this column also exists in the accumulated left frame at
+                # the corresponding join step, register it as a left input too.
+                for ji, jop in enumerate(join_ops):
+                    if col in per_join_right_col_onnx_name[ji]:
+                        left_set_at_join = {cr.column for cr in jop.left_columns}
+                        if col in left_set_at_join and col_ref.dtype != 0:
+                            left_inputs.append((col, col_ref.dtype, (dim,)))
+                        break
             elif col_ref.dtype != 0:
                 # Tracer-produced query (no join, or left-side join column).
                 left_inputs.append((col, col_ref.dtype, (dim,)))
@@ -925,37 +1003,54 @@ def _populate_graph(
                 # SQL-string: column found in input_dtypes.
                 left_inputs.append((col, _np_dtype_to_onnx(left_dtypes[col]), (dim,)))
 
-        # For SQL-string JOINs, make sure all right key columns are registered
-        # on the right side even if they were not referenced in the SELECT list.
-        if join_op is not None and not join_op.right_columns:
-            for rk in join_op.right_keys:
-                if rk not in seen_right and rk in right_dtypes:
-                    right_inputs.append((rk, _np_dtype_to_onnx(right_dtypes[rk]), (dim,)))
-                    seen_right.append(rk)
+        # ---------------------------------------------------------------
+        # SQL-string path: ensure key columns are registered on the correct
+        # side for EVERY JoinOp, not just the first.
+        # ---------------------------------------------------------------
+        if join_ops and not combined_right_col_set:
+            for ji, jop in enumerate(join_ops):
+                jrd = _per_join_right_dtypes(ji)
+                # Make sure all right key columns are registered on the right side.
+                for rk in jop.right_keys:
+                    if rk not in seen_right and rk in jrd:
+                        right_inputs.append((rk, _np_dtype_to_onnx(jrd[rk]), (dim,)))
+                        seen_right.append(rk)
 
-        # For SQL-string JOINs, ensure all LEFT key columns are in left_inputs
-        # even when they also appear in right_dtypes (same-name join key).
-        # Simultaneously build a rename map for right-side inputs that clash
-        # with a left-side name so that the ONNX graph keeps them separate.
-        if join_op is not None and not join_op.right_columns:
+            # Make sure all left key columns for ALL JoinOps are in left_inputs.
             left_input_names = {name for name, _, _ in left_inputs}
-            for lk in join_op.left_keys:
-                if lk not in left_input_names and lk in left_dtypes:
-                    left_inputs.append((lk, _np_dtype_to_onnx(left_dtypes[lk]), (dim,)))
-                    left_input_names.add(lk)
-            # Rename right inputs that conflict with left inputs.
-            sql_right_rename: Dict[str, str] = {}
+            for jop in join_ops:
+                for lk in jop.left_keys:
+                    if lk not in left_input_names and lk in left_dtypes:
+                        left_inputs.append((lk, _np_dtype_to_onnx(left_dtypes[lk]), (dim,)))
+                        left_input_names.add(lk)
+
+            # Rename right inputs that conflict with any left input.
+            # Each join might introduce its own right columns; we rename
+            # per-join to keep all inputs uniquely named.
+            left_input_names = {name for name, _, _ in left_inputs}
+
+            # Build per-join rename maps for the SQL-string path.
+            # We track which columns belong to which join (from sql_col_to_join_idx)
+            # and ensure that clashing names get per-join suffixes.
+            # Strategy: within each join, collect its right column names, check
+            # for clashes with the accumulated left_input_names (which grows after
+            # each join as newly added right columns move to the left side), and
+            # assign rename entries.
+            sql_per_join_rename: List[Dict[str, str]] = [{} for _ in join_ops]
             new_right_inputs: List[Tuple[str, int, Tuple]] = []
+
+            # For each right input, determine which join it belongs to.
             for onnx_name, tp, shape in right_inputs:
+                join_idx_for_col = sql_col_to_join_idx.get(onnx_name, 0)
                 if onnx_name in left_input_names:
                     new_name = f"{onnx_name}_right"
-                    sql_right_rename[onnx_name] = new_name
+                    sql_per_join_rename[join_idx_for_col][onnx_name] = new_name
                     new_right_inputs.append((new_name, tp, shape))
                 else:
                     new_right_inputs.append((onnx_name, tp, shape))
             right_inputs = new_right_inputs
         else:
-            sql_right_rename = {}
+            sql_per_join_rename = []
 
         all_inputs = left_inputs + right_inputs
 
@@ -966,39 +1061,73 @@ def _populate_graph(
 
         # col_map: current ONNX tensor name for each column (left side)
         col_map = {name: name for name, _, _ in left_inputs}
-        # right_col_map: maps right-frame *column name* → ONNX tensor name.
-        # For tracer-produced joins with name clashes the ONNX tensor name may
-        # differ from the column name (e.g. "k1" → "k1_right").
-        if right_col_onnx_name:
-            # tracer path: use the explicit rename mapping
-            right_col_map = {
-                col: right_col_onnx_name[col] for col in right_col_onnx_name if col in seen_right
-            }
-            # also include right-key columns added in the "SQL-string JOIN" block
-            for rk in (join_op.right_keys if join_op else []):
-                if rk not in right_col_map and rk in seen_right:
-                    right_col_map[rk] = rk
-        elif sql_right_rename:
-            # SQL path with same-name key conflict: apply the rename map.
-            # right_inputs now contains renamed entries; build the mapping from
-            # right column name → ONNX tensor name using the inverted rename map.
-            onnx_to_orig: Dict[str, str] = {v: k for k, v in sql_right_rename.items()}
-            right_col_map = {
-                onnx_to_orig.get(onnx_name, onnx_name): onnx_name
-                for onnx_name, _, _ in right_inputs
-            }
-        else:
-            right_col_map = {name: name for name, _, _ in right_inputs}
+
+        # ---------------------------------------------------------------
+        # Build per-join right_col_maps.
+        # per_join_right_col_maps[i] maps right-column name → ONNX tensor
+        # name for the i-th JoinOp.
+        # ---------------------------------------------------------------
+        per_join_right_col_maps = []
+
+        if combined_right_col_set:
+            # Tracer path: use per_join_right_col_onnx_name (already computed).
+            for ji, jop in enumerate(join_ops):
+                rcm = {}
+                rcm_onnx = per_join_right_col_onnx_name[ji]
+                for cr in jop.right_columns:
+                    col = cr.column
+                    onnx_name = rcm_onnx.get(col, col)
+                    if onnx_name in {n for n, _, _ in right_inputs}:
+                        rcm[col] = onnx_name
+                # Also include right-key columns if not already present.
+                right_input_names = {n for n, _, _ in right_inputs}
+                for rk in jop.right_keys:
+                    if rk not in rcm and rk in right_input_names:
+                        rcm[rk] = rcm_onnx.get(rk, rk)
+                per_join_right_col_maps.append(rcm)
+        elif sql_per_join_rename:
+            # SQL-string path with per-join right dtypes or same-name clash.
+            for ji, _jop in enumerate(join_ops):
+                jrd = _per_join_right_dtypes(ji)
+                rename_i = sql_per_join_rename[ji] if ji < len(sql_per_join_rename) else {}
+                rcm = {}
+                for col in jrd:
+                    onnx_name = rename_i.get(col, col)
+                    # Only include if it was actually registered as an input.
+                    if onnx_name in {n for n, _, _ in right_inputs}:
+                        rcm[col] = onnx_name
+                per_join_right_col_maps.append(rcm)
+        elif join_ops:
+            # SQL-string path, single flat right_dtypes, no rename needed.
+            # All joins share the same right_col_map (backward-compat).
+            single_rcm = {name: name for name, _, _ in right_inputs}
+            for _ in join_ops:
+                per_join_right_col_maps.append(single_rcm)
+
+        # For backward-compat non-join converters (FilterOp etc.), keep a
+        # global right_col_map pointing to the first join's map (if any).
+        right_col_map = per_join_right_col_maps[0] if per_join_right_col_maps else {}
 
     select_op: Optional[SelectOp] = None
     _group_op: Optional[GroupByOp] = None
     _pivot_op: Optional[PivotTableOp] = None
 
+    _join_idx = 0  # tracks which JoinOp we are processing in the loop below
     for op in pq.operations:
         converter = get_sql_op_converter(type(op))
         if converter is not None:
             sts_ctx = {"custom_functions": resolved_custom_functions}
-            col_map = converter(g, sts_ctx, list(col_map.keys()), op, col_map, right_col_map)
+            if isinstance(op, JoinOp):
+                # Use the per-join right_col_map for this specific join.
+                rcm = (
+                    per_join_right_col_maps[_join_idx]
+                    if per_join_right_col_maps and _join_idx < len(per_join_right_col_maps)
+                    else right_col_map
+                )
+                col_map = converter(g, sts_ctx, list(col_map.keys()), op, col_map, rcm)
+                _join_idx += 1
+            else:
+                col_map = converter(g, sts_ctx, list(col_map.keys()), op, col_map, right_col_map)
         elif isinstance(op, GroupByOp):
             _group_op = op  # retained for SelectOp aggregation
         elif isinstance(op, SelectOp):

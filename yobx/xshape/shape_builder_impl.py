@@ -726,7 +726,21 @@ class BasicShapeBuilder(
         self.set_type(info.name, info.type.tensor_type.elem_type)
         shape = info.type.tensor_type.shape
         value = tuple(d.dim_param or d.dim_value for d in shape.dim)
-        self.set_shape(info.name, value)
+        if not self.set_shape(info.name, value) and not is_input:
+            # The output already has a computed shape that differs from the
+            # declared one.  Register constraints to link any internally-generated
+            # dimension names (e.g. ``NEWDIM_nonzero_0``) to the user-visible
+            # names declared on the graph output.
+            existing = self.get_shape(info.name)
+            if existing is not None and len(existing) == len(value):
+                for computed_dim, declared_dim in zip(existing, value):
+                    if (
+                        isinstance(computed_dim, str)
+                        and isinstance(declared_dim, str)
+                        and declared_dim
+                        and computed_dim != declared_dim
+                    ):
+                        self.register_constraint_dimension(computed_dim, declared_dim)
 
     def run_model(
         self,
