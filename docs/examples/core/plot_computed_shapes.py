@@ -102,6 +102,30 @@ def print_shapes(shapes, names: list) -> None:
         print(f"  {name:15s}  shape={shape}")
 
 
+def make_shape_comparison_table(model: onnx.ModelProto, names: list) -> pandas.DataFrame:
+    """Build a side-by-side shape comparison DataFrame for *model*.
+
+    Runs all three inference tools and returns a :class:`pandas.DataFrame`
+    with one row per tensor name and one column per tool.
+
+    Columns: ``onnx``, ``onnx_ir``, ``basic``.
+    """
+    onnx_shapes = infer_shapes_onnx(model)
+    ir_shapes = infer_shapes_onnx_ir(model)
+    basic = infer_shapes_basic(model)
+    rows = []
+    for name in names:
+        rows.append(
+            {
+                "name": name,
+                "onnx": str(onnx_shapes.get(name, "unknown")),
+                "onnx_ir": str(ir_shapes.get(name, "unknown")),
+                "basic": str(basic.get_shape(name)),
+            }
+        )
+    return pandas.DataFrame(rows).set_index("name")
+
+
 # %%
 # Build a small model
 # --------------------
@@ -241,21 +265,61 @@ print(pandas.DataFrame(data).pivot(index=["result", "dimension"], columns="col",
 # user-supplied name ``nnz``, and registers the constraint
 # ``NEWDIM_nonzero_0 = nnz``.  The dimension naming step then renames the
 # internal token to the user-visible name across all shapes.
+#
+# The two models share the same 7-node graph topology:
+# ``Abs → Relu → Add → Mul → NonZero(nz) → Transpose → Cast(nz_float)``.
+# They differ only in how the graph outputs are annotated.
 
+_NZ_NODES = [
+    oh.make_node("Abs", ["X"], ["abs_out"]),
+    oh.make_node("Relu", ["abs_out"], ["relu_out"]),
+    oh.make_node("Add", ["relu_out", "relu_out"], ["double_out"]),
+    oh.make_node("Mul", ["double_out", "relu_out"], ["mul_out"]),
+    oh.make_node("NonZero", ["mul_out"], ["nz"]),
+    oh.make_node("Transpose", ["nz"], ["transposed_nz"]),
+    oh.make_node("Cast", ["transposed_nz"], ["nz_float"], to=TFLOAT),
+]
+_NZ_INPUT = [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq"])]
+_NZ_NAMES = [
+    "X",
+    "abs_out",
+    "relu_out",
+    "double_out",
+    "mul_out",
+    "nz",
+    "transposed_nz",
+    "nz_float",
+]
+
+# %%
+# **Anonymous output shapes** (``[None, None]``): the data-dependent dimension
+# keeps the internal placeholder ``NEWDIM_nonzero_0`` and no constraint is
+# registered.
+
+nz_model_anon = oh.make_model(
+    oh.make_graph(
+        _NZ_NODES,
+        "nonzero_anon",
+        _NZ_INPUT,
+        [
+            oh.make_tensor_value_info("nz", TINT64, [None, None]),
+            oh.make_tensor_value_info("nz_float", TFLOAT, [None, None]),
+        ],
+    ),
+    opset_imports=[oh.make_opsetid("", 18)],
+    ir_version=10,
+)
+
+# %%
+# **Named output shapes** (``["rank", "nnz"]``): the constraint
+# ``NEWDIM_nonzero_0 = nnz`` is registered and the placeholder is renamed
+# throughout the graph.
 
 nz_model_named = oh.make_model(
     oh.make_graph(
-        [
-            oh.make_node("Abs", ["X"], ["abs_out"]),
-            oh.make_node("Relu", ["abs_out"], ["relu_out"]),
-            oh.make_node("Add", ["relu_out", "relu_out"], ["double_out"]),
-            oh.make_node("Mul", ["double_out", "relu_out"], ["mul_out"]),
-            oh.make_node("NonZero", ["mul_out"], ["nz"]),
-            oh.make_node("Transpose", ["nz"], ["transposed_nz"]),
-            oh.make_node("Cast", ["transposed_nz"], ["nz_float"], to=TFLOAT),
-        ],
+        _NZ_NODES,
         "nonzero_named",
-        [oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq"])],
+        _NZ_INPUT,
         [
             oh.make_tensor_value_info("nz", TINT64, ["rank", "nnz"]),
             oh.make_tensor_value_info("nz_float", TFLOAT, ["do1", "do2"]),
@@ -266,29 +330,36 @@ nz_model_named = oh.make_model(
 )
 
 # %%
-# with onnx.shape_inference.infer_shapes
-print("=== onnx.shape_inference.infer_shapes ===")
-for name, shape in infer_shapes_onnx(nz_model_named).items():
-    print(f"  {name:15s}  shape={shape}")
+# Comparison table — anonymous output shapes
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
+# With ``[None, None]`` output annotations the data-dependent dimension is
+# kept as the internal placeholder ``NEWDIM_nonzero_0`` by
+# :class:`BasicShapeBuilder`; no constraint is registered.
 
-
-# %%
-# with onnx-shape-inference
-
-onnx_ir_shapes = infer_shapes_onnx_ir(nz_model_named)
-
-print("=== onnx-shape-inference (infer_symbolic_shapes) ===")
-print_shapes(
-    onnx_ir_shapes,
-    ["X", "abs_out", "relu_out", "double_out", "mul_out", "nz", "transposed_nz", "nz_float"],
-)
+print("=== anonymous output shapes ===")
+print(make_shape_comparison_table(nz_model_anon, _NZ_NAMES).to_string())
 
 # %%
-# With BasicShapeBuilder
-builder = infer_shapes_basic(nz_model_named)
+# Registered constraints (anonymous model):
 
-print("\n=== BasicShapeBuilder ===")
-print_shapes(
-    builder,
-    ["X", "abs_out", "relu_out", "double_out", "mul_out", "nz", "transposed_nz", "nz_float"],
-)
+anon_builder = infer_shapes_basic(nz_model_anon)
+print("constraints:", anon_builder.get_registered_constraints())
+
+# %%
+# Comparison table — named output shapes
+# ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+#
+# With ``["rank", "nnz"]`` output annotations :class:`BasicShapeBuilder`
+# registers the constraint ``NEWDIM_nonzero_0 = nnz`` and renames the
+# placeholder everywhere, so ``nz`` shape becomes ``(2, 'nnz')`` and the
+# propagation continues through ``Transpose`` and ``Cast``.
+
+print("=== named output shapes ===")
+print(make_shape_comparison_table(nz_model_named, _NZ_NAMES).to_string())
+
+# %%
+# Registered constraints (named model):
+
+named_builder = infer_shapes_basic(nz_model_named)
+print("constraints:", named_builder.get_registered_constraints())
