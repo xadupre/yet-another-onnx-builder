@@ -564,47 +564,69 @@ class TestMultiDataframe(ExtTestCase):
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b)
 
-    def test_to_onnx_multi_frame_tuple_of_dicts(self):
-        """to_onnx() accepts a tuple of dtype dicts for multi-frame callables."""
+    def test_to_onnx_multi_frame_tuple_of_dataframes(self):
+        """to_onnx() accepts a tuple of pandas DataFrames for multi-frame callables."""
+        try:
+            import pandas as pd
+        except ImportError:
+            self.skipTest("pandas not available")
         from yobx.sql import to_onnx
 
-        def transform(df1, df2):
-            return df1.select([(df1["a"] + df2["b"]).alias("total")])
+        df1 = pd.DataFrame({"a": np.array([1.0, 2.0], dtype=np.float32)})
+        df2 = pd.DataFrame({"b": np.array([3.0, 4.0], dtype=np.float32)})
 
+        def transform(traced_df1, traced_df2):
+            return traced_df1.select([(traced_df1["a"] + traced_df2["b"]).alias("total")])
+
+        artifact = to_onnx(transform, (df1, df2))
+        ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0], dtype=np.float32)
         b = np.array([3.0, 4.0], dtype=np.float32)
-        artifact = to_onnx(transform, ({"a": np.float32}, {"b": np.float32}))
-        ref = ExtendedReferenceEvaluator(artifact)
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b)
 
-    def test_dataframe_to_onnx_tuple_of_dicts(self):
-        """dataframe_to_onnx() accepts a tuple of dtype dicts."""
+    def test_dataframe_to_onnx_tuple_of_dataframes(self):
+        """dataframe_to_onnx() accepts a tuple of pandas DataFrames."""
+        try:
+            import pandas as pd
+        except ImportError:
+            self.skipTest("pandas not available")
 
-        def transform(df1, df2):
-            return df1.select([(df1["a"] + df2["b"]).alias("total")])
+        df1 = pd.DataFrame({"a": np.array([1.0, 2.0], dtype=np.float32)})
+        df2 = pd.DataFrame({"b": np.array([3.0, 4.0], dtype=np.float32)})
 
+        def transform(traced_df1, traced_df2):
+            return traced_df1.select([(traced_df1["a"] + traced_df2["b"]).alias("total")])
+
+        artifact = dataframe_to_onnx(transform, (df1, df2))
+        ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0], dtype=np.float32)
         b = np.array([3.0, 4.0], dtype=np.float32)
-        artifact = dataframe_to_onnx(transform, ({"a": np.float32}, {"b": np.float32}))
-        ref = ExtendedReferenceEvaluator(artifact)
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b)
 
-    def test_to_onnx_three_frames_tuple_of_dicts(self):
-        """to_onnx() accepts a tuple of three dtype dicts."""
+    def test_to_onnx_three_frames_tuple_of_dataframes(self):
+        """to_onnx() accepts a tuple of three pandas DataFrames."""
+        try:
+            import pandas as pd
+        except ImportError:
+            self.skipTest("pandas not available")
         from yobx.sql import to_onnx
 
-        def transform(df1, df2, df3):
-            return df1.select([(df1["a"] + df2["b"] + df3["c"]).alias("total")])
+        df1 = pd.DataFrame({"a": np.array([1.0, 2.0], dtype=np.float32)})
+        df2 = pd.DataFrame({"b": np.array([3.0, 4.0], dtype=np.float32)})
+        df3 = pd.DataFrame({"c": np.array([10.0, 20.0], dtype=np.float32)})
 
+        def transform(traced_df1, traced_df2, traced_df3):
+            return traced_df1.select(
+                [(traced_df1["a"] + traced_df2["b"] + traced_df3["c"]).alias("total")]
+            )
+
+        artifact = to_onnx(transform, (df1, df2, df3))
+        ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0], dtype=np.float32)
         b = np.array([3.0, 4.0], dtype=np.float32)
         c = np.array([10.0, 20.0], dtype=np.float32)
-        artifact = to_onnx(
-            transform, ({"a": np.float32}, {"b": np.float32}, {"c": np.float32})
-        )
-        ref = ExtendedReferenceEvaluator(artifact)
         (total,) = ref.run(None, {"a": a, "b": b, "c": c})
         np.testing.assert_allclose(total, a + b + c)
 
