@@ -564,6 +564,46 @@ class TestMultiDataframe(ExtTestCase):
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b)
 
+    def test_to_onnx_numpy_single_array_in_tuple(self):
+        """to_onnx(f, (arr,)) dispatches to trace_numpy_to_onnx."""
+        from yobx.sql import to_onnx
+
+        def my_func(x):
+            return np.sqrt(np.abs(x) + 1)
+
+        x = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        artifact = to_onnx(my_func, (x,))
+        ref = ExtendedReferenceEvaluator(artifact)
+        (result,) = ref.run(None, {"X": x})
+        np.testing.assert_allclose(result, my_func(x), rtol=1e-5)
+
+    def test_to_onnx_numpy_single_array(self):
+        """to_onnx(f, arr) dispatches to trace_numpy_to_onnx."""
+        from yobx.sql import to_onnx
+
+        def my_func(x):
+            return x + 1.0
+
+        x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        artifact = to_onnx(my_func, x)
+        ref = ExtendedReferenceEvaluator(artifact)
+        (result,) = ref.run(None, {"X": x})
+        np.testing.assert_allclose(result, x + 1.0)
+
+    def test_to_onnx_numpy_two_arrays_in_tuple(self):
+        """to_onnx(f, (arr1, arr2)) dispatches to trace_numpy_to_onnx."""
+        from yobx.sql import to_onnx
+
+        def my_func(x, y):
+            return x + y
+
+        x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        y = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        artifact = to_onnx(my_func, (x, y))
+        ref = ExtendedReferenceEvaluator(artifact)
+        (result,) = ref.run(None, {"X0": x, "X1": y})
+        np.testing.assert_allclose(result, x + y)
+
 
 # ---------------------------------------------------------------------------
 # parsed_query_to_onnx
