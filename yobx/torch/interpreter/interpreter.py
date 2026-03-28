@@ -400,9 +400,12 @@ class DynamoInterpreter:
             else:
                 trace_init = init
 
-            # When the callable is used in a torch.cond call (tracing exporter path),
-            # try to pass input type/shape info so the local function's outputs are typed.
+            # When the callable is used in a torch.cond or scan call (tracing
+            # exporter path), try to pass input type/shape info so the local
+            # function's outputs are typed.
             sub_args = self._get_cond_input_args_for_callable(node)
+            if sub_args is None:
+                sub_args = self._get_scan_input_args_for_callable(node)
 
             builder, _args, _kwargs, output_names = self._interpret_sub_module(
                 trace_init, sub_args, None, source_node=node, local_domain=f"{root}.{n}"
@@ -546,6 +549,80 @@ class DynamoInterpreter:
                     )
                 if sub_args is not None:
                     return sub_args
+        return None
+
+    def _get_scan_input_args_for_callable(
+        self, node: "torch.fx.Node"  # noqa: F821
+    ) -> Optional[List[VirtualTensor]]:
+        """
+        When a callable (get_attr node) is used in a
+        :func:`torch.ops.higher_order.scan` call (tracing exporter path),
+        build the argument type/shape information for the scan body function
+        and return it as a list of :class:`VirtualTensor` objects.
+
+        The body function receives ``(*init_states, *scan_inputs, *additional_inputs)``.
+        Init-state and additional-input tensors are passed at their full shape;
+        scan-input tensors are passed with the scan dimension (dim 0) stripped.
+
+        Returns *None* if the info cannot be determined.
+        """
+        for user_node in node.users:
+            if not (
+                user_node.op == "call_function"
+                and hasattr(user_node.target, "__name__")
+                and user_node.target.__name__ == "scan"
+                and len(user_node.args) >= 3
+            ):
+                continue
+            # user_node.args = (scan_fn_node, [init_nodes], [scan_input_nodes], [add_input_nodes])
+            init_nodes = user_node.args[1]
+            scan_input_nodes = user_node.args[2]
+            add_input_nodes = user_node.args[3] if len(user_node.args) > 3 else []
+            sub_args: Optional[List[VirtualTensor]] = []
+
+            def _node_to_virtual(inp_node, strip_first_dim: bool = False):
+                if not hasattr(inp_node, "name") or not self.builder.has_type(inp_node.name):
+                    return None
+                name = inp_node.name
+                dtype = self.builder.get_type(name)
+                if self.builder.has_shape(name):
+                    full_shape = self.builder.get_shape(name)
+                    shape = full_shape[1:] if strip_first_dim and len(full_shape) > 1 else full_shape
+                elif self.builder.has_rank(name):
+                    rank = self.builder.get_rank(name)
+                    n = max(0, rank - 1) if strip_first_dim else rank
+                    shape = tuple(None for _ in range(n))
+                else:
+                    shape = None
+                device = self.builder.get_device(name) if self.builder.has_device(name) else None
+                return VirtualTensor(name=name, dtype=dtype, shape=shape, device=device)
+
+            for inp_node in init_nodes:
+                vt = _node_to_virtual(inp_node, strip_first_dim=False)
+                if vt is None:
+                    sub_args = None
+                    break
+                sub_args.append(vt)
+            if sub_args is None:
+                continue
+
+            for inp_node in scan_input_nodes:
+                vt = _node_to_virtual(inp_node, strip_first_dim=True)
+                if vt is None:
+                    sub_args = None
+                    break
+                sub_args.append(vt)
+            if sub_args is None:
+                continue
+
+            for inp_node in add_input_nodes:
+                vt = _node_to_virtual(inp_node, strip_first_dim=False)
+                if vt is None:
+                    sub_args = None
+                    break
+                sub_args.append(vt)
+            if sub_args is not None:
+                return sub_args
         return None
 
     def _store_cond_func_output_info(
@@ -1832,6 +1909,21 @@ class DynamoInterpreter:
                             self.builder.set_type(out_name, dtype)
                         if shape is not None:
                             self.builder.set_shape(out_name, shape)
+            # When aten_scan created a Scan node in the tracing path, propagate
+            # the output dtype from the body-function builder (stored in get_attr
+            # via _store_cond_func_output_info).  Shape is intentionally not
+            # propagated here because the Scan carries and scan-outputs have
+            # different shapes from the raw body-function outputs.
+            if aten_name == "aten_scan" and self._cond_func_output_info:
+                # args = [scan_fn_name, scan_inits, scan_inputs, additional_inputs]
+                scan_fn_name = args[0] if args else None
+                if scan_fn_name and scan_fn_name in self._cond_func_output_info:
+                    res_list = list(res) if isinstance(res, (tuple, list)) else [res]
+                    for out_name, (dtype, _shape) in zip(
+                        res_list, self._cond_func_output_info[scan_fn_name]
+                    ):
+                        if dtype and not self.builder.has_type(out_name):
+                            self.builder.set_type(out_name, dtype)
 
         n_nodes_after = len(self.builder.nodes) + len(self.builder.initializers_dict)
         if res is None:
