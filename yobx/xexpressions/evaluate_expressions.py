@@ -60,7 +60,7 @@ def _eval(node, variables, expr):
             f"Unknown variable: {node.id!r} in expression {expr!r} with context={variables!r}"
         )
     if isinstance(node, ast.Call):
-        # Specific function
+        # Specific function (kept for backward compatibility)
         name = node.func.id
         assert name == "CeilToInt", f"Unable to evaluate function {name!r} in {expr!r}"
         values = [_eval(a, variables, expr) for a in node.args]

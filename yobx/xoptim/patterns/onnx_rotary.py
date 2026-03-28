@@ -735,9 +735,9 @@ class FunctionHalfRotaryEmbeddingPattern(PatternOptimization):
             Add_5[["Add(., .)"]]
 
             I_X -->|"FLOAT(a, b, c, d)"| Split_0
-            Split_0 -->|"FLOAT(a, b, c, d-CeilToInt(d,2))"| Neg_1
-            Neg_1 -->|"FLOAT(a, b, c, d-CeilToInt(d,2))"| Concat_2
-            Split_0 -->|"FLOAT(a, b, c, CeilToInt(d,2))"| Concat_2
+            Split_0 -->|"FLOAT(a, b, c, d-(1+d)//2)"| Neg_1
+            Neg_1 -->|"FLOAT(a, b, c, d-(1+d)//2)"| Concat_2
+            Split_0 -->|"FLOAT(a, b, c, (1+d)//2)"| Concat_2
             Concat_2 -->|"FLOAT(a, b, c, d)"| Mul_3
             I_m1 -->|"FLOAT(c, d)"| Mul_3
             I_X -->|"FLOAT(a, b, c, d)"| Mul_4
