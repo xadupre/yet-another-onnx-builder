@@ -1067,7 +1067,7 @@ def _populate_graph(
         # per_join_right_col_maps[i] maps right-column name → ONNX tensor
         # name for the i-th JoinOp.
         # ---------------------------------------------------------------
-        per_join_right_col_maps: List[Dict[str, str]] = []
+        per_join_right_col_maps = []
 
         if combined_right_col_set:
             # Tracer path: use per_join_right_col_onnx_name (already computed).
