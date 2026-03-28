@@ -22,7 +22,7 @@ from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..helpers.to_onnx_helper import _dataframe_to_dtypes, _is_dataframe
 from ..xbuilder import GraphBuilder
 from ..xtracing.dataframe_trace import trace_dataframe
-from ..xtracing.tracing import trace_numpy_function
+from ..xtracing.tracing import trace_numpy_function, TracedDataFrame
 from .polars_convert import lazyframe_to_onnx
 from .sql_convert import sql_to_onnx, sql_to_onnx_graph  # noqa: F401 – re-exported
 
@@ -31,13 +31,10 @@ def _is_numpy_array_inputs(args: Any) -> bool:
     """Return True when *args* is a numpy array or a non-empty tuple/list of numpy arrays."""
     if isinstance(args, np.ndarray):
         return True
-    if (
-        isinstance(args, (tuple, list))
-        and args
-        and all(isinstance(a, np.ndarray) for a in args)
-    ):
+    if isinstance(args, (tuple, list)) and args and all(isinstance(a, np.ndarray) for a in args):
         return True
     return False
+
 
 #: Name used for the dynamic (batch) first dimension when none is specified.
 _BATCH_DIM = "batch"
@@ -295,7 +292,7 @@ def trace_numpy_to_onnx(
 def to_onnx(
     dataframe_or_query: Union[  # type: ignore
         str,
-        Callable[["TracedDataFrame"], "TracedDataFrame"],  # type: ignore # noqa: F821
+        Callable[[TracedDataFrame], TracedDataFrame],  # type: ignore # noqa: F821
         "polars.LazyFrame",  # type: ignore # noqa: F821
     ],
     args: Optional[
@@ -486,11 +483,7 @@ def to_onnx(
             inputs: Tuple[np.ndarray, ...] = (
                 (args,) if isinstance(args, np.ndarray) else tuple(args)  # type: ignore[arg-type]
             )
-            artifact = trace_numpy_to_onnx(
-                dataframe_or_query,
-                *inputs,
-                target_opset=target_opset,
-            )
+            artifact = trace_numpy_to_onnx(dataframe_or_query, *inputs, target_opset=target_opset)
             if filename:
                 if verbose:
                     print(f"[yobx.sql.to_onnx] saving model to {filename!r}")
