@@ -21,10 +21,19 @@ from ..container import ExportArtifact
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..helpers.to_onnx_helper import _dataframe_to_dtypes, _is_dataframe
 from ..xbuilder import GraphBuilder
-from ..xtracing.dataframe_trace import trace_dataframe
-from ..xtracing.tracing import trace_numpy_function
+from ..xtracing import TracedDataFrame, trace_dataframe, trace_numpy_function
 from .polars_convert import lazyframe_to_onnx
 from .sql_convert import sql_to_onnx, sql_to_onnx_graph  # noqa: F401 – re-exported
+
+
+def _is_numpy_array_inputs(args: Any) -> bool:
+    """Return True when *args* is a numpy array or a non-empty tuple/list of numpy arrays."""
+    if isinstance(args, np.ndarray):
+        return True
+    if isinstance(args, (tuple, list)) and args and all(isinstance(a, np.ndarray) for a in args):
+        return True
+    return False
+
 
 #: Name used for the dynamic (batch) first dimension when none is specified.
 _BATCH_DIM = "batch"
@@ -282,11 +291,18 @@ def trace_numpy_to_onnx(
 def to_onnx(
     dataframe_or_query: Union[  # type: ignore
         str,
-        Callable[["TracedDataFrame"], "TracedDataFrame"],  # type: ignore # noqa: F821
+        Callable[[TracedDataFrame], TracedDataFrame],  # type: ignore # noqa: F821
         "polars.LazyFrame",  # type: ignore # noqa: F821
     ],
-    args: Optional[
-        Union[Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]]
+    args: Optional[  # type: ignore
+        Union[
+            np.ndarray,
+            Tuple[np.ndarray, ...],
+            "pandas.DataFrame",  # type: ignore # noqa: F821
+            Tuple["pandas.DataFrame", ...],  # type: ignore # noqa: F821
+            Dict[str, Union[np.dtype, type, str]],
+            List[Dict[str, Union[np.dtype, type, str]]],
+        ]
     ] = None,
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
@@ -302,6 +318,9 @@ def to_onnx(
     * :func:`~yobx.sql.dataframe_trace.dataframe_to_onnx` — when
       *dataframe_or_query* is a **callable** (a Python function that accepts a
       :class:`~yobx.sql.dataframe_trace.TracedDataFrame` and returns one).
+    * :func:`trace_numpy_to_onnx` — when *dataframe_or_query* is a **callable**
+      and *args* is a :class:`numpy.ndarray` or a tuple/list of
+      :class:`numpy.ndarray` objects (sample inputs for numpy-function tracing).
     * :func:`lazyframe_to_onnx` — for any other value (expected to be a
       :class:`polars.LazyFrame`).
 
@@ -320,22 +339,30 @@ def to_onnx(
           :class:`~yobx.sql.dataframe_trace.TracedDataFrame` arguments.  The
           function is traced to capture all ``filter``, ``select``,
           aggregation, and ``join`` operations it performs, which are then
-          compiled to ONNX.
+          compiled to ONNX.  When *args* contains numpy arrays the function is
+          treated as a numpy function and traced via
+          :func:`trace_numpy_to_onnx` instead.
         * **polars.LazyFrame** — the execution plan is extracted via
           :meth:`polars.LazyFrame.explain` and translated into SQL before
           conversion.  See :func:`lazyframe_to_onnx` for details of supported
           operations.
 
-    :param args: either a single ``{column: dtype}`` mapping or,
-        when *dataframe_or_query* is a callable that accepts *multiple*
-        :class:`~yobx.sql.dataframe_trace.TracedDataFrame` arguments, a
-        **list** of ``{column: dtype}`` mappings — one per argument.
+    :param args: one of:
+
+        * A single ``{column: dtype}`` mapping or a **list** of such mappings
+          (one per :class:`~yobx.sql.dataframe_trace.TracedDataFrame`
+          argument) for DataFrame-tracing callables or SQL queries.
+        * A :class:`numpy.ndarray` **or** a tuple/list of
+          :class:`numpy.ndarray` objects — when *dataframe_or_query* is a
+          numpy function, these sample arrays are used to determine the element
+          types and shapes of the ONNX graph inputs; the function is then
+          traced via :func:`trace_numpy_to_onnx`.
+        * A pandas :class:`~pandas.DataFrame` (or a tuple/list of DataFrames)
+          — column names and per-column dtypes are extracted automatically.
+
         For SQL queries this maps *left-table* columns; for a ``LazyFrame``
         it maps the source DataFrame columns referenced in the plan.  Only
         columns that actually appear in the query / plan need to be listed.
-        A pandas :class:`~pandas.DataFrame` (or a list of DataFrames) is also
-        accepted; the column names and per-column dtypes are extracted
-        automatically.
         Supported numpy dtypes: ``float16``, ``float32``, ``float64``,
         ``int8``, ``int16``, ``int32``, ``int64``, ``uint8``, ``uint16``,
         ``uint32``, ``uint64``, ``bool``, ``object`` (string).
@@ -346,7 +373,8 @@ def to_onnx(
         accept one or more numpy arrays and return a numpy array.  The
         function body is traced with :func:`~yobx.xtracing.trace_numpy_function`
         so that numpy arithmetic is translated into ONNX nodes.  Ignored when
-        *dataframe_or_query* is a :class:`polars.LazyFrame`.
+        *dataframe_or_query* is a :class:`polars.LazyFrame` or when *args*
+        contains numpy arrays.
 
         Example::
 
@@ -404,6 +432,21 @@ def to_onnx(
         (total,) = ref.run(None, {"a": a, "b": b})
         # total == array([5., 9.], dtype=float32)  (rows where a > 0)
 
+    Example — from a numpy-function callable with sample inputs::
+
+        import numpy as np
+        from yobx.sql import to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        def my_func(x):
+            return np.sqrt(np.abs(x) + 1)
+
+        x = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        artifact = to_onnx(my_func, (x,))
+
+        ref = ExtendedReferenceEvaluator(artifact)
+        (result,) = ref.run(None, {"X": x})
+
     Example — from a polars LazyFrame::
 
         import numpy as np
@@ -433,6 +476,18 @@ def to_onnx(
         larger than 2^53.
     """
     if callable(dataframe_or_query) and not isinstance(dataframe_or_query, str):
+        if args is not None and _is_numpy_array_inputs(args):
+            # Normalise to a flat tuple: a bare array is wrapped in a 1-tuple;
+            # a tuple/list of arrays is converted as-is.
+            inputs: Tuple[np.ndarray, ...] = (
+                (args,) if isinstance(args, np.ndarray) else tuple(args)  # type: ignore[arg-type]
+            )
+            artifact = trace_numpy_to_onnx(dataframe_or_query, *inputs, target_opset=target_opset)
+            if filename:
+                if verbose:
+                    print(f"[yobx.sql.to_onnx] saving model to {filename!r}")
+                artifact.save(filename)
+            return artifact
         return dataframe_to_onnx(
             dataframe_or_query,  # type: ignore
             args,  # type: ignore
