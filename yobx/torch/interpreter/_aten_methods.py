@@ -142,7 +142,7 @@ def aten_meth_item(
             f"Missing shape or unexpected shape for {x!r}: has_shape={g.has_shape(x)}, "
             f"has_rank={g.has_rank(x)}{g.get_debug_msg()}"
         )
-        if g.has_shape() == (1,):
+        if g.get_shape(x) == (1,):
             res = g.op.SqueezeAnyOpset(x, g.ZERO, outputs=outputs, name=name)
         else:
             res = g.op.Identity(x, outputs=outputs, name=name)

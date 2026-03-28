@@ -35,6 +35,17 @@ class Div_1(OpRunBinary):
     """Div"""
 
     def _run(self, x: OpRunTensor, y: OpRunTensor) -> OpRunTensor:
+        if x.dtype in {
+            torch.int8,
+            torch.int16,
+            torch.int32,
+            torch.int64,
+            torch.uint32,
+            torch.uint64,
+            torch.uint8,
+            torch.uint16,
+        }:
+            return OpRunTensor(torch.div(x.tensor, y.tensor, rounding_mode="trunc"))
         return OpRunTensor(x.tensor / y.tensor)
 
 

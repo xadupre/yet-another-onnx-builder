@@ -63,7 +63,7 @@ class TestSimplifyExpressions(ExtTestCase):
         self.assertEqual("b+c", simplify_expression("b+c-CeilToInt(b+c,2)+CeilToInt(b+c,2)"))
 
     def test_simplify_function(self):
-        self.assertEqual("CeilToInt(b+c,2)", simplify_expression("CeilToInt(b+c,2)"))
+        self.assertEqual("(1+b+c)//2", simplify_expression("CeilToInt(b+c,2)"))
 
     def test_simplify_function_order(self):
         self.assertEqual("a+b", simplify_expression("b+a"))

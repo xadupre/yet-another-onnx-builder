@@ -128,6 +128,11 @@ Its unique API:
    getting_started
    misc
 
+This package was initially started using :epkg:`vibe coding`.
+AI is able to translate an existing code into another one
+such as ONNX but it tends sometime to favor ugly functions definition
+not friendly to the users.
+
 Indices and tables
 ==================
 

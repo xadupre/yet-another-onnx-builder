@@ -86,3 +86,5 @@ onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, target_opset=22, **opt
 
 [onnxruntime](https://onnxruntime.ai/) optimizations are triggered with
 ``target_opset={"": 22, "com.microsoft": 1}``.
+
+This package was initially starting using [Vibe Coding](https://en.wikipedia.org/wiki/Vibe_coding).

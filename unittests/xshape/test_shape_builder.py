@@ -361,8 +361,8 @@ class TestShapeBuilder(ExtTestCase):
             res.append((t.elem_type, shape))
         expected = [
             (1, ("a", "b+c")),
-            (1, ("a", "CeilToInt(b+c,2)")),
-            (1, ("a", "b+c-CeilToInt(b+c,2)")),
+            (1, ("a", "(1+b+c)//2")),
+            (1, ("a", "b+c-(1+b+c)//2")),
             (1, ("a", "b+c")),
         ]
         self.assertEqual(expected, res)

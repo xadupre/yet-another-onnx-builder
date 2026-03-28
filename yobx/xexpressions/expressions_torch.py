@@ -51,7 +51,7 @@ def parse_expression(
     st = ast.parse(simplified, mode="eval")  # type: ignore[arg-type]
     for node in ast.walk(st):
         if isinstance(node, ast.Name):
-            if node.id in {"Max", "Min", "CeilToInt", "IntTrueDiv", "Mod"}:
+            if node.id in {"Max", "Min", "IntTrueDiv", "Mod"}:
                 continue
             sds = []
             for d_ in context.values():
