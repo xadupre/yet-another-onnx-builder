@@ -9156,6 +9156,12 @@ def aten_scan(
         value_info_proto.name = name
         return value_info_proto
 
+    def mkv_typed(vname, elem_type):
+        """Create a ValueInfoProto with type info if available, otherwise untyped."""
+        if elem_type:
+            return make_tensor_value_info(vname, elem_type, None)
+        return mkv(vname)
+
     loc = g.get_local_function(scan_graph, g.local_domain)
     # When the tracing-based exporter is used, _get_output_names produces a
     # single output name because node.meta["val"] is not set.  Expand it to
@@ -9192,6 +9198,29 @@ def aten_scan(
     for i, s in enumerate(scan_inputs):
         full_inputs_graph.append(f"scan_{i}_{s}")
 
+    # Collect element types for body graph inputs and outputs so that the
+    # Scan body subgraph carries type annotations. This is needed by ORT and
+    # ONNX checker which require typed subgraph inputs/outputs.
+    # Body inputs: carry states keep the init-state element type; scan inputs
+    # keep the corresponding scan-input element type.
+    # elem_type 0 means unknown/untyped; mkv_typed falls back to untyped mkv in that case.
+    body_input_elem_types = [
+        g.get_type(s) if g.has_type(s) else 0 for s in scan_inits
+    ] + [g.get_type(s) if g.has_type(s) else 0 for s in scan_inputs]
+
+    # Body outputs: try to read from the local function builder's output types.
+    loc_builder = (
+        g.get_local_function(scan_graph, g.local_domain, builder=True)
+        if g.has_local_function(scan_graph, g.local_domain, builder=True)
+        else None
+    )
+    body_output_elem_types: List[int] = []
+    for oname in loc.output:
+        if loc_builder is not None and loc_builder.has_type(oname):
+            body_output_elem_types.append(loc_builder.get_type(oname))
+        else:
+            body_output_elem_types.append(0)
+
     if g._debug_node_type and g._debug_node_type == scan_graph:
         raise AssertionError(
             f"Stop requested as {g._debug_node_type!r} appears in "
@@ -9209,8 +9238,8 @@ def aten_scan(
             )
         ],
         scan_graph,
-        [mkv(o) for o in full_inputs_graph],
-        [mkv(o) for o in loc.output],
+        [mkv_typed(o, t) for o, t in zip(full_inputs_graph, body_input_elem_types)],
+        [mkv_typed(o, t) for o, t in zip(loc.output, body_output_elem_types)],
     )
     n_outputs = len(loc.output) - (len(full_inputs) - len(scan_inputs))
     g.make_node(
@@ -9224,6 +9253,11 @@ def aten_scan(
         scan_output_axes=[dim for _ in range(n_outputs)],
         scan_output_directions=[(1 if reverse else 0) for _ in range(n_outputs)],
     )
+    # Propagate element types from the body outputs to the Scan node outputs
+    # in the outer graph. This is needed when meta["val"] is not set (tracing path).
+    for out_name, body_out_type in zip(outputs, body_output_elem_types):
+        if body_out_type and not g.has_type(out_name):
+            g.set_type(out_name, body_out_type)
     return tuple(outputs) if len(outputs) > 1 else outputs
 
 
