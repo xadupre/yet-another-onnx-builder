@@ -10288,7 +10288,11 @@ def aten_setitem(
     "setitem"
 
     # Handle mask (boolean tensor) indexing: x[mask] = values
-    if isinstance(indices, str) and g.has_type(indices) and g.get_type(indices) == TensorProto.BOOL:
+    if (
+        isinstance(indices, str)
+        and g.has_type(indices)
+        and g.get_type(indices) == TensorProto.BOOL
+    ):
         name = f"{name}_mask"
         assert g.has_type(x), f"Missing type for x={x!r}{g.get_debug_msg()}"
         itype = g.get_type(x)
@@ -10300,9 +10304,7 @@ def aten_setitem(
         if g.has_rank(x) and g.has_rank(index) and g.get_rank(x) != g.get_rank(index):
             rkx = g.get_rank(x)
             rki = g.get_rank(index)
-            assert rki < rkx, (
-                f"Unexpected ranks rk(x)={rkx}, rk(index)={rki}{g.get_debug_msg()}"
-            )
+            assert rki < rkx, f"Unexpected ranks rk(x)={rkx}, rk(index)={rki}{g.get_debug_msg()}"
             shape_i = g.op.Shape(index, name=name)
             new_shape = g.op.Concat(
                 shape_i,
