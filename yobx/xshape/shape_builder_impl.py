@@ -734,7 +734,12 @@ class BasicShapeBuilder(
             existing = self.get_shape(info.name)
             if existing is not None and len(existing) == len(value):
                 for computed_dim, declared_dim in zip(existing, value):
-                    if isinstance(computed_dim, str) and isinstance(declared_dim, str) and declared_dim and computed_dim != declared_dim:
+                    if (
+                        isinstance(computed_dim, str)
+                        and isinstance(declared_dim, str)
+                        and declared_dim
+                        and computed_dim != declared_dim
+                    ):
                         self.register_constraint_dimension(computed_dim, declared_dim)
 
     def run_model(

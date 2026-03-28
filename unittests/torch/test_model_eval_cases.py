@@ -96,9 +96,7 @@ class TestModelEvalCases(ExtTestCase):
         )
 
     def test_run_exporter_yobx_tracing_controlflow_rank(self):
-        evaluation(
-            cases="ControlFlowRanks", exporters="yobx-tracing", quiet=False, dynamic=False
-        )
+        evaluation(cases="ControlFlowRanks", exporters="yobx-tracing", quiet=False, dynamic=False)
 
     def test_run_exporter_crop_last_dim_tensor_content(self):
         evaluation(

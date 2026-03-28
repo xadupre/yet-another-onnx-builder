@@ -29,6 +29,7 @@ works and a comparison table with :func:`onnx.shape_inference.infer_shapes`.
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 import pandas
 import onnx
 import onnx_ir as ir
@@ -85,9 +86,7 @@ model = oh.make_model(
 inferred = onnx.shape_inference.infer_shapes(model)
 
 print("=== onnx.shape_inference.infer_shapes ===")
-for vi in (
-    list(inferred.graph.input) + list(inferred.graph.value_info) + list(inferred.graph.output)
-):
+for vi in [*inferred.graph.input, *inferred.graph.value_info, *inferred.graph.output]:
     t = vi.type.tensor_type
     if t.HasField("shape"):
         shape = tuple(
@@ -184,66 +183,6 @@ for name, dims in result.items():
         for c, v in zip(["expression", "expected", "computed"], dim):
             data.append(dict(result=name, dimension=i, col=c, value=v))
 print(pandas.DataFrame(data).pivot(index=["result", "dimension"], columns="col", values="value"))
-
-# %%
-# Plot: symbolic vs inferred shapes
-# -----------------------------------
-#
-# The table below compares the shapes reported by
-# ``onnx.shape_inference.infer_shapes`` (which may leave dimensions as
-# ``None`` for dynamic axes), the ``onnx-shape-inference`` package (which uses
-# SymPy for symbolic propagation), and the symbolic expressions computed by
-# :class:`BasicShapeBuilder`.
-
-import matplotlib.pyplot as plt  # noqa: E402
-
-tensor_names = ["X", "Y", "added", "concat_out", "Z"]
-
-# Collect onnx.shape_inference shapes as strings
-onnx_shapes = {}
-for vi in (
-    list(inferred.graph.input) + list(inferred.graph.value_info) + list(inferred.graph.output)
-):
-    t = vi.type.tensor_type
-    if t.HasField("shape"):
-        shape = tuple(
-            d.dim_param if d.dim_param else (d.dim_value if d.dim_value else "?")
-            for d in t.shape.dim
-        )
-    else:
-        shape = ("unknown",)
-    onnx_shapes[vi.name] = str(shape)
-
-# Collect BasicShapeBuilder shapes as strings
-builder_shapes = {name: str(builder.get_shape(name)) for name in tensor_names}
-
-col_labels = ["tensor", "onnx.shape_inference", "onnx-shape-inference", "BasicShapeBuilder"]
-table_data = [
-    [
-        name,
-        onnx_shapes.get(name, "—"),
-        onnx_ir_shapes.get(name, "—"),
-        builder_shapes.get(name, "—"),
-    ]
-    for name in tensor_names
-]
-
-fig, ax = plt.subplots(figsize=(11, 2.5))
-
-ax.axis("off")
-tbl = ax.table(cellText=table_data, colLabels=col_labels, loc="center", cellLoc="center")
-tbl.auto_set_font_size(False)
-tbl.set_fontsize(9)
-tbl.auto_set_column_width(list(range(len(col_labels))))
-# Highlight header
-for col in range(len(col_labels)):
-    tbl[0, col].set_facecolor("#4c72b0")
-    tbl[0, col].set_text_props(color="white", fontweight="bold")
-ax.set_title(
-    "Shape inference: onnx vs onnx-shape-inference vs BasicShapeBuilder", fontsize=10, pad=8
-)
-plt.tight_layout()
-plt.show()
 
 # %%
 # Impact of named output shapes on constraints (NonZero)
@@ -411,12 +350,7 @@ table_data_nz = [
 
 fig, ax = plt.subplots(figsize=(14, 2.0))
 ax.axis("off")
-tbl_nz = ax.table(
-    cellText=table_data_nz,
-    colLabels=col_labels_nz,
-    loc="center",
-    cellLoc="center",
-)
+tbl_nz = ax.table(cellText=table_data_nz, colLabels=col_labels_nz, loc="center", cellLoc="center")
 tbl_nz.auto_set_font_size(False)
 tbl_nz.set_fontsize(8)
 tbl_nz.auto_set_column_width(list(range(len(col_labels_nz))))
@@ -426,8 +360,6 @@ for col in range(len(col_labels_nz)):
 # Highlight the row where the constraint is registered
 for col in range(len(col_labels_nz)):
     tbl_nz[2, col].set_facecolor("#d5e8d4")
-ax.set_title(
-    "NonZero: impact of named output shapes on constraints", fontsize=10, pad=8
-)
+ax.set_title("NonZero: impact of named output shapes on constraints", fontsize=10, pad=8)
 plt.tight_layout()
 plt.show()
