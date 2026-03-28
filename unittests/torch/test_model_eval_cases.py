@@ -87,6 +87,14 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_custom_nested_cond(self):
         evaluation(cases="ControlFlowNestCond", exporters="custom", quiet=False, dynamic=False)
 
+    def test_run_exporter_yobx_tracing_cond_nested_module(self):
+        evaluation(
+            cases="ControlFlowCondNestedModule",
+            exporters="yobx-tracing",
+            quiet=False,
+            dynamic=False,
+        )
+
     def test_run_exporter_yobx_tracing_cond(self):
         evaluation(cases="ControlFlowCond", exporters="yobx-tracing", quiet=False, dynamic=False)
 

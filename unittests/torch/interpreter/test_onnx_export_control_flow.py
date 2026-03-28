@@ -356,6 +356,62 @@ class TestOnnxExportControlFlow(ExtTestCase):
             got = sess.run(None, {"x": _x.detach().numpy()})
             self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @skipif_ci_windows("not yet supported on Windows")
+    @requires_torch("2.4")
+    @ignore_warnings((UserWarning, FutureWarning))
+    def test_nested_cond_tracing(self):
+        """ControlFlowCondNestedModule exported with ExportOptions(tracing=True)."""
+        import onnxruntime
+        import torch
+
+        class Submodule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.tensor([100.0]))
+
+            def forward(self, x):
+                def true_fn(x):
+                    return x * self.weight
+
+                def false_fn(x):
+                    return x / self.weight
+
+                y = torch.cond(torch.abs(x).sum() > 100, true_fn, false_fn, [x])
+                return y
+
+        class CondModel(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.submodule = Submodule()
+                self.weight = torch.nn.Parameter(torch.tensor([42.0]))
+
+            def forward(self, x):
+                def true_fn(x):
+                    return self.submodule(x)
+
+                def false_fn(x):
+                    return x - self.weight
+
+                y = torch.cond(x.sum() > 0, true_fn, false_fn, [x])
+                return y
+
+        x = torch.tensor([-1.0, 2.0])
+        model = CondModel()
+        onx = to_onnx(model, (x,), inline=False, export_options=ExportOptions(tracing=True))
+        co = Counter([n.op_type for n in onx.graph.node])
+        self.assertIn("If", co)
+        ref = ExtendedReferenceEvaluator(onx)
+        sess = onnxruntime.InferenceSession(
+            onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+
+        for _x in (x, -x, -x * 1000, x * 1000):
+            expected = model(_x)
+            got = ref.run(None, {"x": _x.detach().numpy()})
+            self.assertEqualArray(expected, got[0], atol=1e-5)
+            got = sess.run(None, {"x": _x.detach().numpy()})
+            self.assertEqualArray(expected, got[0], atol=1e-5)
+
     def test_cond_llm_image_embedding(self):
         import torch
 
