@@ -21,8 +21,7 @@ from ..container import ExportArtifact
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype
 from ..helpers.to_onnx_helper import _dataframe_to_dtypes, _is_dataframe
 from ..xbuilder import GraphBuilder
-from ..xtracing.dataframe_trace import trace_dataframe
-from ..xtracing.tracing import trace_numpy_function, TracedDataFrame
+from ..xtracing import TracedDataFrame, trace_dataframe, trace_numpy_function
 from .polars_convert import lazyframe_to_onnx
 from .sql_convert import sql_to_onnx, sql_to_onnx_graph  # noqa: F401 – re-exported
 
