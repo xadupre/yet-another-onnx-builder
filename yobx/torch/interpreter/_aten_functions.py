@@ -10287,6 +10287,39 @@ def aten_setitem(
 ) -> T:
     "setitem"
 
+    # Handle mask (boolean tensor) indexing: x[mask] = values
+    if isinstance(indices, str) and g.has_type(indices) and g.get_type(indices) == TensorProto.BOOL:
+        name = f"{name}_mask"
+        assert g.has_type(x), f"Missing type for x={x!r}{g.get_debug_msg()}"
+        itype = g.get_type(x)
+        if isinstance(values, (int, float, bool)):
+            np_values = np.array(values, dtype=tensor_dtype_to_np_dtype(itype))
+        else:
+            np_values = values
+        index = indices
+        if g.has_rank(x) and g.has_rank(index) and g.get_rank(x) != g.get_rank(index):
+            rkx = g.get_rank(x)
+            rki = g.get_rank(index)
+            assert rki < rkx, (
+                f"Unexpected ranks rk(x)={rkx}, rk(index)={rki}{g.get_debug_msg()}"
+            )
+            shape_i = g.op.Shape(index, name=name)
+            new_shape = g.op.Concat(
+                shape_i,
+                np.array([1 for _ in range(rkx - rki)], dtype=np.int64),
+                axis=0,
+                name=name,
+            )
+            index = g.op.Reshape(index, new_shape, name=name)
+        res = g.op.Where(index, np_values, x, outputs=outputs, name=name)
+        if not sts:
+            g.set_type(res, itype)
+            if g.has_shape(x):
+                g.set_shape(res, g.get_shape(x))
+            elif g.has_rank(x):
+                g.set_rank(res, g.get_rank(x))
+        return res
+
     # dealing with ellipsis
     if (
         isinstance(indices, tuple)
