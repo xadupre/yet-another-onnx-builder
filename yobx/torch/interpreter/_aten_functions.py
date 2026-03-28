@@ -9253,11 +9253,46 @@ def aten_scan(
         scan_output_axes=[dim for _ in range(n_outputs)],
         scan_output_directions=[(1 if reverse else 0) for _ in range(n_outputs)],
     )
-    # Propagate element types from the body outputs to the Scan node outputs
-    # in the outer graph. This is needed when meta["val"] is not set (tracing path).
-    for out_name, body_out_type in zip(outputs, body_output_elem_types):
+    # Propagate element types and ranks from body outputs to the Scan node
+    # outputs in the outer graph.  This is needed when meta["val"] is not set
+    # (tracing path) so that downstream nodes (getitem, graph output) can
+    # determine shape/rank.
+    #
+    # Rank rules (ONNX Scan spec):
+    #   carry outputs (0..n_carry-1): same rank as the corresponding init state
+    #   scan accumulation outputs (n_carry..n_total-1): body output rank + 1
+    #     (the scan dimension is prepended)
+    n_carry = len(scan_inits)
+    # Collect body output ranks from the local function builder.
+    body_output_ranks: List[Optional[int]] = []
+    for oname in loc.output:
+        if loc_builder is not None:
+            if loc_builder.has_shape(oname):
+                body_output_ranks.append(len(loc_builder.get_shape(oname)))
+            elif loc_builder.has_rank(oname):
+                body_output_ranks.append(loc_builder.get_rank(oname))
+            else:
+                body_output_ranks.append(None)
+        else:
+            body_output_ranks.append(None)
+
+    for i, out_name in enumerate(outputs):
+        body_out_type = body_output_elem_types[i]
         if body_out_type and not g.has_type(out_name):
             g.set_type(out_name, body_out_type)
+        if not g.has_rank(out_name) and not g.has_shape(out_name):
+            if i < n_carry:
+                # Carry outputs: same rank as the corresponding init state.
+                init_name = scan_inits[i]
+                if g.has_shape(init_name):
+                    g.set_shape(out_name, g.get_shape(init_name))
+                elif g.has_rank(init_name):
+                    g.set_rank(out_name, g.get_rank(init_name))
+            else:
+                # Scan accumulation outputs: prepend the scan dimension.
+                body_rank = body_output_ranks[i]
+                if body_rank is not None:
+                    g.set_rank(out_name, body_rank + 1)
     return tuple(outputs) if len(outputs) > 1 else outputs
 
 
