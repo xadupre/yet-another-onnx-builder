@@ -273,7 +273,7 @@ class ExpressionSimplifierAddVisitor(CommonVisitor):
                 depth += 1
             elif c == ")":
                 depth -= 1
-            elif depth == 0 and var[i : i + 2] in ("//",) or (depth == 0 and c == "%"):
+            elif depth == 0 and (var[i : i + 2] in ("//",) or c == "%"):
                 return True
             i += 1
         return False
