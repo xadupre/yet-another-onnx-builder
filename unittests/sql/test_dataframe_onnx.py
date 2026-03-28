@@ -564,6 +564,50 @@ class TestMultiDataframe(ExtTestCase):
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b)
 
+    def test_to_onnx_multi_frame_tuple_of_dicts(self):
+        """to_onnx() accepts a tuple of dtype dicts for multi-frame callables."""
+        from yobx.sql import to_onnx
+
+        def transform(df1, df2):
+            return df1.select([(df1["a"] + df2["b"]).alias("total")])
+
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        artifact = to_onnx(transform, ({"a": np.float32}, {"b": np.float32}))
+        ref = ExtendedReferenceEvaluator(artifact)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+
+    def test_dataframe_to_onnx_tuple_of_dicts(self):
+        """dataframe_to_onnx() accepts a tuple of dtype dicts."""
+
+        def transform(df1, df2):
+            return df1.select([(df1["a"] + df2["b"]).alias("total")])
+
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        artifact = dataframe_to_onnx(transform, ({"a": np.float32}, {"b": np.float32}))
+        ref = ExtendedReferenceEvaluator(artifact)
+        (total,) = ref.run(None, {"a": a, "b": b})
+        np.testing.assert_allclose(total, a + b)
+
+    def test_to_onnx_three_frames_tuple_of_dicts(self):
+        """to_onnx() accepts a tuple of three dtype dicts."""
+        from yobx.sql import to_onnx
+
+        def transform(df1, df2, df3):
+            return df1.select([(df1["a"] + df2["b"] + df3["c"]).alias("total")])
+
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        c = np.array([10.0, 20.0], dtype=np.float32)
+        artifact = to_onnx(
+            transform, ({"a": np.float32}, {"b": np.float32}, {"c": np.float32})
+        )
+        ref = ExtendedReferenceEvaluator(artifact)
+        (total,) = ref.run(None, {"a": a, "b": b, "c": c})
+        np.testing.assert_allclose(total, a + b + c)
+
     def test_to_onnx_numpy_single_array_in_tuple(self):
         """to_onnx(f, (arr,)) dispatches to trace_numpy_to_onnx."""
         from yobx.sql import to_onnx
