@@ -128,14 +128,14 @@ class CustomProxy(torch.fx.proxy.Proxy):
                             break
                     if root is not None:
                         break
-                assert root is not None, (
-                    f"Unable to find a proxy in scan args={args}, orig_method={orig_method}"
-                )
+                assert (
+                    root is not None
+                ), f"Unable to find a proxy in scan args={args}, orig_method={orig_method}"
                 scan_fn = args[0]
                 init_states = args[1]
                 scan_inputs = args[2]
-                additional_inputs = args[3] if len(args) > 3 else (kwargs or {}).get(
-                    "additional_inputs", []
+                additional_inputs = (
+                    args[3] if len(args) > 3 else (kwargs or {}).get("additional_inputs", [])
                 )
                 scan_fn_node = root.tracer.register_callable("scan", scan_fn)
                 init_nodes = [a.node if hasattr(a, "node") else a for a in init_states]
@@ -403,16 +403,8 @@ def replace_problematic_function_before_tracing() -> Generator:
     such as :func:`torch.cat`.
     """
     _scan_op = getattr(torch.ops.higher_order, "scan", None)
-    saved = {
-        "cat": torch.cat,
-        "cond": torch.cond,
-        "vmap": torch.vmap,
-    }
-    newf = {
-        "cat": CustomProxy.cat,
-        "cond": CondCCOp(),
-        "vmap": _vmap_for_tracing,
-    }
+    saved = {"cat": torch.cat, "cond": torch.cond, "vmap": torch.vmap}
+    newf = {"cat": CustomProxy.cat, "cond": CondCCOp(), "vmap": _vmap_for_tracing}
     if _scan_op is not None:
         saved[(torch.ops.higher_order, "scan")] = _scan_op
         newf[(torch.ops.higher_order, "scan")] = ScanCCOp()
