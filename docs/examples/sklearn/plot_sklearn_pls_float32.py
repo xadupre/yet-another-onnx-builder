@@ -20,6 +20,25 @@ Nevertheless, this shows an example based on
 :class:`sklearn.cross_decomposition.PLSRegression` to
 illustrate the problem step by step and shows how to fix it.
 
+Why almost correlated data?
+-----------------------------
+
+:class:`~sklearn.cross_decomposition.PLSRegression` is designed for datasets
+where the **features are strongly correlated** (near-collinear). In such a
+setting the model finds a small number of latent directions that capture the
+covariance between ``X`` and ``y``.
+
+We therefore generate data with a **low-rank latent-variable structure**:
+
+* A few hidden factors ``Z`` drive both the features ``X`` and the target ``y``.
+* Small independent noise is added to each column of ``X`` and to ``y``.
+
+The resulting feature matrix is almost correlated — its columns span roughly
+the same low-dimensional subspace — which is the canonical use case for PLS.
+This also makes the float32 / float64 precision difference more pronounced:
+the weight vectors of PLS point into directions of high variance, and
+rounding them to float32 changes those directions non-trivially.
+
 Why does float32 cause discrepancies?
 --------------------------------------
 
@@ -52,7 +71,6 @@ floating-point round-off.
 import numpy as np
 import onnxruntime
 from sklearn.cross_decomposition import PLSRegression
-from sklearn.datasets import make_regression
 
 from yobx.sklearn import to_onnx
 
@@ -60,11 +78,27 @@ from yobx.sklearn import to_onnx
 # 1. Train a PLSRegression in float64 (the default)
 # --------------------------------------------------
 #
-# We generate a regression dataset and fit a ``PLSRegression`` model.
-# ``make_regression`` returns ``float64`` arrays by default, which is also
-# what scikit-learn uses internally for all computations.
+# We generate a dataset with **almost correlated features** using a
+# low-rank latent-variable structure: a small number of hidden factors ``Z``
+# drive both the feature matrix ``X`` and the target ``y``, with a tiny amount
+# of independent noise added on top.  The resulting columns of ``X`` are highly
+# correlated — exactly the setting PLS is designed for — and it makes the
+# float32 precision loss more visible.
 
-X, y = make_regression(n_samples=200, n_features=50, n_informative=10, random_state=0)
+rng = np.random.default_rng(0)
+n_samples, n_features, n_latent = 200, 50, 5
+
+# Latent factors shared by X and y
+Z = rng.standard_normal((n_samples, n_latent))
+
+# Features: linear combinations of Z plus tiny noise
+W = rng.standard_normal((n_latent, n_features))
+X = Z @ W + 0.01 * rng.standard_normal((n_samples, n_features))
+
+# Single target: also driven by the latent factors
+c = rng.standard_normal(n_latent)
+y = Z @ c + 0.01 * rng.standard_normal(n_samples)
+
 # X and y are float64 here
 print("X dtype :", X.dtype)  # float64
 print("y dtype :", y.dtype)  # float64
@@ -144,14 +178,21 @@ assert max_diff_f32 > max_diff_f64, "float32 export should introduce more error 
 print("\nConclusion: use float64 inputs when the model was trained with float64 ✓")
 
 # %%
-# 5. Multi-target PLSRegression
-# ------------------------------
+# 5. Multi-target PLSRegression with almost correlated data
+# ----------------------------------------------------------
 #
 # The same precision loss applies to multi-target regression.
+# We again use a latent-variable structure so that the features are
+# almost correlated.
 
-X2, Y2 = make_regression(
-    n_samples=200, n_features=50, n_informative=10, n_targets=3, random_state=1
-)
+rng2 = np.random.default_rng(1)
+n_samples2, n_features2, n_latent2, n_targets2 = 200, 50, 5, 3
+
+Z2 = rng2.standard_normal((n_samples2, n_latent2))
+W2 = rng2.standard_normal((n_latent2, n_features2))
+X2 = Z2 @ W2 + 0.01 * rng2.standard_normal((n_samples2, n_features2))
+C2 = rng2.standard_normal((n_latent2, n_targets2))
+Y2 = Z2 @ C2 + 0.01 * rng2.standard_normal((n_samples2, n_targets2))
 
 pls2 = PLSRegression(n_components=5)
 pls2.fit(X2, Y2)
