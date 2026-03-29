@@ -909,7 +909,7 @@ def trace_dataframe(
     input_dtypes: Union[
         Dict[str, Union[np.dtype, type, str]], List[Dict[str, Union[np.dtype, type, str]]]
     ],
-) -> ParsedQuery:
+) -> Union["ParsedQuery", List["ParsedQuery"]]:
     """Trace *func* and return the equivalent :class:`~yobx.sql.parse.ParsedQuery`.
 
     Constructs one or more :class:`TracedDataFrame` objects whose columns
@@ -918,8 +918,9 @@ def trace_dataframe(
     :class:`~yobx.sql.parse.ParsedQuery`.
 
     :param func: a callable that accepts one or more :class:`TracedDataFrame`
-        objects and returns a :class:`TracedDataFrame`.  The function may apply
-        any combination of ``filter``, ``select``, arithmetic on columns,
+        objects and returns a :class:`TracedDataFrame` **or a tuple/list of**
+        :class:`TracedDataFrame` objects.  The function may apply any
+        combination of ``filter``, ``select``, arithmetic on columns,
         ``join``, and aggregations.
     :param input_dtypes: either
 
@@ -930,8 +931,10 @@ def trace_dataframe(
 
         The dtypes are not used during tracing itself; they are used only when
         the returned query is subsequently compiled to ONNX.
-    :return: a :class:`~yobx.sql.parse.ParsedQuery` representing the operations
-        performed by *func*.
+    :return: a :class:`~yobx.sql.parse.ParsedQuery` representing the
+        operations performed by *func*, or a **list** of
+        :class:`~yobx.sql.parse.ParsedQuery` objects when *func* returns
+        multiple dataframes (as a tuple or list).
 
     Example — single dataframe::
 
@@ -957,6 +960,19 @@ def trace_dataframe(
             return df1.select([(df1["a"] + df2["b"]).alias("total")])
 
         pq = trace_dataframe(transform, [{"a": np.float32}, {"b": np.float32}])
+
+    Example — multiple output dataframes::
+
+        import numpy as np
+        from yobx.xtracing.dataframe_trace import trace_dataframe
+
+        def transform(df):
+            out1 = df.select([(df["a"] + df["b"]).alias("sum_ab")])
+            out2 = df.select([(df["a"] - df["b"]).alias("diff_ab")])
+            return out1, out2
+
+        pqs = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        # pqs is a list of two ParsedQuery objects
     """
     if isinstance(input_dtypes, (list, tuple)):
         dfs = []
@@ -974,6 +990,19 @@ def trace_dataframe(
             columns[ref] = TracedSeries(ref)
         df = TracedDataFrame(columns, source_columns=list(input_dtypes.keys()))
         result = func(df)
+    if isinstance(result, (tuple, list)):
+        if not result:
+            raise ValueError(
+                "trace_dataframe: function returned an empty sequence; "
+                "at least one TracedDataFrame output is required"
+            )
+        for i, item in enumerate(result):
+            if not isinstance(item, TracedDataFrame):
+                raise TypeError(
+                    f"trace_dataframe: function returned a sequence but item {i} is "
+                    f"{type(item).__name__!r}, expected TracedDataFrame"
+                )
+        return [item.to_parsed_query() for item in result]
     if not isinstance(result, TracedDataFrame):
         raise TypeError(
             f"trace_dataframe: function must return a TracedDataFrame, "
