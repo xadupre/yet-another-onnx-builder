@@ -67,24 +67,24 @@ DataFrame function to ONNX:
         verbose: int = 0,
     ) -> ExportArtifact: ...
 
-================  ================================================================
-Parameter         Description
-================  ================================================================
-``func``          Python callable that accepts one or more
-                  :class:`~yobx.xtracing.TracedDataFrame` objects and returns a
-                  :class:`~yobx.xtracing.TracedDataFrame` or a tuple/list of
-                  them.
-``input_dtypes``  ``{column: dtype}`` dict (single input frame) **or** a list of
-                  such dicts (one per input frame).  A
-                  :class:`~pandas.DataFrame` can be passed directly; its column
-                  names and dtypes are extracted automatically.
-``target_opset``  ONNX opset version to target.
+====================  ================================================================
+Parameter             Description
+====================  ================================================================
+``func``              Python callable that accepts one or more
+                      :class:`~yobx.xtracing.TracedDataFrame` objects and returns a
+                      :class:`~yobx.xtracing.TracedDataFrame` or a tuple/list of
+                      them.
+``input_dtypes``      ``{column: dtype}`` dict (single input frame) **or** a list of
+                      such dicts (one per input frame).  A
+                      :class:`~pandas.DataFrame` can be passed directly; its column
+                      names and dtypes are extracted automatically.
+``target_opset``      ONNX opset version to target.
 ``custom_functions``  Optional dict mapping SQL function names to Python
-                  callables for use inside ``select``-level expressions.
-``builder_cls``   :class:`~yobx.xbuilder.GraphBuilder` subclass to use.
-``filename``      Optional path to write the model file.
-``verbose``       Verbosity level (0 = silent).
-================  ================================================================
+                      callables for use inside ``select``-level expressions.
+``builder_cls``       :class:`~yobx.xbuilder.GraphBuilder` subclass to use.
+``filename``          Optional path to write the model file.
+``verbose``           Verbosity level (0 = silent).
+====================  ================================================================
 
 Supported operations
 ====================
