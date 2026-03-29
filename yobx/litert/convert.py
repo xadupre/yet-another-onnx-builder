@@ -181,10 +181,7 @@ def to_onnx(
 
 
 def _finalize_builder(
-    g: Any,
-    large_model: bool,
-    external_threshold: int,
-    verbose: int,
+    g: Any, large_model: bool, external_threshold: int, verbose: int
 ) -> ExportArtifact:
     """Call ``g.to_onnx(...)`` and return the resulting :class:`ExportArtifact`."""
     if isinstance(g, GraphBuilder):
@@ -315,23 +312,15 @@ def _convert_subgraph(
         # downstream ops that look up the original TFLite tensor name can
         # find it through the builder.
         if name != internal_name and not g.has_name(internal_name):
-            g.op.Identity(
-                name,
-                outputs=[internal_name],
-                name=f"{name_prefix}litert_input_alias",
-            )
+            g.op.Identity(name, outputs=[internal_name], name=f"{name_prefix}litert_input_alias")
 
     # ------------------------------------------------------------------ #
     # 3. Convert operators in topological order (TFLite guarantees this). #
     # ------------------------------------------------------------------ #
     for op in subgraph.operators:
         # Build input names: skip tensors with index -1 (optional absent).
-        op_input_names = [
-            (name_prefix + tensors[i].name) if i >= 0 else "" for i in op.inputs
-        ]
-        op_output_names = [
-            name_prefix + tensors[i].name for i in op.outputs if i >= 0
-        ]
+        op_input_names = [(name_prefix + tensors[i].name) if i >= 0 else "" for i in op.inputs]
+        op_output_names = [name_prefix + tensors[i].name for i in op.outputs if i >= 0]
 
         # Resolve converter: extra_converters > registry.
         fct = extra_converters.get(op.opcode)
@@ -367,9 +356,7 @@ def _convert_subgraph(
     # ------------------------------------------------------------------ #
     for t_idx in subgraph.outputs:
         tensor = tensors[t_idx]
-        g.make_tensor_output(
-            name_prefix + tensor.name, indexed=False, allow_untyped_output=True
-        )
+        g.make_tensor_output(name_prefix + tensor.name, indexed=False, allow_untyped_output=True)
 
 
 # ---------------------------------------------------------------------------

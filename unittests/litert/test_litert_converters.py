@@ -401,7 +401,6 @@ class TestLiteRTEndToEnd(ExtTestCase):
         self.assertEqual(len(artifact.proto.graph.output), 2)
 
     def test_to_onnx_all_subgraphs_input_names_mismatch_raises(self):
-        """to_onnx(subgraph_index=None) raises when a per-subgraph input_names length mismatches."""
         from yobx.litert import to_onnx
         from yobx.litert.litert_helper import _make_multi_subgraph_tflite_model
 
