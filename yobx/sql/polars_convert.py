@@ -426,6 +426,8 @@ def lazyframe_to_onnx(
     builder_cls: Union[type, Callable] = GraphBuilder,
     filename: Optional[str] = None,
     verbose: int = 0,
+    large_model: bool = False,
+    external_threshold: int = 1024,
 ) -> ExportArtifact:
     """Convert a :class:`polars.LazyFrame` into a self-contained ONNX model.
 
@@ -458,6 +460,11 @@ def lazyframe_to_onnx(
         the :class:`~yobx.container.ExportReport` is written as a companion
         Excel file (same base name with ``.xlsx`` extension).
     :param verbose: verbosity level (0 = silent).
+    :param large_model: if True the returned :class:`~yobx.container.ExportArtifact`
+        has its :attr:`~yobx.container.ExportArtifact.container` attribute set to
+        an :class:`~yobx.container.ExtendedModelContainer`
+    :param external_threshold: if ``large_model`` is True, every tensor whose
+        element count exceeds this threshold is stored as external data
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -499,4 +506,6 @@ def lazyframe_to_onnx(
         builder_cls=builder_cls,
         filename=filename,
         verbose=verbose,
+        large_model=large_model,
+        external_threshold=external_threshold,
     )
