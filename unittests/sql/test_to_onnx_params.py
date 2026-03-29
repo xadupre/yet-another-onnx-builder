@@ -10,15 +10,10 @@ import numpy as np
 
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.sql import (
-    dataframe_to_onnx,
-    sql_to_onnx,
-    to_onnx,
-)
+from yobx.sql import dataframe_to_onnx, sql_to_onnx, to_onnx
 from yobx.sql.convert import trace_numpy_to_onnx
 from yobx.sql.sql_convert import parsed_query_to_onnx
 from yobx.xtracing import trace_dataframe
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -66,9 +61,7 @@ class TestSqlToOnnxLargeModel(ExtTestCase):
     def test_external_threshold_accepted(self):
         # Just verify no error is raised with a custom threshold.
         dtypes = {"a": np.float32}
-        art = sql_to_onnx(
-            "SELECT a FROM t", dtypes, large_model=True, external_threshold=512
-        )
+        art = sql_to_onnx("SELECT a FROM t", dtypes, large_model=True, external_threshold=512)
         self.assertIsNotNone(art.container)
 
 
@@ -143,8 +136,7 @@ class TestTraceNumpyToOnnxNewParams(ExtTestCase):
         art = trace_numpy_to_onnx(_simple_numpy, X, dynamic_shapes=({0: "N", 1: "M"},))
         inp = art.proto.graph.input[0]
         dims = [
-            d.dim_param if d.dim_param else d.dim_value
-            for d in inp.type.tensor_type.shape.dim
+            d.dim_param if d.dim_param else d.dim_value for d in inp.type.tensor_type.shape.dim
         ]
         self.assertEqual(dims, ["N", "M"])
 
@@ -154,8 +146,7 @@ class TestTraceNumpyToOnnxNewParams(ExtTestCase):
         art = trace_numpy_to_onnx(_simple_numpy, X, dynamic_shapes=({0: "batch"},))
         inp = art.proto.graph.input[0]
         dims = [
-            d.dim_param if d.dim_param else d.dim_value
-            for d in inp.type.tensor_type.shape.dim
+            d.dim_param if d.dim_param else d.dim_value for d in inp.type.tensor_type.shape.dim
         ]
         self.assertEqual(dims[0], "batch")
         self.assertEqual(dims[1], 3)
@@ -163,9 +154,7 @@ class TestTraceNumpyToOnnxNewParams(ExtTestCase):
     def test_dynamic_shapes_length_mismatch_raises(self):
         X = np.random.randn(4, 3).astype(np.float32)
         with self.assertRaises(ValueError):
-            trace_numpy_to_onnx(
-                _simple_numpy, X, dynamic_shapes=({0: "N"}, {1: "M"})
-            )
+            trace_numpy_to_onnx(_simple_numpy, X, dynamic_shapes=({0: "N"}, {1: "M"}))
 
     def test_dynamic_shapes_out_of_bounds_raises(self):
         X = np.random.randn(4, 3).astype(np.float32)
@@ -187,18 +176,13 @@ class TestTraceNumpyToOnnxNewParams(ExtTestCase):
 
     def test_external_threshold_accepted(self):
         X = np.random.randn(4, 3).astype(np.float32)
-        art = trace_numpy_to_onnx(
-            _simple_numpy, X, large_model=True, external_threshold=512
-        )
+        art = trace_numpy_to_onnx(_simple_numpy, X, large_model=True, external_threshold=512)
         self.assertIsNotNone(art.container)
 
     def test_result_is_still_correct(self):
         X = np.random.randn(4, 3).astype(np.float32)
         art = trace_numpy_to_onnx(
-            _simple_numpy,
-            X,
-            input_names=["myX"],
-            dynamic_shapes=({0: "batch"},),
+            _simple_numpy, X, input_names=["myX"], dynamic_shapes=({0: "batch"},)
         )
         ref = ExtendedReferenceEvaluator(art)
         (out,) = ref.run(None, {"myX": X})
@@ -266,8 +250,7 @@ class TestToOnnxNewParams(ExtTestCase):
         art = to_onnx(_simple_numpy, (X,), dynamic_shapes=({0: "N", 1: "M"},))
         inp = art.proto.graph.input[0]
         dims = [
-            d.dim_param if d.dim_param else d.dim_value
-            for d in inp.type.tensor_type.shape.dim
+            d.dim_param if d.dim_param else d.dim_value for d in inp.type.tensor_type.shape.dim
         ]
         self.assertEqual(dims, ["N", "M"])
 
@@ -287,10 +270,7 @@ class TestToOnnxNewParams(ExtTestCase):
     def test_numpy_result_is_correct_with_custom_input_name(self):
         X = np.random.randn(4, 3).astype(np.float32)
         art = to_onnx(
-            _simple_numpy,
-            (X,),
-            input_names=["myinput"],
-            dynamic_shapes=({0: "batch"},),
+            _simple_numpy, (X,), input_names=["myinput"], dynamic_shapes=({0: "batch"},)
         )
         ref = ExtendedReferenceEvaluator(art)
         (out,) = ref.run(None, {"myinput": X})
