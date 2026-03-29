@@ -630,6 +630,13 @@ class ExportOptions:
             if verbose:
                 print(f"[ExportOptions.export] slices: {removed} slices nodes were removed")
             graph.lint()
+        removed_tests = CustomTracer.remove_tests(graph)
+        if removed_tests:
+            if verbose:
+                print(
+                    f"[ExportOptions.export] tests: {removed_tests} test nodes were removed"
+                )
+            graph.lint()
         modified = CustomTracer.remove_inplace(
             graph, exported_program=exported_program, verbose=verbose, exc=False
         )

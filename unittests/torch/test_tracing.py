@@ -223,6 +223,103 @@ class TestCustomTracer(ExtTestCase):
             [node.target.name() for node in graph.nodes if hasattr(node.target, "name")],
         )
 
+    def test_remove_tests_no_tests(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        tracer = CustomTracer()
+        graph = tracer.trace(Model())
+        # No test nodes to remove
+        result = CustomTracer.remove_tests(graph)
+        self.assertEqual(result, 0)
+
+    def test_remove_tests_unused_operator_eq(self):
+        # Build a graph with an unused operator.eq node
+        import operator
+
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        y = graph.placeholder("y")
+        # Create an equality comparison whose result is never used
+        eq_node = graph.call_function(operator.eq, args=(x, y))
+        graph.output(x)
+
+        nodes_before = len(list(graph.nodes))
+        result = CustomTracer.remove_tests(graph)
+        self.assertEqual(result, 1)
+        # eq_node should have been removed (and its predecessor chain if unused)
+        remaining_targets = [n.target for n in graph.nodes if n.op == "call_function"]
+        self.assertNotIn(operator.eq, remaining_targets)
+
+    def test_remove_tests_unused_operator_or(self):
+        # Build a graph with an unused operator.or_ node
+        # (operator.or_ is excluded from _inplace_nodes, so remove_inplace
+        # would not catch it — remove_tests must handle it)
+        import operator
+
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        y = graph.placeholder("y")
+        or_node = graph.call_function(operator.or_, args=(x, y))
+        graph.output(x)
+
+        result = CustomTracer.remove_tests(graph)
+        self.assertEqual(result, 1)
+        remaining_targets = [n.target for n in graph.nodes if n.op == "call_function"]
+        self.assertNotIn(operator.or_, remaining_targets)
+
+    def test_remove_tests_unused_aten_eq(self):
+        # Build a graph with an unused aten::eq.Tensor node
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        y = graph.placeholder("y")
+        eq_node = graph.call_function(torch.ops.aten.eq.Tensor, args=(x, y))
+        graph.output(x)
+
+        result = CustomTracer.remove_tests(graph)
+        self.assertEqual(result, 1)
+        remaining_ops = [
+            n.target.name()
+            for n in graph.nodes
+            if n.op == "call_function" and hasattr(n.target, "name")
+        ]
+        self.assertNotIn("aten::eq.Tensor", remaining_ops)
+
+    def test_remove_tests_used_eq_not_removed(self):
+        # A comparison whose result IS used should NOT be removed
+        import operator
+
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        y = graph.placeholder("y")
+        eq_node = graph.call_function(operator.eq, args=(x, y))
+        # Use eq_node as the output
+        graph.output(eq_node)
+
+        result = CustomTracer.remove_tests(graph)
+        self.assertEqual(result, 0)
+        remaining_targets = [n.target for n in graph.nodes if n.op == "call_function"]
+        self.assertIn(operator.eq, remaining_targets)
+
+    def test_remove_tests_chain_removal(self):
+        # When the test node is removed and its predecessor becomes unused,
+        # the predecessor should also be removed (graph_erase_node behaviour)
+        import operator
+
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        # Create: sum_node = aten.sum(x, []), then gt_node = sum_node > 0 (unused)
+        sum_node = graph.call_function(torch.ops.aten.sum.dim_IntList, args=(x, []))
+        gt_node = graph.call_function(operator.gt, args=(sum_node, 0))
+        graph.output(x)
+
+        result = CustomTracer.remove_tests(graph)
+        # Both gt_node and sum_node should be gone
+        self.assertGreaterEqual(result, 1)
+        remaining_call_targets = [n.target for n in graph.nodes if n.op == "call_function"]
+        self.assertNotIn(operator.gt, remaining_call_targets)
+
     def test_trace_setitem(self):
         class Model(torch.nn.Module):
             def forward(self, x):
@@ -1330,6 +1427,47 @@ class TestTracingControlFlow(ExtTestCase):
         x = torch.rand((3, 4))
         art = to_onnx(model, (x,), export_options=ExportOptions(tracing=True))
         self.assertEqual(["Identity"], [n.op_type for n in art.graph.node])
+
+    def test_remove_tests_unused_comparison_in_traced_graph(self):
+        """Traced model with an explicitly unused equality check produces clean graph."""
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                # Create a comparison that is not used in the output.
+                _ = x == y  # noqa: F841
+                return x + y
+
+        model = Model()
+        x, y = torch.rand((3, 4)), torch.rand((3, 4))
+        tracer = CustomTracer()
+        graph = tracer.trace(model)
+        # After tracing and remove_tests, no equality node should remain.
+        call_targets = [n.target for n in graph.nodes if n.op == "call_function"]
+        import operator as _op
+
+        self.assertNotIn(_op.eq, call_targets)
+        # The graph should still be valid.
+        graph.lint()
+
+    def test_remove_tests_unused_or_in_traced_graph(self):
+        """Traced model with an explicitly unused bitwise-or check produces clean graph."""
+        import operator as _op
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                # Create a bitwise-or that is not used in the output.
+                _ = x | y  # noqa: F841
+                return x + y
+
+        model = Model()
+        x = torch.randint(0, 10, (3, 4))
+        y = torch.randint(0, 10, (3, 4))
+        tracer = CustomTracer()
+        graph = tracer.trace(model)
+        # The traced graph should not contain any unused operator.or_ node.
+        call_targets = [n.target for n in graph.nodes if n.op == "call_function"]
+        self.assertNotIn(_op.or_, call_targets)
+        graph.lint()
 
 
 if __name__ == "__main__":

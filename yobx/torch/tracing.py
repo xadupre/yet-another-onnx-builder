@@ -887,6 +887,7 @@ class CustomTracer(torch.fx.Tracer):
             for k, v in self._callables.items():
                 setattr(root, k, v)
         self.remove_unnecessary_slices(graph, verbose=verbose)
+        self.remove_tests(graph, verbose=verbose)
         if remove_inplace:
             self.remove_inplace(graph, verbose=verbose)
         graph.lint()
@@ -1121,6 +1122,105 @@ class CustomTracer(torch.fx.Tracer):
                     f"{old_name!r} by {new_name!r}"
                 )
             removed += 1
+        return removed
+
+    @classmethod
+    def remove_tests(cls, graph: torch.fx.Graph, verbose: int = 0) -> int:
+        """
+        Removes comparison and boolean test nodes that have no users.
+
+        When a comparison or boolean node has no users, the model output
+        is the same whether or not the node is in the graph — "with or
+        without it gives the same thing".  This cleans up test nodes that
+        were produced as a side-effect of statically-resolved control-flow
+        conditions during tracing (e.g. ``if x.dtype == torch.float32:``
+        evaluates the condition in Python but may still leave orphaned
+        comparison nodes in the graph).
+
+        Handles both Python-operator nodes (e.g. ``operator.eq``) and
+        aten-level comparison nodes (e.g. ``aten::eq.Tensor``), as well
+        as boolean combination operators (``operator.and_``,
+        ``operator.or_``) that are intentionally excluded from the
+        inplace-removal pass.
+
+        :param graph: graph to modify
+        :param verbose: verbosity level
+        :return: number of nodes removed
+
+        ::
+
+            graph = CustomTracer().trace(model)
+            CustomTracer.remove_tests(graph)
+        """
+        # Python comparison and boolean operators that may appear as orphan
+        # nodes after control-flow conditions are resolved at trace time.
+        test_python_targets = {
+            operator.eq,
+            operator.ne,
+            operator.lt,
+            operator.le,
+            operator.gt,
+            operator.ge,
+            operator.not_,
+            operator.and_,
+            operator.or_,
+        }
+
+        # Aten-name prefixes for comparison operations.
+        # These cover both the ``::`` format (from ``node.target.name()`` on
+        # OpOverload objects, e.g. ``torch.ops.aten.eq.Tensor``) and the
+        # single-underscore format returned by ``_get_aten_name`` for plain
+        # callable targets whose ``__name__`` starts without an underscore.
+        test_aten_prefixes = (
+            "aten::eq",
+            "aten::ne",
+            "aten::lt",
+            "aten::le",
+            "aten::gt",
+            "aten::ge",
+            "aten::__and__",
+            "aten::__or__",
+            "aten_eq",
+            "aten_ne",
+            "aten_lt",
+            "aten_le",
+            "aten_gt",
+            "aten_ge",
+        )
+
+        removed = 0
+        changed = True
+        while changed:
+            changed = False
+            for node in list(graph.nodes):
+                if node.op == "output":
+                    continue
+                if len(node.users) > 0:
+                    continue
+                if node.op not in ("call_function", "call_method"):
+                    continue
+
+                # Identify test/comparison operations.
+                is_test = node.target in test_python_targets
+                if not is_test:
+                    try:
+                        aten_name = cls.get_node_target_name(node, exc=False)
+                        if aten_name is not None:
+                            is_test = aten_name.startswith(test_aten_prefixes)
+                    except (NotImplementedError, RuntimeError, AssertionError):
+                        pass
+
+                if is_test:
+                    if verbose > 1:
+                        print(
+                            f"[CustomTracer.remove_tests] remove "
+                            f"{node.target}({node.args})"
+                        )
+                    cls.graph_erase_node(graph, node)
+                    removed += 1
+                    changed = True
+                    break  # restart iteration after each removal
+
         return removed
 
     @classmethod
