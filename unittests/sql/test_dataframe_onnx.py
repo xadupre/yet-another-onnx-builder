@@ -739,6 +739,189 @@ class TestParsedQueryToOnnx(ExtTestCase):
 
 
 # ---------------------------------------------------------------------------
+# Multiple output dataframes
+# ---------------------------------------------------------------------------
+
+
+class TestMultipleOutputDataframes(ExtTestCase):
+    """Tests for functions that return multiple :class:`TracedDataFrame` outputs."""
+
+    def test_trace_dataframe_tuple_output(self):
+        """trace_dataframe returns a list of ParsedQuery when func returns a tuple."""
+        from yobx.xtracing.dataframe_trace import trace_dataframe
+        from yobx.xtracing.parse import ParsedQuery
+
+        def transform(df):
+            out1 = df.select([(df["a"] + df["b"]).alias("sum_ab")])
+            out2 = df.select([(df["a"] - df["b"]).alias("diff_ab")])
+            return out1, out2
+
+        result = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        for pq in result:
+            self.assertIsInstance(pq, ParsedQuery)
+
+    def test_trace_dataframe_list_output(self):
+        """trace_dataframe returns a list of ParsedQuery when func returns a list."""
+        from yobx.xtracing.dataframe_trace import trace_dataframe
+        from yobx.xtracing.parse import ParsedQuery
+
+        def transform(df):
+            return [
+                df.select([(df["a"] * 2).alias("double_a")]),
+                df.select([(df["b"] * 3).alias("triple_b")]),
+            ]
+
+        result = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 2)
+        for pq in result:
+            self.assertIsInstance(pq, ParsedQuery)
+
+    def test_trace_dataframe_bad_tuple_item_raises(self):
+        """trace_dataframe raises TypeError when tuple contains non-TracedDataFrame."""
+        from yobx.xtracing.dataframe_trace import trace_dataframe
+
+        def bad_transform(df):
+            return df.select([(df["a"] + df["b"]).alias("sum")]), 42
+
+        with self.assertRaises(TypeError):
+            trace_dataframe(bad_transform, {"a": np.float32, "b": np.float32})
+
+    def test_dataframe_to_onnx_two_outputs(self):
+        """dataframe_to_onnx handles a function that returns two dataframes."""
+        from yobx.sql import dataframe_to_onnx
+
+        def transform(df):
+            out1 = df.select([(df["a"] + df["b"]).alias("sum_ab")])
+            out2 = df.select([(df["a"] - df["b"]).alias("diff_ab")])
+            return out1, out2
+
+        artifact = dataframe_to_onnx(transform, {"a": np.float32, "b": np.float32})
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        results = ref.run(None, {"a": a, "b": b})
+        self.assertEqual(len(results), 2)
+        np.testing.assert_allclose(results[0], a + b)
+        np.testing.assert_allclose(results[1], a - b)
+
+    def test_dataframe_to_onnx_three_outputs(self):
+        """dataframe_to_onnx handles a function that returns three dataframes."""
+        from yobx.sql import dataframe_to_onnx
+
+        def transform(df):
+            out1 = df.select([(df["a"] + df["b"]).alias("sum_ab")])
+            out2 = df.select([(df["a"] - df["b"]).alias("diff_ab")])
+            out3 = df.select([(df["a"] * df["b"]).alias("prod_ab")])
+            return out1, out2, out3
+
+        artifact = dataframe_to_onnx(transform, {"a": np.float32, "b": np.float32})
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        results = ref.run(None, {"a": a, "b": b})
+        self.assertEqual(len(results), 3)
+        np.testing.assert_allclose(results[0], a + b)
+        np.testing.assert_allclose(results[1], a - b)
+        np.testing.assert_allclose(results[2], a * b)
+
+    def test_dataframe_to_onnx_two_outputs_with_filter(self):
+        """Multiple output dataframes — one with a filter applied."""
+        from yobx.sql import dataframe_to_onnx
+
+        def transform(df):
+            out1 = df.filter(df["a"] > 0).select([(df["a"] + df["b"]).alias("sum_pos")])
+            out2 = df.select([(df["a"] * df["b"]).alias("prod_ab")])
+            return out1, out2
+
+        artifact = dataframe_to_onnx(transform, {"a": np.float32, "b": np.float32})
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
+        b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+        results = ref.run(None, {"a": a, "b": b})
+        self.assertEqual(len(results), 2)
+        np.testing.assert_allclose(results[0], np.array([5.0, 9.0], dtype=np.float32))
+        np.testing.assert_allclose(results[1], a * b)
+
+    def test_dataframe_to_onnx_multi_input_multi_output(self):
+        """Multiple input frames and multiple output frames."""
+        from yobx.sql import dataframe_to_onnx
+
+        def transform(df1, df2):
+            out1 = df1.select([(df1["a"] + df2["b"]).alias("sum_ab")])
+            out2 = df1.select([(df1["a"] - df2["b"]).alias("diff_ab")])
+            return out1, out2
+
+        artifact = dataframe_to_onnx(
+            transform, [{"a": np.float32}, {"b": np.float32}]
+        )
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        results = ref.run(None, {"a": a, "b": b})
+        self.assertEqual(len(results), 2)
+        np.testing.assert_allclose(results[0], a + b)
+        np.testing.assert_allclose(results[1], a - b)
+
+    def test_to_onnx_multiple_outputs(self):
+        """to_onnx() dispatches callable returning multiple dataframes correctly."""
+        from yobx.sql import to_onnx
+
+        def transform(df):
+            out1 = df.select([(df["x"] + 1).alias("x_plus_1")])
+            out2 = df.select([(df["x"] * 2).alias("x_times_2")])
+            return out1, out2
+
+        artifact = to_onnx(transform, {"x": np.float32})
+        ref = ExtendedReferenceEvaluator(artifact)
+        x = np.array([5.0, 6.0], dtype=np.float32)
+        results = ref.run(None, {"x": x})
+        self.assertEqual(len(results), 2)
+        np.testing.assert_allclose(results[0], x + 1)
+        np.testing.assert_allclose(results[1], x * 2)
+
+    def test_parsed_query_to_onnx_list_of_queries(self):
+        """parsed_query_to_onnx accepts a list of ParsedQuery objects."""
+        from yobx.xtracing.dataframe_trace import trace_dataframe
+        from yobx.sql.sql_convert import parsed_query_to_onnx
+
+        def transform(df):
+            out1 = df.select([(df["a"] + df["b"]).alias("sum_ab")])
+            out2 = df.select([(df["a"] - df["b"]).alias("diff_ab")])
+            return out1, out2
+
+        pqs = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        self.assertIsInstance(pqs, list)
+        artifact = parsed_query_to_onnx(pqs)
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        results = ref.run(None, {"a": a, "b": b})
+        self.assertEqual(len(results), 2)
+        np.testing.assert_allclose(results[0], a + b)
+        np.testing.assert_allclose(results[1], a - b)
+
+    def test_trace_dataframe_empty_tuple_raises(self):
+        """trace_dataframe raises ValueError when func returns an empty tuple."""
+        from yobx.xtracing.dataframe_trace import trace_dataframe
+
+        def empty_transform(df):
+            return ()
+
+        with self.assertRaises(ValueError):
+            trace_dataframe(empty_transform, {"a": np.float32})
+
+    def test_parsed_query_to_onnx_empty_list_raises(self):
+        """parsed_query_to_onnx raises ValueError when given an empty list."""
+        from yobx.sql.sql_convert import parsed_query_to_onnx
+
+        with self.assertRaises(ValueError):
+            parsed_query_to_onnx([])
+
+
+# ---------------------------------------------------------------------------
 # DataFrame element-wise arithmetic
 # ---------------------------------------------------------------------------
 

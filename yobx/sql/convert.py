@@ -91,7 +91,11 @@ def dataframe_to_onnx(
     :param func: a callable that accepts one or more
         :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame`
         objects and returns a
-        :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame`.
+        :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame` **or a
+        tuple/list of** :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame`
+        objects.  When *func* returns multiple dataframes, all their outputs are
+        collected into a single ONNX graph with shared inputs and multiple
+        output tensors.
     :param input_dtypes: either
 
         * a single ``{column: dtype}`` mapping — *func* is called with one
@@ -172,6 +176,27 @@ def dataframe_to_onnx(
         dtypes1 = {"cid": np.int64, "a": np.float32}
         dtypes2 = {"id": np.int64, "b": np.float32}
         artifact = dataframe_to_onnx(transform, [dtypes1, dtypes2])
+
+    Example — multiple output dataframes::
+
+        import numpy as np
+        from yobx.sql import dataframe_to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        def transform(df):
+            out1 = df.select([(df["a"] + df["b"]).alias("sum_ab")])
+            out2 = df.select([(df["a"] - df["b"]).alias("diff_ab")])
+            return out1, out2
+
+        dtypes = {"a": np.float32, "b": np.float32}
+        artifact = dataframe_to_onnx(transform, dtypes)
+
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        sum_ab, diff_ab = ref.run(None, {"a": a, "b": b})
+        # sum_ab == array([4., 6.], dtype=float32)
+        # diff_ab == array([-2., -2.], dtype=float32)
     """
     from .sql_convert import parsed_query_to_onnx  # avoid top-level circular import
 

@@ -324,7 +324,7 @@ def parsed_query_to_onnx_graph(
 
 
 def parsed_query_to_onnx(
-    pq: ParsedQuery,
+    pq: Union[ParsedQuery, List[ParsedQuery]],
     target_opset: int = DEFAULT_TARGET_OPSET,
     custom_functions: Optional[Dict[str, Callable]] = None,
     builder_cls: Union[type, Callable] = GraphBuilder,
@@ -343,7 +343,11 @@ def parsed_query_to_onnx(
     (which do not carry dtype information) use :func:`sql_to_onnx` instead.
 
     :param pq: a :class:`~yobx.sql.parse.ParsedQuery` produced by
-        :func:`~yobx.xtracing.dataframe_trace.trace_dataframe`.
+        :func:`~yobx.xtracing.dataframe_trace.trace_dataframe`, or a **list**
+        of such queries when the traced function returns multiple dataframes.
+        All queries in the list are compiled into a single ONNX graph whose
+        shared inputs are de-duplicated and whose outputs are the concatenation
+        of the outputs from each individual query.
     :param target_opset: ONNX opset version to target.
     :param custom_functions: optional mapping from function name to Python
         callable.  Each callable is traced via
@@ -356,7 +360,7 @@ def parsed_query_to_onnx(
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
-    Example::
+    Example — single output::
 
         import numpy as np
         from yobx.xtracing.dataframe_trace import trace_dataframe
@@ -373,10 +377,38 @@ def parsed_query_to_onnx(
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([4.0,  5.0, 6.0], dtype=np.float32)
         (total,) = ref.run(None, {"a": a, "b": b})
+
+    Example — multiple outputs::
+
+        import numpy as np
+        from yobx.xtracing.dataframe_trace import trace_dataframe
+        from yobx.sql.sql_convert import parsed_query_to_onnx
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        def transform(df):
+            out1 = df.select([(df["a"] + df["b"]).alias("sum_ab")])
+            out2 = df.select([(df["a"] - df["b"]).alias("diff_ab")])
+            return out1, out2
+
+        pqs = trace_dataframe(transform, {"a": np.float32, "b": np.float32})
+        artifact = parsed_query_to_onnx(pqs)
+
+        ref = ExtendedReferenceEvaluator(artifact)
+        a = np.array([1.0, 2.0], dtype=np.float32)
+        b = np.array([3.0, 4.0], dtype=np.float32)
+        sum_ab, diff_ab = ref.run(None, {"a": a, "b": b})
     """
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
-    parsed_query_to_onnx_graph(g, sts, [], pq)
+    if isinstance(pq, list):
+        if not pq:
+            raise ValueError(
+                "parsed_query_to_onnx: the list of ParsedQuery objects must not be empty"
+            )
+        for single_pq in pq:
+            parsed_query_to_onnx_graph(g, sts, [], single_pq)
+    else:
+        parsed_query_to_onnx_graph(g, sts, [], pq)
     artifact = g.to_onnx(return_optimize_report=True)
     if filename:
         if verbose:
