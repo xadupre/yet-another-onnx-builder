@@ -22,7 +22,6 @@ to [ONNX](https://onnx.ai) format from many libraries. Each converter relies on 
 to build the final ONNX model. One default implementation is provided but
 it can also be replaced by any implementation of your own
 ([onnxscript](https://microsoft.github.io/onnxscript/)/[ir-py](https://onnx.ai/ir-py/), [Spox](https://spox.readthedocs.io/en/latest/)).
-
 These API are close to `onnx` API, using `NodeProto` for nodes
 and strings for names. This is on purpose: what this API produces is
 what you see in the final ONNX model. You can add your own metadata,

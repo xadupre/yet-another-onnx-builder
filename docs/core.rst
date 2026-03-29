@@ -13,6 +13,7 @@ that maintain code across the project.
 .. toctree::
    :maxdepth: 1
 
+   design/shape/index
    design/builder/index
    design/xtracing/index
    design/misc/index
