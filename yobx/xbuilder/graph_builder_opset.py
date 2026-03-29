@@ -203,24 +203,6 @@ class Opset(OpsetProtocol):
             elif i is None:
                 # Optional input
                 new_inputs.append("")
-            elif isinstance(i, int):
-                # Python int → scalar int64 constant
-                cst_name = self.builder.make_initializer(
-                    "",
-                    np.array(i, dtype=np.int64),
-                    msg=f"int input {i} of op_type={op_type!r}",
-                    source="Opset.make_node.int",
-                )
-                new_inputs.append(cst_name)
-            elif isinstance(i, float):
-                # Python float → scalar float32 constant
-                cst_name = self.builder.make_initializer(
-                    "",
-                    np.array(i, dtype=np.float32),
-                    msg=f"float input {i} of op_type={op_type!r}",
-                    source="Opset.make_node.float",
-                )
-                new_inputs.append(cst_name)
             else:
                 raise AssertionError(
                     f"Not implemented for type(i)={type(i)}, i={i}, "

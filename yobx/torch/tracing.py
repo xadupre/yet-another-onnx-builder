@@ -5,6 +5,7 @@ import operator
 import textwrap
 import types
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
+import numpy as np
 import torch
 import torch.utils._pytree as pytree
 from torch.fx import Node
@@ -1658,19 +1659,36 @@ class CustomTracer(torch.fx.Tracer):
                         indices = node.args[1]
                         values = node.args[2]
                         changed_args = False
-                        # Normalize slice(None, stop) → slice(0, stop) in tuple indices.
+
+                        def _normalize_slice(s):
+                            """Normalize a slice for ONNX: None start → 0,
+                            integer stop → np.array so that g.op.Sub(dim, stop)
+                            receives a properly-typed constant."""
+                            if not isinstance(s, slice):
+                                return s, False
+                            changed = False
+                            start = s.start
+                            if start is None:
+                                start = 0
+                                changed = True
+                            stop = s.stop
+                            if isinstance(stop, int):
+                                stop = np.array(stop, dtype=np.int64)
+                                changed = True
+                            return slice(start, stop, s.step), changed
+
+                        # Normalize slice(None, stop) → slice(0, np.array(stop)) in indices.
                         if isinstance(indices, tuple):
                             new_indices = []
                             for i in indices:
-                                if isinstance(i, slice) and i.start is None:
-                                    new_indices.append(slice(0, i.stop, i.step))
-                                    changed_args = True
-                                else:
-                                    new_indices.append(i)
+                                ni, c = _normalize_slice(i)
+                                new_indices.append(ni)
+                                changed_args = changed_args or c
                             indices = tuple(new_indices)
-                        elif isinstance(indices, slice) and indices.start is None:
-                            indices = slice(0, indices.stop, indices.step)
-                            changed_args = True
+                        else:
+                            indices, c = _normalize_slice(indices)
+                            changed_args = changed_args or c
+
                         # Insert a scalar_tensor FX node for raw scalar values so that
                         # aten_setitem always receives a proper tensor input.
                         if isinstance(values, (int, float, bool)):
