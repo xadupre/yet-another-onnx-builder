@@ -958,7 +958,7 @@ def trace_dataframe(
 
         pq = trace_dataframe(transform, [{"a": np.float32}, {"b": np.float32}])
     """
-    if isinstance(input_dtypes, list):
+    if isinstance(input_dtypes, (list, tuple)):
         dfs = []
         for d in input_dtypes:
             cols: Dict[ColumnRef, TracedSeries] = {}

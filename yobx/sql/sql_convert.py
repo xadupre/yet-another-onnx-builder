@@ -263,7 +263,7 @@ def sql_to_onnx(
     """
     if _is_dataframe(input_dtypes):  # type: ignore
         input_dtypes = _dataframe_to_dtypes(input_dtypes)  # type: ignore
-    if isinstance(right_input_dtypes, list):
+    if isinstance(right_input_dtypes, (list, tuple)):
         right_input_dtypes = [  # type: ignore
             _dataframe_to_dtypes(rd) if _is_dataframe(rd) else rd  # type: ignore
             for rd in right_input_dtypes
@@ -854,8 +854,7 @@ def _populate_graph(
     # right_input_dtypes may now be a List[Dict] (one per JOIN) or a single Dict.
     # Build a flat merged dict for backward-compat code paths that still need it,
     # and also store the structured per-join list for the multi-join path.
-    if isinstance(right_input_dtypes, list):
-        # Per-join dtypes: build a flat merged dict for compat + store list.
+    if isinstance(right_input_dtypes, (list, tuple)):
         _right_per_join_raw: List[Optional[Dict]] = list(right_input_dtypes)
         right_dtypes: Dict[str, np.dtype] = {}
         for _rd in right_input_dtypes:
