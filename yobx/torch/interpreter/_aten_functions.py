@@ -10340,6 +10340,17 @@ def aten_setitem(
         assert g.has_rank(x), f"Missing rank for x{g.get_debug_msg()}"
         indices = [indices[0], *([None] * (g.get_rank(x) - 1))]
 
+    # Convert scalar values to a 0-dim constant tensor so they can be broadcast.
+    if isinstance(values, (int, float, bool)):
+        assert g.has_type(x), f"Missing type for x={x!r}{g.get_debug_msg()}"
+        itype = g.get_type(x)
+        np_val = np.array(values, dtype=tensor_dtype_to_np_dtype(itype))
+        values = g.make_initializer(
+            g.unique_name(f"{outputs[0]}_val"), np_val, source="aten_setitem"
+        )
+        g.set_type(values, itype)
+        g.set_shape(values, tuple())
+
     if g.has_rank(x) and g.get_rank(x) == 1 and g.has_rank(values) and g.get_rank(values) == 1:
         # Uses concat, it might be applicable to other cases. To be improved.
         assert len(indices) == 1 and isinstance(indices[0], slice), (
@@ -10394,7 +10405,7 @@ def aten_setitem(
         f"setitem is not implemented when shape is unknown for the values {values!r}"
         f"{g.get_debug_msg()}"
     )
-    assert g.has_rank(x) and isinstance(indices, tuple) and len(indices) == g.get_rank(x), (
+    assert g.has_rank(x) and isinstance(indices, (tuple, list)) and len(indices) == g.get_rank(x), (
         f"setitem is not implemented when indices={indices} and rank is unknown or not "
         f"equal to the number of indices{g.get_debug_msg()}"
     )
@@ -10426,23 +10437,31 @@ def aten_setitem(
             )
 
         start = (
-            (
-                index.start
-                if index.start >= 0
-                else g.op.Add(_d(x), np.array(index.start, dtype=np.int64), name=name)
-            )
-            if isinstance(index.start, int)
-            else g.op.Where(
-                g.op.GreaterOrEqual(index.start, g.ZERO_NO_DIM, name=name),
-                index.start,
-                g.op.Add(_d(x), index.start, name=name),
+            0
+            if index.start is None
+            else (
+                (
+                    index.start
+                    if index.start >= 0
+                    else g.op.Add(_d(x), np.array(index.start, dtype=np.int64), name=name)
+                )
+                if isinstance(index.start, int)
+                else g.op.Where(
+                    g.op.GreaterOrEqual(index.start, g.ZERO_NO_DIM, name=name),
+                    index.start,
+                    g.op.Add(_d(x), index.start, name=name),
+                )
             )
         )
         stop = (
             0
             if index.stop is None
             else (
-                (-index.stop if index.stop < 0 else g.op.Sub(_d(x), index.stop, name=name))
+                (
+                    -index.stop
+                    if index.stop < 0
+                    else g.op.Sub(_d(x), np.array(index.stop, dtype=np.int64), name=name)
+                )
                 if isinstance(index.stop, int)
                 else g.op.Where(
                     g.op.GreaterOrEqual(index.stop, g.ZERO_NO_DIM, name=name),
@@ -10544,6 +10563,74 @@ def aten_setitem(
     if not sts:
         set_type_shape_unary_op(g, res, x)
     return res
+
+
+def aten_setitem_with_transformation(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    indices: Tuple[Any, ...],
+    transformations: Tuple[Tuple[str, Any], ...],
+    name: str = "setitem_with_transformation",
+) -> T:
+    "setitem with in-place transformation (e.g., exp_, sigmoid_)"
+    _transformation_to_onnx_op = {"exp": "Exp", "sigmoid": "Sigmoid"}
+
+    assert isinstance(indices, tuple), (
+        f"Expected tuple for indices, got {type(indices)}{g.get_debug_msg()}"
+    )
+
+    # Build starts/ends/axes for the ONNX Slice op from the slice tuple.
+    starts: List[Any] = []
+    ends: List[Any] = []
+    axes: List[int] = []
+    for axis, idx in enumerate(indices):
+        if idx is None:
+            continue
+        assert isinstance(idx, slice), (
+            f"Only slice indices are supported in setitem_with_transformation, "
+            f"got {type(idx)} at axis {axis}{g.get_debug_msg()}"
+        )
+        s = 0 if idx.start is None else idx.start
+        e = _INT64_MAX if idx.stop is None else idx.stop
+        starts.append(s)
+        ends.append(e)
+        axes.append(axis)
+
+    starts_t = np.array(starts, dtype=np.int64)
+    ends_t = np.array(ends, dtype=np.int64)
+    axes_t = np.array(axes, dtype=np.int64)
+
+    # Extract the slice: sliced = x[indices]
+    sliced = g.op.Slice(x, starts_t, ends_t, axes_t, name=name)
+    if not sts:
+        if g.has_type(x):
+            g.set_type(sliced, g.get_type(x))
+        if g.has_rank(x):
+            g.set_rank(sliced, g.get_rank(x))
+
+    # Apply each transformation in sequence.
+    values = sliced
+    for transform_name, transform_args in transformations:
+        assert not transform_args, (
+            f"Arguments not supported for transformation {transform_name!r}{g.get_debug_msg()}"
+        )
+        assert transform_name in _transformation_to_onnx_op, (
+            f"Unsupported transformation {transform_name!r}, "
+            f"supported: {sorted(_transformation_to_onnx_op)}{g.get_debug_msg()}"
+        )
+        onnx_op = _transformation_to_onnx_op[transform_name]
+        new_values = getattr(g.op, onnx_op)(values, name=name)
+        if not sts:
+            if g.has_type(values):
+                g.set_type(new_values, g.get_type(values))
+            if g.has_rank(values):
+                g.set_rank(new_values, g.get_rank(values))
+        values = new_values
+
+    # Write the transformed values back using setitem logic.
+    return aten_setitem(g, sts, outputs, x, indices, values, name=name)
 
 
 def aten_slice_Tensor(

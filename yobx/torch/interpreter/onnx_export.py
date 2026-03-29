@@ -441,8 +441,9 @@ def get_default_aten_as_function(target_opset: Optional[int] = None) -> Tuple[st
         "aten.index_put.default",
         "aten._grouped_mm.default",
         # "aten.scaled_dot_product_attention.default",
-        "aten.setitem",
-        operator.setitem,
+        # setitem is handled directly by aten_setitem, not as a local function
+        # "aten.setitem",
+        # operator.setitem,
     )
 
 
