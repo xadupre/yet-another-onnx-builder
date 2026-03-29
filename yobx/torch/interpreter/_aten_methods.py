@@ -33,19 +33,6 @@ def aten_meth_bool(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List
     return aten_meth_to(g, sts, outputs, x, dtype=torch.bool)
 
 
-def aten_meth_add_(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    y: T,
-    alpha: Optional[Any] = None,
-    name: str = "meth_add_",
-) -> T:
-    "``add_``"
-    raise RuntimeError(f"This should not happend.\n{g.get_debug_msg()}")
-
-
 def aten_meth_clamp_max(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
