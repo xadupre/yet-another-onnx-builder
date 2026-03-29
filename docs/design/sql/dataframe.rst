@@ -11,6 +11,11 @@ In addition to accepting SQL strings and :class:`polars.LazyFrame` objects,
 ``yobx.sql`` provides a lightweight pandas-inspired API for tracing Python
 functions that operate on a virtual DataFrame.
 
+.. seealso::
+
+    :ref:`l-plot-dataframe-to-onnx` — runnable end-to-end examples of the
+    DataFrame tracing API.
+
 The tracer works by passing a :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame`
 proxy to the user function.  Every operation performed on the proxy —
 column access, arithmetic, filtering, aggregation — is recorded as an AST
