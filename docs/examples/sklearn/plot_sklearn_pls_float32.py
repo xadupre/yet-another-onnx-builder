@@ -24,14 +24,14 @@ Why almost correlated data?
 -----------------------------
 
 :class:`~sklearn.cross_decomposition.PLSRegression` is designed for datasets
-where the **features are strongly correlated** (near-collinear).  In such a
+where the **features are strongly correlated** (near-collinear). In such a
 setting the model finds a small number of latent directions that capture the
-covariance between *X* and *y*.
+covariance between ``X`` and ``y``.
 
 We therefore generate data with a **low-rank latent-variable structure**:
 
-* A few hidden factors *Z* drive both the features *X* and the target *y*.
-* Small independent noise is added to each column of *X* and to *y*.
+* A few hidden factors ``Z`` drive both the features ``X`` and the target ``y``.
+* Small independent noise is added to each column of ``X`` and to ``y``.
 
 The resulting feature matrix is almost correlated — its columns span roughly
 the same low-dimensional subspace — which is the canonical use case for PLS.
@@ -79,9 +79,9 @@ from yobx.sklearn import to_onnx
 # --------------------------------------------------
 #
 # We generate a dataset with **almost correlated features** using a
-# low-rank latent-variable structure: a small number of hidden factors *Z*
-# drive both the feature matrix *X* and the target *y*, with a tiny amount
-# of independent noise added on top.  The resulting columns of *X* are highly
+# low-rank latent-variable structure: a small number of hidden factors ``Z``
+# drive both the feature matrix ``X`` and the target ``y``, with a tiny amount
+# of independent noise added on top.  The resulting columns of ``X`` are highly
 # correlated — exactly the setting PLS is designed for — and it makes the
 # float32 precision loss more visible.
 
