@@ -13,16 +13,18 @@ from .register import get_litert_op_converter
 
 def to_onnx(
     model: Union[str, "os.PathLike[str]", bytes],
-    args: Tuple[Any, ...],
-    input_names: Optional[Sequence[str]] = None,
-    dynamic_shapes: Optional[Tuple[Dict[int, str], ...]] = None,
+    args: Union[Tuple[Any, ...], Sequence[Tuple[Any, ...]]] = (),
+    input_names: Optional[Union[Sequence[str], Sequence[Optional[Sequence[str]]]]] = None,
+    dynamic_shapes: Optional[
+        Union[Tuple[Dict[int, str], ...], Sequence[Optional[Tuple[Dict[int, str], ...]]]]
+    ] = None,
     target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
     builder_cls: Union[type, Callable] = GraphBuilder,
     verbose: int = 0,
     extra_converters: Optional[Dict[int, Callable]] = None,
     large_model: bool = False,
     external_threshold: int = 1024,
-    subgraph_index: int = 0,
+    subgraph_index: Optional[int] = 0,
 ) -> ExportArtifact:
     """Convert a :epkg:`TFLite`/:epkg:`LiteRT` model to ONNX.
 
@@ -32,13 +34,20 @@ def to_onnx(
     (see :mod:`yobx.litert.register`).
 
     :param model: path to a ``.tflite`` file **or** raw model bytes
-    :param args: dummy inputs (numpy arrays **or** :class:`onnx.ValueInfoProto`
-        descriptors); used to determine dtypes and shapes when the model does
-        not carry that information.
-    :param input_names: optional list of names for the ONNX input tensors;
-        defaults to the tensor names stored inside the TFLite model.
+    :param args: dummy inputs used to determine dtypes and shapes when the
+        model does not carry that information.  For a single subgraph (the
+        default) this is a :class:`tuple` of numpy arrays **or**
+        :class:`onnx.ValueInfoProto` descriptors.  When *subgraph_index* is
+        ``None`` (merge all subgraphs) this must be a sequence of such
+        tuples, one per subgraph; use an empty sequence ``()`` or ``[]`` to
+        let the converter infer all types from the model's own tensor metadata.
+    :param input_names: optional name(s) for the ONNX input tensors.  For a
+        single subgraph: a :class:`~typing.Sequence` of strings.  When
+        *subgraph_index* is ``None``: a sequence of per-subgraph name lists
+        (or ``None`` entries to use the TFLite tensor names for that subgraph).
     :param dynamic_shapes: optional per-input axis-to-dim-name mappings.
-        When *None*, axis 0 is treated as a dynamic batch dimension.
+        When *None*, axis 0 is treated as a dynamic batch dimension.  When
+        *subgraph_index* is ``None``: a sequence of per-subgraph mappings.
     :param target_opset: opset version; either an integer for the default
         domain (``""``) or a ``Dict[str, int]`` mapping domain names to
         versions.
@@ -58,10 +67,13 @@ def to_onnx(
     :param external_threshold: if *large_model* is *True*, every tensor
         whose element count exceeds this threshold is stored as external data.
     :param subgraph_index: index of the subgraph to convert (default: 0).
+        Pass ``None`` to **merge all** subgraphs into a single ONNX model.
+        Tensor names are automatically prefixed with ``sg{i}_`` (where *i* is
+        the subgraph index) to avoid name collisions across subgraphs.
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
-    Example::
+    Example — single subgraph::
 
         import numpy as np
         from yobx.litert import to_onnx
@@ -70,6 +82,11 @@ def to_onnx(
         artifact = to_onnx("model.tflite", (X,))
         proto = artifact.proto
         artifact.save("model.onnx")
+
+    Example — merge all subgraphs::
+
+        artifact = to_onnx("model.tflite", subgraph_index=None)
+        artifact.save("merged.onnx")
     """
     from . import register_litert_converters
 
@@ -86,6 +103,49 @@ def to_onnx(
 
     tflite_model = parse_tflite_model(model)
 
+    kwargs: Dict[str, Any] = {}
+    if "com.microsoft" in dict_target_opset:
+        kwargs["optimization_options"] = OptimizationOptions(patterns="default+onnxruntime")
+    if verbose and issubclass(builder_cls, GraphBuilder):  # type: ignore
+        kwargs["verbose"] = verbose
+
+    if subgraph_index is None:
+        # Merge all subgraphs into a single ONNX model.
+        # Tensor names are prefixed with "sg{i}_" to avoid cross-subgraph
+        # name collisions (except when there is only one subgraph).
+        g = builder_cls(dict_target_opset, **kwargs)
+        n_subgraphs = len(tflite_model.subgraphs)
+        for i, subgraph in enumerate(tflite_model.subgraphs):
+            prefix = f"sg{i}_" if n_subgraphs > 1 else ""
+            # Resolve per-subgraph args / input_names / dynamic_shapes.
+            sg_args: Tuple[Any, ...] = args[i] if i < len(args) else ()  # type: ignore[index]
+            sg_input_names: Optional[Sequence[str]] = (
+                input_names[i] if input_names is not None and i < len(input_names) else None  # type: ignore[index]
+            )
+            sg_dynamic_shapes: Optional[Tuple[Dict[int, str], ...]] = (
+                dynamic_shapes[i]  # type: ignore
+                if dynamic_shapes is not None and i < len(dynamic_shapes)  # type: ignore[arg-type]
+                else None
+            )
+            if sg_input_names is not None and len(sg_input_names) != len(subgraph.inputs):
+                raise ValueError(
+                    f"Length mismatch for subgraph {i}: model has "
+                    f"{len(subgraph.inputs)} input(s) but input_names[{i}]="
+                    f"{list(sg_input_names)!r} has {len(sg_input_names)} entries."
+                )
+            _convert_subgraph(
+                subgraph=subgraph,
+                g=g,
+                args=sg_args,
+                input_names=sg_input_names,
+                dynamic_shapes=sg_dynamic_shapes,
+                verbose=verbose,
+                extra_converters=extra_converters or {},
+                name_prefix=prefix,
+            )
+        return _finalize_builder(g, large_model, external_threshold, verbose)
+
+    # --- Single-subgraph path (original behaviour) ---
     if subgraph_index >= len(tflite_model.subgraphs):
         raise ValueError(
             f"subgraph_index={subgraph_index} is out of range; "
@@ -93,30 +153,37 @@ def to_onnx(
         )
     subgraph = tflite_model.subgraphs[subgraph_index]
 
-    if input_names is not None and len(input_names) != len(subgraph.inputs):
+    # In the single-subgraph case args/input_names/dynamic_shapes are used
+    # directly (not as sequences of per-subgraph values).
+    single_args: Tuple[Any, ...] = args  # type: ignore[assignment]
+    single_input_names: Optional[Sequence[str]] = input_names  # type: ignore[assignment]
+    single_dynamic_shapes: Optional[Tuple[Dict[int, str], ...]] = dynamic_shapes  # type: ignore[assignment]
+
+    if single_input_names is not None and len(single_input_names) != len(subgraph.inputs):
         raise ValueError(
             f"Length mismatch: model has {len(subgraph.inputs)} input(s) "
-            f"but input_names={input_names!r} has {len(input_names)} entries."
+            f"but input_names={single_input_names!r} has {len(single_input_names)} entries."
         )
-
-    kwargs: Dict[str, Any] = {}
-    if "com.microsoft" in dict_target_opset:
-        kwargs["optimization_options"] = OptimizationOptions(patterns="default+onnxruntime")
-    if verbose and issubclass(builder_cls, GraphBuilder):  # type: ignore
-        kwargs["verbose"] = verbose
 
     g = builder_cls(dict_target_opset, **kwargs)
 
     _convert_subgraph(
         subgraph=subgraph,
         g=g,
-        args=args,
-        input_names=input_names,
-        dynamic_shapes=dynamic_shapes,
+        args=single_args,
+        input_names=single_input_names,
+        dynamic_shapes=single_dynamic_shapes,
         verbose=verbose,
         extra_converters=extra_converters or {},
     )
 
+    return _finalize_builder(g, large_model, external_threshold, verbose)
+
+
+def _finalize_builder(
+    g: Any, large_model: bool, external_threshold: int, verbose: int
+) -> ExportArtifact:
+    """Call ``g.to_onnx(...)`` and return the resulting :class:`ExportArtifact`."""
     if isinstance(g, GraphBuilder):
         onx = g.to_onnx(  # type: ignore
             large_model=large_model,
@@ -170,6 +237,7 @@ def _convert_subgraph(
     dynamic_shapes: Optional[Tuple[Dict[int, str], ...]],
     verbose: int,
     extra_converters: Dict[int, Callable],
+    name_prefix: str = "",
 ) -> None:
     """Walk the TFLite subgraph and populate the ONNX GraphBuilder.
 
@@ -180,6 +248,8 @@ def _convert_subgraph(
     :param dynamic_shapes: optional dynamic axis specifications
     :param verbose: verbosity level
     :param extra_converters: op-code → converter overrides
+    :param name_prefix: string prepended to every tensor name produced by this
+        subgraph; used when merging multiple subgraphs to avoid name collisions.
     """
     tensors = subgraph.tensors
 
@@ -193,8 +263,9 @@ def _convert_subgraph(
 
     for t in tensors:
         if t.data is not None and t.index not in input_set:
-            if not g.has_name(t.name):
-                g.make_initializer(t.name, t.data, source="_convert_subgraph.weight")
+            prefixed = name_prefix + t.name
+            if not g.has_name(prefixed):
+                g.make_initializer(prefixed, t.data, source="_convert_subgraph.weight")
 
     # ------------------------------------------------------------------ #
     # 2. Register ONNX inputs.                                            #
@@ -202,11 +273,15 @@ def _convert_subgraph(
     for arg_pos, t_idx in enumerate(subgraph.inputs):
         tensor = tensors[t_idx]
 
-        # Determine ONNX input name.
+        # Internal (graph-builder) name for the tensor — always prefixed so
+        # that ops can look it up by the same key regardless of the path.
+        internal_name = name_prefix + tensor.name
+
+        # The ONNX graph input name: user-supplied or the prefixed tensor name.
         if input_names is not None:
             name = input_names[arg_pos]
         else:
-            name = tensor.name
+            name = internal_name
 
         # Determine dtype.
         if arg_pos < len(args):
@@ -233,18 +308,19 @@ def _convert_subgraph(
         if not g.has_name(name):
             g.make_tensor_input(name, elem_type, shape_tuple)
 
-        # Alias the TFLite tensor name → ONNX input name so downstream ops
-        # can find it.
-        if name != tensor.name and not g.has_name(tensor.name):
-            g.op.Identity(name, outputs=[tensor.name], name="litert_input_alias")
+        # Alias the ONNX input name → internal (prefixed) tensor name so
+        # downstream ops that look up the original TFLite tensor name can
+        # find it through the builder.
+        if name != internal_name and not g.has_name(internal_name):
+            g.op.Identity(name, outputs=[internal_name], name=f"{name_prefix}litert_input_alias")
 
     # ------------------------------------------------------------------ #
     # 3. Convert operators in topological order (TFLite guarantees this). #
     # ------------------------------------------------------------------ #
     for op in subgraph.operators:
         # Build input names: skip tensors with index -1 (optional absent).
-        op_input_names = [tensors[i].name if i >= 0 else "" for i in op.inputs]
-        op_output_names = [tensors[i].name for i in op.outputs if i >= 0]
+        op_input_names = [(name_prefix + tensors[i].name) if i >= 0 else "" for i in op.inputs]
+        op_output_names = [name_prefix + tensors[i].name for i in op.outputs if i >= 0]
 
         # Resolve converter: extra_converters > registry.
         fct = extra_converters.get(op.opcode)
@@ -280,7 +356,7 @@ def _convert_subgraph(
     # ------------------------------------------------------------------ #
     for t_idx in subgraph.outputs:
         tensor = tensors[t_idx]
-        g.make_tensor_output(tensor.name, indexed=False, allow_untyped_output=True)
+        g.make_tensor_output(name_prefix + tensor.name, indexed=False, allow_untyped_output=True)
 
 
 # ---------------------------------------------------------------------------

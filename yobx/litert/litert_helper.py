@@ -1020,3 +1020,160 @@ def _make_sample_tflite_model() -> bytes:
         b.end_table_with_vtable(sp, [])
 
     return b.finalize()
+
+
+def _make_multi_subgraph_tflite_model() -> bytes:
+    """Build a minimal valid TFLite FlatBuffer with **two** subgraphs.
+
+    Both subgraphs contain a single ``RELU`` operator:
+
+    * Subgraph 0 — ``"input"``  float32 [1, 4] → ``"relu"``  float32 [1, 4]
+    * Subgraph 1 — ``"input2"`` float32 [1, 3] → ``"relu2"`` float32 [1, 3]
+
+    No external ``flatbuffers`` or ``tensorflow`` package is required.
+
+    :return: raw bytes of a valid ``.tflite`` FlatBuffer
+    """
+    b = _MinimalFlatBuilder()
+
+    # [0-3] root offset placeholder
+    b.reserve("model")
+    # [4-7] TFLite file identifier
+    b.write(b"TFL3")
+
+    # ── MODEL TABLE ─────────────────────────────────────────────────────────
+    b.mark("model")
+    sp = b.begin_table()
+    f0 = b.pos()
+    b.u32(3)  # version = 3
+    f1 = b.pos()
+    b.reserve("opcodes_vec")  # operator_codes
+    f2 = b.pos()
+    b.reserve("subgraphs_vec")  # subgraphs
+    f4 = b.pos()
+    b.reserve("buffers_vec")  # buffers
+    b.end_table_with_vtable(sp, [f0, f1, f2, None, f4])
+
+    # ── OPERATOR CODES VECTOR ────────────────────────────────────────────────
+    b.align(4)
+    b.mark("opcodes_vec")
+    b.u32(1)
+    b.reserve("opcode0")
+
+    # ── OPCODE 0 TABLE: RELU = 19 ────────────────────────────────────────────
+    b.align(4)
+    b.mark("opcode0")
+    sp = b.begin_table()
+    f0 = b.pos()
+    b.i8(19)  # builtin_code (int8)
+    b.align(4)
+    f4 = b.pos()
+    b.i32(19)  # extended_builtin_code (int32)
+    b.end_table_with_vtable(sp, [f0, None, None, None, f4])
+
+    # ── SUBGRAPHS VECTOR (2 subgraphs) ───────────────────────────────────────
+    b.align(4)
+    b.mark("subgraphs_vec")
+    b.u32(2)
+    b.reserve("sg0")
+    b.reserve("sg1")
+
+    # Helper: write one subgraph table and its associated data.
+    for sg_tag, tensor_pairs, in_idx, out_idx in [
+        ("sg0", [("t0", "input", 1, [1, 4]), ("t1", "relu", 2, [1, 4])], 0, 1),
+        ("sg1", [("t2", "input2", 3, [1, 3]), ("t3", "relu2", 4, [1, 3])], 0, 1),
+    ]:
+        b.align(4)
+        b.mark(sg_tag)
+        sp = b.begin_table()
+        fa_sg = b.pos()
+        b.reserve(sg_tag + "_tensors_vec")
+        fb_sg = b.pos()
+        b.reserve(sg_tag + "_in")
+        fc_sg = b.pos()
+        b.reserve(sg_tag + "_out")
+        fd_sg = b.pos()
+        b.reserve(sg_tag + "_ops_vec")
+        b.end_table_with_vtable(sp, [fa_sg, fb_sg, fc_sg, fd_sg])
+
+        # tensors vector
+        b.align(4)
+        b.mark(sg_tag + "_tensors_vec")
+        b.u32(len(tensor_pairs))
+        for tid, _tname, _buf_idx, _shape in tensor_pairs:
+            b.reserve(tid)
+
+        for tid, tname, buf_idx, shape in tensor_pairs:
+            b.align(4)
+            b.mark(tid)
+            sp2 = b.begin_table()
+            fa = b.pos()
+            b.reserve(tid + "_shape")
+            fb_ = b.pos()
+            b.i8(0)
+            b.align(4)  # type = FLOAT32
+            fc = b.pos()
+            b.u32(buf_idx)
+            fd = b.pos()
+            b.reserve(tid + "_name")
+            b.end_table_with_vtable(sp2, [fa, fb_, fc, fd])
+            b.align(4)
+            b.mark(tid + "_shape")
+            b.u32(len(shape))
+            for dim in shape:
+                b.i32(dim)
+            enc = tname.encode("utf-8")
+            b.align(4)
+            b.mark(tid + "_name")
+            b.u32(len(enc))
+            b.write(enc + b"\x00")
+
+        # inputs / outputs index vectors
+        b.align(4)
+        b.mark(sg_tag + "_in")
+        b.u32(1)
+        b.i32(in_idx)
+        b.align(4)
+        b.mark(sg_tag + "_out")
+        b.u32(1)
+        b.i32(out_idx)
+
+        # operators vector
+        b.align(4)
+        b.mark(sg_tag + "_ops_vec")
+        b.u32(1)
+        b.reserve(sg_tag + "_op0")
+
+        b.align(4)
+        b.mark(sg_tag + "_op0")
+        sp3 = b.begin_table()
+        f0 = b.pos()
+        b.u32(0)  # opcode_index = 0 (RELU)
+        f1 = b.pos()
+        b.reserve(sg_tag + "_op_in")
+        f2 = b.pos()
+        b.reserve(sg_tag + "_op_out")
+        b.end_table_with_vtable(sp3, [f0, f1, f2])
+
+        b.align(4)
+        b.mark(sg_tag + "_op_in")
+        b.u32(1)
+        b.i32(in_idx)
+        b.align(4)
+        b.mark(sg_tag + "_op_out")
+        b.u32(1)
+        b.i32(out_idx)
+
+    # ── BUFFERS VECTOR (5 entries: 1 sentinel + 2 per subgraph) ─────────────
+    b.align(4)
+    b.mark("buffers_vec")
+    b.u32(5)
+    for bid in ("buf0", "buf1", "buf2", "buf3", "buf4"):
+        b.reserve(bid)
+    for bid in ("buf0", "buf1", "buf2", "buf3", "buf4"):
+        b.align(4)
+        b.mark(bid)
+        sp = b.begin_table()
+        b.end_table_with_vtable(sp, [])
+
+    return b.finalize()
