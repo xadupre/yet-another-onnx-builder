@@ -179,6 +179,21 @@ class TestModelEvalCases(ExtTestCase):
             cases="InplaceSetItemMask", exporters="yobx-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_inplace_setitem_square_tracing(self):
+        evaluation(
+            cases="InplaceSetItemSquare", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_inplace_setitem_square_add_tracing(self):
+        evaluation(
+            cases="InplaceSetItemSquareAdd", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_inplace_setitem_square_add2_tracing(self):
+        evaluation(
+            cases="InplaceSetItemSquareAdd2", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

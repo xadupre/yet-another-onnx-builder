@@ -10390,10 +10390,17 @@ def aten_setitem(
 
     # We use padding to implement this.
     name = f"{name}_pad"
-    assert g.has_shape(values), (
-        f"setitem is not implemented when shape is unknown for the values {values!r}"
-        f"{g.get_debug_msg()}"
-    )
+    # Convert scalar values (int/float/bool) to a numpy array with the correct dtype.
+    if isinstance(values, (int, float, bool)):
+        assert g.has_type(x), f"Missing type for x={x!r}{g.get_debug_msg()}"
+        itype = g.get_type(x)
+        dtype_v = tensor_dtype_to_np_dtype(itype)
+        values = np.array(values, dtype=dtype_v)
+    if not isinstance(values, np.ndarray):
+        assert g.has_shape(values), (
+            f"setitem is not implemented when shape is unknown for the values {values!r}"
+            f"{g.get_debug_msg()}"
+        )
     assert g.has_rank(x) and isinstance(indices, tuple) and len(indices) == g.get_rank(x), (
         f"setitem is not implemented when indices={indices} and rank is unknown or not "
         f"equal to the number of indices{g.get_debug_msg()}"
@@ -10425,24 +10432,29 @@ def aten_setitem(
                 g.op.Shape(name, start=axis, end=axis + 1, name=name), g.ZERO, name=name
             )
 
-        start = (
-            (
+        if index.start is None:
+            start = 0
+        elif isinstance(index.start, int):
+            start = (
                 index.start
                 if index.start >= 0
                 else g.op.Add(_d(x), np.array(index.start, dtype=np.int64), name=name)
             )
-            if isinstance(index.start, int)
-            else g.op.Where(
+        else:
+            start = g.op.Where(
                 g.op.GreaterOrEqual(index.start, g.ZERO_NO_DIM, name=name),
                 index.start,
                 g.op.Add(_d(x), index.start, name=name),
             )
-        )
         stop = (
             0
             if index.stop is None
             else (
-                (-index.stop if index.stop < 0 else g.op.Sub(_d(x), index.stop, name=name))
+                (
+                    -index.stop
+                    if index.stop < 0
+                    else g.op.Sub(_d(x), np.array(index.stop, dtype=np.int64), name=name)
+                )
                 if isinstance(index.stop, int)
                 else g.op.Where(
                     g.op.GreaterOrEqual(index.stop, g.ZERO_NO_DIM, name=name),
@@ -10455,8 +10467,9 @@ def aten_setitem(
         padding_x_stop.append(stop)
 
     rk_x = g.get_rank(x)
-    rk_values = g.get_rank(values)
-    if rk_values != rk_x or 1 in g.get_shape(values):
+    rk_values = values.ndim if isinstance(values, np.ndarray) else g.get_rank(values)
+    values_shape = values.shape if isinstance(values, np.ndarray) else g.get_shape(values)
+    if rk_values != rk_x or 1 in values_shape:
         # We need to expand the values first.
         assert rk_values <= rk_x, (
             f"setitem is not implemented when rank(x)={rk_x} < rank(values)={rk_values}"
