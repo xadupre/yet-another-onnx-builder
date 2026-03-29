@@ -10,8 +10,7 @@ graphs.
 .. toctree::
    :maxdepth: 1
 
-   shape
-   cost
+   shapebuilder/index
    graph_builder
    optimizer
    optimizer_patterns
