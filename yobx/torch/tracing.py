@@ -685,7 +685,7 @@ class CustomTracer(torch.fx.Tracer):
     @classmethod
     def make_wrapped_model(cls, root, concrete_args):
         flat_concrete_args, spec = pytree.tree_flatten(concrete_args)
-        args_names = cls.make_args_names(concrete_args, flat_concrete_args)
+        all_args_names = cls.make_args_names(concrete_args, flat_concrete_args)
 
         if (
             len(concrete_args) == 2
@@ -716,17 +716,32 @@ class CustomTracer(torch.fx.Tracer):
                     self._traced_m1 = m
                     self._spec = spec
 
-                forward = make_method(args_names)
+                forward = make_method(all_args_names)
 
-            return FlatArgWrap(root, spec), args_names
+            return FlatArgWrap(root, spec), all_args_names
 
         # pytree.tree_unflatten does not work on CustomProxy
 
-        def make_method(args_names):
-            args = ", ".join(args_names)
+        # None positions in flat_concrete_args must be injected as constants (not placeholders)
+        # so that `is not None` checks in the model body evaluate correctly during tracing.
+        none_positions = frozenset(
+            i for i, v in enumerate(flat_concrete_args) if v is None
+        )
+        non_none_args_names = [
+            n for i, n in enumerate(all_args_names) if i not in none_positions
+        ]
+
+        def make_method(non_none_args_names, none_positions, total_len):
+            args = ", ".join(non_none_args_names)
+            # Reconstruct the full flat list with None at the original positions.
+            non_none_iter = iter(non_none_args_names)
+            flat_reconstruction = "[" + ", ".join(
+                "None" if i in none_positions else next(non_none_iter)
+                for i in range(total_len)
+            ) + "]"
             src = textwrap.dedent(f"""
                 def f(self, {args}):
-                    res = tree_unflatten_with_proxy(self._spec, [{args}])
+                    res = tree_unflatten_with_proxy(self._spec, {flat_reconstruction})
                     assert isinstance(res, dict), (
                         "A dictionary is expected but unflattened type is %r" % type(res)
                     )
@@ -742,9 +757,9 @@ class CustomTracer(torch.fx.Tracer):
                 self._traced_m2 = m
                 self._spec = spec
 
-            forward = make_method(args_names)
+            forward = make_method(non_none_args_names, none_positions, len(flat_concrete_args))
 
-        return FlatArgWrap(root, spec), args_names
+        return FlatArgWrap(root, spec), non_none_args_names
 
     def trace(
         self,
@@ -795,7 +810,10 @@ class CustomTracer(torch.fx.Tracer):
                 dynamic_shapes = (
                     ({},) * len(concrete_args)
                     if isinstance(concrete_args, tuple)
-                    else {k: {} for k in concrete_args}
+                    else {
+                        k: (None if isinstance(v, (list, tuple)) else {})
+                        for k, v in concrete_args.items()
+                    }
                 )
 
             flat_args = (
@@ -810,7 +828,10 @@ class CustomTracer(torch.fx.Tracer):
                 traced_concrete_args, _ = make_fake_with_dynamic_dimensions(
                     torch_deepcopy(concrete_args), dynamic_shapes
                 )
-                self._traced_concrete_args, _ = pytree.tree_flatten(traced_concrete_args)
+                flat_list, _ = pytree.tree_flatten(traced_concrete_args)
+                # Filter out None values so _traced_concrete_args aligns with new_names
+                # (which also excludes None positions) for create_args_for_root validation.
+                self._traced_concrete_args = [v for v in flat_list if v is not None]
                 traced_model = new_model
             else:
                 new_names = None
@@ -843,7 +864,10 @@ class CustomTracer(torch.fx.Tracer):
                 print(f"[CustomTracer.trace] -- new_names={new_names}")
             if new_names:
                 flat_concrete_args, _spec = pytree.tree_flatten(concrete_args)
-                flat_traced_concrete_args, _spec = pytree.tree_flatten(self._traced_concrete_args)
+                non_none_traced_concrete_args = self._traced_concrete_args
+                # _traced_concrete_args and new_names both exclude None positions;
+                # build a matching non-None view of flat_concrete_args.
+                non_none_flat_concrete_args = [v for v in flat_concrete_args if v is not None]
             mapped = set()
             for node in graph.nodes:
                 if node.op == "placeholder":
@@ -861,8 +885,8 @@ class CustomTracer(torch.fx.Tracer):
                         mapped.add(node.name)
                     elif new_names and node.name in new_names:
                         ii = new_names.index(node.name)
-                        ti = flat_concrete_args[ii]
-                        tif = flat_traced_concrete_args[ii]
+                        ti = non_none_flat_concrete_args[ii]
+                        tif = non_none_traced_concrete_args[ii]
                         if verbose:
                             print(
                                 f"[CustomTracer.trace] assign.1 {node.name!r} with "
@@ -876,12 +900,11 @@ class CustomTracer(torch.fx.Tracer):
                 f"Missing mapped inputs, set(concrete_args)={set(concrete_args)}, "
                 f"mapped={mapped}\n{graph}\nroot={root}"
             )
-            assert not new_names or len(new_names) == len(flat_concrete_args), (
+            assert not new_names or len(new_names) == len(non_none_flat_concrete_args), (
                 f"Missing mapped inputs, new_names={new_names}, "
-                f"flat_concrete_args={string_type(flat_concrete_args, with_shape=True)}, "
+                f"non_none_flat_concrete_args={string_type(non_none_flat_concrete_args, with_shape=True)}, "
                 f"mapped={mapped}\n{graph}\nroot={root}"
             )
-
         self._replace_problematic_functions(graph)
         if update_model_with_callable and self._callables:
             for k, v in self._callables.items():
