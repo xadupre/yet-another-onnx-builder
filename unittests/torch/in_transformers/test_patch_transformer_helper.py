@@ -53,12 +53,7 @@ class TestPatchTransformerHelper(ExtTestCase):
     def test_involved_patches_dynamic_rope(self):
         data = get_tiny_model(
             "arnir0/Tiny-LLM",
-            config_updates={
-                "rope_parameters": {
-                    "factor": 10.0,
-                    "rope_type": "dynamic",
-                },
-            },
+            config_updates={"rope_parameters": {"factor": 10.0, "rope_type": "dynamic"}},
         )
         model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
         expected = model(**torch_deepcopy(inputs))

@@ -854,9 +854,7 @@ class TestMultipleOutputDataframes(ExtTestCase):
             out2 = df1.select([(df1["a"] - df2["b"]).alias("diff_ab")])
             return out1, out2
 
-        artifact = dataframe_to_onnx(
-            transform, [{"a": np.float32}, {"b": np.float32}]
-        )
+        artifact = dataframe_to_onnx(transform, [{"a": np.float32}, {"b": np.float32}])
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0], dtype=np.float32)
         b = np.array([3.0, 4.0], dtype=np.float32)
