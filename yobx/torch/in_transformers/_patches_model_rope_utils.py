@@ -59,7 +59,7 @@ def patched__compute_dynamic_ntk_parameters(
             factor = config.rope_scaling["factor"]
         else:
             base = config.rope_parameters["rope_theta"]
-            partial_rotary_factor = config.rope_parameters["partial_rotary_factor"]
+            partial_rotary_factor = config.rope_parameters.get("partial_rotary_factor", 1.0)
             factor = config.rope_parameters["factor"]
         head_dim = getattr(config, "head_dim", config.hidden_size // config.num_attention_heads)
         dim = int(head_dim * partial_rotary_factor)
