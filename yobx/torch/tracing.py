@@ -16,19 +16,6 @@ from .torch_helper import torch_deepcopy
 _torch_cat = torch.cat
 
 
-def _safe_add_if_not_none(x: Any, y: Any) -> Any:
-    """Performs ``x += y`` in-place and returns ``x`` when ``y is not None``, otherwise returns ``x`` unchanged.
-
-    This is used for graph nodes generated from ``if arg is not None: x += arg`` patterns
-    where ``arg`` may be ``None`` at runtime.  Using in-place semantics (``+=``) preserves
-    the same tensor-identity behaviour as the original model's ``+=`` statements.
-    """
-    if y is None:
-        return x
-    x += y
-    return x
-
-
 class LEAVE_INPLACE:
     "Constant indicating inplace removal failed."
 
@@ -940,24 +927,6 @@ class CustomTracer(torch.fx.Tracer):
         """
         replaces = {CustomProxy.cat: torch.cat}
         n = 0
-
-        # Detect ``if arg is not None`` patterns.  During tracing the `is not None`
-        # check always evaluates to True (proxies are never None), so the tracer emits
-        # a dead ``getitem(source, idx)`` node (num_users==0) right before the live
-        # ``getitem(source, idx)`` that feeds the ``add``.  Collect those (source, idx)
-        # pairs so that the corresponding ``add`` can be replaced with a runtime-safe
-        # version that skips the addition when the operand is None.
-        none_guarded_getitems: set[tuple] = set()
-        for node in graph.nodes:
-            if (
-                node.op == "call_function"
-                and node.target is operator.getitem
-                and len(node.users) == 0
-                and len(node.args) == 2
-                and isinstance(node.args[1], int)
-            ):
-                none_guarded_getitems.add((node.args[0], node.args[1]))
-
         for node in graph.nodes:
             if node.op == "call_function":
                 if node.target in replaces:
@@ -974,27 +943,6 @@ class CustomTracer(torch.fx.Tracer):
                 elif isinstance(node.target, ScanCCOp):
                     n += 1
                     node.target = torch.ops.higher_order.scan
-                elif (
-                    none_guarded_getitems
-                    and node.target in (operator.add, operator.iadd)
-                    and len(node.args) == 2
-                ):
-                    rhs = node.args[1]
-                    if (
-                        isinstance(rhs, torch.fx.Node)
-                        and rhs.op == "call_function"
-                        and rhs.target is operator.getitem
-                        and len(rhs.args) == 2
-                        and isinstance(rhs.args[1], int)
-                        and (rhs.args[0], rhs.args[1]) in none_guarded_getitems
-                    ):
-                        node.target = _safe_add_if_not_none
-                        n += 1
-                        if verbose > 1:
-                            print(
-                                f"[CustomTracer._replace_problematic_functions] replace "
-                                f"add with _safe_add_if_not_none for {node.name}"
-                            )
         return n
 
     @classmethod
