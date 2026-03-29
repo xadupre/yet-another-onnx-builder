@@ -721,19 +721,19 @@ class TestTracing(ExtTestCase):
                     x += lx[2]
                 return x
 
+            _inputs = [
+                ([torch.rand((4, 4)), torch.rand((4, 4)), None],),
+                ([torch.rand((4, 4)), torch.rand((4, 4)), torch.rand((4, 4))],),
+            ]
+
+        inputs = Model._inputs
         model = Model()
-        a = torch.rand((4, 4))
-        b = torch.rand((4, 4))
-        lx = [a, b, None]
-        tracer = CustomTracer()
-        graph = tracer.trace(model, concrete_args={"lx": lx})
-        # Use clones to avoid in-place modification side-effects between calls.
-        expected = model([a.clone(), b.clone(), None])
-        mod = torch.fx.GraphModule(tracer.traced_model, graph)
-        # The traced model was wrapped: lx[2] is None (constant), so only lx[0] and lx[1]
-        # are placeholder args.
-        got = mod(a, b)
-        self.assertEqualArray(expected, got)
+        graph = CustomTracer().trace(model)
+        for inp in inputs:
+            expected = model(*inp)
+            mod = torch.fx.GraphModule(model, graph)
+            got = mod(*inp)
+            self.assertEqualArray(expected, got)
 
     def test_tracing_int_shape(self):
         class Model(torch.nn.Module):
