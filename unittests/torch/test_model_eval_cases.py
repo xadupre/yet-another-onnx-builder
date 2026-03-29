@@ -189,10 +189,7 @@ class TestModelEvalCases(ExtTestCase):
 
     def test_run_exporter_controlflow_numel_zero_export_tracing(self):
         evaluation(
-            cases="ControlFlowNumelZero",
-            exporters="export-tracing",
-            quiet=False,
-            dynamic=True,
+            cases="ControlFlowNumelZero", exporters="export-tracing", quiet=False, dynamic=True
         )
 
 

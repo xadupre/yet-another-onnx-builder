@@ -123,7 +123,7 @@ def to_onnx(
                 input_names[i] if input_names is not None and i < len(input_names) else None  # type: ignore[index]
             )
             sg_dynamic_shapes: Optional[Tuple[Dict[int, str], ...]] = (
-                dynamic_shapes[i]  # type: ignore[index]
+                dynamic_shapes[i]  # type: ignore
                 if dynamic_shapes is not None and i < len(dynamic_shapes)  # type: ignore[arg-type]
                 else None
             )
