@@ -1813,6 +1813,62 @@ class CustomTracer(torch.fx.Tracer):
         return n_inplace
 
     @classmethod
+    def _replace_inplace_call_methods(cls, graph: torch.fx.Graph, verbose: int = 0) -> int:
+        """
+        Replaces ``call_method`` nodes with inplace targets (e.g. ``add_``, ``mul_``,
+        ``sub_``, ``div_``) with their non-inplace ``call_function`` equivalents.
+
+        For each such node, the first argument is the tensor modified in-place.
+        After conversion, all uses of that first argument that appear *after*
+        the current node are replaced with the new non-inplace result, preserving
+        the original in-place semantics.
+
+        :param graph: graph to modify
+        :param verbose: verbosity level
+        :return: number of nodes replaced
+        """
+        _method_to_aten = {
+            "add_": torch.ops.aten.add.Tensor,
+            "mul_": torch.ops.aten.mul.Tensor,
+            "sub_": torch.ops.aten.sub.Tensor,
+            "div_": torch.ops.aten.div.Tensor,
+        }
+        n = 0
+        # Build a position map for O(1) position lookups inside the loop.
+        position_map = {node: pos for pos, node in enumerate(graph.nodes)}
+        existing_nodes = list(enumerate(graph.nodes))
+        for pos, node in existing_nodes:
+            if (
+                node.op != "call_method"
+                or not isinstance(node.target, str)
+                or node.target not in _method_to_aten
+            ):
+                continue
+            old_first_arg = (
+                node.args[0] if node.args and isinstance(node.args[0], torch.fx.Node) else None
+            )
+            old_target = node.target
+            node.op = "call_function"
+            node.target = _method_to_aten[old_target]
+            n += 1
+            if old_first_arg is not None:
+                # Only replace uses of old_first_arg that appear *after* the inplace node.
+                # Users at or before pos (including node itself) are left untouched so that
+                # they continue to reference the pre-modification value, which preserves
+                # correct in-place semantics.
+                if any(position_map.get(user, -1) > pos for user in old_first_arg.users):
+                    old_first_arg.replace_all_uses_with(
+                        node,
+                        delete_user_cb=lambda user, p=pos: position_map.get(user, -1) > p,
+                    )
+            if verbose > 1:
+                print(
+                    f"[CustomTracer._replace_inplace_call_methods] replaced "
+                    f"call_method {old_target!r} -> aten at {node.name!r}"
+                )
+        return n
+
+    @classmethod
     def remove_inplace(
         cls,
         graph: torch.fx.Graph,
@@ -1852,6 +1908,9 @@ class CustomTracer(torch.fx.Tracer):
                     if inpl < 0:
                         return inpl
                     n_inplace_submobules += inpl
+
+        # Convert call_method inplace nodes (add_, mul_, etc.) to call_function equivalents.
+        cls._replace_inplace_call_methods(graph, verbose=verbose)
 
         # Remove obvious unused nodes.
         rem = []

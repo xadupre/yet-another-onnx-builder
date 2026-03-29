@@ -362,9 +362,9 @@ class TestTracing(ExtTestCase):
         x = torch.ones((4, 4))
         expected = model(x)
         graph = CustomTracer().trace(model)
-        self.assertIn("add_]", str(graph))
+        self.assertNotIn("add_]", str(graph))
         mod = torch.fx.GraphModule(model, graph)
-        self.assertIn("add_]", str(mod.graph))
+        self.assertNotIn("add_]", str(mod.graph))
         got = mod(x)
         self.assertEqualArray(expected, got)
 
