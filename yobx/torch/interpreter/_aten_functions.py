@@ -1010,7 +1010,7 @@ def aten_as_strided(
         # Identity
         return g.op.Identity(x, outputs=outputs, name=name)
 
-    if g.has_shape(x) and is_static_shape(g.get_shape(x)) and is_static_shape(size):
+    if is_static_shape(size) and all_int(stride):
         n_elems = np.prod(size)
         indices = np.zeros(np.prod(size), dtype=np.int64)
         shape_c = [1]
@@ -1020,10 +1020,13 @@ def aten_as_strided(
         for dim, dimc, strid in zip(size, shape_c, stride):
             i = ((np.arange(n_elems) // dimc) % dim) * strid
             indices += i
+        if storage_offset:
+            indices += storage_offset
 
         flat = g.op.Reshape(x, g.MINUS_ONE, name=name)
         g.set_type(flat, g.get_type(x))
-        g.set_shape(flat, (int(np.prod(g.get_shape(x))),))
+        if g.has_shape(x) and is_static_shape(g.get_shape(x)):
+            g.set_shape(flat, (int(np.prod(g.get_shape(x))),))
         new_values = g.op.Gather(flat, indices, name=name)
         g.set_type(new_values, g.get_type(x))
         g.set_shape(new_values, (int(np.prod(size)),))
