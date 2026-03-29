@@ -10408,7 +10408,9 @@ def aten_setitem(
         f"setitem is not implemented when shape is unknown for the values {values!r}"
         f"{g.get_debug_msg()}"
     )
-    assert g.has_rank(x) and isinstance(indices, (tuple, list)) and len(indices) == g.get_rank(x), (
+    assert (
+        g.has_rank(x) and isinstance(indices, (tuple, list)) and len(indices) == g.get_rank(x)
+    ), (
         f"setitem is not implemented when indices={indices} and rank is unknown or not "
         f"equal to the number of indices{g.get_debug_msg()}"
     )
@@ -10580,9 +10582,9 @@ def aten_setitem_with_transformation(
     "setitem with in-place transformation (e.g., exp_, sigmoid_)"
     _transformation_to_onnx_op = {"exp": "Exp", "sigmoid": "Sigmoid"}
 
-    assert isinstance(indices, tuple), (
-        f"Expected tuple for indices, got {type(indices)}{g.get_debug_msg()}"
-    )
+    assert isinstance(
+        indices, tuple
+    ), f"Expected tuple for indices, got {type(indices)}{g.get_debug_msg()}"
 
     # Build starts/ends/axes for the ONNX Slice op from the slice tuple.
     starts: List[Any] = []
@@ -10616,9 +10618,9 @@ def aten_setitem_with_transformation(
     # Apply each transformation in sequence.
     values = sliced
     for transform_name, transform_args in transformations:
-        assert not transform_args, (
-            f"Arguments not supported for transformation {transform_name!r}{g.get_debug_msg()}"
-        )
+        assert (
+            not transform_args
+        ), f"Arguments not supported for transformation {transform_name!r}{g.get_debug_msg()}"
         assert transform_name in _transformation_to_onnx_op, (
             f"Unsupported transformation {transform_name!r}, "
             f"supported: {sorted(_transformation_to_onnx_op)}{g.get_debug_msg()}"

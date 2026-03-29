@@ -278,12 +278,8 @@ class InplaceSetItemExp(torch.nn.Module):
         return K_33
 
     _inputs = [
-        (
-            (torch.arange(7 * 9 * 11) + 10).reshape((7, 9, 11)).to(torch.float32),
-        ),
-        (
-            (torch.arange(8 * 9 * 11) + 10).reshape((8, 9, 11)).to(torch.float32),
-        ),
+        ((torch.arange(7 * 9 * 11) + 10).reshape((7, 9, 11)).to(torch.float32),),
+        ((torch.arange(8 * 9 * 11) + 10).reshape((8, 9, 11)).to(torch.float32),),
     ]
     _dynamic = {"x": {0: DIM("batch")}}
 

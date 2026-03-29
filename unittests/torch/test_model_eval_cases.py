@@ -186,10 +186,7 @@ class TestModelEvalCases(ExtTestCase):
 
     def test_run_exporter_inplace_setitem_square_add_tracing(self):
         evaluation(
-            cases="InplaceSetItemSquareAdd",
-            exporters="yobx-tracing",
-            quiet=False,
-            dynamic=True,
+            cases="InplaceSetItemSquareAdd", exporters="yobx-tracing", quiet=False, dynamic=True
         )
 
     def test_run_exporter_inplace_setitem_exp_tracing(self):
