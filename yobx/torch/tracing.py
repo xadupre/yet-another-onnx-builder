@@ -1650,6 +1650,41 @@ class CustomTracer(torch.fx.Tracer):
                             f"{node.target}({node.args}) -> {node}"
                         )
 
+                    # Normalize operator.setitem args for ONNX compatibility.
+                    # The tracing path produces slice(None, n) indices and raw scalar
+                    # values, whereas the non-tracing (torch.export) path produces
+                    # slice(0, n) indices and a proper tensor node.
+                    if node_target_name == "operator.setitem":
+                        indices = node.args[1]
+                        values = node.args[2]
+                        changed_args = False
+                        # Normalize slice(None, stop) → slice(0, stop) in tuple indices.
+                        if isinstance(indices, tuple):
+                            new_indices = []
+                            for i in indices:
+                                if isinstance(i, slice) and i.start is None:
+                                    new_indices.append(slice(0, i.stop, i.step))
+                                    changed_args = True
+                                else:
+                                    new_indices.append(i)
+                            indices = tuple(new_indices)
+                        elif isinstance(indices, slice) and indices.start is None:
+                            indices = slice(0, indices.stop, indices.step)
+                            changed_args = True
+                        # Insert a scalar_tensor FX node for raw scalar values so that
+                        # aten_setitem always receives a proper tensor input.
+                        if isinstance(values, (int, float, bool)):
+                            with graph.inserting_before(node):
+                                scalar_node = graph.call_function(
+                                    torch.ops.aten.scalar_tensor.default,
+                                    args=(float(values),),
+                                    kwargs={},
+                                )
+                            values = scalar_node
+                            changed_args = True
+                        if changed_args:
+                            node.args = (node.args[0], indices, values)
+
                     # class Node can be used as a key
                     # We also assume a user is placed after this node.
                     nodes_to_leave = {n[1] for n in existing_nodes[: pos + 1]}
