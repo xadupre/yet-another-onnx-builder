@@ -338,61 +338,67 @@ class TestLiteRTEndToEnd(ExtTestCase):
             os.unlink(path)
 
     def test_to_onnx_all_subgraphs_single_model(self):
-        """to_onnx(subgraph_index=None) on a single-subgraph model returns a list of 1."""
+        """to_onnx(subgraph_index=None) on a single-subgraph model returns one artifact."""
         from yobx.litert import to_onnx
+        from yobx.container import ExportArtifact
 
         model_bytes = _make_sample_tflite_model()
         X = np.zeros((1, 4), dtype=np.float32)
-        artifacts = to_onnx(model_bytes, [(X,)], input_names=[["x"]], subgraph_index=None)
+        artifact = to_onnx(model_bytes, [(X,)], input_names=[["x"]], subgraph_index=None)
 
-        self.assertIsInstance(artifacts, list)
-        self.assertEqual(len(artifacts), 1)
-        op_types = [n.op_type for n in artifacts[0].proto.graph.node]
+        self.assertIsInstance(artifact, ExportArtifact)
+        op_types = [n.op_type for n in artifact.proto.graph.node]
         self.assertIn("Relu", op_types)
 
     def test_to_onnx_all_subgraphs_multi_model(self):
-        """to_onnx(subgraph_index=None) on a two-subgraph model returns 2 artifacts."""
+        """to_onnx(subgraph_index=None) merges two subgraphs into one ONNX model."""
         from yobx.litert import to_onnx
         from yobx.litert.litert_helper import _make_multi_subgraph_tflite_model
+        from yobx.container import ExportArtifact
         from onnxruntime import InferenceSession
 
         model_bytes = _make_multi_subgraph_tflite_model()
         # Provide per-subgraph dummy inputs.
         X0 = np.random.default_rng(0).standard_normal((1, 4)).astype(np.float32)
         X1 = np.random.default_rng(1).standard_normal((1, 3)).astype(np.float32)
-        artifacts = to_onnx(model_bytes, [(X0,), (X1,)], subgraph_index=None)
+        artifact = to_onnx(model_bytes, [(X0,), (X1,)], subgraph_index=None)
 
-        self.assertIsInstance(artifacts, list)
-        self.assertEqual(len(artifacts), 2)
+        # Must be a single artifact, not a list.
+        self.assertIsInstance(artifact, ExportArtifact)
 
-        # Both subgraphs should contain a Relu node.
-        for art in artifacts:
-            op_types = [n.op_type for n in art.proto.graph.node]
-            self.assertIn("Relu", op_types)
+        # The merged graph should contain two Relu nodes (one per subgraph).
+        op_types = [n.op_type for n in artifact.proto.graph.node]
+        relu_count = sum(1 for t in op_types if t == "Relu")
+        self.assertEqual(relu_count, 2)
+
+        # The merged model has two sets of inputs/outputs (prefixed sg0_/sg1_).
+        input_names = [inp.name for inp in artifact.proto.graph.input]
+        output_names = [out.name for out in artifact.proto.graph.output]
+        self.assertEqual(len(input_names), 2)
+        self.assertEqual(len(output_names), 2)
 
         # Verify outputs numerically.
-        sess0 = InferenceSession(
-            artifacts[0].proto.SerializeToString(), providers=["CPUExecutionProvider"]
+        sess = InferenceSession(
+            artifact.proto.SerializeToString(), providers=["CPUExecutionProvider"]
         )
-        (out0,) = sess0.run(None, {artifacts[0].proto.graph.input[0].name: X0})
+        feeds = {input_names[0]: X0, input_names[1]: X1}
+        out0, out1 = sess.run(None, feeds)
         self.assertEqualArray(np.maximum(X0, 0), out0)
-
-        sess1 = InferenceSession(
-            artifacts[1].proto.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
-        (out1,) = sess1.run(None, {artifacts[1].proto.graph.input[0].name: X1})
         self.assertEqualArray(np.maximum(X1, 0), out1)
 
     def test_to_onnx_all_subgraphs_no_args(self):
         """to_onnx(subgraph_index=None) works with no explicit args (inferred from model)."""
         from yobx.litert import to_onnx
         from yobx.litert.litert_helper import _make_multi_subgraph_tflite_model
+        from yobx.container import ExportArtifact
 
         model_bytes = _make_multi_subgraph_tflite_model()
-        artifacts = to_onnx(model_bytes, subgraph_index=None)
+        artifact = to_onnx(model_bytes, subgraph_index=None)
 
-        self.assertIsInstance(artifacts, list)
-        self.assertEqual(len(artifacts), 2)
+        self.assertIsInstance(artifact, ExportArtifact)
+        # Two inputs and two outputs from the two merged subgraphs.
+        self.assertEqual(len(artifact.proto.graph.input), 2)
+        self.assertEqual(len(artifact.proto.graph.output), 2)
 
     def test_to_onnx_all_subgraphs_input_names_mismatch_raises(self):
         """to_onnx(subgraph_index=None) raises when a per-subgraph input_names length mismatches."""
