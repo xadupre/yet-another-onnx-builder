@@ -471,34 +471,82 @@ class DynamoInterpreter:
         return node.name
 
     def make_nn_module_with_callable(self, f: Callable) -> "torch.nn.Module":  # noqa: F821
-        """Wraps a function into a nn Module to export it."""
+        """Wraps a function into a nn Module to export it.
+
+        When *f* is a closure that captures ``nn.Module`` instances (e.g. when
+        ``true_fn`` calls ``self.submodule(x)``), the child modules and direct
+        parameters of those captured modules are registered on the wrapper
+        instance so that ``torch.fx.Tracer.path_of_module`` can resolve them.
+        """
         sig = inspect.signature(f)
         n = len(sig.parameters)
+
+        # Collect nn.Module instances captured in the closure of f.
+        captured_outer_modules = []
+        if hasattr(f, "__closure__") and f.__closure__:
+            for cell in f.__closure__:
+                try:
+                    val = cell.cell_contents
+                except ValueError:
+                    # Unbound cell variable – skip (no value assigned yet)
+                    continue
+                if isinstance(val, self.torch.nn.Module):
+                    captured_outer_modules.append(val)
+
+        def _init_with_captured(self_local):
+            """Register child modules and parameters from captured nn.Modules."""
+            for outer in captured_outer_modules:
+                for name, m in outer.named_children():
+                    # Only register if not already present; the wrapper starts
+                    # empty so collisions are not expected in normal usage.
+                    if name not in self_local._modules:
+                        self_local.add_module(name, m)
+                for name, p in outer.named_parameters(recurse=False):
+                    # Same first-wins policy for parameters.
+                    if p is not None and name not in self_local._parameters:
+                        self_local.register_parameter(name, p)
+
         if n == 1:
 
             class LocalFunction1(self.torch.nn.Module):
-                def forward(self, arg0):
+                def __init__(self_local):
+                    super().__init__()
+                    _init_with_captured(self_local)
+
+                def forward(self_local, arg0):
                     return f(arg0)
 
             return LocalFunction1
         if n == 2:
 
             class LocalFunction2(self.torch.nn.Module):
-                def forward(self, arg0, arg1):
+                def __init__(self_local):
+                    super().__init__()
+                    _init_with_captured(self_local)
+
+                def forward(self_local, arg0, arg1):
                     return f(arg0, arg1)
 
             return LocalFunction2
         if n == 3:
 
             class LocalFunction3(self.torch.nn.Module):
-                def forward(self, arg0, arg1, arg2):
+                def __init__(self_local):
+                    super().__init__()
+                    _init_with_captured(self_local)
+
+                def forward(self_local, arg0, arg1, arg2):
                     return f(arg0, arg1, arg2)
 
             return LocalFunction3
         if n == 4:
 
             class LocalFunction4(self.torch.nn.Module):
-                def forward(self, arg0, arg1, arg2, arg3):
+                def __init__(self_local):
+                    super().__init__()
+                    _init_with_captured(self_local)
+
+                def forward(self_local, arg0, arg1, arg2, arg3):
                     return f(arg0, arg1, arg2, arg3)
 
             return LocalFunction4
@@ -2536,8 +2584,14 @@ class DynamoInterpreter:
             gm = sub_module
         else:
             # https://docs.pytorch.org/docs/stable/fx.html
-            tracer_class = self.torch.fx.Tracer
-            tracer = tracer_class()
+            # Use CustomTracer instead of the plain FX tracer so that nested
+            # torch.cond / scan calls inside the callable (e.g. when true_fn
+            # delegates to a submodule whose forward() contains torch.cond) are
+            # properly intercepted and recorded as graph nodes rather than
+            # executed eagerly (which would raise a TraceError on proxy bool).
+            from ..tracing import CustomTracer
+
+            tracer = CustomTracer()
             graph = tracer.trace(sub_module)
             # Let's propulate with type
             if new_args:
