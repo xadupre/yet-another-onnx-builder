@@ -166,6 +166,11 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_inplace_clone_add_tracing(self):
         evaluation(cases="InplaceCloneAdd_", exporters="yobx-tracing", quiet=False, dynamic=True)
 
+    def test_run_exporter_inplace_setitem_mask_tracing(self):
+        evaluation(
+            cases="InplaceSetItemMask", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
