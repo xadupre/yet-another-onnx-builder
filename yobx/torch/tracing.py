@@ -1851,11 +1851,16 @@ class CustomTracer(torch.fx.Tracer):
             node.op = "call_function"
             node.target = _method_to_aten[old_target]
             n += 1
-            if old_first_arg is not None and old_first_arg.users:
-                old_first_arg.replace_all_uses_with(
-                    node,
-                    delete_user_cb=lambda user, p=pos: position_map.get(user, -1) > p,
-                )
+            if old_first_arg is not None:
+                # Only replace uses of old_first_arg that appear *after* the inplace node.
+                # Users at or before pos (including node itself) are left untouched so that
+                # they continue to reference the pre-modification value, which preserves
+                # correct in-place semantics.
+                if any(position_map.get(user, -1) > pos for user in old_first_arg.users):
+                    old_first_arg.replace_all_uses_with(
+                        node,
+                        delete_user_cb=lambda user, p=pos: position_map.get(user, -1) > p,
+                    )
             if verbose > 1:
                 print(
                     f"[CustomTracer._replace_inplace_call_methods] replaced "
