@@ -69,20 +69,32 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 if isinstance(val, torch.Tensor):
                     return getattr(val, k)
         elif k == "shape":
-            # Return the concrete shape only when every dimension is a plain
-            # Python int (static shape).  If any dimension is symbolic
-            # (torch.SymInt, i.e. a dynamic dimension), fall through to the
-            # CustomAttribute proxy path so that comparisons like
-            # ``x.shape[0] == y.shape[0]`` correctly raise TraceError at
-            # trace time instead of silently succeeding or raising a less
-            # informative symbolic-guards error.
             node = self.__dict__.get("node")
             if node is not None and "val" in node.meta:
                 val = node.meta["val"]
                 if isinstance(val, torch.Tensor):
                     shape = val.shape
                     if all(isinstance(d, int) for d in shape):
+                        # All-concrete static shape: return torch.Size directly so
+                        # that downstream code (e.g. torch.full) receives plain ints.
                         return shape
+                    # Dynamic shape: return a _SafeShape wrapper so that element
+                    # comparisons like ``x.shape[2] == 0`` return a Python bool
+                    # while the element itself remains a proper FX proxy node for
+                    # dynamic ONNX shape computation.
+                    return _SafeShape(CustomAttribute(self, k), shape, self)
+        elif k == "numel":
+            # Intercept x.numel() calls so that ``if x.numel() == 0:`` resolves
+            # to a plain Python bool during tracing with dynamic shapes.
+            node = self.__dict__.get("node")
+            if node is not None and "val" in node.meta:
+                val = node.meta["val"]
+                if isinstance(val, torch.Tensor):
+                    try:
+                        concrete_numel = val.numel()
+                        return _SafeNumelCallable(self, concrete_numel)
+                    except Exception:
+                        pass
         return CustomAttribute(self, k)
 
     @classmethod
@@ -253,6 +265,159 @@ class CustomAttribute(CustomProxy):
 
     def __call__(self, *args, **kwargs):
         return self.tracer.create_proxy("call_method", self.attr, (self.root, *args), kwargs)
+
+
+def _guard_size_oblivious_eq(concrete_val: Any, other: Any) -> bool:
+    """
+    Evaluates ``concrete_val == other`` and returns a plain Python bool,
+    catching ``GuardOnDataDependentSymNode`` so that symbolic comparisons
+    on backed or unbacked SymInts/SymFloats do not abort tracing.
+    Falls back to ``False`` when the guard cannot be evaluated.
+    """
+    try:
+        import torch.fx.experimental.symbolic_shapes as _ss
+
+        _guard_exc = getattr(_ss, "GuardOnDataDependentSymNode", None)
+    except ImportError:
+        _guard_exc = None
+    try:
+        return bool(concrete_val == other)
+    except Exception as e:
+        if _guard_exc is not None and isinstance(e, _guard_exc):
+            return False
+        raise
+
+
+def _guard_size_oblivious_cmp(concrete_val: Any, other: Any, op: str) -> bool:
+    """
+    Evaluates a comparison ``op`` between ``concrete_val`` and ``other``
+    and returns a plain Python bool, catching ``GuardOnDataDependentSymNode``.
+    Falls back to ``False`` when the guard cannot be evaluated.
+    *op* must be one of ``'<'``, ``'<='``, ``'>'``, ``'>='``, ``'bool'``.
+    """
+    try:
+        import torch.fx.experimental.symbolic_shapes as _ss
+
+        _guard_exc = getattr(_ss, "GuardOnDataDependentSymNode", None)
+    except ImportError:
+        _guard_exc = None
+    try:
+        if op == "<":
+            return bool(concrete_val < other)
+        if op == "<=":
+            return bool(concrete_val <= other)
+        if op == ">":
+            return bool(concrete_val > other)
+        if op == ">=":
+            return bool(concrete_val >= other)
+        return bool(concrete_val)  # op == 'bool'
+    except Exception as e:
+        if _guard_exc is not None and isinstance(e, _guard_exc):
+            return False
+        raise
+
+
+class _SymGuardProxy(CustomProxy):
+    """
+    A :class:`CustomProxy` whose Python comparison operators
+    (``__eq__``, ``__ne__``, ``__bool__``, ``__lt__``, etc.) evaluate to
+    a plain ``bool`` instead of raising ``TraceError``.
+
+    This allows control-flow such as ``if x.shape[2] == 0:`` or
+    ``if x.numel() == 0:`` to be handled gracefully during symbolic
+    tracing with dynamic shapes: the condition evaluates to a concrete
+    ``bool`` (using the backed SymInt hint value, defaulting to ``False``
+    when unbacked), so the tracer records whichever branch is taken while
+    the proxy node for the underlying computation (e.g. ``shape[-2]``) is
+    still captured in the FX graph for correct dynamic ONNX generation.
+    """
+
+    __hash__ = CustomProxy.__hash__  # restore hash after __eq__ override
+
+    def __init__(self, node: Node, tracer: "TracerBase", concrete_val: Any) -> None:
+        super().__init__(node, tracer=tracer)
+        self._concrete_val = concrete_val
+
+    def __eq__(self, other: object) -> bool:  # type: ignore[override]
+        return _guard_size_oblivious_eq(self._concrete_val, other)
+
+    def __ne__(self, other: object) -> bool:  # type: ignore[override]
+        return not _guard_size_oblivious_eq(self._concrete_val, other)
+
+    def __bool__(self) -> bool:
+        return _guard_size_oblivious_cmp(self._concrete_val, None, "bool")
+
+    def __lt__(self, other: Any) -> bool:
+        return _guard_size_oblivious_cmp(self._concrete_val, other, "<")
+
+    def __le__(self, other: Any) -> bool:
+        return _guard_size_oblivious_cmp(self._concrete_val, other, "<=")
+
+    def __gt__(self, other: Any) -> bool:
+        return _guard_size_oblivious_cmp(self._concrete_val, other, ">")
+
+    def __ge__(self, other: Any) -> bool:
+        return _guard_size_oblivious_cmp(self._concrete_val, other, ">=")
+
+
+class _SafeShape:
+    """
+    Wraps a shape :class:`CustomAttribute` proxy together with the
+    concrete ``torch.Size`` (which may contain backed SymInts) of the
+    underlying fake tensor.
+
+    When an element is accessed via ``__getitem__``, a proper
+    :class:`_SymGuardProxy` is returned: it is a valid FX proxy node
+    (so dynamic-shape operators such as ``torch.full`` are recorded
+    correctly in the graph) *and* supports Python comparison operators
+    that return plain ``bool`` values (so ``if x.shape[2] == 0:`` does
+    not raise ``TraceError``).
+    """
+
+    def __init__(
+        self,
+        shape_proxy: "CustomAttribute",
+        concrete_shape: "torch.Size",
+        tensor_proxy: "CustomProxy",
+    ) -> None:
+        self._shape_proxy = shape_proxy
+        self._concrete_shape = concrete_shape
+        self._tensor_proxy = tensor_proxy
+
+    def __getitem__(self, idx: int) -> "_SymGuardProxy":
+        # Create the FX proxy node for shape[idx] (dynamic shape recording).
+        item_proxy: CustomProxy = self._shape_proxy[idx]  # type: ignore[assignment]
+        # Concrete value for safe Python comparisons.
+        concrete_val = self._concrete_shape[idx]
+        return _SymGuardProxy(item_proxy.node, item_proxy.tracer, concrete_val)
+
+    def __len__(self) -> int:
+        return len(self._concrete_shape)
+
+    def __iter__(self):
+        return (self[i] for i in range(len(self)))
+
+
+class _SafeNumelCallable:
+    """
+    Returned by ``CustomProxy.__getattr__("numel")`` when the proxy carries
+    a fake tensor in its ``meta["val"]``.
+
+    Calling this object (i.e. ``x.numel()``) creates the proper
+    ``call_method("numel", x)`` FX node *and* returns a
+    :class:`_SymGuardProxy` so that ``if x.numel() == 0:`` resolves to a
+    plain ``bool`` without raising ``TraceError``.
+    """
+
+    def __init__(self, tensor_proxy: "CustomProxy", concrete_numel: Any) -> None:
+        self._tensor_proxy = tensor_proxy
+        self._concrete_numel = concrete_numel
+
+    def __call__(self, *args: Any, **kwargs: Any) -> "_SymGuardProxy":
+        proxy = self._tensor_proxy.tracer.create_proxy(
+            "call_method", "numel", (self._tensor_proxy, *args), kwargs
+        )
+        return _SymGuardProxy(proxy.node, proxy.tracer, self._concrete_numel)
 
 
 class CustomParameterProxy(CustomProxy):
