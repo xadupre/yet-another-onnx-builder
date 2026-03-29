@@ -1858,8 +1858,7 @@ class CustomTracer(torch.fx.Tracer):
                 # correct in-place semantics.
                 if any(position_map.get(user, -1) > pos for user in old_first_arg.users):
                     old_first_arg.replace_all_uses_with(
-                        node,
-                        delete_user_cb=lambda user, p=pos: position_map.get(user, -1) > p,
+                        node, delete_user_cb=lambda user, p=pos: position_map.get(user, -1) > p
                     )
             if verbose > 1:
                 print(

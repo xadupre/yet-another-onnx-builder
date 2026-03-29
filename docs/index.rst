@@ -95,19 +95,9 @@ operations on a DataFrame and compiles them to ONNX directly.
 | TFLite / :epkg:`LiteRT`               | :func:`yobx.litert.to_onnx`              | :ref:`l-design-litert-converter`       |
 +---------------------------------------+------------------------------------------+----------------------------------------+
 
-It also provides:
-
-- A :ref:`graph builder API <l-design-graph-builder>` for constructing and optimizing ONNX graphs,
-  with built-in shape inference and a pattern-based
-  :ref:`graph optimizer <l-design-pattern-optimizer-patterns>`.
-- Converters for **scikit-learn** estimators and pipelines (``yobx.sklearn``).
-- Utilities for **PyTorch** export, including model patching and input flattening (``yobx.torch``).
-- A symbolic :ref:`shape expression system <l-design-shape>` for dynamic shape handling at export time.
-- A :ref:`translation tool <l-design-translate>` that converts ONNX graphs back to executable Python code.
-- **Optimization functions** to make the model more efficient.
-- It supports multiple opsets and multiple domains.
-- It allows the user to directly onnx model with :epkg:`spox` or :epkg:`onnxscript`/:epkg:`ir-py`.
-
+The package is built upon a single :ref:`graph builder API <l-design-graph-builder>`
+for constructing and optimizing ONNX graphs with built-in shape inference
+with can also linked to :epkg:`spox` or :epkg:`onnxscript`/:epkg:`ir-py`.
 Its unique API:
 
 .. code-block:: python

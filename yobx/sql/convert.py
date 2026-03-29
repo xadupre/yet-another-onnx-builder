@@ -82,6 +82,8 @@ def dataframe_to_onnx(
     builder_cls: Union[type, Callable] = GraphBuilder,
     filename: Optional[str] = None,
     verbose: int = 0,
+    large_model: bool = False,
+    external_threshold: int = 1024,
 ) -> ExportArtifact:
     """Trace *func* and convert the resulting computation to ONNX.
 
@@ -125,6 +127,11 @@ def dataframe_to_onnx(
         the :class:`~yobx.container.ExportReport` is written as a companion
         Excel file (same base name with ``.xlsx`` extension).
     :param verbose: verbosity level (0 = silent).
+    :param large_model: if True the returned :class:`~yobx.container.ExportArtifact`
+        has its :attr:`~yobx.container.ExportArtifact.container` attribute set to
+        an :class:`~yobx.container.ExtendedModelContainer`
+    :param external_threshold: if ``large_model`` is True, every tensor whose
+        element count exceeds this threshold is stored as external data
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -209,6 +216,8 @@ def dataframe_to_onnx(
         builder_cls=builder_cls,
         filename=filename,
         verbose=verbose,
+        large_model=large_model,
+        external_threshold=external_threshold,
     )
 
 
@@ -219,6 +228,9 @@ def trace_numpy_to_onnx(
     output_names: Optional[Sequence[str]] = None,
     target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
     batch_dim: str = _BATCH_DIM,
+    dynamic_shapes: Optional[Tuple[Dict[int, str], ...]] = None,
+    large_model: bool = False,
+    external_threshold: int = 1024,
 ) -> ExportArtifact:
     """
     Trace a numpy function and return the equivalent ONNX model.
@@ -247,8 +259,18 @@ def trace_numpy_to_onnx(
     :param target_opset: ONNX opset version.  Can be an integer (default
         domain only) or a dictionary mapping domain names to opset versions.
     :param batch_dim: name of the dynamic first dimension (default:
-        ``"batch"``).  Change this when the default name conflicts with
-        another symbolic dimension in the same graph.
+        ``"batch"``).  Used when *dynamic_shapes* is not provided.  Change
+        this when the default name conflicts with another symbolic dimension
+        in the same graph.
+    :param dynamic_shapes: optional per-input axis-to-dimension-name mappings.
+        Each element is a ``{axis: dim_name}`` dict for the corresponding
+        input.  When provided, these override the default ``batch_dim``
+        behaviour for each input.
+    :param large_model: if True the returned :class:`~yobx.container.ExportArtifact`
+        has its :attr:`~yobx.container.ExportArtifact.container` attribute set to
+        an :class:`~yobx.container.ExtendedModelContainer`
+    :param external_threshold: if ``large_model`` is True, every tensor whose
+        element count exceeds this threshold is stored as external data
     :return: an :class:`~yobx.container.ExportArtifact` representing the
         traced function.
 
@@ -289,10 +311,28 @@ def trace_numpy_to_onnx(
 
     g = GraphBuilder(opsets)  # type: ignore
 
-    for iname, arr in zip(resolved_input_names, inputs):
+    if dynamic_shapes is not None and len(dynamic_shapes) != len(inputs):
+        raise ValueError(
+            f"Length mismatch: {len(inputs)} sample inputs but "
+            f"dynamic_shapes has {len(dynamic_shapes)} elements."
+        )
+
+    for i, (iname, arr) in enumerate(zip(resolved_input_names, inputs)):
         itype = np_dtype_to_tensor_dtype(arr.dtype)
-        # Make the first (batch) dimension dynamic; keep the rest static.
-        shape: Tuple = (batch_dim, *arr.shape[1:])  # type: ignore[assignment]
+        if dynamic_shapes is not None:
+            ds = dynamic_shapes[i]
+            shape_list = list(arr.shape)
+            for axis, dim_name in ds.items():
+                if axis < 0 or axis >= len(shape_list):
+                    raise ValueError(
+                        f"dynamic_shapes[{i}] contains axis {axis} which is out of range "
+                        f"for an array with {len(shape_list)} dimension(s)."
+                    )
+                shape_list[axis] = dim_name  # type: ignore[call-overload]
+            shape: Tuple = tuple(shape_list)  # type: ignore[assignment]
+        else:
+            # Make the first (batch) dimension dynamic; keep the rest static.
+            shape = (batch_dim, *arr.shape[1:])  # type: ignore[assignment]
         g.make_tensor_input(iname, itype, shape)
 
     if output_names is not None:
@@ -310,7 +350,11 @@ def trace_numpy_to_onnx(
     for out_name in resolved_output_names:
         g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
 
-    onx = g.to_onnx(return_optimize_report=True)  # type: ignore
+    onx = g.to_onnx(  # type: ignore
+        large_model=large_model,
+        external_threshold=external_threshold,
+        return_optimize_report=True,
+    )
     return onx
 
 
@@ -335,6 +379,10 @@ def to_onnx(
     builder_cls: Union[type, Callable] = GraphBuilder,
     filename: Optional[str] = None,
     verbose: int = 0,
+    input_names: Optional[Sequence[str]] = None,
+    dynamic_shapes: Optional[Tuple[Dict[int, str], ...]] = None,
+    large_model: bool = False,
+    external_threshold: int = 1024,
 ) -> ExportArtifact:
     """Convert a SQL string, a DataFrame-tracing function, or a polars LazyFrame to ONNX.
 
@@ -421,6 +469,18 @@ def to_onnx(
         the :class:`~yobx.container.ExportReport` is written as a companion
         Excel file (same base name with ``.xlsx`` extension).
     :param verbose: verbosity level (0 = silent).
+    :param input_names: optional list of tensor names for the ONNX graph
+        inputs.  Only used when *dataframe_or_query* is a numpy function
+        (i.e. *args* contains :class:`numpy.ndarray` objects); ignored
+        for SQL strings and DataFrame-tracing callables.
+    :param dynamic_shapes: optional per-input axis-to-dimension-name mappings.
+        Only used when *dataframe_or_query* is a numpy function; ignored
+        for SQL strings and DataFrame-tracing callables.
+    :param large_model: if True the returned :class:`~yobx.container.ExportArtifact`
+        has its :attr:`~yobx.container.ExportArtifact.container` attribute set to
+        an :class:`~yobx.container.ExtendedModelContainer`
+    :param external_threshold: if ``large_model`` is True, every tensor whose
+        element count exceeds this threshold is stored as external data
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -508,7 +568,15 @@ def to_onnx(
             inputs: Tuple[np.ndarray, ...] = (
                 (args,) if isinstance(args, np.ndarray) else tuple(args)  # type: ignore[arg-type]
             )
-            artifact = trace_numpy_to_onnx(dataframe_or_query, *inputs, target_opset=target_opset)
+            artifact = trace_numpy_to_onnx(
+                dataframe_or_query,
+                *inputs,
+                input_names=input_names,
+                dynamic_shapes=dynamic_shapes,
+                target_opset=target_opset,
+                large_model=large_model,
+                external_threshold=external_threshold,
+            )
             if filename:
                 if verbose:
                     print(f"[yobx.sql.to_onnx] saving model to {filename!r}")
@@ -522,6 +590,8 @@ def to_onnx(
             builder_cls=builder_cls,
             filename=filename,
             verbose=verbose,
+            large_model=large_model,
+            external_threshold=external_threshold,
         )
     args = _normalize_input_dtypes(args)  # type: ignore[assignment]
     if isinstance(dataframe_or_query, str):
@@ -533,6 +603,8 @@ def to_onnx(
             builder_cls=builder_cls,
             filename=filename,
             verbose=verbose,
+            large_model=large_model,
+            external_threshold=external_threshold,
         )
     return lazyframe_to_onnx(
         dataframe_or_query,
@@ -541,4 +613,6 @@ def to_onnx(
         builder_cls=builder_cls,
         filename=filename,
         verbose=verbose,
+        large_model=large_model,
+        external_threshold=external_threshold,
     )

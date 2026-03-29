@@ -337,6 +337,81 @@ class TestLiteRTEndToEnd(ExtTestCase):
         finally:
             os.unlink(path)
 
+    def test_to_onnx_all_subgraphs_single_model(self):
+        """to_onnx(subgraph_index=None) on a single-subgraph model returns one artifact."""
+        from yobx.litert import to_onnx
+        from yobx.container import ExportArtifact
+
+        model_bytes = _make_sample_tflite_model()
+        X = np.zeros((1, 4), dtype=np.float32)
+        artifact = to_onnx(model_bytes, [(X,)], input_names=[["x"]], subgraph_index=None)
+
+        self.assertIsInstance(artifact, ExportArtifact)
+        op_types = [n.op_type for n in artifact.proto.graph.node]
+        self.assertIn("Relu", op_types)
+
+    def test_to_onnx_all_subgraphs_multi_model(self):
+        """to_onnx(subgraph_index=None) merges two subgraphs into one ONNX model."""
+        from yobx.litert import to_onnx
+        from yobx.litert.litert_helper import _make_multi_subgraph_tflite_model
+        from yobx.container import ExportArtifact
+        from onnxruntime import InferenceSession
+
+        model_bytes = _make_multi_subgraph_tflite_model()
+        # Provide per-subgraph dummy inputs.
+        X0 = np.random.default_rng(0).standard_normal((1, 4)).astype(np.float32)
+        X1 = np.random.default_rng(1).standard_normal((1, 3)).astype(np.float32)
+        artifact = to_onnx(model_bytes, [(X0,), (X1,)], subgraph_index=None)
+
+        # Must be a single artifact, not a list.
+        self.assertIsInstance(artifact, ExportArtifact)
+
+        # The merged graph should contain two Relu nodes (one per subgraph).
+        op_types = [n.op_type for n in artifact.proto.graph.node]
+        relu_count = sum(1 for t in op_types if t == "Relu")
+        self.assertEqual(relu_count, 2)
+
+        # The merged model has two sets of inputs/outputs (prefixed sg0_/sg1_).
+        input_names = [inp.name for inp in artifact.proto.graph.input]
+        output_names = [out.name for out in artifact.proto.graph.output]
+        self.assertEqual(len(input_names), 2)
+        self.assertEqual(len(output_names), 2)
+
+        # Verify outputs numerically.
+        sess = InferenceSession(
+            artifact.proto.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        feeds = {input_names[0]: X0, input_names[1]: X1}
+        out0, out1 = sess.run(None, feeds)
+        self.assertEqualArray(np.maximum(X0, 0), out0)
+        self.assertEqualArray(np.maximum(X1, 0), out1)
+
+    def test_to_onnx_all_subgraphs_no_args(self):
+        """to_onnx(subgraph_index=None) works with no explicit args (inferred from model)."""
+        from yobx.litert import to_onnx
+        from yobx.litert.litert_helper import _make_multi_subgraph_tflite_model
+        from yobx.container import ExportArtifact
+
+        model_bytes = _make_multi_subgraph_tflite_model()
+        artifact = to_onnx(model_bytes, subgraph_index=None)
+
+        self.assertIsInstance(artifact, ExportArtifact)
+        # Two inputs and two outputs from the two merged subgraphs.
+        self.assertEqual(len(artifact.proto.graph.input), 2)
+        self.assertEqual(len(artifact.proto.graph.output), 2)
+
+    def test_to_onnx_all_subgraphs_input_names_mismatch_raises(self):
+        from yobx.litert import to_onnx
+        from yobx.litert.litert_helper import _make_multi_subgraph_tflite_model
+
+        model_bytes = _make_multi_subgraph_tflite_model()
+        with self.assertRaises(ValueError):
+            to_onnx(
+                model_bytes,
+                subgraph_index=None,
+                input_names=[["a", "b"], ["c"]],  # sg0 has 1 input, not 2
+            )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
