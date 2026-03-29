@@ -1,7 +1,7 @@
 .. _l-design-xtracing:
 
-Numpy Tracing
-=============
+Numpy and DataFrame Tracing
+===========================
 
 This section covers the numpy-tracing infrastructure that converts plain
 numpy functions into ONNX graphs — a core building block used by multiple
@@ -13,3 +13,4 @@ available as a standalone tool.
    :maxdepth: 1
 
    numpy_tracing
+   dataframe_tracing
