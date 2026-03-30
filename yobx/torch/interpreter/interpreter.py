@@ -1772,8 +1772,6 @@ class DynamoInterpreter:
             return tuple(self._process_arg(node, aten_name, t) for t in i)
         if isinstance(i, (float, int, tuple, complex)):
             return i
-        if isinstance(i, np.ndarray):
-            return i
         if isinstance(i, list):
             new_list = []
             for el in i:

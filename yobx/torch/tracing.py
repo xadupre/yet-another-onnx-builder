@@ -5,7 +5,6 @@ import operator
 import textwrap
 import types
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
-import numpy as np
 import torch
 import torch.utils._pytree as pytree
 from torch.fx import Node
@@ -1650,58 +1649,6 @@ class CustomTracer(torch.fx.Tracer):
                             f"[CustomTracer.remove_inplace] D.process {pos}: "
                             f"{node.target}({node.args}) -> {node}"
                         )
-
-                    # Normalize operator.setitem args for ONNX compatibility.
-                    # The tracing path produces slice(None, n) indices and raw scalar
-                    # values, whereas the non-tracing (torch.export) path produces
-                    # slice(0, n) indices and a proper tensor node.
-                    if node_target_name == "operator.setitem":
-                        indices = node.args[1]
-                        values = node.args[2]
-                        changed_args = False
-
-                        def _normalize_slice(s):
-                            """Normalize a slice for ONNX: None start → 0,
-                            integer stop → np.array so that g.op.Sub(dim, stop)
-                            receives a properly-typed constant."""
-                            if not isinstance(s, slice):
-                                return s, False
-                            changed = False
-                            start = s.start
-                            if start is None:
-                                start = 0
-                                changed = True
-                            stop = s.stop
-                            if isinstance(stop, int):
-                                stop = np.array(stop, dtype=np.int64)
-                                changed = True
-                            return slice(start, stop, s.step), changed
-
-                        # Normalize slice(None, stop) → slice(0, np.array(stop)) in indices.
-                        if isinstance(indices, tuple):
-                            new_indices = []
-                            for i in indices:
-                                ni, c = _normalize_slice(i)
-                                new_indices.append(ni)
-                                changed_args = changed_args or c
-                            indices = tuple(new_indices)
-                        else:
-                            indices, c = _normalize_slice(indices)
-                            changed_args = changed_args or c
-
-                        # Insert a scalar_tensor FX node for raw scalar values so that
-                        # aten_setitem always receives a proper tensor input.
-                        if isinstance(values, (int, float, bool)):
-                            with graph.inserting_before(node):
-                                scalar_node = graph.call_function(
-                                    torch.ops.aten.scalar_tensor.default,
-                                    args=(float(values),),
-                                    kwargs={},
-                                )
-                            values = scalar_node
-                            changed_args = True
-                        if changed_args:
-                            node.args = (node.args[0], indices, values)
 
                     # class Node can be used as a key
                     # We also assume a user is placed after this node.
