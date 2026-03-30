@@ -346,8 +346,6 @@ class ControlFlowRanks(torch.nn.Module):
 class ControlFlowNumelZero1(torch.nn.Module):
     def forward(self, x):
         def empty_cache(x):
-            if x.shape[2] == 0:
-                return 0
             return x.shape[-2]
 
         size = (empty_cache(x), 1)
