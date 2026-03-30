@@ -5,9 +5,15 @@ import pprint
 import time
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
-from onnx import ModelProto
-from onnx.defs import onnx_opset_version
-from onnx.model_container import ModelContainer
+try:
+    from onnx import ModelProto, ValueInfoProto
+    from onnx.defs import onnx_opset_version
+    from onnx.model_container import ModelContainer
+except ImportError:
+    ModelProto = None  # type: ignore[misc,assignment]
+    ValueInfoProto = None  # type: ignore[misc,assignment]
+    onnx_opset_version = None  # type: ignore[misc,assignment]
+    ModelContainer = None  # type: ignore[misc,assignment]
 from ...container import ExportArtifact, ExportReport
 from ...helpers import string_type
 from ...xbuilder.graph_builder import GraphBuilder, OptimizationOptions, FunctionOptions
@@ -843,9 +849,7 @@ def build_source_lines(
 def _contains_value_info_proto(x: Any) -> bool:
     """Return ``True`` if *x* or any element of the nested structure *x* is a
     :class:`~onnx.ValueInfoProto`."""
-    try:
-        from onnx import ValueInfoProto
-    except ImportError:
+    if ValueInfoProto is None:
         return False
     if isinstance(x, ValueInfoProto):
         return True
@@ -876,8 +880,6 @@ def _replace_value_info_protos(
         used to create the fake tensors
     :return: ``(converted_x, dynamic_shapes_x)``
     """
-    from onnx import ValueInfoProto
-
     if isinstance(x, ValueInfoProto):
         fake_tensor, dyn_axes = context.value_info_proto_to_torch(x)
         return fake_tensor, dyn_axes or None
