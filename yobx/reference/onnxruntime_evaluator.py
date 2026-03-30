@@ -470,7 +470,7 @@ class OnnxruntimeEvaluator:
         return hidden - (hidden & set(node.input))
 
     def _get_sess(
-        self, node: Union[onnx.ModelProto, onnx.NodeProto], inputs: List[Any]
+        self, node: Union[onnx.ModelProto, onnx.FunctionProto, onnx.NodeProto], inputs: List[Any]
     ) -> Tuple[onnx.ModelProto, _InferenceSession]:
         on_cpu = None
         if isinstance(node, onnx.ModelProto):
@@ -533,15 +533,24 @@ class OnnxruntimeEvaluator:
 
         if self.dump_onnx_model:
             onnx.save(onx, self.dump_onnx_model, save_as_external_data=len(onx.graph.node) > 100)
-        if not inputs or any(isinstance(i, np.ndarray) for i in inputs):
-            # TODO: improves the case when it is empty.
+
+        if not inputs:
+            cls = getattr(self, "_cached_cls", None)
+            assert cls is not None, (
+                f"Unable to guess the session to create to expected sessions, "
+                f"node is of type {type(node)}."
+            )
+        elif any(isinstance(i, np.ndarray) for i in inputs):
             from ._inference_session_numpy import InferenceSessionForNumpy
 
             cls = InferenceSessionForNumpy
         else:
+            # It should be torch Tensor.
             from ._inference_session_torch import InferenceSessionForTorch
 
             cls = InferenceSessionForTorch  # type: ignore
+        self._cached_cls = cls
+
         if (
             "providers" not in self.session_kwargs or not self.session_kwargs["providers"]
         ) and any(hasattr(t, "is_cuda") and t.is_cuda for t in inputs):

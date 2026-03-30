@@ -5464,7 +5464,8 @@ class GraphBuilder(
         known_functions = set()
         for k, v in self.functions.items():
             for node in v.node:
-                # TODO: This is very restrictive. This should be changed.
+                # This condition is very restrictive. It fails for any
+                # unexpected case.
                 if (
                     node.domain in {"", "ai.onnx.ml", "com.microsoft", "ai.onnx.training"}
                     or ".onnx" in node.domain

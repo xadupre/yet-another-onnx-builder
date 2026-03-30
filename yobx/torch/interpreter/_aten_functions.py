@@ -13174,7 +13174,6 @@ def aten_view(
             ), f"Unexpected shape for view, size={size}{g.get_debug_msg()}"
         elif g.is_dynamic_shape(asize):
             asize = g.make_shape_from_results(asize, name=node_name)
-            # TODO: check that the shape is just a number
         else:
             raise RuntimeError(f"aten_view not implemented when size={size!r}{g.get_debug_msg()}")
         res = g.op.Reshape(x, asize, outputs=outputs, name=node_name)

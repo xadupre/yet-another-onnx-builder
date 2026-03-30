@@ -249,12 +249,14 @@ class ExportOptions:
             if target_name in {"aten:relu_", "aten::mul_.Tensor"}:
                 ret = len(node.users) == 0
                 continue
+            if target_name in {"aten::lstm.input"}:
+                return True, True
             if target_name in {
-                "aten::lstm.input",
                 "torch._functorch.predispatch._add_batch_dim",
                 "torch._functorch.predispatch._remove_batch_dim",
             }:
-                return True, True
+                ret = len(node.users) == 0
+                continue
         return ret, False
 
     def _export(

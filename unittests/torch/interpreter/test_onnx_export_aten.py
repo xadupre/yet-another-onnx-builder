@@ -3190,7 +3190,6 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
-    @unittest.skip("unable to run_decompositions")
     def test_aten_add_batch_dim11(self):
         import torch
 
@@ -3205,7 +3204,8 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model()
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
+        with apply_patches_for_model(patch_torch=True, model=model):
+            onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_fused_rms(self):
