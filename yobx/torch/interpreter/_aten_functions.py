@@ -451,6 +451,60 @@ def aten_add__Tensor(
     return res
 
 
+def aten__add_batch_dim(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    batch_dim: int,
+    level: int,
+    name: str = "_add_batch_dim",
+) -> T:
+    """
+    Marks dimension *batch_dim* as the vmap batch dimension (level *level*).
+
+    Each vmap level uses ``level - 1`` as its canonical batch dimension
+    position (outermost level 1 → position 0, level 2 → position 1, etc.).
+    The operation is equivalent to ``torch.movedim(x, batch_dim, level - 1)``.
+    When *batch_dim* already equals ``level - 1`` the operation is a no-op
+    and an ``Identity`` node is emitted.
+    """
+    dst_dim = level - 1
+    if batch_dim == dst_dim:
+        res = g.op.Identity(x, outputs=outputs, name=name)
+        if not sts:
+            set_type_shape_unary_op(g, res, x)
+        return res
+    return aten_movedim_int(g, sts, outputs, x, batch_dim, dst_dim, name=name)
+
+
+def aten__remove_batch_dim(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    level: int,
+    batch_size: int,
+    out_dim: int,
+    name: str = "_remove_batch_dim",
+) -> T:
+    """
+    Restores the vmap batch dimension from its canonical position ``level - 1``
+    back to *out_dim*.
+
+    The operation is equivalent to ``torch.movedim(x, level - 1, out_dim)``.
+    When ``level - 1`` equals *out_dim* the operation is a no-op and an
+    ``Identity`` node is emitted.
+    """
+    src_dim = level - 1
+    if src_dim == out_dim:
+        res = g.op.Identity(x, outputs=outputs, name=name)
+        if not sts:
+            set_type_shape_unary_op(g, res, x)
+        return res
+    return aten_movedim_int(g, sts, outputs, x, src_dim, out_dim, name=name)
+
+
 def aten_addcmul(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],

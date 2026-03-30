@@ -1303,15 +1303,16 @@ class CustomTracer(torch.fx.Tracer):
                 assert (
                     len(node.args) == 3
                 ), f"_add_batch_dim expected 3 args, got {len(node.args)}: {node.args}"
-                x, batch_dim, _level = node.args
-                if batch_dim == 0:
-                    # trivial: batch dim is already at position 0 → identity
+                x, batch_dim, level = node.args
+                dst_dim = level - 1
+                if batch_dim == dst_dim:
+                    # trivial: batch dim is already at its canonical position → identity
                     node.replace_all_uses_with(x)
                     graph.erase_node(node)
                 else:
                     with graph.inserting_before(node):
                         new_node = graph.call_function(
-                            torch.ops.aten.movedim.int, args=(x, batch_dim, 0)
+                            torch.ops.aten.movedim.int, args=(x, batch_dim, dst_dim)
                         )
                         new_node.meta = node.meta.copy()
                     node.replace_all_uses_with(new_node)
@@ -1319,7 +1320,7 @@ class CustomTracer(torch.fx.Tracer):
                 if verbose:
                     print(
                         f"[CustomTracer.remove_batch_dim_nodes] replaced _add_batch_dim "
-                        f"batch_dim={batch_dim}"
+                        f"batch_dim={batch_dim} level={level}"
                     )
                 modified += 1
             elif target is _remove_batch_dim:
@@ -1327,15 +1328,16 @@ class CustomTracer(torch.fx.Tracer):
                 assert (
                     len(node.args) == 4
                 ), f"_remove_batch_dim expected 4 args, got {len(node.args)}: {node.args}"
-                x, _level, _batch_size, out_dim = node.args
-                if out_dim == 0:
-                    # trivial: batch dim stays at position 0 → identity
+                x, level, _batch_size, out_dim = node.args
+                src_dim = level - 1
+                if src_dim == out_dim:
+                    # trivial: batch dim is already at its output position → identity
                     node.replace_all_uses_with(x)
                     graph.erase_node(node)
                 else:
                     with graph.inserting_before(node):
                         new_node = graph.call_function(
-                            torch.ops.aten.movedim.int, args=(x, 0, out_dim)
+                            torch.ops.aten.movedim.int, args=(x, src_dim, out_dim)
                         )
                         new_node.meta = node.meta.copy()
                     node.replace_all_uses_with(new_node)
@@ -1343,7 +1345,7 @@ class CustomTracer(torch.fx.Tracer):
                 if verbose:
                     print(
                         f"[CustomTracer.remove_batch_dim_nodes] replaced _remove_batch_dim "
-                        f"out_dim={out_dim}"
+                        f"level={level} out_dim={out_dim}"
                     )
                 modified += 1
         return modified
