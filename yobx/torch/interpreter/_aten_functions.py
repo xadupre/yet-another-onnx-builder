@@ -10402,6 +10402,49 @@ def aten_setitem(
             return res
         raise NotImplementedError(f"Not implemented yet when index={index}{g.get_debug_msg()}")
 
+    # Handle x[..., index_1d] = values or x[index_1d, ...] = values using ScatterElements.
+    # After ellipsis expansion, indices is a list where exactly one entry is a 1-D tensor
+    # name (str) and all others are None.  Use ScatterElements along that axis.
+    if isinstance(indices, (list, tuple)) and g.has_rank(x):
+        non_none = [(i, idx) for i, idx in enumerate(indices) if idx is not None]
+        if (
+            len(non_none) == 1
+            and isinstance(non_none[0][1], str)
+            and g.has_rank(non_none[0][1])
+            and g.get_rank(non_none[0][1]) == 1
+            and len(indices) == g.get_rank(x)
+        ):
+            axis = non_none[0][0]
+            tensor_idx = non_none[0][1]
+            rank = g.get_rank(x)
+            name = f"{name}_se"
+            # target_shape = shape(x)[0:axis] + shape(tensor_idx) + shape(x)[axis+1:]
+            # i.e. (D0, ..., D_{axis-1}, k, D_{axis+1}, ...) where k = len(tensor_idx)
+            shape_parts = []
+            if axis > 0:
+                shape_parts.append(g.op.Shape(x, start=0, end=axis, name=name))
+            shape_parts.append(g.op.Shape(tensor_idx, name=name))
+            if axis < rank - 1:
+                shape_parts.append(g.op.Shape(x, start=axis + 1, name=name))
+            if len(shape_parts) == 1:
+                target_shape = shape_parts[0]
+            else:
+                target_shape = g.op.Concat(*shape_parts, axis=0, name=name)
+            # Reshape tensor_idx from (k,) to shape (1,...,1,k,1,...,1) for broadcasting
+            # where -1 is at position `axis`
+            new_shape_idx = np.array(
+                [1 if j != axis else -1 for j in range(rank)], dtype=np.int64
+            )
+            idx_reshaped = g.op.Reshape(tensor_idx, new_shape_idx, name=name)
+            idx_broadcast = g.op.Expand(idx_reshaped, target_shape, name=name)
+            val_broadcast = g.op.Expand(values, target_shape, name=name)
+            res = g.op.ScatterElements(
+                x, idx_broadcast, val_broadcast, axis=axis, name=name, outputs=outputs
+            )
+            if not sts:
+                set_type_shape_unary_op(g, res, x)
+            return res
+
     # We use padding to implement this.
     name = f"{name}_pad"
     assert g.has_shape(values), (
