@@ -12,6 +12,8 @@ from yobx.ext_test_case import (
 from yobx.torch.tracing import (
     CustomTracer,
     CustomProxy,
+    CustomProxyBool,
+    CustomProxyInt,
     CustomParameterProxy,
     CondCCOp,
     _len,
@@ -84,6 +86,48 @@ class TestCustomTracer(ExtTestCase):
                 proxy = tracer.proxy(node)
                 self.assertIsInstance(proxy, CustomProxy)
                 self.assertIn("CustomProxy", repr(proxy))
+
+    def test_custom_proxy_int_comparison_returns_bool(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, lx: list):
+                length = _len(lx)
+                return length == 2, length != 2, length < 3, length <= 2, length > 1, length >= 2
+
+        model = Model()
+        tracer = CustomTracer()
+        graph = tracer.trace(model)
+        # Collect all nodes that correspond to comparisons
+        cmp_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertGreater(len(cmp_nodes), 0)
+        # Verify that the length proxy is a CustomProxyInt and comparisons
+        # return CustomProxyBool instances.
+        inputs = (
+            torch.arange(4).to(torch.float32),
+            [
+                torch.arange(4).to(torch.float32),
+                torch.arange(4).to(torch.float32),
+            ],
+        )
+        length_proxy = None
+        for node in graph.nodes:
+            proxy = tracer.proxy(node)
+            if node.op == "call_method" and node.target == "__len__":
+                length_proxy = tracer.proxy(node, cls=CustomProxyInt)
+                break
+        if length_proxy is not None:
+            self.assertIsInstance(length_proxy, CustomProxyInt)
+            cmp_result = length_proxy == 2
+            self.assertIsInstance(cmp_result, CustomProxyBool)
+            cmp_result = length_proxy != 2
+            self.assertIsInstance(cmp_result, CustomProxyBool)
+            cmp_result = length_proxy < 3
+            self.assertIsInstance(cmp_result, CustomProxyBool)
+            cmp_result = length_proxy <= 2
+            self.assertIsInstance(cmp_result, CustomProxyBool)
+            cmp_result = length_proxy > 1
+            self.assertIsInstance(cmp_result, CustomProxyBool)
+            cmp_result = length_proxy >= 2
+            self.assertIsInstance(cmp_result, CustomProxyBool)
 
     def test_is_leaf_module_default(self):
         tracer = CustomTracer()

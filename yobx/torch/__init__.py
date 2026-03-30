@@ -9,6 +9,7 @@ from .tracing import (
     CustomProxy,
     CustomAttribute,
     CustomParameterProxy,
+    CustomProxyBool,
     CustomProxyInt,
     CustomProxyFloat,
     CustomTracer,

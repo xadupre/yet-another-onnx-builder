@@ -234,12 +234,50 @@ def _isinstance(x, cls):
     return isinstance(x, cls)
 
 
+class CustomProxyBool(CustomProxy):
+    "A proxy for a boolean."
+
+    def instanceof(self, cls):
+        """isinstance"""
+        return cls in {CustomProxyBool, CustomProxy, bool}
+
+
 class CustomProxyInt(CustomProxy):
     "A proxy for an integer."
+
+    __hash__ = CustomProxy.__hash__  # restore hash after __eq__ override
 
     def instanceof(self, cls):
         """isinstance"""
         return cls in {CustomProxyInt, CustomProxy, int}
+
+    def _compare(self, op, other):
+        """Creates a comparison node and returns a :class:`CustomProxyBool`."""
+        node = self.tracer.create_node(
+            "call_function",
+            op,
+            args=(self.node, other.node if isinstance(other, CustomProxy) else other),
+            kwargs={},
+        )
+        return self.tracer.proxy(node, cls=CustomProxyBool)
+
+    def __eq__(self, other):  # type: ignore[override]
+        return self._compare(operator.eq, other)
+
+    def __ne__(self, other):  # type: ignore[override]
+        return self._compare(operator.ne, other)
+
+    def __lt__(self, other):
+        return self._compare(operator.lt, other)
+
+    def __le__(self, other):
+        return self._compare(operator.le, other)
+
+    def __gt__(self, other):
+        return self._compare(operator.gt, other)
+
+    def __ge__(self, other):
+        return self._compare(operator.ge, other)
 
 
 class CustomProxyFloat(CustomProxy):
