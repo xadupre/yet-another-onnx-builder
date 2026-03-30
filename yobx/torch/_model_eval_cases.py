@@ -271,6 +271,19 @@ class InplaceSetItemMask(torch.nn.Module):
     _dynamic = {"x": {0: DIM("batch")}}
 
 
+class InplaceSetItemExp(torch.nn.Module):
+    def forward(self, x):
+        K_33 = x.clone()
+        torch.exp_(K_33[2:-2, 2:-2, :-1])
+        return K_33
+
+    _inputs = [
+        ((torch.arange(7 * 9 * 11) + 10).reshape((7, 9, 11)).to(torch.float32),),
+        ((torch.arange(8 * 9 * 11) + 10).reshape((8, 9, 11)).to(torch.float32),),
+    ]
+    _dynamic = {"x": {0: DIM("batch")}}
+
+
 class AtenInterpolate(torch.nn.Module):
     def forward(self, x):
         y = torch.nn.functional.interpolate(
