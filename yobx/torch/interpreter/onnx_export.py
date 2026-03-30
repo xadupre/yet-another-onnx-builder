@@ -853,6 +853,8 @@ def _contains_value_info_proto(x: Any) -> bool:
         return False
     if isinstance(x, ValueInfoProto):
         return True
+    if isinstance(x, dict):
+        return any(_contains_value_info_proto(v) for v in x.values())
     if isinstance(x, (list, tuple)):
         return any(_contains_value_info_proto(item) for item in x)
     return False
@@ -865,16 +867,16 @@ def _replace_value_info_protos(
     """Recursively replace :class:`~onnx.ValueInfoProto` objects in *x* with
     fake :class:`torch.Tensor` objects.
 
-    The function mirrors the nested structure of *x* (lists and tuples) and
-    returns a pair ``(converted, dynamic_shapes)`` where *dynamic_shapes* has
-    the same nesting as *x*:
+    The function mirrors the nested structure of *x* (lists, tuples, and dicts)
+    and returns a pair ``(converted, dynamic_shapes)`` where *dynamic_shapes*
+    has the same nesting as *x*:
 
     * A ``Dict[int, str]`` for each replaced :class:`~onnx.ValueInfoProto`,
       mapping each dynamic axis index to its symbolic name.
     * ``None`` for elements that were not :class:`~onnx.ValueInfoProto`
       instances and therefore left unchanged.
 
-    :param x: an element, or a (possibly nested) list/tuple of elements,
+    :param x: an element, or a (possibly nested) list/tuple/dict of elements,
         that may contain :class:`~onnx.ValueInfoProto` objects
     :param context: a :class:`~yobx.torch.fake_tensor_helper.FakeTensorContext`
         used to create the fake tensors
@@ -884,16 +886,28 @@ def _replace_value_info_protos(
         fake_tensor, dyn_axes = context.value_info_proto_to_torch(x)
         return fake_tensor, dyn_axes or None
 
+    if isinstance(x, dict):
+        converted = {}
+        shapes: Any = {}
+        has_dynamic = False
+        for k, v in x.items():
+            t, s = _replace_value_info_protos(v, context)
+            converted[k] = t
+            shapes[k] = s
+            if s is not None:
+                has_dynamic = True
+        return converted, (shapes if has_dynamic else None)
+
     if isinstance(x, (list, tuple)):
         items = [_replace_value_info_protos(item, context) for item in x]
         if isinstance(x, tuple):
             tensors: Any = tuple(t for t, _ in items)
-            shapes: Any = tuple(s for _, s in items)
+            list_shapes: Any = tuple(s for _, s in items)
         else:
             tensors = [t for t, _ in items]
-            shapes = [s for _, s in items]
-        has_dynamic = any(s is not None for s in shapes)
-        return tensors, (shapes if has_dynamic else None)
+            list_shapes = [s for _, s in items]
+        has_dynamic = any(s is not None for s in list_shapes)
+        return tensors, (list_shapes if has_dynamic else None)
 
     return x, None
 

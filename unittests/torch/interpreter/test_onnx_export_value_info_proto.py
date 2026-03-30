@@ -146,6 +146,53 @@ class TestTorchToOnnxValueInfoProto(ExtTestCase):
         self.assertIsNotNone(onx)
         self.assertGreater(len(onx.graph.input), 0)
 
+    def test_value_info_proto_no_shape_raises(self):
+        """ValueInfoProto without any shape information raises ValueError."""
+        from yobx.torch.fake_tensor_helper import FakeTensorContext
+
+        vip = onnx.ValueInfoProto()
+        vip.name = "x"
+        vip.type.tensor_type.elem_type = onnx.TensorProto.FLOAT
+        # Intentionally leave the shape field unset.
+        ctx = FakeTensorContext()
+        with self.assertRaises(ValueError):
+            ctx.value_info_proto_to_torch(vip)
+
+    def test_value_info_proto_zero_dim_raises(self):
+        """ValueInfoProto with dim_value=0 and no dim_param raises ValueError."""
+        from yobx.torch.fake_tensor_helper import FakeTensorContext
+
+        vip = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, [0, 4])
+        ctx = FakeTensorContext()
+        with self.assertRaises(ValueError):
+            ctx.value_info_proto_to_torch(vip)
+
+    @skipif_ci_windows("not yet supported on Windows")
+    def test_dict_args_value_info_proto(self):
+        """ValueInfoProto objects inside a dict passed as args are converted correctly."""
+        import torch
+        from yobx.torch.interpreter.onnx_export import (
+            _contains_value_info_proto,
+            _replace_value_info_protos,
+        )
+        from yobx.torch.fake_tensor_helper import FakeTensorContext
+
+        vip = onnx.helper.make_tensor_value_info("x", onnx.TensorProto.FLOAT, ["batch", 4])
+        d = {"x": vip, "extra": 1}
+
+        self.assertTrue(_contains_value_info_proto(d))
+
+        ctx = FakeTensorContext()
+        converted, shapes = _replace_value_info_protos(d, ctx)
+
+        # The VIP should have been converted to a torch tensor.
+        self.assertIsInstance(converted["x"], torch.Tensor)
+        # The non-VIP value should be left unchanged.
+        self.assertEqual(converted["extra"], 1)
+        # dynamic_shapes should have an entry for "x".
+        self.assertIsNotNone(shapes)
+        self.assertIsNotNone(shapes["x"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
