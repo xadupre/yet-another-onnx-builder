@@ -312,6 +312,9 @@ class OnnxruntimeEvaluator:
             outputs = self.output_names
         results: Dict[str, Any] = (self.rt_inits_ or {}).copy()
 
+        # should not be an attribute
+        self._cached_cls = self._determine_session_cls(feed_inputs.values())
+
         for k, v in results.items():
             self._log(2, " +C %s: %s", k, v)
         for k, v in feed_inputs.items():
@@ -469,6 +472,23 @@ class OnnxruntimeEvaluator:
                 hidden |= get_hidden_inputs(att.g)
         return hidden - (hidden & set(node.input))
 
+    def _determine_session_cls(self, inputs, node=None):
+        if not inputs:
+            cls = getattr(self, "_cached_cls", None)
+            assert cls is not None, (
+                f"Unable to guess the session to create to expected sessions, "
+                f"node is of type {type(node)}."
+            )
+            return cls
+        if any(isinstance(i, np.ndarray) for i in inputs):
+            from ._inference_session_numpy import InferenceSessionForNumpy
+
+            return InferenceSessionForNumpy
+        # It should be torch Tensor.
+        from ._inference_session_torch import InferenceSessionForTorch
+
+        return InferenceSessionForTorch  # type: ignore
+
     def _get_sess(
         self, node: Union[onnx.ModelProto, onnx.FunctionProto, onnx.NodeProto], inputs: List[Any]
     ) -> Tuple[onnx.ModelProto, _InferenceSession]:
@@ -534,22 +554,7 @@ class OnnxruntimeEvaluator:
         if self.dump_onnx_model:
             onnx.save(onx, self.dump_onnx_model, save_as_external_data=len(onx.graph.node) > 100)
 
-        if not inputs:
-            cls = getattr(self, "_cached_cls", None)
-            assert cls is not None, (
-                f"Unable to guess the session to create to expected sessions, "
-                f"node is of type {type(node)}."
-            )
-        elif any(isinstance(i, np.ndarray) for i in inputs):
-            from ._inference_session_numpy import InferenceSessionForNumpy
-
-            cls = InferenceSessionForNumpy
-        else:
-            # It should be torch Tensor.
-            from ._inference_session_torch import InferenceSessionForTorch
-
-            cls = InferenceSessionForTorch  # type: ignore
-        self._cached_cls = cls
+        self._cached_cls = cls = self._determine_session_cls(inputs, node=node)
 
         if (
             "providers" not in self.session_kwargs or not self.session_kwargs["providers"]
