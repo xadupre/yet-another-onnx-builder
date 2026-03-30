@@ -10579,7 +10579,7 @@ def aten_setitem_with_transformation(
     transformations: Tuple[Tuple[str, Any], ...],
     name: str = "setitem_with_transformation",
 ) -> T:
-    "setitem with in-place transformation (e.g., exp_, sigmoid_)"
+    "setitem_with_transformation"
     _transformation_to_onnx_op = {"exp": "Exp", "sigmoid": "Sigmoid"}
 
     assert isinstance(
