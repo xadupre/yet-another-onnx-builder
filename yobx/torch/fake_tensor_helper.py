@@ -3,6 +3,12 @@ import torch
 from torch._subclasses.fake_tensor import FakeTensorMode, FakeTensor
 from torch.fx.experimental.symbolic_shapes import ShapeEnv
 
+# Fallback concrete size used for ONNX dimensions that have no ``dim_value``
+# (i.e. ``dim_value == 0``).  In the ONNX spec, ``dim_value == 0`` with no
+# ``dim_param`` means "unknown/unset", **not** an empty (zero-sized) dimension.
+# A small positive integer is used so that fake tensors can be created.
+_DEFAULT_CONCRETE_DIM: int = 2
+
 
 class FakeTensorContext:
     """Stores information used to reuse same dimension for the same dimension names."""
@@ -261,6 +267,74 @@ class FakeTensorContext:
         raise TypeError(
             f"Unexpected type {type(x)} for x, content is {string_type(x, with_shape=True)}"
         )
+
+    def value_info_proto_to_torch(
+        self,
+        vip: Any,
+    ) -> Tuple["FakeTensor", Dict[int, str]]:
+        """Convert an :class:`onnx.ValueInfoProto` to a fake :class:`torch.Tensor`.
+
+        Symbolic dimensions (those with a non-empty ``dim_param``) are assigned
+        unique prime concrete sizes so that :func:`torch.export.export` sees
+        distinct values.  The mapping from axis index to symbolic-dimension name
+        is returned so the caller can construct a ``dynamic_shapes`` argument for
+        :func:`torch.export.export`.
+
+        Dimensions whose ``dim_value`` is 0 (i.e. not set) are treated as
+        *unknown* — per the ONNX specification a ``dim_value`` of 0 with no
+        ``dim_param`` means the size is unknown — and are assigned the fallback
+        concrete size ``_DEFAULT_CONCRETE_DIM`` so that a runnable tensor can be
+        created.  Actual zero-sized (empty) tensors cannot appear in this
+        context because ONNX does not distinguish them from *unknown* when
+        ``dim_value == 0`` and ``dim_param == ""``.
+
+        :param vip: an ONNX value-info descriptor (:class:`onnx.ValueInfoProto`)
+        :return: ``(fake_tensor, dynamic_axes)`` where *dynamic_axes* maps each
+            dynamic dimension index to its symbolic name (empty dict when there
+            are no symbolic dimensions)
+        """
+        from onnx import TensorProto as _TensorProto
+        from .torch_helper import onnx_dtype_to_torch_dtype
+
+        tt = vip.type.tensor_type
+        elem_type = tt.elem_type if tt.elem_type else _TensorProto.FLOAT
+        torch_dtype = onnx_dtype_to_torch_dtype(elem_type)
+
+        dynamic_axes: Dict[int, str] = {}
+        if tt.HasField("shape"):
+            shape = []
+            for i, dim in enumerate(tt.shape.dim):
+                if dim.dim_param:
+                    # Symbolic dimension — pick (or reuse) a unique prime size.
+                    name = dim.dim_param
+                    if name in self._mapping_str:
+                        concrete = self._mapping_str[name]
+                    else:
+                        concrete = self._unique()
+                        self._mapping_str[name] = concrete
+                    shape.append(concrete)
+                    dynamic_axes[i] = name
+                else:
+                    # dim_value == 0 means "unknown/unset" in ONNX; use the
+                    # fallback concrete size rather than creating an empty tensor.
+                    value = dim.dim_value
+                    shape.append(value if value > 0 else _DEFAULT_CONCRETE_DIM)
+        else:
+            # No shape information — use a 1-D tensor with the fallback size.
+            shape = [_DEFAULT_CONCRETE_DIM]
+
+        if shape:
+            real_tensor = torch.empty(tuple(shape), dtype=torch_dtype)
+            if dynamic_axes:
+                fake_tensor = self.fake_reshape(real_tensor, dynamic_axes)
+            else:
+                fake_tensor = self.from_tensor(real_tensor, static_shapes=True)
+        else:
+            # Scalar tensor (0-D).
+            real_tensor = torch.empty((), dtype=torch_dtype)
+            fake_tensor = self.from_tensor(real_tensor, static_shapes=True)
+
+        return fake_tensor, dynamic_axes
 
 
 def make_fake(

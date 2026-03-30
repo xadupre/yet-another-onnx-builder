@@ -840,6 +840,62 @@ def build_source_lines(
     return sources
 
 
+def _contains_value_info_proto(x: Any) -> bool:
+    """Return ``True`` if *x* or any element of the nested structure *x* is a
+    :class:`~onnx.ValueInfoProto`."""
+    try:
+        from onnx import ValueInfoProto
+    except ImportError:
+        return False
+    if isinstance(x, ValueInfoProto):
+        return True
+    if isinstance(x, (list, tuple)):
+        return any(_contains_value_info_proto(item) for item in x)
+    return False
+
+
+def _replace_value_info_protos(
+    x: Any,
+    context: Any,
+) -> Tuple[Any, Any]:
+    """Recursively replace :class:`~onnx.ValueInfoProto` objects in *x* with
+    fake :class:`torch.Tensor` objects.
+
+    The function mirrors the nested structure of *x* (lists and tuples) and
+    returns a pair ``(converted, dynamic_shapes)`` where *dynamic_shapes* has
+    the same nesting as *x*:
+
+    * A ``Dict[int, str]`` for each replaced :class:`~onnx.ValueInfoProto`,
+      mapping each dynamic axis index to its symbolic name.
+    * ``None`` for elements that were not :class:`~onnx.ValueInfoProto`
+      instances and therefore left unchanged.
+
+    :param x: an element, or a (possibly nested) list/tuple of elements,
+        that may contain :class:`~onnx.ValueInfoProto` objects
+    :param context: a :class:`~yobx.torch.fake_tensor_helper.FakeTensorContext`
+        used to create the fake tensors
+    :return: ``(converted_x, dynamic_shapes_x)``
+    """
+    from onnx import ValueInfoProto
+
+    if isinstance(x, ValueInfoProto):
+        fake_tensor, dyn_axes = context.value_info_proto_to_torch(x)
+        return fake_tensor, dyn_axes or None
+
+    if isinstance(x, (list, tuple)):
+        items = [_replace_value_info_protos(item, context) for item in x]
+        if isinstance(x, tuple):
+            tensors: Any = tuple(t for t, _ in items)
+            shapes: Any = tuple(s for _, s in items)
+        else:
+            tensors = [t for t, _ in items]
+            shapes = [s for _, s in items]
+        has_dynamic = any(s is not None for s in shapes)
+        return tensors, (shapes if has_dynamic else None)
+
+    return x, None
+
+
 def to_onnx(
     mod: Union["torch.nn.Module", "torch.fx.GraphModule"],  # noqa: F821
     args: Optional[Sequence["torch.Tensor"]] = None,  # noqa: F821
@@ -958,6 +1014,16 @@ def to_onnx(
         else:
             options = OptimizationOptions()
     begin = time.perf_counter()
+
+    # Convert any ValueInfoProto objects in args to fake torch tensors so the
+    # caller can pass ONNX type/shape descriptors instead of real tensors.
+    if args is not None and _contains_value_info_proto(args):
+        from ..fake_tensor_helper import FakeTensorContext
+
+        _ctx = FakeTensorContext()
+        args, _derived_dynamic_shapes = _replace_value_info_protos(args, _ctx)
+        if dynamic_shapes is None and _derived_dynamic_shapes is not None:
+            dynamic_shapes = _derived_dynamic_shapes
 
     verbose = max(verbose, int(os.environ.get("ONNXVERBOSE", verbose)))
     if verbose:
