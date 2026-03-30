@@ -343,9 +343,25 @@ class ControlFlowRanks(torch.nn.Module):
     _dynamic = {"x": {0: DIM("batch")}}
 
 
-class ControlFlowNumelZero(torch.nn.Module):
+class ControlFlowNumelZero1(torch.nn.Module):
     def forward(self, x):
         def empty_cache(x):
+            if x.shape[2] == 0:
+                return 0
+            return x.shape[-2]
+
+        size = (empty_cache(x), 1)
+        return torch.full(size, fill_value=2)
+
+    _inputs = [(torch.rand(3, 2, 2, 5),), (torch.rand(3, 2, 1, 5),), (torch.rand(3, 2, 0, 5),)]
+    _dynamic = {"x": {0: torch.export.Dim.DYNAMIC, 2: torch.export.Dim.DYNAMIC}}
+
+
+class ControlFlowNumelZero2(torch.nn.Module):
+    def forward(self, x):
+        def empty_cache(x):
+            if x.numel() == 0:
+                return 0
             return x.shape[-2]
 
         size = (empty_cache(x), 1)
@@ -356,8 +372,12 @@ class ControlFlowNumelZero(torch.nn.Module):
 
 
 class ControlFlowRanksType(torch.nn.Module):
-    def forward(self, x):
-        if x.ndim == 2 and (x.dtype == torch.float32 or x.dtype == torch.float16):
+    def forward(self, x=None):
+        if (
+            x is not None
+            and (x.dtype == torch.float32 or x.dtype == torch.float16)
+            and x.ndim == 2
+        ):
             return x.clone()
         return (x / x.ndim).to(torch.float32)
 
