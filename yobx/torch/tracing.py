@@ -1300,9 +1300,9 @@ class CustomTracer(torch.fx.Tracer):
             target = node.target
             if target is _add_batch_dim:
                 # args: (x, batch_dim, level)
-                assert len(node.args) == 3, (
-                    f"_add_batch_dim expected 3 args, got {len(node.args)}: {node.args}"
-                )
+                assert (
+                    len(node.args) == 3
+                ), f"_add_batch_dim expected 3 args, got {len(node.args)}: {node.args}"
                 x, batch_dim, _level = node.args
                 if batch_dim == 0:
                     # trivial: batch dim is already at position 0 → identity
@@ -1311,8 +1311,7 @@ class CustomTracer(torch.fx.Tracer):
                 else:
                     with graph.inserting_before(node):
                         new_node = graph.call_function(
-                            torch.ops.aten.movedim.int,
-                            args=(x, batch_dim, 0),
+                            torch.ops.aten.movedim.int, args=(x, batch_dim, 0)
                         )
                         new_node.meta = node.meta.copy()
                     node.replace_all_uses_with(new_node)
@@ -1325,9 +1324,9 @@ class CustomTracer(torch.fx.Tracer):
                 modified += 1
             elif target is _remove_batch_dim:
                 # args: (x, level, batch_size, out_dim)
-                assert len(node.args) == 4, (
-                    f"_remove_batch_dim expected 4 args, got {len(node.args)}: {node.args}"
-                )
+                assert (
+                    len(node.args) == 4
+                ), f"_remove_batch_dim expected 4 args, got {len(node.args)}: {node.args}"
                 x, _level, _batch_size, out_dim = node.args
                 if out_dim == 0:
                     # trivial: batch dim stays at position 0 → identity
@@ -1336,8 +1335,7 @@ class CustomTracer(torch.fx.Tracer):
                 else:
                     with graph.inserting_before(node):
                         new_node = graph.call_function(
-                            torch.ops.aten.movedim.int,
-                            args=(x, 0, out_dim),
+                            torch.ops.aten.movedim.int, args=(x, 0, out_dim)
                         )
                         new_node.meta = node.meta.copy()
                     node.replace_all_uses_with(new_node)

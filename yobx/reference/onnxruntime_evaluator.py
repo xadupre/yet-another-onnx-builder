@@ -475,10 +475,12 @@ class OnnxruntimeEvaluator:
     def _determine_session_cls(self, inputs, node=None):
         if not inputs:
             cls = getattr(self, "_cached_cls", None)
-            assert cls is not None, (
-                f"Unable to guess the session to create to expected sessions, "
-                f"node is of type {type(node)}."
-            )
+            if cls is None:
+                # in that case, let's assume it is not a big model,
+                # it should not matter too much
+                from ._inference_session_numpy import InferenceSessionForNumpy
+
+                return InferenceSessionForNumpy
             return cls
         if any(isinstance(i, np.ndarray) for i in inputs):
             from ._inference_session_numpy import InferenceSessionForNumpy
