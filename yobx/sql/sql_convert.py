@@ -171,6 +171,8 @@ def sql_to_onnx(
     builder_cls: Union[type, Callable] = GraphBuilder,
     filename: Optional[str] = None,
     verbose: int = 0,
+    large_model: bool = False,
+    external_threshold: int = 1024,
 ) -> ExportArtifact:
     """
     Convert a SQL *query* to a self-contained ONNX model.
@@ -236,6 +238,11 @@ def sql_to_onnx(
         the :class:`~yobx.container.ExportReport` is written as a companion
         Excel file (same base name with ``.xlsx`` extension).
     :param verbose: verbosity level (0 = silent).
+    :param large_model: if True the returned :class:`~yobx.container.ExportArtifact`
+        has its :attr:`~yobx.container.ExportArtifact.container` attribute set to
+        an :class:`~yobx.container.ExtendedModelContainer`
+    :param external_threshold: if ``large_model`` is True, every tensor whose
+        element count exceeds this threshold is stored as external data
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
@@ -273,7 +280,14 @@ def sql_to_onnx(
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
     sql_to_onnx_graph(g, sts, [], query, input_dtypes, right_input_dtypes=right_input_dtypes)
-    artifact = g.to_onnx(return_optimize_report=True)
+    if isinstance(g, GraphBuilder):
+        artifact = g.to_onnx(
+            large_model=large_model,
+            external_threshold=external_threshold,
+            return_optimize_report=True,
+        )
+    else:
+        artifact = g.to_onnx(large_model=large_model, external_threshold=external_threshold)
     if filename:
         if verbose:
             print(f"[yobx.sql.sql_to_onnx] saving model to {filename!r}")
@@ -330,6 +344,8 @@ def parsed_query_to_onnx(
     builder_cls: Union[type, Callable] = GraphBuilder,
     filename: Optional[str] = None,
     verbose: int = 0,
+    large_model: bool = False,
+    external_threshold: int = 1024,
 ) -> ExportArtifact:
     """
     Convert an already-parsed :class:`~yobx.sql.parse.ParsedQuery` to ONNX.
@@ -357,6 +373,11 @@ def parsed_query_to_onnx(
         the :class:`~yobx.container.ExportReport` is written as a companion
         Excel file (same base name with ``.xlsx`` extension).
     :param verbose: verbosity level (0 = silent).
+    :param large_model: if True the returned :class:`~yobx.container.ExportArtifact`
+        has its :attr:`~yobx.container.ExportArtifact.container` attribute set to
+        an :class:`~yobx.container.ExtendedModelContainer`
+    :param external_threshold: if ``large_model`` is True, every tensor whose
+        element count exceeds this threshold is stored as external data
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -409,7 +430,14 @@ def parsed_query_to_onnx(
             parsed_query_to_onnx_graph(g, sts, [], single_pq)
     else:
         parsed_query_to_onnx_graph(g, sts, [], pq)
-    artifact = g.to_onnx(return_optimize_report=True)
+    if isinstance(g, GraphBuilder):
+        artifact = g.to_onnx(
+            large_model=large_model,
+            external_threshold=external_threshold,
+            return_optimize_report=True,
+        )
+    else:
+        artifact = g.to_onnx(large_model=large_model, external_threshold=external_threshold)
     if filename:
         if verbose:
             print(f"[yobx.sql.parsed_query_to_onnx] saving model to {filename!r}")

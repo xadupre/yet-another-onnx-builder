@@ -271,6 +271,19 @@ class InplaceSetItemMask(torch.nn.Module):
     _dynamic = {"x": {0: DIM("batch")}}
 
 
+class InplaceSetItemExp(torch.nn.Module):
+    def forward(self, x):
+        K_33 = x.clone()
+        torch.exp_(K_33[2:-2, 2:-2, :-1])
+        return K_33
+
+    _inputs = [
+        ((torch.arange(7 * 9 * 11) + 10).reshape((7, 9, 11)).to(torch.float32),),
+        ((torch.arange(8 * 9 * 11) + 10).reshape((8, 9, 11)).to(torch.float32),),
+    ]
+    _dynamic = {"x": {0: DIM("batch")}}
+
+
 class AtenInterpolate(torch.nn.Module):
     def forward(self, x):
         y = torch.nn.functional.interpolate(
@@ -328,6 +341,18 @@ class ControlFlowRanks(torch.nn.Module):
 
     _inputs = [(torch.rand(3, 4),), (torch.rand(5, 4),)]
     _dynamic = {"x": {0: DIM("batch")}}
+
+
+class ControlFlowNumelZero(torch.nn.Module):
+    def forward(self, x):
+        def empty_cache(x):
+            return x.shape[-2]
+
+        size = (empty_cache(x), 1)
+        return torch.full(size, fill_value=2)
+
+    _inputs = [(torch.rand(3, 2, 2, 5),), (torch.rand(3, 2, 1, 5),), (torch.rand(3, 2, 0, 5),)]
+    _dynamic = {"x": {0: torch.export.Dim.DYNAMIC, 2: torch.export.Dim.DYNAMIC}}
 
 
 class ControlFlowRanksType(torch.nn.Module):
@@ -509,16 +534,13 @@ class ControlFlowCondIdentity_153832(torch.nn.Module):
 
 
 class ControlFlowScan(torch.nn.Module):
-    @staticmethod
-    def add(carry: torch.Tensor, y: torch.Tensor):
-        next_carry = carry + y
-        return [next_carry, next_carry]
-
     def forward(self, x):
+        def add(carry: torch.Tensor, y: torch.Tensor):
+            next_carry = carry + y
+            return [next_carry, next_carry]
+
         init = torch.zeros_like(x[0])
-        carry, _out = torch.ops.higher_order.scan(
-            ControlFlowScan.add, [init], [x], additional_inputs=[]
-        )
+        carry, _out = torch.ops.higher_order.scan(add, [init], [x], additional_inputs=[])
         return carry
 
     _inputs = (torch.tensor([[1, 2, 3], [4, 5, 6], [7, 8, 9]], dtype=torch.float32),)
@@ -526,17 +548,16 @@ class ControlFlowScan(torch.nn.Module):
 
 
 class ControlFlowScan2Carried(torch.nn.Module):
-    @staticmethod
-    def add(carry1: torch.Tensor, carry2: torch.Tensor, y1: torch.Tensor, y2: torch.Tensor):
-        next_carry1 = carry1 + y1
-        next_carry2 = carry2 * y2
-        return [next_carry1, next_carry2, next_carry1, next_carry2]
-
     def forward(self, x):
+        def add(carry1: torch.Tensor, carry2: torch.Tensor, y1: torch.Tensor, y2: torch.Tensor):
+            next_carry1 = carry1 + y1
+            next_carry2 = carry2 * y2
+            return [next_carry1, next_carry2, next_carry1, next_carry2]
+
         init1 = torch.zeros_like(x[0])
         init2 = torch.ones_like(x[0])
         carry1, carry2, out1, out2 = torch.ops.higher_order.scan(
-            ControlFlowScan2Carried.add,
+            add,
             [init1, init2],
             [x, x * 2],
             # dim=0,  # 01/31/2025, not supported anymore
@@ -549,18 +570,17 @@ class ControlFlowScan2Carried(torch.nn.Module):
 
 
 class ControlFlowScanCDist(torch.nn.Module):
-    @staticmethod
-    def dist(carry: torch.Tensor, x: torch.Tensor):
-        sub = carry - x.reshape((1, -1))
-        sq = sub * sub
-        rd = sq.sum(axis=1) ** 0.5
-        # clone --> UnsupportedAliasMutationException:
-        # Combine_fn might be aliasing the input!
-        return [carry.clone(), rd]
-
     def forward(self, x):
+        def dist(carry: torch.Tensor, x: torch.Tensor):
+            sub = carry - x.reshape((1, -1))
+            sq = sub * sub
+            rd = sq.sum(axis=1) ** 0.5
+            # clone --> UnsupportedAliasMutationException:
+            # Combine_fn might be aliasing the input!
+            return [carry.clone(), rd]
+
         _carry, out = torch.ops.higher_order.scan(
-            ControlFlowScanCDist.dist,
+            dist,
             [x],
             [x],
             # dim=0,  # 01/31/2025, not supported anymore
@@ -573,20 +593,19 @@ class ControlFlowScanCDist(torch.nn.Module):
 
 
 class ControlFlowScanCDist2(torch.nn.Module):
-    @staticmethod
-    def dist(unused: torch.Tensor, x: torch.Tensor, samex: torch.Tensor):
-        sub = samex - x.reshape((1, -1))
-        sq = sub * sub
-        rd = torch.sqrt(sq.sum(axis=1))
-        # clone --> UnsupportedAliasMutationException:
-        # Combine_fn might be aliasing the input!
-        return [unused.clone(), rd]
-
     def forward(self, x):
+        def dist(unused: torch.Tensor, x: torch.Tensor, samex: torch.Tensor):
+            sub = samex - x.reshape((1, -1))
+            sq = sub * sub
+            rd = torch.sqrt(sq.sum(axis=1))
+            # clone --> UnsupportedAliasMutationException:
+            # Combine_fn might be aliasing the input!
+            return [unused.clone(), rd]
+
         z = torch.tensor([0], dtype=torch.float32)
         y = x.clone()
         out = torch.ops.higher_order.scan(
-            ControlFlowScanCDist2.dist,
+            dist,
             [z],
             [x],
             # dim=0,  # 01/31/2025, not supported anymore
@@ -599,18 +618,17 @@ class ControlFlowScanCDist2(torch.nn.Module):
 
 
 class ControlFlowScanCDistXY(torch.nn.Module):
-    @staticmethod
-    def dist(y: torch.Tensor, scanned_x: torch.Tensor):
-        sub = y - scanned_x.reshape((1, -1))
-        sq = sub * sub
-        rd = torch.sqrt(sq.sum(axis=1))
-        # clone --> UnsupportedAliasMutationException:
-        # Combine_fn might be aliasing the input!
-        return [y.clone(), rd]
-
     def forward(self, x, y):
+        def dist(y: torch.Tensor, scanned_x: torch.Tensor):
+            sub = y - scanned_x.reshape((1, -1))
+            sq = sub * sub
+            rd = torch.sqrt(sq.sum(axis=1))
+            # clone --> UnsupportedAliasMutationException:
+            # Combine_fn might be aliasing the input!
+            return [y.clone(), rd]
+
         _carry, out = torch.ops.higher_order.scan(
-            ControlFlowScanCDistXY.dist,
+            dist,
             [y],
             [x],
             # dim=0,  # 01/31/2025, not supported anymore
@@ -649,37 +667,32 @@ class ControlFlowScanDecomposition_151564(torch.nn.Module):
     `#151564 <https://github.com/pytorch/pytorch/issues/151564>`_
     """
 
-    @classmethod
-    def dummy_loop(cls, padded: torch.Tensor, pos: torch.Tensor):
-        copy = torch.zeros(padded.shape)
-        for i in range(pos.shape[0]):
-            p = pos[i]
-            copy[i, :p] = padded[i, :p]
-        return copy
-
-    @classmethod
-    def dummy_loop_with_scan(cls, padded: torch.Tensor, pos: torch.Tensor):
-        def pad_row(padded, p):
-            row = torch.zeros((padded.shape[0],))
-            torch._check(p.item() > 0)
-            torch._check(p.item() < padded.shape[0])
-            # this check is not always true, we add it anyway to make this dimension >= 2
-            # and avoid raising an exception about dynamic dimension in {0, 1}
-            if torch.compiler.is_exporting():
-                torch._check(p.item() > 1)
-            row[: p.item()] = padded[: p.item()]
-            return (row,)
-
-        return torch.ops.higher_order.scan(pad_row, [], [padded, pos], [])
-
-    @classmethod
-    def select_when_exporting(cls, f, f_scan):
-        return f_scan if torch.compiler.is_exporting() else f
-
     def forward(self, images, position):
-        return self.select_when_exporting(self.dummy_loop, self.dummy_loop_with_scan)(
-            images, position
-        )
+        def dummy_loop(padded: torch.Tensor, pos: torch.Tensor):
+            copy = torch.zeros(padded.shape)
+            for i in range(pos.shape[0]):
+                p = pos[i]
+                copy[i, :p] = padded[i, :p]
+            return copy
+
+        def dummy_loop_with_scan(padded: torch.Tensor, pos: torch.Tensor):
+            def pad_row(padded, p):
+                row = torch.zeros((padded.shape[0],))
+                torch._check(p.item() > 0)
+                torch._check(p.item() < padded.shape[0])
+                # this check is not always true, we add it anyway to make this dimension >= 2
+                # and avoid raising an exception about dynamic dimension in {0, 1}
+                if torch.compiler.is_exporting():
+                    torch._check(p.item() > 1)
+                row[: p.item()] = padded[: p.item()]
+                return (row,)
+
+            return torch.ops.higher_order.scan(pad_row, [], [padded, pos], [])
+
+        def select_when_exporting(f, f_scan):
+            return f_scan if torch.compiler.is_exporting() else f
+
+        return select_when_exporting(dummy_loop, dummy_loop_with_scan)(images, position)
 
     _inputs = [(torch.randn((5, 6)), torch.arange(5, dtype=torch.int64) + 1)]
     _dynamic = {"images": {0: DYN, 1: DYN}, "position": {0: DYN}}
@@ -909,7 +922,6 @@ class TypeBFloat16(torch.nn.Module):
 
 
 class CropLastDimensionWithTensorShape(torch.nn.Module):
-
     def forward(self, x, y):
         return x[..., : y.shape[0]]
 
@@ -957,12 +969,11 @@ class CreateFromShape(torch.nn.Module):
 
 
 class CreateFromShapeThroughFunction(torch.nn.Module):
-    @staticmethod
-    def add_one(dim):
-        return dim + 1
-
     def forward(self, x):
-        dy1 = CreateFromShapeThroughFunction.add_one(x.shape[1])
+        def add_one(dim):
+            return dim + 1
+
+        dy1 = add_one(x.shape[1])
         y = torch.ones((x.shape[0], dy1))
         return y
 

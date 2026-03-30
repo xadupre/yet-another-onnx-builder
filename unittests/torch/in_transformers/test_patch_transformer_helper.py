@@ -47,19 +47,13 @@ class TestPatchTransformerHelper(ExtTestCase):
             got = ep.module()(**inputs)
             self.assertEqualAny(expected, got)
 
+    @skipif_ci_windows("patch did not apply on windows")
     @requires_transformers("4.57")
-    @unittest.skip("dynamic_rope does not work with this model")
+    @hide_stdout()
     def test_involved_patches_dynamic_rope(self):
         data = get_tiny_model(
             "arnir0/Tiny-LLM",
-            config_updates={
-                "rope_parameters": {
-                    "factor": 10.0,
-                    "rope_type": "dynamic",
-                    "partial_rotary_factor": 0.4,
-                },
-                "head_dim": 38,
-            },
+            config_updates={"rope_parameters": {"factor": 10.0, "rope_type": "dynamic"}},
         )
         model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
         expected = model(**torch_deepcopy(inputs))
@@ -71,7 +65,7 @@ class TestPatchTransformerHelper(ExtTestCase):
         ):
             ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=use_dyn_not_str(ds))
             patches = details.patches_involved_in_graph(ep.graph)
-            self.assertEqual(len(patches), 0)
+            self.assertEqual(len(patches), 1)
             self.assertNotEmpty(patches)
 
             report = details.make_report(patches, format="rst")
