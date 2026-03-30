@@ -99,8 +99,10 @@ def jax_to_concrete_function(
         shape = list(arr.shape)
         n = arr.ndim
 
-        if dynamic_shapes and i < len(dynamic_shapes):
+        if dynamic_shapes is not None and i < len(dynamic_shapes):
             dyn_axes = dynamic_shapes[i]
+        elif dynamic_shapes is None and arr.ndim >= 1:
+            dyn_axes = {0: "batch"}
         else:
             dyn_axes = {}
 

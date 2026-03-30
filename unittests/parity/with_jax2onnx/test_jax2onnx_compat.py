@@ -206,7 +206,7 @@ class TestJax2OnnxCompositeCompat(ExtTestCase):
     _rng = np.random.default_rng(2)
 
     def test_matmul(self):
-        """Simple matrix multiplication: (4,3) @ (3,2) → (4,2)."""
+        """Matrix multiplication with dynamic batch: (batch,3) @ (3,2) → (batch,2)."""
         import jax.numpy as jnp
 
         a = self._rng.standard_normal((4, 3)).astype(np.float32)
@@ -217,7 +217,10 @@ class TestJax2OnnxCompositeCompat(ExtTestCase):
 
         expected = np.asarray(fn(a, b))
         _, ref_out = _run_jax2onnx(fn, a, b)
-        _, yobx_out = _run_yobx(fn, a, b)
+        # Only the first (batch) input has a dynamic axis 0; the weight matrix b
+        # must keep its static shape so the contracting dimension (axis 0 of b = 3)
+        # can be matched against axis 1 of a (= 3).
+        _, yobx_out = _run_yobx(fn, a, b, dynamic_shapes=({0: "batch"}, {}))
         self.assertEqualArray(expected, ref_out[0], atol=1e-5)
         self.assertEqualArray(expected, yobx_out[0], atol=1e-5)
 
