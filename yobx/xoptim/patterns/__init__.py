@@ -5,6 +5,7 @@ from ..patterns_api import PatternOptimization, MatchResult
 
 # onnx patterns
 from .onnx_any import (
+    ConstantOfShapeIdentityPattern,
     IdentityPattern,
     NotNotPattern,
     SameChildrenPattern,
@@ -176,6 +177,7 @@ def get_default_patterns(verbose: int = 0) -> List[PatternOptimization]:
         ConcatGatherPattern(verbose=verbose),
         ConcatReshapePattern(verbose=verbose),
         ConcatTwiceUnaryPattern(verbose=verbose),
+        ConstantOfShapeIdentityPattern(verbose=verbose),
         ConstantToInitializerPattern(verbose=verbose),
         ConvBiasNullPattern(verbose=verbose),
         PadConvPattern(verbose=verbose),

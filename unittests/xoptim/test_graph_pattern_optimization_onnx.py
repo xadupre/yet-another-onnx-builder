@@ -2730,6 +2730,279 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_constant_of_shape_identity_add_zeros_like(self):
+        """Add(x, ConstantOfShape(Shape(x), 0)) -> Identity(x)."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["X"], ["shape"]),
+                    oh.make_node(
+                        "ConstantOfShape",
+                        ["shape"],
+                        ["zeros"],
+                        value=onh.from_array(np.array([0.0], dtype=np.float32)),
+                    ),
+                    oh.make_node("Add", ["X", "zeros"], ["Y"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b"])],
+                [_mkv_("Y", TFLOAT, ["a", "b"])],
+            )
+        )
+        feeds = {"X": self._range(3, 4).astype(np.float32)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["ConstantOfShapeIdentity"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_constant_of_shape_identity_mul_ones_like(self):
+        """Mul(x, ConstantOfShape(Shape(x), 1)) -> Identity(x)."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["X"], ["shape"]),
+                    oh.make_node(
+                        "ConstantOfShape",
+                        ["shape"],
+                        ["ones"],
+                        value=onh.from_array(np.array([1.0], dtype=np.float32)),
+                    ),
+                    oh.make_node("Mul", ["X", "ones"], ["Y"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b"])],
+                [_mkv_("Y", TFLOAT, ["a", "b"])],
+            )
+        )
+        feeds = {"X": self._range(3, 4).astype(np.float32)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["ConstantOfShapeIdentity"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_constant_of_shape_identity_sub_zeros_like(self):
+        """Sub(x, ConstantOfShape(Shape(x), 0)) -> Identity(x)."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["X"], ["shape"]),
+                    oh.make_node(
+                        "ConstantOfShape",
+                        ["shape"],
+                        ["zeros"],
+                        value=onh.from_array(np.array([0.0], dtype=np.float32)),
+                    ),
+                    oh.make_node("Sub", ["X", "zeros"], ["Y"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b"])],
+                [_mkv_("Y", TFLOAT, ["a", "b"])],
+            )
+        )
+        feeds = {"X": self._range(3, 4).astype(np.float32)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["ConstantOfShapeIdentity"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_constant_of_shape_identity_div_ones_like(self):
+        """Div(x, ConstantOfShape(Shape(x), 1)) -> Identity(x)."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["X"], ["shape"]),
+                    oh.make_node(
+                        "ConstantOfShape",
+                        ["shape"],
+                        ["ones"],
+                        value=onh.from_array(np.array([1.0], dtype=np.float32)),
+                    ),
+                    oh.make_node("Div", ["X", "ones"], ["Y"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b"])],
+                [_mkv_("Y", TFLOAT, ["a", "b"])],
+            )
+        )
+        feeds = {"X": self._range(3, 4).astype(np.float32)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["ConstantOfShapeIdentity"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_constant_of_shape_identity_add_zeros_like_commutative(self):
+        """Add(ConstantOfShape(Shape(x), 0), x) -> Identity(x) (commutative)."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["X"], ["shape"]),
+                    oh.make_node(
+                        "ConstantOfShape",
+                        ["shape"],
+                        ["zeros"],
+                        value=onh.from_array(np.array([0.0], dtype=np.float32)),
+                    ),
+                    # zeros is the *first* operand
+                    oh.make_node("Add", ["zeros", "X"], ["Y"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b"])],
+                [_mkv_("Y", TFLOAT, ["a", "b"])],
+            )
+        )
+        feeds = {"X": self._range(3, 4).astype(np.float32)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["ConstantOfShapeIdentity"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_constant_of_shape_identity_no_match_wrong_value(self):
+        """Add(x, ConstantOfShape(Shape(x), 2)) should NOT be simplified."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["X"], ["shape"]),
+                    oh.make_node(
+                        "ConstantOfShape",
+                        ["shape"],
+                        ["twos"],
+                        value=onh.from_array(np.array([2.0], dtype=np.float32)),
+                    ),
+                    oh.make_node("Add", ["X", "twos"], ["Y"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b"])],
+                [_mkv_("Y", TFLOAT, ["a", "b"])],
+            )
+        )
+        feeds = {"X": self._range(3, 4).astype(np.float32)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["ConstantOfShapeIdentity"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Should not have been simplified: Add must still be present.
+        self.assertIn("Add", [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_constant_of_shape_identity_no_match_different_shape_source(self):
+        """Add(x, ConstantOfShape(Shape(y), 0)) should NOT be simplified when Shape(y) != Shape(x).
+
+        The pattern checks that the ConstantOfShape shape is derived from Shape(x), the
+        same tensor that participates in the binary operation.  When the shape comes from
+        a *different* tensor (y), the pattern must not simplify, because broadcasting
+        may expand x to y's shape, changing the output shape of the Add.
+        """
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["Y"], ["shape_y"]),
+                    oh.make_node(
+                        "ConstantOfShape",
+                        ["shape_y"],
+                        ["zeros"],
+                        value=onh.from_array(np.array([0.0], dtype=np.float32)),
+                    ),
+                    oh.make_node("Add", ["X", "zeros"], ["Z"]),
+                ],
+                "dummy",
+                # X has shape (1, 4), Y has shape (3, 4); zeros will have shape (3, 4).
+                # Adding zeros(3,4) to X(1,4) broadcasts X to (3,4) — shape change, no simplify.
+                [_mkv_("X", TFLOAT, [1, 4]), _mkv_("Y", TFLOAT, [3, 4])],
+                [_mkv_("Z", TFLOAT, [3, 4])],
+            )
+        )
+        feeds = {
+            "X": self._range(1, 4).astype(np.float32),
+            "Y": self._range(3, 4).astype(np.float32),
+        }
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["ConstantOfShapeIdentity"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Should NOT be simplified: the Shape node targets Y (different shape), not X.
+        self.assertIn("Add", [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
     def test_reduce_sum_normalization(self):
         model = oh.make_model(
             oh.make_graph(

@@ -1,6 +1,8 @@
 import inspect
 from typing import Dict, List, Optional, Set
+import numpy as np
 from onnx import AttributeProto, NodeProto, TensorProto
+from onnx.numpy_helper import to_array
 from ...helpers.onnx_helper import make_idn, unary_like_op_types
 from ..patterns_api import MatchResult, PatternOptimization
 
@@ -1089,5 +1091,190 @@ class NotNotPattern(PatternOptimization):
                 [not_before.input[0]],
                 [not_after.output[0]],
                 name=f"{self.__class__.__name__}--{not_after.name}",
+            ),
+        ]
+
+
+class ConstantOfShapeIdentityPattern(PatternOptimization):
+    """
+    Simplifies binary operations involving a ``ConstantOfShape`` filled with a
+    neutral value (zeros for addition/subtraction, ones for multiplication/division).
+
+    These patterns appear commonly when tracing PyTorch models that use
+    ``torch.zeros_like`` or ``torch.ones_like``.  For a dynamic tensor ``x``
+    the corresponding ONNX subgraph looks like::
+
+        shape = Shape(x)
+        zeros = ConstantOfShape(shape, value=0)   # torch.zeros_like(x)
+        result = Add(x, zeros)                    # x + 0 = x
+
+    or::
+
+        shape = Shape(x)
+        ones = ConstantOfShape(shape, value=1)    # torch.ones_like(x)
+        result = Mul(x, ones)                     # x * 1 = x
+
+    Both can be replaced by ``Identity(x)`` because the neutral-element property
+    holds for any compatible shape.  To ensure the shapes are compatible (no
+    unexpected broadcasting expansion), the pattern requires that the
+    ``ConstantOfShape`` input is ``Shape(other_operand)`` — i.e. the shape was
+    derived from the same tensor that participates in the binary operation.
+
+    Handles the following simplifiable patterns:
+
+    * ``Add(x, ConstantOfShape(Shape(x), 0))`` → ``Identity(x)``
+    * ``Add(ConstantOfShape(Shape(x), 0), x)`` → ``Identity(x)``
+    * ``Sub(x, ConstantOfShape(Shape(x), 0))`` → ``Identity(x)``
+    * ``Mul(x, ConstantOfShape(Shape(x), 1))`` → ``Identity(x)``
+    * ``Mul(ConstantOfShape(Shape(x), 1), x)`` → ``Identity(x)``
+    * ``Div(x, ConstantOfShape(Shape(x), 1))`` → ``Identity(x)``
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_x(["x FLOAT(a, b)"])
+
+            Shape_0[["Shape(.)"]]
+            ConstantOfShape_1[["ConstantOfShape(., value=0)"]]
+            Add_2[["Add(., .)"]]
+
+            I_x -->|"FLOAT(a, b)"| Shape_0
+            Shape_0 -->|"INT64(2)"| ConstantOfShape_1
+            I_x -->|"FLOAT(a, b)"| Add_2
+            ConstantOfShape_1 -->|"FLOAT(a, b)"| Add_2
+
+            O_result(["result FLOAT(a, b)"])
+            Add_2 --> O_result
+
+            class I_x,O_result ioNode
+            class Shape_0,ConstantOfShape_1,Add_2 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_x(["x FLOAT(a, b)"])
+
+            Identity_0[["Identity(.)"]]
+
+            I_x -->|"FLOAT(a, b)"| Identity_0
+
+            O_result(["result FLOAT(a, b)"])
+            Identity_0 --> O_result
+
+            class I_x,O_result ioNode
+            class Identity_0 opNode
+    """
+
+    # Neutral values: op_type -> fill value that makes the op identity
+    _neutral_values = {
+        "Add": 0.0,
+        "Sub": 0.0,
+        "Mul": 1.0,
+        "Div": 1.0,
+    }
+
+    # For Sub and Div only the *right* operand can be the neutral element.
+    # Add and Mul are commutative so either side works.
+    _commutative = {"Add", "Mul"}
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if node.op_type not in self._neutral_values or node.domain != "":
+            return self.none()
+        if len(node.input) != 2:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        neutral = self._neutral_values[node.op_type]
+
+        # Try the second operand as ConstantOfShape first; for commutative ops
+        # also try the first operand.
+        candidates = [1]
+        if node.op_type in self._commutative:
+            candidates = [1, 0]
+
+        for cos_idx in candidates:
+            other_idx = 1 - cos_idx
+            cos_name = node.input[cos_idx]
+            other_name = node.input[other_idx]
+
+            cos_node = g.node_before(cos_name)
+            if cos_node is None or cos_node.op_type != "ConstantOfShape":
+                continue
+
+            # Extract the fill value from the ConstantOfShape value attribute.
+            att = g.get_attribute(cos_node, "value", exc=False)
+            if att is None:
+                # Default fill value is 0 (float32) when attribute is absent.
+                fill_value = 0.0
+            else:
+                arr = to_array(att.t)
+                fill_value = float(arr.flat[0])
+
+            if not np.isclose(fill_value, neutral, atol=1e-7, rtol=0):
+                continue
+
+            # Verify that the ConstantOfShape shape comes from Shape(other_operand).
+            # This ensures no unexpected broadcast expansion of other_name occurs.
+            shape_name = cos_node.input[0]
+            shape_node = g.node_before(shape_name)
+            if shape_node is None or shape_node.op_type != "Shape":
+                # Shape input is not a Shape node; fall back to static shape check.
+                if not g.has_shape(cos_name) or not g.has_shape(other_name):
+                    continue
+                if g.get_shape(cos_name) != g.get_shape(other_name):
+                    continue
+            else:
+                # Shape node present: verify its input is other_name.
+                if shape_node.input[0] != other_name:
+                    continue
+
+            return MatchResult(self, [cos_node, node], self.apply, insert_at=node)
+
+        return self.none(node, inspect.currentframe().f_lineno)
+
+    def apply(
+        self,
+        g: "GraphBuilder",  # noqa: F821
+        cos_node: NodeProto,
+        binary_node: NodeProto,
+    ) -> List[NodeProto]:
+        # Determine which input of the binary node is the ConstantOfShape output.
+        cos_output = cos_node.output[0]
+        if binary_node.input[1] == cos_output:
+            other_name = binary_node.input[0]
+        else:
+            other_name = binary_node.input[1]
+
+        pre_nodes = []
+        if g.is_used_more_than_once(cos_output):
+            pre_nodes.append(cos_node)
+
+        return [
+            *pre_nodes,
+            g.make_node(
+                "Identity",
+                [other_name],
+                binary_node.output,
+                name=f"{self.__class__.__name__}--{binary_node.name}",
             ),
         ]
