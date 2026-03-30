@@ -59,7 +59,6 @@ class TestJaxToConcreteFunction(ExtTestCase):
             expected = np.sin(xi)
             self.assertEqualArray(expected, result, atol=1e-6)
 
-    @unittest.skip("not implemented yet")
     def test_export_to_onnx_dynamic_shapes(self):
         """to_onnx() accepts a ConcreteFunction from jax_to_concrete_function.
 
