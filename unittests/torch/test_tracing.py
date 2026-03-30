@@ -20,7 +20,12 @@ from yobx.torch.tracing import (
     setitem_with_transformation,
     tree_unflatten_with_proxy,
 )
-from yobx.torch import register_flattening_functions, apply_patches_for_model
+from yobx.torch import (
+    register_flattening_functions,
+    apply_patches_for_model,
+    to_onnx,
+    ExportOptions,
+)
 from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
 
 
@@ -590,6 +595,10 @@ class TestTracing(ExtTestCase):
         self.assertNotEmpty(expected)
         graph = CustomTracer().trace(model)
         self.assertIn(operator.setitem, {n.target for n in graph.nodes})
+        art = to_onnx(model, inputs, export_options=ExportOptions(tracing=True))
+        sess = self._check_with_ort(art)
+        got = sess.run(None, dict(zip(["x", "sumx"], [t.numpy() for t in inputs])))
+        self.assertEqualArray(expected, got[0])
         mod = torch.fx.GraphModule(model, graph)
         got = mod(*inputs)
         self.assertNotEmpty(got)

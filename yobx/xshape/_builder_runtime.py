@@ -165,7 +165,7 @@ class _BuilderRuntime:
             return "torch"
         if hasattr(v, "ref") and self._has_tensorflow and isinstance(v, self.tensorflow.Tensor):
             return "tensorflow"
-        raise TypeError(f"Unexpected type {type(v)} for a value.")
+        raise TypeError(f"Unexpected type {type(v)} for a value{self.get_debug_msg()}")
 
     def consistent_tensor_feeds(
         self, feeds: Dict[str, Any], node: NodeProto

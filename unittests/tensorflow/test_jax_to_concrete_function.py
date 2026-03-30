@@ -26,7 +26,6 @@ class TestJaxToConcreteFunction(ExtTestCase):
         expected = np.sin(x)
         self.assertEqualArray(expected, result, atol=1e-6)
 
-    @unittest.skip("not implemented yet")
     def test_dynamic_batch_default(self):
         """Without explicit dynamic_shapes, batch dim (axis 0) is made dynamic."""
         import jax.nn as jnn
