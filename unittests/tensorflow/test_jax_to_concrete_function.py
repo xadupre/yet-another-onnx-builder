@@ -112,7 +112,6 @@ class TestJaxToConcreteFunction(ExtTestCase):
         spec = cf.structured_input_signature[0][0]
         self.assertEqual(spec.name, "my_input")
 
-    @unittest.skip("not implemented yet")
     def test_to_onnx_auto_detects_jax_function(self):
         """to_onnx() automatically calls jax_to_concrete_function for JAX callables.
 
