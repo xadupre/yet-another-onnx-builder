@@ -506,7 +506,6 @@ class TestJaxUnaryOpsEndToEnd(ExtTestCase):
         expected, result = self._run_jax_fn(jnp.sign, x)
         self.assertEqualArray(expected, result, atol=1e-6)
 
-    @unittest.skip("jnn.sigmoid may expand to multiple ops on some JAX versions")
     def test_sigmoid(self):
         import jax.nn as jnn
 
