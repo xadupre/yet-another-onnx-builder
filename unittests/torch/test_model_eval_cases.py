@@ -195,14 +195,24 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_aten_as_strided_tracing(self):
         evaluation(cases="AtenAsStrided", exporters="yobx-tracing", quiet=False, dynamic=True)
 
-    def test_run_exporter_controlflow_numel_zero_tracing(self):
+    def test_run_exporter_controlflow_numel_zero_1_tracing(self):
         evaluation(
-            cases="ControlFlowNumelZero", exporters="yobx-tracing", quiet=False, dynamic=True
+            cases="ControlFlowNumelZero1", exporters="yobx-tracing", quiet=False, dynamic=True
         )
 
-    def test_run_exporter_controlflow_numel_zero_export_tracing(self):
+    def test_run_exporter_controlflow_numel_zero_2_tracing(self):
         evaluation(
-            cases="ControlFlowNumelZero", exporters="export-tracing", quiet=False, dynamic=True
+            cases="ControlFlowNumelZero2", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_numel_zero_export_1_tracing(self):
+        evaluation(
+            cases="ControlFlowNumelZero1", exporters="export-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_numel_zero_export_2_tracing(self):
+        evaluation(
+            cases="ControlFlowNumelZero2", exporters="export-tracing", quiet=False, dynamic=True
         )
 
 
