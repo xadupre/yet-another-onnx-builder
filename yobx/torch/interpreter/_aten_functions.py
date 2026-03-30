@@ -451,55 +451,6 @@ def aten_add__Tensor(
     return res
 
 
-def aten__add_batch_dim(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    batch_dim: int,
-    level: int,
-    name: str = "_add_batch_dim",
-) -> T:
-    """
-    Marks dimension *batch_dim* as the vmap batch dimension (level *level*).
-
-    For ONNX, this is equivalent to ``torch.movedim(x, batch_dim, 0)``:
-    the batch dimension is moved to position 0 so that the vmap body can
-    iterate over the first axis.  When *batch_dim* is already 0 the
-    operation is a no-op and an ``Identity`` node is emitted.
-    """
-    if batch_dim == 0:
-        res = g.op.Identity(x, outputs=outputs, name=name)
-        if not sts:
-            set_type_shape_unary_op(g, res, x)
-        return res
-    return aten_movedim_int(g, sts, outputs, x, batch_dim, 0, name=name)
-
-
-def aten__remove_batch_dim(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    level: int,
-    batch_size: int,
-    out_dim: int,
-    name: str = "_remove_batch_dim",
-) -> T:
-    """
-    Restores the vmap batch dimension from position 0 to position *out_dim*.
-
-    For ONNX, this is equivalent to ``torch.movedim(x, 0, out_dim)``.
-    When *out_dim* is 0 the operation is a no-op and an ``Identity`` node
-    is emitted.
-    """
-    if out_dim == 0:
-        res = g.op.Identity(x, outputs=outputs, name=name)
-        if not sts:
-            set_type_shape_unary_op(g, res, x)
-        return res
-    return aten_movedim_int(g, sts, outputs, x, 0, out_dim, name=name)
-
 
 def aten_addcmul(
     g: GraphBuilder,

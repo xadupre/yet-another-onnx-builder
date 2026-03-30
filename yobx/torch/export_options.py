@@ -632,6 +632,14 @@ class ExportOptions:
             if verbose:
                 print(f"[ExportOptions.export] slices: {removed} slices nodes were removed")
             graph.lint()
+        batch_dim_removed = CustomTracer.remove_batch_dim_nodes(graph, verbose=verbose)
+        if batch_dim_removed:
+            if verbose:
+                print(
+                    f"[ExportOptions.export] batch_dim: "
+                    f"{batch_dim_removed} batch dim nodes were removed"
+                )
+            graph.lint()
         modified = CustomTracer.remove_inplace(
             graph, exported_program=exported_program, verbose=verbose, exc=False
         )
