@@ -262,6 +262,79 @@ class FakeTensorContext:
             f"Unexpected type {type(x)} for x, content is {string_type(x, with_shape=True)}"
         )
 
+    def value_info_proto_to_torch(
+        self,
+        vip: Any,
+    ) -> Tuple["FakeTensor", Dict[int, str]]:
+        """Convert an :class:`onnx.ValueInfoProto` to a fake :class:`torch.Tensor`.
+
+        Symbolic dimensions (those with a non-empty ``dim_param``) are assigned
+        unique prime concrete sizes so that :func:`torch.export.export` sees
+        distinct values.  The mapping from axis index to symbolic-dimension name
+        is returned so the caller can construct a ``dynamic_shapes`` argument for
+        :func:`torch.export.export`.
+
+        A :class:`ValueError` is raised when the ``ValueInfoProto`` has no
+        shape information, or when a dimension has ``dim_value <= 0`` with no
+        ``dim_param`` (unknown/unset dimensions must be represented as symbolic
+        dims using ``dim_param``).
+
+        :param vip: an ONNX value-info descriptor (:class:`onnx.ValueInfoProto`)
+        :return: ``(fake_tensor, dynamic_axes)`` where *dynamic_axes* maps each
+            dynamic dimension index to its symbolic name (empty dict when there
+            are no symbolic dimensions)
+        :raises ValueError: if the shape is missing or a dimension is
+            unresolvable
+        """
+        from onnx import TensorProto as _TensorProto
+        from .torch_helper import onnx_dtype_to_torch_dtype
+
+        tt = vip.type.tensor_type
+        elem_type = tt.elem_type if tt.elem_type else _TensorProto.FLOAT
+        torch_dtype = onnx_dtype_to_torch_dtype(elem_type)
+
+        dynamic_axes: Dict[int, str] = {}
+        if tt.HasField("shape"):
+            shape = []
+            for i, dim in enumerate(tt.shape.dim):
+                if dim.dim_param:
+                    # Symbolic dimension — pick (or reuse) a unique prime size.
+                    name = dim.dim_param
+                    if name in self._mapping_str:
+                        concrete = self._mapping_str[name]
+                    else:
+                        concrete = self._unique()
+                        self._mapping_str[name] = concrete
+                    shape.append(concrete)
+                    dynamic_axes[i] = name
+                else:
+                    value = dim.dim_value
+                    if value <= 0:
+                        raise ValueError(
+                            f"Dimension {i} of ValueInfoProto {vip.name!r} has "
+                            f"dim_value={value} with no dim_param. "
+                            "Please set a positive dim_value or a symbolic dim_param."
+                        )
+                    shape.append(value)
+        else:
+            raise ValueError(
+                f"ValueInfoProto {vip.name!r} has no shape information. "
+                "Please set the shape field."
+            )
+
+        if shape:
+            real_tensor = torch.empty(tuple(shape), dtype=torch_dtype)
+            if dynamic_axes:
+                fake_tensor = self.fake_reshape(real_tensor, dynamic_axes)
+            else:
+                fake_tensor = self.from_tensor(real_tensor, static_shapes=True)
+        else:
+            # Scalar tensor (0-D).
+            real_tensor = torch.empty((), dtype=torch_dtype)
+            fake_tensor = self.from_tensor(real_tensor, static_shapes=True)
+
+        return fake_tensor, dynamic_axes
+
 
 def make_fake(
     x: Any, context: Optional[FakeTensorContext] = None
