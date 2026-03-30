@@ -5,15 +5,9 @@ import pprint
 import time
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
-try:
-    from onnx import ModelProto, ValueInfoProto
-    from onnx.defs import onnx_opset_version
-    from onnx.model_container import ModelContainer
-except ImportError:
-    ModelProto = None  # type: ignore[misc,assignment]
-    ValueInfoProto = None  # type: ignore[misc,assignment]
-    onnx_opset_version = None  # type: ignore[misc,assignment]
-    ModelContainer = None  # type: ignore[misc,assignment]
+from onnx import ModelProto, ValueInfoProto
+from onnx.defs import onnx_opset_version
+from onnx.model_container import ModelContainer
 from ...container import ExportArtifact, ExportReport
 from ...helpers import string_type
 from ...xbuilder.graph_builder import GraphBuilder, OptimizationOptions, FunctionOptions
@@ -849,8 +843,6 @@ def build_source_lines(
 def _contains_value_info_proto(x: Any) -> bool:
     """Return ``True`` if *x* or any element of the nested structure *x* is a
     :class:`~onnx.ValueInfoProto`."""
-    if ValueInfoProto is None:
-        return False
     if isinstance(x, ValueInfoProto):
         return True
     if isinstance(x, dict):
