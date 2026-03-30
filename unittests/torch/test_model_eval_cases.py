@@ -195,7 +195,7 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_aten_as_strided_tracing(self):
         evaluation(cases="AtenAsStrided", exporters="yobx-tracing", quiet=False, dynamic=True)
 
-    def test_run_exporter_controlflow_numel_zero_1_tracing(self):
+    def test_control_flow_numel_zero_1(self):
         evaluation(
             cases="ControlFlowNumelZero1", exporters="yobx-tracing", quiet=False, dynamic=True
         )
