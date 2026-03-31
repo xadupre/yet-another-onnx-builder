@@ -330,10 +330,10 @@ class CustomProxyInt(CustomProxy):
 
     When constructed with a *concrete_val* (e.g. a backed ``SymInt`` from
     fake-tensor metadata), ``==`` and ``!=`` against a plain Python
-    integer / float are evaluated with :func:`_guard_size_oblivious_eq` so
-    that patterns like ``if x.shape[2] == 0:`` work during symbolic tracing
-    without raising ``TraceError``.  All other comparisons (including
-    proxy-vs-proxy) still create FX nodes as usual.
+    integer / float are evaluated concretely so that patterns like
+    ``if x.shape[2] == 0:`` work during symbolic tracing without raising
+    ``TraceError``.  All other comparisons (including proxy-vs-proxy) still
+    create FX nodes as usual.
     """
 
     __hash__ = CustomProxy.__hash__  # restore hash after __eq__ override
@@ -367,7 +367,18 @@ class CustomProxyInt(CustomProxy):
             and isinstance(other, (int, float))
             and not isinstance(other, bool)
         ):
-            return _guard_size_oblivious_eq(self._concrete_val, other)
+            try:
+                import torch.fx.experimental.symbolic_shapes as _ss
+
+                _guard_exc = getattr(_ss, "GuardOnDataDependentSymNode", None)
+            except ImportError:
+                _guard_exc = None
+            try:
+                return bool(self._concrete_val == other)
+            except Exception as e:
+                if _guard_exc is not None and isinstance(e, _guard_exc):
+                    return False
+                raise
         return self._compare(operator.eq, other)
 
     def __ne__(self, other):  # type: ignore[override]
@@ -376,7 +387,18 @@ class CustomProxyInt(CustomProxy):
             and isinstance(other, (int, float))
             and not isinstance(other, bool)
         ):
-            return not _guard_size_oblivious_eq(self._concrete_val, other)
+            try:
+                import torch.fx.experimental.symbolic_shapes as _ss
+
+                _guard_exc = getattr(_ss, "GuardOnDataDependentSymNode", None)
+            except ImportError:
+                _guard_exc = None
+            try:
+                return not bool(self._concrete_val == other)
+            except Exception as e:
+                if _guard_exc is not None and isinstance(e, _guard_exc):
+                    return True
+                raise
         return self._compare(operator.ne, other)
 
     def __lt__(self, other):
@@ -421,27 +443,6 @@ class CustomAttribute(CustomProxy):
 
     def __call__(self, *args, **kwargs):
         return self.tracer.create_proxy("call_method", self.attr, (self.root, *args), kwargs)
-
-
-def _guard_size_oblivious_eq(concrete_val: Any, other: Any) -> bool:
-    """
-    Evaluates ``concrete_val == other`` and returns a plain Python bool,
-    catching ``GuardOnDataDependentSymNode`` so that symbolic comparisons
-    on backed SymInts do not abort tracing.
-    Falls back to ``False`` when the guard cannot be evaluated.
-    """
-    try:
-        import torch.fx.experimental.symbolic_shapes as _ss
-
-        _guard_exc = getattr(_ss, "GuardOnDataDependentSymNode", None)
-    except ImportError:
-        _guard_exc = None
-    try:
-        return bool(concrete_val == other)
-    except Exception as e:
-        if _guard_exc is not None and isinstance(e, _guard_exc):
-            return False
-        raise
 
 
 class CustomProxyShape(tuple):
