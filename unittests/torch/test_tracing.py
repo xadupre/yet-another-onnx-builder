@@ -1483,12 +1483,6 @@ class TestCustomProxyShape(ExtTestCase):
 
         self.assertIsNotNone(CPS)
 
-    def test_safe_shape_alias(self):
-        """_SafeShape must remain a backward-compatible alias for CustomProxyShape."""
-        from yobx.torch.tracing import _SafeShape
-
-        self.assertIs(_SafeShape, CustomProxyShape)
-
     def test_custom_proxy_shape_is_tuple(self):
         """CustomProxyShape must be a tuple subclass."""
         self.assertTrue(issubclass(CustomProxyShape, tuple))

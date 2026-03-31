@@ -492,10 +492,6 @@ class CustomProxyShape(tuple):
         return cls(items)
 
 
-#: Backward-compatible alias – prefer :class:`CustomProxyShape`.
-_SafeShape = CustomProxyShape
-
-
 class _SafeNumelCallable:
     """
     Returned by ``CustomProxy.__getattr__("numel")`` when the proxy carries
