@@ -123,12 +123,19 @@ class TestCustomTracer(ExtTestCase):
 
     def test_custom_proxy_bool_logic_ops(self):
         class Model(torch.nn.Module):
-            def forward(self, x, lx: list):
-                length = _len(lx)
+            def forward(self, x):
+                length = x.size(0)
                 a = length == 2
                 b = length > 0
                 c = 0 < length  # reflected comparison: int on the left
-                return a & b, a | b, a ^ b, ~a, c
+                # Convert bool results back to tensors before returning
+                return (
+                    (a & b).to(torch.int32),
+                    (a | b).to(torch.int32),
+                    (a ^ b).to(torch.int32),
+                    (~a).to(torch.int32),
+                    c.to(torch.int32),
+                )
 
         model = Model()
         tracer = CustomTracer()
@@ -136,7 +143,7 @@ class TestCustomTracer(ExtTestCase):
         # Verify that 0 < length (reflected comparison) produces a CustomProxyBool
         length_node = None
         for node in graph.nodes:
-            if node.op == "call_method" and node.target == "__len__":
+            if node.op == "call_method" and node.target == "size":
                 length_node = node
                 break
         if length_node is not None:
