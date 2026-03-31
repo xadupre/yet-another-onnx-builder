@@ -89,12 +89,12 @@ class CustomProxy(torch.fx.proxy.Proxy):
                     # comparisons (``x.shape[0] == y.shape[0]``) still raise
                     # as before.
                     node = self.tracer.create_node(
-                        "call_method", "shape", args=(self.node,), kwargs={}
+                        "call_method", "size", args=(self.node,), kwargs={}
                     )
                     shape_proxy = self.tracer.proxy(node, cls=CustomProxyShape)
                     return CustomProxyShape.from_proxy(shape_proxy, shape)
             # In any other case (no meta val or val is not a Tensor), emit a node.
-            node = self.tracer.create_node("call_method", "shape", args=(self.node,), kwargs={})
+            node = self.tracer.create_node("call_method", "size", args=(self.node,), kwargs={})
             tt = self.tracer.proxy(node, cls=CustomProxyShape)
             return tt
         return CustomAttribute(self, k)
@@ -221,6 +221,8 @@ class CustomProxy(torch.fx.proxy.Proxy):
         node = self.tracer.create_node(
             "call_method", "numel", args=(self.node, *args), kwargs=kwargs
         )
+        if concrete_numel is not _MISSING and isinstance(concrete_numel, int):
+            return concrete_numel
         return self.tracer.proxy(node, cls=CustomProxyInt, concrete_val=concrete_numel)
 
     def size(self, dim: Optional[int] = None):
@@ -413,7 +415,9 @@ class CustomProxyInt(CustomProxy):
         self._concrete_val = concrete_val
         self.only_positive = only_positive
         self.can_be_null = can_be_null
-        assert not isinstance(concrete_val, int)
+        assert not isinstance(
+            concrete_val, int
+        ), f"concrete_val is an integer {concrete_val}, CustomProxyInt is not needed"
 
     def _compare(self, op, other):
         """Creates a comparison node and returns a :class:`CustomProxyBool`."""
