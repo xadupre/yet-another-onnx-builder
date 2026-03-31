@@ -127,11 +127,23 @@ class TestCustomTracer(ExtTestCase):
                 length = _len(lx)
                 a = length == 2
                 b = length > 0
-                return a & b, a | b, a ^ b, ~a
+                c = 0 < length  # reflected comparison: int on the left
+                return a & b, a | b, a ^ b, ~a, c
 
         model = Model()
         tracer = CustomTracer()
         graph = tracer.trace(model)
+        # Verify that 0 < length (reflected comparison) produces a CustomProxyBool
+        length_node = None
+        for node in graph.nodes:
+            if node.op == "call_method" and node.target == "__len__":
+                length_node = node
+                break
+        if length_node is not None:
+            length_proxy = tracer.proxy(length_node, cls=CustomProxyInt)
+            # 0 < length_proxy triggers int.__lt__ → NotImplemented → length_proxy.__gt__(0)
+            result = 0 < length_proxy
+            self.assertIsInstance(result, CustomProxyBool)
         # Build bool proxies from comparison results in the traced graph
         bool_node = None
         for node in graph.nodes:
