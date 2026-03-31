@@ -92,21 +92,8 @@ class CustomProxy(torch.fx.proxy.Proxy):
                     node = self.tracer.create_node(
                         "call_method", "size", args=(self.node,), kwargs={}
                     )
-                    tt = self.tracer.proxy(
-                        node,
-                        cls=CustomProxyShape,
-                        concrete_val=tuple(
-                            [
-                                (
-                                    d
-                                    if isinstance(d, int)
-                                    else CustomProxyInt(node, tracer=self.tracer, concrete_val=d)
-                                )
-                                for d in shape
-                            ]
-                        ),
-                    )
-                    return tt
+                    shape_proxy = self.tracer.proxy(node, cls=CustomProxyShape)
+                    return CustomProxyShape.from_proxy(shape_proxy, shape)
                 raise NotImplementedError(f"k={k!r}, node={node!r}, {type(val)=}")
             # In any other case, let's emit a node.
             node = self.tracer.create_node("call_method", "size", args=(self.node,), kwargs={})
@@ -438,9 +425,21 @@ class CustomProxyInt(CustomProxy):
         return self.tracer.proxy(node, cls=CustomProxyBool)
 
     def __eq__(self, other):  # type: ignore[override]
+        if (
+            self._concrete_val is not _MISSING
+            and isinstance(other, (int, float))
+            and not isinstance(other, bool)
+        ):
+            return bool(self._concrete_val == other)
         return self._compare(operator.eq, other)
 
     def __ne__(self, other):  # type: ignore[override]
+        if (
+            self._concrete_val is not _MISSING
+            and isinstance(other, (int, float))
+            and not isinstance(other, bool)
+        ):
+            return not bool(self._concrete_val == other)
         return self._compare(operator.ne, other)
 
     def __lt__(self, other):
