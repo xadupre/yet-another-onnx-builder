@@ -89,7 +89,7 @@ class TestCustomTracer(ExtTestCase):
     def test_custom_proxy_int_comparison_returns_bool(self):
         class Model(torch.nn.Module):
             def forward(self, x, lx: list):
-                length = len(lx)
+                length = lx.length()  # cannot use len(lx)
                 return length == 2, length != 2, length < 3, length <= 2, length > 1, length >= 2
 
         model = Model()
@@ -237,8 +237,8 @@ class TestCustomTracer(ExtTestCase):
         for node in graph.nodes:
             if node.op == "placeholder":
                 proxy = tracer.proxy(node)
-                # _len on a proxy should return another proxy
-                result = len(proxy)
+                # __len__ on a proxy should return another proxy but python is not ok with that
+                result = proxy.length()
                 self.assertIsNotNone(result)
                 break
 
@@ -843,12 +843,10 @@ class TestTracing(ExtTestCase):
 
     def test_tracing_function_int_shape(self):
         class Model(torch.nn.Module):
-            @staticmethod
-            def add_one(dim: int) -> int:
-                return dim + 1
-
             def forward(self, x):
-                dy1 = Model.add_one(x.shape[1])
+                shape = x.shape
+                dy = shape[1]
+                dy1 = dy + 1
                 y = torch.ones((x.shape[0], dy1))
                 return y
 
@@ -1440,18 +1438,38 @@ class TestCustomProxyShape(ExtTestCase):
 
         model = Model()
         x = torch.rand((3, 4))
+        to_onnx(model, (x,), export_options=ExportOptions(tracing=True))
+        self.assertEqual(len(captured), 1)
+        self.assertIsInstance(captured[0], tuple)
+        self.assertEqual(len(captured[0]), 2)
+        self.assertIsInstance(captured[0][0], int)
+        self.assertIsInstance(captured[0][1], int)
+
+    def test_elements_are_custom_proxy_int_dynamic(self):
+        """Each element of a CustomProxyShape must be a CustomProxyInt."""
+        from yobx.torch import to_onnx, ExportOptions
+
+        captured = []
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                captured.append(x.shape)
+                return x + 1
+
+        model = Model()
+        x = torch.rand((3, 4))
         to_onnx(
             model,
             (x,),
             export_options=ExportOptions(tracing=True),
             dynamic_shapes=({0: "batch"},),
         )
-        # At least one dynamic shape was captured
         self.assertTrue(any(isinstance(s, CustomProxyShape) for s in captured))
-        for s in captured:
-            if isinstance(s, CustomProxyShape):
-                for elem in s:
-                    self.assertIsInstance(elem, CustomProxyInt)
+        self.assertEqual(len(captured), 1)
+        self.assertIsInstance(captured[0], CustomProxyShape)
+        self.assertEqual(len(captured[0]), 2)
+        self.assertIsInstance(captured[0][0], CustomProxyInt)
+        self.assertIsInstance(captured[0][1], int)
 
     def test_len_and_iter(self):
         """CustomProxyShape must support len() and iteration like a tuple."""

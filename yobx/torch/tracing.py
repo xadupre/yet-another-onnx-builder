@@ -89,19 +89,29 @@ class CustomProxy(torch.fx.proxy.Proxy):
                     # bool without raising TraceError, while cross-tensor
                     # comparisons (``x.shape[0] == y.shape[0]``) still raise
                     # as before.
-                    return CustomProxyShape(
-                        node,
-                        tracer=self.tracer,
-                        concrete_val=[
-                            (
-                                d
-                                if isinstance(d, int)
-                                else CustomProxyInt(node, tracer=self.tracer, concrete_val=d)
-                            )
-                            for d in shape
-                        ],
+                    node = self.tracer.create_node(
+                        "call_method", "shape", args=(self.node,), kwargs={}
                     )
-            raise NotImplementedError(f"k={k!r}, node={node!r}")
+                    tt = self.tracer.proxy(
+                        node,
+                        cls=CustomProxyShape,
+                        concrete_val=tuple(
+                            [
+                                (
+                                    d
+                                    if isinstance(d, int)
+                                    else CustomProxyInt(node, tracer=self.tracer, concrete_val=d)
+                                )
+                                for d in shape
+                            ]
+                        ),
+                    )
+                    return tt
+                raise NotImplementedError(f"k={k!r}, node={node!r}, {type(val)=}")
+            # In any other case, let's emit a node.
+            node = self.tracer.create_node("call_method", "shape", args=(self.node,), kwargs={})
+            tt = self.tracer.proxy(node, cls=CustomProxyShape)
+            return tt
         return CustomAttribute(self, k)
 
     @classmethod
@@ -190,7 +200,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
         return self.tracer.proxy(node)
 
     def __len__(self):
-        return self.length()
+        raise RuntimeError("'len' is not supported in symbolic tracing by default.")
 
     def length(self):
         """Returns a proxy for the length."""
@@ -220,7 +230,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
         node = self.tracer.create_node(
             "call_method", "numel", args=(self.node, *args), kwargs=kwargs
         )
-        return CustomProxyInt(node, self.tracer, concrete_numel)
+        return self.tracer.proxy(node, cls=CustomProxyInt, concrete_val=concrete_numel)
 
     def size(self, dim: Optional[int] = None):
         """
@@ -252,12 +262,14 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 size_node = self.tracer.create_node(
                     "call_method", "size", args=(self.node,), kwargs={}
                 )
-                return CustomProxyShape.from_proxy(self.tracer.proxy(size_node), concrete_shape)
+                return CustomProxyShape.from_proxy(
+                    self.tracer.proxy(size_node), concrete_shape, only_positive=True
+                )
             # No fake-tensor metadata: return a plain call_method proxy.
             size_node = self.tracer.create_node(
                 "call_method", "size", args=(self.node,), kwargs={}
             )
-            return self.tracer.proxy(size_node)
+            return self.tracer.proxy(size_node, cls=CustomProxyInt, only_positive=True)
         else:
             concrete_val: Any = _MISSING
             if concrete_shape is not None:
@@ -265,7 +277,9 @@ class CustomProxy(torch.fx.proxy.Proxy):
             size_node = self.tracer.create_node(
                 "call_method", "size", args=(self.node, dim), kwargs={}
             )
-            return CustomProxyInt(size_node, self.tracer, concrete_val)
+            return self.tracer.proxy(
+                size_node, cls=CustomProxyInt, concrete_val=concrete_val, only_positive=True
+            )
 
     @classmethod
     def cat(
@@ -371,11 +385,21 @@ class CustomProxyInt(CustomProxy):
 
     __hash__ = CustomProxy.__hash__  # restore hash after __eq__ override
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self._concrete_val})"
+
     def __init__(
-        self, node: Node, tracer: Optional["TracerBase"] = None, concrete_val: Any = _MISSING
+        self,
+        node: Node,
+        tracer: Optional["TracerBase"] = None,
+        concrete_val: Any = _MISSING,
+        only_positive: bool = False,
+        can_be_null: bool = True,
     ):
         super().__init__(node, tracer=tracer)
         self._concrete_val = concrete_val
+        self.only_positive = only_positive
+        self.can_be_null = can_be_null
 
     def _compare(self, op, other):
         """Creates a comparison node and returns a :class:`CustomProxyBool`."""
@@ -419,6 +443,9 @@ class CustomAttribute(CustomProxy):
         self.tracer = root.tracer
         self._node: Optional[Node] = None
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.attr})"
+
     @property
     def node(self):
         # the node for attributes is added lazily, since most will just be method calls
@@ -453,15 +480,21 @@ class CustomProxyShape(CustomProxy):
         self, node: Node, tracer: Optional["TracerBase"] = None, concrete_val: Any = _MISSING
     ):
         super().__init__(node, tracer=tracer)
-        assert concrete_val is not _MISSING and all(
+        self.values = concrete_val
+        assert concrete_val is _MISSING or all(
             isinstance(v, (int, CustomProxyInt)) for v in concrete_val
         ), (
             f"Unexpected type in values (type(values)={type(concrete_val)}), "
-            f"{[type(v) for v in concrete_val]}"
+            f"{'MISSING' if concrete_val is _MISSING else [type(v) for v in concrete_val]}"
         )
-        self.values = concrete_val
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.values})"
 
     def __len__(self) -> int:
+        return len(self.values)
+
+    def length(self) -> int:
         return len(self.values)
 
     def __iter__(self):
@@ -469,8 +502,15 @@ class CustomProxyShape(CustomProxy):
 
     def __getitem__(self, index):
         if isinstance(index, int):
+            if self.values is _MISSING:
+                # Let's return a traced int.
+                node = self.tracer.create_node(
+                    "call_method", "getitem", args=(self.node, index), kwargs={}
+                )
+                return self.tracer.proxy(node, cls=CustomProxyInt)
             return self.values[index]
         if isinstance(index, slice):
+            assert self.values is not _MISSING, "Not implemented when there is concrete_val"
             return self.__class__(*self.values[index])
         raise TypeError(f"{type(index)=} is unexpected for {self.__class__=}")
 
@@ -813,9 +853,11 @@ class CustomTracer(torch.fx.Tracer):
         self._callables[cand] = fn
         return self.create_node("get_attr", cand, args=(), kwargs={})
 
-    def proxy(self, node: torch.fx.Node, cls: type[CustomProxy] = CustomProxy) -> torch.fx.Proxy:
+    def proxy(
+        self, node: torch.fx.Node, cls: type[CustomProxy] = CustomProxy, **kwargs
+    ) -> torch.fx.Proxy:
         """Overwrites this method to replace the default Proxy by CustomProxy."""
-        return cls(node, self)
+        return cls(node, self, **kwargs)
 
     def create_arg(self, a: Any) -> "Argument":  # noqa: F821
         """Overwrites this method to deal with more argument."""
