@@ -249,12 +249,14 @@ class ExportOptions:
             if target_name in {"aten:relu_", "aten::mul_.Tensor"}:
                 ret = len(node.users) == 0
                 continue
+            if target_name in {"aten::lstm.input"}:
+                return True, True
             if target_name in {
-                "aten::lstm.input",
                 "torch._functorch.predispatch._add_batch_dim",
                 "torch._functorch.predispatch._remove_batch_dim",
             }:
-                return True, True
+                ret = len(node.users) == 0
+                continue
         return ret, False
 
     def _export(
@@ -629,6 +631,14 @@ class ExportOptions:
         if removed:
             if verbose:
                 print(f"[ExportOptions.export] slices: {removed} slices nodes were removed")
+            graph.lint()
+        batch_dim_removed = CustomTracer.remove_batch_dim_nodes(graph, verbose=verbose)
+        if batch_dim_removed:
+            if verbose:
+                print(
+                    f"[ExportOptions.export] batch_dim: "
+                    f"{batch_dim_removed} batch dim nodes were removed"
+                )
             graph.lint()
         modified = CustomTracer.remove_inplace(
             graph, exported_program=exported_program, verbose=verbose, exc=False

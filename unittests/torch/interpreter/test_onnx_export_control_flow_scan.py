@@ -338,7 +338,6 @@ class TestOnnxExportControlFlow(ExtTestCase):
                     got = sess.run(None, feeds)
                     self.assertEqualArray(expected, got[0], atol=1e-5)
 
-    @unittest.skip("TODO: investigate later")
     def test_scan_loop_inplace(self):
         import torch
 

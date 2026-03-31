@@ -2,7 +2,6 @@ import unittest
 from collections import Counter
 from typing import Any, Dict, List
 import numpy as np
-import onnx
 from yobx.ext_test_case import ExtTestCase, requires_torch, skipif_ci_windows, ignore_warnings
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder import GraphBuilder
@@ -143,34 +142,6 @@ class TestOnnxExportCustomCode(ExtTestCase):
         targets = [node.target for node in graph.nodes]
         names = [(t if isinstance(t, str) else t.name()) for t in targets]
         self.assertEqual(names, ["x", "aten::add.Tensor", "aten::mul.Tensor", "output"])
-
-    @skipif_ci_windows("dynamo not working on Windows")
-    @unittest.skip("autograd.function not working with dynamo")
-    def test_custom_code_dynamo(self):
-        import torch
-
-        cls, x = self.get_custom_model_autograd()
-        model = cls()
-        expected = model(x)
-        self.assertNotEmpty(expected)
-        filename = "test_custom_code_dynamo.onnx"
-        torch.onnx.export(
-            model,
-            (x,),
-            filename,
-            input_names=["x"],
-            opset_version=18,
-            dynamo=True,
-            fallback=False,
-        )
-        with open(filename, "rb") as f:
-            onx = onnx.load(f)
-        co = Counter([n.op_type for n in onx.graph.node])
-        self.assertEqual(co, {"Add": 2, "Mul": 1})
-        ref = ExtendedReferenceEvaluator(onx)
-        got = ref.run(None, {"x": x.detach().numpy()})[0]
-        expected = (x + x + x) * x
-        self.assertEqualArray(expected, got)
 
     @classmethod
     def get_custom_model_export(cls):

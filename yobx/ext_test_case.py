@@ -1258,7 +1258,6 @@ class ExtTestCase(unittest.TestCase):
     """
 
     _warns: List[Tuple[str, int, Warning]] = []
-    _todos: List[Tuple[Callable, str]] = []
 
     def shortDescription(self):
         # To remove annoying display on the screen every time verbosity is enabled.
@@ -1282,20 +1281,6 @@ class ExtTestCase(unittest.TestCase):
         logger.setLevel(logging.ERROR)
         warnings.filterwarnings("ignore", category=DeprecationWarning)
         unittest.TestCase.setUpClass()
-
-    @classmethod
-    def tearDownClass(cls):
-        for name, line, w in cls._warns:
-            warnings.warn(f"\n{name}:{line}: {type(w)}\n  {w!s}", stacklevel=2)
-        if not cls._todos:
-            return
-        for f, msg in cls._todos:
-            sys.stderr.write(f"TODO {cls.__name__}::{f.__name__}: {msg}\n")
-
-    @classmethod
-    def todo(cls, f: Callable, msg: str):
-        "Adds a todo printed when all test are run."
-        cls._todos.append((f, msg))
 
     @classmethod
     def ort(cls) -> unittest.__class__:

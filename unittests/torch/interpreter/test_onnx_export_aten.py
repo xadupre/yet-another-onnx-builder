@@ -1213,11 +1213,7 @@ class TestOnnxExportAten(ExtTestCase):
                     continue
                 key = red, include, stype
                 if key in skip_ort:
-                    self.todo(
-                        self.test_aten_scatter_reduce_include_self,
-                        f"case {key} not supported by onnxruntime",
-                    )
-                    continue
+                    self.skipTest(f"case {key} not supported by onnxruntime")
                 import onnxruntime
 
                 sess_options = onnxruntime.SessionOptions()
@@ -3190,7 +3186,6 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
-    @unittest.skip("unable to run_decompositions")
     def test_aten_add_batch_dim11(self):
         import torch
 
@@ -3205,7 +3200,24 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model()
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
+
+        ep = torch.export.export(model, inputs, dynamic_shapes=dynamic, strict=False)
+        ep_dec = ep.run_decompositions()
+        # _add_batch_dim / _remove_batch_dim should be present
+        # in ep but absent after decomposition
+        names = [str(n.target) for n in ep.graph.nodes]
+        names_dec = [str(n.target) for n in ep_dec.graph.nodes]
+        self.assertTrue(
+            any("_add_batch_dim" in n for n in names),
+            f"_add_batch_dim not found in ep nodes: {names}",
+        )
+        self.assertFalse(
+            any("_add_batch_dim" in n for n in names_dec),
+            f"_add_batch_dim unexpectedly found in ep_dec nodes: {names_dec}",
+        )
+
+        with apply_patches_for_model(patch_torch=True, model=model):
+            onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_fused_rms(self):
