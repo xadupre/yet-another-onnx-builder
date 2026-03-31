@@ -121,6 +121,51 @@ class TestCustomTracer(ExtTestCase):
             cmp_result = length_proxy >= 2
             self.assertIsInstance(cmp_result, CustomProxyBool)
 
+    def test_custom_proxy_bool_logic_ops(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, lx: list):
+                length = _len(lx)
+                a = length == 2
+                b = length > 0
+                return a & b, a | b, a ^ b, ~a
+
+        model = Model()
+        tracer = CustomTracer()
+        graph = tracer.trace(model)
+        # Build bool proxies from comparison results in the traced graph
+        bool_node = None
+        for node in graph.nodes:
+            if node.op == "call_function" and node.target is operator.eq:
+                bool_node = node
+                break
+        if bool_node is not None:
+            bool_proxy = tracer.proxy(bool_node, cls=CustomProxyBool)
+            self.assertIsInstance(bool_proxy, CustomProxyBool)
+            # and
+            result = bool_proxy & bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            # or
+            result = bool_proxy | bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            # xor
+            result = bool_proxy ^ bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            # not (~)
+            result = ~bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            # eq / ne between bools
+            result = bool_proxy == bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            result = bool_proxy != bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            # reverse operations with non-proxy operands
+            result = True & bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            result = False | bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            result = True ^ bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+
     def test_is_leaf_module_default(self):
         tracer = CustomTracer()
         # Standard nn.Linear is a leaf by default
