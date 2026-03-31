@@ -1512,6 +1512,70 @@ class TestCustomProxyShape(ExtTestCase):
                 elems = list(s)
                 self.assertEqual(len(elems), 2)
 
+    def test_control_flow_comparisons_resolve_to_bool(self):
+        """
+        Comparisons against 0 using CustomProxyInt-backed values must resolve
+        to Python bool during tracing so they can be used in control flow.
+        """
+        from yobx.torch import to_onnx, ExportOptions
 
+        captured_conds = []
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                # x.shape[0] will be a CustomProxyInt when using dynamic_shapes.
+                c1 = x.shape[0] == 0
+                c2 = x.numel() == 0
+                c3 = x.size(0) == 0
+                captured_conds.extend([c1, c2, c3])
+                # Use the conditions in control flow to exercise bool conversion.
+                if c1:
+                    return x
+                if c2:
+                    return x
+                if c3:
+                    return x
+                return x + 1
+
+        model = Model()
+        x = torch.rand((3, 4))
+        # Make the batch dimension dynamic so shape[0] is a CustomProxyInt.
+        to_onnx(
+            model,
+            (x,),
+            export_options=ExportOptions(tracing=True),
+            dynamic_shapes=({0: "batch"},),
+        )
+        # All captured conditions should be plain Python bools.
+        self.assertEqual(len(captured_conds), 3)
+        for c in captured_conds:
+            self.assertIsInstance(c, bool)
+
+    def test_proxy_vs_proxy_comparison_raises_traceerror(self):
+        """
+        Comparing two CustomProxyInt values (proxy-vs-proxy) should still raise
+        TraceError during tracing, to prevent unsupported symbolic control flow.
+        """
+        from torch.fx.proxy import TraceError
+        from yobx.torch import to_onnx, ExportOptions
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                # Both dimensions are dynamic; this comparison is proxy vs proxy.
+                cond = x.shape[0] == x.shape[1]
+                if cond:
+                    return x
+                return x + 1
+
+        model = Model()
+        x = torch.rand((3, 4))
+        # Make both dimensions dynamic so both shape entries are proxies.
+        with self.assertRaises(TraceError):
+            to_onnx(
+                model,
+                (x,),
+                export_options=ExportOptions(tracing=True),
+                dynamic_shapes=({0: "batch", 1: "seq"},),
+            )
 if __name__ == "__main__":
     unittest.main(verbosity=2)
