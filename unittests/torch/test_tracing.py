@@ -89,7 +89,7 @@ class TestCustomTracer(ExtTestCase):
     def test_custom_proxy_int_comparison_returns_bool(self):
         class Model(torch.nn.Module):
             def forward(self, x, lx: list):
-                length = lx.length()  # cannot use len(lx)
+                length = len(lx)
                 return length == 2, length != 2, length < 3, length <= 2, length > 1, length >= 2
 
         model = Model()
