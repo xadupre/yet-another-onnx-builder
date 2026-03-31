@@ -184,6 +184,33 @@ class TestCustomTracer(ExtTestCase):
             self.assertIsInstance(result, CustomProxyBool)
             result = True ^ bool_proxy
             self.assertIsInstance(result, CustomProxyBool)
+            # constant-folding: False & proxy == False, True & proxy == proxy
+            result = bool_proxy & False
+            self.assertIs(result, False)
+            result = bool_proxy & True
+            self.assertIs(result, bool_proxy)
+            result = False & bool_proxy
+            self.assertIs(result, False)
+            result = True & bool_proxy
+            self.assertIs(result, bool_proxy)
+            # constant-folding: proxy | False == proxy, proxy | True == True
+            result = bool_proxy | False
+            self.assertIsInstance(result, CustomProxyBool)
+            result = bool_proxy | True
+            self.assertIs(result, True)
+            result = False | bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            result = True | bool_proxy
+            self.assertIs(result, True)
+            # constant-folding: proxy ^ False == proxy, proxy ^ True == ~proxy
+            result = bool_proxy ^ False
+            self.assertIsInstance(result, CustomProxyBool)
+            result = bool_proxy ^ True
+            self.assertIsInstance(result, CustomProxyBool)
+            result = False ^ bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            result = True ^ bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
 
     def test_is_leaf_module_default(self):
         tracer = CustomTracer()

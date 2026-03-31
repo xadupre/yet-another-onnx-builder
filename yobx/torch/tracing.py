@@ -245,6 +245,14 @@ class CustomProxyBool(CustomProxy):
 
     def _bool_op(self, op, other):
         """Creates a binary boolean operation node and returns a :class:`CustomProxyBool`."""
+        # Constant-fold when the non-proxy operand is a known bool literal.
+        if isinstance(other, bool):
+            if op is operator.and_:
+                return False if not other else self
+            if op is operator.or_:
+                return True if other else self
+            if op is operator.xor:
+                return ~self if other else self
         node = self.tracer.create_node(
             "call_function",
             op,
@@ -255,6 +263,14 @@ class CustomProxyBool(CustomProxy):
 
     def _bool_op_reversed(self, op, other):
         """Creates a binary boolean operation node (reversed) and returns a :class:`CustomProxyBool`."""
+        # Constant-fold when the non-proxy operand is a known bool literal.
+        if isinstance(other, bool):
+            if op is operator.and_:
+                return False if not other else self
+            if op is operator.or_:
+                return True if other else self
+            if op is operator.xor:
+                return ~self if other else self
         node = self.tracer.create_node(
             "call_function",
             op,
