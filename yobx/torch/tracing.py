@@ -1382,7 +1382,12 @@ class CustomTracer(torch.fx.Tracer):
             else:
                 # Propagate vmap batch-dim metadata through all other ops so that
                 # _remove_batch_dim can find it even after several intervening nodes.
-                _propagate(node.args, node)
+                # Skip quickly when no input node carries vmap metadata.
+                if any(
+                    isinstance(a, torch.fx.Node) and _VMAP_KEY in a.meta
+                    for a in node.args
+                ):
+                    _propagate(node.args, node)
 
         return modified
 
