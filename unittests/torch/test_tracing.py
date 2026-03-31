@@ -445,7 +445,7 @@ class TestTracing(ExtTestCase):
         tr = CustomTracer()
         tr.graph = torch.fx.Graph(tracer_cls=CustomTracer)
         x = CustomProxy(node, tr)
-        i = len(x)
+        i = x.length()
         self.assertIsInstance(i, CustomProxy)
 
     def test_tracing_abs(self):
@@ -1080,14 +1080,15 @@ class TestTracing(ExtTestCase):
     @requires_torch("2.9.99")
     @requires_transformers("4.57")
     def test_tree_unflatten_with_proxy_dynamic_cache(self):
-        graph = torch.fx.Graph()
-        tr = CustomTracer()
-        tr.graph = torch.fx.Graph(tracer_cls=CustomTracer)
-        cps = []
-        for i in range(7):
-            node = graph.create_node("placeholder", f"tx{i}", args=(), kwargs={}, name=f"txn{i}")
-            cps.append(CustomProxy(node, tr))
-
+        tensors = [
+            torch.randn((4, 5)),
+            torch.randn((7, 5)),
+            torch.randn((8, 5)),
+            torch.randn(2, 32, 30, 96),
+            torch.randn(2, 32, 30, 96),
+            torch.randn(2, 32, 30, 96),
+            torch.randn(2, 32, 30, 96),
+        ]
         nested = [
             torch.randn((4, 5)),
             [torch.randn((7, 5)), torch.randn((8, 5))],
@@ -1095,9 +1096,24 @@ class TestTracing(ExtTestCase):
                 [(torch.randn(2, 32, 30, 96), torch.randn(2, 32, 30, 96)) for i in range(2)]
             ),
         ]
-        with register_flattening_functions(patch_transformers=True):
+
+        graph = torch.fx.Graph()
+        tr = CustomTracer()
+        tr.graph = torch.fx.Graph(tracer_cls=CustomTracer)
+        cps = []
+        for i in range(len(tensors)):
+            node = graph.create_node("placeholder", f"tx{i}", args=(), kwargs={}, name=f"txn{i}")
+            if not hasattr(node, "meta"):
+                node.meta = {}
+            node.meta["val"] = tensors[i]
+            cps.append(CustomProxy(node, tr))
+
+        with (
+            register_flattening_functions(patch_transformers=True),
+            replace_problematic_function_before_tracing(),
+        ):
             flat_list, tree_spec = torch.utils._pytree.tree_flatten(nested)
-            self.assertEqual(len(flat_list), 7)
+            self.assertEqual(len(flat_list), len(tensors))
             unflatten = tree_unflatten_with_proxy(tree_spec, cps)
 
             self.assertEqual(len(nested), len(unflatten))

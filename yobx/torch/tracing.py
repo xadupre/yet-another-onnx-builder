@@ -70,7 +70,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 val = node.meta["val"]
                 if isinstance(val, torch.Tensor):
                     return getattr(val, k)
-            raise NotImplementedError(f"k={k!r}, node={node!r}")
+            raise NotImplementedError(f"k={k!r}, node={node!r}, {node.meta=}")
         if k == "shape":
             node = self.__dict__.get("node")
             if node is not None and "val" in node.meta:
@@ -90,7 +90,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
                     # comparisons (``x.shape[0] == y.shape[0]``) still raise
                     # as before.
                     node = self.tracer.create_node(
-                        "call_method", "shape", args=(self.node,), kwargs={}
+                        "call_method", "size", args=(self.node,), kwargs={}
                     )
                     tt = self.tracer.proxy(
                         node,
@@ -109,7 +109,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
                     return tt
                 raise NotImplementedError(f"k={k!r}, node={node!r}, {type(val)=}")
             # In any other case, let's emit a node.
-            node = self.tracer.create_node("call_method", "shape", args=(self.node,), kwargs={})
+            node = self.tracer.create_node("call_method", "size", args=(self.node,), kwargs={})
             tt = self.tracer.proxy(node, cls=CustomProxyShape)
             return tt
         return CustomAttribute(self, k)
@@ -288,6 +288,30 @@ class CustomProxy(torch.fx.proxy.Proxy):
         """Implements cat for tensors."""
         assert out is None, "Tracing is not implementing is out is not None."
         if isinstance(tensors, list):
+            if any(isinstance(t, CustomProxy) for t in tensors):
+                proxy = next(t for t in tensors if isinstance(t, CustomProxy))
+                new_tensors = []
+                for t in tensors:
+                    if isinstance(t, CustomProxy):
+                        new_tensors.append(t)
+                        continue
+                    if isinstance(t, torch.Tensor):
+                        # This is not expected, it may be due to a unit test.
+                        ph = proxy.tracer.create_node(
+                            "placeholder", f"tcat{id(t)}", args=(), kwargs={}
+                        )
+                        if not ph.meta:
+                            ph.meta = {}
+                        ph.meta["val"] = t
+                        p = proxy.tracer.proxy(ph, cls=proxy.__class__)
+                        new_tensors.append(p)
+                        continue
+
+                    raise TypeError(f"A tensor is expected not {type(t)}.")
+                node = proxy.tracer.create_node(
+                    "call_function", torch.cat, args=(new_tensors, dim), kwargs={}
+                )
+                return proxy.tracer.proxy(node)
             return _torch_cat(tensors, dim)
         if axis is not None and dim == 0:
             dim = axis
@@ -505,7 +529,7 @@ class CustomProxyShape(CustomProxy):
             if self.values is _MISSING:
                 # Let's return a traced int.
                 node = self.tracer.create_node(
-                    "call_method", "getitem", args=(self.node, index), kwargs={}
+                    "call_function", operator.getitem, args=(self.node, index), kwargs={}
                 )
                 return self.tracer.proxy(node, cls=CustomProxyInt)
             return self.values[index]
