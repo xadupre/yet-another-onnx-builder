@@ -211,10 +211,6 @@ class CustomProxy(torch.fx.proxy.Proxy):
         )
         return CustomProxyInt(node, self.tracer, concrete_numel)
 
-    def instanceof(self, cls):
-        """Tells if this proxy represents a specific class."""
-        raise RuntimeError(f"Unable to know if cls is from type {cls}.")
-
     @classmethod
     def cat(
         cls, tensors: List["CustomProxy"], dim: int = 0, *, out=None, axis: Optional[int] = None
@@ -232,28 +228,10 @@ class CustomProxy(torch.fx.proxy.Proxy):
         return proxy.tracer.proxy(node)
 
 
-def _len(x: Any) -> Union[int, CustomProxy]:
-    """Overloads `len` to return a proxy if the input is the proxy."""
-    if isinstance(x, CustomProxy):
-        return x.length()
-    return len(x)
-
-
-def _isinstance(x, cls):
-    """Overloads `isinstance` to deal with CustomProxy."""
-    if isinstance(x, CustomProxy):
-        return x.instanceof(cls)
-    return isinstance(x, cls)
-
-
 class CustomProxyBool(CustomProxy):
     "A proxy for a boolean."
 
     __hash__ = CustomProxy.__hash__  # restore hash after __eq__ override
-
-    def instanceof(self, cls):
-        """isinstance"""
-        return cls in {CustomProxyBool, CustomProxy, bool}
 
     def _bool_op(self, op, other):
         """Creates a binary boolean operation node and returns a :class:`CustomProxyBool`."""
@@ -343,10 +321,6 @@ class CustomProxyInt(CustomProxy):
         super().__init__(node, tracer=tracer)
         self._concrete_val = concrete_val
 
-    def instanceof(self, cls):
-        """isinstance"""
-        return cls in {CustomProxyInt, CustomProxy, int}
-
     def _compare(self, op, other):
         """Creates a comparison node and returns a :class:`CustomProxyBool`."""
         node = self.tracer.create_node(
@@ -412,10 +386,6 @@ class CustomProxyInt(CustomProxy):
 
 class CustomProxyFloat(CustomProxy):
     "A proxy for a float."
-
-    def instanceof(self, cls):
-        """isinstance"""
-        return cls in {CustomProxyFloat, CustomProxy, float}
 
 
 class CustomAttribute(CustomProxy):
