@@ -79,13 +79,14 @@ class CustomProxy(torch.fx.proxy.Proxy):
                         # torch.Size directly so that downstream code receives
                         # plain ints.
                         return shape
-                    # Dynamic shape: return a _SafeShape so that indexed
-                    # elements are _SymGuardProxy instances.  Comparing an
-                    # element against a plain int (e.g. ``x.shape[2] == 0``)
-                    # then evaluates to a Python bool without raising
-                    # TraceError, while cross-tensor comparisons
-                    # (``x.shape[0] == y.shape[0]``) still raise as before.
-                    return _SafeShape(CustomAttribute(self, k), shape, self)
+                    # Dynamic shape: return a CustomProxyShape so that
+                    # elements are _SymGuardProxy (CustomProxyInt) instances.
+                    # Comparing an element against a plain int
+                    # (e.g. ``x.shape[2] == 0``) then evaluates to a Python
+                    # bool without raising TraceError, while cross-tensor
+                    # comparisons (``x.shape[0] == y.shape[0]``) still raise
+                    # as before.
+                    return CustomProxyShape.from_proxy(CustomAttribute(self, k), shape)
         elif k == "numel":
             # Intercept x.numel() so that ``if x.numel() == 0:`` can be
             # evaluated as a Python bool at trace time without raising
@@ -402,9 +403,9 @@ def _guard_size_oblivious_eq(concrete_val: Any, other: Any) -> bool:
         raise
 
 
-class _SymGuardProxy(CustomProxy):
+class _SymGuardProxy(CustomProxyInt):
     """
-    A :class:`CustomProxy` whose equality operators evaluate to a plain
+    A :class:`CustomProxyInt` whose equality operators evaluate to a plain
     Python ``bool`` *only* when compared against a constant Python integer
     or float (e.g. ``x.shape[2] == 0`` or ``x.numel() == 0``).
 
@@ -449,40 +450,50 @@ class _SymGuardProxy(CustomProxy):
         return torch.fx.proxy.Proxy.__ne__(self, other)  # type: ignore[return-value]
 
 
-class _SafeShape:
+class CustomProxyShape(tuple):
     """
-    Wraps a shape :class:`CustomAttribute` proxy together with the
-    concrete ``torch.Size`` (which may contain backed SymInts) of the
-    underlying fake tensor.
+    A :class:`tuple` of :class:`_SymGuardProxy` (a :class:`CustomProxyInt`
+    subclass) representing a tensor shape with dynamic dimensions.
 
-    When an element is accessed via ``__getitem__``, a
-    :class:`_SymGuardProxy` is returned: it is a valid FX proxy node
-    (so dynamic-shape operators such as ``torch.full`` are recorded
-    correctly in the graph) *and* supports equality comparison against
-    plain integer constants so that ``if x.shape[2] == 0:`` evaluates to
-    a Python ``bool`` without raising ``TraceError``.
+    Each element is a valid FX proxy node (so dynamic-shape operators such
+    as ``torch.full`` are recorded correctly in the graph) *and* supports
+    equality comparison against plain integer constants so that
+    ``if x.shape[2] == 0:`` evaluates to a Python ``bool`` without raising
+    ``TraceError``.
+
+    Use :meth:`from_proxy` to construct an instance from a shape
+    :class:`CustomAttribute` proxy and its corresponding concrete
+    ``torch.Size``.
     """
 
-    def __init__(
-        self,
+    @classmethod
+    def from_proxy(
+        cls,
         shape_proxy: "CustomAttribute",
         concrete_shape: "torch.Size",
-        tensor_proxy: "CustomProxy",
-    ) -> None:
-        self._shape_proxy = shape_proxy
-        self._concrete_shape = concrete_shape
-        self._tensor_proxy = tensor_proxy
+    ) -> "CustomProxyShape":
+        """
+        Build a :class:`CustomProxyShape` from a shape attribute proxy and
+        the corresponding concrete (possibly symbolic) ``torch.Size``.
 
-    def __getitem__(self, idx: int) -> "_SymGuardProxy":
-        item_proxy: CustomProxy = self._shape_proxy[idx]  # type: ignore[assignment]
-        concrete_val = self._concrete_shape[idx]
-        return _SymGuardProxy(item_proxy.node, item_proxy.tracer, concrete_val)
+        Parameters
+        ----------
+        shape_proxy:
+            The FX attribute proxy for ``tensor.shape``.
+        concrete_shape:
+            The concrete ``torch.Size`` from the fake tensor's metadata
+            (may contain backed ``SymInt`` values for dynamic dimensions).
+        """
+        items = []
+        for i in range(len(concrete_shape)):
+            item_proxy: CustomProxy = shape_proxy[i]  # type: ignore[assignment]
+            concrete_val = concrete_shape[i]
+            items.append(_SymGuardProxy(item_proxy.node, item_proxy.tracer, concrete_val))
+        return cls(items)
 
-    def __len__(self) -> int:
-        return len(self._concrete_shape)
 
-    def __iter__(self):
-        return (self[i] for i in range(len(self)))
+#: Backward-compatible alias – prefer :class:`CustomProxyShape`.
+_SafeShape = CustomProxyShape
 
 
 class _SafeNumelCallable:

@@ -12,6 +12,7 @@ from .tracing import (
     CustomProxyBool,
     CustomProxyInt,
     CustomProxyFloat,
+    CustomProxyShape,
     CustomTracer,
 )
 from .tiny_models import get_tiny_model

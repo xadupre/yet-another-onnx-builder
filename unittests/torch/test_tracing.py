@@ -14,6 +14,7 @@ from yobx.torch.tracing import (
     CustomProxy,
     CustomProxyBool,
     CustomProxyInt,
+    CustomProxyShape,
     CustomParameterProxy,
     CondCCOp,
     _len,
@@ -1468,6 +1469,82 @@ class TestTracingControlFlow(ExtTestCase):
         x = torch.rand((3, 4))
         art = to_onnx(model, (x,), export_options=ExportOptions(tracing=True))
         self.assertEqual(["Identity"], [n.op_type for n in art.graph.node])
+
+
+@requires_torch("2.0")
+class TestCustomProxyShape(ExtTestCase):
+    """Tests for CustomProxyShape – the replacement for _SafeShape."""
+
+    def test_import(self):
+        self.assertIsNotNone(CustomProxyShape)
+
+    def test_import_from_package(self):
+        from yobx.torch import CustomProxyShape as CPS
+
+        self.assertIsNotNone(CPS)
+
+    def test_safe_shape_alias(self):
+        """_SafeShape must remain a backward-compatible alias for CustomProxyShape."""
+        from yobx.torch.tracing import _SafeShape
+
+        self.assertIs(_SafeShape, CustomProxyShape)
+
+    def test_custom_proxy_shape_is_tuple(self):
+        """CustomProxyShape must be a tuple subclass."""
+        self.assertTrue(issubclass(CustomProxyShape, tuple))
+
+    def test_elements_are_custom_proxy_int(self):
+        """Each element of a CustomProxyShape must be a CustomProxyInt."""
+        from yobx.torch import to_onnx, ExportOptions
+        from yobx.torch.tracing import _SymGuardProxy
+
+        captured = []
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                captured.append(x.shape)
+                return x + 1
+
+        model = Model()
+        x = torch.rand((3, 4))
+        to_onnx(
+            model,
+            (x,),
+            export_options=ExportOptions(tracing=True),
+            dynamic_shapes=({0: "batch"},),
+        )
+        # At least one dynamic shape was captured
+        self.assertTrue(any(isinstance(s, CustomProxyShape) for s in captured))
+        for s in captured:
+            if isinstance(s, CustomProxyShape):
+                for elem in s:
+                    self.assertIsInstance(elem, CustomProxyInt)
+                    self.assertIsInstance(elem, _SymGuardProxy)
+
+    def test_len_and_iter(self):
+        """CustomProxyShape must support len() and iteration like a tuple."""
+        from yobx.torch import to_onnx, ExportOptions
+
+        captured = []
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                captured.append(x.shape)
+                return x + 1
+
+        model = Model()
+        x = torch.rand((3, 4))
+        to_onnx(
+            model,
+            (x,),
+            export_options=ExportOptions(tracing=True),
+            dynamic_shapes=({0: "batch"},),
+        )
+        for s in captured:
+            if isinstance(s, CustomProxyShape):
+                self.assertEqual(len(s), 2)
+                elems = list(s)
+                self.assertEqual(len(elems), 2)
 
 
 if __name__ == "__main__":
