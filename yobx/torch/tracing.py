@@ -15,6 +15,8 @@ from .torch_helper import torch_deepcopy
 
 _torch_cat = torch.cat
 
+_MISSING: Any = object()  # sentinel for "no concrete value supplied"
+
 
 class LEAVE_INPLACE:
     "Constant indicating inplace removal failed."
@@ -87,21 +89,6 @@ class CustomProxy(torch.fx.proxy.Proxy):
                     # comparisons (``x.shape[0] == y.shape[0]``) still raise
                     # as before.
                     return CustomProxyShape.from_proxy(CustomAttribute(self, k), shape)
-        elif k == "numel":
-            # Intercept x.numel() so that ``if x.numel() == 0:`` can be
-            # evaluated as a Python bool at trace time without raising
-            # TraceError, while ``x.numel() > 0`` used in torch.cond still
-            # produces a proper FX proxy (since > against a non-int falls
-            # through to the standard Proxy path).
-            node = self.__dict__.get("node")
-            if node is not None and "val" in node.meta:
-                val = node.meta["val"]
-                if isinstance(val, torch.Tensor):
-                    try:
-                        concrete_numel = val.numel()
-                        return _SafeNumelCallable(self, concrete_numel)
-                    except Exception:
-                        pass
         return CustomAttribute(self, k)
 
     @classmethod
@@ -199,6 +186,31 @@ class CustomProxy(torch.fx.proxy.Proxy):
         node = self.tracer.create_node("call_method", "__len__", args=(self.node,), kwargs={})
         tt = self.tracer.proxy(node, cls=CustomProxyInt)
         return tt
+
+    def numel(self, *args: Any, **kwargs: Any) -> "CustomProxyInt":
+        """
+        Records a ``numel()`` call in the FX graph and returns a
+        :class:`CustomProxyInt`.
+
+        When the fake-tensor metadata carries a concrete element count,
+        ``concrete_val`` is set on the returned proxy so that comparisons
+        such as ``if x.numel() == 0:`` resolve to a plain Python ``bool``
+        at trace time without raising ``TraceError``.  All other comparisons
+        (e.g. ``x.numel() > 0``) keep the standard FX-proxy behaviour.
+        """
+        concrete_numel: Any = _MISSING
+        _node = self.__dict__.get("node")
+        if _node is not None and "val" in _node.meta:
+            val = _node.meta["val"]
+            if isinstance(val, torch.Tensor):
+                try:
+                    concrete_numel = val.numel()
+                except Exception:
+                    pass
+        node = self.tracer.create_node(
+            "call_method", "numel", args=(self.node, *args), kwargs=kwargs
+        )
+        return CustomProxyInt(node, self.tracer, concrete_numel)
 
     def instanceof(self, cls):
         """Tells if this proxy represents a specific class."""
@@ -311,9 +323,6 @@ class CustomProxyBool(CustomProxy):
 
     def __ne__(self, other):  # type: ignore[override]
         return self._bool_op(operator.ne, other)
-
-
-_MISSING: Any = object()  # sentinel for "no concrete value supplied"
 
 
 class CustomProxyInt(CustomProxy):
@@ -475,32 +484,6 @@ class CustomProxyShape(tuple):
             concrete_val = concrete_shape[i]
             items.append(CustomProxyInt(item_proxy.node, item_proxy.tracer, concrete_val))
         return cls(items)
-
-
-class _SafeNumelCallable:
-    """
-    Returned by ``CustomProxy.__getattr__("numel")`` when the proxy carries
-    a fake tensor in its ``meta["val"]``.
-
-    Calling this object (i.e. ``x.numel()``) creates the proper
-    ``call_method("numel", x)`` FX node *and* returns a
-    :class:`CustomProxyInt` so that ``if x.numel() == 0:`` resolves to a
-    plain Python ``bool`` without raising ``TraceError``.
-
-    Crucially, other comparisons (e.g. ``x.numel() > 0``) keep the FX
-    proxy behaviour so that they can be passed to ``torch.cond`` as a
-    tensor-valued condition without issue.
-    """
-
-    def __init__(self, tensor_proxy: "CustomProxy", concrete_numel: Any) -> None:
-        self._tensor_proxy = tensor_proxy
-        self._concrete_numel = concrete_numel
-
-    def __call__(self, *args: Any, **kwargs: Any) -> "CustomProxyInt":
-        proxy = self._tensor_proxy.tracer.create_proxy(
-            "call_method", "numel", (self._tensor_proxy, *args), kwargs
-        )
-        return CustomProxyInt(proxy.node, proxy.tracer, self._concrete_numel)
 
 
 class CustomParameterProxy(CustomProxy):
