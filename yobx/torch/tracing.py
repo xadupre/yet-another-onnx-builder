@@ -1307,22 +1307,25 @@ class CustomTracer(torch.fx.Tracer):
 
         _VMAP_KEY = "vmap_batch_dim"  # meta key: Dict[level, actual_batch_dim]
 
-        def _get_batch_dim(node: torch.fx.Node, level: int):
+        def _get_batch_dim(node: torch.fx.Node) -> Optional[Tuple[int]]:
             """Return the tracked batch-dim position for *level*, or None."""
-            return node.meta.get(_VMAP_KEY, {}).get(level)
+            return node.meta.get(_VMAP_KEY, None)
 
-        def _set_batch_dim(node: torch.fx.Node, level: int, batch_dim: int):
+        def _set_batch_dim(node: torch.fx.Node, batch_dim: int, level: int):
             """Store the batch-dim position for *level* in *node*'s metadata."""
-            if _VMAP_KEY not in node.meta:
-                node.meta[_VMAP_KEY] = {}
-            node.meta[_VMAP_KEY][level] = batch_dim
+            assert _VMAP_KEY not in node.meta or node.meta[_VMAP_KEY] == (batch_dim, level), (
+                f"Incompatible hatc_dim dimension existing is "
+                f"{node.meta[_VMAP_KEY]} != {(batch_dim, level)} (new)"
+            )
+            node.meta[_VMAP_KEY] = (batch_dim, level)
 
         def _propagate(src_nodes, dst_node: torch.fx.Node):
             """Copy vmap batch-dim metadata from any src node that carries it."""
             for src in src_nodes:
                 if isinstance(src, torch.fx.Node):
-                    for level, bd in src.meta.get(_VMAP_KEY, {}).items():
-                        _set_batch_dim(dst_node, level, bd)
+                    batch = _get_batch_dim(src)
+                    if batch:
+                        _set_batch_dim(dst_node, *batch)
 
         modified = 0
         for node in list(graph.nodes):
@@ -1331,17 +1334,28 @@ class CustomTracer(torch.fx.Tracer):
             target = node.target
             if target is _add_batch_dim:
                 # args: (x, batch_dim, level)
-                assert (
-                    len(node.args) == 3
-                ), f"_add_batch_dim expected 3 args, got {len(node.args)}: {node.args}"
+                assert len(node.args) == 3, (
+                    f"_add_batch_dim expected 3 args, got {len(node.args)}: {node.args} "
+                    f"is it expected?"
+                )
                 x, batch_dim, level = node.args
                 # Replace with clone(x) and tag with the actual batch-dim position.
                 with graph.inserting_before(node):
-                    new_node = graph.call_function(
-                        torch.ops.aten.clone.default, args=(x,)
-                    )
-                    new_node.meta = node.meta.copy()
-                _set_batch_dim(new_node, level, batch_dim)
+                    new_node = graph.call_function(torch.ops.aten.clone.default, args=(x,))
+                    x_shape = x.meta["val"].shape
+                    node_shape = node.meta["val"].shape
+                    if x_shape == node_shape:
+                        new_node.meta = node.meta.copy()
+                    else:
+                        assert len(node_shape) == 0 and len(x_shape) == 1, (
+                            f"{x_shape=} and {node_shape=} is not yet implmeented. "
+                            f"You should raise an issue."
+                        )
+                        new_node = graph.call_function(
+                            torch.ops.aten.squeeze.default, args=(new_node, 0)
+                        )
+                        new_node.meta = node.meta.copy()
+                _set_batch_dim(new_node, batch_dim, level)
                 node.replace_all_uses_with(new_node)
                 graph.erase_node(node)
                 if verbose:
@@ -1356,71 +1370,50 @@ class CustomTracer(torch.fx.Tracer):
                     len(node.args) == 4
                 ), f"_remove_batch_dim expected 4 args, got {len(node.args)}: {node.args}"
                 x, level, batch_size, out_dim = node.args
+
                 # Resolve the actual batch-dim position from tracked metadata.
-                if isinstance(x, torch.fx.Node):
-                    actual_batch_dim = _get_batch_dim(x, level)
-                    if actual_batch_dim is None:
-                        actual_batch_dim = level - 1
-                else:
-                    actual_batch_dim = level - 1
-                # Check whether the batch dimension in x has size 1 while
-                # batch_size > 1.  This happens when the tensor was "not batched"
-                # inside vmap (i.e. broadcast).  In that case we must emit an
-                # aten.expand node before any movedim so the full batch is
-                # materialised in the output.
-                need_expand = False
-                if (
-                    isinstance(x, torch.fx.Node)
-                    and isinstance(batch_size, int)
-                    and batch_size > 1
-                    and "val" in x.meta
-                ):
-                    x_val = x.meta["val"]
-                    if (
-                        hasattr(x_val, "shape")
-                        and len(x_val.shape) > actual_batch_dim
-                    ):
-                        dim_size = x_val.shape[actual_batch_dim]
-                        need_expand = isinstance(dim_size, int) and dim_size == 1
-                src = x
-                if need_expand or actual_batch_dim != out_dim:
-                    with graph.inserting_before(node):
-                        if need_expand:
-                            # Build expand shape: keep all dims as-is (-1) except
-                            # the batch dim which is set to batch_size.
-                            rank = len(x.meta["val"].shape)
-                            expand_shape = [-1] * rank
-                            expand_shape[actual_batch_dim] = batch_size
-                            src = graph.call_function(
-                                torch.ops.aten.expand.default,
-                                args=(x, expand_shape),
-                            )
-                            src.meta = node.meta.copy()
-                        if actual_batch_dim != out_dim:
-                            movedim_node = graph.call_function(
-                                torch.ops.aten.movedim.int,
-                                args=(src, actual_batch_dim, out_dim),
-                            )
-                            movedim_node.meta = node.meta.copy()
-                            src = movedim_node
+                assert isinstance(
+                    x, torch.fx.Node
+                ), f"This is not implemented yet for type {type(x)}"
+                x_batch, _x_level = _get_batch_dim(x)
+                assert x_batch == out_dim, (
+                    f"Not yet implemented when batch_dim(x)={x_batch} and {out_dim=}. "
+                    f"You should file an issue."
+                )
+
+                with graph.inserting_before(node):
+                    # Build expand shape: keep all dims as-is (-1) except
+                    # the batch dim which is set to batch_size.
+                    x_shape = x.meta["val"].shape
+                    rank = len(x_shape)
+                    assert rank > 1 or x_batch == 0, (
+                        f"Incompatibilies between {x_shape=} and {x_batch=}. "
+                        f"A case is not tested?"
+                    )
+                    if rank == 0:
+                        rank = 1
+                    expand_shape = [-1] * rank
+                    expand_shape[x_batch] = batch_size
+                    src = graph.call_function(
+                        torch.ops.aten.expand.default, args=(x, expand_shape)
+                    )
+                    src.meta = node.meta.copy()
+                    if x_batch != out_dim:
+                        movedim_node = graph.call_function(
+                            torch.ops.aten.movedim.int, args=(src, x_batch, out_dim)
+                        )
+                        movedim_node.meta = node.meta.copy()
+                        src = movedim_node
                 node.replace_all_uses_with(src)
                 graph.erase_node(node)
                 if verbose:
-                    print(
-                        f"[CustomTracer.remove_batch_dim_nodes] _remove_batch_dim "
-                        f"level={level} actual_batch_dim={actual_batch_dim} "
-                        f"out_dim={out_dim} batch_size={batch_size} "
-                        f"need_expand={need_expand}"
-                    )
+                    print(f"[CustomTracer.remove_batch_dim_nodes] _remove_batch_dim {src.name!r}")
                 modified += 1
             else:
                 # Propagate vmap batch-dim metadata through all other ops so that
                 # _remove_batch_dim can find it even after several intervening nodes.
                 # Skip quickly when no input node carries vmap metadata.
-                if any(
-                    isinstance(a, torch.fx.Node) and _VMAP_KEY in a.meta
-                    for a in node.args
-                ):
+                if any(isinstance(a, torch.fx.Node) and _VMAP_KEY in a.meta for a in node.args):
                     _propagate(node.args, node)
 
         return modified

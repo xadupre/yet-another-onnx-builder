@@ -3207,7 +3207,8 @@ class TestOnnxExportAten(ExtTestCase):
 
         ep = torch.export.export(model, inputs, dynamic_shapes=dynamic, strict=False)
         ep_dec = ep.run_decompositions()
-        # _add_batch_dim / _remove_batch_dim should be present in ep but absent after decomposition
+        # _add_batch_dim / _remove_batch_dim should be present
+        # in ep but absent after decomposition
         names = [str(n.target) for n in ep.graph.nodes]
         names_dec = [str(n.target) for n in ep_dec.graph.nodes]
         self.assertTrue(
