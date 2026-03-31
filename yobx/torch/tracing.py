@@ -89,7 +89,18 @@ class CustomProxy(torch.fx.proxy.Proxy):
                     # bool without raising TraceError, while cross-tensor
                     # comparisons (``x.shape[0] == y.shape[0]``) still raise
                     # as before.
-                    return CustomProxyShape.from_proxy(CustomAttribute(self, k), shape)
+                    return CustomProxyShape(
+                        node,
+                        tracer=self.tracer,
+                        concrete_val=[
+                            (
+                                d
+                                if isinstance(d, int)
+                                else CustomProxyInt(node, tracer=self.tracer, concrete_val=d)
+                            )
+                            for d in shape
+                        ],
+                    )
             raise NotImplementedError(f"k={k!r}, node={node!r}")
         return CustomAttribute(self, k)
 
@@ -362,7 +373,7 @@ class CustomProxyInt(CustomProxy):
 
     def __init__(
         self, node: Node, tracer: Optional["TracerBase"] = None, concrete_val: Any = _MISSING
-    ) -> None:
+    ):
         super().__init__(node, tracer=tracer)
         self._concrete_val = concrete_val
 
@@ -422,7 +433,7 @@ class CustomAttribute(CustomProxy):
         return self.tracer.create_proxy("call_method", self.attr, (self.root, *args), kwargs)
 
 
-class CustomProxyShape:
+class CustomProxyShape(CustomProxy):
     """
     A :class:`tuple` of :class:`CustomProxyInt` instances representing a
     tensor shape with dynamic dimensions.
@@ -438,11 +449,23 @@ class CustomProxyShape:
     ``torch.Size``.
     """
 
-    def __init__(self, *values):
-        self.values = tuple(values)
+    def __init__(
+        self, node: Node, tracer: Optional["TracerBase"] = None, concrete_val: Any = _MISSING
+    ):
+        super().__init__(node, tracer=tracer)
+        assert concrete_val is not _MISSING and all(
+            isinstance(v, (int, CustomProxyInt)) for v in concrete_val
+        ), (
+            f"Unexpected type in values (type(values)={type(concrete_val)}), "
+            f"{[type(v) for v in concrete_val]}"
+        )
+        self.values = concrete_val
 
     def __len__(self) -> int:
         return len(self.values)
+
+    def __iter__(self):
+        yield from self.values
 
     def __getitem__(self, index):
         if isinstance(index, int):

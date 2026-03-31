@@ -1427,10 +1427,6 @@ class TestCustomProxyShape(ExtTestCase):
 
         self.assertIsNotNone(CPS)
 
-    def test_custom_proxy_shape_is_tuple(self):
-        """CustomProxyShape must be a tuple subclass."""
-        self.assertTrue(issubclass(CustomProxyShape, tuple))
-
     def test_elements_are_custom_proxy_int(self):
         """Each element of a CustomProxyShape must be a CustomProxyInt."""
         from yobx.torch import to_onnx, ExportOptions
