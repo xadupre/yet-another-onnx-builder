@@ -852,10 +852,7 @@ def _contains_value_info_proto(x: Any) -> bool:
     return False
 
 
-def _replace_value_info_protos(
-    x: Any,
-    context: Any,
-) -> Tuple[Any, Any]:
+def _replace_value_info_protos(x: Any, context: Any) -> Tuple[Any, Any]:
     """Recursively replace :class:`~onnx.ValueInfoProto` objects in *x* with
     fake :class:`torch.Tensor` objects.
 

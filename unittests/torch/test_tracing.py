@@ -101,16 +101,8 @@ class TestCustomTracer(ExtTestCase):
         self.assertGreater(len(cmp_nodes), 0)
         # Verify that the length proxy is a CustomProxyInt and comparisons
         # return CustomProxyBool instances.
-        inputs = (
-            torch.arange(4).to(torch.float32),
-            [
-                torch.arange(4).to(torch.float32),
-                torch.arange(4).to(torch.float32),
-            ],
-        )
         length_proxy = None
         for node in graph.nodes:
-            proxy = tracer.proxy(node)
             if node.op == "call_method" and node.target == "__len__":
                 length_proxy = tracer.proxy(node, cls=CustomProxyInt)
                 break
