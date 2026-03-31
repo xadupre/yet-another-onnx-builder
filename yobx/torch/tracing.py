@@ -80,7 +80,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
                         # plain ints.
                         return shape
                     # Dynamic shape: return a CustomProxyShape so that
-                    # elements are _SymGuardProxy (CustomProxyInt) instances.
+                    # elements are CustomProxyInt instances.
                     # Comparing an element against a plain int
                     # (e.g. ``x.shape[2] == 0``) then evaluates to a Python
                     # bool without raising TraceError, while cross-tensor
@@ -313,10 +313,30 @@ class CustomProxyBool(CustomProxy):
         return self._bool_op(operator.ne, other)
 
 
+_MISSING: Any = object()  # sentinel for "no concrete value supplied"
+
+
 class CustomProxyInt(CustomProxy):
-    "A proxy for an integer."
+    """A proxy for an integer.
+
+    When constructed with a *concrete_val* (e.g. a backed ``SymInt`` from
+    fake-tensor metadata), ``==`` and ``!=`` against a plain Python
+    integer / float are evaluated with :func:`_guard_size_oblivious_eq` so
+    that patterns like ``if x.shape[2] == 0:`` work during symbolic tracing
+    without raising ``TraceError``.  All other comparisons (including
+    proxy-vs-proxy) still create FX nodes as usual.
+    """
 
     __hash__ = CustomProxy.__hash__  # restore hash after __eq__ override
+
+    def __init__(
+        self,
+        node: Node,
+        tracer: Optional["TracerBase"] = None,
+        concrete_val: Any = _MISSING,
+    ) -> None:
+        super().__init__(node, tracer=tracer)
+        self._concrete_val = concrete_val
 
     def instanceof(self, cls):
         """isinstance"""
@@ -333,9 +353,21 @@ class CustomProxyInt(CustomProxy):
         return self.tracer.proxy(node, cls=CustomProxyBool)
 
     def __eq__(self, other):  # type: ignore[override]
+        if (
+            self._concrete_val is not _MISSING
+            and isinstance(other, (int, float))
+            and not isinstance(other, bool)
+        ):
+            return _guard_size_oblivious_eq(self._concrete_val, other)
         return self._compare(operator.eq, other)
 
     def __ne__(self, other):  # type: ignore[override]
+        if (
+            self._concrete_val is not _MISSING
+            and isinstance(other, (int, float))
+            and not isinstance(other, bool)
+        ):
+            return not _guard_size_oblivious_eq(self._concrete_val, other)
         return self._compare(operator.ne, other)
 
     def __lt__(self, other):
@@ -403,57 +435,10 @@ def _guard_size_oblivious_eq(concrete_val: Any, other: Any) -> bool:
         raise
 
 
-class _SymGuardProxy(CustomProxyInt):
-    """
-    A :class:`CustomProxyInt` whose equality operators evaluate to a plain
-    Python ``bool`` *only* when compared against a constant Python integer
-    or float (e.g. ``x.shape[2] == 0`` or ``x.numel() == 0``).
-
-    For all other comparisons (including comparisons against another proxy,
-    e.g. ``x.shape[0] == y.shape[0]``), the default ``Proxy`` path is used
-    so that an FX node is created and
-    ``TraceError: symbolically traced variables cannot be used as inputs to
-    control flow`` is still raised when appropriate.
-
-    This asymmetry lets patterns like::
-
-        if x.shape[2] == 0:
-            return 0
-        return x.shape[-2]
-
-    be traced safely (the ``== 0`` evaluates to ``False`` at trace time using
-    the backed SymInt value, so the correct branch is recorded) while
-    cross-tensor comparisons such as ``if x.shape[0] == y.shape[0]:`` still
-    raise ``TraceError`` as expected.
-    """
-
-    __hash__ = CustomProxy.__hash__  # restore hash after __eq__ override
-
-    def __init__(self, node: Node, tracer: "TracerBase", concrete_val: Any) -> None:
-        super().__init__(node, tracer=tracer)
-        self._concrete_val = concrete_val
-
-    def __eq__(self, other: object) -> bool:  # type: ignore[override]
-        if isinstance(other, (int, float)) and not isinstance(other, bool):
-            # Safe to evaluate concretely: comparing a dynamic dimension
-            # against a constant integer/float.
-            return _guard_size_oblivious_eq(self._concrete_val, other)
-        # Comparing against a proxy or another symbolic value: fall through
-        # to the default Proxy path which creates an FX node.  When the
-        # result is used in a Python ``if``, Proxy.__bool__ will raise
-        # TraceError as intended.
-        return torch.fx.proxy.Proxy.__eq__(self, other)  # type: ignore[return-value]
-
-    def __ne__(self, other: object) -> bool:  # type: ignore[override]
-        if isinstance(other, (int, float)) and not isinstance(other, bool):
-            return not _guard_size_oblivious_eq(self._concrete_val, other)
-        return torch.fx.proxy.Proxy.__ne__(self, other)  # type: ignore[return-value]
-
-
 class CustomProxyShape(tuple):
     """
-    A :class:`tuple` of :class:`_SymGuardProxy` (a :class:`CustomProxyInt`
-    subclass) representing a tensor shape with dynamic dimensions.
+    A :class:`tuple` of :class:`CustomProxyInt` instances representing a
+    tensor shape with dynamic dimensions.
 
     Each element is a valid FX proxy node (so dynamic-shape operators such
     as ``torch.full`` are recorded correctly in the graph) *and* supports
@@ -488,7 +473,7 @@ class CustomProxyShape(tuple):
         for i in range(len(concrete_shape)):
             item_proxy: CustomProxy = shape_proxy[i]  # type: ignore[assignment]
             concrete_val = concrete_shape[i]
-            items.append(_SymGuardProxy(item_proxy.node, item_proxy.tracer, concrete_val))
+            items.append(CustomProxyInt(item_proxy.node, item_proxy.tracer, concrete_val))
         return cls(items)
 
 
@@ -499,7 +484,7 @@ class _SafeNumelCallable:
 
     Calling this object (i.e. ``x.numel()``) creates the proper
     ``call_method("numel", x)`` FX node *and* returns a
-    :class:`_SymGuardProxy` so that ``if x.numel() == 0:`` resolves to a
+    :class:`CustomProxyInt` so that ``if x.numel() == 0:`` resolves to a
     plain Python ``bool`` without raising ``TraceError``.
 
     Crucially, other comparisons (e.g. ``x.numel() > 0``) keep the FX
@@ -511,11 +496,11 @@ class _SafeNumelCallable:
         self._tensor_proxy = tensor_proxy
         self._concrete_numel = concrete_numel
 
-    def __call__(self, *args: Any, **kwargs: Any) -> "_SymGuardProxy":
+    def __call__(self, *args: Any, **kwargs: Any) -> "CustomProxyInt":
         proxy = self._tensor_proxy.tracer.create_proxy(
             "call_method", "numel", (self._tensor_proxy, *args), kwargs
         )
-        return _SymGuardProxy(proxy.node, proxy.tracer, self._concrete_numel)
+        return CustomProxyInt(proxy.node, proxy.tracer, self._concrete_numel)
 
 
 class CustomParameterProxy(CustomProxy):

@@ -1490,7 +1490,6 @@ class TestCustomProxyShape(ExtTestCase):
     def test_elements_are_custom_proxy_int(self):
         """Each element of a CustomProxyShape must be a CustomProxyInt."""
         from yobx.torch import to_onnx, ExportOptions
-        from yobx.torch.tracing import _SymGuardProxy
 
         captured = []
 
@@ -1513,7 +1512,6 @@ class TestCustomProxyShape(ExtTestCase):
             if isinstance(s, CustomProxyShape):
                 for elem in s:
                     self.assertIsInstance(elem, CustomProxyInt)
-                    self.assertIsInstance(elem, _SymGuardProxy)
 
     def test_len_and_iter(self):
         """CustomProxyShape must support len() and iteration like a tuple."""
