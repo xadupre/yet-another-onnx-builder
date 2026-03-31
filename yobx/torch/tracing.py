@@ -263,13 +263,15 @@ class CustomProxy(torch.fx.proxy.Proxy):
                     "call_method", "size", args=(self.node,), kwargs={}
                 )
                 return CustomProxyShape.from_proxy(
-                    self.tracer.proxy(size_node), concrete_shape, only_positive=True
+                    self.tracer.proxy(size_node), concrete_shape
                 )
-            # No fake-tensor metadata: return a plain call_method proxy.
+            # No fake-tensor metadata: return a plain CustomProxyShape proxy
+            # (values will be _MISSING; individual elements can still be traced
+            # via getitem when indexed).
             size_node = self.tracer.create_node(
                 "call_method", "size", args=(self.node,), kwargs={}
             )
-            return self.tracer.proxy(size_node, cls=CustomProxyInt, only_positive=True)
+            return self.tracer.proxy(size_node, cls=CustomProxyShape)
         else:
             concrete_val: Any = _MISSING
             if concrete_shape is not None:
@@ -278,7 +280,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 "call_method", "size", args=(self.node, dim), kwargs={}
             )
             return self.tracer.proxy(
-                size_node, cls=CustomProxyInt, concrete_val=concrete_val, only_positive=True
+                size_node, cls=CustomProxyInt, concrete_val=concrete_val
             )
 
     @classmethod
@@ -516,12 +518,27 @@ class CustomProxyShape(CustomProxy):
         return f"{self.__class__.__name__}({self.values})"
 
     def __len__(self) -> int:
+        if self.values is _MISSING:
+            raise NotImplementedError(
+                "Cannot compute the length of a CustomProxyShape without concrete values. "
+                "Ensure concrete shape metadata is available, or use the proxy node directly."
+            )
         return len(self.values)
 
     def length(self) -> int:
+        if self.values is _MISSING:
+            raise NotImplementedError(
+                "Cannot compute the length of a CustomProxyShape without concrete values. "
+                "Ensure concrete shape metadata is available, or use the proxy node directly."
+            )
         return len(self.values)
 
     def __iter__(self):
+        if self.values is _MISSING:
+            raise NotImplementedError(
+                "Cannot iterate a CustomProxyShape without concrete values. "
+                "Ensure concrete shape metadata is available."
+            )
         yield from self.values
 
     def __getitem__(self, index):
@@ -534,8 +551,12 @@ class CustomProxyShape(CustomProxy):
                 return self.tracer.proxy(node, cls=CustomProxyInt)
             return self.values[index]
         if isinstance(index, slice):
-            assert self.values is not _MISSING, "Not implemented when there is concrete_val"
-            return self.__class__(*self.values[index])
+            if self.values is _MISSING:
+                raise NotImplementedError(
+                    "Slicing a CustomProxyShape requires concrete values. "
+                    "Ensure concrete shape metadata is available."
+                )
+            return self.values[index]
         raise TypeError(f"{type(index)=} is unexpected for {self.__class__=}")
 
     @classmethod
@@ -561,7 +582,12 @@ class CustomProxyShape(CustomProxy):
             item_proxy: CustomProxy = shape_proxy[i]  # type: ignore[assignment]
             concrete_val = concrete_shape[i]
             items.append(CustomProxyInt(item_proxy.node, item_proxy.tracer, concrete_val))
-        return cls(items)
+        # Tie the CustomProxyShape to the underlying proxy node and tracer, then
+        # attach the per-dimension proxies as values (bypassing the init assertion
+        # so the assignment is made directly after construction).
+        shape = cls(shape_proxy.node, shape_proxy.tracer)
+        shape.values = tuple(items)
+        return shape
 
 
 class CustomParameterProxy(CustomProxy):
