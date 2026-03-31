@@ -3207,11 +3207,17 @@ class TestOnnxExportAten(ExtTestCase):
 
         ep = torch.export.export(model, inputs, dynamic_shapes=dynamic, strict=False)
         ep_dec = ep.run_decompositions()
-        # ep and ep_dec use different sets of ops; _add_batch_dim / _remove_batch_dim
-        # should be present in ep but absent after decomposition
+        # _add_batch_dim / _remove_batch_dim should be present in ep but absent after decomposition
         names = [str(n.target) for n in ep.graph.nodes]
         names_dec = [str(n.target) for n in ep_dec.graph.nodes]
-        self.assertNotEqual(names, names_dec)
+        self.assertTrue(
+            any("_add_batch_dim" in n for n in names),
+            f"_add_batch_dim not found in ep nodes: {names}",
+        )
+        self.assertFalse(
+            any("_add_batch_dim" in n for n in names_dec),
+            f"_add_batch_dim unexpectedly found in ep_dec nodes: {names_dec}",
+        )
 
         with apply_patches_for_model(patch_torch=True, model=model):
             onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
