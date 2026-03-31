@@ -1213,11 +1213,7 @@ class TestOnnxExportAten(ExtTestCase):
                     continue
                 key = red, include, stype
                 if key in skip_ort:
-                    self.todo(
-                        self.test_aten_scatter_reduce_include_self,
-                        f"case {key} not supported by onnxruntime",
-                    )
-                    continue
+                    self.skipTest(f"case {key} not supported by onnxruntime")
                 import onnxruntime
 
                 sess_options = onnxruntime.SessionOptions()

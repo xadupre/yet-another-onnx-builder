@@ -1387,7 +1387,7 @@ class CustomTracer(torch.fx.Tracer):
                     x_shape = x.meta["val"].shape
                     rank = len(x_shape)
                     assert rank > 1 or x_batch == 0, (
-                        f"Incompatibilies between {x_shape=} and {x_batch=}. "
+                        f"Incompatibilities between {x_shape=} and {x_batch=}. "
                         f"A case is not tested?"
                     )
                     if rank == 0:
