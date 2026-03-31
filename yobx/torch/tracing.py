@@ -262,7 +262,8 @@ class CustomProxyBool(CustomProxy):
         return self.tracer.proxy(node, cls=CustomProxyBool)
 
     def _bool_op_reversed(self, op, other):
-        """Creates a binary boolean operation node (reversed) and returns a :class:`CustomProxyBool`."""
+        """Creates a binary boolean operation node
+        (reversed) and returns a :class:`CustomProxyBool`."""
         # Constant-fold when the non-proxy operand is a known bool literal.
         if isinstance(other, bool):
             if op is operator.and_:
@@ -300,10 +301,7 @@ class CustomProxyBool(CustomProxy):
     def __invert__(self):
         """Logical not (~b)."""
         node = self.tracer.create_node(
-            "call_function",
-            operator.not_,
-            args=(self.node,),
-            kwargs={},
+            "call_function", operator.not_, args=(self.node,), kwargs={}
         )
         return self.tracer.proxy(node, cls=CustomProxyBool)
 
