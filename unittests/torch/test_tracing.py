@@ -86,10 +86,25 @@ class TestCustomTracer(ExtTestCase):
                 self.assertIsInstance(proxy, CustomProxy)
                 self.assertIn("CustomProxy", repr(proxy))
 
-    def test_custom_proxy_int_comparison_returns_bool(self):
+    def test_custom_proxy_int_comparison_returns_bool_except(self):
         class Model(torch.nn.Module):
             def forward(self, x, lx: list):
                 length = len(lx)
+                return length == 2, length != 2, length < 3, length <= 2, length > 1, length >= 2
+
+        model = Model()
+        tracer = CustomTracer()
+        self.assertRaise(lambda: tracer.trace(model), RuntimeError)
+
+    def test_custom_proxy_int_comparison_returns_bool(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, lx: list):
+                if isinstance(x, torch.Tensor):
+                    # no tracing
+                    length = len(lx)
+                else:
+                    # tracing
+                    length = lx.length()
                 return length == 2, length != 2, length < 3, length <= 2, length > 1, length >= 2
 
         model = Model()
@@ -1577,5 +1592,7 @@ class TestCustomProxyShape(ExtTestCase):
                 export_options=ExportOptions(tracing=True),
                 dynamic_shapes=({0: "batch", 1: "seq"},),
             )
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

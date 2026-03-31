@@ -89,12 +89,12 @@ class CustomProxy(torch.fx.proxy.Proxy):
                     # comparisons (``x.shape[0] == y.shape[0]``) still raise
                     # as before.
                     node = self.tracer.create_node(
-                        "call_method", "size", args=(self.node,), kwargs={}
+                        "call_method", "shape", args=(self.node,), kwargs={}
                     )
                     shape_proxy = self.tracer.proxy(node, cls=CustomProxyShape)
                     return CustomProxyShape.from_proxy(shape_proxy, shape)
             # In any other case (no meta val or val is not a Tensor), emit a node.
-            node = self.tracer.create_node("call_method", "size", args=(self.node,), kwargs={})
+            node = self.tracer.create_node("call_method", "shape", args=(self.node,), kwargs={})
             tt = self.tracer.proxy(node, cls=CustomProxyShape)
             return tt
         return CustomAttribute(self, k)
@@ -185,7 +185,13 @@ class CustomProxy(torch.fx.proxy.Proxy):
         return self.tracer.proxy(node)
 
     def __len__(self):
-        raise RuntimeError("'len' is not supported in symbolic tracing by default.")
+        raise RuntimeError(
+            f"'len' is not supported in symbolic tracing by default, "
+            f"you need to detect if the model is being traced and then "
+            f"call 'self.length()'. "
+            f"self={self!r}, node={self.node!r}, op={self.node.op!r}, "
+            f"node.meta={self.node.meta}. "
+        )
 
     def length(self):
         """Returns a proxy for the length."""
@@ -247,9 +253,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 size_node = self.tracer.create_node(
                     "call_method", "size", args=(self.node,), kwargs={}
                 )
-                return CustomProxyShape.from_proxy(
-                    self.tracer.proxy(size_node), concrete_shape
-                )
+                return CustomProxyShape.from_proxy(self.tracer.proxy(size_node), concrete_shape)
             # No fake-tensor metadata: return a plain CustomProxyShape proxy
             # (values will be _MISSING; individual elements can still be traced
             # via getitem when indexed).
@@ -264,9 +268,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
             size_node = self.tracer.create_node(
                 "call_method", "size", args=(self.node, dim), kwargs={}
             )
-            return self.tracer.proxy(
-                size_node, cls=CustomProxyInt, concrete_val=concrete_val
-            )
+            return self.tracer.proxy(size_node, cls=CustomProxyInt, concrete_val=concrete_val)
 
     @classmethod
     def cat(
@@ -411,6 +413,7 @@ class CustomProxyInt(CustomProxy):
         self._concrete_val = concrete_val
         self.only_positive = only_positive
         self.can_be_null = can_be_null
+        assert not isinstance(concrete_val, int)
 
     def _compare(self, op, other):
         """Creates a comparison node and returns a :class:`CustomProxyBool`."""
@@ -578,7 +581,11 @@ class CustomProxyShape(CustomProxy):
         for i in range(len(concrete_shape)):
             item_proxy: CustomProxy = shape_proxy[i]  # type: ignore[assignment]
             concrete_val = concrete_shape[i]
-            items.append(CustomProxyInt(item_proxy.node, item_proxy.tracer, concrete_val))
+            items.append(
+                concrete_val
+                if isinstance(concrete_val, int)
+                else CustomProxyInt(item_proxy.node, item_proxy.tracer, concrete_val)
+            )
         # Tie the CustomProxyShape to the underlying proxy node and tracer, then
         # attach the per-dimension proxies as values (bypassing the init assertion
         # so the assignment is made directly after construction).
@@ -1125,13 +1132,6 @@ class CustomTracer(torch.fx.Tracer):
 
         traced_model = None
         if concrete_args:
-            if dynamic_shapes is None:
-                dynamic_shapes = (
-                    ({},) * len(concrete_args)
-                    if isinstance(concrete_args, tuple)
-                    else {k: {} for k in concrete_args}
-                )
-
             flat_args = (
                 concrete_args.values() if isinstance(concrete_args, dict) else concrete_args
             )

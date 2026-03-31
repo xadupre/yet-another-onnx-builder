@@ -335,6 +335,13 @@ def aten_meth_sin(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[
     return aten_sin(g, sts, outputs, x, name=".sin")
 
 
+def aten_meth_shape(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = ".shape"
+) -> T:
+    "shape"
+    return g.op.Shape(x, name=name, outputs=outputs)
+
+
 def aten_meth_size(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
