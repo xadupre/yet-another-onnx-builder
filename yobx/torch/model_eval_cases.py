@@ -560,9 +560,7 @@ def run_exporter(
                 else pretty_onnx(onx)
             )
         if verbose >= 2:
-            onnx.save(
-                onx.proto, f"evaluation-{model.__class__.__name__}-{dynamic}-{exporter}.onnx"
-            )
+            onnx.save(onx, f"evaluation-{model.__class__.__name__}-{dynamic}-{exporter}.onnx")
 
         names = [i.name for i in onx.graph.input]
         flats = _flatten_inputs(inputs[0]) if len(names) > len(inputs[0]) else inputs[0]

@@ -345,15 +345,19 @@ def aten_meth_size(
 ) -> T:
     "size"
     if dim is None:
-        res = g.op.Shape(x, name=f"{name}A", outputs=outputs)
+        res = g.op.Size(x, name=f"{name}A", outputs=outputs)
         if not sts:
             g.set_type(res, TensorProto.INT64)
             if g.has_rank(x):
                 g.set_shape(res, (g.get_rank(x),))
         return res
 
-    s = g.op.Shape(x, name=name)
-    d = g.op.Gather(s, np.array([dim], dtype=np.int64), name=f"{name}B")
+    assert isinstance(dim, int), f"Unexpected type {type(dim)} for dim {g.get_debug_msg()}"
+    d = (
+        g.op.Shape(x, name=f"{name}B", start=-1)
+        if dim == -1
+        else g.op.Shape(x, start=dim, end=dim + 1, name=f"{name}B")
+    )
     res = g.op.SqueezeAnyOpset(d, g.ZERO, name=f"{name}B", outputs=outputs)
     if not sts:
         g.set_type(res, TensorProto.INT64)
