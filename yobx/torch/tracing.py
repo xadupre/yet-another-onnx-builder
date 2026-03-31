@@ -211,6 +211,54 @@ class CustomProxy(torch.fx.proxy.Proxy):
         )
         return CustomProxyInt(node, self.tracer, concrete_numel)
 
+    def size(self, dim: Optional[int] = None):
+        """
+        Records a ``size()`` or ``size(dim)`` call in the FX graph.
+
+        * ``size()`` — returns a :class:`CustomProxyShape` (dynamic shapes) or a
+          plain :class:`torch.Size` (all-static shapes), matching the behaviour
+          of accessing ``.shape``.
+        * ``size(dim)`` — returns a :class:`CustomProxyInt` whose ``concrete_val``
+          is set from fake-tensor metadata so that comparisons such as
+          ``if x.size(0) == 0:`` resolve to a plain Python ``bool`` at trace time
+          without raising ``TraceError``.
+        """
+        _node = self.__dict__.get("node")
+        concrete_shape: Any = None
+        if _node is not None and "val" in _node.meta:
+            val = _node.meta["val"]
+            if isinstance(val, torch.Tensor):
+                concrete_shape = val.shape
+        if dim is None:
+            if concrete_shape is not None:
+                if all(isinstance(d, int) for d in concrete_shape):
+                    # All dimensions are concrete static integers: return
+                    # torch.Size directly so that downstream code receives plain ints.
+                    return concrete_shape
+                # Dynamic shape: create a call_method("size") node and wrap in
+                # CustomProxyShape so each element is a CustomProxyInt with a
+                # concrete_val, enabling ``if x.size()[0] == 0:`` at trace time.
+                size_node = self.tracer.create_node(
+                    "call_method", "size", args=(self.node,), kwargs={}
+                )
+                return CustomProxyShape.from_proxy(self.tracer.proxy(size_node), concrete_shape)
+            # No fake-tensor metadata: return a plain call_method proxy.
+            size_node = self.tracer.create_node(
+                "call_method", "size", args=(self.node,), kwargs={}
+            )
+            return self.tracer.proxy(size_node)
+        else:
+            concrete_val: Any = _MISSING
+            if concrete_shape is not None:
+                try:
+                    concrete_val = concrete_shape[dim]
+                except IndexError:
+                    pass
+            size_node = self.tracer.create_node(
+                "call_method", "size", args=(self.node, dim), kwargs={}
+            )
+            return CustomProxyInt(size_node, self.tracer, concrete_val)
+
     @classmethod
     def cat(
         cls, tensors: List["CustomProxy"], dim: int = 0, *, out=None, axis: Optional[int] = None
@@ -442,16 +490,18 @@ class CustomProxyShape:
 
     @classmethod
     def from_proxy(
-        cls, shape_proxy: "CustomAttribute", concrete_shape: "torch.Size"
+        cls, shape_proxy: "CustomProxy", concrete_shape: "torch.Size"
     ) -> "CustomProxyShape":
         """
-        Build a :class:`CustomProxyShape` from a shape attribute proxy and
+        Build a :class:`CustomProxyShape` from a shape/size proxy and
         the corresponding concrete (possibly symbolic) ``torch.Size``.
 
         Parameters
         ----------
         shape_proxy:
-            The FX attribute proxy for ``tensor.shape``.
+            An FX proxy whose ``[i]`` subscript creates a ``getitem`` graph
+            node (e.g. a ``CustomAttribute`` for ``tensor.shape`` or a
+            ``CustomProxy`` wrapping a ``call_method("size", …)`` node).
         concrete_shape:
             The concrete ``torch.Size`` from the fake tensor's metadata
             (may contain backed ``SymInt`` values for dynamic dimensions).
@@ -484,8 +534,8 @@ class CustomParameterProxy(CustomProxy):
     def shape(self):
         return self.param.shape
 
-    def size(self):
-        return self.param.size()
+    def size(self, dim=None):
+        return self.param.size() if dim is None else self.param.size(dim)
 
     def dim(self):
         return self.param.dim()
