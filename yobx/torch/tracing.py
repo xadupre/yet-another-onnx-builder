@@ -380,43 +380,9 @@ class CustomProxyInt(CustomProxy):
         return self.tracer.proxy(node, cls=CustomProxyBool)
 
     def __eq__(self, other):  # type: ignore[override]
-        if (
-            self._concrete_val is not _MISSING
-            and isinstance(other, (int, float))
-            and not isinstance(other, bool)
-        ):
-            try:
-                import torch.fx.experimental.symbolic_shapes as _ss
-
-                _guard_exc = getattr(_ss, "GuardOnDataDependentSymNode", None)
-            except ImportError:
-                _guard_exc = None
-            try:
-                return bool(self._concrete_val == other)
-            except Exception as e:
-                if _guard_exc is not None and isinstance(e, _guard_exc):
-                    return False
-                raise
         return self._compare(operator.eq, other)
 
     def __ne__(self, other):  # type: ignore[override]
-        if (
-            self._concrete_val is not _MISSING
-            and isinstance(other, (int, float))
-            and not isinstance(other, bool)
-        ):
-            try:
-                import torch.fx.experimental.symbolic_shapes as _ss
-
-                _guard_exc = getattr(_ss, "GuardOnDataDependentSymNode", None)
-            except ImportError:
-                _guard_exc = None
-            try:
-                return not bool(self._concrete_val == other)
-            except Exception as e:
-                if _guard_exc is not None and isinstance(e, _guard_exc):
-                    return True
-                raise
         return self._compare(operator.ne, other)
 
     def __lt__(self, other):
