@@ -237,9 +237,79 @@ def _isinstance(x, cls):
 class CustomProxyBool(CustomProxy):
     "A proxy for a boolean."
 
+    __hash__ = CustomProxy.__hash__  # restore hash after __eq__ override
+
     def instanceof(self, cls):
         """isinstance"""
         return cls in {CustomProxyBool, CustomProxy, bool}
+
+    def _bool_op(self, op, other):
+        """Creates a binary boolean operation node and returns a :class:`CustomProxyBool`."""
+        # Constant-fold when the non-proxy operand is a known bool literal.
+        if isinstance(other, bool):
+            if op is operator.and_:
+                return False if not other else self
+            if op is operator.or_:
+                return True if other else self
+            if op is operator.xor:
+                return ~self if other else self
+        node = self.tracer.create_node(
+            "call_function",
+            op,
+            args=(self.node, other.node if isinstance(other, CustomProxy) else other),
+            kwargs={},
+        )
+        return self.tracer.proxy(node, cls=CustomProxyBool)
+
+    def _bool_op_reversed(self, op, other):
+        """Creates a binary boolean operation node
+        (reversed) and returns a :class:`CustomProxyBool`."""
+        # Constant-fold when the non-proxy operand is a known bool literal.
+        if isinstance(other, bool):
+            if op is operator.and_:
+                return False if not other else self
+            if op is operator.or_:
+                return True if other else self
+            if op is operator.xor:
+                return ~self if other else self
+        node = self.tracer.create_node(
+            "call_function",
+            op,
+            args=(other.node if isinstance(other, CustomProxy) else other, self.node),
+            kwargs={},
+        )
+        return self.tracer.proxy(node, cls=CustomProxyBool)
+
+    def __and__(self, other):
+        return self._bool_op(operator.and_, other)
+
+    def __rand__(self, other):
+        return self._bool_op_reversed(operator.and_, other)
+
+    def __or__(self, other):
+        return self._bool_op(operator.or_, other)
+
+    def __ror__(self, other):
+        return self._bool_op_reversed(operator.or_, other)
+
+    def __xor__(self, other):
+        return self._bool_op(operator.xor, other)
+
+    def __rxor__(self, other):
+        return self._bool_op_reversed(operator.xor, other)
+
+    def __invert__(self):
+        """Logical not (~b)."""
+        node = self.tracer.create_node(
+            "call_function", operator.not_, args=(self.node,), kwargs={}
+        )
+        return self.tracer.proxy(node, cls=CustomProxyBool)
+
+    def __eq__(self, other):  # type: ignore[override]
+        return self._bool_op(operator.eq, other)
+
+    def __ne__(self, other):  # type: ignore[override]
+        return self._bool_op(operator.ne, other)
 
 
 class CustomProxyInt(CustomProxy):

@@ -121,6 +121,99 @@ class TestCustomTracer(ExtTestCase):
             cmp_result = length_proxy >= 2
             self.assertIsInstance(cmp_result, CustomProxyBool)
 
+    def test_custom_proxy_bool_logic_ops(self):
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                length = x.size(0)
+                a = length == 2
+                b = length > 0
+                c = 0 < length  # reflected comparison: int on the left
+                # Stack bool results into a single int32 tensor before returning
+                return torch.stack(
+                    [
+                        (a & b).to(torch.int32),
+                        (a | b).to(torch.int32),
+                        (a ^ b).to(torch.int32),
+                        (~a).to(torch.int32),
+                        c.to(torch.int32),
+                    ]
+                )
+
+        model = Model()
+        tracer = CustomTracer()
+        graph = tracer.trace(model)
+        # Verify that 0 < length (reflected comparison) produces a CustomProxyBool
+        length_node = None
+        for node in graph.nodes:
+            if node.op == "call_method" and node.target == "size":
+                length_node = node
+                break
+        if length_node is not None:
+            length_proxy = tracer.proxy(length_node, cls=CustomProxyInt)
+            # 0 < length_proxy triggers int.__lt__ → NotImplemented → length_proxy.__gt__(0)
+            result = 0 < length_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+        # Build bool proxies from comparison results in the traced graph
+        bool_node = None
+        for node in graph.nodes:
+            if node.op == "call_function" and node.target is operator.eq:
+                bool_node = node
+                break
+        if bool_node is not None:
+            bool_proxy = tracer.proxy(bool_node, cls=CustomProxyBool)
+            self.assertIsInstance(bool_proxy, CustomProxyBool)
+            # and
+            result = bool_proxy & bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            # or
+            result = bool_proxy | bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            # xor
+            result = bool_proxy ^ bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            # not (~)
+            result = ~bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            # eq / ne between bools
+            result = bool_proxy == bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            result = bool_proxy != bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            # reverse operations with non-proxy operands
+            result = True & bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            result = False | bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            result = True ^ bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            # constant-folding: False & proxy == False, True & proxy == proxy
+            result = bool_proxy & False
+            self.assertIs(result, False)
+            result = bool_proxy & True
+            self.assertIs(result, bool_proxy)
+            result = False & bool_proxy
+            self.assertIs(result, False)
+            result = True & bool_proxy
+            self.assertIs(result, bool_proxy)
+            # constant-folding: proxy | False == proxy, proxy | True == True
+            result = bool_proxy | False
+            self.assertIsInstance(result, CustomProxyBool)
+            result = bool_proxy | True
+            self.assertIs(result, True)
+            result = False | bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            result = True | bool_proxy
+            self.assertIs(result, True)
+            # constant-folding: proxy ^ False == proxy, proxy ^ True == ~proxy
+            result = bool_proxy ^ False
+            self.assertIsInstance(result, CustomProxyBool)
+            result = bool_proxy ^ True
+            self.assertIsInstance(result, CustomProxyBool)
+            result = False ^ bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+            result = True ^ bool_proxy
+            self.assertIsInstance(result, CustomProxyBool)
+
     def test_is_leaf_module_default(self):
         tracer = CustomTracer()
         # Standard nn.Linear is a leaf by default
