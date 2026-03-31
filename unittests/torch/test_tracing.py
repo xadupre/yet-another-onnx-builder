@@ -17,8 +17,6 @@ from yobx.torch.tracing import (
     CustomProxyShape,
     CustomParameterProxy,
     CondCCOp,
-    _len,
-    _isinstance,
     replace_problematic_function_before_tracing,
     setitem_with_transformation,
     tree_unflatten_with_proxy,
@@ -91,7 +89,7 @@ class TestCustomTracer(ExtTestCase):
     def test_custom_proxy_int_comparison_returns_bool(self):
         class Model(torch.nn.Module):
             def forward(self, x, lx: list):
-                length = _len(lx)
+                length = len(lx)
                 return length == 2, length != 2, length < 3, length <= 2, length > 1, length >= 2
 
         model = Model()
@@ -240,16 +238,9 @@ class TestCustomTracer(ExtTestCase):
             if node.op == "placeholder":
                 proxy = tracer.proxy(node)
                 # _len on a proxy should return another proxy
-                result = _len(proxy)
+                result = len(proxy)
                 self.assertIsNotNone(result)
                 break
-
-    def test_len_plain(self):
-        self.assertEqual(_len([1, 2, 3]), 3)
-
-    def test_isinstance_plain(self):
-        self.assertTrue(_isinstance([1, 2], list))
-        self.assertFalse(_isinstance((1, 2), list))
 
     def test_replace_problematic_function(self):
         original_cat = torch.cat
@@ -454,7 +445,7 @@ class TestTracing(ExtTestCase):
         tr = CustomTracer()
         tr.graph = torch.fx.Graph(tracer_cls=CustomTracer)
         x = CustomProxy(node, tr)
-        i = _len(x)
+        i = len(x)
         self.assertIsInstance(i, CustomProxy)
 
     def test_tracing_abs(self):
@@ -569,53 +560,6 @@ class TestTracing(ExtTestCase):
         self.assertIn("operator.setitem", str(graph))
         mod = torch.fx.GraphModule(model, graph)
         got = mod(x)
-        self.assertEqualArray(expected, got)
-
-    def test_tracing_isinstance(self):
-        class Model(torch.nn.Module):
-            def __init__(self, n_dims: int = 3, n_targets: int = 1):
-                super().__init__()
-                self.linear = torch.nn.Linear(n_dims, n_targets)
-                self.buff = torch.nn.parameter.Buffer(torch.tensor([0.5] * n_targets))
-
-            def forward(self, x, lx):
-                if _isinstance(lx, list):
-                    return torch.sigmoid(self.linear(x)) + lx
-                t = lx[0] * lx[1].sum(axis=1, keepdim=True)
-                return torch.sigmoid(self.linear(x)) - t
-
-        model = Model()
-        self.assertRaise(
-            lambda: CustomTracer().trace(model),
-            RuntimeError,
-            "Unable to know if cls is from type",
-        )
-
-    def test_tracing_len(self):
-        class Model(torch.nn.Module):
-            def __init__(self, n_dims: int = 3, n_targets: int = 1):
-                super().__init__()
-                self.linear = torch.nn.Linear(n_dims, n_targets)
-                self.buff = torch.nn.parameter.Buffer(torch.tensor([0.5] * n_targets))
-
-            def forward(self, x, lx: list):
-                t = lx[0] * lx[1].sum(axis=1, keepdim=True)
-                llx = _len(lx)
-                tn = t / llx
-                return torch.sigmoid(self.linear(x)) - tn
-
-        model = Model()
-        inputs = (
-            (torch.arange(4 * 3) + 10).reshape((-1, 3)).to(torch.float32),
-            [
-                (torch.arange(4) + 10).reshape((-1, 1)).to(torch.float32),
-                (torch.arange(4 * 2) + 10).reshape((-1, 2)).to(torch.float32),
-            ],
-        )
-        graph = CustomTracer().trace(model)
-        mod = torch.fx.GraphModule(model, graph)
-        expected = model(*inputs)
-        got = mod(*inputs)
         self.assertEqualArray(expected, got)
 
     def test_tracing_inplace_setitem_ellipsis(self):

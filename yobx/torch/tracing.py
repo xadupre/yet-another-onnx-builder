@@ -70,7 +70,8 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 val = node.meta["val"]
                 if isinstance(val, torch.Tensor):
                     return getattr(val, k)
-        elif k == "shape":
+            raise NotImplementedError(f"k={k!r}, node={node!r}")
+        if k == "shape":
             node = self.__dict__.get("node")
             if node is not None and "val" in node.meta:
                 val = node.meta["val"]
@@ -89,6 +90,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
                     # comparisons (``x.shape[0] == y.shape[0]``) still raise
                     # as before.
                     return CustomProxyShape.from_proxy(CustomAttribute(self, k), shape)
+            raise NotImplementedError(f"k={k!r}, node={node!r}")
         return CustomAttribute(self, k)
 
     @classmethod
@@ -177,9 +179,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
         return self.tracer.proxy(node)
 
     def __len__(self):
-        raise RuntimeError(
-            "len(.) expects an integer, len needs to be replaced. You should use _len."
-        )
+        return self.length()
 
     def length(self):
         """Returns a proxy for the length."""
@@ -250,10 +250,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
         else:
             concrete_val: Any = _MISSING
             if concrete_shape is not None:
-                try:
-                    concrete_val = concrete_shape[dim]
-                except IndexError:
-                    pass
+                concrete_val = concrete_shape[dim]
             size_node = self.tracer.create_node(
                 "call_method", "size", args=(self.node, dim), kwargs={}
             )
