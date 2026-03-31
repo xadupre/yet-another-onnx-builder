@@ -128,13 +128,13 @@ class TestCustomTracer(ExtTestCase):
                 a = length == 2
                 b = length > 0
                 c = 0 < length  # reflected comparison: int on the left
-                # Convert bool results back to tensors before returning
+                # Combine bool results into a single int32 tensor before returning
                 return (
-                    (a & b).to(torch.int32),
-                    (a | b).to(torch.int32),
-                    (a ^ b).to(torch.int32),
-                    (~a).to(torch.int32),
-                    c.to(torch.int32),
+                    (a & b).to(torch.int32)
+                    + (a | b).to(torch.int32)
+                    + (a ^ b).to(torch.int32)
+                    + (~a).to(torch.int32)
+                    + c.to(torch.int32)
                 )
 
         model = Model()
