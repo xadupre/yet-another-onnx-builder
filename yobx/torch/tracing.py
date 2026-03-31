@@ -70,7 +70,6 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 val = node.meta["val"]
                 if isinstance(val, torch.Tensor):
                     return getattr(val, k)
-            raise NotImplementedError(f"k={k!r}, node={node!r}, {node.meta=}")
         if k == "shape":
             node = self.__dict__.get("node")
             if node is not None and "val" in node.meta:
@@ -94,8 +93,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
                     )
                     shape_proxy = self.tracer.proxy(node, cls=CustomProxyShape)
                     return CustomProxyShape.from_proxy(shape_proxy, shape)
-                raise NotImplementedError(f"k={k!r}, node={node!r}, {type(val)=}")
-            # In any other case, let's emit a node.
+            # In any other case (no meta val or val is not a Tensor), emit a node.
             node = self.tracer.create_node("call_method", "size", args=(self.node,), kwargs={})
             tt = self.tracer.proxy(node, cls=CustomProxyShape)
             return tt
