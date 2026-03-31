@@ -262,10 +262,7 @@ class FakeTensorContext:
             f"Unexpected type {type(x)} for x, content is {string_type(x, with_shape=True)}"
         )
 
-    def value_info_proto_to_torch(
-        self,
-        vip: Any,
-    ) -> Tuple["FakeTensor", Dict[int, str]]:
+    def value_info_proto_to_torch(self, vip: Any) -> Tuple["FakeTensor", Dict[int, str]]:
         """Convert an :class:`onnx.ValueInfoProto` to a fake :class:`torch.Tensor`.
 
         Symbolic dimensions (those with a non-empty ``dim_param``) are assigned
