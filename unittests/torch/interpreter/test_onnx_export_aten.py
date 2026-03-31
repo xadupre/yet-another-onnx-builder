@@ -3204,6 +3204,15 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model()
         expected = model(*torch_deepcopy(inputs))
+
+        ep = torch.export.export(model, inputs, dynamic_shapes=dynamic, strict=False)
+        ep_dec = ep.run_decompositions()
+        # ep and ep_dec use different sets of ops; _add_batch_dim / _remove_batch_dim
+        # should be present in ep but absent after decomposition
+        names = [str(n.target) for n in ep.graph.nodes]
+        names_dec = [str(n.target) for n in ep_dec.graph.nodes]
+        self.assertNotEqual(names, names_dec)
+
         with apply_patches_for_model(patch_torch=True, model=model):
             onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
