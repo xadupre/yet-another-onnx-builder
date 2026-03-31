@@ -203,10 +203,9 @@ class CustomProxy(torch.fx.proxy.Proxy):
         if _node is not None and "val" in _node.meta:
             val = _node.meta["val"]
             if isinstance(val, torch.Tensor):
-                try:
-                    concrete_numel = val.numel()
-                except Exception:
-                    pass
+                concrete_numel = val.numel()
+            elif isinstance(val, CustomProxy):
+                concrete_numel = val.numel()
         node = self.tracer.create_node(
             "call_method", "numel", args=(self.node, *args), kwargs=kwargs
         )
@@ -339,10 +338,7 @@ class CustomProxyInt(CustomProxy):
     __hash__ = CustomProxy.__hash__  # restore hash after __eq__ override
 
     def __init__(
-        self,
-        node: Node,
-        tracer: Optional["TracerBase"] = None,
-        concrete_val: Any = _MISSING,
+        self, node: Node, tracer: Optional["TracerBase"] = None, concrete_val: Any = _MISSING
     ) -> None:
         super().__init__(node, tracer=tracer)
         self._concrete_val = concrete_val
@@ -445,7 +441,7 @@ class CustomAttribute(CustomProxy):
         return self.tracer.create_proxy("call_method", self.attr, (self.root, *args), kwargs)
 
 
-class CustomProxyShape(tuple):
+class CustomProxyShape:
     """
     A :class:`tuple` of :class:`CustomProxyInt` instances representing a
     tensor shape with dynamic dimensions.
@@ -461,11 +457,22 @@ class CustomProxyShape(tuple):
     ``torch.Size``.
     """
 
+    def __init__(self, *values):
+        self.values = tuple(values)
+
+    def __len__(self) -> int:
+        return len(self.values)
+
+    def __getitem__(self, index):
+        if isinstance(index, int):
+            return self.values[index]
+        if isinstance(index, slice):
+            return self.__class__(*self.values[index])
+        raise TypeError(f"{type(index)=} is unexpected for {self.__class__=}")
+
     @classmethod
     def from_proxy(
-        cls,
-        shape_proxy: "CustomAttribute",
-        concrete_shape: "torch.Size",
+        cls, shape_proxy: "CustomAttribute", concrete_shape: "torch.Size"
     ) -> "CustomProxyShape":
         """
         Build a :class:`CustomProxyShape` from a shape attribute proxy and
