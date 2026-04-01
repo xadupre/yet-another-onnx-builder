@@ -1,0 +1,359 @@
+"""Tests for yobx.torch.new_tracing."""
+
+import operator
+import unittest
+
+import torch
+
+from yobx.ext_test_case import ExtTestCase, requires_torch
+
+
+@requires_torch("2.0")
+class TestNewTracing(ExtTestCase):
+    # ------------------------------------------------------------------
+    # Imports
+    # ------------------------------------------------------------------
+
+    def test_import(self):
+        from yobx.torch.new_tracing import (
+            DispatchTracer,
+            TracingDimension,
+            TracingShape,
+            TracingTensor,
+            trace_model,
+        )
+
+        self.assertIsNotNone(DispatchTracer)
+        self.assertIsNotNone(TracingDimension)
+        self.assertIsNotNone(TracingShape)
+        self.assertIsNotNone(TracingTensor)
+        self.assertIsNotNone(trace_model)
+
+    # ------------------------------------------------------------------
+    # TracingDimension
+    # ------------------------------------------------------------------
+
+    def test_tracing_dimension_repr_no_value(self):
+        from yobx.torch.new_tracing import TracingDimension
+
+        d = TracingDimension("batch")
+        self.assertIn("batch", repr(d))
+        self.assertEqual(str(d), "batch")
+
+    def test_tracing_dimension_repr_with_value(self):
+        from yobx.torch.new_tracing import TracingDimension
+
+        d = TracingDimension("batch", value=4)
+        self.assertIn("batch", repr(d))
+        self.assertIn("4", repr(d))
+        self.assertEqual(int(d), 4)
+
+    def test_tracing_dimension_int_raises_without_value(self):
+        from yobx.torch.new_tracing import TracingDimension
+
+        d = TracingDimension("n")
+        with self.assertRaises(ValueError):
+            int(d)
+
+    def test_tracing_dimension_eq(self):
+        from yobx.torch.new_tracing import TracingDimension
+
+        d1 = TracingDimension("batch", 4)
+        d2 = TracingDimension("batch", 4)
+        d3 = TracingDimension("seq", 4)
+
+        self.assertEqual(d1, d2)
+        self.assertNotEqual(d1, d3)
+        self.assertEqual(d1, 4)  # compare with concrete int
+
+    def test_tracing_dimension_arithmetic(self):
+        from yobx.torch.new_tracing import TracingDimension
+
+        d = TracingDimension("n", 8)
+
+        self.assertEqual(int(d + 2), 10)
+        self.assertEqual(int(d - 3), 5)
+        self.assertEqual(int(d * 2), 16)
+        self.assertEqual(int(d // 4), 2)
+        self.assertEqual(int(2 + d), 10)
+        self.assertEqual(int(2 * d), 16)
+        # When value is present str() returns the numeric string,
+        # but the symbolic name is preserved in .name.
+        self.assertIn("n", (d + 2).name)
+
+    def test_tracing_dimension_neg(self):
+        from yobx.torch.new_tracing import TracingDimension
+
+        d = TracingDimension("n", 5)
+        nd = -d
+        self.assertEqual(int(nd), -5)
+
+    def test_tracing_dimension_hash(self):
+        from yobx.torch.new_tracing import TracingDimension
+
+        d = TracingDimension("batch")
+        self.assertIsInstance(hash(d), int)
+        self.assertIn(d, {d})
+
+    # ------------------------------------------------------------------
+    # TracingShape
+    # ------------------------------------------------------------------
+
+    def test_tracing_shape_concrete(self):
+        from yobx.torch.new_tracing import TracingDimension, TracingShape
+
+        s = TracingShape([TracingDimension("b", 4), 16])
+        self.assertTrue(s.is_concrete)
+        self.assertEqual(s.numel(), 64)
+        self.assertEqual(s.to_torch_size(), torch.Size([4, 16]))
+
+    def test_tracing_shape_symbolic(self):
+        from yobx.torch.new_tracing import TracingDimension, TracingShape
+
+        s = TracingShape([TracingDimension("n"), 8])
+        self.assertFalse(s.is_concrete)
+        with self.assertRaises(ValueError):
+            s.numel()
+        with self.assertRaises(ValueError):
+            s.to_torch_size()
+
+    def test_tracing_shape_repr(self):
+        from yobx.torch.new_tracing import TracingDimension, TracingShape
+
+        s = TracingShape([TracingDimension("batch", 2), 4])
+        r = repr(s)
+        self.assertIn("TracingShape", r)
+
+    def test_tracing_shape_indexing(self):
+        from yobx.torch.new_tracing import TracingDimension, TracingShape
+
+        d = TracingDimension("n", 5)
+        s = TracingShape([d, 8])
+        self.assertIs(s[0], d)
+        self.assertEqual(s[1], 8)
+
+    # ------------------------------------------------------------------
+    # TracingTensor
+    # ------------------------------------------------------------------
+
+    def test_tracing_tensor_creation(self):
+        from yobx.torch.new_tracing import TracingTensor
+
+        t = TracingTensor.__new__(TracingTensor, (3, 4), dtype=torch.float32)
+        t.__init__((3, 4), dtype=torch.float32)
+        self.assertEqual(t.shape, torch.Size([3, 4]))
+        self.assertEqual(t.dtype, torch.float32)
+
+    def test_tracing_tensor_repr(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        tracer = DispatchTracer()
+        x = torch.randn(2, 3)
+        t = tracer.placeholder("x", x.shape, x.dtype, x.device)
+        self.assertIn("TracingTensor", repr(t))
+        self.assertIn("x", repr(t))
+
+    # ------------------------------------------------------------------
+    # DispatchTracer – basic graphs
+    # ------------------------------------------------------------------
+
+    def test_trace_simple_add(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def add(x, y):
+            return x + y
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(add, (torch.randn(3, 4), torch.randn(3, 4)))
+
+        ops = [n.op for n in graph.nodes]
+        self.assertIn("placeholder", ops)
+        self.assertIn("call_function", ops)
+        self.assertIn("output", ops)
+        # Two placeholders for the two inputs.
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(ph_nodes), 2)
+        graph.lint()
+
+    def test_trace_simple_mul(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def mul(x, y):
+            return x * y
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(mul, (torch.randn(2, 5), torch.randn(2, 5)))
+        graph.lint()
+        call_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertGreater(len(call_nodes), 0)
+
+    def test_trace_elementwise_chain(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def chain(x):
+            return torch.relu(x + 1.0)
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(chain, (torch.randn(4, 4),))
+        graph.lint()
+        ops = {n.target for n in graph.nodes if n.op == "call_function"}
+        # relu and add should be in the graph
+        self.assertTrue(len(ops) >= 1)
+
+    def test_trace_matmul(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def matmul(x, y):
+            return x @ y
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(matmul, (torch.randn(4, 8), torch.randn(8, 4)))
+        graph.lint()
+        call_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertGreater(len(call_nodes), 0)
+
+    def test_trace_multiple_outputs(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def split_heads(x):
+            a, b = x.chunk(2, dim=-1)
+            return a, b
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(split_heads, (torch.randn(2, 8),))
+        graph.lint()
+        # output should be a tuple
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        self.assertIsInstance(output_node.args[0], (tuple, list))
+
+    def test_trace_nn_linear(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        model = torch.nn.Linear(8, 4, bias=True)
+        tracer = DispatchTracer()
+        graph = tracer.trace(model, (torch.randn(2, 8),))
+        graph.lint()
+        ops = [n.op for n in graph.nodes]
+        self.assertIn("placeholder", ops)
+        self.assertIn("call_function", ops)
+        self.assertIn("output", ops)
+
+    def test_trace_nn_relu(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        model = torch.nn.ReLU()
+        tracer = DispatchTracer()
+        graph = tracer.trace(model, (torch.randn(3, 5),))
+        graph.lint()
+
+    def test_trace_kwargs(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def add_kw(x, y):
+            return x + y
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(
+            add_kw,
+            args=(),
+            kwargs={"x": torch.randn(2, 2), "y": torch.randn(2, 2)},
+        )
+        graph.lint()
+        ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
+        self.assertIn("x", ph_names)
+        self.assertIn("y", ph_names)
+
+    # ------------------------------------------------------------------
+    # DispatchTracer – dynamic shapes
+    # ------------------------------------------------------------------
+
+    def test_trace_dynamic_shapes(self):
+        from yobx.torch.new_tracing import DispatchTracer, TracingDimension
+
+        def add(x, y):
+            return x + y
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(
+            add,
+            (torch.randn(4, 8), torch.randn(4, 8)),
+            dynamic_shapes={
+                "x_0": [TracingDimension("batch", 4), 8],
+                "x_1": [TracingDimension("batch", 4), 8],
+            },
+        )
+        graph.lint()
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(ph_nodes), 2)
+
+    # ------------------------------------------------------------------
+    # trace_model convenience function
+    # ------------------------------------------------------------------
+
+    def test_trace_model_function(self):
+        from yobx.torch.new_tracing import trace_model
+
+        graph = trace_model(
+            lambda x: x * 2,
+            (torch.randn(3, 3),),
+        )
+        graph.lint()
+        ops = [n.op for n in graph.nodes]
+        self.assertIn("call_function", ops)
+
+    def test_trace_model_nn_module(self):
+        from yobx.torch.new_tracing import trace_model
+
+        model = torch.nn.Linear(4, 4)
+        graph = trace_model(model, (torch.randn(2, 4),))
+        graph.lint()
+        self.assertIsNotNone(graph)
+
+    # ------------------------------------------------------------------
+    # Re-tracing: calling trace() twice on the same DispatchTracer
+    # ------------------------------------------------------------------
+
+    def test_retrace_resets_state(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        tracer = DispatchTracer()
+
+        graph1 = tracer.trace(lambda x: x + 1, (torch.randn(2, 2),))
+        n1 = len(list(graph1.nodes))
+
+        graph2 = tracer.trace(lambda x, y: x + y, (torch.randn(2, 2), torch.randn(2, 2)))
+        n2 = len(list(graph2.nodes))
+
+        # second graph should have one more placeholder
+        ph1 = [n for n in graph1.nodes if n.op == "placeholder"]
+        ph2 = [n for n in graph2.nodes if n.op == "placeholder"]
+        self.assertEqual(len(ph1), 1)
+        self.assertEqual(len(ph2), 2)
+        graph1.lint()
+        graph2.lint()
+
+    # ------------------------------------------------------------------
+    # Graph node metadata
+    # ------------------------------------------------------------------
+
+    def test_placeholder_meta_val(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(lambda x: x, (torch.randn(3, 5),))
+        ph = next(n for n in graph.nodes if n.op == "placeholder")
+        self.assertIn("val", ph.meta)
+        self.assertEqual(ph.meta["val"].shape, torch.Size([3, 5]))
+
+    def test_call_function_meta_val(self):
+        from yobx.torch.new_tracing import DispatchTracer
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(lambda x: x + 1.0, (torch.randn(3, 5),))
+        cf = next(n for n in graph.nodes if n.op == "call_function")
+        self.assertIn("val", cf.meta)
+        self.assertEqual(cf.meta["val"].shape, torch.Size([3, 5]))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
