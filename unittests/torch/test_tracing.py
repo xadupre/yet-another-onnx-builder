@@ -1620,10 +1620,13 @@ class TestTorchCheckConstraints(ExtTestCase):
         """_torch_check_for_tracing should silently accept a CustomProxy condition."""
         from yobx.torch.tracing import _torch_check_for_tracing, CustomTracer, CustomProxyInt
 
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
         tracer = CustomTracer()
-        # Create a placeholder node for a proxy.
-        graph = torch.fx.Graph()
-        node = graph.placeholder("x")
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
         proxy = tracer.proxy(node, cls=CustomProxyInt)
         # Must NOT raise TraceError even though bool(proxy) would.
         _torch_check_for_tracing(proxy > 0)
@@ -1635,9 +1638,13 @@ class TestTorchCheckConstraints(ExtTestCase):
         """
         from yobx.torch.tracing import _torch_check_for_tracing, CustomTracer, CustomProxyInt
 
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
         tracer = CustomTracer()
-        graph = torch.fx.Graph()
-        node = graph.placeholder("x")
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
         proxy = tracer.proxy(node, cls=CustomProxyInt)
 
         self.assertFalse(proxy.only_positive)
@@ -1654,9 +1661,13 @@ class TestTorchCheckConstraints(ExtTestCase):
         """
         from yobx.torch.tracing import _torch_check_for_tracing, CustomTracer, CustomProxyInt
 
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
         tracer = CustomTracer()
-        graph = torch.fx.Graph()
-        node = graph.placeholder("x")
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
         proxy = tracer.proxy(node, cls=CustomProxyInt)
 
         self.assertTrue(proxy.can_be_null)
@@ -1672,9 +1683,13 @@ class TestTorchCheckConstraints(ExtTestCase):
         """
         from yobx.torch.tracing import CustomTracer, CustomProxyInt, CustomProxyBool
 
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
         tracer = CustomTracer()
-        graph = torch.fx.Graph()
-        node = graph.placeholder("x")
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
         proxy = tracer.proxy(node, cls=CustomProxyInt)
         proxy.only_positive = True
         proxy.can_be_null = False
