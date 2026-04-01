@@ -3489,7 +3489,7 @@ class GraphBuilder(
                         d["input_name"] = input_name
                         if shape:
                             axis = d["axis"]
-                            assert axis < len(shape), (
+                            assert isinstance(axis, int) and axis < len(shape), (
                                 f"Unexpected shape={shape!r} and axis={axis}, "
                                 f"dim_name={dim_name!r}, self.dynamic_dimensions_source="
                                 f"{self.dynamic_dimensions_source} "
@@ -3605,7 +3605,7 @@ class GraphBuilder(
                         d["input_name"] = input_name
                         if shape:
                             axis = d["axis"]
-                            assert axis < len(shape), (
+                            assert isinstance(axis, int) and axis < len(shape), (
                                 f"Unexpected shape={shape!r} and axis={axis}, "
                                 f"dim_name={dim_name!r}, self.dynamic_dimensions_source="
                                 f"{self.dynamic_dimensions_source} "

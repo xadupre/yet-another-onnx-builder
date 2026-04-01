@@ -1762,7 +1762,7 @@ class CubeLogsPerformance(CubeLogs):
                     if res is None:
                         res = df[c].fillna("")
                     else:
-                        res = pandas.Series(np.where(res != "", res, df[c].fillna("")))
+                        res = pandas.Series(np.where(res != "", res, df[c].fillna("")))  # type: ignore
                 return res
 
             return first_err
