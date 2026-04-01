@@ -488,12 +488,12 @@ def requires_sklearn(version: str = "", msg: str = "") -> Callable:
         return unittest.skip(msg or "scikit-learn not installed")
 
     if not hasattr(sklearn, "__version__"):
-        return False
+        return unittest.skip(msg or "scikit-learn not installed")
     if not version:
-        return True
+        return lambda x: x
     if PvVersion(sklearn.__version__) < PvVersion(version):
         msg = f"scikit-learn version {sklearn.__version__} < {version}: {msg}"
-        return unittest.skip(msg)
+        return unittest.skip(msg or f"scikit-learn version < {version}")
     return lambda x: x
 
 
@@ -990,11 +990,10 @@ def has_tensorflow(version: str = "") -> bool:
     except (ImportError, AttributeError):
         return False
 
-    if not version:
-        return True
-
     if not hasattr(tensorflow, "__version__"):
-        # development version
+        return False
+
+    if not version:
         return True
 
     return PvVersion(tensorflow.__version__) >= PvVersion(version)

@@ -21,6 +21,7 @@ They all returns an instance of :class:`~yobx.container.ExportArtifact`.
    :maxdepth: 1
    :caption: Converters
 
+   design/to_onnx
    design/litert/index
    design/sklearn/index
    design/sql/index
