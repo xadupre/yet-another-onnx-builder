@@ -500,7 +500,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
     @hide_stdout()
     @requires_transformers("5.2")
-    @unittest.skip("not ready yet")
+    @unittest.skip("tracing not ready yet")
     def test_tiny_llm_tracing_to_onnx_22(self):
         import onnxruntime
 

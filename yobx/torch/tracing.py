@@ -50,6 +50,9 @@ class CustomProxy(torch.fx.proxy.Proxy):
     def __repr__(self) -> str:
         return f"{self.__class__.__name__}({self.node.name})"
 
+    def __str__(self) -> str:
+        return f"{self.__class__.__name__}({self.node.name}), meta={self.node.meta}"
+
     def _custom_fx_repr_fn(self) -> str:
         "To avoid bugs."
         return f"CustomProxy(%{str(self.node)})"
@@ -57,7 +60,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
     def __getattr__(self, k) -> "CustomAttribute":
         # note: not added to the graph yet, if this is a method call
         # we peephole optimize to the method invocation
-        if k in ("dtype", "device", "ndim"):
+        if k in ("dtype", "device"):
             # Return the concrete value so that dtype/device comparisons in
             # control flow (e.g. ``if x.dtype == torch.int64:``) resolve to a
             # plain Python bool instead of a proxy, which would raise
@@ -97,6 +100,21 @@ class CustomProxy(torch.fx.proxy.Proxy):
             node = self.tracer.create_node("call_method", "size", args=(self.node,), kwargs={})
             tt = self.tracer.proxy(node, cls=CustomProxyShape)
             return tt
+        if k == "ndim":
+            node = self.__dict__.get("node")
+            if node is not None and "val" in node.meta:
+                val = node.meta["val"]
+                if isinstance(val, torch.Tensor):
+                    ndim = val.ndim
+                    if isinstance(ndim, int):
+                        # All dimensions are concrete static integers: return
+                        # torch.Size directly so that downstream code receives
+                        # plain ints.
+                        return ndim
+            raise RuntimeError(
+                f"The rank of a tensor is always known. "
+                f"k={k!r} - {self=} - {self.node=} - {self.node.meta=}"
+            )
         return CustomAttribute(self, k)
 
     @classmethod

@@ -3343,7 +3343,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs, dynamic_shapes=({0: "batch"},))
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
-    @unittest.skip("see https://github.com/pytorch/pytorch/issues/174668")
+    @unittest.skip("won't fix: see https://github.com/pytorch/pytorch/issues/174668")
     def test_aten_histc_float16_rounding(self):
         import torch
 
@@ -3498,7 +3498,7 @@ class TestOnnxExportAten(ExtTestCase):
                 got = sess.run(None, {"x": inputs[0].detach().numpy()})
                 self.assertEqualArray(expected, got[0])
 
-    @unittest.skip("histc not supported on ints")
+    @unittest.skip("won't fix: histc not supported on ints")
     def test_aten_histc_int(self):
         import torch
 
