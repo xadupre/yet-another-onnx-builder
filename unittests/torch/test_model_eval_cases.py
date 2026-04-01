@@ -169,6 +169,12 @@ class TestModelEvalCases(ExtTestCase):
             cases="ControlFlowScanCDist", exporters="yobx-tracing", quiet=False, dynamic=True
         )
 
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_yobx_tracing_scan_cdist2(self):
+        evaluation(
+            cases="ControlFlowScanCDist2", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
     def test_run_exporter_inplace_add2_tracing(self):
         evaluation(cases="InplaceAdd2", exporters="yobx-tracing", quiet=False, dynamic=True)
 
