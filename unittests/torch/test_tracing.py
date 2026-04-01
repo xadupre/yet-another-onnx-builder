@@ -1613,7 +1613,7 @@ class TestTorchCheckConstraints(ExtTestCase):
             return
         from yobx.torch.tracing import _torch_check_for_tracing
 
-        with self.assertRaises(Exception):
+        with self.assertRaises(Exception):  # noqa: B017
             _torch_check_for_tracing(False)
 
     def test_torch_check_for_tracing_proxy_noop(self):
@@ -1718,7 +1718,11 @@ class TestTorchCheckConstraints(ExtTestCase):
         Tracing a model that calls torch._check with a shape comparison
         should succeed, and the constraint should be reflected.
         """
-        from yobx.torch.tracing import CustomTracer, CustomProxyInt, replace_problematic_function_before_tracing
+        from yobx.torch.tracing import (
+            CustomTracer,
+            CustomProxyInt,
+            replace_problematic_function_before_tracing,
+        )
 
         if not hasattr(torch, "_check"):
             return
@@ -1733,7 +1737,7 @@ class TestTorchCheckConstraints(ExtTestCase):
                 return x + 1
 
         tracer = CustomTracer()
-        x = torch.rand((4, 3))
+        _x = torch.rand((4, 3))
         with replace_problematic_function_before_tracing():
             graph = tracer.trace(Model())
         self.assertIsNotNone(graph)

@@ -841,10 +841,10 @@ def _torch_check_for_tracing(cond: Any, msg: Any = None) -> None:
                     operator.ne: operator.ne,
                 }.get(op, op)
             tracer = cond.tracer
-            node_proxy_map: Dict[torch.fx.Node, Any] = getattr(
-                tracer, "_node_proxy_map", {}
+            node_proxy_map: Dict[torch.fx.Node, Any] = getattr(tracer, "_node_proxy_map", {})
+            lhs_proxy = (
+                node_proxy_map.get(lhs_node) if isinstance(lhs_node, torch.fx.Node) else None
             )
-            lhs_proxy = node_proxy_map.get(lhs_node) if isinstance(lhs_node, torch.fx.Node) else None
             if isinstance(lhs_proxy, CustomProxyInt) and isinstance(rhs, (int, float)):
                 if op is operator.gt and rhs == 0:
                     # torch._check(x > 0): x is strictly positive
