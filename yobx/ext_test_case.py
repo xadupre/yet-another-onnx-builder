@@ -493,7 +493,7 @@ def requires_sklearn(version: str = "", msg: str = "") -> Callable:
         return lambda x: x
     if PvVersion(sklearn.__version__) < PvVersion(version):
         msg = f"scikit-learn version {sklearn.__version__} < {version}: {msg}"
-        return unittest.skip(msg or f"scikit-learn verions < {version}")
+        return unittest.skip(msg or f"scikit-learn version < {version}")
     return lambda x: x
 
 
