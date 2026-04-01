@@ -629,6 +629,17 @@ class DynamoInterpreter:
             sub_args: Optional[List[VirtualTensor]] = []
 
             def _node_to_virtual(inp_node, strip_first_dim: bool = False):
+                if isinstance(inp_node, self.torch.Tensor):
+                    # Concrete tensor literal (not a traced FX node) -
+                    # extract type/shape info directly from the tensor value.
+                    full_shape = tuple(inp_node.shape)
+                    shape = (
+                        full_shape[1:] if strip_first_dim and len(full_shape) > 1 else full_shape
+                    )
+                    onnx_dtype = torch_dtype_to_onnx_dtype(inp_node.dtype)
+                    # device.index is None for CPU, int index for CUDA.
+                    dev = inp_node.device.index
+                    return VirtualTensor(name="", dtype=onnx_dtype, shape=shape, device=dev)
                 if not hasattr(inp_node, "name") or not self.builder.has_type(inp_node.name):
                     return None
                 name = inp_node.name
@@ -1766,6 +1777,11 @@ class DynamoInterpreter:
             return None
         if isinstance(i, str):
             return i
+        if isinstance(i, self.torch.Tensor):
+            # Concrete tensor literal (not an FX node) - register as initializer.
+            name = self.builder.unique_name("cst")
+            self.builder.make_initializer(name, i, source="_process_arg")
+            return name
         if hasattr(i, "name"):
             return i.name
         if isinstance(i, tuple):
@@ -1775,6 +1791,12 @@ class DynamoInterpreter:
         if isinstance(i, list):
             new_list = []
             for el in i:
+                if isinstance(el, self.torch.Tensor):
+                    # Concrete tensor literal (not an FX node) - register as initializer.
+                    name = self.builder.unique_name("cst")
+                    self.builder.make_initializer(name, el, source="_process_arg")
+                    new_list.append(name)
+                    continue
                 if hasattr(el, "name"):
                     # torch.fx.Node
                     new_list.append(el.name)
