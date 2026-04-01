@@ -990,11 +990,10 @@ def has_tensorflow(version: str = "") -> bool:
     except (ImportError, AttributeError):
         return False
 
-    if not version:
-        return True
-
     if not hasattr(tensorflow, "__version__"):
-        # development version
+        return False
+
+    if not version:
         return True
 
     return PvVersion(tensorflow.__version__) >= PvVersion(version)
