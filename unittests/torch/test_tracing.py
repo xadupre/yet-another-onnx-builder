@@ -14,10 +14,9 @@ from yobx.torch.tracing import (
     CustomProxy,
     CustomProxyBool,
     CustomProxyInt,
+    CustomProxyShape,
     CustomParameterProxy,
     CondCCOp,
-    _len,
-    _isinstance,
     replace_problematic_function_before_tracing,
     setitem_with_transformation,
     tree_unflatten_with_proxy,
@@ -87,10 +86,25 @@ class TestCustomTracer(ExtTestCase):
                 self.assertIsInstance(proxy, CustomProxy)
                 self.assertIn("CustomProxy", repr(proxy))
 
+    def test_custom_proxy_int_comparison_returns_bool_except(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, lx: list):
+                length = len(lx)
+                return length == 2, length != 2, length < 3, length <= 2, length > 1, length >= 2
+
+        model = Model()
+        tracer = CustomTracer()
+        self.assertRaise(lambda: tracer.trace(model), RuntimeError)
+
     def test_custom_proxy_int_comparison_returns_bool(self):
         class Model(torch.nn.Module):
             def forward(self, x, lx: list):
-                length = _len(lx)
+                if isinstance(x, torch.Tensor):
+                    # no tracing
+                    length = len(lx)
+                else:
+                    # tracing
+                    length = lx.length()
                 return length == 2, length != 2, length < 3, length <= 2, length > 1, length >= 2
 
         model = Model()
@@ -238,17 +252,10 @@ class TestCustomTracer(ExtTestCase):
         for node in graph.nodes:
             if node.op == "placeholder":
                 proxy = tracer.proxy(node)
-                # _len on a proxy should return another proxy
-                result = _len(proxy)
+                # __len__ on a proxy should return another proxy but python is not ok with that
+                result = proxy.length()
                 self.assertIsNotNone(result)
                 break
-
-    def test_len_plain(self):
-        self.assertEqual(_len([1, 2, 3]), 3)
-
-    def test_isinstance_plain(self):
-        self.assertTrue(_isinstance([1, 2], list))
-        self.assertFalse(_isinstance((1, 2), list))
 
     def test_replace_problematic_function(self):
         original_cat = torch.cat
@@ -453,7 +460,7 @@ class TestTracing(ExtTestCase):
         tr = CustomTracer()
         tr.graph = torch.fx.Graph(tracer_cls=CustomTracer)
         x = CustomProxy(node, tr)
-        i = _len(x)
+        i = x.length()
         self.assertIsInstance(i, CustomProxy)
 
     def test_tracing_abs(self):
@@ -568,53 +575,6 @@ class TestTracing(ExtTestCase):
         self.assertIn("operator.setitem", str(graph))
         mod = torch.fx.GraphModule(model, graph)
         got = mod(x)
-        self.assertEqualArray(expected, got)
-
-    def test_tracing_isinstance(self):
-        class Model(torch.nn.Module):
-            def __init__(self, n_dims: int = 3, n_targets: int = 1):
-                super().__init__()
-                self.linear = torch.nn.Linear(n_dims, n_targets)
-                self.buff = torch.nn.parameter.Buffer(torch.tensor([0.5] * n_targets))
-
-            def forward(self, x, lx):
-                if _isinstance(lx, list):
-                    return torch.sigmoid(self.linear(x)) + lx
-                t = lx[0] * lx[1].sum(axis=1, keepdim=True)
-                return torch.sigmoid(self.linear(x)) - t
-
-        model = Model()
-        self.assertRaise(
-            lambda: CustomTracer().trace(model),
-            RuntimeError,
-            "Unable to know if cls is from type",
-        )
-
-    def test_tracing_len(self):
-        class Model(torch.nn.Module):
-            def __init__(self, n_dims: int = 3, n_targets: int = 1):
-                super().__init__()
-                self.linear = torch.nn.Linear(n_dims, n_targets)
-                self.buff = torch.nn.parameter.Buffer(torch.tensor([0.5] * n_targets))
-
-            def forward(self, x, lx: list):
-                t = lx[0] * lx[1].sum(axis=1, keepdim=True)
-                llx = _len(lx)
-                tn = t / llx
-                return torch.sigmoid(self.linear(x)) - tn
-
-        model = Model()
-        inputs = (
-            (torch.arange(4 * 3) + 10).reshape((-1, 3)).to(torch.float32),
-            [
-                (torch.arange(4) + 10).reshape((-1, 1)).to(torch.float32),
-                (torch.arange(4 * 2) + 10).reshape((-1, 2)).to(torch.float32),
-            ],
-        )
-        graph = CustomTracer().trace(model)
-        mod = torch.fx.GraphModule(model, graph)
-        expected = model(*inputs)
-        got = mod(*inputs)
         self.assertEqualArray(expected, got)
 
     def test_tracing_inplace_setitem_ellipsis(self):
@@ -898,12 +858,10 @@ class TestTracing(ExtTestCase):
 
     def test_tracing_function_int_shape(self):
         class Model(torch.nn.Module):
-            @staticmethod
-            def add_one(dim: int) -> int:
-                return dim + 1
-
             def forward(self, x):
-                dy1 = Model.add_one(x.shape[1])
+                shape = x.shape
+                dy = shape[1]
+                dy1 = dy + 1
                 y = torch.ones((x.shape[0], dy1))
                 return y
 
@@ -1137,14 +1095,15 @@ class TestTracing(ExtTestCase):
     @requires_torch("2.9.99")
     @requires_transformers("4.57")
     def test_tree_unflatten_with_proxy_dynamic_cache(self):
-        graph = torch.fx.Graph()
-        tr = CustomTracer()
-        tr.graph = torch.fx.Graph(tracer_cls=CustomTracer)
-        cps = []
-        for i in range(7):
-            node = graph.create_node("placeholder", f"tx{i}", args=(), kwargs={}, name=f"txn{i}")
-            cps.append(CustomProxy(node, tr))
-
+        tensors = [
+            torch.randn((4, 5)),
+            torch.randn((7, 5)),
+            torch.randn((8, 5)),
+            torch.randn(2, 32, 30, 96),
+            torch.randn(2, 32, 30, 96),
+            torch.randn(2, 32, 30, 96),
+            torch.randn(2, 32, 30, 96),
+        ]
         nested = [
             torch.randn((4, 5)),
             [torch.randn((7, 5)), torch.randn((8, 5))],
@@ -1152,9 +1111,24 @@ class TestTracing(ExtTestCase):
                 [(torch.randn(2, 32, 30, 96), torch.randn(2, 32, 30, 96)) for i in range(2)]
             ),
         ]
-        with register_flattening_functions(patch_transformers=True):
+
+        graph = torch.fx.Graph()
+        tr = CustomTracer()
+        tr.graph = torch.fx.Graph(tracer_cls=CustomTracer)
+        cps = []
+        for i in range(len(tensors)):
+            node = graph.create_node("placeholder", f"tx{i}", args=(), kwargs={}, name=f"txn{i}")
+            if not hasattr(node, "meta"):
+                node.meta = {}
+            node.meta["val"] = tensors[i]
+            cps.append(CustomProxy(node, tr))
+
+        with (
+            register_flattening_functions(patch_transformers=True),
+            replace_problematic_function_before_tracing(),
+        ):
             flat_list, tree_spec = torch.utils._pytree.tree_flatten(nested)
-            self.assertEqual(len(flat_list), 7)
+            self.assertEqual(len(flat_list), len(tensors))
             unflatten = tree_unflatten_with_proxy(tree_spec, cps)
 
             self.assertEqual(len(nested), len(unflatten))
@@ -1468,6 +1442,156 @@ class TestTracingControlFlow(ExtTestCase):
         x = torch.rand((3, 4))
         art = to_onnx(model, (x,), export_options=ExportOptions(tracing=True))
         self.assertEqual(["Identity"], [n.op_type for n in art.graph.node])
+
+
+@requires_torch("2.0")
+class TestCustomProxyShape(ExtTestCase):
+    """Tests for CustomProxyShape – the replacement for _SafeShape."""
+
+    def test_import(self):
+        self.assertIsNotNone(CustomProxyShape)
+
+    def test_import_from_package(self):
+        from yobx.torch import CustomProxyShape as CPS
+
+        self.assertIsNotNone(CPS)
+
+    def test_elements_are_custom_proxy_int(self):
+        """Each element of a CustomProxyShape must be a CustomProxyInt."""
+        from yobx.torch import to_onnx, ExportOptions
+
+        captured = []
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                captured.append(x.shape)
+                return x + 1
+
+        model = Model()
+        x = torch.rand((3, 4))
+        to_onnx(model, (x,), export_options=ExportOptions(tracing=True))
+        self.assertEqual(len(captured), 1)
+        self.assertIsInstance(captured[0], tuple)
+        self.assertEqual(len(captured[0]), 2)
+        self.assertIsInstance(captured[0][0], int)
+        self.assertIsInstance(captured[0][1], int)
+
+    def test_elements_are_custom_proxy_int_dynamic(self):
+        """Each element of a CustomProxyShape must be a CustomProxyInt."""
+        from yobx.torch import to_onnx, ExportOptions
+
+        captured = []
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                captured.append(x.shape)
+                return x + 1
+
+        model = Model()
+        x = torch.rand((3, 4))
+        to_onnx(
+            model,
+            (x,),
+            export_options=ExportOptions(tracing=True),
+            dynamic_shapes=({0: "batch"},),
+        )
+        self.assertTrue(any(isinstance(s, CustomProxyShape) for s in captured))
+        self.assertEqual(len(captured), 1)
+        self.assertIsInstance(captured[0], CustomProxyShape)
+        self.assertEqual(len(captured[0]), 2)
+        self.assertIsInstance(captured[0][0], CustomProxyInt)
+        self.assertIsInstance(captured[0][1], int)
+
+    def test_len_and_iter(self):
+        """CustomProxyShape must support len() and iteration like a tuple."""
+        from yobx.torch import to_onnx, ExportOptions
+
+        captured = []
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                captured.append(x.shape)
+                return x + 1
+
+        model = Model()
+        x = torch.rand((3, 4))
+        to_onnx(
+            model,
+            (x,),
+            export_options=ExportOptions(tracing=True),
+            dynamic_shapes=({0: "batch"},),
+        )
+        for s in captured:
+            if isinstance(s, CustomProxyShape):
+                self.assertEqual(len(s), 2)
+                elems = list(s)
+                self.assertEqual(len(elems), 2)
+
+    def test_control_flow_comparisons_resolve_to_bool(self):
+        """
+        Comparisons against 0 using CustomProxyInt-backed values must resolve
+        to Python bool during tracing so they can be used in control flow.
+        """
+        from yobx.torch import to_onnx, ExportOptions
+
+        captured_conds = []
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                # x.shape[0] will be a CustomProxyInt when using dynamic_shapes.
+                c1 = x.shape[0] == 0
+                c2 = x.numel() == 0
+                c3 = x.size(0) == 0
+                captured_conds.extend([c1, c2, c3])
+                # Use the conditions in control flow to exercise bool conversion.
+                if c1:
+                    return x
+                if c2:
+                    return x
+                if c3:
+                    return x
+                return x + 1
+
+        model = Model()
+        x = torch.rand((3, 4))
+        # Make the batch dimension dynamic so shape[0] is a CustomProxyInt.
+        to_onnx(
+            model,
+            (x,),
+            export_options=ExportOptions(tracing=True),
+            dynamic_shapes=({0: "batch"},),
+        )
+        # All captured conditions should be plain Python bools.
+        self.assertEqual(len(captured_conds), 3)
+        for c in captured_conds:
+            self.assertIsInstance(c, bool)
+
+    def test_proxy_vs_proxy_comparison_raises_traceerror(self):
+        """
+        Comparing two CustomProxyInt values (proxy-vs-proxy) should still raise
+        TraceError during tracing, to prevent unsupported symbolic control flow.
+        """
+        from torch.fx.proxy import TraceError
+        from yobx.torch import to_onnx, ExportOptions
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                # Both dimensions are dynamic; this comparison is proxy vs proxy.
+                cond = x.shape[0] == x.shape[1]
+                if cond:
+                    return x
+                return x + 1
+
+        model = Model()
+        x = torch.rand((3, 4))
+        # Make both dimensions dynamic so both shape entries are proxies.
+        with self.assertRaises(TraceError):
+            to_onnx(
+                model,
+                (x,),
+                export_options=ExportOptions(tracing=True),
+                dynamic_shapes=({0: "batch", 1: "seq"},),
+            )
 
 
 if __name__ == "__main__":

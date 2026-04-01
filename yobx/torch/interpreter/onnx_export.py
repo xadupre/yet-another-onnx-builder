@@ -926,6 +926,7 @@ def to_onnx(
     output_names: Optional[List[str]] = None,
     output_dynamic_shapes: Optional[Union[Dict[str, Any], Tuple[Any]]] = None,
     validate_onnx: Union[bool, float] = False,
+    return_ep: bool = False,
 ) -> ExportArtifact:
     """
     Exports a torch model into ONNX using
@@ -941,6 +942,7 @@ def to_onnx(
     :param options: optimization options
     :param verbose: verbosity level
     :param return_builder: returns the builder as well
+    :param return_ep: returns the ExportedProgram, or an fx.Graph or a GraphModule as well
     :param raise_list: the builder stops any time a name falls into that list,
         this is a debugging tool
     :param dynamic_shapes: see :epkg:`torch.export.export`
@@ -1156,6 +1158,8 @@ def to_onnx(
     )
     if return_builder:
         onx.builder = builder
+    if return_ep:
+        onx.ep = graph_module
     all_stats = dict(builder=builder.statistics_)
     if onx.report and onx.report.stats:
         add_stats["optimization"] = onx.report

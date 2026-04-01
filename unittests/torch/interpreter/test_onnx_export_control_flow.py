@@ -12,7 +12,6 @@ from yobx.helpers import string_type
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch import ExportOptions
 from yobx.torch.interpreter import to_onnx
-from yobx.torch.tracing import CustomTracer
 
 
 class TestOnnxExportControlFlow(ExtTestCase):
@@ -459,18 +458,17 @@ class TestOnnxExportControlFlow(ExtTestCase):
                     # positions for image tokens
                     condition = (input_ids < 0) & (input_ids > -int(1e9))
                     positions = torch.nonzero(condition, as_tuple=True)
-                    input_ids = input_ids.clamp_min(0).clamp_max(vocab_size).detach()
+                    input_ids = input_ids.clone().clamp_min(0).clamp_max(vocab_size)
                     return (input_ids, positions[0], positions[1])
 
                 def else_branch(input_ids, image_features, vocab_size):
                     r = torch.where(torch.zeros((1, 1), dtype=torch.bool))
                     return (input_ids, r[0], r[1])
 
+                cond = image_features.numel() > 0
+
                 a, b, c = torch.cond(
-                    image_features.numel() > 0,
-                    then_branch,
-                    else_branch,
-                    [input_ids, image_features, vocab_size],
+                    cond, then_branch, else_branch, [input_ids, image_features, vocab_size]
                 )
                 return a, b, c
 
@@ -480,23 +478,25 @@ class TestOnnxExportControlFlow(ExtTestCase):
 
         batch = torch.export.Dim("batch")
         seq_length = torch.export.Dim("seq_length")
-        dynamic_shapes = ({0: batch}, {0: batch, 1: seq_length}, None)
-
-        graph = CustomTracer().trace(
-            model2,
-            concrete_args=dict(zip(["input_ids", "image_features", "vocab_size"], inputs[0])),
+        dynamic_shapes = dict(
+            zip(
+                ["input_ids", "image_features", "vocab_size"],
+                [{0: batch}, {0: batch, 1: seq_length}, {}],
+            )
         )
-        self.assertNotEmpty(graph)
 
+        dynamic_shapes = ({0: batch}, {0: batch, 1: seq_length}, {})
         onx = to_onnx(
             model2,
             inputs[0],
             dynamic_shapes=dynamic_shapes,
             export_options=ExportOptions(tracing=True, allow_untyped_output=True),
             inline=False,
+            verbose=0,
         )
         with open("test_cond_llm_image_embedding_tracing.onnx", "wb") as f:
             f.write(onx.SerializeToString())
+        self.assertIn("If", [n.op_type for n in onx.graph.node])
 
         # still does not work
         # onx = to_onnx(
@@ -509,7 +509,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         #     f.write(onx.SerializeToString())
         self.assertIn("If", {n.op_type for n in onx.graph.node})
 
-        sess = ExtendedReferenceEvaluator(onx)
+        sess = ExtendedReferenceEvaluator(onx, verbose=0)
         for exp, inp in zip(expected, inputs):
             with self.subTest(input2_shape=inp[1].shape):
                 feeds = dict(
