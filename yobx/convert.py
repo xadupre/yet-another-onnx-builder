@@ -5,6 +5,8 @@ Top-level dispatcher that routes a model to the appropriate backend converter.
 import os
 from typing import Any, Dict, Optional, Sequence, Union
 
+from .ext_test_case import has_litert, has_sklearn, has_tensorflow, has_torch
+
 #: Default ONNX opset version targeted by all converters.
 DEFAULT_TARGET_OPSET = 21
 
@@ -167,41 +169,35 @@ def to_onnx(
     # ------------------------------------------------------------------ #
     # 1. torch.nn.Module / torch.fx.GraphModule                          #
     # ------------------------------------------------------------------ #
-    try:
+    if has_torch():
         import torch  # noqa: PLC0415
 
         if isinstance(model, (torch.nn.Module, torch.fx.GraphModule)):
             from .torch import to_onnx as torch_to_onnx  # noqa: PLC0415
 
             return torch_to_onnx(model, args, **common, **kwargs)
-    except ImportError:
-        pass
 
     # ------------------------------------------------------------------ #
     # 2. scikit-learn BaseEstimator                                       #
     # ------------------------------------------------------------------ #
-    try:
+    if has_sklearn():
         from sklearn.base import BaseEstimator  # noqa: PLC0415
 
         if isinstance(model, BaseEstimator):
             from .sklearn import to_onnx as sklearn_to_onnx  # noqa: PLC0415
 
             return sklearn_to_onnx(model, args, **common, **kwargs)
-    except ImportError:
-        pass
 
     # ------------------------------------------------------------------ #
     # 3. TensorFlow / Keras module                                        #
     # ------------------------------------------------------------------ #
-    try:
+    if has_tensorflow():
         import tensorflow as tf  # noqa: PLC0415
 
         if isinstance(model, tf.Module):
             from .tensorflow import to_onnx as tf_to_onnx  # noqa: PLC0415
 
             return tf_to_onnx(model, args, **common, **kwargs)
-    except ImportError:
-        pass
 
     # ------------------------------------------------------------------ #
     # 4. LiteRT / TFLite: bytes or path ending with ".tflite"            #
@@ -209,17 +205,10 @@ def to_onnx(
     # LiteRT does not support filename; remove it before forwarding.
     litert_common = {k: v for k, v in common.items() if k != "filename"}
 
-    if isinstance(model, bytes):
-        from .litert import to_onnx as litert_to_onnx  # noqa: PLC0415
-
-        return litert_to_onnx(model, args if args is not None else (), **litert_common, **kwargs)
-
-    if isinstance(model, os.PathLike) and str(model).endswith(".tflite"):
-        from .litert import to_onnx as litert_to_onnx  # noqa: PLC0415
-
-        return litert_to_onnx(model, args if args is not None else (), **litert_common, **kwargs)
-
-    if isinstance(model, str) and model.endswith(".tflite") and os.path.isfile(model):
+    _is_tflite_path = (isinstance(model, os.PathLike) and str(model).endswith(".tflite")) or (
+        isinstance(model, str) and model.endswith(".tflite") and os.path.isfile(model)
+    )
+    if has_litert() and (isinstance(model, bytes) or _is_tflite_path):
         from .litert import to_onnx as litert_to_onnx  # noqa: PLC0415
 
         return litert_to_onnx(model, args if args is not None else (), **litert_common, **kwargs)
