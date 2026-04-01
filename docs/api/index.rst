@@ -3,6 +3,12 @@ API
 
 .. toctree::
    :maxdepth: 1
+   :caption: Dispatcher
+
+   convert
+
+.. toctree::
+   :maxdepth: 1
    :caption: Core
 
    typing
