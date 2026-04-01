@@ -476,12 +476,17 @@ class TestOnnxExportSignatures(ExtTestCase):
             (torch.arange(8 * 3) + 10).reshape((-1, 3)).to(torch.float32),
             (torch.arange(8 * 1) + 10).reshape((-1, 1)).to(torch.float32),
         )
-        dim = torch.export.Dim("batch", min=0, max=1024)
-        dyn = {"x": {0: dim}, "y": {0: dim, 1: torch.export.Dim("length", min=0, max=2)}}
+        dyn = {"x": {0: "batch"}, "y": {0: "batch", 1: "length"}}
         sname = inspect.currentframe().f_code.co_name
         sig_tracing = (("x", 1, ("batch", 3)), ("y", 1, ("batch", "length")))
         self._check_exporter(
-            sname, Neuron(), inputs, sig_tracing, dynamic_shapes=dyn, others=inputs2
+            sname,
+            Neuron(),
+            inputs,
+            sig_tracing,
+            dynamic_shapes=dyn,
+            others=inputs2,
+            exporter=("custom-tracing", "custom"),
         )
 
     @skipif_ci_windows("not working on windows")

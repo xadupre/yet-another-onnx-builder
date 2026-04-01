@@ -352,7 +352,7 @@ def aten_meth_size(
 ) -> T:
     "size"
     if dim is None:
-        res = g.op.Size(x, name=f"{name}A", outputs=outputs)
+        res = g.op.Shape(x, name=f"{name}A", outputs=outputs)
         if not sts:
             g.set_type(res, TensorProto.INT64)
             if g.has_rank(x):
