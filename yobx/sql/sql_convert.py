@@ -481,7 +481,7 @@ def _build_group_by_tensors(
     if len(group_cols) == 1:
         # Single GROUP BY column: apply Unique directly.
         col_tensor = col_map[group_cols[0]]
-        unique_vals, first_indices, inverse_indices, _ = g.op.Unique(  # type: ignore[misc]
+        unique_vals, first_indices, inverse_indices, _ = g.op.Unique(  # type: ignore
             col_tensor, sorted=1, outputs=4, name="gb_unique"
         )
         n_groups = g.op.Gather(
@@ -506,7 +506,7 @@ def _build_group_by_tensors(
             for t, c in zip(cast_tensors, group_cols)
         ]
         stacked = g.op.Concat(*unsqueezed, axis=1, name="gb_stack")  # type: ignore[misc]
-        unique_rows, first_indices, inverse_indices, _ = g.op.Unique(  # type: ignore[misc]
+        unique_rows, first_indices, inverse_indices, _ = g.op.Unique(  # type: ignore
             stacked, axis=0, sorted=1, outputs=4, name="gb_unique"
         )
         n_groups = g.op.Gather(
@@ -593,7 +593,7 @@ def _build_pivot_table_tensors(
     # ------------------------------------------------------------------
     if len(index_cols) == 1:
         idx_tensor = col_map[index_cols[0]]
-        unique_idx, _first_idx, inv_idx, _ = g.op.Unique(  # type: ignore[misc]
+        unique_idx, _first_idx, inv_idx, _ = g.op.Unique(  # type: ignore
             idx_tensor, sorted=1, outputs=4, name="pt_unique"
         )
         n_groups = g.op.Gather(
@@ -615,7 +615,7 @@ def _build_pivot_table_tensors(
             for t, c in zip(cast_idx, index_cols)
         ]
         stacked_idx = g.op.Concat(*unsqueezed_idx, axis=1, name="pt_stack")  # type: ignore[misc]
-        unique_rows, _first_idx, inv_idx, _ = g.op.Unique(  # type: ignore[misc]
+        unique_rows, _first_idx, inv_idx, _ = g.op.Unique(  # type: ignore
             stacked_idx, axis=0, sorted=1, outputs=4, name="pt_unique"
         )
         n_groups = g.op.Gather(
@@ -838,7 +838,7 @@ def _build_pivot_table_tensors(
                         name=f"pt_fv_init_c_{slot}",
                     )
                     # Among matching rows, find the first occurrence of each group.
-                    unique_grp, first_in_match, _, _ = g.op.Unique(  # type: ignore[misc]
+                    unique_grp, first_in_match, _, _ = g.op.Unique(  # type: ignore
                         matching_inv_idx, sorted=1, outputs=4, name=f"pt_umatch_{slot}"
                     )
                     first_match_vals = g.op.Gather(  # type: ignore[misc]
