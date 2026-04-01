@@ -95,6 +95,20 @@ operations on a DataFrame and compiles them to ONNX directly.
 | TFLite / :epkg:`LiteRT`               | :func:`yobx.litert.to_onnx`              | :ref:`l-design-litert-converter`       |
 +---------------------------------------+------------------------------------------+----------------------------------------+
 
+:func:`yobx.to_onnx` is the single entry point for all supported frameworks.
+It inspects the type of *model* at runtime and automatically delegates to
+the appropriate backend-specific converter:
+
+* a :class:`torch.nn.Module` or :class:`torch.fx.GraphModule` → :func:`yobx.torch.to_onnx`
+* a :class:`sklearn.base.BaseEstimator` → :func:`yobx.sklearn.to_onnx`
+* a :class:`tensorflow.Module` (including Keras models) → :func:`yobx.tensorflow.to_onnx`
+* raw ``.tflite`` bytes or a path ending in ``".tflite"`` → :func:`yobx.litert.to_onnx`
+* a SQL string, a Python callable, or a :class:`polars.LazyFrame` → :func:`yobx.sql.to_onnx`
+
+All extra keyword arguments are forwarded verbatim to the selected converter,
+so the backend-specific parameters (``export_options``, ``function_options``,
+``extra_converters``, …) remain fully accessible through the top-level function.
+
 The package is built upon a single :ref:`graph builder API <l-design-graph-builder>`
 for constructing and optimizing ONNX graphs with built-in shape inference
 with can also linked to :epkg:`spox` or :epkg:`onnxscript`/:epkg:`ir-py`.
