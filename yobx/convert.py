@@ -5,8 +5,6 @@ Top-level dispatcher that routes a model to the appropriate backend converter.
 import os
 from typing import Any, Dict, Optional, Sequence, Union
 
-from .ext_test_case import has_litert, has_sklearn, has_tensorflow, has_torch
-
 #: Default ONNX opset version targeted by all converters.
 DEFAULT_TARGET_OPSET = 21
 
@@ -156,6 +154,13 @@ def to_onnx(
     """
     # Build a dict of the common named arguments so they can be passed to
     # each backend without duplicating keyword logic.
+    from .ext_test_case import (  # noqa: PLC0415
+        has_litert,
+        has_sklearn,
+        has_tensorflow,
+        has_torch,
+    )
+
     common: Dict[str, Any] = dict(
         input_names=input_names,
         dynamic_shapes=dynamic_shapes,
