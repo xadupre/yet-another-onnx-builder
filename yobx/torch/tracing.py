@@ -13,11 +13,6 @@ from ..helpers import flatten_object, string_type
 from .fake_tensor_helper import make_fake_with_dynamic_dimensions
 from .torch_helper import torch_deepcopy
 
-try:
-    from torch.fx.experimental.symbolic_shapes import guard_size_oblivious as _guard_size_oblivious
-except (ImportError, AttributeError):
-    _guard_size_oblivious = None
-
 _torch_cat = torch.cat
 
 _MISSING: Any = object()  # sentinel for "no concrete value supplied"
@@ -228,7 +223,21 @@ class CustomProxy(torch.fx.proxy.Proxy):
         node = self.tracer.create_node(
             "call_method", "numel", args=(self.node, *args), kwargs=kwargs
         )
-        return self.tracer.proxy(node, cls=CustomProxyInt, concrete_val=concrete_numel)
+        # If concrete_numel is a SymInt (dynamic shape product), assume it is
+        # non-zero during tracing (matches guard_size_oblivious semantics) so
+        # that ``if x.numel() == 0:`` resolves to False without calling bool()
+        # on a potentially un-evaluable SymInt.
+        # can_be_null=True when we have no metadata (unknown);
+        # can_be_null=False when concrete_numel is a SymInt we can assume > 0.
+        can_be_null = concrete_numel is _MISSING
+        only_positive = concrete_numel is not _MISSING
+        return self.tracer.proxy(
+            node,
+            cls=CustomProxyInt,
+            concrete_val=concrete_numel,
+            can_be_null=can_be_null,
+            only_positive=only_positive,
+        )
 
     def size(self, dim: Optional[int] = None):
         """
@@ -435,37 +444,46 @@ class CustomProxyInt(CustomProxy):
         return self.tracer.proxy(node, cls=CustomProxyBool)
 
     def __eq__(self, other):  # type: ignore[override]
-        if (
-            self._concrete_val is not _MISSING
-            and isinstance(other, (int, float))
-            and not isinstance(other, bool)
-        ):
-            if _guard_size_oblivious is not None:
-                return _guard_size_oblivious(self._concrete_val == other)
-            return bool(self._concrete_val == other)
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            # Use can_be_null flag: if this value is known to be non-zero,
+            # return False immediately for ``== 0`` without calling bool() on a
+            # potentially un-evaluable SymInt product (numel of dynamic tensor).
+            if other == 0 and not self.can_be_null:
+                return False
+            if self._concrete_val is not _MISSING:
+                return bool(self._concrete_val == other)
         return self._compare(operator.eq, other)
 
     def __ne__(self, other):  # type: ignore[override]
-        if (
-            self._concrete_val is not _MISSING
-            and isinstance(other, (int, float))
-            and not isinstance(other, bool)
-        ):
-            if _guard_size_oblivious is not None:
-                return not _guard_size_oblivious(self._concrete_val == other)
-            return not bool(self._concrete_val == other)
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            if other == 0 and not self.can_be_null:
+                return True
+            if self._concrete_val is not _MISSING:
+                return not bool(self._concrete_val == other)
         return self._compare(operator.ne, other)
 
     def __lt__(self, other):
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            if self.only_positive and other <= 0:
+                return False
         return self._compare(operator.lt, other)
 
     def __le__(self, other):
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            if self.only_positive and other <= 0:
+                return False
         return self._compare(operator.le, other)
 
     def __gt__(self, other):
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            if self.only_positive and other <= 0:
+                return True
         return self._compare(operator.gt, other)
 
     def __ge__(self, other):
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            if self.only_positive and other <= 0:
+                return True
         return self._compare(operator.ge, other)
 
 
