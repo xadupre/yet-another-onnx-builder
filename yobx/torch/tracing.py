@@ -412,6 +412,17 @@ class CustomProxyInt(CustomProxy):
 
     * ``value == 0`` → ``False``
     * ``value != 0`` → ``True``
+
+    Integer arithmetic (``+``, ``-``) with a plain :class:`int` constant
+    returns a new :class:`CustomProxyInt` that remembers its *root node* (the
+    original proxy node) and *integer offset*.  When two such proxies derived
+    from the **same** root are compared, the result is determined directly from
+    the offsets without emitting an FX comparison node.  For example::
+
+        y = x + 1   # y._root_node is x.node, y._int_offset == 1
+        y > x       # 1 > 0  →  True  (no FX node emitted)
+        y >= x      # 1 >= 0 →  True
+        y == x      # 1 == 0 →  False
     """
 
     __hash__ = CustomProxy.__hash__  # restore hash after __eq__ override
@@ -431,9 +442,68 @@ class CustomProxyInt(CustomProxy):
         self._concrete_val = concrete_val
         self.only_positive = only_positive
         self.can_be_null = can_be_null
+        # Root-and-offset tracking for known-comparison resolution.
+        # A freshly created proxy IS the root (offset 0).  After `x + c`
+        # the result gets _root_node=x._root_node, _int_offset=x._int_offset+c.
+        self._root_node: Node = node
+        self._int_offset: int = 0
         assert not isinstance(
             concrete_val, int
         ), f"concrete_val is an integer {concrete_val}, CustomProxyInt is not needed"
+
+    # ------------------------------------------------------------------
+    # Arithmetic helpers – return CustomProxyInt so that derived values
+    # carry root/offset metadata for known-comparison resolution.
+    # ------------------------------------------------------------------
+
+    def _make_offset_proxy(self, fx_node: Node, new_offset: int) -> "CustomProxyInt":
+        """Return a new :class:`CustomProxyInt` sharing *self*'s root."""
+        result: CustomProxyInt = self.tracer.proxy(fx_node, cls=CustomProxyInt)
+        result._root_node = self._root_node
+        result._int_offset = new_offset
+        # Propagate positivity when it can be guaranteed.
+        if self.only_positive and new_offset >= self._int_offset:
+            # Adding a non-negative constant to a positive value stays positive.
+            result.only_positive = True
+            result.can_be_null = False
+        return result
+
+    def __add__(self, other):  # type: ignore[override]
+        if isinstance(other, int) and not isinstance(other, bool):
+            fx_node = self.tracer.create_node(
+                "call_function",
+                operator.add,
+                args=(self.node, other),
+                kwargs={},
+            )
+            return self._make_offset_proxy(fx_node, self._int_offset + other)
+        return torch.fx.proxy.Proxy.__add__(self, other)
+
+    def __radd__(self, other):  # type: ignore[override]
+        if isinstance(other, int) and not isinstance(other, bool):
+            fx_node = self.tracer.create_node(
+                "call_function",
+                operator.add,
+                args=(other, self.node),
+                kwargs={},
+            )
+            return self._make_offset_proxy(fx_node, self._int_offset + other)
+        return torch.fx.proxy.Proxy.__radd__(self, other)
+
+    def __sub__(self, other):  # type: ignore[override]
+        if isinstance(other, int) and not isinstance(other, bool):
+            fx_node = self.tracer.create_node(
+                "call_function",
+                operator.sub,
+                args=(self.node, other),
+                kwargs={},
+            )
+            return self._make_offset_proxy(fx_node, self._int_offset - other)
+        return torch.fx.proxy.Proxy.__sub__(self, other)
+
+    # ------------------------------------------------------------------
+    # Comparison helpers
+    # ------------------------------------------------------------------
 
     def _compare(self, op, other):
         """Creates a comparison node and returns a :class:`CustomProxyBool`."""
@@ -444,6 +514,18 @@ class CustomProxyInt(CustomProxy):
             kwargs={},
         )
         return self.tracer.proxy(node, cls=CustomProxyBool)
+
+    def _resolve_proxy_cmp(self, op: Any, other: "CustomProxyInt") -> Optional[bool]:
+        """Try to resolve *self op other* using root-and-offset tracking.
+
+        Returns ``True`` or ``False`` when both proxies share the same root
+        node and the comparison can therefore be decided from their integer
+        offsets alone.  Returns ``None`` when the comparison cannot be
+        determined statically.
+        """
+        if self._root_node is other._root_node:
+            return bool(op(self._int_offset, other._int_offset))
+        return None
 
     def __eq__(self, other):  # type: ignore[override]
         if (
@@ -458,6 +540,10 @@ class CustomProxyInt(CustomProxy):
                 return False
             if not self.can_be_null and other == 0:
                 return False
+        elif isinstance(other, CustomProxyInt):
+            result = self._resolve_proxy_cmp(operator.eq, other)
+            if result is not None:
+                return result
         return self._compare(operator.eq, other)
 
     def __ne__(self, other):  # type: ignore[override]
@@ -473,6 +559,10 @@ class CustomProxyInt(CustomProxy):
                 return True
             if not self.can_be_null and other == 0:
                 return True
+        elif isinstance(other, CustomProxyInt):
+            result = self._resolve_proxy_cmp(operator.ne, other)
+            if result is not None:
+                return result
         return self._compare(operator.ne, other)
 
     def __lt__(self, other):
@@ -481,6 +571,10 @@ class CustomProxyInt(CustomProxy):
                 # Strictly positive ⟹ value > 0, so value < other is impossible
                 # when other <= 0.
                 return False
+        elif isinstance(other, CustomProxyInt):
+            result = self._resolve_proxy_cmp(operator.lt, other)
+            if result is not None:
+                return result
         return self._compare(operator.lt, other)
 
     def __le__(self, other):
@@ -489,6 +583,10 @@ class CustomProxyInt(CustomProxy):
                 # Strictly positive ⟹ value > 0, so value <= other is impossible
                 # when other <= 0.
                 return False
+        elif isinstance(other, CustomProxyInt):
+            result = self._resolve_proxy_cmp(operator.le, other)
+            if result is not None:
+                return result
         return self._compare(operator.le, other)
 
     def __gt__(self, other):
@@ -497,6 +595,10 @@ class CustomProxyInt(CustomProxy):
                 # Strictly positive ⟹ value > 0 > other (or value > 0 = other),
                 # so True.
                 return True
+        elif isinstance(other, CustomProxyInt):
+            result = self._resolve_proxy_cmp(operator.gt, other)
+            if result is not None:
+                return result
         return self._compare(operator.gt, other)
 
     def __ge__(self, other):
@@ -504,6 +606,10 @@ class CustomProxyInt(CustomProxy):
             if self.only_positive and other <= 0:
                 # Strictly positive ⟹ value > 0 ≥ other, so True.
                 return True
+        elif isinstance(other, CustomProxyInt):
+            result = self._resolve_proxy_cmp(operator.ge, other)
+            if result is not None:
+                return result
         return self._compare(operator.ge, other)
 
 

@@ -1781,6 +1781,150 @@ class TestTorchCheckConstraints(ExtTestCase):
         # value > 1 → still returns proxy (we don't know if value > 1)
         self.assertIsInstance(proxy > 1, CustomProxyBool)
 
+    def test_known_comparison_add_offset(self):
+        """
+        x + 1 > x must resolve to True without emitting an FX comparison node.
+        Similarly, related offset comparisons should resolve statically.
+        """
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt, CustomProxyBool
+
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        tracer = CustomTracer()
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
+        x = tracer.proxy(node, cls=CustomProxyInt)
+
+        y = x + 1  # derived proxy: _root_node == x.node, _int_offset == 1
+
+        self.assertIsInstance(y, CustomProxyInt)
+        self.assertIs(x.node, y._root_node)
+        self.assertEqual(y._int_offset, 1)
+
+        # x + 1 > x  →  1 > 0  →  True
+        self.assertIs(y > x, True)
+        # x + 1 >= x  →  1 >= 0  →  True
+        self.assertIs(y >= x, True)
+        # x < x + 1  →  0 < 1  →  True
+        self.assertIs(x < y, True)
+        # x <= x + 1  →  0 <= 1  →  True
+        self.assertIs(x <= y, True)
+        # x + 1 == x  →  1 == 0  →  False
+        self.assertIs(y == x, False)
+        # x + 1 != x  →  1 != 0  →  True
+        self.assertIs(y != x, True)
+        # x > x + 1  →  0 > 1  →  False
+        self.assertIs(x > y, False)
+
+    def test_known_comparison_sub_offset(self):
+        """x - 1 < x must resolve to True (offset -1 < 0)."""
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt
+
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        tracer = CustomTracer()
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
+        x = tracer.proxy(node, cls=CustomProxyInt)
+
+        z = x - 1  # offset -1
+
+        self.assertIsInstance(z, CustomProxyInt)
+        self.assertEqual(z._int_offset, -1)
+
+        # x - 1 < x  →  -1 < 0  →  True
+        self.assertIs(z < x, True)
+        # x > x - 1  →  0 > -1  →  True
+        self.assertIs(x > z, True)
+
+    def test_known_comparison_radd_offset(self):
+        """1 + x produces a CustomProxyInt with offset 1."""
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt
+
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        tracer = CustomTracer()
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
+        x = tracer.proxy(node, cls=CustomProxyInt)
+
+        y = 1 + x  # __radd__
+
+        self.assertIsInstance(y, CustomProxyInt)
+        self.assertEqual(y._int_offset, 1)
+        # 1 + x > x  →  True
+        self.assertIs(y > x, True)
+
+    def test_known_comparison_chained_offsets(self):
+        """(x + 2) > (x + 1) must resolve to True."""
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt
+
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        tracer = CustomTracer()
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
+        x = tracer.proxy(node, cls=CustomProxyInt)
+
+        y1 = x + 1  # offset 1
+        y2 = x + 2  # offset 2
+
+        self.assertIs(y2 > y1, True)
+        self.assertIs(y1 < y2, True)
+        # Two independently-created (x+1) proxies share the same root and offset.
+        y1_copy = x + 1
+        self.assertIs(y1 == y1_copy, True)  # same offset → equal
+        self.assertIs(y1 != y2, True)
+
+    def test_known_comparison_different_roots_not_resolved(self):
+        """Proxies with different root nodes must NOT be resolved statically."""
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt, CustomProxyBool
+
+        class _M(torch.nn.Module):
+            def forward(self, x, y):
+                return x + y
+
+        tracer = CustomTracer()
+        graph = tracer.trace(_M())
+        placeholders = [n for n in graph.nodes if n.op == "placeholder"]
+        x_node, y_node = placeholders[0], placeholders[1]
+        px = tracer.proxy(x_node, cls=CustomProxyInt)
+        py = tracer.proxy(y_node, cls=CustomProxyInt)
+
+        # Different root nodes → cannot be resolved statically → FX node emitted.
+        result = px > py
+        self.assertIsInstance(result, CustomProxyBool)
+
+    def test_known_comparison_positivity_propagation(self):
+        """Adding a non-negative constant to a positive proxy stays positive."""
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt, CustomProxyBool
+
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        tracer = CustomTracer()
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
+        x = tracer.proxy(node, cls=CustomProxyInt)
+        x.only_positive = True
+        x.can_be_null = False
+
+        y = x + 2  # strictly positive + 2 → still strictly positive
+        self.assertTrue(y.only_positive)
+        self.assertFalse(y.can_be_null)
+
+        # y > 0 → True (from only_positive flag)
+        self.assertIs(y > 0, True)
+
     def test_tracing_with_torch_check_and_shape_constraint(self):
         """
         Tracing a model that calls torch._check with a shape comparison
