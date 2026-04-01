@@ -38,10 +38,7 @@ class TestToOnnxDispatcher(ExtTestCase):
         from yobx import to_onnx
         from yobx.container import ExportArtifact
 
-        artifact = to_onnx(
-            "SELECT a + b AS total FROM t",
-            {"a": np.float32, "b": np.float32},
-        )
+        artifact = to_onnx("SELECT a + b AS total FROM t", {"a": np.float32, "b": np.float32})
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertIsNotNone(artifact.proto)
 

@@ -488,12 +488,12 @@ def requires_sklearn(version: str = "", msg: str = "") -> Callable:
         return unittest.skip(msg or "scikit-learn not installed")
 
     if not hasattr(sklearn, "__version__"):
-        return False
+        return unittest.skip(msg or "scikit-learn not installed")
     if not version:
-        return True
+        return lambda x: x
     if PvVersion(sklearn.__version__) < PvVersion(version):
         msg = f"scikit-learn version {sklearn.__version__} < {version}: {msg}"
-        return unittest.skip(msg)
+        return unittest.skip(msg or f"scikit-learn verions < {version}")
     return lambda x: x
 
 

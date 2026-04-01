@@ -219,11 +219,7 @@ def to_onnx(
 
         return litert_to_onnx(model, args if args is not None else (), **litert_common, **kwargs)
 
-    if (
-        isinstance(model, str)
-        and model.endswith(".tflite")
-        and os.path.isfile(model)
-    ):
+    if isinstance(model, str) and model.endswith(".tflite") and os.path.isfile(model):
         from .litert import to_onnx as litert_to_onnx  # noqa: PLC0415
 
         return litert_to_onnx(model, args if args is not None else (), **litert_common, **kwargs)
