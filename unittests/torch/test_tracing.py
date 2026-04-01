@@ -758,6 +758,74 @@ class TestTracing(ExtTestCase):
         self.assertNotEmpty(got)
         self.assertEqualArray(expected, got)
 
+    def test_inplace_setitem_square(self):
+        """InplaceSetItemSquare: x[:2, :3] = 1 on direct input (no clone), return x."""
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                x[:2, :3] = 1
+                return x
+
+        inputs = (torch.rand(5, 5),)
+        model = Model()
+        expected = model(*copy.deepcopy(inputs))
+        self.assertNotEmpty(expected)
+        graph = CustomTracer().trace(model)
+        self.assertIn(operator.setitem, {n.target for n in graph.nodes})
+        mod = torch.fx.GraphModule(model, graph)
+        got = mod(*copy.deepcopy(inputs))
+        self.assertEqualArray(expected, got)
+        art = to_onnx(model, inputs, export_options=ExportOptions(tracing=True))
+        sess = self._check_with_ort(art)
+        got_ort = sess.run(None, {"x": inputs[0].numpy()})
+        self.assertEqualArray(expected, got_ort[0])
+
+    def test_inplace_setitem_square_add(self):
+        """InplaceSetItemSquareAdd: x[:2, :3] = 1 on direct input, return x + 2."""
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                x[:2, :3] = 1
+                return x + 2
+
+        inputs = (torch.rand(5, 5),)
+        model = Model()
+        expected = model(*copy.deepcopy(inputs))
+        self.assertNotEmpty(expected)
+        graph = CustomTracer().trace(model)
+        self.assertIn(operator.setitem, {n.target for n in graph.nodes})
+        mod = torch.fx.GraphModule(model, graph)
+        got = mod(*copy.deepcopy(inputs))
+        self.assertEqualArray(expected, got)
+        art = to_onnx(model, inputs, export_options=ExportOptions(tracing=True))
+        sess = self._check_with_ort(art)
+        got_ort = sess.run(None, {"x": inputs[0].numpy()})
+        self.assertEqualArray(expected, got_ort[0])
+
+    def test_inplace_setitem_square_add2(self):
+        """InplaceSetItemSquareAdd2: x[:2, :3] = 1 on direct input, return (x+2, x+3)."""
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                x[:2, :3] = 1
+                return x + 2, x + 3
+
+        inputs = (torch.rand(5, 5),)
+        model = Model()
+        expected = model(*copy.deepcopy(inputs))
+        self.assertNotEmpty(expected)
+        graph = CustomTracer().trace(model)
+        self.assertIn(operator.setitem, {n.target for n in graph.nodes})
+        mod = torch.fx.GraphModule(model, graph)
+        got = mod(*copy.deepcopy(inputs))
+        for e, g in zip(expected, got):
+            self.assertEqualArray(e, g)
+        art = to_onnx(model, inputs, export_options=ExportOptions(tracing=True))
+        sess = self._check_with_ort(art)
+        got_ort = sess.run(None, {"x": inputs[0].numpy()})
+        for e, g in zip(expected, got_ort):
+            self.assertEqualArray(e, g)
+
     def test_index_Tensor_copy_exp(self):
         class Model(torch.nn.Module):
             def forward(self, x, sumx):
