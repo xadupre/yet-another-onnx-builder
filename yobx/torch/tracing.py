@@ -13,6 +13,11 @@ from ..helpers import flatten_object, string_type
 from .fake_tensor_helper import make_fake_with_dynamic_dimensions
 from .torch_helper import torch_deepcopy
 
+try:
+    from torch.fx.experimental.symbolic_shapes import guard_size_oblivious as _guard_size_oblivious
+except (ImportError, AttributeError):
+    _guard_size_oblivious = None
+
 _torch_cat = torch.cat
 
 _MISSING: Any = object()  # sentinel for "no concrete value supplied"
@@ -218,11 +223,11 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 concrete_numel = val.numel()
             elif isinstance(val, CustomProxy):
                 concrete_numel = val.numel()
+        if concrete_numel is not _MISSING and isinstance(concrete_numel, int):
+            return concrete_numel
         node = self.tracer.create_node(
             "call_method", "numel", args=(self.node, *args), kwargs=kwargs
         )
-        if concrete_numel is not _MISSING and isinstance(concrete_numel, int):
-            return concrete_numel
         return self.tracer.proxy(node, cls=CustomProxyInt, concrete_val=concrete_numel)
 
     def size(self, dim: Optional[int] = None):
@@ -435,6 +440,8 @@ class CustomProxyInt(CustomProxy):
             and isinstance(other, (int, float))
             and not isinstance(other, bool)
         ):
+            if _guard_size_oblivious is not None:
+                return _guard_size_oblivious(self._concrete_val == other)
             return bool(self._concrete_val == other)
         return self._compare(operator.eq, other)
 
@@ -444,6 +451,8 @@ class CustomProxyInt(CustomProxy):
             and isinstance(other, (int, float))
             and not isinstance(other, bool)
         ):
+            if _guard_size_oblivious is not None:
+                return not _guard_size_oblivious(self._concrete_val == other)
             return not bool(self._concrete_val == other)
         return self._compare(operator.ne, other)
 
