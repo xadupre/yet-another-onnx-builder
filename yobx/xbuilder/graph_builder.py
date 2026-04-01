@@ -3498,7 +3498,7 @@ class GraphBuilder(
                                 f"self.input_names={self.input_names}"
                                 f"{self.get_debug_msg()}"
                             )
-                            dim_name_axis = self._torch_sym_int_to_str(shape[axis])
+                            dim_name_axis = self._torch_sym_int_to_str(shape[axis])  # type: ignore
                             if dim_name != dim_name_axis and not isinstance(dim_name_axis, int):
                                 assert (
                                     dim_name_axis not in self._dynamic_alias
@@ -3614,7 +3614,7 @@ class GraphBuilder(
                                 f"self.input_names={self.input_names}"
                                 f"{self.get_debug_msg()}"
                             )
-                            dim_name_axis = self._torch_sym_int_to_str(shape[axis])
+                            dim_name_axis = self._torch_sym_int_to_str(shape[axis])  # type: ignore
                             if dim_name != dim_name_axis:
                                 assert (
                                     dim_name_axis not in self._dynamic_alias
