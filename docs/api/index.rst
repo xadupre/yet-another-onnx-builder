@@ -3,14 +3,9 @@ API
 
 .. toctree::
    :maxdepth: 1
-   :caption: Dispatcher
-
-   convert
-
-.. toctree::
-   :maxdepth: 1
    :caption: Core
 
+   convert
    typing
    builder/index
    container/index
@@ -27,6 +22,7 @@ API
    :maxdepth: 1
    :caption: Converters
 
+   to_onnx
    litert/index
    sql/index
    sklearn/index

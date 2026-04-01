@@ -1,4 +1,7 @@
-yobx.to\_onnx
-=============
+yobx.convert
+============
 
-.. autofunction:: yobx.to_onnx
+.. automodule:: yobx.convert
+    :members:
+    :no-undoc-members:
+    :exclude-members: to_onnx
