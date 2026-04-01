@@ -396,6 +396,22 @@ class CustomProxyInt(CustomProxy):
     ``if x.shape[2] == 0:`` work during symbolic tracing without raising
     ``TraceError``.  All other comparisons (including proxy-vs-proxy) still
     create FX nodes as usual.
+
+    When *only_positive* is ``True`` (set e.g. after seeing
+    ``torch._check(value > 0)``), comparisons against non-positive constants
+    are evaluated concretely:
+
+    * ``value > c`` for ``c <= 0`` → ``True``
+    * ``value >= c`` for ``c <= 0`` → ``True``  (since value > 0 ≥ c)
+    * ``value < c`` for ``c <= 0`` → ``False``
+    * ``value <= c`` for ``c <= 0`` → ``False``
+    * ``value != c`` for ``c <= 0`` → ``True``
+
+    When *can_be_null* is ``False`` (set e.g. after seeing
+    ``torch._check(value != 0)``), zero-comparisons are evaluated concretely:
+
+    * ``value == 0`` → ``False``
+    * ``value != 0`` → ``True``
     """
 
     __hash__ = CustomProxy.__hash__  # restore hash after __eq__ override
@@ -436,6 +452,12 @@ class CustomProxyInt(CustomProxy):
             and not isinstance(other, bool)
         ):
             return bool(self._concrete_val == other)
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            if self.only_positive and other <= 0:
+                # Strictly positive ⟹ value > 0, cannot equal a non-positive constant.
+                return False
+            if not self.can_be_null and other == 0:
+                return False
         return self._compare(operator.eq, other)
 
     def __ne__(self, other):  # type: ignore[override]
@@ -445,18 +467,43 @@ class CustomProxyInt(CustomProxy):
             and not isinstance(other, bool)
         ):
             return not bool(self._concrete_val == other)
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            if self.only_positive and other <= 0:
+                # Strictly positive ⟹ value > 0, never equal to a non-positive constant.
+                return True
+            if not self.can_be_null and other == 0:
+                return True
         return self._compare(operator.ne, other)
 
     def __lt__(self, other):
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            if self.only_positive and other <= 0:
+                # Strictly positive ⟹ value > 0, so value < other is impossible
+                # when other <= 0.
+                return False
         return self._compare(operator.lt, other)
 
     def __le__(self, other):
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            if self.only_positive and other <= 0:
+                # Strictly positive ⟹ value > 0, so value <= other is impossible
+                # when other <= 0.
+                return False
         return self._compare(operator.le, other)
 
     def __gt__(self, other):
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            if self.only_positive and other <= 0:
+                # Strictly positive ⟹ value > 0 > other (or value > 0 = other),
+                # so True.
+                return True
         return self._compare(operator.gt, other)
 
     def __ge__(self, other):
+        if isinstance(other, (int, float)) and not isinstance(other, bool):
+            if self.only_positive and other <= 0:
+                # Strictly positive ⟹ value > 0 ≥ other, so True.
+                return True
         return self._compare(operator.ge, other)
 
 
@@ -585,11 +632,16 @@ class CustomProxyShape(CustomProxy):
         for i in range(len(concrete_shape)):
             item_proxy: CustomProxy = shape_proxy[i]  # type: ignore[assignment]
             concrete_val = concrete_shape[i]
-            items.append(
-                concrete_val
-                if isinstance(concrete_val, int)
-                else CustomProxyInt(item_proxy.node, item_proxy.tracer, concrete_val)
-            )
+            if isinstance(concrete_val, int):
+                items.append(concrete_val)
+            else:
+                cpi = CustomProxyInt(item_proxy.node, item_proxy.tracer, concrete_val)
+                # Register in the tracer's node→proxy map so that
+                # _torch_check_for_tracing can find this proxy by its node.
+                node_proxy_map = getattr(item_proxy.tracer, "_node_proxy_map", None)
+                if node_proxy_map is not None:
+                    node_proxy_map[item_proxy.node] = cpi
+                items.append(cpi)
         # Tie the CustomProxyShape to the underlying proxy node and tracer, then
         # attach the per-dimension proxies as values (bypassing the init assertion
         # so the assignment is made directly after construction).
@@ -739,6 +791,80 @@ def _vmap_for_tracing(func: Callable, in_dims: Any = 0, out_dims: Any = 0, **kwa
     return wrapped
 
 
+_torch_check = getattr(torch, "_check", None)
+
+
+def _torch_check_for_tracing(cond: Any, msg: Any = None) -> None:
+    """
+    Replacement for :func:`torch._check` during :class:`CustomTracer` symbolic
+    tracing.
+
+    :func:`torch._check` is intended as a runtime assertion that a condition
+    holds.  During symbolic tracing with :class:`CustomTracer` the condition
+    is often a :class:`CustomProxy` or :class:`CustomProxyBool` — an FX graph
+    node whose concrete boolean value is not available.  Calling
+    ``bool(proxy)`` on such a node raises ``torch.fx.proxy.TraceError``.
+
+    This wrapper avoids that error by **not** evaluating ``bool(cond)`` when
+    *cond* is a proxy.  Instead it:
+
+    1. Silently accepts the constraint (the assertion is assumed to hold, as
+       it would at runtime).
+    2. If the condition looks like ``proxy_int > 0`` / ``proxy_int >= 1``
+       (or the symmetric ``0 < proxy_int``), it sets
+       :attr:`CustomProxyInt.only_positive` on the underlying
+       :class:`CustomProxyInt` proxy so that downstream comparisons such as
+       ``if proxy_int > 0:`` can be resolved to a concrete Python ``True``
+       without creating additional FX nodes.
+    3. If the condition looks like ``proxy_int != 0``, it clears
+       :attr:`CustomProxyInt.can_be_null` on the underlying proxy.
+
+    For concrete Python ``bool`` values the original :func:`torch._check` is
+    called unchanged.
+    """
+    if isinstance(cond, CustomProxy):
+        # Try to propagate constraint information to the underlying CustomProxyInt.
+        cond_node = cond.node
+        if cond_node.op == "call_function" and len(cond_node.args) == 2:
+            op = cond_node.target
+            lhs_node, rhs = cond_node.args
+            # Normalise: if rhs is a Node (proxy on the right), flip for gt/ge/lt/le.
+            if isinstance(rhs, torch.fx.Node) and not isinstance(lhs_node, torch.fx.Node):
+                # e.g. 0 < proxy → swap to proxy > 0
+                lhs_node, rhs = rhs, lhs_node
+                op = {
+                    operator.gt: operator.lt,
+                    operator.lt: operator.gt,
+                    operator.ge: operator.le,
+                    operator.le: operator.ge,
+                    operator.eq: operator.eq,
+                    operator.ne: operator.ne,
+                }.get(op, op)
+            tracer = cond.tracer
+            node_proxy_map: Dict[torch.fx.Node, Any] = getattr(
+                tracer, "_node_proxy_map", {}
+            )
+            lhs_proxy = node_proxy_map.get(lhs_node) if isinstance(lhs_node, torch.fx.Node) else None
+            if isinstance(lhs_proxy, CustomProxyInt) and isinstance(rhs, (int, float)):
+                if op is operator.gt and rhs == 0:
+                    # torch._check(x > 0): x is strictly positive
+                    lhs_proxy.only_positive = True
+                    lhs_proxy.can_be_null = False
+                elif op is operator.ge and rhs == 1:
+                    # torch._check(x >= 1): x is strictly positive (integer)
+                    lhs_proxy.only_positive = True
+                    lhs_proxy.can_be_null = False
+                elif op is operator.ne and rhs == 0:
+                    # torch._check(x != 0)
+                    lhs_proxy.can_be_null = False
+        return  # Do not call bool(cond) – it would raise TraceError.
+    if _torch_check is not None:
+        if msg is not None:
+            _torch_check(cond, msg)
+        else:
+            _torch_check(cond)
+
+
 @contextlib.contextmanager
 def replace_problematic_function_before_tracing() -> Generator:
     """
@@ -747,7 +873,11 @@ def replace_problematic_function_before_tracing() -> Generator:
     """
     _scan_op = getattr(torch.ops.higher_order, "scan", None)
     saved = {"cat": torch.cat, "cond": torch.cond, "vmap": torch.vmap}
+    if _torch_check is not None:
+        saved["_check"] = _torch_check
     newf = {"cat": CustomProxy.cat, "cond": CondCCOp(), "vmap": _vmap_for_tracing}
+    if _torch_check is not None:
+        newf["_check"] = _torch_check_for_tracing
     if _scan_op is not None:
         saved[(torch.ops.higher_order, "scan")] = _scan_op
         newf[(torch.ops.higher_order, "scan")] = ScanCCOp()
@@ -826,6 +956,11 @@ class CustomTracer(torch.fx.Tracer):
         )
         self._callables = {}
         self.module_leaves = module_leaves
+        # Maps each FX node to the :class:`CustomProxy` (or subclass) that was
+        # created for it.  Used by :func:`_torch_check_for_tracing` to look up
+        # the :class:`CustomProxyInt` associated with the operand of a comparison
+        # node so that constraint flags such as ``only_positive`` can be set.
+        self._node_proxy_map: Dict[torch.fx.Node, CustomProxy] = {}
 
     @torch.fx._compatibility.compatibility(is_backward_compatible=True)
     def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
@@ -915,7 +1050,9 @@ class CustomTracer(torch.fx.Tracer):
         self, node: torch.fx.Node, cls: type[CustomProxy] = CustomProxy, **kwargs
     ) -> torch.fx.Proxy:
         """Overwrites this method to replace the default Proxy by CustomProxy."""
-        return cls(node, self, **kwargs)
+        p = cls(node, self, **kwargs)
+        self._node_proxy_map[node] = p
+        return p
 
     def create_arg(self, a: Any) -> "Argument":  # noqa: F821
         """Overwrites this method to deal with more argument."""

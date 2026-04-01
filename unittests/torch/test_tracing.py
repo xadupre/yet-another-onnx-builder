@@ -1594,5 +1594,138 @@ class TestCustomProxyShape(ExtTestCase):
             )
 
 
+@requires_torch("2.0")
+class TestTorchCheckConstraints(ExtTestCase):
+    """Tests for torch._check constraint propagation to CustomProxyInt."""
+
+    def test_torch_check_for_tracing_concrete_true(self):
+        """_torch_check_for_tracing should pass through concrete True."""
+        from yobx.torch.tracing import _torch_check_for_tracing
+
+        # Should not raise for concrete True.
+        _torch_check_for_tracing(True)
+
+    def test_torch_check_for_tracing_concrete_false_raises(self):
+        """_torch_check_for_tracing should raise for concrete False (same as torch._check)."""
+        import torch
+
+        if not hasattr(torch, "_check"):
+            return
+        from yobx.torch.tracing import _torch_check_for_tracing
+
+        with self.assertRaises(Exception):
+            _torch_check_for_tracing(False)
+
+    def test_torch_check_for_tracing_proxy_noop(self):
+        """_torch_check_for_tracing should silently accept a CustomProxy condition."""
+        from yobx.torch.tracing import _torch_check_for_tracing, CustomTracer, CustomProxyInt
+
+        tracer = CustomTracer()
+        # Create a placeholder node for a proxy.
+        graph = torch.fx.Graph()
+        node = graph.placeholder("x")
+        proxy = tracer.proxy(node, cls=CustomProxyInt)
+        # Must NOT raise TraceError even though bool(proxy) would.
+        _torch_check_for_tracing(proxy > 0)
+        _torch_check_for_tracing(proxy != 0)
+
+    def test_only_positive_set_by_torch_check(self):
+        """
+        _torch_check_for_tracing(proxy > 0) should set only_positive on proxy.
+        """
+        from yobx.torch.tracing import _torch_check_for_tracing, CustomTracer, CustomProxyInt
+
+        tracer = CustomTracer()
+        graph = torch.fx.Graph()
+        node = graph.placeholder("x")
+        proxy = tracer.proxy(node, cls=CustomProxyInt)
+
+        self.assertFalse(proxy.only_positive)
+
+        # Call patched torch._check with proxy > 0 condition.
+        _torch_check_for_tracing(proxy > 0)
+
+        self.assertTrue(proxy.only_positive)
+        self.assertFalse(proxy.can_be_null)
+
+    def test_can_be_null_cleared_by_torch_check_ne(self):
+        """
+        _torch_check_for_tracing(proxy != 0) should clear can_be_null on proxy.
+        """
+        from yobx.torch.tracing import _torch_check_for_tracing, CustomTracer, CustomProxyInt
+
+        tracer = CustomTracer()
+        graph = torch.fx.Graph()
+        node = graph.placeholder("x")
+        proxy = tracer.proxy(node, cls=CustomProxyInt)
+
+        self.assertTrue(proxy.can_be_null)
+
+        _torch_check_for_tracing(proxy != 0)
+
+        self.assertFalse(proxy.can_be_null)
+        self.assertFalse(proxy.only_positive)
+
+    def test_only_positive_comparisons(self):
+        """
+        When only_positive is True, comparison operators should evaluate concretely.
+        """
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt, CustomProxyBool
+
+        tracer = CustomTracer()
+        graph = torch.fx.Graph()
+        node = graph.placeholder("x")
+        proxy = tracer.proxy(node, cls=CustomProxyInt)
+        proxy.only_positive = True
+        proxy.can_be_null = False
+
+        # value > 0 → True
+        self.assertIs(proxy > 0, True)
+        # value > -1 → True
+        self.assertIs(proxy > -1, True)
+        # value >= 0 → True
+        self.assertIs(proxy >= 0, True)
+        # value >= 1 → still returns proxy (we only know > 0, not >= 1 unless checked)
+        self.assertIsInstance(proxy >= 1, CustomProxyBool)
+        # value < 0 → False
+        self.assertIs(proxy < 0, False)
+        # value <= 0 → False
+        self.assertIs(proxy <= 0, False)
+        # value != 0 → True (can_be_null is False)
+        self.assertIs(proxy != 0, True)
+        # value == 0 → False (can_be_null is False)
+        self.assertIs(proxy == 0, False)
+        # value > 1 → still returns proxy (we don't know if value > 1)
+        self.assertIsInstance(proxy > 1, CustomProxyBool)
+
+    def test_tracing_with_torch_check_and_shape_constraint(self):
+        """
+        Tracing a model that calls torch._check with a shape comparison
+        should succeed, and the constraint should be reflected.
+        """
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt, replace_problematic_function_before_tracing
+
+        if not hasattr(torch, "_check"):
+            return
+
+        captured_shape_proxy = []
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                n = x.size(0)
+                torch._check(n > 0)
+                captured_shape_proxy.append(n)
+                return x + 1
+
+        tracer = CustomTracer()
+        x = torch.rand((4, 3))
+        with replace_problematic_function_before_tracing():
+            graph = tracer.trace(Model())
+        self.assertIsNotNone(graph)
+        # The shape proxy captured should now have only_positive = True.
+        if captured_shape_proxy and isinstance(captured_shape_proxy[0], CustomProxyInt):
+            self.assertTrue(captured_shape_proxy[0].only_positive)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
