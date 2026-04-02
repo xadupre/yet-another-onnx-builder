@@ -225,7 +225,6 @@ class TestModelEvalCases(ExtTestCase):
             cases="ControlFlowNumelZero1", exporters="yobx-tracing", quiet=False, dynamic=True
         )
 
-    @unittest.skip("does not work")
     def test_run_exporter_controlflow_numel_zero_2_tracing(self):
         evaluation(
             cases="ControlFlowNumelZero2", exporters="yobx-tracing", quiet=False, dynamic=True
@@ -236,7 +235,6 @@ class TestModelEvalCases(ExtTestCase):
             cases="ControlFlowNumelZero1", exporters="export-tracing", quiet=False, dynamic=True
         )
 
-    @unittest.skip("does not work")
     def test_run_exporter_controlflow_numel_zero_export_2_tracing(self):
         evaluation(
             cases="ControlFlowNumelZero2", exporters="export-tracing", quiet=False, dynamic=True

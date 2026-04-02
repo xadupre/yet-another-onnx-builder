@@ -285,19 +285,38 @@ def _make_exporter_export(
         return exported.module()
 
     if exporter == "export-tracing":
+        import inspect
+
+        import torch.utils._pytree as pytree
+
         from .tracing import CustomTracer
 
+        sig = inspect.signature(model.forward)
+        params = list(sig.parameters.keys())
+        concrete_args = dict(zip(params, inputs))
+        # Only pass concrete_args when all inputs are plain tensors/scalars.
+        # List/pytree inputs cause model-wrapping which changes the calling
+        # convention of the resulting GraphModule, breaking downstream callers.
+        if any(type(v) in pytree.SUPPORTED_NODES for v in concrete_args.values()):
+            concrete_args = None
         try:
+            tracer = CustomTracer()
             if verbose >= 2:
-                graph = CustomTracer().trace(model)
-                mod = torch.fx.GraphModule(model, graph)
+                graph = tracer.trace(
+                    model, concrete_args=concrete_args, dynamic_shapes=dynamic_shapes
+                )
+                root = tracer.traced_model or model
+                mod = torch.fx.GraphModule(root, graph)
             else:
                 with (
                     contextlib.redirect_stdout(io.StringIO()),
                     contextlib.redirect_stderr(io.StringIO()),
                 ):
-                    graph = CustomTracer().trace(model)
-                    mod = torch.fx.GraphModule(model, graph)
+                    graph = tracer.trace(
+                        model, concrete_args=concrete_args, dynamic_shapes=dynamic_shapes
+                    )
+                    root = tracer.traced_model or model
+                    mod = torch.fx.GraphModule(root, graph)
         except Exception as e:
             if not quiet:
                 raise
