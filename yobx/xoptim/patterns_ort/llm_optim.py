@@ -1111,9 +1111,6 @@ class GroupQueryAttention3DPattern(PatternOptimization):
             np.array([0, 0, -1, head_size], dtype=np.int64),
             source=f"{self.__class__.__name__}.00_1",
         )
-        one32 = g.make_initializer(
-            "", np.array([1], dtype=np.int32), source=f"{self.__class__.__name__}.1i"
-        )
 
         query3D = g.unique_name(f"{self.__class__.__name__}--{query}")
         query4D = g.unique_name(f"{self.__class__.__name__}--{query}")
@@ -1127,7 +1124,9 @@ class GroupQueryAttention3DPattern(PatternOptimization):
         seqlensk = g.unique_name(f"{self.__class__.__name__}--sl")
         total_length64 = g.unique_name(f"{self.__class__.__name__}--tl")
         total_length = g.unique_name(f"{self.__class__.__name__}--tl")
-        total_length_1 = g.unique_name(f"{self.__class__.__name__}--tl_1")
+        seq_length64 = g.unique_name(f"{self.__class__.__name__}--seq64")
+        seq_length32 = g.unique_name(f"{self.__class__.__name__}--seq32")
+        past_length = g.unique_name(f"{self.__class__.__name__}--pl")
 
         batch_shape = g.unique_name(f"{self.__class__.__name__}--{query}")
 
@@ -1204,8 +1203,10 @@ class GroupQueryAttention3DPattern(PatternOptimization):
                 g._make_node("Shape", [query], [batch_shape], start=0, end=1),
                 g._make_node("Shape", [float_mask], [total_length64], start=-1),
                 g._make_node("Cast", [total_length64], [total_length], to=TensorProto.INT32),
-                g._make_node("Sub", [total_length, one32], [total_length_1]),
-                g._make_node("Expand", [total_length_1, batch_shape], [seqlensk]),
+                g._make_node("Shape", [float_mask], [seq_length64], start=0, end=1),
+                g._make_node("Cast", [seq_length64], [seq_length32], to=TensorProto.INT32),
+                g._make_node("Sub", [total_length, seq_length32], [past_length]),
+                g._make_node("Expand", [past_length, batch_shape], [seqlensk]),
                 g._make_node("Transpose", [query], [query4D], perm=[0, 2, 1, 3]),
                 g._make_node(
                     "Transpose", [keys_concat_node.input[1]], [keys4D], perm=[0, 2, 1, 3]
