@@ -35,6 +35,7 @@ Example::
 """
 
 import operator
+import traceback
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
@@ -611,6 +612,7 @@ class DispatchTracer:
 
         # --- 3. emit FX node ---
         node = self.graph.call_function(op, args=fx_args, kwargs=fx_kwargs)
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
         if isinstance(meta_out, torch.Tensor):
             node.meta["val"] = meta_out
 
@@ -639,6 +641,8 @@ class DispatchTracer:
                         operator.getitem, args=(node, i), kwargs={}
                     )
                     get_node.meta["val"] = item
+                    if "stack_trace" in node.meta:
+                        get_node.meta["stack_trace"] = node.meta["stack_trace"]
                     results.append(
                         self._make_tracing_tensor(item.shape, item.dtype, device, get_node)
                     )

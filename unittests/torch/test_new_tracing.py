@@ -1,5 +1,6 @@
 """Tests for yobx.torch.new_tracing."""
 
+import operator
 import unittest
 import torch
 from yobx.ext_test_case import ExtTestCase, requires_torch
@@ -369,6 +370,39 @@ class TestNewTracing(ExtTestCase):
         cf = next(n for n in graph.nodes if n.op == "call_function")
         self.assertIn("val", cf.meta)
         self.assertEqual(cf.meta["val"].shape, torch.Size([3, 5]))
+
+    def test_call_function_meta_stack_trace(self):
+        """call_function nodes should have a 'stack_trace' entry in node.meta."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(lambda x: x + 1.0, (torch.randn(3, 5),))
+        cf = next(n for n in graph.nodes if n.op == "call_function")
+        self.assertIn("stack_trace", cf.meta)
+        self.assertIsInstance(cf.meta["stack_trace"], str)
+        # The stack trace should contain file/line information.
+        self.assertIn("File", cf.meta["stack_trace"])
+
+    def test_multiple_outputs_getitem_meta_stack_trace(self):
+        """getitem nodes for multi-output ops inherit 'stack_trace' from their parent."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def split_heads(x):
+            a, b = x.chunk(2, dim=-1)
+            return a, b
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(split_heads, (torch.randn(2, 8),))
+        graph.lint()
+        # getitem nodes should have stack_trace propagated
+        getitem_nodes = [
+            n for n in graph.nodes
+            if n.op == "call_function" and n.target is operator.getitem
+        ]
+        self.assertGreater(len(getitem_nodes), 0)
+        for n in getitem_nodes:
+            self.assertIn("stack_trace", n.meta, f"node {n.name} missing stack_trace")
+            self.assertIsInstance(n.meta["stack_trace"], str)
 
     # ------------------------------------------------------------------
     # Nested input structures
