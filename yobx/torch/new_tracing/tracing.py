@@ -427,9 +427,8 @@ class DispatchTracer:
         graph = tracer.trace(add, (x, y))
         print(graph)
 
-    Attributes:
-        graph: The :class:`torch.fx.Graph` built during the last
-            :meth:`trace` call.
+    The class creates an empty :class:`torch.fx.Graph`
+    populated by a :meth:`trace` call.
     """
 
     def __init__(self) -> None:
@@ -454,7 +453,7 @@ class DispatchTracer:
     ) -> "TracingTensor":
         """Create a :class:`TracingTensor` and register it with *node*."""
         t = TracingTensor.__new__(TracingTensor, shape, dtype=dtype, device=device)
-        t.__init__(shape, dtype=dtype, device=device)
+        t.__init__(shape, dtype=dtype, device=device)  # type: ignore
         t._tracer = self
         t._node = node
         self._tensor_id_to_node[id(t)] = node
