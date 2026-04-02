@@ -369,6 +369,66 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
                     got = sess.run(None, feeds)
                     self.assertEqualArray(expected[0], got[0], atol=1e-5)
 
+    def get_simplified_layer_normalization_model_eps_first(self, dyn):
+        """Build a SimplifiedLayerNorm model where epsilon is at Add.input[0]."""
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Pow", ["X", "exp"], ["x2"]),
+                    oh.make_node("ReduceMean", ["x2", "axis"], ["xr"]),
+                    # epsilon at input[0], ReduceMean output at input[1]
+                    oh.make_node("Add", ["eps", "xr"], ["xa"]),
+                    oh.make_node("Sqrt", ["xa"], ["xq"]),
+                    oh.make_node("Reciprocal", ["xq"], ["xi"]),
+                    oh.make_node("Mul", ["xi", "X"], ["Y"]),
+                ],
+                "dummy",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "D" if dyn else 4])],
+                [oh.make_tensor_value_info("Y", TFLOAT, ["a", "D" if dyn else 4])],
+                [
+                    onh.from_array(np.array([2], dtype=np.float32), name="exp"),
+                    onh.from_array(
+                        np.array([9.999999974752427e-7], dtype=np.float32), name="eps"
+                    ),
+                    onh.from_array(np.array([-1], dtype=np.int64), name="axis"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        check_model(model)
+        return model
+
+    def test_simplified_layer_normalization_eps_first(self):
+        """Test SimplifiedLayerNormalizationPattern when epsilon is at Add.input[0]."""
+        for dyn in [False, True]:
+            with self.subTest(dyn=dyn):
+                model = self.get_simplified_layer_normalization_model_eps_first(dyn=dyn)
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(
+                        patterns=["SimplifiedLayerNormalization"]
+                    ),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                self.assertEqual(
+                    (
+                        ["Shape", "Gather", "ConstantOfShape", "SimplifiedLayerNormalization"]
+                        if dyn
+                        else ["SimplifiedLayerNormalization"]
+                    ),
+                    [n.op_type for n in opt_onx.graph.node],
+                )
+
+                feeds = {"X": np.arange(20).reshape((5, 4)).astype(np.float32)}
+                ref1 = ExtendedReferenceEvaluator(model)
+                expected = ref1.run(None, feeds)
+
+                ref2 = ExtendedReferenceEvaluator(opt_onx)
+                got = ref2.run(None, feeds)
+                self.assertEqualArray(expected[0], got[0], atol=1e-5)
+
     def get_simplified_layer_normalization_model_output(self, div, dyn):
         model = oh.make_model(
             oh.make_graph(

@@ -171,7 +171,8 @@ class SimplifiedLayerNormalizationPattern(PatternOptimization):
     ) -> List[NodeProto]:
         nname = node_reduce.name
         nodes = []
-        epsilon = g.get_computed_constant(node_add.input[1])
+        eps_input_idx = 1 if g.is_constant_scalar(node_add.input[1]) else 0
+        epsilon = g.get_computed_constant(node_add.input[eps_input_idx])
         shape = g.get_shape(node_reduce.input[0]) if g.has_shape(node_reduce.input[0]) else None
         axis = g.get_constant_or_attribute(node_reduce, "axes", input_index=1)[0]
         assert shape is None or axis < len(
@@ -448,12 +449,12 @@ class SkipSimplifiedLayerNormalizationPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
 
         add = g.node_before(node.input[0])
-        if add.op_type != "Add" or add.domain != "":
+        if add is None or add.op_type != "Add" or add.domain != "":
             return self.none(node, inspect.currentframe().f_lineno)
         if (
             not g.has_shape(add.input[0])
             or not g.has_shape(add.input[1])
-            or g.get_shape(add.input[0]) != g.get_shape(add.input[1])
+            or g.get_shape_renamed(add.input[0]) != g.get_shape_renamed(add.input[1])
         ):
             return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [add, node], self.apply)

@@ -1079,9 +1079,9 @@ class RotaryEmbeddingPattern(PatternOptimization):
             self,
             [concat_cos, concat_sin, split_node, node, concat_node],
             self.apply,
-            insert_at=None
-            if g.is_used_more_than_once(concat_cos.output[0])
-            else (concat_node or node),
+            insert_at=(
+                None if g.is_used_more_than_once(concat_cos.output[0]) else (concat_node or node)
+            ),
         )
 
     def apply(
