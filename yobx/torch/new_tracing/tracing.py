@@ -329,10 +329,10 @@ class TracingTensor(torch.Tensor):
         :class:`DispatchTracer`.  Use :meth:`DispatchTracer.trace` to trace a
         callable rather than constructing :class:`TracingTensor` directly.
 
-    Attributes:
-        _tracer: The :class:`DispatchTracer` managing this tensor's graph.
-        _node: The :class:`torch.fx.Node` corresponding to this tensor in the
-            graph.
+    It contains two attributes:
+
+    * ``_tracer``: The :class:`DispatchTracer` managing this tensor's graph.
+    * `` _node``: The :class:`torch.fx.Node` corresponding to this tensor in the graph.
     """
 
     @staticmethod
