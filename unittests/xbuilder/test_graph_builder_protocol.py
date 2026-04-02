@@ -388,6 +388,7 @@ class TestGraphBuilderTorchProtocol(ExtTestCase):
         "make_dynamic_object",
         "add_dynamic_object",
         "make_new_dynamic_shape",
+        "make_new_dynamic_name",
         # sub-builder / local functions
         "make_nodes",
         "make_local_function",
@@ -397,6 +398,10 @@ class TestGraphBuilderTorchProtocol(ExtTestCase):
         "pretty_text",
         "register_users",
         "extract_input_names_from_args",
+        "make_key",
+        "make_shape_from_results",
+        "make_tensor_value_info_from_name",
+        "make_torch_tensor_from_np_array",
         # state attributes / properties
         "anyop",
         "last_added_node",

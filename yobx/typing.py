@@ -538,11 +538,14 @@ class GraphBuilderTorchProtocol(GraphBuilderExtendedProtocol, Protocol):
       :meth:`get_input_dynamic_shape`,
       :meth:`verify_dynamic_shape`, :meth:`register_dynamic_objects_from_shape`,
       :meth:`make_dynamic_object`, :meth:`add_dynamic_object`,
-      :meth:`make_new_dynamic_shape`.
+      :meth:`make_new_dynamic_shape`, :meth:`make_new_dynamic_name`.
     * **Sub-builder / local-function support** — :meth:`make_nodes`,
       :meth:`make_local_function`, :meth:`make_subset_builder`.
     * **Miscellaneous** — :meth:`add_stat`, :meth:`pretty_text`,
-      :meth:`register_users`, :meth:`extract_input_names_from_args`.
+      :meth:`register_users`, :meth:`extract_input_names_from_args`,
+      :meth:`make_key`, :meth:`make_shape_from_results`,
+      :meth:`make_tensor_value_info_from_name`,
+      :meth:`make_torch_tensor_from_np_array`.
     * **State attributes** — ``anyop``, ``as_function``, ``local_domain``,
       ``verbose``, ``torch``, ``optimization_options``, ``dynamic_shapes``,
       ``dynamic_objects``, ``dynamic_dimensions_source``, ``nodes``,
@@ -786,6 +789,15 @@ class GraphBuilderTorchProtocol(GraphBuilderExtendedProtocol, Protocol):
         """
         ...
 
+    def make_new_dynamic_name(self, prefix: str = "d") -> str:
+        """Creates a unique name for a new dynamic dimension that has not
+        yet been registered in ``dynamic_objects``.
+
+        :param prefix: prefix for the generated name (e.g. ``"d"``)
+        :return: a string name not present in ``dynamic_objects``
+        """
+        ...
+
     # ------------------------------------------------------------------
     # Sub-builder and local-function support
     # ------------------------------------------------------------------
@@ -886,6 +898,53 @@ class GraphBuilderTorchProtocol(GraphBuilderExtendedProtocol, Protocol):
         :param args: flat or nested sequence of values; strings that are
             known graph names are collected
         :return: deduplicated list of input tensor names
+        """
+        ...
+
+    def make_key(self, value: Any) -> Any:
+        """Builds a hashable cache key that identifies a constant *value*.
+
+        Used internally to deduplicate initializers: two values that
+        produce the same key are considered identical and will share a
+        single initializer name.
+
+        :param value: candidate constant — typically a
+            :class:`numpy.ndarray`, :class:`onnx.TensorProto`, ``int``,
+            or :class:`torch.Tensor`
+        :return: a hashable key, or ``None`` when no compact
+            representation is available for *value*
+        """
+        ...
+
+    def make_shape_from_results(self, shape: Any, name: str = "") -> str:
+        """Creates an INT64 shape tensor (initializer or Concat of dynamic
+        scalars) from a mixed shape tuple.
+
+        :param shape: sequence of ``int`` values, symbolic-dimension names
+            (``str``), or :class:`torch.SymInt` objects
+        :param name: optional node-name prefix used when emitting Concat
+            nodes for dynamic dimensions
+        :return: name of the INT64 tensor that holds the shape
+        """
+        ...
+
+    def make_tensor_value_info_from_name(self, name: str, verbose: int = 0) -> Any:
+        """Creates a :class:`~onnx.ValueInfoProto` for *name* from the
+        type and shape information currently known to the builder.
+
+        :param name: tensor name
+        :param verbose: verbosity level; higher values emit debug prints
+        :return: a :class:`~onnx.ValueInfoProto`
+        """
+        ...
+
+    def make_torch_tensor_from_np_array(self, np_array: Any) -> Any:
+        """Converts a NumPy array into a :class:`torch.Tensor`, handling
+        special dtypes such as ``bfloat16`` via ``ml_dtypes`` when
+        available.
+
+        :param np_array: source NumPy array
+        :return: a :class:`torch.Tensor`
         """
         ...
 
