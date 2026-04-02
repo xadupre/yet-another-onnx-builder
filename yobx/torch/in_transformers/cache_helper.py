@@ -273,9 +273,9 @@ def make_dynamic_cache(
             k, v = key_value_pairs[i][0], key_value_pairs[i][1]
             layer.dtype = k.dtype  # type: ignore[attr-defined]
             layer.device = k.device  # type: ignore[attr-defined]
-            layer.keys = k
-            layer.values = v
-            layer.is_initialized = True
+            layer.keys = k  # type: ignore
+            layer.values = v  # type: ignore
+            layer.is_initialized = True  # type: ignore
         assert not hasattr(cache, "layers") or len(key_value_pairs) == len(cache.layers), (
             f"Unexpected number of layers in the cache ({len(cache.layers)}), "
             f"{len(key_value_pairs)} expected."
@@ -301,8 +301,8 @@ def make_dynamic_cache(
             [cls_layer(**kws) for cls_layer, kws in zip(cls_layers, cls_kwargs)]  # type: ignore[operator, arg-type]
         )
         for i, layer in enumerate(cache.layers):
-            layer.keys, layer.values = key_value_pairs[i][0], key_value_pairs[i][1]
-            layer.is_initialized = True
+            layer.keys, layer.values = key_value_pairs[i][0], key_value_pairs[i][1]  # type: ignore
+            layer.is_initialized = True  # type: ignore
     else:
         cache = transformers.cache_utils.DynamicCache(key_value_pairs)
         if hasattr(cache, "layers") and len(key_value_pairs) < len(cache.layers):
@@ -347,7 +347,7 @@ def finalize_cache(cache: transformers.cache_utils.Cache) -> transformers.cache_
         # This is needed since transformers>4.55.3
         cache.layer_class_to_replicate = cache.layers[0].__class__
     assert (
-        not hasattr(cache, "layers") or len(cache.layers) != 1 or cache.layers[0].keys is not None
+        not hasattr(cache, "layers") or len(cache.layers) != 1 or cache.layers[0].keys is not None  # type: ignore
     ), (
         f"Size mismatch between {len(cache.layers)=}, "
         f"first key={cache.layers[0].keys}, "  # type: ignore[attr-defined]

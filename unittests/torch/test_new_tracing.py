@@ -396,8 +396,7 @@ class TestNewTracing(ExtTestCase):
         graph.lint()
         # getitem nodes should have stack_trace propagated
         getitem_nodes = [
-            n for n in graph.nodes
-            if n.op == "call_function" and n.target is operator.getitem
+            n for n in graph.nodes if n.op == "call_function" and n.target is operator.getitem
         ]
         self.assertGreater(len(getitem_nodes), 0)
         for n in getitem_nodes:
