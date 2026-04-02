@@ -354,6 +354,92 @@ class TestNewTracing(ExtTestCase):
         self.assertIn("val", cf.meta)
         self.assertEqual(cf.meta["val"].shape, torch.Size([3, 5]))
 
+    # ------------------------------------------------------------------
+    # Nested input structures
+    # ------------------------------------------------------------------
+
+    def test_trace_list_of_tensors(self):
+        """Inputs as a list of tensors should produce one placeholder per tensor."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def add_list(tensors):
+            return tensors[0] + tensors[1]
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(add_list, ([torch.randn(2, 3), torch.randn(2, 3)],))
+        graph.lint()
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        # Two tensors inside the list → two placeholders
+        self.assertEqual(len(ph_nodes), 2)
+        # Names should encode the nested path
+        ph_names = [n.name for n in ph_nodes]
+        self.assertTrue(any("x_0_0" in n for n in ph_names))
+        self.assertTrue(any("x_0_1" in n for n in ph_names))
+
+    def test_trace_tuple_of_tensors(self):
+        """Inputs as a tuple of tensors should produce one placeholder per tensor."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def add_tuple(pair):
+            a, b = pair
+            return a + b
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(add_tuple, ((torch.randn(3, 4), torch.randn(3, 4)),))
+        graph.lint()
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(ph_nodes), 2)
+
+    def test_trace_dict_of_tensors(self):
+        """Inputs as a dict of tensors should produce one placeholder per tensor."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def add_dict(d):
+            return d["a"] + d["b"]
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(
+            add_dict,
+            ({"a": torch.randn(2, 2), "b": torch.randn(2, 2)},),
+        )
+        graph.lint()
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(ph_nodes), 2)
+        ph_names = [n.name for n in ph_nodes]
+        self.assertTrue(any("x_0_a" in n for n in ph_names))
+        self.assertTrue(any("x_0_b" in n for n in ph_names))
+
+    def test_trace_mixed_nested_input(self):
+        """Mixed nesting: top-level tuple arg containing a list and a plain tensor."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def compute(pair, z):
+            return pair[0] + pair[1] + z
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(
+            compute,
+            ([torch.randn(2, 2), torch.randn(2, 2)], torch.randn(2, 2)),
+        )
+        graph.lint()
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        # Two from the list + one plain tensor = 3 placeholders
+        self.assertEqual(len(ph_nodes), 3)
+
+    def test_trace_nested_scalar_passthrough(self):
+        """Non-tensor values inside a nested structure pass through unchanged."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        def scale(tensors, factor):
+            return tensors[0] * factor
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(scale, ([torch.randn(3, 3)], 2.0))
+        graph.lint()
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        # Only the tensor inside the list gets a placeholder; 2.0 is a scalar
+        self.assertEqual(len(ph_nodes), 1)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -596,17 +596,28 @@ class DispatchTracer:
 
         # ------------------------------------------------------------------
         # Build placeholder TracingTensors for each tensor input.
+        # Nested structures (list, tuple, dict) are traversed recursively so
+        # that every tensor leaf gets its own placeholder node.
         # ------------------------------------------------------------------
         def _make_placeholder(arg: Any, name: str) -> Any:
-            if not isinstance(arg, torch.Tensor):
-                return arg
-            if name in dynamic_shapes:
-                shape: Union[Tuple[int, ...], TracingShape] = TracingShape(
-                    dynamic_shapes[name]
-                )
-            else:
-                shape = arg.shape
-            return self.placeholder(name, shape, arg.dtype, arg.device)
+            """Recursively replace tensors in a nested structure with placeholders."""
+            if isinstance(arg, torch.Tensor):
+                if name in dynamic_shapes:
+                    shape: Union[Tuple[int, ...], TracingShape] = TracingShape(
+                        dynamic_shapes[name]
+                    )
+                else:
+                    shape = arg.shape
+                return self.placeholder(name, shape, arg.dtype, arg.device)
+            if isinstance(arg, dict):
+                return {k: _make_placeholder(v, f"{name}_{k}") for k, v in arg.items()}
+            if isinstance(arg, (list, tuple)):
+                items = [
+                    _make_placeholder(item, f"{name}_{j}") for j, item in enumerate(arg)
+                ]
+                return type(arg)(items)
+            # Non-tensor scalars / non-container objects pass through unchanged.
+            return arg
 
         tracing_args = tuple(
             _make_placeholder(arg, f"x_{i}") for i, arg in enumerate(args)
