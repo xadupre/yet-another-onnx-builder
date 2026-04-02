@@ -296,7 +296,6 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
     @hide_stdout()
     @requires_transformers("5.2")
-    @unittest.skip("still not working")
     def test_tiny_llm_to_onnx_ort_22(self):
         import onnxruntime
 
