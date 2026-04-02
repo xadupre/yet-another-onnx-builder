@@ -295,7 +295,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self._chech_shape(onx.get_proto(include_weights=False))
 
     @hide_stdout()
-    @unittest.skip("one optimization pattern is broken")
+    @requires_transformers("5.2")
     def test_tiny_llm_to_onnx_ort_22(self):
         import onnxruntime
 
