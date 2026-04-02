@@ -200,5 +200,60 @@ class TestNotImplementedError(unittest.TestCase):
                 self.assertIn(notes, msg)
 
 
+class TestCoverageReflectsImplementation(unittest.TestCase):
+    """Spot-checks that SQL_COVERAGE and DATAFRAME_COVERAGE reflect the actual
+    implementation state of the converters."""
+
+    def _find_row(self, rows, keyword):
+        """Return the first row whose construct contains *keyword* (case-insensitive)."""
+        keyword_lower = keyword.lower()
+        for row in rows:
+            if keyword_lower in row[0].lower():
+                return row
+        return None
+
+    def test_subqueries_marked_supported(self):
+        """Subqueries are processed by sql_convert._populate_graph and must be
+        marked as supported in SQL_COVERAGE."""
+        from yobx.sql.coverage import _SUPPORTED
+
+        row = self._find_row(SQL_COVERAGE, "subqueries")
+        self.assertIsNotNone(row, "No 'Subqueries' row found in SQL_COVERAGE")
+        construct, status, notes = row
+        self.assertEqual(
+            status,
+            _SUPPORTED,
+            f"Subqueries should be {_SUPPORTED!r} but got {status!r}",
+        )
+
+    def test_dataframe_join_marked_supported(self):
+        """TracedDataFrame.join() is implemented and must appear in DATAFRAME_COVERAGE
+        as supported."""
+        from yobx.sql.coverage import _SUPPORTED
+
+        row = self._find_row(DATAFRAME_COVERAGE, "df.join")
+        self.assertIsNotNone(row, "No 'df.join' row found in DATAFRAME_COVERAGE")
+        construct, status, notes = row
+        self.assertEqual(
+            status,
+            _SUPPORTED,
+            f"df.join should be {_SUPPORTED!r} but got {status!r}",
+        )
+
+    def test_dataframe_pivot_table_marked_supported(self):
+        """TracedDataFrame.pivot_table() is implemented and must appear in
+        DATAFRAME_COVERAGE as supported."""
+        from yobx.sql.coverage import _SUPPORTED
+
+        row = self._find_row(DATAFRAME_COVERAGE, "pivot_table")
+        self.assertIsNotNone(row, "No 'pivot_table' row found in DATAFRAME_COVERAGE")
+        construct, status, notes = row
+        self.assertEqual(
+            status,
+            _SUPPORTED,
+            f"df.pivot_table should be {_SUPPORTED!r} but got {status!r}",
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
