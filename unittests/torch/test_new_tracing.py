@@ -92,8 +92,8 @@ class TestNewTracing(ExtTestCase):
         from yobx.torch.new_tracing import TracingInt
 
         d = TracingInt(5)
-        nd = -d
-        self.assertEqual(int(nd), -5)
+        negd = -d
+        self.assertEqual(int(negd), -5)
 
     def test_tracing_dimension_hash(self):
         from yobx.torch.new_tracing import TracingInt
