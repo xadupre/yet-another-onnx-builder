@@ -1,10 +1,7 @@
 """Tests for yobx.torch.new_tracing."""
 
-import operator
 import unittest
-
 import torch
-
 from yobx.ext_test_case import ExtTestCase, requires_torch
 
 
@@ -279,9 +276,7 @@ class TestNewTracing(ExtTestCase):
 
         tracer = DispatchTracer()
         graph = tracer.trace(
-            add_kw,
-            args=(),
-            kwargs={"x": torch.randn(2, 2), "y": torch.randn(2, 2)},
+            add_kw, args=(), kwargs={"x": torch.randn(2, 2), "y": torch.randn(2, 2)}
         )
         graph.lint()
         ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
@@ -302,10 +297,7 @@ class TestNewTracing(ExtTestCase):
         graph = tracer.trace(
             add,
             (torch.randn(4, 8), torch.randn(4, 8)),
-            dynamic_shapes={
-                "x_0": [TracingInt("batch"), 8],
-                "x_1": [TracingInt("batch"), 8],
-            },
+            dynamic_shapes={"x_0": [TracingInt("batch"), 8], "x_1": [TracingInt("batch"), 8]},
         )
         graph.lint()
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
@@ -318,10 +310,7 @@ class TestNewTracing(ExtTestCase):
     def test_trace_model_function(self):
         from yobx.torch.new_tracing import trace_model
 
-        graph = trace_model(
-            lambda x: x * 2,
-            (torch.randn(3, 3),),
-        )
+        graph = trace_model(lambda x: x * 2, (torch.randn(3, 3),))
         graph.lint()
         ops = [n.op for n in graph.nodes]
         self.assertIn("call_function", ops)
@@ -345,9 +334,11 @@ class TestNewTracing(ExtTestCase):
 
         graph1 = tracer.trace(lambda x: x + 1, (torch.randn(2, 2),))
         n1 = len(list(graph1.nodes))
+        self.assertGreater(n1, 0)
 
         graph2 = tracer.trace(lambda x, y: x + y, (torch.randn(2, 2), torch.randn(2, 2)))
         n2 = len(list(graph2.nodes))
+        self.assertGreater(n2, 0)
 
         # second graph should have one more placeholder
         ph1 = [n for n in graph1.nodes if n.op == "placeholder"]
@@ -423,10 +414,7 @@ class TestNewTracing(ExtTestCase):
             return d["a"] + d["b"]
 
         tracer = DispatchTracer()
-        graph = tracer.trace(
-            add_dict,
-            ({"a": torch.randn(2, 2), "b": torch.randn(2, 2)},),
-        )
+        graph = tracer.trace(add_dict, ({"a": torch.randn(2, 2), "b": torch.randn(2, 2)},))
         graph.lint()
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
         self.assertEqual(len(ph_nodes), 2)
@@ -442,10 +430,7 @@ class TestNewTracing(ExtTestCase):
             return pair[0] + pair[1] + z
 
         tracer = DispatchTracer()
-        graph = tracer.trace(
-            compute,
-            ([torch.randn(2, 2), torch.randn(2, 2)], torch.randn(2, 2)),
-        )
+        graph = tracer.trace(compute, ([torch.randn(2, 2), torch.randn(2, 2)], torch.randn(2, 2)))
         graph.lint()
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
         # Two from the list + one plain tensor = 3 placeholders
@@ -480,12 +465,10 @@ class TestNewTracing(ExtTestCase):
         ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
         # Expect "weight" and "bias" placeholder nodes (sanitized module param names)
         self.assertTrue(
-            any("weight" in n for n in ph_names),
-            f"No 'weight' placeholder found in {ph_names}",
+            any("weight" in n for n in ph_names), f"No 'weight' placeholder found in {ph_names}"
         )
         self.assertTrue(
-            any("bias" in n for n in ph_names),
-            f"No 'bias' placeholder found in {ph_names}",
+            any("bias" in n for n in ph_names), f"No 'bias' placeholder found in {ph_names}"
         )
 
     def test_trace_nn_module_shared_parameter_single_placeholder(self):
@@ -522,8 +505,7 @@ class TestNewTracing(ExtTestCase):
         # nn.Sequential(Linear(4,4)) has params "0.weight" and "0.bias",
         # sanitized to "0_weight" and "0_bias"
         self.assertTrue(
-            any("weight" in n for n in ph_names),
-            f"No 'weight' placeholder found in {ph_names}",
+            any("weight" in n for n in ph_names), f"No 'weight' placeholder found in {ph_names}"
         )
 
     # ------------------------------------------------------------------
@@ -596,9 +578,7 @@ class TestNewTracing(ExtTestCase):
         for param_name in param_names:
             sanitized = param_name.replace(".", "_")
             self.assertIn(
-                sanitized,
-                ph_names,
-                f"Expected placeholder '{sanitized}' in {ph_names}",
+                sanitized, ph_names, f"Expected placeholder '{sanitized}' in {ph_names}"
             )
 
     def test_trace_nn_module_no_bias(self):
@@ -613,8 +593,7 @@ class TestNewTracing(ExtTestCase):
         self.assertTrue(any("weight" in n for n in ph_names))
         # No bias placeholder expected
         self.assertFalse(
-            any("bias" in n for n in ph_names),
-            f"Unexpected 'bias' placeholder in {ph_names}",
+            any("bias" in n for n in ph_names), f"Unexpected 'bias' placeholder in {ph_names}"
         )
 
 

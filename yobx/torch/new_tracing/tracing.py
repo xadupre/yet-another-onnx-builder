@@ -71,7 +71,7 @@ class TracingBool:
             "the result depends on a symbolic/dynamic dimension"
         )
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: Any) -> bool:  # noqa: PYI032
         if isinstance(other, TracingBool):
             return self.value == other.value
         return NotImplemented
@@ -122,7 +122,7 @@ class TracingInt:
         """Enable use as a sequence index (calls :meth:`__int__`)."""
         return int(self)
 
-    def __eq__(self, other: Any) -> Union[bool, "TracingBool"]:
+    def __eq__(self, other: Any) -> Union[bool, "TracingBool"]:  # type: ignore # noqa: PYI032
         """
         Return a plain :class:`bool` when both sides are concrete; return a
         :class:`TracingBool` when at least one side is symbolic.
@@ -245,9 +245,7 @@ class TracingShape:
         print(sym_shape.is_concrete)  # False
     """
 
-    def __init__(
-        self, dims: "Sequence[Union[TracingInt, int]]"
-    ) -> None:
+    def __init__(self, dims: "Sequence[Union[TracingInt, int]]") -> None:
         self.dims: Tuple[Union["TracingInt", int], ...] = tuple(dims)
 
     def __repr__(self) -> str:
@@ -266,7 +264,7 @@ class TracingShape:
     def __getitem__(self, idx):
         return self.dims[idx]
 
-    def __eq__(self, other: Any) -> bool:
+    def __eq__(self, other: Any) -> bool:  # noqa: PYI032
         if isinstance(other, TracingShape):
             return self.dims == other.dims
         return NotImplemented
@@ -278,8 +276,7 @@ class TracingShape:
     def is_concrete(self) -> bool:
         """Return ``True`` if every dimension has a concrete integer value."""
         return all(
-            isinstance(d, int)
-            or (isinstance(d, TracingInt) and isinstance(d.value, int))
+            isinstance(d, int) or (isinstance(d, TracingInt) and isinstance(d.value, int))
             for d in self.dims
         )
 
@@ -313,9 +310,7 @@ class TracingShape:
                 "Cannot convert TracingShape with purely symbolic dims to torch.Size; "
                 "ensure all TracingInt objects have a concrete (int) value"
             )
-        return torch.Size(
-            d.value if isinstance(d, TracingInt) else int(d) for d in self.dims
-        )
+        return torch.Size(tuple(int(d) for d in self.dims))
 
 
 class TracingTensor(torch.Tensor):
@@ -341,33 +336,29 @@ class TracingTensor(torch.Tensor):
     """
 
     @staticmethod
-    def __new__(
+    def __new__(  # noqa: PYI034
         cls,
         size: Union[Tuple[int, ...], "TracingShape"],
         dtype: torch.dtype = torch.float32,
-        device: Union[str, torch.device] = "cpu",
+        device: Optional[Union[str, torch.device]] = None,
         requires_grad: bool = False,
     ) -> "TracingTensor":
         if isinstance(size, TracingShape):
             # Use concrete values where available; fall back to 1 for purely
             # symbolic dimensions so that _make_wrapper_subclass receives ints.
             sizes = tuple(
-                d.value
-                if isinstance(d, TracingInt) and isinstance(d.value, int)
-                else int(d)
-                if isinstance(d, int)
-                else 1
+                (
+                    d.value
+                    if isinstance(d, TracingInt) and isinstance(d.value, int)
+                    else int(d) if isinstance(d, int) else 1
+                )
                 for d in size
             )
         else:
             sizes = tuple(int(s) for s in size)
 
         t = torch.Tensor._make_wrapper_subclass(
-            cls,
-            sizes,
-            dtype=dtype,
-            device=device,
-            requires_grad=requires_grad,
+            cls, sizes, dtype=dtype, device=device, requires_grad=requires_grad  # type: ignore
         )
         return t
 
@@ -381,7 +372,7 @@ class TracingTensor(torch.Tensor):
         self._tracer: Optional["DispatchTracer"] = None
         self._node: Optional[torch.fx.Node] = None
 
-    def __repr__(self) -> str:
+    def __repr__(self) -> str:  # type: ignore
         node_name = self._node.name if self._node is not None else "<unregistered>"
         return (
             f"TracingTensor(node={node_name!r}, shape={tuple(self.shape)}, "
@@ -389,9 +380,9 @@ class TracingTensor(torch.Tensor):
         )
 
     @classmethod
-    def __torch_dispatch__(
+    def __torch_dispatch__(  # type: ignore
         cls,
-        op: Any,
+        func: Any,
         types: Any,
         args: Tuple[Any, ...] = (),
         kwargs: Optional[Dict[str, Any]] = None,
@@ -414,7 +405,7 @@ class TracingTensor(torch.Tensor):
             # No tracer found — fall back to the default behaviour.
             return NotImplemented
 
-        return tracer._dispatch(op, args, kwargs)
+        return tracer._dispatch(func, args, kwargs)
 
 
 class DispatchTracer:
@@ -510,9 +501,7 @@ class DispatchTracer:
             buffers should be pre-registered.
         """
         seen_ids: set = set()
-        for name, tensor in (
-            list(module.named_parameters()) + list(module.named_buffers())
-        ):
+        for name, tensor in list(module.named_parameters()) + list(module.named_buffers()):
             if tensor is None:
                 continue
             key = id(tensor)
@@ -549,10 +538,17 @@ class DispatchTracer:
         node = self.graph.placeholder(name)
         # Store a meta tensor so downstream shape inference can use it.
         if isinstance(shape, TracingShape):
-            concrete = shape.to_torch_size() if shape.is_concrete else torch.Size(
-                d.value if isinstance(d, TracingInt) and isinstance(d.value, int)
-                else int(d) if isinstance(d, int) else 1
-                for d in shape
+            concrete = (
+                shape.to_torch_size()
+                if shape.is_concrete
+                else torch.Size(
+                    (
+                        d.value
+                        if isinstance(d, TracingInt) and isinstance(d.value, int)
+                        else int(d) if isinstance(d, int) else 1
+                    )
+                    for d in shape
+                )
             )
         else:
             concrete = torch.Size(shape)
@@ -563,12 +559,7 @@ class DispatchTracer:
     # Dispatch handler
     # ------------------------------------------------------------------
 
-    def _dispatch(
-        self,
-        op: Any,
-        args: Tuple[Any, ...],
-        kwargs: Dict[str, Any],
-    ) -> Any:
+    def _dispatch(self, op: Any, args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Any:
         """
         Handle one dispatched operation:
 
@@ -628,10 +619,7 @@ class DispatchTracer:
         return self._wrap_output(meta_out, node, device)
 
     def _wrap_output(
-        self,
-        meta_out: Any,
-        node: torch.fx.Node,
-        device: Union[str, torch.device],
+        self, meta_out: Any, node: torch.fx.Node, device: Union[str, torch.device]
     ) -> Any:
         """
         Wrap meta-tensor output(s) as :class:`TracingTensor` instances.
@@ -746,16 +734,12 @@ class DispatchTracer:
             if isinstance(arg, dict):
                 return {k: _make_placeholder(v, f"{name}_{k}") for k, v in arg.items()}
             if isinstance(arg, (list, tuple)):
-                items = [
-                    _make_placeholder(item, f"{name}_{j}") for j, item in enumerate(arg)
-                ]
+                items = [_make_placeholder(item, f"{name}_{j}") for j, item in enumerate(arg)]
                 return type(arg)(items)
             # Non-tensor scalars / non-container objects pass through unchanged.
             return arg
 
-        tracing_args = tuple(
-            _make_placeholder(arg, f"x_{i}") for i, arg in enumerate(args)
-        )
+        tracing_args = tuple(_make_placeholder(arg, f"x_{i}") for i, arg in enumerate(args))
         tracing_kwargs = {k: _make_placeholder(v, k) for k, v in kwargs.items()}
 
         # ------------------------------------------------------------------
