@@ -1049,31 +1049,39 @@ class RotaryEmbeddingPattern(PatternOptimization):
         if g.is_used_more_than_once(node.input[0]):
             return self.none(node, inspect.currentframe().f_lineno)
         split_node = g.node_before(node.input[0])
-        if split_node is None or split_node.op_type != "Split" or split_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
-        if not g.is_constant(split_node.input[1]):
-            return self.none(node, inspect.currentframe().f_lineno)
-        cst = g.get_computed_constant(split_node.input[1])
-        if cst.shape != (2,):
-            return self.none(node, inspect.currentframe().f_lineno)
+        if split_node is not None and (split_node.op_type != "Split" or split_node.domain != ""):
+            # Not a Split before the HalfRotaryEmbedding: full rotation, no partial split.
+            split_node = None
 
-        next_nodes = g.next_nodes(node.output[0])
-        if len(next_nodes) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
-        concat_node = next_nodes[0]
-        if concat_node.op_type != "Concat" or concat_node.domain != "":
-            return self.none(node, inspect.currentframe().f_lineno)
-        if split_node.output[1] != concat_node.input[1]:
-            return self.none(node, inspect.currentframe().f_lineno)
-        axis = g.get_attribute(concat_node, "axis").i
-        if axis != -1:
-            return self.none(node, inspect.currentframe().f_lineno)
+        if split_node is not None:
+            if not g.is_constant(split_node.input[1]):
+                return self.none(node, inspect.currentframe().f_lineno)
+            cst = g.get_computed_constant(split_node.input[1])
+            if cst.shape != (2,):
+                return self.none(node, inspect.currentframe().f_lineno)
+
+            next_nodes = g.next_nodes(node.output[0])
+            if len(next_nodes) != 1:
+                return self.none(node, inspect.currentframe().f_lineno)
+            concat_node = next_nodes[0]
+            if concat_node.op_type != "Concat" or concat_node.domain != "":
+                return self.none(node, inspect.currentframe().f_lineno)
+            if split_node.output[1] != concat_node.input[1]:
+                return self.none(node, inspect.currentframe().f_lineno)
+            axis = g.get_attribute(concat_node, "axis").i
+            if axis != -1:
+                return self.none(node, inspect.currentframe().f_lineno)
+        else:
+            # No Split before: full rotation applied directly to the input tensor.
+            concat_node = None
 
         return MatchResult(
             self,
             [concat_cos, concat_sin, split_node, node, concat_node],
             self.apply,
-            insert_at=None if g.is_used_more_than_once(concat_cos.output[0]) else concat_node,
+            insert_at=None
+            if g.is_used_more_than_once(concat_cos.output[0])
+            else (concat_node or node),
         )
 
     def apply(
@@ -1118,7 +1126,7 @@ class RotaryEmbeddingPattern(PatternOptimization):
         )
         rotary_nodes.extend(
             [
-                g._make_node("Shape", [split_node.input[0]], [batch_name], start=0, end=1),
+                g._make_node("Shape", [main_input], [batch_name], start=0, end=1),
                 g._make_node("Concat", [batch_name, ones], [shape_name], axis=0),
                 g._make_node("Squeeze", [concat_cos.input[0], one], [cos_name]),
                 g._make_node("Squeeze", [concat_sin.input[0], one], [sin_name]),
