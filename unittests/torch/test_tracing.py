@@ -877,7 +877,7 @@ class TestTracing(ExtTestCase):
         got = ep.module()(*inputs)
         self.assertEqualArray(expected, got)
 
-    @unittest.skip("TODO: fix it")
+    @unittest.skip("won't fix: tracing cannot work: a vector can be empty but not None")
     def test_tracing_fixed_list_with_none(self):
         class Model(torch.nn.Module):
             def forward(self, lx):

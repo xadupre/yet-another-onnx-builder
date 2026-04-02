@@ -154,12 +154,7 @@ def to_onnx(
     """
     # Build a dict of the common named arguments so they can be passed to
     # each backend without duplicating keyword logic.
-    from .ext_test_case import (  # noqa: PLC0415
-        has_litert,
-        has_sklearn,
-        has_tensorflow,
-        has_torch,
-    )
+    from .ext_test_case import has_litert, has_sklearn, has_tensorflow, has_torch  # noqa: PLC0415
 
     common: Dict[str, Any] = dict(
         input_names=input_names,

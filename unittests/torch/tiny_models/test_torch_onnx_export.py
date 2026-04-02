@@ -10,7 +10,7 @@ from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_transformers
 
 
 class TestOnnxExport(ExtTestCase):
-    @unittest.skip("broken at decomposition")
+    @unittest.skip("won't fix: broken at decomposition")
     @hide_stdout()
     @requires_transformers("5.2")
     def test_toex_tiny_llm_to_onnx_22(self):
@@ -25,8 +25,6 @@ class TestOnnxExport(ExtTestCase):
         del b1["position_ids"]
 
         expected_b1 = model(**torch_deepcopy(b1))
-        print(self.string_type(inputs, with_shape=True))
-        print(ds)
 
         with (
             register_flattening_functions(patch_transformers=True),
