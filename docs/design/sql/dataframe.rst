@@ -35,7 +35,8 @@ Key classes and functions
 =========================
 
 * :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame` — proxy DataFrame with
-  ``.filter()``, ``.select()``, ``.assign()``, ``.groupby()`` operations.
+  ``.filter()``, ``.select()``, ``.assign()``, ``.groupby()``,
+  ``.join()``, and ``.pivot_table()`` operations.
 * :class:`~yobx.xtracing.dataframe_trace.TracedSeries` — proxy for a column or
   expression; supports arithmetic (``+``, ``-``, ``*``, ``/``),
   comparisons (``>``, ``<``, ``>=``, ``<=``, ``==``, ``!=``),
@@ -121,10 +122,16 @@ The following pandas-inspired operations can be traced:
       - ``ReduceSum``, ``ReduceMean``, ``ReduceMin``, ``ReduceMax``
     * - Group by
       - ``df.groupby(cols)``
-      - (aggregation expressions in ``select``)
+      - ``Unique``, ``ScatterElements`` (per-group aggregations)
     * - Boolean AND / OR
       - ``cond1 & cond2``, ``cond1 | cond2``
       - ``And``, ``Or``
+    * - Equi-join
+      - ``df.join(right, left_key, right_key, join_type)``
+      - ``Unsqueeze``, ``Equal``, ``ArgMax``, ``Compress``, ``Gather``
+    * - Pivot table
+      - ``df.pivot_table(values, index, columns, aggfunc, column_values=…)``
+      - ``Unique``, ``ScatterElements``, ``Gather``
 
 Limitations
 ===========
@@ -132,7 +139,9 @@ Limitations
 * Tracing captures only the operations performed during the single forward
   pass through the function.  Conditional branches (``if``/``else``) are
   not supported.
-* ``GROUP BY`` uses whole-dataset aggregation, not true per-group
-  semantics (same limitation as the SQL converter).
+* ``GROUP BY`` on multiple columns casts the key columns to ``float64`` before
+  combining them, which causes precision loss for integer keys greater than 2**53.
+* ``pivot_table`` requires an explicit ``column_values`` list: ONNX static
+  graphs need the output column count known at conversion time.
 * The ``TracedDataFrame`` API is a subset of the full pandas/polars API;
   operations outside this subset will raise :class:`NotImplementedError`.

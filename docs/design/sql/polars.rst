@@ -124,9 +124,8 @@ Example
 Limitations
 ===========
 
-* ``GROUP BY`` uses whole-dataset aggregation (``ReduceSum`` etc.) rather
-  than true per-group semantics (one output row per unique key).  True
-  per-group semantics would require an ONNX ``Loop`` or a custom kernel.
+* ``GROUP BY`` on multiple columns casts the key columns to ``float64`` before
+  combining them, which causes precision loss for integer keys greater than 2**53.
 * Only a single ``filter`` step, a single ``select`` step, and a single
   ``group_by``/``agg`` step are handled.  Complex multi-step plans may
   not translate correctly.

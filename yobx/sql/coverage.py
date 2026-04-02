@@ -25,17 +25,22 @@ SQL_COVERAGE: List[CoverageRow] = [
     ("``SELECT expr AS alias``", _SUPPORTED, "arithmetic: ``Add``, ``Sub``, ``Mul``, ``Div``"),
     ("``SELECT AGG(col)``", _SUPPORTED, "``SUM``, ``AVG``, ``MIN``, ``MAX``, ``COUNT``"),
     ("``WHERE condition``", _SUPPORTED, "comparisons + ``AND`` / ``OR``"),
-    ("``GROUP BY cols``", _PARTIAL, "whole-dataset aggregation only; no per-group rows"),
+    (
+        "``GROUP BY cols``",
+        _PARTIAL,
+        "per-group aggregation via ``Unique`` + ``ScatterElements``; "
+        "multi-column keys cast to ``float64`` (precision loss for integers > 2**53)",
+    ),
     (
         "``[INNER|LEFT|RIGHT|FULL] JOIN … ON col = col``",
         _SUPPORTED,
-        "equi-join on a single key column",
+        "equi-join on a single key column; multiple JOINs supported",
     ),
     ("``SELECT DISTINCT``", _UNSUPPORTED, "parsed but raises ``NotImplementedError``"),
     ("``HAVING``", _UNSUPPORTED, "not yet implemented"),
     ("``ORDER BY``", _UNSUPPORTED, "not yet implemented"),
     ("``LIMIT``", _UNSUPPORTED, "not yet implemented"),
-    ("Subqueries", _UNSUPPORTED, "not yet implemented"),
+    ("Subqueries", _SUPPORTED, "inner query outputs become outer query columns"),
     (
         "String equality (``WHERE col = 'val'``)",
         _UNSUPPORTED,
@@ -48,7 +53,11 @@ DATAFRAME_COVERAGE: List[CoverageRow] = [
     ("``df.filter(condition)``", _SUPPORTED, "maps to ``WHERE``"),
     ("``df.select([series, …])``", _SUPPORTED, "maps to ``SELECT``"),
     ("``df.assign(name=series)``", _SUPPORTED, "maps to ``SELECT … AS name``"),
-    ("``df.groupby(cols)``", _PARTIAL, "whole-dataset aggregation only"),
+    (
+        "``df.groupby(cols)``",
+        _PARTIAL,
+        "per-group aggregation supported; multi-column keys cast to ``float64``",
+    ),
     (
         "Series arithmetic (``+``, ``-``, ``*``, ``/``)",
         _SUPPORTED,
@@ -66,6 +75,16 @@ DATAFRAME_COVERAGE: List[CoverageRow] = [
     ),
     ("``cond1 & cond2`` / ``cond1 | cond2``", _SUPPORTED, "``And``, ``Or``"),
     ('``series.alias("name")``', _SUPPORTED, "output rename"),
+    (
+        "``df.join(right, left_key, right_key)``",
+        _SUPPORTED,
+        "equi-join; ``inner`` (default), ``left``, ``right``, ``full``",
+    ),
+    (
+        "``df.pivot_table(values, index, columns, aggfunc)``",
+        _SUPPORTED,
+        "requires explicit ``column_values``; ``sum``, ``mean``, ``min``, ``max``, ``count``",
+    ),
     (
         "Conditional branches (``if``/``else``)",
         _UNSUPPORTED,
