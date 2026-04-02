@@ -306,6 +306,9 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         del inputs["position_ids"]
         del ds["position_ids"]
         del b1["position_ids"]
+        # Ensure attention_mask is valid (non-zero) so the ORT GroupQueryAttention op
+        # produces results consistent with PyTorch's causal attention semantics.
+        b1["attention_mask"] = torch.ones_like(b1["attention_mask"])
 
         expected = model(**torch_deepcopy(b1))
 
