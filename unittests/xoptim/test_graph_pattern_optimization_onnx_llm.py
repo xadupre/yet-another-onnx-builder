@@ -568,6 +568,99 @@ class TestGraphPatternOptimizationOnnxLLM(ExtTestCase):
                 zz = ref.run(None, feeds)[0]
                 self.assertEqualArray(z, zz, atol=1e-4)
 
+    def test_rotary_embedding_full_no_split(self):
+        """
+        Tests the full-rotation (no partial Split) path of RotaryEmbeddingPattern.
+
+        In this variant the ``HalfRotaryEmbedding`` is applied to the **whole**
+        input tensor (no outer Split/Concat for partial rotation).  The pattern
+        should replace it with a single ``RotaryEmbedding`` node at opset ≥ 23.
+        """
+        opset = 23
+        # Raw ONNX graph:
+        #   Concat(m1, m1, axis=-1) -> m1x2
+        #   Concat(m2, m2, axis=-1) -> m2x2
+        #   Split(X, num_outputs=2, axis=-1) -> x1, x2
+        #   Neg(x2) -> nx2
+        #   Concat(nx2, x1, axis=-1) -> cc
+        #   Mul(cc, m1x2) -> cm1
+        #   Mul(X,  m2x2) -> cm2
+        #   Add(cm1, cm2) -> Y
+        # After FunctionHalfRotaryEmbeddingPattern:
+        #   HalfRotaryEmbedding(X, m1x2, m2x2) -> Y
+        # After RotaryEmbeddingPattern (no-split):
+        #   RotaryEmbedding(X, cos_expanded, sin_expanded) -> Y
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["m1", "m1"], ["m1x2"], axis=-1),
+                    oh.make_node("Concat", ["m2", "m2"], ["m2x2"], axis=-1),
+                    oh.make_node("Split", ["X"], ["x1", "x2"], axis=-1, num_outputs=2),
+                    oh.make_node("Neg", ["x2"], ["nx2"]),
+                    oh.make_node("Concat", ["nx2", "x1"], ["cc"], axis=-1),
+                    oh.make_node("Mul", ["cc", "m1x2"], ["cm1"]),
+                    oh.make_node("Mul", ["X", "m2x2"], ["cm2"]),
+                    oh.make_node("Add", ["cm1", "cm2"], ["Y"]),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, ["a", 2, "c", "d"]),
+                    oh.make_tensor_value_info("m1", TFLOAT, [1, 1, "c", "e"]),
+                    oh.make_tensor_value_info("m2", TFLOAT, [1, 1, "c", "e"]),
+                ],
+                [oh.make_tensor_value_info("Y", TFLOAT, ["a", 2, "c", "d"])],
+            ),
+            opset_imports=[oh.make_operatorsetid("", opset)],
+            ir_version=10,
+        )
+
+        shape_x = (2, 2, 3, 8)  # (batch, num_heads, seq, head_dim)
+        shape_c = (1, 1, 3, 4)  # (1, 1, seq, head_dim/2)
+        feeds = {
+            "X": ((np.arange(np.prod(shape_x)) + 1) / (np.prod(shape_x) * 10))
+            .reshape(shape_x)
+            .astype(np.float32),
+            "m1": ((np.arange(np.prod(shape_c)) + 1) / np.prod(shape_c) * 15)
+            .reshape(shape_c)
+            .astype(np.float32),
+            "m2": ((np.arange(np.prod(shape_c)) + 1) / np.prod(shape_c) * 5)
+            .reshape(shape_c)
+            .astype(np.float32),
+        }
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=InferShapesOptions.BUILDER,
+            optimization_options=OptimizationOptions(
+                patterns=["FunctionHalfRotaryEmbedding", "RotaryEmbedding"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.dump_onnx("test_rotary_embedding_full_no_split.onnx", opt_onx)
+        node_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("RotaryEmbedding", node_types)
+        self.assertNotIn("HalfRotaryEmbedding", node_types)
+
+        import onnxruntime
+
+        for name, cls in [
+            ("ref", lambda m: ExtendedReferenceEvaluator(m, verbose=0)),
+            (
+                "ort",
+                lambda m: onnxruntime.InferenceSession(
+                    m.SerializeToString(), providers=["CPUExecutionProvider"]
+                ),
+            ),
+        ]:
+            with self.subTest(name=name):
+                if name == "ort" and not has_onnxruntime("1.23"):
+                    raise unittest.SkipTest("onnxruntime < 1.23")
+                ref = cls(model)
+                z = ref.run(None, feeds)[0]
+                ref = cls(opt_onx)
+                zz = ref.run(None, feeds)[0]
+                self.assertEqualArray(z, zz, atol=1e-4)
+
     def test_local_function_attention_3d(self):
         model = oh.make_model(
             oh.make_graph(
