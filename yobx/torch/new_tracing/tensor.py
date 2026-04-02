@@ -11,7 +11,7 @@ import torch
 import torch.fx
 import torch.utils._pytree as pytree
 
-from ._shape import TracingInt, TracingShape
+from .shape import TracingInt, TracingShape
 
 
 class TracingTensor(torch.Tensor):

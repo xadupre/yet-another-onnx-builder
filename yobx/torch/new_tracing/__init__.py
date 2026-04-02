@@ -8,16 +8,16 @@ New dispatch-level tracing for PyTorch models.  Produces
 
 The implementation is split across three submodules:
 
-- :mod:`._shape` — shape/dimension types
+- :mod:`.shape` — shape/dimension types
   (:class:`TracingBool`, :class:`TracingInt`, :data:`TracingDimension`,
   :class:`TracingShape`).
-- :mod:`._tensor` — :class:`TracingTensor`.
-- :mod:`._dispatcher` — :class:`DispatchTracer` and :func:`trace_model`.
+- :mod:`.tensor` — :class:`TracingTensor`.
+- :mod:`.dispatcher` — :class:`DispatchTracer` and :func:`trace_model`.
 """
 
-from ._dispatcher import DispatchTracer, trace_model
-from ._shape import TracingBool, TracingDimension, TracingInt, TracingShape
-from ._tensor import TracingTensor
+from .dispatcher import DispatchTracer, trace_model
+from .shape import TracingBool, TracingDimension, TracingInt, TracingShape
+from .tensor import TracingTensor
 
 __all__ = [
     "DispatchTracer",

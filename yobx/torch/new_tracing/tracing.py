@@ -4,10 +4,10 @@ New tracing mechanism for PyTorch models using ``__torch_dispatch__``.
 This module re-exports all public names from the three implementation
 submodules for backward compatibility:
 
-- :mod:`._shape` — :class:`TracingBool`, :class:`TracingInt`,
+- :mod:`.shape` — :class:`TracingBool`, :class:`TracingInt`,
   :data:`TracingDimension`, :class:`TracingShape`.
-- :mod:`._tensor` — :class:`TracingTensor`.
-- :mod:`._dispatcher` — :class:`DispatchTracer`, :func:`trace_model`.
+- :mod:`.tensor` — :class:`TracingTensor`.
+- :mod:`.dispatcher` — :class:`DispatchTracer`, :func:`trace_model`.
 
 Example::
 
@@ -26,9 +26,9 @@ Example::
     print(graph)
 """
 
-from ._dispatcher import DispatchTracer, trace_model
-from ._shape import TracingBool, TracingDimension, TracingInt, TracingShape
-from ._tensor import TracingTensor
+from .dispatcher import DispatchTracer, trace_model
+from .shape import TracingBool, TracingDimension, TracingInt, TracingShape
+from .tensor import TracingTensor
 
 __all__ = [
     "DispatchTracer",
