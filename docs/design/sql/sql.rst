@@ -61,11 +61,15 @@ Supported SQL clauses
         ``LessOrEqual``, ``GreaterOrEqual``, ``And``, ``Or``, ``Not``
     * - ``GROUP BY col, …``
       - :class:`~yobx.xtracing.parse.GroupByOp`
-      - (groups are processed together with ``SelectOp`` aggregations)
+      - ``Unique``, ``ScatterElements`` (groups are processed together
+        with ``SelectOp`` aggregations)
     * - ``[INNER|LEFT|RIGHT|FULL] JOIN … ON col = col``
       - :class:`~yobx.xtracing.parse.JoinOp`
       - ``Unsqueeze``, ``Equal``, ``ArgMax``, ``ReduceMax``,
         ``Compress``, ``Gather``
+    * - Subqueries (``SELECT … FROM (SELECT …)``)
+      - inner :class:`~yobx.xtracing.parse.ParsedQuery`
+      - (inner query outputs become outer query column tensors)
 
 Columnar input convention
 =========================
@@ -94,23 +98,27 @@ Execution order
 
 Operations are applied in the following logical order:
 
-1. **JoinOp** — merge left and right tables using an equi-join key.
-2. **FilterOp** — apply the ``WHERE`` predicate as a boolean mask
+1. **Subquery** — if present, the inner query is processed first; its SELECT
+   outputs become the column tensors for the outer query.
+2. **JoinOp** — merge left and right tables using an equi-join key.
+3. **FilterOp** — apply the ``WHERE`` predicate as a boolean mask
    (``Compress``) to all column tensors simultaneously.
-3. **GroupByOp** — record the group keys; referenced by aggregation
-   expressions in the ``SelectOp``.
-4. **SelectOp** — compute output expressions (arithmetic, aggregations)
+4. **GroupByOp** — use ``Unique`` + ``ScatterElements`` to compute per-group
+   aggregations; referenced by aggregation expressions in the ``SelectOp``.
+5. **SelectOp** — compute output expressions (arithmetic, aggregations)
    over the filtered/joined columns.
 
 .. code-block:: text
 
     inputs: col_a, col_b, col_key_left, col_key_right
         │
+        ├── Subquery:  inner ParsedQuery → intermediate column tensors
+        │
         ├── JoinOp:   Unsqueeze/Equal/ArgMax → Compress/Gather aligned columns
         │
         ├── FilterOp: Greater/And/… → Compress (row mask applied to all cols)
         │
-        ├── GroupByOp: (records group columns, used by aggregations)
+        ├── GroupByOp: Unique → ScatterElements (per-group aggregations)
         │
         └── SelectOp: Add/ReduceSum/… → Identity → outputs
 
@@ -158,12 +166,11 @@ Expression grammar
 Limitations and future work
 ============================
 
-* ``GROUP BY`` uses a whole-dataset aggregation (``ReduceSum`` etc.) rather
-  than true per-group aggregation.  True per-group semantics require an ONNX
-  ``Loop`` or a custom kernel.
+* ``GROUP BY`` on multiple columns casts the key columns to ``float64`` before
+  combining them, which causes precision loss for integer keys greater than 2**53.
 * ``SELECT DISTINCT`` is parsed but raises :class:`NotImplementedError` during conversion.
 * Only equi-joins on a single key column are supported for ``JOIN``.
-* ``HAVING``, ``ORDER BY``, ``LIMIT``, and subqueries are not yet supported.
+* ``HAVING``, ``ORDER BY``, and ``LIMIT`` are not yet supported.
 * String equality (``WHERE name = 'alice'``) is not yet supported
   (string literals are parsed but ONNX ``Equal`` on strings may need a
   separate handling path).
