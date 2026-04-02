@@ -27,6 +27,7 @@ yobx.torch
     in_torch/index
     in_transformers/index
     interpreter/index
+    new_tracing/index
 
 register_flattening_functions
 +++++++++++++++++++++++++++++
