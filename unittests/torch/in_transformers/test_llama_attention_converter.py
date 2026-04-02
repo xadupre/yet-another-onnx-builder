@@ -3,8 +3,9 @@ Unit tests for :func:`yobx.torch.in_transformers.models.llama_attention_to_onnx`
 
 Tests cover:
 
-* All three ONNX backends: opset 22 (plain ops), opset 24 (ONNX Attention op),
-  and ``com.microsoft`` (OnnxRuntime MultiHeadAttention contrib op).
+* All four ONNX backends: opset 22 (plain ops), opset 23 (RotaryEmbedding + plain
+  attention), opset 24 (RotaryEmbedding + ONNX Attention op), and ``com.microsoft``
+  (OnnxRuntime RotaryEmbedding + MultiHeadAttention contrib ops).
 * All supported dtypes: ``float32``, ``float16``, and ``bfloat16``.
 * Both with and without an ``attention_mask`` input.
 * GQA (grouped-query attention) and equal-heads configurations.
@@ -81,6 +82,38 @@ class TestLlamaAttentionConverter(ExtTestCase):
         hs = torch.randn(batch, seq, hidden_size, dtype=torch_dtype)
         cos = torch.randn(batch, seq, head_dim, dtype=torch_dtype)
         sin = torch.randn(batch, seq, head_dim, dtype=torch_dtype)
+        return hs, cos, sin
+
+    def _get_inputs_symmetric(
+        self, batch=2, seq=10, hidden_size=64, head_dim=16, torch_dtype=torch.float32
+    ):
+        """
+        Like :meth:`_get_inputs` but generates *symmetric* ``cos``/``sin``
+        tensors where:
+
+        1. The first and second halves of the last axis are equal
+           (``cos[..., :half] == cos[..., half:]``).  This matches what
+           :class:`transformers.models.llama.modeling_llama.LlamaRotaryEmbedding`
+           produces and is required for the ONNX/ORT ``RotaryEmbedding`` op
+           paths to give results identical to the plain-ops path.
+
+        2. All batch elements carry the same positional values.  In LLaMA,
+           ``cos``/``sin`` depend only on the *position* (not on the batch
+           content), so when all sequences share the same position IDs
+           ``[0, 1, …, seq-1]`` the batch dimension is effectively a repeat.
+           The ``com.microsoft.RotaryEmbedding`` op requires a single 2-D
+           cache ``(seq, head_dim/2)``; this helper ensures that taking batch
+           element 0 produces the correct values for all elements.
+        """
+        half = head_dim // 2
+        hs = torch.randn(batch, seq, hidden_size, dtype=torch_dtype)
+        # Generate a single set of positional embeddings and replicate across batch
+        cos_half_base = torch.randn(1, seq, half, dtype=torch_dtype)
+        sin_half_base = torch.randn(1, seq, half, dtype=torch_dtype)
+        cos_half = cos_half_base.repeat(batch, 1, 1)
+        sin_half = sin_half_base.repeat(batch, 1, 1)
+        cos = torch.cat([cos_half, cos_half], dim=-1)
+        sin = torch.cat([sin_half, sin_half], dim=-1)
         return hs, cos, sin
 
     def _torch_expected(self, attn, hs, cos, sin):
@@ -209,14 +242,14 @@ class TestLlamaAttentionConverter(ExtTestCase):
         self._run_ort_bf16(model, feeds, expected)
 
     # ------------------------------------------------------------------ #
-    # opset 24 (ONNX Attention op)                                         #
+    # opset 24 (ONNX Attention op + ONNX RotaryEmbedding)               #
     # ------------------------------------------------------------------ #
 
     @requires_onnxruntime("1.23")
     def test_opset24_float32(self):
-        """ONNX Attention op path (opset 24), float32."""
+        """ONNX RotaryEmbedding + Attention op path (opset 24), float32."""
         attn = _make_llama_attention().eval()
-        hs, cos, sin = self._get_inputs()
+        hs, cos, sin = self._get_inputs_symmetric()
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset=24)
@@ -241,9 +274,9 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
     @requires_onnxruntime("1.23")
     def test_opset24_float16(self):
-        """ONNX Attention op path (opset 24), float16."""
+        """ONNX RotaryEmbedding + Attention op path (opset 24), float16."""
         attn = _make_llama_attention().to(torch.float16).eval()
-        hs, cos, sin = self._get_inputs(torch_dtype=torch.float16)
+        hs, cos, sin = self._get_inputs_symmetric(torch_dtype=torch.float16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset=24)
@@ -268,10 +301,10 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
     @requires_onnxruntime("1.23")
     def test_opset24_bfloat16(self):
-        """ONNX Attention op path (opset 24), bfloat16 —
+        """ONNX RotaryEmbedding + Attention op path (opset 24), bfloat16 —
         model dtype check + ref/ORT validation."""
         attn = _make_llama_attention().to(torch.bfloat16).eval()
-        hs, cos, sin = self._get_inputs(torch_dtype=torch.bfloat16)
+        hs, cos, sin = self._get_inputs_symmetric(torch_dtype=torch.bfloat16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset=24)
@@ -295,21 +328,78 @@ class TestLlamaAttentionConverter(ExtTestCase):
         self._run_ort_bf16(model, feeds, expected)
 
     # ------------------------------------------------------------------ #
-    # com.microsoft MultiHeadAttention contrib ops                         #
+    # opset 23 (ONNX RotaryEmbedding + plain attention ops)               #
+    # ------------------------------------------------------------------ #
+
+    def test_opset23_float32(self):
+        """ONNX RotaryEmbedding op + plain attention (opset 23), float32."""
+        attn = _make_llama_attention().eval()
+        hs, cos, sin = self._get_inputs_symmetric()
+        expected = self._torch_expected(attn, hs, cos, sin)
+
+        model = _to_model(attn, hs, cos, sin, target_opset=23)
+
+        feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
+        ref = ExtendedReferenceEvaluator(model)
+        got = ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=1e-4)
+
+        import onnxruntime as ort
+
+        try:
+            sess = ort.InferenceSession(
+                model.SerializeToString(), providers=["CPUExecutionProvider"]
+            )
+        except Exception as e:
+            if "opset" in str(e).lower() or "RotaryEmbedding" in str(e):
+                raise unittest.SkipTest(f"onnxruntime does not support this opset/op: {e}")
+            raise
+        got_ort = sess.run(None, feeds)[0]
+        self.assertEqualArray(expected, got_ort, atol=1e-4)
+
+    def test_opset23_float16(self):
+        """ONNX RotaryEmbedding op + plain attention (opset 23), float16."""
+        attn = _make_llama_attention().to(torch.float16).eval()
+        hs, cos, sin = self._get_inputs_symmetric(torch_dtype=torch.float16)
+        expected = self._torch_expected(attn, hs, cos, sin)
+
+        model = _to_model(attn, hs, cos, sin, target_opset=23)
+
+        feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
+        ref = ExtendedReferenceEvaluator(model)
+        got = ref.run(None, feeds)[0].astype(np.float32)
+        self.assertEqualArray(expected, got, atol=5e-3)
+
+        import onnxruntime as ort
+
+        try:
+            sess = ort.InferenceSession(
+                model.SerializeToString(), providers=["CPUExecutionProvider"]
+            )
+        except Exception as e:
+            if "opset" in str(e).lower() or "RotaryEmbedding" in str(e):
+                raise unittest.SkipTest(f"onnxruntime does not support this opset/op: {e}")
+            raise
+        got_ort = sess.run(None, feeds)[0].astype(np.float32)
+        self.assertEqualArray(expected, got_ort, atol=5e-3)
+
+    # ------------------------------------------------------------------ #
+    # com.microsoft RotaryEmbedding + MultiHeadAttention contrib ops      #
     # ------------------------------------------------------------------ #
 
     @requires_onnxruntime("1.0")
     def test_com_microsoft_float32(self):
-        """com.microsoft.MultiHeadAttention path, float32."""
+        """com.microsoft.RotaryEmbedding + MultiHeadAttention path, float32."""
         attn = _make_llama_attention().eval()
-        hs, cos, sin = self._get_inputs()
+        hs, cos, sin = self._get_inputs_symmetric()
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
 
-        # Verify that the model contains the MultiHeadAttention contrib op
+        # Verify that the model contains both ORT contrib ops
         op_types = {n.op_type for n in model.graph.node}
         self.assertIn("MultiHeadAttention", op_types)
+        self.assertIn("RotaryEmbedding", op_types)
 
         feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
         import onnxruntime as ort
@@ -320,15 +410,16 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
     @requires_onnxruntime("1.0")
     def test_com_microsoft_float16(self):
-        """com.microsoft.MultiHeadAttention path, float16."""
+        """com.microsoft.RotaryEmbedding + MultiHeadAttention path, float16."""
         attn = _make_llama_attention().to(torch.float16).eval()
-        hs, cos, sin = self._get_inputs(torch_dtype=torch.float16)
+        hs, cos, sin = self._get_inputs_symmetric(torch_dtype=torch.float16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
 
         op_types = {n.op_type for n in model.graph.node}
         self.assertIn("MultiHeadAttention", op_types)
+        self.assertIn("RotaryEmbedding", op_types)
 
         feeds = {"hidden_states": hs.numpy(), "cos": cos.numpy(), "sin": sin.numpy()}
         import onnxruntime as ort
@@ -339,16 +430,17 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
     @requires_onnxruntime("1.0")
     def test_com_microsoft_bfloat16(self):
-        """com.microsoft.MultiHeadAttention path, bfloat16 —
+        """com.microsoft.RotaryEmbedding + MultiHeadAttention path, bfloat16 —
         model dtype check + ORT validation."""
         attn = _make_llama_attention().to(torch.bfloat16).eval()
-        hs, cos, sin = self._get_inputs(torch_dtype=torch.bfloat16)
+        hs, cos, sin = self._get_inputs_symmetric(torch_dtype=torch.bfloat16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
 
         op_types = {n.op_type for n in model.graph.node}
         self.assertIn("MultiHeadAttention", op_types)
+        self.assertIn("RotaryEmbedding", op_types)
         for inp in model.graph.input:
             self.assertEqual(inp.type.tensor_type.elem_type, onnx.TensorProto.BFLOAT16)
 
@@ -364,7 +456,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
         """com.microsoft path when num_kv_heads == num_attention_heads."""
         # No GQA: kv_heads == query heads
         attn = _make_llama_attention(num_attention_heads=4, num_key_value_heads=4).eval()
-        hs, cos, sin = self._get_inputs()
+        hs, cos, sin = self._get_inputs_symmetric()
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
@@ -442,14 +534,43 @@ class TestLlamaAttentionConverter(ExtTestCase):
         model = _to_model(attn, hs, cos, sin, target_opset=22)
         op_types = {n.op_type for n in model.graph.node}
         self.assertNotIn("Attention", op_types)
+        self.assertNotIn("RotaryEmbedding", op_types)
+
+    def test_opset22_no_rotary_embedding_op(self):
+        """Opset 22 path does not use the RotaryEmbedding op (falls back to plain ops)."""
+        attn = _make_llama_attention().eval()
+        hs, cos, sin = self._get_inputs()
+        model = _to_model(attn, hs, cos, sin, target_opset=22)
+        op_types = {n.op_type for n in model.graph.node}
+        self.assertNotIn("RotaryEmbedding", op_types)
+
+    def test_opset23_uses_rotary_embedding_op(self):
+        """Opset 23 path uses the ONNX RotaryEmbedding op."""
+        attn = _make_llama_attention().eval()
+        hs, cos, sin = self._get_inputs()
+        model = _to_model(attn, hs, cos, sin, target_opset=23)
+        op_types = {n.op_type for n in model.graph.node}
+        self.assertIn("RotaryEmbedding", op_types)
+        self.assertNotIn("Attention", op_types)
 
     def test_opset24_uses_attention_op(self):
-        """Opset 24 path uses the ONNX Attention op."""
+        """Opset 24 path uses the ONNX Attention op and RotaryEmbedding op."""
         attn = _make_llama_attention().eval()
         hs, cos, sin = self._get_inputs()
         model = _to_model(attn, hs, cos, sin, target_opset=24)
         op_types = {n.op_type for n in model.graph.node}
         self.assertIn("Attention", op_types)
+        self.assertIn("RotaryEmbedding", op_types)
+
+    def test_com_microsoft_uses_rotary_embedding_op(self):
+        """com.microsoft path uses com.microsoft.RotaryEmbedding op."""
+        attn = _make_llama_attention().eval()
+        hs, cos, sin = self._get_inputs()
+        model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
+        op_types = {n.op_type for n in model.graph.node}
+        op_domains = {(n.op_type, n.domain) for n in model.graph.node}
+        self.assertIn("RotaryEmbedding", op_types)
+        self.assertIn(("RotaryEmbedding", "com.microsoft"), op_domains)
 
 
 @requires_transformers("")

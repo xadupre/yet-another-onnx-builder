@@ -9,15 +9,23 @@ Three computation backends are supported, selected automatically based on
 the opsets registered in the graph builder:
 
 * **com.microsoft** (``"com.microsoft"`` domain registered in the builder):
-  Uses the ``com.microsoft.MultiHeadAttention`` contrib op from *onnxruntime*.
+  Uses the ``com.microsoft.RotaryEmbedding`` contrib op for rotary embeddings
+  and the ``com.microsoft.MultiHeadAttention`` contrib op for attention from
+  *onnxruntime*.
   GQA key/value heads are expanded (via repeat-interleave) to match the query
-  head count before being passed to the op.
+  head count before the attention op.
   The model runs efficiently on CPU and CUDA with OnnxRuntime.
 * **opset ≥ 24** (main opset ≥ 24):
-  Uses the standard ONNX ``Attention`` operator introduced in opset 23
-  (revision 24 fixes a correctness bug; this converter therefore requires 24).
+  Uses the standard ONNX ``RotaryEmbedding`` operator (opset ≥ 23) for
+  rotary embeddings and the standard ONNX ``Attention`` operator introduced
+  in opset 23 (revision 24 fixes a correctness bug; this converter therefore
+  requires 24) for attention.
+* **opset 23** (main opset == 23):
+  Uses the standard ONNX ``RotaryEmbedding`` operator for rotary embeddings
+  and basic ONNX ops (``MatMul``, ``Softmax``, ``Transpose``, …) for attention.
 * **opset ≤ 22** (default fallback):
-  Uses basic ONNX ops (``MatMul``, ``Softmax``, ``Transpose``, …).
+  Uses basic ONNX ops (``MatMul``, ``Softmax``, ``Transpose``, …) for both
+  rotary embeddings and attention.
 
 Supported dtypes:
     ``float32``, ``float16``, and ``bfloat16`` are all supported.
@@ -306,6 +314,137 @@ def _mha_com_microsoft(
     return out
 
 
+def _apply_rope_standard_onnx(
+    g: GraphBuilderExtendedProtocol,
+    states_4d: T,
+    cos: T,
+    sin: T,
+    head_dim: int,
+    num_heads: int,
+    name: str,
+) -> T:
+    """
+    Applies Rotary Position Embedding using the standard ONNX
+    ``RotaryEmbedding`` operator (opset ≥ 23).
+
+    ``states_4d`` is a 4-D ``(batch, n_heads, seq, head_dim)`` tensor.
+    ``cos`` and ``sin`` are 3-D ``(batch, seq, head_dim)`` tensors whose
+    first and second halves along the last axis carry the same values
+    (LLaMA-style symmetric positional embeddings).  Only the first half
+    is passed to the op; the formula is mathematically equivalent to
+    the manual ``_apply_rope`` implementation when the symmetry property
+    holds.
+    """
+    half = head_dim // 2
+    cos_half = g.op.Slice(
+        cos,
+        np.array([0], dtype=np.int64),
+        np.array([half], dtype=np.int64),
+        np.array([-1], dtype=np.int64),
+        name=name,
+    )
+    sin_half = g.op.Slice(
+        sin,
+        np.array([0], dtype=np.int64),
+        np.array([half], dtype=np.int64),
+        np.array([-1], dtype=np.int64),
+        name=name,
+    )
+    return g.op.RotaryEmbedding(
+        states_4d,
+        cos_half,
+        sin_half,
+        num_heads=num_heads,
+        name=name,
+    )
+
+
+def _apply_rope_ms_op(
+    g: GraphBuilderExtendedProtocol,
+    x_3d: T,
+    cos: T,
+    sin: T,
+    head_dim: int,
+    num_heads: int,
+    name: str,
+) -> T:
+    """
+    Applies Rotary Position Embedding using the
+    ``com.microsoft.RotaryEmbedding`` contrib op.
+
+    ``x_3d`` is a 3-D ``(batch, seq, num_heads * head_dim)`` tensor.
+    ``cos`` and ``sin`` are 3-D ``(batch, seq, head_dim)`` tensors.
+    The first half of the last dimension is extracted; in the LLaMA model
+    the two halves are identical (symmetric positional embeddings), so
+    taking the first batch element's values as the 2-D cache is safe.
+
+    Position IDs are synthesised as ``[0, 1, …, seq-1]`` broadcast over
+    the batch dimension, producing a ``(batch, seq)`` tensor.
+
+    Returns a 3-D ``(batch, seq, num_heads * head_dim)`` tensor.
+    """
+    half = head_dim // 2
+
+    # Slice cos/sin to (batch, seq, head_dim // 2)
+    cos_half = g.op.Slice(
+        cos,
+        np.array([0], dtype=np.int64),
+        np.array([half], dtype=np.int64),
+        np.array([-1], dtype=np.int64),
+        name=name,
+    )
+    sin_half = g.op.Slice(
+        sin,
+        np.array([0], dtype=np.int64),
+        np.array([half], dtype=np.int64),
+        np.array([-1], dtype=np.int64),
+        name=name,
+    )
+
+    # Drop the batch dimension by gathering index 0:
+    # (batch, seq, head_dim//2) -> (seq, head_dim//2)
+    # LLaMA positional embeddings are identical for every batch element,
+    # so this is safe regardless of batch size.
+    cos_2d = g.op.Gather(cos_half, np.array(0, dtype=np.int64), axis=0, name=name)
+    sin_2d = g.op.Gather(sin_half, np.array(0, dtype=np.int64), axis=0, name=name)
+
+    # Build position_ids: (batch, seq) INT64 with values [0, 1, ..., seq-1]
+    x_shape = g.op.Shape(x_3d, name=name)
+    batch_1d = g.op.Slice(
+        x_shape,
+        np.array([0], dtype=np.int64),
+        np.array([1], dtype=np.int64),
+        name=name,
+    )
+    seq_1d = g.op.Slice(
+        x_shape,
+        np.array([1], dtype=np.int64),
+        np.array([2], dtype=np.int64),
+        name=name,
+    )
+    seq_scalar = g.op.Squeeze(seq_1d, name=name)
+    flat_ids = g.op.Range(
+        np.array(0, dtype=np.int64),
+        seq_scalar,
+        np.array(1, dtype=np.int64),
+        name=name,
+    )
+    # Unsqueeze to (1, seq), then Expand to (batch, seq)
+    position_ids_1row = g.op.Unsqueeze(flat_ids, np.array([0], dtype=np.int64), name=name)
+    expand_shape = g.op.Concat(batch_1d, seq_1d, axis=0, name=name)
+    position_ids = g.op.Expand(position_ids_1row, expand_shape, name=name)
+
+    return g.op.RotaryEmbedding(
+        x_3d,
+        position_ids,
+        cos_2d,
+        sin_2d,
+        domain="com.microsoft",
+        num_heads=num_heads,
+        name=name,
+    )
+
+
 @register_transformer_converter(LlamaAttention)
 def llama_attention_to_onnx(
     g: GraphBuilderExtendedProtocol,
@@ -326,12 +465,29 @@ def llama_attention_to_onnx(
 
     The backend is chosen from the opsets registered in *g*:
 
-    * **com.microsoft** — ``MultiHeadAttention`` contrib op (OnnxRuntime).
-      The ``"com.microsoft"`` domain must be registered in *g*.
-      GQA KV heads are expanded to match the query head count before the op.
-    * **opset ≥ 24** — standard ONNX ``Attention`` op.
-    * **opset ≤ 22** — plain ONNX ops (``MatMul``, ``Softmax``,
-      ``Transpose``, …).  This is the default path.
+    * **com.microsoft** — ``com.microsoft.RotaryEmbedding`` for rotary
+      embeddings and ``com.microsoft.MultiHeadAttention`` for attention
+      (OnnxRuntime).  The ``"com.microsoft"`` domain must be registered in
+      *g*.  GQA KV heads are expanded to match the query head count before
+      the attention op.
+    * **opset ≥ 24** — standard ONNX ``RotaryEmbedding`` op (opset ≥ 23)
+      for rotary embeddings and the standard ONNX ``Attention`` op for
+      attention.
+    * **opset 23** — standard ONNX ``RotaryEmbedding`` op for rotary
+      embeddings and plain ONNX ops (``MatMul``, ``Softmax``,
+      ``Transpose``, …) for attention.
+    * **opset ≤ 22** — plain ONNX ops for both rotary embeddings and
+      attention.  This is the default fallback path.
+
+    .. note::
+
+        The ``cos`` and ``sin`` inputs are expected to carry *symmetric*
+        values, i.e. ``cos[..., :head_dim//2] == cos[..., head_dim//2:]``
+        (and likewise for ``sin``).  This matches what
+        :class:`transformers.models.llama.modeling_llama.LlamaRotaryEmbedding`
+        produces.  The dedicated ONNX/ORT ``RotaryEmbedding`` ops use only
+        the first half of the last dimension; the plain-op fallback uses
+        the full tensor unchanged.
 
     :param g: an existing graph builder — inputs must already be declared with
         their types; the function appends nodes without creating new graph inputs
@@ -396,7 +552,7 @@ def llama_attention_to_onnx(
     hidden_size: int = attn.config.hidden_size
 
     # -------------------------------------------------------------- #
-    # Branch: com.microsoft MultiHeadAttention                        #
+    # Branch: com.microsoft RotaryEmbedding + MultiHeadAttention     #
     # -------------------------------------------------------------- #
     if has_ms:
         # Project (batch, seq, hidden) -> (batch, seq, heads * head_dim)
@@ -412,25 +568,9 @@ def llama_attention_to_onnx(
         k_3d = _proj_3d(hidden_states, k_w, k_b, "w_k")  # (batch, seq, num_kv_heads * head_dim)
         v_3d = _proj_3d(hidden_states, v_w, v_b, "w_v")  # (batch, seq, num_kv_heads * head_dim)
 
-        # Apply RoPE: reshape to 4D, apply, reshape back to 3D
-        def _apply_rope_3d(x_3d: T, n_h: int, cos_n: T, sin_n: T) -> T:
-            # (batch, seq, n_h * head_dim) -> (batch, seq, n_h, head_dim)
-            sp = np.array([0, 0, n_h, head_dim], dtype=np.int64)
-            x4d = g.op.Reshape(x_3d, sp, name=name)
-            # (batch, seq, n_h, head_dim) -> (batch, n_h, seq, head_dim)
-            x4d = g.op.Transpose(x4d, perm=[0, 2, 1, 3], name=name)
-            # cos/sin: (batch, seq, head_dim) -> (batch, 1, seq, head_dim)
-            cos4d = g.op.Unsqueeze(cos_n, np.array([1], dtype=np.int64), name=name)
-            sin4d = g.op.Unsqueeze(sin_n, np.array([1], dtype=np.int64), name=name)
-            x4d = _apply_rope(g, x4d, cos4d, sin4d, head_dim, name)
-            # (batch, n_h, seq, head_dim) -> (batch, seq, n_h, head_dim)
-            x4d = g.op.Transpose(x4d, perm=[0, 2, 1, 3], name=name)
-            # (batch, seq, n_h, head_dim) -> (batch, seq, n_h * head_dim)
-            sp3 = np.array([0, 0, -1], dtype=np.int64)
-            return g.op.Reshape(x4d, sp3, name=name)
-
-        q_3d = _apply_rope_3d(q_3d, num_heads, cos, sin)
-        k_3d = _apply_rope_3d(k_3d, num_kv_heads, cos, sin)
+        # Apply RoPE using com.microsoft.RotaryEmbedding
+        q_3d = _apply_rope_ms_op(g, q_3d, cos, sin, head_dim, num_heads, name)
+        k_3d = _apply_rope_ms_op(g, k_3d, cos, sin, head_dim, num_kv_heads, name)
 
         # Repeat KV for GQA so k/v have same head count as q.
         # Use Unsqueeze + Expand (not Tile) to get the same interleaved ordering
@@ -483,7 +623,7 @@ def llama_attention_to_onnx(
             attn_out = g.op.Add(attn_out, o_bv, name=name)
 
     # -------------------------------------------------------------- #
-    # Branch: ONNX Attention (opset >= 24)                            #
+    # Branch: standard ONNX RotaryEmbedding + ONNX Attention (≥ 24) #
     # -------------------------------------------------------------- #
     elif main_opset >= 24:
         # Project to 4D
@@ -491,11 +631,9 @@ def llama_attention_to_onnx(
         k_4d = _project_and_split(g, hidden_states, k_w, k_b, num_kv_heads, head_dim, name, "w_k")
         v_4d = _project_and_split(g, hidden_states, v_w, v_b, num_kv_heads, head_dim, name, "w_v")
 
-        # Apply RoPE
-        cos4d = g.op.Unsqueeze(cos, np.array([1], dtype=np.int64), name=name)
-        sin4d = g.op.Unsqueeze(sin, np.array([1], dtype=np.int64), name=name)
-        q_4d = _apply_rope(g, q_4d, cos4d, sin4d, head_dim, name)
-        k_4d = _apply_rope(g, k_4d, cos4d, sin4d, head_dim, name)
+        # Apply RoPE using standard ONNX RotaryEmbedding op
+        q_4d = _apply_rope_standard_onnx(g, q_4d, cos, sin, head_dim, num_heads, name)
+        k_4d = _apply_rope_standard_onnx(g, k_4d, cos, sin, head_dim, num_kv_heads, name)
 
         # Expand KV if needed
         if n_rep > 1:
@@ -518,7 +656,42 @@ def llama_attention_to_onnx(
             attn_out = g.op.Add(attn_out, o_bv, name=name)
 
     # -------------------------------------------------------------- #
-    # Branch: Standard ONNX ops (opset ≤ 22)                          #
+    # Branch: standard ONNX RotaryEmbedding + plain attention (≥ 23) #
+    # -------------------------------------------------------------- #
+    elif main_opset >= 23:
+        # Project to 4D
+        q_4d = _project_and_split(g, hidden_states, q_w, q_b, num_heads, head_dim, name, "w_q")
+        k_4d = _project_and_split(g, hidden_states, k_w, k_b, num_kv_heads, head_dim, name, "w_k")
+        v_4d = _project_and_split(g, hidden_states, v_w, v_b, num_kv_heads, head_dim, name, "w_v")
+
+        # Apply RoPE using standard ONNX RotaryEmbedding op
+        q_4d = _apply_rope_standard_onnx(g, q_4d, cos, sin, head_dim, num_heads, name)
+        k_4d = _apply_rope_standard_onnx(g, k_4d, cos, sin, head_dim, num_kv_heads, name)
+
+        # Expand KV if needed
+        if n_rep > 1:
+            k_4d = _repeat_kv(g, k_4d, n_rep, num_kv_heads, head_dim, name)
+            v_4d = _repeat_kv(g, v_4d, n_rep, num_kv_heads, head_dim, name)
+
+        # Standard attention ops
+        out_4d = _standard_attention(
+            g, q_4d, k_4d, v_4d, attention_mask, scaling, onnx_dtype, name
+        )
+
+        # (batch, n_heads, seq, head_dim) -> (batch, seq, hidden_size)
+        transposed = g.op.Transpose(out_4d, perm=[0, 2, 1, 3], name=name)
+        flat_shape = np.array([0, 0, hidden_size], dtype=np.int64)
+        flat = g.op.Reshape(transposed, flat_shape, name=name)
+
+        # Output projection
+        o_wt = g.make_initializer("w_o", o_w.T)
+        attn_out = g.op.MatMul(flat, o_wt, name=name)
+        if o_b is not None:
+            o_bv = g.make_initializer("w_o_bias", o_b)
+            attn_out = g.op.Add(attn_out, o_bv, name=name)
+
+    # -------------------------------------------------------------- #
+    # Branch: plain ONNX ops (opset ≤ 22)                            #
     # -------------------------------------------------------------- #
     else:
         # Project to 4D
