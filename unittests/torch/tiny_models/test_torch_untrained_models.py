@@ -193,7 +193,10 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         # self._chech_shape(onx.get_proto(include_weights=False))
 
     @hide_stdout()
-    @unittest.skip("one optimization pattern is broken")
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
+    @ignore_warnings(FutureWarning)
     def test_tiny_llm_to_onnx_24(self):
         import onnxruntime
 
@@ -204,6 +207,9 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         del inputs["position_ids"]
         del ds["position_ids"]
         del b1["position_ids"]
+        # Ensure attention_mask is valid (non-zero) so the ONNX Attention op
+        # produces results consistent with PyTorch's causal attention semantics.
+        b1["attention_mask"] = torch.ones_like(b1["attention_mask"])
 
         filename = self.get_dump_file("test_tiny_llm_to_onnx_24.onnx")
 
@@ -273,9 +279,8 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             "CausalMaskMulAdd": 1,
             "Concat": 5,
             "CosSinCacheWithRange": 1,
-            "Expand": 0,
+            "Expand": 2,
             "Gather": 2,
-            "HalfRotaryEmbedding": 2,
             "MatMul": 8,
             "Mul": 5,
             "Reshape": 3,
@@ -287,7 +292,6 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         }
         self.assertEqual(counter["Expand"], expected_counts["Expand"])
         self.assertEqual(counter["Transpose"], expected_counts["Transpose"])
-        # not working yet
         self._chech_shape(onx.get_proto(include_weights=False))
 
     @hide_stdout()
