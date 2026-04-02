@@ -465,6 +465,67 @@ class TestNewTracing(ExtTestCase):
         # Only the tensor inside the list gets a placeholder; 2.0 is a scalar
         self.assertEqual(len(ph_nodes), 1)
 
+    # ------------------------------------------------------------------
+    # nn.Module: named parameter / buffer placeholders
+    # ------------------------------------------------------------------
+
+    def test_trace_nn_module_named_weight_placeholders(self):
+        """Parameters of an nn.Module get named placeholder nodes."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        model = torch.nn.Linear(4, 2, bias=True)
+        tracer = DispatchTracer()
+        graph = tracer.trace(model, (torch.randn(3, 4),))
+        graph.lint()
+        ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
+        # Expect "weight" and "bias" placeholder nodes (sanitized module param names)
+        self.assertTrue(
+            any("weight" in n for n in ph_names),
+            f"No 'weight' placeholder found in {ph_names}",
+        )
+        self.assertTrue(
+            any("bias" in n for n in ph_names),
+            f"No 'bias' placeholder found in {ph_names}",
+        )
+
+    def test_trace_nn_module_shared_parameter_single_placeholder(self):
+        """A parameter used twice maps to exactly one placeholder (no duplicates)."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        class SharedWeight(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.w = torch.nn.Parameter(torch.randn(4, 4))
+
+            def forward(self, x):
+                # Use self.w in two matmuls — same tensor object both times
+                return x @ self.w + x @ self.w
+
+        model = SharedWeight()
+        tracer = DispatchTracer()
+        graph = tracer.trace(model, (torch.randn(2, 4),))
+        graph.lint()
+        ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
+        # Only one placeholder for 'w', not two
+        w_phs = [n for n in ph_names if "w" in n]
+        self.assertEqual(len(w_phs), 1, f"Expected 1 'w' placeholder, got {w_phs}")
+
+    def test_trace_nested_module_parameter_names(self):
+        """Nested module parameters appear with sanitized dotted names."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        model = torch.nn.Sequential(torch.nn.Linear(4, 4))
+        tracer = DispatchTracer()
+        graph = tracer.trace(model, (torch.randn(2, 4),))
+        graph.lint()
+        ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
+        # nn.Sequential(Linear(4,4)) has params "0.weight" and "0.bias",
+        # sanitized to "0_weight" and "0_bias"
+        self.assertTrue(
+            any("weight" in n for n in ph_names),
+            f"No 'weight' placeholder found in {ph_names}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -472,17 +472,20 @@ class DispatchTracer:
     def _get_node(self, t: "TracingTensor") -> torch.fx.Node:
         """Return the :class:`torch.fx.Node` associated with *t*."""
         node = self._tensor_id_to_node.get(id(t))
-        if node is None:
-            raise RuntimeError(
-                f"TracingTensor {t!r} is not registered with this tracer. "
-                "Ensure all tensors were created (or passed to) this DispatchTracer."
-            )
+        assert node is not None, (
+            f"TracingTensor {t!r} is not registered with this tracer. "
+            "Ensure all tensors were created (or passed to) this DispatchTracer."
+        )
         return node
 
     def _node_for_external_tensor(self, t: torch.Tensor) -> torch.fx.Node:
         """
         Return (or lazily create) a placeholder node for a non-traced tensor
         (e.g. a module parameter or bias encountered during dispatch).
+
+        If the tensor was pre-registered by :meth:`_register_module_parameters`
+        its named placeholder is returned; otherwise a generic ``param_N``
+        placeholder is created on the fly.
         """
         key = id(t)
         if key not in self._external_tensor_to_node:
@@ -492,6 +495,35 @@ class DispatchTracer:
             node.meta["val"] = t.detach().to(device="meta")
             self._external_tensor_to_node[key] = node
         return self._external_tensor_to_node[key]
+
+    def _register_module_parameters(self, module: torch.nn.Module) -> None:
+        """
+        Pre-register all named parameters and buffers of *module* as
+        placeholder nodes in the graph.
+
+        This gives each parameter a meaningful name in the graph (e.g.
+        ``linear_weight`` instead of ``param_1``) and ensures that shared
+        tensors (the same :class:`torch.Tensor` referenced under multiple
+        names) map to exactly one placeholder node.
+
+        :param module: The :class:`torch.nn.Module` whose parameters and
+            buffers should be pre-registered.
+        """
+        seen_ids: set = set()
+        for name, tensor in (
+            list(module.named_parameters()) + list(module.named_buffers())
+        ):
+            if tensor is None:
+                continue
+            key = id(tensor)
+            if key in seen_ids or key in self._external_tensor_to_node:
+                continue
+            seen_ids.add(key)
+            # Replace "." with "_" so the FX node name is a valid identifier.
+            sanitized = name.replace(".", "_")
+            node = self.graph.placeholder(sanitized)
+            node.meta["val"] = tensor.detach().to(device="meta")
+            self._external_tensor_to_node[key] = node
 
     # ------------------------------------------------------------------
     # Graph construction helpers
@@ -687,6 +719,14 @@ class DispatchTracer:
         self._tensor_id_to_node = {}
         self._external_tensor_to_node = {}
         self._placeholder_count = 0
+
+        # ------------------------------------------------------------------
+        # Pre-register nn.Module parameters and buffers as named placeholders.
+        # This must happen before building input placeholders so that the
+        # parameter placeholder nodes appear first in the graph.
+        # ------------------------------------------------------------------
+        if isinstance(func, torch.nn.Module):
+            self._register_module_parameters(func)
 
         # ------------------------------------------------------------------
         # Build placeholder TracingTensors for each tensor input.
