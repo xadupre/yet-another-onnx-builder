@@ -11,7 +11,8 @@ Exported names
 
 .. autosummary::
 
-    TracingDimension
+    TracingInt
+    TracingBool
     TracingShape
     TracingTensor
     DispatchTracer
@@ -20,7 +21,9 @@ Exported names
 
 from .tracing import (
     DispatchTracer,
+    TracingBool,
     TracingDimension,
+    TracingInt,
     TracingShape,
     TracingTensor,
     trace_model,
@@ -28,7 +31,9 @@ from .tracing import (
 
 __all__ = [
     "DispatchTracer",
+    "TracingBool",
     "TracingDimension",
+    "TracingInt",
     "TracingShape",
     "TracingTensor",
     "trace_model",

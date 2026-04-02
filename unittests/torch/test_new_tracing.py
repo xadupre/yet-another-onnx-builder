@@ -17,100 +17,125 @@ class TestNewTracing(ExtTestCase):
     def test_import(self):
         from yobx.torch.new_tracing import (
             DispatchTracer,
-            TracingDimension,
+            TracingBool,
+            TracingInt,
             TracingShape,
             TracingTensor,
             trace_model,
         )
 
         self.assertIsNotNone(DispatchTracer)
-        self.assertIsNotNone(TracingDimension)
+        self.assertIsNotNone(TracingBool)
+        self.assertIsNotNone(TracingInt)
         self.assertIsNotNone(TracingShape)
         self.assertIsNotNone(TracingTensor)
         self.assertIsNotNone(trace_model)
 
     # ------------------------------------------------------------------
-    # TracingDimension
+    # TracingInt / TracingBool
     # ------------------------------------------------------------------
 
     def test_tracing_dimension_repr_no_value(self):
-        from yobx.torch.new_tracing import TracingDimension
+        from yobx.torch.new_tracing import TracingInt
 
-        d = TracingDimension("batch")
+        d = TracingInt("batch")
         self.assertIn("batch", repr(d))
         self.assertEqual(str(d), "batch")
 
     def test_tracing_dimension_repr_with_value(self):
-        from yobx.torch.new_tracing import TracingDimension
+        from yobx.torch.new_tracing import TracingInt
 
-        d = TracingDimension("batch", value=4)
-        self.assertIn("batch", repr(d))
+        d = TracingInt(4)
         self.assertIn("4", repr(d))
         self.assertEqual(int(d), 4)
 
     def test_tracing_dimension_int_raises_without_value(self):
-        from yobx.torch.new_tracing import TracingDimension
+        from yobx.torch.new_tracing import TracingInt
 
-        d = TracingDimension("n")
+        d = TracingInt("n")
         with self.assertRaises(ValueError):
             int(d)
 
     def test_tracing_dimension_eq(self):
-        from yobx.torch.new_tracing import TracingDimension
+        from yobx.torch.new_tracing import TracingBool, TracingInt
 
-        d1 = TracingDimension("batch", 4)
-        d2 = TracingDimension("batch", 4)
-        d3 = TracingDimension("seq", 4)
-
+        # Concrete comparison → plain bool
+        d1 = TracingInt(4)
+        d2 = TracingInt(4)
+        d3 = TracingInt(8)
         self.assertEqual(d1, d2)
         self.assertNotEqual(d1, d3)
-        self.assertEqual(d1, 4)  # compare with concrete int
+        self.assertEqual(d1, 4)  # compare concrete TracingInt with plain int
+
+        # Symbolic comparison → TracingBool
+        d_sym = TracingInt("batch")
+        result = d_sym == 4
+        self.assertIsInstance(result, TracingBool)
+        self.assertIn("batch", str(result.value))
 
     def test_tracing_dimension_arithmetic(self):
-        from yobx.torch.new_tracing import TracingDimension
+        from yobx.torch.new_tracing import TracingInt
 
-        d = TracingDimension("n", 8)
-
+        # Concrete arithmetic produces concrete TracingInt
+        d = TracingInt(8)
         self.assertEqual(int(d + 2), 10)
         self.assertEqual(int(d - 3), 5)
         self.assertEqual(int(d * 2), 16)
         self.assertEqual(int(d // 4), 2)
         self.assertEqual(int(2 + d), 10)
         self.assertEqual(int(2 * d), 16)
-        # When value is present str() returns the numeric string,
-        # but the symbolic name is preserved in .name.
-        self.assertIn("n", (d + 2).name)
+
+        # Symbolic arithmetic preserves the expression as a string value
+        s = TracingInt("n")
+        result = s + 2
+        self.assertIsInstance(result, TracingInt)
+        self.assertIn("n", str(result.value))
 
     def test_tracing_dimension_neg(self):
-        from yobx.torch.new_tracing import TracingDimension
+        from yobx.torch.new_tracing import TracingInt
 
-        d = TracingDimension("n", 5)
+        d = TracingInt(5)
         nd = -d
         self.assertEqual(int(nd), -5)
 
     def test_tracing_dimension_hash(self):
-        from yobx.torch.new_tracing import TracingDimension
+        from yobx.torch.new_tracing import TracingInt
 
-        d = TracingDimension("batch")
+        d = TracingInt("batch")
         self.assertIsInstance(hash(d), int)
         self.assertIn(d, {d})
+
+    def test_tracing_bool_concrete(self):
+        from yobx.torch.new_tracing import TracingBool
+
+        tb_true = TracingBool(True)
+        tb_false = TracingBool(False)
+        self.assertTrue(bool(tb_true))
+        self.assertFalse(bool(tb_false))
+
+    def test_tracing_bool_symbolic_raises_on_bool(self):
+        from yobx.torch.new_tracing import TracingBool
+
+        tb = TracingBool("(n==4)")
+        with self.assertRaises(ValueError):
+            bool(tb)
 
     # ------------------------------------------------------------------
     # TracingShape
     # ------------------------------------------------------------------
 
     def test_tracing_shape_concrete(self):
-        from yobx.torch.new_tracing import TracingDimension, TracingShape
+        from yobx.torch.new_tracing import TracingInt, TracingShape
 
-        s = TracingShape([TracingDimension("b", 4), 16])
+        s = TracingShape([TracingInt(4), 16])
         self.assertTrue(s.is_concrete)
         self.assertEqual(s.numel(), 64)
         self.assertEqual(s.to_torch_size(), torch.Size([4, 16]))
 
     def test_tracing_shape_symbolic(self):
-        from yobx.torch.new_tracing import TracingDimension, TracingShape
+        from yobx.torch.new_tracing import TracingInt, TracingShape
 
-        s = TracingShape([TracingDimension("n"), 8])
+        s = TracingShape([TracingInt("n"), 8])
         self.assertFalse(s.is_concrete)
         with self.assertRaises(ValueError):
             s.numel()
@@ -118,16 +143,16 @@ class TestNewTracing(ExtTestCase):
             s.to_torch_size()
 
     def test_tracing_shape_repr(self):
-        from yobx.torch.new_tracing import TracingDimension, TracingShape
+        from yobx.torch.new_tracing import TracingInt, TracingShape
 
-        s = TracingShape([TracingDimension("batch", 2), 4])
+        s = TracingShape([TracingInt(2), 4])
         r = repr(s)
         self.assertIn("TracingShape", r)
 
     def test_tracing_shape_indexing(self):
-        from yobx.torch.new_tracing import TracingDimension, TracingShape
+        from yobx.torch.new_tracing import TracingInt, TracingShape
 
-        d = TracingDimension("n", 5)
+        d = TracingInt(5)
         s = TracingShape([d, 8])
         self.assertIs(s[0], d)
         self.assertEqual(s[1], 8)
@@ -268,7 +293,7 @@ class TestNewTracing(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_trace_dynamic_shapes(self):
-        from yobx.torch.new_tracing import DispatchTracer, TracingDimension
+        from yobx.torch.new_tracing import DispatchTracer, TracingInt
 
         def add(x, y):
             return x + y
@@ -278,8 +303,8 @@ class TestNewTracing(ExtTestCase):
             add,
             (torch.randn(4, 8), torch.randn(4, 8)),
             dynamic_shapes={
-                "x_0": [TracingDimension("batch", 4), 8],
-                "x_1": [TracingDimension("batch", 4), 8],
+                "x_0": [TracingInt("batch"), 8],
+                "x_1": [TracingInt("batch"), 8],
             },
         )
         graph.lint()

@@ -8,8 +8,11 @@ works.
 
 Key classes:
 
-- :class:`TracingDimension`: A symbolic or concrete tensor dimension.
-- :class:`TracingShape`: A tuple of :class:`TracingDimension` objects.
+- :class:`TracingInt`: A symbolic or concrete integer dimension.
+- :class:`TracingBool`: A boolean that may be symbolic when it depends on
+  dynamic dimensions.
+- :class:`TracingShape`: A container of :class:`TracingInt` / :class:`int`
+  dimension values.
 - :class:`TracingTensor`: A :class:`torch.Tensor` subclass that records
   all operations into a :class:`torch.fx.Graph` via ``__torch_dispatch__``.
 - :class:`DispatchTracer`: Manages tracing context and builds the graph.
@@ -39,169 +42,260 @@ import torch.fx
 import torch.utils._pytree as pytree
 
 
-class TracingDimension:
+class TracingBool:
     """
-    Represents a single symbolic or concrete dimension in a tensor shape.
+    Represents a boolean comparison that may involve symbolic :class:`TracingInt`
+    dimensions and therefore cannot always be evaluated at trace time.
 
-    Each :class:`TracingTensor` can have dimensions that are either concrete
-    integers or symbolic names (when dynamic shapes are used).
+    :param value: Either a concrete :class:`bool` or a :class:`str` containing
+        a symbolic expression such as ``"(batch==4)"``.
 
-    :param name: Symbolic name for this dimension (e.g. ``"batch"``,
-        ``"seq_len"``).
-    :param value: Optional concrete integer value. When provided, arithmetic
-        on this dimension returns a new :class:`TracingDimension` with an
-        updated concrete value.
-
-    Example::
-
-        d = TracingDimension("batch", value=4)
-        d2 = d * 2  # TracingDimension("(batch*2)", value=8)
-        print(int(d))  # 4
+    - ``TracingBool(True)`` / ``TracingBool(False)`` — concrete result.
+    - ``TracingBool("(n==4)")`` — symbolic; cannot be used as a Python bool.
     """
 
-    def __init__(self, name: str, value: Optional[int] = None):
-        self.name = name
+    def __init__(self, value: Union[bool, str]):
         self.value = value
 
     def __repr__(self) -> str:
-        if self.value is not None:
-            return f"TracingDimension({self.name!r}, value={self.value})"
-        return f"TracingDimension({self.name!r})"
+        return f"TracingBool({self.value!r})"
 
     def __str__(self) -> str:
-        return self.name if self.value is None else str(self.value)
+        return str(self.value)
+
+    def __bool__(self) -> bool:
+        if isinstance(self.value, bool):
+            return self.value
+        raise ValueError(
+            f"TracingBool({self.value!r}) cannot be converted to a Python bool; "
+            "the result depends on a symbolic/dynamic dimension"
+        )
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, TracingBool):
+            return self.value == other.value
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.value)
+
+
+class TracingInt:
+    """
+    Represents a single symbolic or concrete integer (e.g. a tensor dimension).
+
+    :param value: Either a concrete :class:`int` (concrete dimension) or a
+        :class:`str` (symbolic/dynamic dimension name such as ``"batch"``).
+
+    Examples::
+
+        # Concrete dimension
+        d = TracingInt(4)
+        print(int(d))       # 4
+        print(d + 2)        # TracingInt(6)
+
+        # Symbolic/dynamic dimension
+        s = TracingInt("batch")
+        print(str(s))       # batch
+        print(s + 2)        # TracingInt('(batch+2)')
+        print(s == 4)       # TracingBool('(batch==4)')
+    """
+
+    def __init__(self, value: Union[int, str]):
+        self.value = value
+
+    def __repr__(self) -> str:
+        return f"TracingInt({self.value!r})"
+
+    def __str__(self) -> str:
+        return str(self.value)
 
     def __int__(self) -> int:
-        if self.value is None:
-            raise ValueError(
-                f"TracingDimension {self.name!r} has no concrete value; "
-                "pass a concrete value or use .value"
-            )
-        return self.value
+        if isinstance(self.value, int):
+            return self.value
+        raise ValueError(
+            f"TracingInt({self.value!r}) has no concrete integer value; "
+            "pass a concrete int or check .value"
+        )
 
     def __index__(self) -> int:
         """Enable use as a sequence index (calls :meth:`__int__`)."""
         return int(self)
 
-    def __eq__(self, other: Any) -> bool:
-        if isinstance(other, TracingDimension):
-            return self.name == other.name
-        if isinstance(other, int) and self.value is not None:
-            return self.value == other
+    def __eq__(self, other: Any) -> Union[bool, "TracingBool"]:
+        """
+        Return a plain :class:`bool` when both sides are concrete; return a
+        :class:`TracingBool` when at least one side is symbolic.
+        """
+        if isinstance(other, TracingInt):
+            if isinstance(self.value, int) and isinstance(other.value, int):
+                return self.value == other.value
+            return TracingBool(f"({self.value}=={other.value})")
+        if isinstance(other, int):
+            if isinstance(self.value, int):
+                return self.value == other
+            return TracingBool(f"({self.value}=={other})")
         return NotImplemented
 
     def __hash__(self) -> int:
-        return hash(self.name)
+        return hash(self.value)
 
     # ------------------------------------------------------------------
-    # Arithmetic helpers so TracingDimension can participate in shape
-    # calculations while keeping the symbolic expression as the name.
+    # Arithmetic helpers so TracingInt can participate in shape
+    # calculations while keeping symbolic expressions intact.
     # ------------------------------------------------------------------
 
-    def __add__(self, other: Union[int, "TracingDimension"]) -> "TracingDimension":
-        new_val: Optional[int] = None
-        if self.value is not None:
-            other_val = other.value if isinstance(other, TracingDimension) else other
-            if other_val is not None:
-                new_val = self.value + int(other_val)
-        return TracingDimension(f"({self.name}+{other})", new_val)
+    def _sym(self) -> str:
+        """String representation of *self* for building expressions."""
+        return str(self.value)
 
-    def __radd__(self, other: int) -> "TracingDimension":
-        new_val = (self.value + other) if self.value is not None else None
-        return TracingDimension(f"({other}+{self.name})", new_val)
+    def __add__(self, other: Union[int, "TracingInt"]) -> "TracingInt":
+        if isinstance(other, TracingInt):
+            if isinstance(self.value, int) and isinstance(other.value, int):
+                return TracingInt(self.value + other.value)
+            return TracingInt(f"({self._sym()}+{other._sym()})")
+        if isinstance(other, int):
+            if isinstance(self.value, int):
+                return TracingInt(self.value + other)
+            return TracingInt(f"({self._sym()}+{other})")
+        return NotImplemented
 
-    def __sub__(self, other: Union[int, "TracingDimension"]) -> "TracingDimension":
-        new_val: Optional[int] = None
-        if self.value is not None:
-            other_val = other.value if isinstance(other, TracingDimension) else other
-            if other_val is not None:
-                new_val = self.value - int(other_val)
-        return TracingDimension(f"({self.name}-{other})", new_val)
+    def __radd__(self, other: int) -> "TracingInt":
+        if isinstance(other, int):
+            if isinstance(self.value, int):
+                return TracingInt(other + self.value)
+            return TracingInt(f"({other}+{self._sym()})")
+        return NotImplemented
 
-    def __rsub__(self, other: int) -> "TracingDimension":
-        new_val = (other - self.value) if self.value is not None else None
-        return TracingDimension(f"({other}-{self.name})", new_val)
+    def __sub__(self, other: Union[int, "TracingInt"]) -> "TracingInt":
+        if isinstance(other, TracingInt):
+            if isinstance(self.value, int) and isinstance(other.value, int):
+                return TracingInt(self.value - other.value)
+            return TracingInt(f"({self._sym()}-{other._sym()})")
+        if isinstance(other, int):
+            if isinstance(self.value, int):
+                return TracingInt(self.value - other)
+            return TracingInt(f"({self._sym()}-{other})")
+        return NotImplemented
 
-    def __mul__(self, other: Union[int, "TracingDimension"]) -> "TracingDimension":
-        new_val: Optional[int] = None
-        if self.value is not None:
-            other_val = other.value if isinstance(other, TracingDimension) else other
-            if other_val is not None:
-                new_val = self.value * int(other_val)
-        return TracingDimension(f"({self.name}*{other})", new_val)
+    def __rsub__(self, other: int) -> "TracingInt":
+        if isinstance(other, int):
+            if isinstance(self.value, int):
+                return TracingInt(other - self.value)
+            return TracingInt(f"({other}-{self._sym()})")
+        return NotImplemented
 
-    def __rmul__(self, other: int) -> "TracingDimension":
-        new_val = (self.value * other) if self.value is not None else None
-        return TracingDimension(f"({other}*{self.name})", new_val)
+    def __mul__(self, other: Union[int, "TracingInt"]) -> "TracingInt":
+        if isinstance(other, TracingInt):
+            if isinstance(self.value, int) and isinstance(other.value, int):
+                return TracingInt(self.value * other.value)
+            return TracingInt(f"({self._sym()}*{other._sym()})")
+        if isinstance(other, int):
+            if isinstance(self.value, int):
+                return TracingInt(self.value * other)
+            return TracingInt(f"({self._sym()}*{other})")
+        return NotImplemented
 
-    def __floordiv__(self, other: Union[int, "TracingDimension"]) -> "TracingDimension":
-        new_val: Optional[int] = None
-        if self.value is not None:
-            other_val = other.value if isinstance(other, TracingDimension) else other
-            if other_val is not None:
-                new_val = self.value // int(other_val)
-        return TracingDimension(f"({self.name}//{other})", new_val)
+    def __rmul__(self, other: int) -> "TracingInt":
+        if isinstance(other, int):
+            if isinstance(self.value, int):
+                return TracingInt(other * self.value)
+            return TracingInt(f"({other}*{self._sym()})")
+        return NotImplemented
 
-    def __neg__(self) -> "TracingDimension":
-        new_val = (-self.value) if self.value is not None else None
-        return TracingDimension(f"(-{self.name})", new_val)
+    def __floordiv__(self, other: Union[int, "TracingInt"]) -> "TracingInt":
+        if isinstance(other, TracingInt):
+            if isinstance(self.value, int) and isinstance(other.value, int):
+                return TracingInt(self.value // other.value)
+            return TracingInt(f"({self._sym()}//{other._sym()})")
+        if isinstance(other, int):
+            if isinstance(self.value, int):
+                return TracingInt(self.value // other)
+            return TracingInt(f"({self._sym()}//{other})")
+        return NotImplemented
+
+    def __neg__(self) -> "TracingInt":
+        if isinstance(self.value, int):
+            return TracingInt(-self.value)
+        return TracingInt(f"(-{self._sym()})")
 
 
-class TracingShape(tuple):
+# Keep TracingDimension as a backward-compatible alias.
+TracingDimension = TracingInt
+
+
+class TracingShape:
     """
-    Represents the shape of a :class:`TracingTensor` as an immutable sequence
-    of :class:`TracingDimension` or :class:`int` elements.
+    Represents the shape of a :class:`TracingTensor` as an ordered collection
+    of :class:`TracingInt` or :class:`int` dimension values.
 
-    Behaves like :class:`torch.Size` but allows symbolic dimensions via
-    :class:`TracingDimension`.
+    Unlike :class:`torch.Size`, individual dimensions may be symbolic
+    (:class:`TracingInt` with a ``str`` value).
 
-    :param dims: Iterable of :class:`TracingDimension` or :class:`int` values.
+    :param dims: Iterable of :class:`TracingInt` or :class:`int` values.
 
     Example::
 
-        shape = TracingShape([TracingDimension("batch", 4), 16])
-        print(shape)           # TracingShape([TracingDimension('batch', value=4), 16])
-        print(shape.numel())   # 64
+        shape = TracingShape([TracingInt(4), 16])
+        print(shape)              # TracingShape([TracingInt(4), 16])
+        print(shape.numel())      # 64
         print(shape.is_concrete)  # True
 
-        sym_shape = TracingShape([TracingDimension("n"), 8])
+        sym_shape = TracingShape([TracingInt("n"), 8])
         print(sym_shape.is_concrete)  # False
     """
 
-    def __new__(
-        cls, dims: Sequence[Union["TracingDimension", int]]
-    ) -> "TracingShape":
-        return super().__new__(cls, dims)
+    def __init__(
+        self, dims: "Sequence[Union[TracingInt, int]]"
+    ) -> None:
+        self.dims: Tuple[Union["TracingInt", int], ...] = tuple(dims)
 
     def __repr__(self) -> str:
-        return f"TracingShape({list(self)!r})"
+        return f"TracingShape({list(self.dims)!r})"
 
     def __str__(self) -> str:
-        items = ", ".join(str(d) for d in self)
+        items = ", ".join(str(d) for d in self.dims)
         return f"TracingShape([{items}])"
+
+    def __len__(self) -> int:
+        return len(self.dims)
+
+    def __iter__(self):
+        return iter(self.dims)
+
+    def __getitem__(self, idx):
+        return self.dims[idx]
+
+    def __eq__(self, other: Any) -> bool:
+        if isinstance(other, TracingShape):
+            return self.dims == other.dims
+        return NotImplemented
+
+    def __hash__(self) -> int:
+        return hash(self.dims)
 
     @property
     def is_concrete(self) -> bool:
         """Return ``True`` if every dimension has a concrete integer value."""
         return all(
             isinstance(d, int)
-            or (isinstance(d, TracingDimension) and d.value is not None)
-            for d in self
+            or (isinstance(d, TracingInt) and isinstance(d.value, int))
+            for d in self.dims
         )
 
     def numel(self) -> int:
         """
         Return the total number of elements (product of all dimensions).
 
-        :raises ValueError: If any dimension is purely symbolic (has no
-            concrete value).
+        :raises ValueError: If any dimension is purely symbolic (no concrete
+            integer value).
         """
         result = 1
-        for d in self:
-            if isinstance(d, TracingDimension):
-                if d.value is None:
+        for d in self.dims:
+            if isinstance(d, TracingInt):
+                if not isinstance(d.value, int):
                     raise ValueError(
-                        f"Cannot compute numel: dimension {d.name!r} has no concrete value"
+                        f"Cannot compute numel: dimension {d.value!r} has no concrete value"
                     )
                 result *= d.value
             else:
@@ -217,10 +311,10 @@ class TracingShape(tuple):
         if not self.is_concrete:
             raise ValueError(
                 "Cannot convert TracingShape with purely symbolic dims to torch.Size; "
-                "ensure all TracingDimension objects have a concrete value"
+                "ensure all TracingInt objects have a concrete (int) value"
             )
         return torch.Size(
-            d.value if isinstance(d, TracingDimension) else int(d) for d in self
+            d.value if isinstance(d, TracingInt) else int(d) for d in self.dims
         )
 
 
@@ -259,7 +353,7 @@ class TracingTensor(torch.Tensor):
             # symbolic dimensions so that _make_wrapper_subclass receives ints.
             sizes = tuple(
                 d.value
-                if isinstance(d, TracingDimension) and d.value is not None
+                if isinstance(d, TracingInt) and isinstance(d.value, int)
                 else int(d)
                 if isinstance(d, int)
                 else 1
@@ -424,7 +518,7 @@ class DispatchTracer:
         # Store a meta tensor so downstream shape inference can use it.
         if isinstance(shape, TracingShape):
             concrete = shape.to_torch_size() if shape.is_concrete else torch.Size(
-                d.value if isinstance(d, TracingDimension) and d.value is not None
+                d.value if isinstance(d, TracingInt) and isinstance(d.value, int)
                 else int(d) if isinstance(d, int) else 1
                 for d in shape
             )
@@ -562,7 +656,7 @@ class DispatchTracer:
         :param kwargs: Optional keyword arguments to *func*.
         :param dynamic_shapes: Optional mapping from argument *name*
             (``"x_0"``, ``"x_1"``, … for positional args; key name for
-            keyword args) to a list/tuple of :class:`TracingDimension` / int
+            keyword args) to a list/tuple of :class:`TracingInt` / int
             describing the dimensions symbolically.  When provided, the
             corresponding placeholder is given a :class:`TracingShape` instead
             of a concrete :class:`torch.Size`.
@@ -571,7 +665,7 @@ class DispatchTracer:
         Example::
 
             import torch
-            from yobx.torch.new_tracing import DispatchTracer, TracingDimension
+            from yobx.torch.new_tracing import DispatchTracer, TracingInt
 
             def linear(x, w, b):
                 return x @ w.t() + b
@@ -580,7 +674,7 @@ class DispatchTracer:
             graph = tracer.trace(
                 linear,
                 (torch.randn(4, 8), torch.randn(16, 8), torch.randn(16)),
-                dynamic_shapes={"x_0": [TracingDimension("batch", 4), 8]},
+                dynamic_shapes={"x_0": [TracingInt("batch"), 8]},
             )
             print(graph)
         """
