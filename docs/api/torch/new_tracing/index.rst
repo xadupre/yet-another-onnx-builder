@@ -9,6 +9,7 @@ yobx.torch.new_tracing
     :maxdepth: 1
     :caption: modules
 
+    dispatcher
     shape
     tensor
-    dispatcher
+    tracing
