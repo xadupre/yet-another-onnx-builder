@@ -526,6 +526,97 @@ class TestNewTracing(ExtTestCase):
             f"No 'weight' placeholder found in {ph_names}",
         )
 
+    # ------------------------------------------------------------------
+    # nn.Module: custom subclasses and functional tests
+    # ------------------------------------------------------------------
+
+    def test_trace_custom_nn_module(self):
+        """Tracing a custom nn.Module subclass produces a valid graph."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        class TwoLayerMLP(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.fc1 = torch.nn.Linear(8, 4, bias=True)
+                self.fc2 = torch.nn.Linear(4, 2, bias=True)
+
+            def forward(self, x):
+                return self.fc2(torch.relu(self.fc1(x)))
+
+        model = TwoLayerMLP()
+        tracer = DispatchTracer()
+        graph = tracer.trace(model, (torch.randn(3, 8),))
+        graph.lint()
+        ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
+        # 4 parameters: fc1.weight, fc1.bias, fc2.weight, fc2.bias + 1 input
+        self.assertGreaterEqual(len(ph_names), 5)
+        self.assertTrue(any("weight" in n for n in ph_names))
+        self.assertTrue(any("bias" in n for n in ph_names))
+        call_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertGreater(len(call_nodes), 0)
+
+    def test_trace_model_with_nn_module(self):
+        """trace_model convenience wrapper works with an nn.Module."""
+        from yobx.torch.new_tracing import trace_model
+
+        model = torch.nn.Linear(4, 2, bias=True)
+        graph = trace_model(model, (torch.randn(1, 4),))
+        graph.lint()
+        ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
+        self.assertTrue(any("weight" in n for n in ph_names))
+        self.assertTrue(any("bias" in n for n in ph_names))
+
+    def test_trace_nn_module_with_buffer(self):
+        """Buffers of an nn.Module get named placeholder nodes."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        model = torch.nn.BatchNorm1d(4)
+        model.eval()
+        tracer = DispatchTracer()
+        graph = tracer.trace(model, (torch.randn(3, 4),))
+        graph.lint()
+        ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
+        # BatchNorm has weight/bias params and running_mean/running_var buffers
+        self.assertTrue(
+            any("running_mean" in n or "running_var" in n for n in ph_names),
+            f"No buffer placeholders found in {ph_names}",
+        )
+
+    def test_trace_nn_module_parameter_count(self):
+        """The number of parameter placeholders matches named_parameters() count."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        model = torch.nn.Linear(4, 2, bias=True)
+        param_names = [name for name, _ in model.named_parameters()]
+        tracer = DispatchTracer()
+        graph = tracer.trace(model, (torch.randn(2, 4),))
+        graph.lint()
+        ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
+        # Each named parameter should have exactly one placeholder node
+        for param_name in param_names:
+            sanitized = param_name.replace(".", "_")
+            self.assertIn(
+                sanitized,
+                ph_names,
+                f"Expected placeholder '{sanitized}' in {ph_names}",
+            )
+
+    def test_trace_nn_module_no_bias(self):
+        """nn.Module without bias produces a graph without a bias placeholder."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        model = torch.nn.Linear(4, 2, bias=False)
+        tracer = DispatchTracer()
+        graph = tracer.trace(model, (torch.randn(2, 4),))
+        graph.lint()
+        ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
+        self.assertTrue(any("weight" in n for n in ph_names))
+        # No bias placeholder expected
+        self.assertFalse(
+            any("bias" in n for n in ph_names),
+            f"Unexpected 'bias' placeholder in {ph_names}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
