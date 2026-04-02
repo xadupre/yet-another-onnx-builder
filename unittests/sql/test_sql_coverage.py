@@ -219,11 +219,9 @@ class TestCoverageReflectsImplementation(unittest.TestCase):
 
         row = self._find_row(SQL_COVERAGE, "subqueries")
         self.assertIsNotNone(row, "No 'Subqueries' row found in SQL_COVERAGE")
-        construct, status, notes = row
+        _construct, status, _notes = row
         self.assertEqual(
-            status,
-            _SUPPORTED,
-            f"Subqueries should be {_SUPPORTED!r} but got {status!r}",
+            status, _SUPPORTED, f"Subqueries should be {_SUPPORTED!r} but got {status!r}"
         )
 
     def test_dataframe_join_marked_supported(self):
@@ -233,11 +231,9 @@ class TestCoverageReflectsImplementation(unittest.TestCase):
 
         row = self._find_row(DATAFRAME_COVERAGE, "df.join")
         self.assertIsNotNone(row, "No 'df.join' row found in DATAFRAME_COVERAGE")
-        construct, status, notes = row
+        _construct, status, _notes = row
         self.assertEqual(
-            status,
-            _SUPPORTED,
-            f"df.join should be {_SUPPORTED!r} but got {status!r}",
+            status, _SUPPORTED, f"df.join should be {_SUPPORTED!r} but got {status!r}"
         )
 
     def test_dataframe_pivot_table_marked_supported(self):
@@ -247,11 +243,9 @@ class TestCoverageReflectsImplementation(unittest.TestCase):
 
         row = self._find_row(DATAFRAME_COVERAGE, "pivot_table")
         self.assertIsNotNone(row, "No 'pivot_table' row found in DATAFRAME_COVERAGE")
-        construct, status, notes = row
+        _construct, status, _notes = row
         self.assertEqual(
-            status,
-            _SUPPORTED,
-            f"df.pivot_table should be {_SUPPORTED!r} but got {status!r}",
+            status, _SUPPORTED, f"df.pivot_table should be {_SUPPORTED!r} but got {status!r}"
         )
 
 
