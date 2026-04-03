@@ -354,7 +354,7 @@ def finalize_cache(cache: transformers.cache_utils.Cache) -> transformers.cache_
         f"first value={cache.layers[0].values}"  # type: ignore
     )
     assert not hasattr(cache, "layers") or all(
-        layer.is_initialized for layer in cache.layers
+        not hasattr(layer, "is_initialized") or layer.is_initialized for layer in cache.layers
     ), f"A layyer (among {len(cache.layers)}) is not initialized."
     return cache
 
