@@ -37,6 +37,12 @@ class TracingTensor(torch.Tensor):
       managing this tensor's graph.
     * ``_node``: The :class:`torch.fx.Node` corresponding to this tensor in
       the graph.
+    * ``_tracing_shape``: The symbolic :class:`TracingShape` when any
+      dimension is dynamic, or ``None`` for fully concrete tensors.
+      The concrete PyTorch ``shape`` attribute uses ``1`` as a stand-in for
+      symbolic dimensions, so downstream code that needs the symbolic form
+      should read ``_tracing_shape`` instead.  The tensor ``dtype`` is always
+      concrete and is accessible directly via ``self.dtype``.
     """
 
     @staticmethod
@@ -80,8 +86,13 @@ class TracingTensor(torch.Tensor):
 
     def __repr__(self) -> str:  # type: ignore
         node_name = self._node.name if self._node is not None else "<unregistered>"
+        shape_repr = (
+            repr(self._tracing_shape)
+            if self._tracing_shape is not None
+            else repr(tuple(self.shape))
+        )
         return (
-            f"TracingTensor(node={node_name!r}, shape={tuple(self.shape)}, "
+            f"TracingTensor(node={node_name!r}, shape={shape_repr}, "
             f"dtype={self.dtype}, device={self.device})"
         )
 
