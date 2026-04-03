@@ -12,4 +12,8 @@ yobx.torch.new_tracing
     dispatcher
     shape
     tensor
-    tracing
+
+trace_model
++++++++++++
+
+.. autofunction:: trace_model

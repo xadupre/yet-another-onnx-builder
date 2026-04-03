@@ -292,22 +292,6 @@ class DispatchTracer:
             corresponding placeholder is given a :class:`TracingShape` instead
             of a concrete :class:`torch.Size`.
         :return: A :class:`torch.fx.Graph` representing the full computation.
-
-        Example::
-
-            import torch
-            from yobx.torch.new_tracing import DispatchTracer, TracingInt
-
-            def linear(x, w, b):
-                return x @ w.t() + b
-
-            tracer = DispatchTracer()
-            graph = tracer.trace(
-                linear,
-                (torch.randn(4, 8), torch.randn(16, 8), torch.randn(16)),
-                dynamic_shapes={"x_0": [TracingInt("batch"), 8]},
-            )
-            print(graph)
         """
         if kwargs is None:
             kwargs = {}
@@ -318,6 +302,8 @@ class DispatchTracer:
         self._tensor_id_to_node = {}
         self._external_tensor_to_node = {}
         self._placeholder_count = 0
+
+        # args and kwargs should be replaced by TracingTensor
 
         # ------------------------------------------------------------------
         # Pre-register nn.Module parameters and buffers as named placeholders.
@@ -350,6 +336,7 @@ class DispatchTracer:
             # Non-tensor scalars / non-container objects pass through unchanged.
             return arg
 
+        # use signature here
         tracing_args = tuple(_make_placeholder(arg, f"x_{i}") for i, arg in enumerate(args))
         tracing_kwargs = {k: _make_placeholder(v, k) for k, v in kwargs.items()}
 

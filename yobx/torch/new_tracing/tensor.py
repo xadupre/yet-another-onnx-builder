@@ -43,7 +43,7 @@ class TracingTensor(torch.Tensor):
     def __new__(  # noqa: PYI034
         cls,
         size: Union[Tuple[int, ...], "TracingShape"],
-        dtype: torch.dtype = torch.float32,
+        dtype: torch.dtype,
         device: Optional[Union[str, torch.device]] = None,
         requires_grad: bool = False,
     ) -> "TracingTensor":

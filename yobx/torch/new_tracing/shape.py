@@ -6,6 +6,7 @@ Defines :class:`TracingBool`, :class:`TracingInt` (and its alias
 """
 
 from typing import Any, Sequence, Tuple, Union
+from ...xexpressions import simplify_expression
 
 import torch
 
@@ -98,11 +99,11 @@ class TracingInt:
         if isinstance(other, TracingInt):
             if isinstance(self.value, int) and isinstance(other.value, int):
                 return self.value == other.value
-            return TracingBool(f"({self.value}=={other.value})")
+            return TracingBool(simplify_expression(f"({self.value}=={other.value})"))
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return self.value == other
-            return TracingBool(f"({self.value}=={other})")
+            return TracingBool(simplify_expression(f"({self.value}=={other})"))
         return NotImplemented
 
     def __hash__(self) -> int:
@@ -121,71 +122,71 @@ class TracingInt:
         if isinstance(other, TracingInt):
             if isinstance(self.value, int) and isinstance(other.value, int):
                 return TracingInt(self.value + other.value)
-            return TracingInt(f"({self._sym()}+{other._sym()})")
+            return TracingInt(simplify_expression(f"({self._sym()})+({other._sym()})"))
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return TracingInt(self.value + other)
-            return TracingInt(f"({self._sym()}+{other})")
+            return TracingInt(simplify_expression(f"({self._sym()})+({other})"))
         return NotImplemented
 
     def __radd__(self, other: int) -> "TracingInt":
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return TracingInt(other + self.value)
-            return TracingInt(f"({other}+{self._sym()})")
+            return TracingInt(simplify_expression(f"({other})+({self._sym()}"))
         return NotImplemented
 
     def __sub__(self, other: Union[int, "TracingInt"]) -> "TracingInt":
         if isinstance(other, TracingInt):
             if isinstance(self.value, int) and isinstance(other.value, int):
                 return TracingInt(self.value - other.value)
-            return TracingInt(f"({self._sym()}-{other._sym()})")
+            return TracingInt(simplify_expression(f"({self._sym()})-({other._sym()})"))
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return TracingInt(self.value - other)
-            return TracingInt(f"({self._sym()}-{other})")
+            return TracingInt(simplify_expression(f"({self._sym()})-({other})"))
         return NotImplemented
 
     def __rsub__(self, other: int) -> "TracingInt":
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return TracingInt(other - self.value)
-            return TracingInt(f"({other}-{self._sym()})")
+            return TracingInt(simplify_expression(f"({other})-({self._sym()})"))
         return NotImplemented
 
     def __mul__(self, other: Union[int, "TracingInt"]) -> "TracingInt":
         if isinstance(other, TracingInt):
             if isinstance(self.value, int) and isinstance(other.value, int):
                 return TracingInt(self.value * other.value)
-            return TracingInt(f"({self._sym()}*{other._sym()})")
+            return TracingInt(simplify_expression(f"({self._sym()})*({other._sym()})"))
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return TracingInt(self.value * other)
-            return TracingInt(f"({self._sym()}*{other})")
+            return TracingInt(simplify_expression(f"({self._sym()})*({other})"))
         return NotImplemented
 
     def __rmul__(self, other: int) -> "TracingInt":
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return TracingInt(other * self.value)
-            return TracingInt(f"({other}*{self._sym()})")
+            return TracingInt(simplify_expression(f"({other}*{self._sym()})"))
         return NotImplemented
 
     def __floordiv__(self, other: Union[int, "TracingInt"]) -> "TracingInt":
         if isinstance(other, TracingInt):
             if isinstance(self.value, int) and isinstance(other.value, int):
                 return TracingInt(self.value // other.value)
-            return TracingInt(f"({self._sym()}//{other._sym()})")
+            return TracingInt(simplify_expression(f"({self._sym()})//({other._sym()})"))
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return TracingInt(self.value // other)
-            return TracingInt(f"({self._sym()}//{other})")
+            return TracingInt(simplify_expression(f"({self._sym()})//({other})"))
         return NotImplemented
 
     def __neg__(self) -> "TracingInt":
         if isinstance(self.value, int):
             return TracingInt(-self.value)
-        return TracingInt(f"(-{self._sym()})")
+        return TracingInt(simplify_expression(f"-({self._sym()})"))
 
 
 # Keep TracingDimension as a backward-compatible alias.
