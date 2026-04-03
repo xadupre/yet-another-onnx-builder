@@ -235,7 +235,10 @@ class DispatchTracer:
                 )
                 return node.meta["val"]
             if isinstance(x, torch.Tensor):
-                return x.detach().to(device="meta")
+                raise RuntimeError(
+                    f"Unexpected raw torch.Tensor in _dispatch args: {x!r}. "
+                    "All tensor inputs must be TracingTensor instances."
+                )
             return x
 
         meta_args = pytree.tree_map(_to_meta, args)
