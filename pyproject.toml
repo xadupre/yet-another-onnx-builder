@@ -50,13 +50,10 @@ docs = [
     "tqdm",
     "xlsxwriter",
 ]
-category_encoders = [
-    "scikit-learn>=1.4",
-    "category-encoders>=2.6",
-]
 
 # packages
 
+category_encoders = ["scikit-learn>=1.4", "category-encoders>=2.6"]
 imblearn = ["scikit-learn>=1.4", "imbalanced-learn>=0.11"]
 jax = ["jax[cpu]>=0.4", "tensorflow>=2.20"]
 lightgbm = ["scikit-learn>=1.4", "lightgbm>=3.0"]
