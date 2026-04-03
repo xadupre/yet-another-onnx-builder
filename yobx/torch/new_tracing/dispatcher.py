@@ -5,6 +5,7 @@ Defines :class:`DispatchTracer` and the convenience function
 :func:`trace_model`.
 """
 
+import inspect
 import operator
 import traceback
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
@@ -286,11 +287,11 @@ class DispatchTracer:
             dtypes are used for placeholder metadata.
         :param kwargs: Optional keyword arguments to *func*.
         :param dynamic_shapes: Optional mapping from argument *name*
-            (``"x_0"``, ``"x_1"``, … for positional args; key name for
-            keyword args) to a list/tuple of :class:`TracingInt` / int
-            describing the dimensions symbolically.  When provided, the
-            corresponding placeholder is given a :class:`TracingShape` instead
-            of a concrete :class:`torch.Size`.
+            (parameter name from *func*'s signature for positional args;
+            key name for keyword args) to a list/tuple of
+            :class:`TracingInt` / int describing the dimensions symbolically.
+            When provided, the corresponding placeholder is given a
+            :class:`TracingShape` instead of a concrete :class:`torch.Size`.
         :return: A :class:`torch.fx.Graph` representing the full computation.
         """
         if kwargs is None:
@@ -336,8 +337,28 @@ class DispatchTracer:
             # Non-tensor scalars / non-container objects pass through unchanged.
             return arg
 
+        # Collect positional parameter names from func's signature (if available).
+        try:
+            _sig_params = [
+                p.name
+                for p in inspect.signature(func).parameters.values()
+                if p.kind
+                not in (
+                    inspect.Parameter.VAR_POSITIONAL,
+                    inspect.Parameter.VAR_KEYWORD,
+                )
+            ]
+        except (ValueError, TypeError):
+            _sig_params = []
+
+        def _arg_name(i: int) -> str:
+            """Return the parameter name for positional argument *i*."""
+            if i < len(_sig_params):
+                return _sig_params[i]
+            return f"x_{i}"
+
         # use signature here
-        tracing_args = tuple(_make_placeholder(arg, f"x_{i}") for i, arg in enumerate(args))
+        tracing_args = tuple(_make_placeholder(arg, _arg_name(i)) for i, arg in enumerate(args))
         tracing_kwargs = {k: _make_placeholder(v, k) for k, v in kwargs.items()}
 
         # ------------------------------------------------------------------
