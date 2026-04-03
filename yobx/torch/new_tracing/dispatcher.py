@@ -96,6 +96,48 @@ class DispatchTracer:
             self._external_tensor_to_node[key] = node
         return self._external_tensor_to_node[key]
 
+    def _make_placeholder(
+        self, arg: Any, name: str, dynamic_shapes: Dict[str, Any]
+    ) -> Any:
+        """
+        Recursively replace tensors in a nested structure with placeholders.
+
+        :class:`TracingTensor` arguments are returned as-is (they already have
+        a registered placeholder node).  Raw :class:`torch.Tensor` arguments
+        are converted into new placeholder nodes.  Nested containers (dict,
+        list, tuple) are traversed recursively.  Non-tensor scalars and other
+        objects are returned unchanged.
+
+        :param arg: The argument to process.
+        :param name: Base name for the placeholder node(s).
+        :param dynamic_shapes: Mapping from argument name to dynamic shape
+            spec (forwarded from :meth:`trace`).
+        """
+        if isinstance(arg, TracingTensor):
+            # Already a TracingTensor placeholder — return as-is.
+            return arg
+        if isinstance(arg, torch.Tensor):
+            if name in dynamic_shapes:
+                shape: Union[Tuple[int, ...], TracingShape] = TracingShape(
+                    dynamic_shapes[name]
+                )
+            else:
+                shape = arg.shape
+            return self.placeholder(name, shape, arg.dtype, arg.device)
+        if isinstance(arg, dict):
+            return {
+                k: self._make_placeholder(v, f"{name}_{k}", dynamic_shapes)
+                for k, v in arg.items()
+            }
+        if isinstance(arg, (list, tuple)):
+            items = [
+                self._make_placeholder(item, f"{name}_{j}", dynamic_shapes)
+                for j, item in enumerate(arg)
+            ]
+            return type(arg)(items)
+        # Non-tensor scalars / non-container objects pass through unchanged.
+        return arg
+
     def _register_module_parameters(self, module: torch.nn.Module) -> None:
         """
         Pre-register all named parameters and buffers of *module* as
@@ -319,26 +361,6 @@ class DispatchTracer:
         # All torch.Tensor inputs in args and kwargs are replaced with
         # TracingTensor placeholders before the function is called.
         # ------------------------------------------------------------------
-        def _make_placeholder(arg: Any, name: str) -> Any:
-            """Recursively replace tensors in a nested structure with placeholders."""
-            if isinstance(arg, TracingTensor):
-                # Already a TracingTensor placeholder — return as-is.
-                return arg
-            if isinstance(arg, torch.Tensor):
-                if name in dynamic_shapes:
-                    shape: Union[Tuple[int, ...], TracingShape] = TracingShape(
-                        dynamic_shapes[name]
-                    )
-                else:
-                    shape = arg.shape
-                return self.placeholder(name, shape, arg.dtype, arg.device)
-            if isinstance(arg, dict):
-                return {k: _make_placeholder(v, f"{name}_{k}") for k, v in arg.items()}
-            if isinstance(arg, (list, tuple)):
-                items = [_make_placeholder(item, f"{name}_{j}") for j, item in enumerate(arg)]
-                return type(arg)(items)
-            # Non-tensor scalars / non-container objects pass through unchanged.
-            return arg
 
         # Collect positional parameter names from func's signature.
         _sig_params = [
@@ -354,8 +376,13 @@ class DispatchTracer:
             return f"x_{i}"
 
         # Replace all torch.Tensor inputs with TracingTensor placeholders.
-        tracing_args = tuple(_make_placeholder(arg, _arg_name(i)) for i, arg in enumerate(args))
-        tracing_kwargs = {k: _make_placeholder(v, k) for k, v in kwargs.items()}
+        tracing_args = tuple(
+            self._make_placeholder(arg, _arg_name(i), dynamic_shapes)
+            for i, arg in enumerate(args)
+        )
+        tracing_kwargs = {
+            k: self._make_placeholder(v, k, dynamic_shapes) for k, v in kwargs.items()
+        }
 
         # ------------------------------------------------------------------
         # Execute the function under tracing.
