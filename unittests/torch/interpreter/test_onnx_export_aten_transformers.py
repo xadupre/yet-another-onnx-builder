@@ -13,7 +13,7 @@ class TestOnnxExportTransformers(ExtTestCase):
         if not hasattr(tmoe, "_grouped_mm_fallback"):
             self.skipTest(
                 "transformers.integrations.moe._grouped_mm_fallback "
-                "introduced in transformers>=5.3"
+                "introduced in transformers>=5.5"
             )
 
         class Model(torch.nn.Module):

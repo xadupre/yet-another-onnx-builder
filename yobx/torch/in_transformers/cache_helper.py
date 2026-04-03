@@ -271,8 +271,8 @@ def make_dynamic_cache(
         )
         for i, layer in enumerate(cache.layers):
             k, v = key_value_pairs[i][0], key_value_pairs[i][1]
-            layer.dtype = k.dtype  # type: ignore[attr-defined]
-            layer.device = k.device  # type: ignore[attr-defined]
+            layer.dtype = k.dtype  # type: ignore
+            layer.device = k.device  # type: ignore
             layer.keys = k  # type: ignore
             layer.values = v  # type: ignore
             layer.is_initialized = True  # type: ignore
@@ -350,8 +350,8 @@ def finalize_cache(cache: transformers.cache_utils.Cache) -> transformers.cache_
         not hasattr(cache, "layers") or len(cache.layers) != 1 or cache.layers[0].keys is not None  # type: ignore
     ), (
         f"Size mismatch between {len(cache.layers)=}, "
-        f"first key={cache.layers[0].keys}, "  # type: ignore[attr-defined]
-        f"first value={cache.layers[0].values}"  # type: ignore[attr-defined]
+        f"first key={cache.layers[0].keys}, "  # type: ignore
+        f"first value={cache.layers[0].values}"  # type: ignore
     )
     return cache
 
