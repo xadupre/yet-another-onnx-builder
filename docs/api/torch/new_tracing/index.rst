@@ -5,6 +5,11 @@ yobx.torch.new_tracing
     :members:
     :no-undoc-members:
 
-.. automodule:: yobx.torch.new_tracing.tracing
-    :members:
-    :no-undoc-members:
+.. toctree::
+    :maxdepth: 1
+    :caption: modules
+
+    dispatcher
+    shape
+    tensor
+    tracing
