@@ -343,6 +343,17 @@ class ControlFlowRanks(torch.nn.Module):
     _dynamic = {"x": {0: DIM("batch")}}
 
 
+class ControlFlowIndirectRanks(torch.nn.Module):
+    def forward(self, x):
+        x1 = x + 1
+        if x1.ndim == 2:
+            return x1.clone()
+        return x / x1.ndim
+
+    _inputs = [(torch.rand(3, 4),), (torch.rand(5, 4),)]
+    _dynamic = {"x": {0: DIM("batch")}}
+
+
 class ControlFlowNumelZero1(torch.nn.Module):
     def forward(self, x):
         def empty_cache(x):

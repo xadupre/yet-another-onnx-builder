@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        torch-version: ["2.10"]
+        torch-version: ["2.11"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.13
@@ -29,9 +29,9 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install pytorch 2.10
-        if: matrix.torch-version == '2.10'
-        run: pip install torch==2.10.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install pytorch 2.11
+        if: matrix.torch-version == '2.11'
+        run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       - name: Install nightly pytorch
         if: matrix.torch-version == 'nightly'
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        torch-version: ["2.10"]
+        torch-version: ["2.11"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.13
@@ -70,9 +70,9 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install pytorch 2.10
-        if: matrix.torch-version == '2.10'
-        run: pip install torch==2.10.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install pytorch 2.11
+        if: matrix.torch-version == '2.11'
+        run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       - name: Install nightly pytorch
         if: matrix.torch-version == 'nightly'
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu

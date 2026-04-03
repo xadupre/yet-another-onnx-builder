@@ -515,9 +515,10 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
         b1 = data.inputs_batch1
         filename = self.get_dump_file("test_tiny_llm_tracing_to_onnx_22.onnx")
-        del inputs["position_ids"]
-        del ds["position_ids"]
-        del b1["position_ids"]
+        # del inputs["position_ids"]
+        # del ds["position_ids"]
+        # del b1["position_ids"]
+        print("***", ds)
 
         expected_b1 = model(**torch_deepcopy(b1))
 
