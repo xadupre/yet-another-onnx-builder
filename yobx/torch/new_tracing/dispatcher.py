@@ -184,7 +184,7 @@ class DispatchTracer:
         """
         node = self.graph.placeholder(name)
         # Store a meta tensor so downstream shape inference can use it.
-        assert isinstance(shape, TracingShape), f"Unexpeted type {type(shape)} for this operator"
+        assert isinstance(shape, TracingShape), f"Unexpected type {type(shape)} for this operator"
         tt = self._make_tracing_tensor(shape, dtype, device, node)
         node.meta["val"] = tt
         return tt
