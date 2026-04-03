@@ -229,9 +229,11 @@ class DispatchTracer:
         def _to_meta(x: Any) -> Any:
             if isinstance(x, TracingTensor):
                 node = self._tensor_id_to_node.get(id(x))
-                if node is not None and "val" in node.meta:
-                    return node.meta["val"]
-                return torch.empty(x.shape, dtype=x.dtype, device="meta")
+                assert node is not None and "val" in node.meta, (
+                    f"TracingTensor {x!r} has no registered node or missing 'val' metadata. "
+                    "All TracingTensor inputs must have been created by this tracer."
+                )
+                return node.meta["val"]
             if isinstance(x, torch.Tensor):
                 return x.detach().to(device="meta")
             return x
