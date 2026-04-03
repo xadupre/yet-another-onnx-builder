@@ -304,8 +304,6 @@ class DispatchTracer:
         self._external_tensor_to_node = {}
         self._placeholder_count = 0
 
-        # args and kwargs should be replaced by TracingTensor
-
         # ------------------------------------------------------------------
         # Pre-register nn.Module parameters and buffers as named placeholders.
         # This must happen before building input placeholders so that the
@@ -318,9 +316,14 @@ class DispatchTracer:
         # Build placeholder TracingTensors for each tensor input.
         # Nested structures (list, tuple, dict) are traversed recursively so
         # that every tensor leaf gets its own placeholder node.
+        # All torch.Tensor inputs in args and kwargs are replaced with
+        # TracingTensor placeholders before the function is called.
         # ------------------------------------------------------------------
         def _make_placeholder(arg: Any, name: str) -> Any:
             """Recursively replace tensors in a nested structure with placeholders."""
+            if isinstance(arg, TracingTensor):
+                # Already a TracingTensor placeholder — return as-is.
+                return arg
             if isinstance(arg, torch.Tensor):
                 if name in dynamic_shapes:
                     shape: Union[Tuple[int, ...], TracingShape] = TracingShape(
@@ -337,15 +340,12 @@ class DispatchTracer:
             # Non-tensor scalars / non-container objects pass through unchanged.
             return arg
 
-        # Collect positional parameter names from func's signature (if available).
-        try:
-            _sig_params = [
-                p.name
-                for p in inspect.signature(func).parameters.values()
-                if p.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
-            ]
-        except (ValueError, TypeError):
-            _sig_params = []
+        # Collect positional parameter names from func's signature.
+        _sig_params = [
+            p.name
+            for p in inspect.signature(func).parameters.values()
+            if p.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
+        ]
 
         def _arg_name(i: int) -> str:
             """Return the parameter name for positional argument *i*."""
@@ -353,7 +353,7 @@ class DispatchTracer:
                 return _sig_params[i]
             return f"x_{i}"
 
-        # use signature here
+        # Replace all torch.Tensor inputs with TracingTensor placeholders.
         tracing_args = tuple(_make_placeholder(arg, _arg_name(i)) for i, arg in enumerate(args))
         tracing_kwargs = {k: _make_placeholder(v, k) for k, v in kwargs.items()}
 
@@ -368,6 +368,11 @@ class DispatchTracer:
         def _to_output_node(x: Any) -> Any:
             if isinstance(x, TracingTensor):
                 return self._get_node(x)
+            if isinstance(x, torch.Tensor):
+                raise RuntimeError(
+                    f"Function returned a real torch.Tensor: {x!r}. "
+                    "All tensor outputs must be TracingTensor instances produced during tracing."
+                )
             return x
 
         output_val = pytree.tree_map(_to_output_node, out)
