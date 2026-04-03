@@ -25,6 +25,6 @@ jobs:
         if: matrix.torch-version == '2.10'
         run: pip install torch==2.10.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,dev,docs,imblearn,lightgbm,polars,sklearn,sksurv,spox,statmodels,tensorflow,torch,transformers,xgboost]" pyrefly
+        run: pip install -e ".[category_encoders,imblearn,lightgbm,polars,sklearn,sksurv,spox,statmodels,tensorflow,torch,transformers,xgboost]" pyrefly
       - name: Run pyrefly
         run: pyrefly check

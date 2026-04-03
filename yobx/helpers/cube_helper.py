@@ -279,7 +279,7 @@ class CubePlot:
         graph height. Default is 1.0.
         """
         assert merge, f"merge={merge} not implemented yet"
-        import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt  # type: ignore
 
         df = self.df.T if self.orientation == "row" else self.df
         title_suffix = f"\n{title_suffix}" if title_suffix else ""
@@ -327,7 +327,7 @@ class CubePlot:
             ax.tick_params(labelleft=True)
             return ax
 
-        import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt  # type: ignore
 
         df = self.df.T
 
@@ -1346,7 +1346,7 @@ class CubeLogs:
                 )
 
             if plots:
-                from openpyxl.drawing.image import Image
+                from openpyxl.drawing.image import Image  # type: ignore
 
                 if verbose:
                     print(f"[CubeLogs.to_excel] plots {len(plots)} plots")
