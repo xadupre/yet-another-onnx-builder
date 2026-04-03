@@ -22,7 +22,7 @@ jobs:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
         python-version: ["3.12", "3.13"]
         transformers-version: ["5.5"]
-        torch-version: ["2.10", "nightly"]
+        torch-version: ["2.11", "nightly"]
         exclude:
           - os: "macos-latest"
             python-version: "3.12"
@@ -37,7 +37,7 @@ jobs:
             torch-version: "nightly"
           - os: "ubuntu-latest"
             python-version: "3.13"
-            torch-version: "2.10"
+            torch-version: "2.11"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
@@ -49,13 +49,13 @@ jobs:
         if: matrix.torch-version == 'nightly'
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 
-      - name: Install pytorch 2.10 (Linux/Windows)
-        if: matrix.torch-version == '2.10' && matrix.os != 'macos-latest'
-        run: pip install torch==2.10.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install pytorch 2.11 (Linux/Windows)
+        if: matrix.torch-version == '2.11' && matrix.os != 'macos-latest'
+        run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-      - name: Install pytorch 2.10 (macOS)
-        if: matrix.torch-version == '2.10' && matrix.os == 'macos-latest'
-        run: pip install torch==2.10.0 torchvision torchaudio
+      - name: Install pytorch 2.11 (macOS)
+        if: matrix.torch-version == '2.11' && matrix.os == 'macos-latest'
+        run: pip install torch==2.11.0 torchvision torchaudio
 
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
