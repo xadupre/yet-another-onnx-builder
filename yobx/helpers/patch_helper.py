@@ -10,7 +10,7 @@ def clean_code_with_black(code: str) -> str:
     """Changes the code style with :epkg:`black` if available."""
     code = textwrap.dedent(code)
     try:
-        import black
+        import black  # type: ignore
     except ImportError:
         return code
     try:
