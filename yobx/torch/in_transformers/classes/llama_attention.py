@@ -350,13 +350,7 @@ def _apply_rope_standard_onnx(
         np.array([-1], dtype=np.int64),
         name=name,
     )
-    return g.op.RotaryEmbedding(
-        states_4d,
-        cos_half,
-        sin_half,
-        num_heads=num_heads,
-        name=name,
-    )
+    return g.op.RotaryEmbedding(states_4d, cos_half, sin_half, num_heads=num_heads, name=name)
 
 
 def _apply_rope_ms_op(
@@ -411,23 +405,14 @@ def _apply_rope_ms_op(
     # Build position_ids: (batch, seq) INT64 with values [0, 1, ..., seq-1]
     x_shape = g.op.Shape(x_3d, name=name)
     batch_1d = g.op.Slice(
-        x_shape,
-        np.array([0], dtype=np.int64),
-        np.array([1], dtype=np.int64),
-        name=name,
+        x_shape, np.array([0], dtype=np.int64), np.array([1], dtype=np.int64), name=name
     )
     seq_1d = g.op.Slice(
-        x_shape,
-        np.array([1], dtype=np.int64),
-        np.array([2], dtype=np.int64),
-        name=name,
+        x_shape, np.array([1], dtype=np.int64), np.array([2], dtype=np.int64), name=name
     )
     seq_scalar = g.op.Squeeze(seq_1d, name=name)
     flat_ids = g.op.Range(
-        np.array(0, dtype=np.int64),
-        seq_scalar,
-        np.array(1, dtype=np.int64),
-        name=name,
+        np.array(0, dtype=np.int64), seq_scalar, np.array(1, dtype=np.int64), name=name
     )
     # Unsqueeze to (1, seq), then Expand to (batch, seq)
     position_ids_1row = g.op.Unsqueeze(flat_ids, np.array([0], dtype=np.int64), name=name)
@@ -435,13 +420,7 @@ def _apply_rope_ms_op(
     position_ids = g.op.Expand(position_ids_1row, expand_shape, name=name)
 
     return g.op.RotaryEmbedding(
-        x_3d,
-        position_ids,
-        cos_2d,
-        sin_2d,
-        domain="com.microsoft",
-        num_heads=num_heads,
-        name=name,
+        x_3d, position_ids, cos_2d, sin_2d, domain="com.microsoft", num_heads=num_heads, name=name
     )
 
 
