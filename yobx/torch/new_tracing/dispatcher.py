@@ -342,11 +342,7 @@ class DispatchTracer:
             _sig_params = [
                 p.name
                 for p in inspect.signature(func).parameters.values()
-                if p.kind
-                not in (
-                    inspect.Parameter.VAR_POSITIONAL,
-                    inspect.Parameter.VAR_KEYWORD,
-                )
+                if p.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
             ]
         except (ValueError, TypeError):
             _sig_params = []
