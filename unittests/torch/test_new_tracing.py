@@ -13,14 +13,10 @@ class TestNewTracing(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_import(self):
-        from yobx.torch.new_tracing import (
-            DispatchTracer,
-            TracingBool,
-            TracingInt,
-            TracingShape,
-            TracingTensor,
-            trace_model,
-        )
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
+        from yobx.torch.new_tracing.shape import TracingBool, TracingInt, TracingShape
+        from yobx.torch.new_tracing.tensor import TracingTensor
+        from yobx.torch.new_tracing import trace_model
 
         self.assertIsNotNone(DispatchTracer)
         self.assertIsNotNone(TracingBool)
@@ -34,28 +30,28 @@ class TestNewTracing(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_tracing_dimension_repr_no_value(self):
-        from yobx.torch.new_tracing import TracingInt
+        from yobx.torch.new_tracing.shape import TracingInt
 
         d = TracingInt("batch")
         self.assertIn("batch", repr(d))
         self.assertEqual(str(d), "batch")
 
     def test_tracing_dimension_repr_with_value(self):
-        from yobx.torch.new_tracing import TracingInt
+        from yobx.torch.new_tracing.shape import TracingInt
 
         d = TracingInt(4)
         self.assertIn("4", repr(d))
         self.assertEqual(int(d), 4)
 
     def test_tracing_dimension_int_raises_without_value(self):
-        from yobx.torch.new_tracing import TracingInt
+        from yobx.torch.new_tracing.shape import TracingInt
 
         d = TracingInt("n")
         with self.assertRaises(ValueError):
             int(d)
 
     def test_tracing_dimension_eq(self):
-        from yobx.torch.new_tracing import TracingBool, TracingInt
+        from yobx.torch.new_tracing.shape import TracingBool, TracingInt
 
         # Concrete comparison → plain bool
         d1 = TracingInt(4)
@@ -72,7 +68,7 @@ class TestNewTracing(ExtTestCase):
         self.assertIn("batch", str(result.value))
 
     def test_tracing_dimension_arithmetic(self):
-        from yobx.torch.new_tracing import TracingInt
+        from yobx.torch.new_tracing.shape import TracingInt
 
         # Concrete arithmetic produces concrete TracingInt
         d = TracingInt(8)
@@ -90,21 +86,21 @@ class TestNewTracing(ExtTestCase):
         self.assertIn("n", str(result.value))
 
     def test_tracing_dimension_neg(self):
-        from yobx.torch.new_tracing import TracingInt
+        from yobx.torch.new_tracing.shape import TracingInt
 
         d = TracingInt(5)
         negd = -d
         self.assertEqual(int(negd), -5)
 
     def test_tracing_dimension_hash(self):
-        from yobx.torch.new_tracing import TracingInt
+        from yobx.torch.new_tracing.shape import TracingInt
 
         d = TracingInt("batch")
         self.assertIsInstance(hash(d), int)
         self.assertIn(d, {d})
 
     def test_tracing_bool_concrete(self):
-        from yobx.torch.new_tracing import TracingBool
+        from yobx.torch.new_tracing.shape import TracingBool
 
         tb_true = TracingBool(True)
         tb_false = TracingBool(False)
@@ -112,7 +108,7 @@ class TestNewTracing(ExtTestCase):
         self.assertFalse(bool(tb_false))
 
     def test_tracing_bool_symbolic_raises_on_bool(self):
-        from yobx.torch.new_tracing import TracingBool
+        from yobx.torch.new_tracing.shape import TracingBool
 
         tb = TracingBool("(n==4)")
         with self.assertRaises(ValueError):
@@ -123,7 +119,7 @@ class TestNewTracing(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_tracing_shape_concrete(self):
-        from yobx.torch.new_tracing import TracingInt, TracingShape
+        from yobx.torch.new_tracing.shape import TracingInt, TracingShape
 
         s = TracingShape([TracingInt(4), 16])
         self.assertTrue(s.is_concrete)
@@ -131,7 +127,7 @@ class TestNewTracing(ExtTestCase):
         self.assertEqual(s.to_torch_size(), torch.Size([4, 16]))
 
     def test_tracing_shape_symbolic(self):
-        from yobx.torch.new_tracing import TracingInt, TracingShape
+        from yobx.torch.new_tracing.shape import TracingInt, TracingShape
 
         s = TracingShape([TracingInt("n"), 8])
         self.assertFalse(s.is_concrete)
@@ -141,14 +137,14 @@ class TestNewTracing(ExtTestCase):
             s.to_torch_size()
 
     def test_tracing_shape_repr(self):
-        from yobx.torch.new_tracing import TracingInt, TracingShape
+        from yobx.torch.new_tracing.shape import TracingInt, TracingShape
 
         s = TracingShape([TracingInt(2), 4])
         r = repr(s)
         self.assertIn("TracingShape", r)
 
     def test_tracing_shape_indexing(self):
-        from yobx.torch.new_tracing import TracingInt, TracingShape
+        from yobx.torch.new_tracing.shape import TracingInt, TracingShape
 
         d = TracingInt(5)
         s = TracingShape([d, 8])
@@ -160,7 +156,7 @@ class TestNewTracing(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_tracing_tensor_creation(self):
-        from yobx.torch.new_tracing import TracingTensor
+        from yobx.torch.new_tracing.tensor import TracingTensor
 
         t = TracingTensor.__new__(TracingTensor, (3, 4), dtype=torch.float32)
         t.__init__((3, 4), dtype=torch.float32)
@@ -168,7 +164,7 @@ class TestNewTracing(ExtTestCase):
         self.assertEqual(t.dtype, torch.float32)
 
     def test_tracing_tensor_repr(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         tracer = DispatchTracer()
         x = torch.randn(2, 3)
@@ -181,7 +177,7 @@ class TestNewTracing(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_trace_simple_add(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def add(x, y):
             return x + y
@@ -199,7 +195,7 @@ class TestNewTracing(ExtTestCase):
         graph.lint()
 
     def test_trace_simple_mul(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def mul(x, y):
             return x * y
@@ -211,7 +207,7 @@ class TestNewTracing(ExtTestCase):
         self.assertGreater(len(call_nodes), 0)
 
     def test_trace_elementwise_chain(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def chain(x):
             return torch.relu(x + 1.0)
@@ -224,7 +220,7 @@ class TestNewTracing(ExtTestCase):
         self.assertTrue(len(ops) >= 1)
 
     def test_trace_matmul(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def matmul(x, y):
             return x @ y
@@ -236,7 +232,7 @@ class TestNewTracing(ExtTestCase):
         self.assertGreater(len(call_nodes), 0)
 
     def test_trace_multiple_outputs(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def split_heads(x):
             a, b = x.chunk(2, dim=-1)
@@ -250,7 +246,7 @@ class TestNewTracing(ExtTestCase):
         self.assertIsInstance(output_node.args[0], (tuple, list))
 
     def test_trace_nn_linear(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         model = torch.nn.Linear(8, 4, bias=True)
         tracer = DispatchTracer()
@@ -262,7 +258,7 @@ class TestNewTracing(ExtTestCase):
         self.assertIn("output", ops)
 
     def test_trace_nn_relu(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         model = torch.nn.ReLU()
         tracer = DispatchTracer()
@@ -270,7 +266,7 @@ class TestNewTracing(ExtTestCase):
         graph.lint()
 
     def test_trace_kwargs(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def add_kw(x, y):
             return x + y
@@ -289,7 +285,7 @@ class TestNewTracing(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_trace_dynamic_shapes(self):
-        from yobx.torch.new_tracing import DispatchTracer, TracingInt
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer, TracingInt
 
         def add(x, y):
             return x + y
@@ -329,7 +325,7 @@ class TestNewTracing(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_retrace_resets_state(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         tracer = DispatchTracer()
 
@@ -354,7 +350,7 @@ class TestNewTracing(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_placeholder_meta_val(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         tracer = DispatchTracer()
         graph = tracer.trace(lambda x: x, (torch.randn(3, 5),))
@@ -363,7 +359,7 @@ class TestNewTracing(ExtTestCase):
         self.assertEqual(ph.meta["val"].shape, torch.Size([3, 5]))
 
     def test_call_function_meta_val(self):
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         tracer = DispatchTracer()
         graph = tracer.trace(lambda x: x + 1.0, (torch.randn(3, 5),))
@@ -373,7 +369,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_call_function_meta_stack_trace(self):
         """call_function nodes should have a 'stack_trace' entry in node.meta."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         tracer = DispatchTracer()
         graph = tracer.trace(lambda x: x + 1.0, (torch.randn(3, 5),))
@@ -385,7 +381,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_multiple_outputs_getitem_meta_stack_trace(self):
         """getitem nodes for multi-output ops inherit 'stack_trace' from their parent."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def split_heads(x):
             a, b = x.chunk(2, dim=-1)
@@ -409,7 +405,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_trace_list_of_tensors(self):
         """Inputs as a list of tensors should produce one placeholder per tensor."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def add_list(tensors):
             return tensors[0] + tensors[1]
@@ -422,12 +418,12 @@ class TestNewTracing(ExtTestCase):
         self.assertEqual(len(ph_nodes), 2)
         # Names should encode the nested path
         ph_names = [n.name for n in ph_nodes]
-        self.assertTrue(any("x_0_0" in n for n in ph_names))
-        self.assertTrue(any("x_0_1" in n for n in ph_names))
+        self.assertIn("tensors_0", ph_names)
+        self.assertIn("tensors_1", ph_names)
 
     def test_trace_tuple_of_tensors(self):
         """Inputs as a tuple of tensors should produce one placeholder per tensor."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def add_tuple(pair):
             a, b = pair
@@ -441,7 +437,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_trace_dict_of_tensors(self):
         """Inputs as a dict of tensors should produce one placeholder per tensor."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def add_dict(d):
             return d["a"] + d["b"]
@@ -452,12 +448,12 @@ class TestNewTracing(ExtTestCase):
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
         self.assertEqual(len(ph_nodes), 2)
         ph_names = [n.name for n in ph_nodes]
-        self.assertTrue(any("x_0_a" in n for n in ph_names))
-        self.assertTrue(any("x_0_b" in n for n in ph_names))
+        self.assertIn("d_a", ph_names)
+        self.assertIn("d_b", ph_names)
 
     def test_trace_mixed_nested_input(self):
         """Mixed nesting: top-level tuple arg containing a list and a plain tensor."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def compute(pair, z):
             return pair[0] + pair[1] + z
@@ -471,7 +467,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_trace_nested_scalar_passthrough(self):
         """Non-tensor values inside a nested structure pass through unchanged."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         def scale(tensors, factor):
             return tensors[0] * factor
@@ -489,7 +485,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_trace_nn_module_named_weight_placeholders(self):
         """Parameters of an nn.Module get named placeholder nodes."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         model = torch.nn.Linear(4, 2, bias=True)
         tracer = DispatchTracer()
@@ -506,7 +502,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_trace_nn_module_shared_parameter_single_placeholder(self):
         """A parameter used twice maps to exactly one placeholder (no duplicates)."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         class SharedWeight(torch.nn.Module):
             def __init__(self):
@@ -528,7 +524,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_trace_nested_module_parameter_names(self):
         """Nested module parameters appear with sanitized dotted names."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         model = torch.nn.Sequential(torch.nn.Linear(4, 4))
         tracer = DispatchTracer()
@@ -547,7 +543,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_trace_custom_nn_module(self):
         """Tracing a custom nn.Module subclass produces a valid graph."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         class TwoLayerMLP(torch.nn.Module):
             def __init__(self):
@@ -583,7 +579,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_trace_nn_module_with_buffer(self):
         """Buffers of an nn.Module get named placeholder nodes."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         model = torch.nn.BatchNorm1d(4)
         model.eval()
@@ -599,7 +595,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_trace_nn_module_parameter_count(self):
         """The number of parameter placeholders matches named_parameters() count."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         model = torch.nn.Linear(4, 2, bias=True)
         param_names = [name for name, _ in model.named_parameters()]
@@ -616,7 +612,7 @@ class TestNewTracing(ExtTestCase):
 
     def test_trace_nn_module_no_bias(self):
         """nn.Module without bias produces a graph without a bias placeholder."""
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing.dispatcher import DispatchTracer
 
         model = torch.nn.Linear(4, 2, bias=False)
         tracer = DispatchTracer()

@@ -96,9 +96,7 @@ class DispatchTracer:
             self._external_tensor_to_node[key] = node
         return self._external_tensor_to_node[key]
 
-    def _make_placeholder(
-        self, arg: Any, name: str, dynamic_shapes: Dict[str, Any]
-    ) -> Any:
+    def _make_placeholder(self, arg: Any, name: str, dynamic_shapes: Dict[str, Any]) -> Any:
         """
         Recursively replace tensors in a nested structure with placeholders.
 
@@ -118,9 +116,7 @@ class DispatchTracer:
             return arg
         if isinstance(arg, torch.Tensor):
             if name in dynamic_shapes:
-                shape: Union[Tuple[int, ...], TracingShape] = TracingShape(
-                    dynamic_shapes[name]
-                )
+                shape: Union[Tuple[int, ...], TracingShape] = TracingShape(dynamic_shapes[name])
             else:
                 shape = arg.shape
             return self.placeholder(name, shape, arg.dtype, arg.device)
