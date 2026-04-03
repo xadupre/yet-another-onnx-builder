@@ -14,7 +14,7 @@ import torch
 import torch.fx
 import torch.utils._pytree as pytree
 
-from .shape import TracingInt, TracingShape
+from .shape import TracingShape
 from .tensor import TracingTensor
 
 
@@ -184,23 +184,10 @@ class DispatchTracer:
         """
         node = self.graph.placeholder(name)
         # Store a meta tensor so downstream shape inference can use it.
-        if isinstance(shape, TracingShape):
-            concrete = (
-                shape.to_torch_size()
-                if shape.is_concrete
-                else torch.Size(
-                    (
-                        d.value
-                        if isinstance(d, TracingInt) and isinstance(d.value, int)
-                        else int(d) if isinstance(d, int) else 1
-                    )
-                    for d in shape
-                )
-            )
-        else:
-            concrete = torch.Size(shape)
-        node.meta["val"] = torch.empty(concrete, dtype=dtype, device="meta")
-        return self._make_tracing_tensor(shape, dtype, device, node)
+        assert isinstance(shape, TracingShape), f"Unexpeted type {type(shape)} for this operator"
+        tt = self._make_tracing_tensor(shape, dtype, device, node)
+        node.meta["val"] = tt
+        return tt
 
     # ------------------------------------------------------------------
     # Dispatch handler
