@@ -22,7 +22,6 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install pytorch 2.11
-        if: matrix.torch-version == '2.11'
         run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       - name: Install dependencies
         run: pip install -e ".[category_encoders,imblearn,lightgbm,polars,sklearn,sksurv,spox,statmodels,tensorflow,torch,transformers,xgboost]" pyrefly
