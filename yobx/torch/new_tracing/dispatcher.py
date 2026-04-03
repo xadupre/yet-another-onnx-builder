@@ -59,13 +59,26 @@ class DispatchTracer:
         dtype: torch.dtype,
         device: Union[str, torch.device],
         node: torch.fx.Node,
+        tracing_shape: Optional["TracingShape"] = None,
     ) -> "TracingTensor":
-        """Create a :class:`TracingTensor` and register it with *node*."""
+        """Create a :class:`TracingTensor` and register it with *node*.
+
+        :param tracing_shape: Optional symbolic :class:`TracingShape` to attach
+            to the tensor.  When *None* (the default), ``shape`` itself is used
+            if it is already a :class:`TracingShape`.
+        """
         t = TracingTensor.__new__(TracingTensor, shape, dtype=dtype, device=device)
         t.__init__(shape, dtype=dtype, device=device)  # type: ignore
         t._tracer = self
         t._node = node
         self._tensor_id_to_node[id(t)] = node
+        # Attach symbolic shape if available.
+        sym = tracing_shape if tracing_shape is not None else (
+            shape if isinstance(shape, TracingShape) else None
+        )
+        if sym is not None:
+            t._tracing_shape = sym
+            node.meta["tensor_shape"] = sym
         return t
 
     def _get_node(self, t: "TracingTensor") -> torch.fx.Node:
@@ -94,6 +107,63 @@ class DispatchTracer:
             node.meta["val"] = t.detach().to(device="meta")
             self._external_tensor_to_node[key] = node
         return self._external_tensor_to_node[key]
+
+    def _infer_output_tracing_shape(
+        self,
+        meta_out: torch.Tensor,
+        args: Tuple[Any, ...],
+        kwargs: Dict[str, Any],
+    ) -> Optional["TracingShape"]:
+        """
+        Attempt to derive a symbolic :class:`TracingShape` for an output tensor
+        by matching each output dimension position against the corresponding
+        position in the :class:`TracingShape` of every :class:`TracingTensor`
+        input that has the same number of dimensions.
+
+        A symbolic :class:`TracingInt` is propagated to an output dimension
+        when *all* input :class:`TracingShape` objects with the same rank agree
+        on the same symbolic name at that position (or have only concrete values
+        there).  This handles element-wise operations correctly.
+
+        :param meta_out: The meta output tensor produced during shape inference.
+        :param args: Positional arguments to the dispatched operation.
+        :param kwargs: Keyword arguments to the dispatched operation.
+        :return: A :class:`TracingShape` when at least one dimension is
+            symbolic, or ``None`` when no symbolic information is available.
+        """
+        n = len(meta_out.shape)
+        # candidates[i] = TracingInt if all inputs agree on a symbolic dim at
+        # position i, or None if there is a conflict.
+        candidates: Dict[int, Optional[TracingInt]] = {}
+
+        for leaf in pytree.tree_leaves((*args, *kwargs.values())):
+            if not isinstance(leaf, TracingTensor):
+                continue
+            sym = leaf._tracing_shape
+            if sym is None or len(sym) != n:
+                continue
+            for i, d in enumerate(sym):
+                if isinstance(d, TracingInt) and d.is_symbolic:
+                    # Symbolic dimension at position i (d.value is a str).
+                    # candidates[i] is also always a symbolic TracingInt (str value)
+                    # when set, so value comparison is always str vs str here.
+                    if i not in candidates:
+                        candidates[i] = d
+                    elif candidates[i] is not None and candidates[i].value != d.value:
+                        # Conflict: two inputs disagree on the symbolic name.
+                        candidates[i] = None
+
+        sym_dims = {i: d for i, d in candidates.items() if d is not None}
+        if not sym_dims:
+            return None
+
+        dims: List[Union[TracingInt, int]] = []
+        for i, s in enumerate(meta_out.shape):
+            if i in sym_dims:
+                dims.append(sym_dims[i])
+            else:
+                dims.append(int(s))
+        return TracingShape(dims)
 
     def _register_module_parameters(self, module: torch.nn.Module) -> None:
         """
@@ -224,11 +294,20 @@ class DispatchTracer:
         if isinstance(meta_out, torch.Tensor):
             node.meta["val"] = meta_out
 
-        # --- 4. wrap output ---
-        return self._wrap_output(meta_out, node, device)
+        # --- 4. infer symbolic output shape and wrap output ---
+        out_tracing_shape: Optional[TracingShape] = None
+        if isinstance(meta_out, torch.Tensor):
+            out_tracing_shape = self._infer_output_tracing_shape(meta_out, args, kwargs)
+        return self._wrap_output(meta_out, node, device, out_tracing_shape, args, kwargs)
 
     def _wrap_output(
-        self, meta_out: Any, node: torch.fx.Node, device: Union[str, torch.device]
+        self,
+        meta_out: Any,
+        node: torch.fx.Node,
+        device: Union[str, torch.device],
+        tracing_shape: Optional["TracingShape"] = None,
+        args: Optional[Tuple[Any, ...]] = None,
+        kwargs: Optional[Dict[str, Any]] = None,
     ) -> Any:
         """
         Wrap meta-tensor output(s) as :class:`TracingTensor` instances.
@@ -237,9 +316,19 @@ class DispatchTracer:
         * List/tuple of tensors → same container type with
           ``operator.getitem`` nodes interleaved.
         * Anything else (scalar, ``None``) → returned as-is.
+
+        :param tracing_shape: Pre-computed symbolic shape for a single-tensor
+            output.  Ignored for list/tuple outputs (shape is inferred
+            per-element when *args* and *kwargs* are provided).
+        :param args: Original op args forwarded for per-element shape inference
+            in multi-output operations.
+        :param kwargs: Original op kwargs forwarded for per-element shape
+            inference in multi-output operations.
         """
         if isinstance(meta_out, torch.Tensor):
-            return self._make_tracing_tensor(meta_out.shape, meta_out.dtype, device, node)
+            return self._make_tracing_tensor(
+                meta_out.shape, meta_out.dtype, device, node, tracing_shape
+            )
 
         if isinstance(meta_out, (list, tuple)):
             results: List[Any] = []
@@ -251,8 +340,16 @@ class DispatchTracer:
                     get_node.meta["val"] = item
                     if "stack_trace" in node.meta:
                         get_node.meta["stack_trace"] = node.meta["stack_trace"]
+                    # Infer symbolic shape for this element individually.
+                    elem_tracing_shape: Optional[TracingShape] = None
+                    if args is not None and kwargs is not None:
+                        elem_tracing_shape = self._infer_output_tracing_shape(
+                            item, args, kwargs
+                        )
                     results.append(
-                        self._make_tracing_tensor(item.shape, item.dtype, device, get_node)
+                        self._make_tracing_tensor(
+                            item.shape, item.dtype, device, get_node, elem_tracing_shape
+                        )
                     )
                 else:
                     results.append(item)

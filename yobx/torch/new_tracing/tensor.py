@@ -75,6 +75,8 @@ class TracingTensor(torch.Tensor):
     ):
         self._tracer: Optional[Any] = None
         self._node: Optional[torch.fx.Node] = None
+        # Symbolic shape (TracingShape) if any dimension is dynamic; None otherwise.
+        self._tracing_shape: Optional["TracingShape"] = None
 
     def __repr__(self) -> str:  # type: ignore
         node_name = self._node.name if self._node is not None else "<unregistered>"

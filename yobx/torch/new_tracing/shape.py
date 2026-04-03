@@ -187,6 +187,11 @@ class TracingInt:
             return TracingInt(-self.value)
         return TracingInt(f"(-{self._sym()})")
 
+    @property
+    def is_symbolic(self) -> bool:
+        """Return ``True`` if this dimension has a symbolic (string) value."""
+        return not isinstance(self.value, int)
+
 
 # Keep TracingDimension as a backward-compatible alias.
 TracingDimension = TracingInt

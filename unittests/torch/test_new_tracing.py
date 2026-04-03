@@ -629,6 +629,159 @@ class TestNewTracing(ExtTestCase):
             any("bias" in n for n in ph_names), f"Unexpected 'bias' placeholder in {ph_names}"
         )
 
+    # ------------------------------------------------------------------
+    # Shape propagation with dynamic shapes
+    # ------------------------------------------------------------------
+
+    def test_placeholder_stores_tracing_shape(self):
+        """Placeholder TracingTensors carry the symbolic TracingShape."""
+        from yobx.torch.new_tracing import DispatchTracer, TracingInt, TracingShape
+
+        tracer = DispatchTracer()
+        sym = TracingShape([TracingInt("batch"), 8])
+        t = tracer.placeholder("x", sym, torch.float32, "cpu")
+        self.assertIsNotNone(t._tracing_shape)
+        self.assertIsInstance(t._tracing_shape, TracingShape)
+        self.assertEqual(len(t._tracing_shape), 2)
+        # First dim should be symbolic.
+        d0 = t._tracing_shape[0]
+        self.assertIsInstance(d0, TracingInt)
+        self.assertEqual(d0.value, "batch")
+
+    def test_placeholder_node_meta_tensor_shape(self):
+        """Placeholder nodes store the TracingShape in node.meta['tensor_shape']."""
+        from yobx.torch.new_tracing import DispatchTracer, TracingInt, TracingShape
+
+        tracer = DispatchTracer()
+        sym = TracingShape([TracingInt("batch"), 4])
+        tracer.placeholder("x", sym, torch.float32, "cpu")
+        ph_node = next(n for n in tracer.graph.nodes if n.op == "placeholder" and n.name == "x")
+        self.assertIn("tensor_shape", ph_node.meta)
+        self.assertIsInstance(ph_node.meta["tensor_shape"], TracingShape)
+        self.assertEqual(ph_node.meta["tensor_shape"][0].value, "batch")
+
+    def test_elementwise_op_propagates_shape(self):
+        """Element-wise ops propagate the input TracingShape to the output node."""
+        from yobx.torch.new_tracing import DispatchTracer, TracingInt, TracingShape
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(
+            lambda x: x + 1.0,
+            (torch.randn(4, 8),),
+            dynamic_shapes={"x_0": [TracingInt("batch"), 8]},
+        )
+        graph.lint()
+        # The call_function node for the add should carry a tensor_shape.
+        cf_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertGreater(len(cf_nodes), 0)
+        # At least one call_function node should have tensor_shape with a symbolic dim.
+        symbolic_found = False
+        for n in cf_nodes:
+            ts = n.meta.get("tensor_shape")
+            if ts is not None and isinstance(ts, TracingShape):
+                if any(isinstance(d, TracingInt) and d.is_symbolic for d in ts):
+                    symbolic_found = True
+                    break
+        self.assertTrue(
+            symbolic_found,
+            "No call_function node has a symbolic tensor_shape after dynamic-shape trace",
+        )
+
+    def test_elementwise_output_tracing_tensor_has_shape(self):
+        """The output TracingTensor of an elementwise op has _tracing_shape set."""
+        from yobx.torch.new_tracing import DispatchTracer, TracingInt, TracingShape
+
+        captured: list = []
+
+        class CaptureModel(torch.nn.Module):
+            def forward(self, x):
+                result = x + 1.0
+                captured.append(result)
+                return result
+
+        tracer = DispatchTracer()
+        tracer.trace(
+            CaptureModel(),
+            (torch.randn(4, 8),),
+            dynamic_shapes={"x_0": [TracingInt("batch"), 8]},
+        )
+        self.assertEqual(len(captured), 1)
+        t = captured[0]
+        self.assertIsInstance(t._tracing_shape, TracingShape)
+        # First dim should be the 'batch' symbolic dim.
+        d0 = t._tracing_shape[0]
+        self.assertIsInstance(d0, TracingInt)
+        self.assertEqual(d0.value, "batch")
+        # Second dim should be the concrete 8.
+        d1 = t._tracing_shape[1]
+        self.assertEqual(int(d1) if isinstance(d1, TracingInt) else d1, 8)
+
+    def test_shape_propagates_through_chain(self):
+        """TracingShape propagates through a multi-step elementwise chain."""
+        from yobx.torch.new_tracing import DispatchTracer, TracingInt, TracingShape
+
+        def chain(x):
+            return torch.relu(x + 1.0)
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(
+            chain,
+            (torch.randn(4, 8),),
+            dynamic_shapes={"x_0": [TracingInt("batch"), 8]},
+        )
+        graph.lint()
+        # All call_function nodes in a chain of elementwise ops should have
+        # tensor_shape metadata carrying the symbolic dimension.
+        cf_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        for n in cf_nodes:
+            ts = n.meta.get("tensor_shape")
+            self.assertIsNotNone(
+                ts, f"Node {n.name} is missing tensor_shape metadata"
+            )
+            self.assertIsInstance(ts, TracingShape)
+            d0 = ts[0]
+            self.assertIsInstance(d0, TracingInt)
+            self.assertEqual(d0.value, "batch")
+
+    def test_concrete_shape_no_tracing_shape(self):
+        """Without dynamic shapes, tensor_shape metadata is not set on nodes."""
+        from yobx.torch.new_tracing import DispatchTracer
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(lambda x: x + 1.0, (torch.randn(3, 5),))
+        graph.lint()
+        for n in graph.nodes:
+            self.assertNotIn(
+                "tensor_shape",
+                n.meta,
+                f"Node {n.name} unexpectedly has tensor_shape metadata for concrete input",
+            )
+
+    def test_two_dynamic_inputs_same_symbolic_dim(self):
+        """Two inputs with the same symbolic dim propagate that dim to the output."""
+        from yobx.torch.new_tracing import DispatchTracer, TracingInt, TracingShape
+
+        def add(x, y):
+            return x + y
+
+        tracer = DispatchTracer()
+        graph = tracer.trace(
+            add,
+            (torch.randn(4, 8), torch.randn(4, 8)),
+            dynamic_shapes={
+                "x_0": [TracingInt("batch"), 8],
+                "x_1": [TracingInt("batch"), 8],
+            },
+        )
+        graph.lint()
+        cf_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertGreater(len(cf_nodes), 0)
+        ts = cf_nodes[0].meta.get("tensor_shape")
+        self.assertIsNotNone(ts)
+        self.assertIsInstance(ts, TracingShape)
+        self.assertIsInstance(ts[0], TracingInt)
+        self.assertEqual(ts[0].value, "batch")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
