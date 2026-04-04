@@ -115,10 +115,11 @@ class DispatchTracer:
             # Already a TracingTensor placeholder — return as-is.
             return arg
         if isinstance(arg, torch.Tensor):
-            if name in dynamic_shapes:
-                shape: Union[Tuple[int, ...], TracingShape] = TracingShape(dynamic_shapes[name])
-            else:
-                shape = arg.shape
+            shape = (
+                TracingShape(dynamic_shapes[name])
+                if name in dynamic_shapes
+                else TracingShape(tuple(int(i) for i in arg.shape))
+            )
             return self.placeholder(name, shape, arg.dtype, arg.device)
         if isinstance(arg, dict):
             return {
@@ -214,28 +215,16 @@ class DispatchTracer:
 
         # --- 1. shape inference using meta tensors ---
         def _to_meta(x: Any) -> Any:
-            if isinstance(x, TracingTensor):
-                node = self._tensor_id_to_node.get(id(x))
-                assert node is not None and "val" in node.meta, (
-                    f"TracingTensor {x!r} has no registered node or missing 'val' metadata. "
-                    "All TracingTensor inputs must have been created by this tracer."
-                )
-                return node.meta["val"]
-            if isinstance(x, torch.Tensor):
-                raise RuntimeError(
-                    f"Unexpected raw torch.Tensor in _dispatch args: {x!r}. "
-                    "All tensor inputs must be TracingTensor instances."
-                )
+            assert isinstance(
+                x, (TracingTensor, int, float, str)
+            ), f"unexpected type {type(x)} for x"
             return x
 
         meta_args = pytree.tree_map(_to_meta, args)
         meta_kwargs = pytree.tree_map(_to_meta, kwargs)
 
         with torch.no_grad():
-            try:
-                meta_out = op(*meta_args, **meta_kwargs)
-            except Exception:
-                meta_out = None
+            meta_out = op(*meta_args, **meta_kwargs)
 
         # --- 2. build FX node args ---
         def _to_node(x: Any) -> Any:

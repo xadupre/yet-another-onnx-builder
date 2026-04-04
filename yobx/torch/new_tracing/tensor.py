@@ -73,6 +73,7 @@ class TracingTensor(torch.Tensor):
         device: Union[str, torch.device] = "cpu",
         requires_grad: bool = False,
     ):
+        super().__init__()
         self._tracer: Optional[Any] = None
         self._node: Optional[torch.fx.Node] = None
 
@@ -109,4 +110,8 @@ class TracingTensor(torch.Tensor):
             # No tracer found — fall back to the default behaviour.
             return NotImplemented
 
-        return tracer._dispatch(func, args, kwargs)
+        res = tracer._dispatch(func, args, kwargs)
+        assert (
+            func not in {torch.ops.aten.split.Tensor} or res is not None
+        ), f"res is None but func is {func}, this is not possible, args={args}, kwargs={kwargs}"
+        return res

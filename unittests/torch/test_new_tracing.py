@@ -165,10 +165,13 @@ class TestNewTracing(ExtTestCase):
 
     def test_tracing_tensor_repr(self):
         from yobx.torch.new_tracing.dispatcher import DispatchTracer
+        from yobx.torch.new_tracing.shape import TracingShape
 
         tracer = DispatchTracer()
         x = torch.randn(2, 3)
-        t = tracer.placeholder("x", x.shape, x.dtype, x.device)
+        t = tracer.placeholder(
+            "x", TracingShape(tuple(int(i) for i in x.shape)), x.dtype, x.device
+        )
         self.assertIn("TracingTensor", repr(t))
         self.assertIn("x", repr(t))
 
