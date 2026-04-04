@@ -120,7 +120,7 @@ class TracingTensor(torch.Tensor):
                 assert s in dyanmic_shape_values, f"Missing value for dynamic dimension {s!r}"
                 new_shape.append(dyanmic_shape_values[s])
             else:
-                raise NotImplementedError(f"Unexected type {type(s)}")
+                raise NotImplementedError(f"Unexpected type {type(s)}")
         return torch.empty(tuple(new_shape), dtype=self.dtype, device=self.device)
 
     @classmethod

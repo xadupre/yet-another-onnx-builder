@@ -1,41 +1,20 @@
-"""Tests for yobx.torch.new_tracing – tracing (DispatchTracer and trace_model)."""
+"""Tests for yobx.torch.new_tracing – tracing (GraphTracer and trace_model)."""
 
 import operator
 import unittest
 import torch
-from yobx.ext_test_case import ExtTestCase, requires_torch
+from yobx.ext_test_case import ExtTestCase
+from yobx.torch.new_tracing.shape import TracingInt
+from yobx.torch.new_tracing.tracer import GraphTracer
+from yobx.torch.new_tracing import trace_model
 
 
-@requires_torch("2.0")
-class TestNewTracingTracing(ExtTestCase):
-    # ------------------------------------------------------------------
-    # Imports
-    # ------------------------------------------------------------------
-
-    def test_import(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-        from yobx.torch.new_tracing.shape import TracingBool, TracingInt, TracingShape
-        from yobx.torch.new_tracing.tensor import TracingTensor
-        from yobx.torch.new_tracing import trace_model
-
-        self.assertIsNotNone(DispatchTracer)
-        self.assertIsNotNone(TracingBool)
-        self.assertIsNotNone(TracingInt)
-        self.assertIsNotNone(TracingShape)
-        self.assertIsNotNone(TracingTensor)
-        self.assertIsNotNone(trace_model)
-
-    # ------------------------------------------------------------------
-    # DispatchTracer – basic graphs
-    # ------------------------------------------------------------------
-
+class TestNewTracingTracer(ExtTestCase):
     def test_trace_simple_add(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def add(x, y):
             return x + y
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(add, (torch.randn(3, 4), torch.randn(3, 4)))
 
         ops = [n.op for n in graph.nodes]
@@ -48,24 +27,20 @@ class TestNewTracingTracing(ExtTestCase):
         graph.lint()
 
     def test_trace_simple_mul(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def mul(x, y):
             return x * y
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(mul, (torch.randn(2, 5), torch.randn(2, 5)))
         graph.lint()
         call_nodes = [n for n in graph.nodes if n.op == "call_function"]
         self.assertGreater(len(call_nodes), 0)
 
     def test_trace_elementwise_chain(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def chain(x):
             return torch.relu(x + 1.0)
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(chain, (torch.randn(4, 4),))
         graph.lint()
         ops = {n.target for n in graph.nodes if n.op == "call_function"}
@@ -73,25 +48,21 @@ class TestNewTracingTracing(ExtTestCase):
         self.assertTrue(len(ops) >= 1)
 
     def test_trace_matmul(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def matmul(x, y):
             return x @ y
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(matmul, (torch.randn(4, 8), torch.randn(8, 4)))
         graph.lint()
         call_nodes = [n for n in graph.nodes if n.op == "call_function"]
         self.assertGreater(len(call_nodes), 0)
 
     def test_trace_multiple_outputs(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def split_heads(x):
             a, b = x.chunk(2, dim=-1)
             return a, b
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(split_heads, (torch.randn(2, 8),))
         graph.lint()
         # output should be a tuple
@@ -99,10 +70,8 @@ class TestNewTracingTracing(ExtTestCase):
         self.assertIsInstance(output_node.args[0], (tuple, list))
 
     def test_trace_nn_linear(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         model = torch.nn.Linear(8, 4, bias=True)
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(model, (torch.randn(2, 8),))
         graph.lint()
         ops = [n.op for n in graph.nodes]
@@ -111,20 +80,16 @@ class TestNewTracingTracing(ExtTestCase):
         self.assertIn("output", ops)
 
     def test_trace_nn_relu(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         model = torch.nn.ReLU()
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(model, (torch.randn(3, 5),))
         graph.lint()
 
     def test_trace_kwargs(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def add_kw(x, y):
             return x + y
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(
             add_kw, args=(), kwargs={"x": torch.randn(2, 2), "y": torch.randn(2, 2)}
         )
@@ -133,17 +98,11 @@ class TestNewTracingTracing(ExtTestCase):
         self.assertIn("x", ph_names)
         self.assertIn("y", ph_names)
 
-    # ------------------------------------------------------------------
-    # DispatchTracer – dynamic shapes
-    # ------------------------------------------------------------------
-
     def test_trace_dynamic_shapes(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer, TracingInt
-
         def add(x, y):
             return x + y
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(
             add,
             (torch.randn(4, 8), torch.randn(4, 8)),
@@ -153,40 +112,27 @@ class TestNewTracingTracing(ExtTestCase):
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
         self.assertEqual(len(ph_nodes), 2)
 
-    # ------------------------------------------------------------------
-    # trace_model convenience function
-    # ------------------------------------------------------------------
-
     def test_trace_model_function(self):
-        from yobx.torch.new_tracing import trace_model
-
         graph = trace_model(lambda x: x * 2, (torch.randn(3, 3),))
         graph.lint()
         ops = [n.op for n in graph.nodes]
         self.assertIn("call_function", ops)
 
     def test_trace_model_nn_module(self):
-        from yobx.torch.new_tracing import trace_model
-
         model = torch.nn.Linear(4, 4)
         graph = trace_model(model, (torch.randn(2, 4),))
         graph.lint()
         self.assertIsNotNone(graph)
 
-    # ------------------------------------------------------------------
-    # Re-tracing: calling trace() twice on the same DispatchTracer
-    # ------------------------------------------------------------------
-
     def test_retrace_resets_state(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
+        tracer1 = GraphTracer()
+        tracer2 = GraphTracer()
 
-        tracer = DispatchTracer()
-
-        graph1 = tracer.trace(lambda x: x + 1, (torch.randn(2, 2),))
+        graph1 = tracer1.trace(lambda x: x + 1, (torch.randn(2, 2),))
         n1 = len(list(graph1.nodes))
         self.assertGreater(n1, 0)
 
-        graph2 = tracer.trace(lambda x, y: x + y, (torch.randn(2, 2), torch.randn(2, 2)))
+        graph2 = tracer2.trace(lambda x, y: x + y, (torch.randn(2, 2), torch.randn(2, 2)))
         n2 = len(list(graph2.nodes))
         self.assertGreater(n2, 0)
 
@@ -198,33 +144,22 @@ class TestNewTracingTracing(ExtTestCase):
         graph1.lint()
         graph2.lint()
 
-    # ------------------------------------------------------------------
-    # Graph node metadata
-    # ------------------------------------------------------------------
-
     def test_placeholder_meta_val(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(lambda x: x, (torch.randn(3, 5),))
         ph = next(n for n in graph.nodes if n.op == "placeholder")
         self.assertIn("val", ph.meta)
         self.assertEqual(ph.meta["val"].shape, torch.Size([3, 5]))
 
     def test_call_function_meta_val(self):
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(lambda x: x + 1.0, (torch.randn(3, 5),))
         cf = next(n for n in graph.nodes if n.op == "call_function")
         self.assertIn("val", cf.meta)
         self.assertEqual(cf.meta["val"].shape, torch.Size([3, 5]))
 
     def test_call_function_meta_stack_trace(self):
-        """call_function nodes should have a 'stack_trace' entry in node.meta."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(lambda x: x + 1.0, (torch.randn(3, 5),))
         cf = next(n for n in graph.nodes if n.op == "call_function")
         self.assertIn("stack_trace", cf.meta)
@@ -233,14 +168,11 @@ class TestNewTracingTracing(ExtTestCase):
         self.assertIn("File", cf.meta["stack_trace"])
 
     def test_multiple_outputs_getitem_meta_stack_trace(self):
-        """getitem nodes for multi-output ops inherit 'stack_trace' from their parent."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def split_heads(x):
             a, b = x.chunk(2, dim=-1)
             return a, b
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(split_heads, (torch.randn(2, 8),))
         graph.lint()
         # getitem nodes should have stack_trace propagated
@@ -252,18 +184,11 @@ class TestNewTracingTracing(ExtTestCase):
             self.assertIn("stack_trace", n.meta, f"node {n.name} missing stack_trace")
             self.assertIsInstance(n.meta["stack_trace"], str)
 
-    # ------------------------------------------------------------------
-    # Nested input structures
-    # ------------------------------------------------------------------
-
     def test_trace_list_of_tensors(self):
-        """Inputs as a list of tensors should produce one placeholder per tensor."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def add_list(tensors):
             return tensors[0] + tensors[1]
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(add_list, ([torch.randn(2, 3), torch.randn(2, 3)],))
         graph.lint()
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
@@ -275,27 +200,21 @@ class TestNewTracingTracing(ExtTestCase):
         self.assertIn("tensors_1", ph_names)
 
     def test_trace_tuple_of_tensors(self):
-        """Inputs as a tuple of tensors should produce one placeholder per tensor."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def add_tuple(pair):
             a, b = pair
             return a + b
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(add_tuple, ((torch.randn(3, 4), torch.randn(3, 4)),))
         graph.lint()
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
         self.assertEqual(len(ph_nodes), 2)
 
     def test_trace_dict_of_tensors(self):
-        """Inputs as a dict of tensors should produce one placeholder per tensor."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def add_dict(d):
             return d["a"] + d["b"]
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(add_dict, ({"a": torch.randn(2, 2), "b": torch.randn(2, 2)},))
         graph.lint()
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
@@ -305,13 +224,10 @@ class TestNewTracingTracing(ExtTestCase):
         self.assertIn("d_b", ph_names)
 
     def test_trace_mixed_nested_input(self):
-        """Mixed nesting: top-level tuple arg containing a list and a plain tensor."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def compute(pair, z):
             return pair[0] + pair[1] + z
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(compute, ([torch.randn(2, 2), torch.randn(2, 2)], torch.randn(2, 2)))
         graph.lint()
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
@@ -319,13 +235,10 @@ class TestNewTracingTracing(ExtTestCase):
         self.assertEqual(len(ph_nodes), 3)
 
     def test_trace_nested_scalar_passthrough(self):
-        """Non-tensor values inside a nested structure pass through unchanged."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         def scale(tensors, factor):
             return tensors[0] * factor
 
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(scale, ([torch.randn(3, 3)], 2.0))
         graph.lint()
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
@@ -337,11 +250,8 @@ class TestNewTracingTracing(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_trace_nn_module_named_weight_placeholders(self):
-        """Parameters of an nn.Module get named placeholder nodes."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         model = torch.nn.Linear(4, 2, bias=True)
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(model, (torch.randn(3, 4),))
         graph.lint()
         ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
@@ -354,9 +264,6 @@ class TestNewTracingTracing(ExtTestCase):
         )
 
     def test_trace_nn_module_shared_parameter_single_placeholder(self):
-        """A parameter used twice maps to exactly one placeholder (no duplicates)."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         class SharedWeight(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -367,7 +274,7 @@ class TestNewTracingTracing(ExtTestCase):
                 return x @ self.w + x @ self.w
 
         model = SharedWeight()
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(model, (torch.randn(2, 4),))
         graph.lint()
         ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
@@ -376,11 +283,8 @@ class TestNewTracingTracing(ExtTestCase):
         self.assertEqual(len(w_phs), 1, f"Expected 1 'w' placeholder, got {w_phs}")
 
     def test_trace_nested_module_parameter_names(self):
-        """Nested module parameters appear with sanitized dotted names."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         model = torch.nn.Sequential(torch.nn.Linear(4, 4))
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(model, (torch.randn(2, 4),))
         graph.lint()
         ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
@@ -390,14 +294,7 @@ class TestNewTracingTracing(ExtTestCase):
             any("weight" in n for n in ph_names), f"No 'weight' placeholder found in {ph_names}"
         )
 
-    # ------------------------------------------------------------------
-    # nn.Module: custom subclasses and functional tests
-    # ------------------------------------------------------------------
-
     def test_trace_custom_nn_module(self):
-        """Tracing a custom nn.Module subclass produces a valid graph."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         class TwoLayerMLP(torch.nn.Module):
             def __init__(self):
                 super().__init__()
@@ -408,7 +305,7 @@ class TestNewTracingTracing(ExtTestCase):
                 return self.fc2(torch.relu(self.fc1(x)))
 
         model = TwoLayerMLP()
-        tracer = DispatchTracer()
+        tracer = GraphTracer(verbose=3)
         graph = tracer.trace(model, (torch.randn(3, 8),))
         graph.lint()
         ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
@@ -420,9 +317,6 @@ class TestNewTracingTracing(ExtTestCase):
         self.assertGreater(len(call_nodes), 0)
 
     def test_trace_model_with_nn_module(self):
-        """trace_model convenience wrapper works with an nn.Module."""
-        from yobx.torch.new_tracing import trace_model
-
         model = torch.nn.Linear(4, 2, bias=True)
         graph = trace_model(model, (torch.randn(1, 4),))
         graph.lint()
@@ -431,12 +325,9 @@ class TestNewTracingTracing(ExtTestCase):
         self.assertTrue(any("bias" in n for n in ph_names))
 
     def test_trace_nn_module_with_buffer(self):
-        """Buffers of an nn.Module get named placeholder nodes."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         model = torch.nn.BatchNorm1d(4)
         model.eval()
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(model, (torch.randn(3, 4),))
         graph.lint()
         ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
@@ -447,12 +338,9 @@ class TestNewTracingTracing(ExtTestCase):
         )
 
     def test_trace_nn_module_parameter_count(self):
-        """The number of parameter placeholders matches named_parameters() count."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         model = torch.nn.Linear(4, 2, bias=True)
         param_names = [name for name, _ in model.named_parameters()]
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(model, (torch.randn(2, 4),))
         graph.lint()
         ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
@@ -464,11 +352,8 @@ class TestNewTracingTracing(ExtTestCase):
             )
 
     def test_trace_nn_module_no_bias(self):
-        """nn.Module without bias produces a graph without a bias placeholder."""
-        from yobx.torch.new_tracing.dispatcher import DispatchTracer
-
         model = torch.nn.Linear(4, 2, bias=False)
-        tracer = DispatchTracer()
+        tracer = GraphTracer()
         graph = tracer.trace(model, (torch.randn(2, 4),))
         graph.lint()
         ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]

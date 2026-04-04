@@ -54,10 +54,11 @@ class GraphTracer:
 
     """
 
-    def __init__(self) -> None:
+    def __init__(self, verbose: int = 0) -> None:
         self.graph: torch.fx.Graph = torch.fx.Graph()
         self._external_tensor_to_node: Dict[int, torch.fx.Node] = {}
         self._placeholder_count: int = 0
+        self.verbose = verbose
         #
         self._shape_env = ShapeEnv()
         self._fake_mode = FakeTensorMode(shape_env=self._shape_env)
@@ -102,7 +103,7 @@ class GraphTracer:
             self._external_tensor_to_node[key] = node
         return self._external_tensor_to_node[key]
 
-    def register_module_parameters(self, module: torch.nn.Module, verbose: int = 0) -> None:
+    def register_module_parameters(self, module: torch.nn.Module) -> None:
         """
         Pre-register all named parameters and buffers of *module* as
         placeholder nodes in the graph.
@@ -114,7 +115,6 @@ class GraphTracer:
 
         :param module: The :class:`torch.nn.Module` whose parameters and
             buffers should be pre-registered.
-        :param verbose: verbosity
         """
         seen_ids: set = set()
         for name, tensor in list(module.named_parameters()) + list(module.named_buffers()):
@@ -129,7 +129,7 @@ class GraphTracer:
             node = self.graph.placeholder(sanitized)
             node.meta["val"] = tensor.detach().to(device="meta")
             node.meta["torch_name"] = name
-            if verbose:
+            if self.verbose:
                 print(f"[GraphTracer.register_module_parameters] + {name!r}")
             self._external_tensor_to_node[key] = node
 
@@ -203,18 +203,34 @@ class GraphTracer:
         3. Emit a ``call_function`` node in the graph.
         4. Return wrapped :class:`TracingTensor` output(s).
         """
+        if self.verbose > 1:
+            print(f"[GraphTracer.dispatch] call {func}")
         kwargs = kwargs or {}
 
         combined_args, treespec = torch.utils._pytree.tree_flatten((args, kwargs))
 
         # We could recompute the dynamic shapes without FakeTensor
         # but this is the first approach
-        fake_combined = [self.make_fake(a) for a in combined_args]
+        fake_combined = [
+            (self.make_fake(a) if isinstance(a, TracingTensor) else a) for a in combined_args
+        ]
         unflat = torch.utils._pytree.tree_unflatten(fake_combined, treespec)
         fake_args, fake_kwargs = unflat
 
+        if self.verbose > 2:
+            from ...helpers import string_type
+
+            print("**", [type(a) for a in combined_args])
+            print(f"[GraphTracer.dispatch] args={string_type(args, with_shape=True)}")
+            print(f"[GraphTracer.dispatch] fake_args={string_type(fake_args, with_shape=True)}")
+            print(f"[GraphTracer.dispatch] kwargs={string_type(kwargs, with_shape=True)}")
+            print(
+                f"[GraphTracer.dispatch] fake_kwargs={string_type(fake_kwargs, with_shape=True)}"
+            )
+
         # running the function
-        fake_res = func(*fake_args, **fake_kwargs)
+        with self._fake_mode:
+            fake_res = func(*fake_args, **fake_kwargs)
         assert type(fake_res) is not torch.Tensor, f"Unexpected type {type(fake_res)} for output."
 
         # add a node in the graph
@@ -276,7 +292,7 @@ class GraphTracer:
 
     def make_names(self, n: int, name: str, arg, treespec):
         if isinstance(arg, (list, tuple)):
-            return [f"{name}_i" for i in range(n)]
+            return [f"{name}_{i}" for i in range(n)]
         if isinstance(arg, dict) and len(arg) == n:
             return [f"{name}_{k}" for k in arg]
         raise NotImplementedError(
@@ -287,13 +303,13 @@ class GraphTracer:
         if isinstance(name, int):
             name = f"arg_{name}"
         if isinstance(arg, torch.Tensor):
-            node = self.placeholder(
+            tt = self.placeholder(
                 name,
                 TracingShape.from_existing_shape(arg.shape, dynamic_shapes),
                 arg.dtype,
                 device=arg.device,
             )
-            return node.meta["val"]
+            return tt
 
         new_arg, treespec_arg = torch.utils._pytree.tree_flatten(arg)
         if dynamic_shapes:
@@ -334,9 +350,8 @@ class GraphTracer:
                     if dynamic_shapes
                     else None
                 )
-                tracing_args.append(
-                    self.make_tracing_arg(a, ds, name=sig_names[i] if sig_names else i)
-                )
+                x = self.make_tracing_arg(a, ds, name=sig_names[i] if sig_names else i)
+                tracing_args.append(x)
         if kwargs:
             for k, v in kwargs.items():
                 ds = dynamic_shapes[k] if dynamic_shapes else None
@@ -349,7 +364,6 @@ class GraphTracer:
         args: Tuple[Any, ...],
         kwargs: Optional[Dict[str, Any]] = None,
         dynamic_shapes: Optional[Dict[str, Any]] = None,
-        verbose: int = 0,
     ) -> torch.fx.Graph:
         """
         Trace *func* with the provided *args* and return the resulting
@@ -371,11 +385,14 @@ class GraphTracer:
             :class:`TracingInt` / int describing the dimensions symbolically.
             When provided, the corresponding placeholder is given a
             :class:`TracingShape` instead of a concrete :class:`torch.Size`.
-        :param verbose: verbosity
         :return: A :class:`torch.fx.Graph` representing the full computation.
         """
+        if self.verbose:
+            s = str(func).split("\n")[0]
+            print(f"[GraphTracer.trace] trace {s}")
+
         if isinstance(func, torch.nn.Module):
-            self._register_module_parameters(func, verbose=verbose)
+            self.register_module_parameters(func)
 
         sig_params = [
             p.name
@@ -387,8 +404,8 @@ class GraphTracer:
             args, kwargs, dynamic_shapes=dynamic_shapes, sig_names=sig_params
         )
 
-        if verbose:
-            print(f"[GraphTracer.trace] trace {func}")
+        if self.verbose:
+            print("[GraphTracer.trace] call...")
         out = func(*tracing_args, **tracing_kwargs)
 
         def _to_output_node(x: Any) -> Any:
@@ -435,4 +452,6 @@ def trace_model(
         )
         print(graph)
     """
-    return GraphTracer().trace(func, args, kwargs=kwargs, dynamic_shapes=dynamic_shapes)
+    return GraphTracer(verbose=verbose).trace(
+        func, args, kwargs=kwargs, dynamic_shapes=dynamic_shapes
+    )
