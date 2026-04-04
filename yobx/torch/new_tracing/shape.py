@@ -1,13 +1,5 @@
-"""
-Shape-related classes for dispatch-level tracing.
-
-Defines :class:`TracingBool`, :class:`TracingInt` (and its alias
-:data:`TracingDimension`), and :class:`TracingShape`.
-"""
-
 from typing import Any, Sequence, Tuple, Union
 from ...xexpressions import simplify_expression
-
 import torch
 
 
@@ -236,6 +228,10 @@ class TracingShape:
     def __eq__(self, other: Any) -> bool:  # noqa: PYI032
         if isinstance(other, TracingShape):
             return self.dims == other.dims
+        if isinstance(other, tuple):
+            if len(self.dims) != len(other):
+                return False
+            return all(d == i for d, i in zip(self.dims, other))
         return NotImplemented
 
     def __hash__(self) -> int:

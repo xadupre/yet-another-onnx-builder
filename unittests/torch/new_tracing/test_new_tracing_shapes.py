@@ -1,8 +1,7 @@
-"""Tests for yobx.torch.new_tracing – shape-related classes (TracingInt, TracingBool, TracingShape)."""
-
 import unittest
 import torch
 from yobx.ext_test_case import ExtTestCase, requires_torch
+from yobx.torch.new_tracing.shape import TracingInt, TracingShape, TracingBool
 
 
 @requires_torch("2.0")
@@ -12,29 +11,21 @@ class TestNewTracingShapes(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_tracing_dimension_repr_no_value(self):
-        from yobx.torch.new_tracing.shape import TracingInt
-
         d = TracingInt("batch")
         self.assertIn("batch", repr(d))
         self.assertEqual(str(d), "batch")
 
     def test_tracing_dimension_repr_with_value(self):
-        from yobx.torch.new_tracing.shape import TracingInt
-
         d = TracingInt(4)
         self.assertIn("4", repr(d))
         self.assertEqual(int(d), 4)
 
     def test_tracing_dimension_int_raises_without_value(self):
-        from yobx.torch.new_tracing.shape import TracingInt
-
         d = TracingInt("n")
         with self.assertRaises(ValueError):
             int(d)
 
     def test_tracing_dimension_eq(self):
-        from yobx.torch.new_tracing.shape import TracingBool, TracingInt
-
         # Concrete comparison → plain bool
         d1 = TracingInt(4)
         d2 = TracingInt(4)
@@ -50,8 +41,6 @@ class TestNewTracingShapes(ExtTestCase):
         self.assertIn("batch", str(result.value))
 
     def test_tracing_dimension_arithmetic(self):
-        from yobx.torch.new_tracing.shape import TracingInt
-
         # Concrete arithmetic produces concrete TracingInt
         d = TracingInt(8)
         self.assertEqual(int(d + 2), 10)
@@ -75,23 +64,17 @@ class TestNewTracingShapes(ExtTestCase):
         self.assertEqual(int(negd), -5)
 
     def test_tracing_dimension_hash(self):
-        from yobx.torch.new_tracing.shape import TracingInt
-
         d = TracingInt("batch")
         self.assertIsInstance(hash(d), int)
         self.assertIn(d, {d})
 
     def test_tracing_bool_concrete(self):
-        from yobx.torch.new_tracing.shape import TracingBool
-
         tb_true = TracingBool(True)
         tb_false = TracingBool(False)
         self.assertTrue(bool(tb_true))
         self.assertFalse(bool(tb_false))
 
     def test_tracing_bool_symbolic_raises_on_bool(self):
-        from yobx.torch.new_tracing.shape import TracingBool
-
         tb = TracingBool("(n==4)")
         with self.assertRaises(ValueError):
             bool(tb)
@@ -101,7 +84,6 @@ class TestNewTracingShapes(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_tracing_shape_concrete(self):
-        from yobx.torch.new_tracing.shape import TracingInt, TracingShape
 
         s = TracingShape([TracingInt(4), 16])
         self.assertTrue(s.is_concrete)
@@ -109,8 +91,6 @@ class TestNewTracingShapes(ExtTestCase):
         self.assertEqual(s.to_torch_size(), torch.Size([4, 16]))
 
     def test_tracing_shape_symbolic(self):
-        from yobx.torch.new_tracing.shape import TracingInt, TracingShape
-
         s = TracingShape([TracingInt("n"), 8])
         self.assertFalse(s.is_concrete)
         with self.assertRaises(ValueError):
@@ -119,15 +99,11 @@ class TestNewTracingShapes(ExtTestCase):
             s.to_torch_size()
 
     def test_tracing_shape_repr(self):
-        from yobx.torch.new_tracing.shape import TracingInt, TracingShape
-
         s = TracingShape([TracingInt(2), 4])
         r = repr(s)
         self.assertIn("TracingShape", r)
 
     def test_tracing_shape_indexing(self):
-        from yobx.torch.new_tracing.shape import TracingInt, TracingShape
-
         d = TracingInt(5)
         s = TracingShape([d, 8])
         self.assertIs(s[0], d)

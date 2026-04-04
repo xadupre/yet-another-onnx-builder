@@ -1,58 +1,59 @@
-"""
-Dispatcher-related classes and helpers for dispatch-level tracing.
-
-Defines :class:`DispatchTracer` and the convenience function
-:func:`trace_model`.
-"""
-
 import inspect
 import operator
 import traceback
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
-
 import torch
 import torch.fx
 import torch.utils._pytree as pytree
-
 from .shape import TracingShape
 from .tensor import TracingTensor
 
 
-class DispatchTracer:
+class GraphTracer:
     """
     Traces a callable by intercepting all tensor operations via
     ``__torch_dispatch__`` and records them into a :class:`torch.fx.Graph`.
 
-    Example::
+    .. runpython::
+        :showcode:
 
         import torch
-        from yobx.torch.new_tracing import DispatchTracer
+        from yobx.torch.new_tracing import GraphTracer
 
         def add(x, y):
             return x + y
 
-        tracer = DispatchTracer()
         x = torch.randn(3, 4)
         y = torch.randn(3, 4)
+        tracer = GraphTracer()
         graph = tracer.trace(add, (x, y))
         print(graph)
 
     The class creates an empty :class:`torch.fx.Graph`
-    populated by a :meth:`trace` call.
+    populated by a :meth:`trace` call. We do the same
+    with dynamic shapes:
+
+    .. runpython::
+        :showcode:
+
+        import torch
+        from yobx.torch.new_tracing import GraphTracer
+
+        def add(x, y):
+            return x + y
+
+        x = torch.randn(3, 4)
+        y = torch.randn(1, 4)
+        tracer = GraphTracer()
+        graph = tracer.trace(add, (x, y), ({0:"batch"}, {}))
+        print(graph)
+
     """
 
     def __init__(self) -> None:
         self.graph: torch.fx.Graph = torch.fx.Graph()
-        # id(TracingTensor) -> torch.fx.Node
-        self._tensor_id_to_node: Dict[int, torch.fx.Node] = {}
-        # id(regular torch.Tensor) -> torch.fx.Node  (auto-placeholders)
         self._external_tensor_to_node: Dict[int, torch.fx.Node] = {}
-        # Counter for auto-generated placeholder names
         self._placeholder_count: int = 0
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
 
     def _make_tracing_tensor(
         self,
@@ -63,20 +64,16 @@ class DispatchTracer:
     ) -> "TracingTensor":
         """Create a :class:`TracingTensor` and register it with *node*."""
         t = TracingTensor.__new__(TracingTensor, shape, dtype=dtype, device=device)
-        t.__init__(shape, dtype=dtype, device=device)  # type: ignore
-        t._tracer = self
+        t.__init__(shape, dtype=dtype, device=device, tracer=self)  # type: ignore
         t._node = node
-        self._tensor_id_to_node[id(t)] = node
         return t
 
     def _get_node(self, t: "TracingTensor") -> torch.fx.Node:
         """Return the :class:`torch.fx.Node` associated with *t*."""
-        node = self._tensor_id_to_node.get(id(t))
-        assert node is not None, (
-            f"TracingTensor {t!r} is not registered with this tracer. "
-            "Ensure all tensors were created (or passed to) this DispatchTracer."
-        )
-        return node
+        assert isinstance(t, TracingTensor), f"Unexpected type {type(t)} for a tracing tensor."
+        assert t._node, f"Tensor {t} has no node."
+        assert t._tracer is self, "The tensor seems traced by another graph."
+        return t._node
 
     def _node_for_external_tensor(self, t: torch.Tensor) -> torch.fx.Node:
         """
@@ -96,46 +93,7 @@ class DispatchTracer:
             self._external_tensor_to_node[key] = node
         return self._external_tensor_to_node[key]
 
-    def _make_placeholder(self, arg: Any, name: str, dynamic_shapes: Dict[str, Any]) -> Any:
-        """
-        Recursively replace tensors in a nested structure with placeholders.
-
-        :class:`TracingTensor` arguments are returned as-is (they already have
-        a registered placeholder node).  Raw :class:`torch.Tensor` arguments
-        are converted into new placeholder nodes.  Nested containers (dict,
-        list, tuple) are traversed recursively.  Non-tensor scalars and other
-        objects are returned unchanged.
-
-        :param arg: The argument to process.
-        :param name: Base name for the placeholder node(s).
-        :param dynamic_shapes: Mapping from argument name to dynamic shape
-            spec (forwarded from :meth:`trace`).
-        """
-        if isinstance(arg, TracingTensor):
-            # Already a TracingTensor placeholder — return as-is.
-            return arg
-        if isinstance(arg, torch.Tensor):
-            shape = (
-                TracingShape(dynamic_shapes[name])
-                if name in dynamic_shapes
-                else TracingShape(tuple(int(i) for i in arg.shape))
-            )
-            return self.placeholder(name, shape, arg.dtype, arg.device)
-        if isinstance(arg, dict):
-            return {
-                k: self._make_placeholder(v, f"{name}_{k}", dynamic_shapes)
-                for k, v in arg.items()
-            }
-        if isinstance(arg, (list, tuple)):
-            items = [
-                self._make_placeholder(item, f"{name}_{j}", dynamic_shapes)
-                for j, item in enumerate(arg)
-            ]
-            return type(arg)(items)
-        # Non-tensor scalars / non-container objects pass through unchanged.
-        return arg
-
-    def _register_module_parameters(self, module: torch.nn.Module) -> None:
+    def register_module_parameters(self, module: torch.nn.Module, verbose: int = 0) -> None:
         """
         Pre-register all named parameters and buffers of *module* as
         placeholder nodes in the graph.
@@ -147,6 +105,7 @@ class DispatchTracer:
 
         :param module: The :class:`torch.nn.Module` whose parameters and
             buffers should be pre-registered.
+        :param verbose: verbosity
         """
         seen_ids: set = set()
         for name, tensor in list(module.named_parameters()) + list(module.named_buffers()):
@@ -160,11 +119,10 @@ class DispatchTracer:
             sanitized = name.replace(".", "_")
             node = self.graph.placeholder(sanitized)
             node.meta["val"] = tensor.detach().to(device="meta")
+            node.meta["torch_name"] = name
+            if verbose:
+                print(f"[GraphTracer.register_module_parameters] + {name!r}")
             self._external_tensor_to_node[key] = node
-
-    # ------------------------------------------------------------------
-    # Graph construction helpers
-    # ------------------------------------------------------------------
 
     def placeholder(
         self,
@@ -190,64 +148,7 @@ class DispatchTracer:
         node.meta["val"] = tt
         return tt
 
-    # ------------------------------------------------------------------
-    # Dispatch handler
-    # ------------------------------------------------------------------
-
-    def _dispatch(self, op: Any, args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Any:
-        """
-        Handle one dispatched operation:
-
-        1. Run the op on *meta* tensors for shape/dtype inference.
-        2. Build FX node args (replacing :class:`TracingTensor` with their
-           nodes, and non-traced tensors with auto-placeholder nodes).
-        3. Emit a ``call_function`` node in the graph.
-        4. Return wrapped :class:`TracingTensor` output(s).
-        """
-        # Determine the device from the first TracingTensor arg (used for
-        # the wrapper subclass device attribute of output tensors).
-        device: Union[str, torch.device] = "cpu"
-        all_inputs = (*args, *kwargs.values())
-        for leaf in pytree.tree_leaves(all_inputs):
-            if isinstance(leaf, TracingTensor):
-                device = leaf.device
-                break
-
-        # --- 1. shape inference using meta tensors ---
-        def _to_meta(x: Any) -> Any:
-            assert isinstance(
-                x, (TracingTensor, int, float, str)
-            ), f"unexpected type {type(x)} for x"
-            return x
-
-        meta_args = pytree.tree_map(_to_meta, args)
-        meta_kwargs = pytree.tree_map(_to_meta, kwargs)
-
-        with torch.no_grad():
-            meta_out = op(*meta_args, **meta_kwargs)
-
-        # --- 2. build FX node args ---
-        def _to_node(x: Any) -> Any:
-            if isinstance(x, TracingTensor):
-                return self._get_node(x)
-            if isinstance(x, torch.Tensor):
-                # Non-traced tensor: auto-create a placeholder node.
-                return self._node_for_external_tensor(x)
-            return x
-
-        fx_args = pytree.tree_map(_to_node, args)
-        fx_kwargs = pytree.tree_map(_to_node, kwargs)
-
-        # --- 3. emit FX node ---
-        node = self.graph.call_function(op, args=fx_args, kwargs=fx_kwargs)
-        node.meta["stack_trace"] = "".join(traceback.format_stack())
-        if isinstance(meta_out, torch.Tensor):
-            node.meta["val"] = meta_out
-
-        # --- 4. wrap output ---
-        return self._wrap_output(meta_out, node, device)
-
-    def _wrap_output(
+    def wrap_output(
         self, meta_out: Any, node: torch.fx.Node, device: Union[str, torch.device]
     ) -> Any:
         """
@@ -280,6 +181,53 @@ class DispatchTracer:
 
         return meta_out
 
+    def _dispatch(self, op: Any, args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Any:
+        """
+        Handle one dispatched operation:
+
+        1. Run the op on *meta* tensors for shape/dtype inference.
+        2. Build FX node args (replacing :class:`TracingTensor` with their
+           nodes, and non-traced tensors with auto-placeholder nodes).
+        3. Emit a ``call_function`` node in the graph.
+        4. Return wrapped :class:`TracingTensor` output(s).
+        """
+        # Determine the device from the first TracingTensor arg (used for
+        # the wrapper subclass device attribute of output tensors).
+
+        # --- 1. shape inference using meta tensors ---
+        def _to_meta(x: Any) -> Any:
+            assert isinstance(
+                x, (TracingTensor, int, float, str)
+            ), f"unexpected type {type(x)} for a tensor or a constant"
+            return x
+
+        meta_args = pytree.tree_map(_to_meta, args)
+        meta_kwargs = pytree.tree_map(_to_meta, kwargs)
+
+        with torch.no_grad():
+            meta_out = op(*meta_args, **meta_kwargs)
+
+        # --- 2. build FX node args ---
+        def _to_node(x: Any) -> Any:
+            if isinstance(x, TracingTensor):
+                return self._get_node(x)
+            if isinstance(x, torch.Tensor):
+                # Non-traced tensor: auto-create a placeholder node.
+                return self._node_for_external_tensor(x)
+            return x
+
+        fx_args = pytree.tree_map(_to_node, args)
+        fx_kwargs = pytree.tree_map(_to_node, kwargs)
+
+        # --- 3. emit FX node ---
+        node = self.graph.call_function(op, args=fx_args, kwargs=fx_kwargs)
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        if isinstance(meta_out, torch.Tensor):
+            node.meta["val"] = meta_out
+
+        # --- 4. wrap output ---
+        return self._wrap_output(meta_out, node, device)
+
     # ------------------------------------------------------------------
     # Public tracing entry point
     # ------------------------------------------------------------------
@@ -290,6 +238,7 @@ class DispatchTracer:
         args: Tuple[Any, ...],
         kwargs: Optional[Dict[str, Any]] = None,
         dynamic_shapes: Optional[Dict[str, Any]] = None,
+        verbose: int = 0,
     ) -> torch.fx.Graph:
         """
         Trace *func* with the provided *args* and return the resulting
@@ -311,33 +260,21 @@ class DispatchTracer:
             :class:`TracingInt` / int describing the dimensions symbolically.
             When provided, the corresponding placeholder is given a
             :class:`TracingShape` instead of a concrete :class:`torch.Size`.
+        :param verbose: verbosity
         :return: A :class:`torch.fx.Graph` representing the full computation.
         """
-        if kwargs is None:
-            kwargs = {}
-        dynamic_shapes = dynamic_shapes or {}
-
-        # Reset state for a fresh trace.
-        self.graph = torch.fx.Graph()
-        self._tensor_id_to_node = {}
-        self._external_tensor_to_node = {}
-        self._placeholder_count = 0
-
-        # ------------------------------------------------------------------
-        # Pre-register nn.Module parameters and buffers as named placeholders.
-        # This must happen before building input placeholders so that the
-        # parameter placeholder nodes appear first in the graph.
-        # ------------------------------------------------------------------
         if isinstance(func, torch.nn.Module):
-            self._register_module_parameters(func)
+            self._register_module_parameters(func, verbose=verbose)
 
-        # ------------------------------------------------------------------
-        # Build placeholder TracingTensors for each tensor input.
-        # Nested structures (list, tuple, dict) are traversed recursively so
-        # that every tensor leaf gets its own placeholder node.
-        # All torch.Tensor inputs in args and kwargs are replaced with
-        # TracingTensor placeholders before the function is called.
-        # ------------------------------------------------------------------
+        new_args, treespec_args = torch.utils._pytree.tree_flatten(args)
+        new_kwargs, treespec_kwargs = torch.utils._pytree.tree_flatten(kwargs or {})
+
+        assert all(
+            isinstance(t, (TracingTensor, int, float, str)) for t in new_args
+        ), f"Unexpected type in args {[type(t) for t in new_args]}"
+        assert all(
+            isinstance(t, (TracingTensor, int, float, str)) for t in new_kwargs
+        ), f"Unexpected type in args {[type(t) for t in new_kwargs]}"
 
         # Collect positional parameter names from func's signature.
         _sig_params = [
@@ -352,23 +289,28 @@ class DispatchTracer:
                 return _sig_params[i]
             return f"x_{i}"
 
-        # Replace all torch.Tensor inputs with TracingTensor placeholders.
-        tracing_args = tuple(
-            self._make_placeholder(arg, _arg_name(i), dynamic_shapes)
-            for i, arg in enumerate(args)
-        )
-        tracing_kwargs = {
-            k: self._make_placeholder(v, k, dynamic_shapes) for k, v in kwargs.items()
-        }
+        tracing_args = []
+        tracing_kwargs = {}
+        if dynamic_shapes:
+            # walk through along new_args, kwargs and dynamic_shapes to create TracingTensor
+            pass
+        else:
+            # walk through along new_args, kwargs to create TracingTensor
+            pass
 
-        # ------------------------------------------------------------------
-        # Execute the function under tracing.
-        # ------------------------------------------------------------------
+        # Replace all torch.Tensor inputs with TracingTensor placeholders.
+        # tracing_args = tuple(
+        #    self._make_placeholder(arg, _arg_name(i), dynamic_shapes)
+        #    for i, arg in enumerate(args)
+        # )
+        # tracing_kwargs = {
+        #    k: self._make_placeholder(v, k, dynamic_shapes) for k, v in kwargs.items()
+        # }
+
+        if verbose:
+            print(f"[GraphTracer.trace] trace {func}")
         out = func(*tracing_args, **tracing_kwargs)
 
-        # ------------------------------------------------------------------
-        # Emit output node.
-        # ------------------------------------------------------------------
         def _to_output_node(x: Any) -> Any:
             if isinstance(x, TracingTensor):
                 return self._get_node(x)
@@ -390,6 +332,7 @@ def trace_model(
     args: Tuple[Any, ...],
     kwargs: Optional[Dict[str, Any]] = None,
     dynamic_shapes: Optional[Dict[str, Any]] = None,
+    verbose: int = 0,
 ) -> torch.fx.Graph:
     """
     Convenience wrapper: create a :class:`DispatchTracer` and trace *func*.
@@ -400,6 +343,7 @@ def trace_model(
     :param kwargs: Optional keyword tensor arguments.
     :param dynamic_shapes: Optional dynamic shape specifications; see
         :meth:`DispatchTracer.trace` for the format.
+    :param verbose: verbosity level
     :return: A :class:`torch.fx.Graph` representing the computation.
 
     Example::
@@ -413,4 +357,4 @@ def trace_model(
         )
         print(graph)
     """
-    return DispatchTracer().trace(func, args, kwargs=kwargs, dynamic_shapes=dynamic_shapes)
+    return GraphTracer().trace(func, args, kwargs=kwargs, dynamic_shapes=dynamic_shapes)
