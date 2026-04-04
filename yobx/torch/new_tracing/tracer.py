@@ -5,6 +5,10 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import torch
 import torch.fx
 import torch.utils._pytree as pytree
+from torch._subclasses.fake_tensor import FakeTensorMode
+from torch.fx.experimental.symbolic_shapes import ShapeEnv
+from torch.fx.experimental.sym_node import SymNode
+from ...xexpressions import rename_expression
 from .shape import TracingShape
 from .tensor import TracingTensor
 
@@ -54,6 +58,11 @@ class GraphTracer:
         self.graph: torch.fx.Graph = torch.fx.Graph()
         self._external_tensor_to_node: Dict[int, torch.fx.Node] = {}
         self._placeholder_count: int = 0
+        #
+        self._shape_env = ShapeEnv()
+        self._fake_mode = FakeTensorMode(shape_env=self._shape_env)
+        self._mapped_dimension = {}
+        self._sym_int_to_dynamic_dimension = {}
 
     def _make_tracing_tensor(
         self,
@@ -148,6 +157,42 @@ class GraphTracer:
         node.meta["val"] = tt
         return tt
 
+    def make_fake(self, a: TracingTensor) -> "FakeTensor":  # noqa: F821
+        new_shape = []
+        for d in a.shape:
+            if isinstance(d, str):
+                if d in self._mapped_dimension:
+                    symd = self._mapped_dimension[d]
+                else:
+                    symd = self._shape_env.create_unbacked_symint()
+                    self._mapped_dimension[d] = symd
+                    symd_name = self._sym_int_to_str(symd)
+                    self._sym_int_to_dynamic_dimension[symd_name] = d
+                new_shape.append(symd)
+            else:
+                assert isinstance(d, int), f"Unexpected type for a dimension {type(d)}"
+                new_shape.append(d)
+        with self._fake_mode:
+            return torch.empty(tuple(new_shape), dtype=a.dtype, device=a.device)
+
+    def _sym_int_to_str(self, value):
+        if isinstance(value, str):
+            return value
+        if hasattr(value, "node") and isinstance(value.node, str):
+            return f"{value.node}"
+        if hasattr(value, "node") and isinstance(value.node, SymNode):
+            # '_expr' is safer than expr
+            return str(value.node._expr).replace(" ", "")
+        val_int = int(value)
+        return val_int
+
+    def _token_replace(self, expr: Union[str, int]) -> Union[str, int]:
+        if isinstance(expr, int):
+            return expr
+        if expr in self._sym_int_to_dynamic_dimension:
+            return self._sym_int_to_dynamic_dimension[expr]
+        return rename_expression(expr, self._sym_int_to_dynamic_dimension)
+
     def dispatch(self, func: Any, args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Any:
         """
         Handle one dispatched operation:
@@ -164,7 +209,7 @@ class GraphTracer:
 
         # We could recompute the dynamic shapes without FakeTensor
         # but this is the first approach
-        fake_combined = [a.as_fake() for a in combined_args]
+        fake_combined = [self.make_fake(a) for a in combined_args]
         unflat = torch.utils._pytree.tree_unflatten(fake_combined, treespec)
         fake_args, fake_kwargs = unflat
 
@@ -181,9 +226,15 @@ class GraphTracer:
 
         flat_fake_res, treespec_res = torch.utils._pytree.tree_flatten(fake_res)
         flat_res = [
-            self._make_tracing_tensor(a.shape, a.dtype, a.device, node) for a in flat_fake_res
+            self._make_tracing_tensor(
+                tuple(self._token_replace(self._sym_int_to_str(s)) for s in a.shape),
+                a.dtype,
+                a.device,
+                node,
+            )
+            for a in flat_fake_res
         ]
-        unflat_res = torch.utils._pytree.tree_flatten(flat_res, treespec_res)
+        unflat_res = torch.utils._pytree.tree_unflatten(flat_res, treespec_res)
 
         if node:
             node.meta["val"] = unflat_res

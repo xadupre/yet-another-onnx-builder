@@ -49,6 +49,7 @@ class TracingTensor(torch.Tensor):
                 )
                 for d in size
             )
+            sizes = tuple((i if isinstance(i, int) else 0) for i in sizes)
         else:
             assert isinstance(size, tuple), f"Unexpected type {type(size)} for size"
             assert not size or all(
