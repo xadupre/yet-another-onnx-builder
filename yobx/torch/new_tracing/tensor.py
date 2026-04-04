@@ -1,7 +1,6 @@
 from typing import Any, Dict, Optional, Tuple, Union
 import torch
 import torch.fx
-import torch.utils._pytree as pytree
 from .shape import TracingInt, TracingShape
 
 
@@ -37,7 +36,7 @@ class TracingTensor(torch.Tensor):
         dtype: torch.dtype,
         device: Optional[Union[str, torch.device]] = None,
         requires_grad: bool = False,
-        tracer: Optional["GraphTracer"] = None,
+        tracer: Optional["GraphTracer"] = None,  # noqa: F821
     ) -> "TracingTensor":
         if isinstance(size, TracingShape):
             # Use concrete values where available; fall back to 1 for purely
@@ -69,7 +68,7 @@ class TracingTensor(torch.Tensor):
         dtype: torch.dtype = torch.float32,
         device: Union[str, torch.device] = "cpu",
         requires_grad: bool = False,
-        tracer: Optional["GraphTracer"] = None,
+        tracer: Optional["GraphTracer"] = None,  # noqa: F821
     ):
         self._tracer = tracer
         self._node: Optional[torch.fx.Node] = None
@@ -93,15 +92,15 @@ class TracingTensor(torch.Tensor):
         cls,
         t: torch.Tensor,
         dynamic_shapes: Optional[Dict[int, str]] = None,
-        tracer: Optional["GraphTracer"] = None,
+        tracer: Optional["GraphTracer"] = None,  # noqa: F821
     ) -> "TracingTensor":
         """Creates a tracing tensor."""
-        if not dynamic_shapes:
-            return TracingTensor(tuple(int(i) for i in t.shape), t.dtype, t.device, tracer=tracer)
-        shape = [int(i) for i in t.shape]
-        for d, name in dynamic_shapes.items():
-            shape[d] = name
-        return TracingTensor(tuple(shape), t.dtype, t.device, tracer=tracer)
+        return TracingTensor(
+            TracingShape.from_existing_shape(t.shape, dynamic_shapes),
+            t.dtype,
+            t.device,
+            tracer=tracer,
+        )
 
     def make_empty_instance(
         self, dyanmic_shape_values: Optional[Dict[str, int]] = None
@@ -135,11 +134,6 @@ class TracingTensor(torch.Tensor):
         Intercept every dispatched operation, create an FX graph node, and
         return a new :class:`TracingTensor` (or tuple thereof) for the result.
         """
-        kwargs = kwargs or {}
-
-        # infinite loop here, we create FakeTensor and we call the op.
-        res = tracer._dispatch(func, args, kwargs)
-        assert (
-            func not in {torch.ops.aten.split.Tensor} or res is not None
-        ), f"res is None but func is {func}, this is not possible, args={args}, kwargs={kwargs}"
-        return res
+        tracer = next(a._tracer for a in args if isinstance(a, TracingTensor))
+        assert tracer, f"Missing tracer for func={func}, types={types}, {args}, {kwargs=}"
+        return tracer.dispatch(func, args, kwargs)

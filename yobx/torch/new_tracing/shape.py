@@ -1,4 +1,4 @@
-from typing import Any, Sequence, Tuple, Union
+from typing import Any, Dict, Optional, Sequence, Tuple, Union
 from ...xexpressions import simplify_expression
 import torch
 
@@ -247,7 +247,7 @@ class TracingShape:
 
     def numel(self) -> int:
         """
-        Return the total number of elements (product of all dimensions).
+        Returns the total number of elements (product of all dimensions).
 
         :raises ValueError: If any dimension is purely symbolic (no concrete
             integer value).
@@ -266,7 +266,7 @@ class TracingShape:
 
     def to_torch_size(self) -> torch.Size:
         """
-        Convert to :class:`torch.Size` (requires all dimensions to be concrete).
+        Converts to :class:`torch.Size` (requires all dimensions to be concrete).
 
         :raises ValueError: If any dimension is purely symbolic.
         """
@@ -276,3 +276,14 @@ class TracingShape:
                 "ensure all TracingInt objects have a concrete (int) value"
             )
         return torch.Size(tuple(int(d) for d in self.dims))
+
+    @classmethod
+    def from_existing_shape(
+        cls, shape: Tuple[int, ...], dynamic_shapes: Optional[Dict[int, str]] = None
+    ) -> "TracingShape":
+        if not dynamic_shapes:
+            return TracingShape(tuple(int(i) for i in shape))
+        shape = [int(i) for i in shape]
+        for d, name in dynamic_shapes.items():
+            shape[d] = name
+        return TracingShape(tuple(shape))

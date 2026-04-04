@@ -148,40 +148,7 @@ class GraphTracer:
         node.meta["val"] = tt
         return tt
 
-    def wrap_output(
-        self, meta_out: Any, node: torch.fx.Node, device: Union[str, torch.device]
-    ) -> Any:
-        """
-        Wrap meta-tensor output(s) as :class:`TracingTensor` instances.
-
-        * Single tensor → one :class:`TracingTensor`.
-        * List/tuple of tensors → same container type with
-          ``operator.getitem`` nodes interleaved.
-        * Anything else (scalar, ``None``) → returned as-is.
-        """
-        if isinstance(meta_out, torch.Tensor):
-            return self._make_tracing_tensor(meta_out.shape, meta_out.dtype, device, node)
-
-        if isinstance(meta_out, (list, tuple)):
-            results: List[Any] = []
-            for i, item in enumerate(meta_out):
-                if isinstance(item, torch.Tensor):
-                    get_node = self.graph.call_function(
-                        operator.getitem, args=(node, i), kwargs={}
-                    )
-                    get_node.meta["val"] = item
-                    if "stack_trace" in node.meta:
-                        get_node.meta["stack_trace"] = node.meta["stack_trace"]
-                    results.append(
-                        self._make_tracing_tensor(item.shape, item.dtype, device, get_node)
-                    )
-                else:
-                    results.append(item)
-            return type(meta_out)(results)
-
-        return meta_out
-
-    def _dispatch(self, op: Any, args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Any:
+    def dispatch(self, func: Any, args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Any:
         """
         Handle one dispatched operation:
 
@@ -191,46 +158,139 @@ class GraphTracer:
         3. Emit a ``call_function`` node in the graph.
         4. Return wrapped :class:`TracingTensor` output(s).
         """
-        # Determine the device from the first TracingTensor arg (used for
-        # the wrapper subclass device attribute of output tensors).
+        kwargs = kwargs or {}
 
-        # --- 1. shape inference using meta tensors ---
-        def _to_meta(x: Any) -> Any:
-            assert isinstance(
-                x, (TracingTensor, int, float, str)
-            ), f"unexpected type {type(x)} for a tensor or a constant"
-            return x
+        combined_args, treespec = torch.utils._pytree.tree_flatten((args, kwargs))
 
-        meta_args = pytree.tree_map(_to_meta, args)
-        meta_kwargs = pytree.tree_map(_to_meta, kwargs)
+        # We could recompute the dynamic shapes without FakeTensor
+        # but this is the first approach
+        fake_combined = [a.as_fake() for a in combined_args]
+        unflat = torch.utils._pytree.tree_unflatten(fake_combined, treespec)
+        fake_args, fake_kwargs = unflat
 
-        with torch.no_grad():
-            meta_out = op(*meta_args, **meta_kwargs)
+        # running the function
+        fake_res = func(*fake_args, **fake_kwargs)
+        assert type(fake_res) is not torch.Tensor, f"Unexpected type {type(fake_res)} for output."
 
-        # --- 2. build FX node args ---
-        def _to_node(x: Any) -> Any:
-            if isinstance(x, TracingTensor):
-                return self._get_node(x)
-            if isinstance(x, torch.Tensor):
-                # Non-traced tensor: auto-create a placeholder node.
-                return self._node_for_external_tensor(x)
-            return x
+        # add a node in the graph
+        node_combined = [(a._node if isinstance(a, TracingTensor) else a) for a in combined_args]
+        unflat_nodes = torch.utils._pytree.tree_unflatten(node_combined, treespec)
+        node_args, node_kwargs = unflat_nodes
+        # We need to add nodes.
+        node = self.graph.call_function(func, args=node_args, kwargs=node_kwargs)
 
-        fx_args = pytree.tree_map(_to_node, args)
-        fx_kwargs = pytree.tree_map(_to_node, kwargs)
+        flat_fake_res, treespec_res = torch.utils._pytree.tree_flatten(fake_res)
+        flat_res = [
+            self._make_tracing_tensor(a.shape, a.dtype, a.device, node) for a in flat_fake_res
+        ]
+        unflat_res = torch.utils._pytree.tree_flatten(flat_res, treespec_res)
 
-        # --- 3. emit FX node ---
-        node = self.graph.call_function(op, args=fx_args, kwargs=fx_kwargs)
-        node.meta["stack_trace"] = "".join(traceback.format_stack())
-        if isinstance(meta_out, torch.Tensor):
-            node.meta["val"] = meta_out
+        if node:
+            node.meta["val"] = unflat_res
+            node.meta["fake_val"] = fake_res
+            node.meta["stack_trace"] = "".join(traceback.format_stack())
 
-        # --- 4. wrap output ---
-        return self._wrap_output(meta_out, node, device)
+        assert (
+            func not in {torch.ops.aten.split.Tensor} or unflat_res is not None
+        ), f"res is None but func is {func}, this is not possible, args={args}, kwargs={kwargs}"
+
+        if isinstance(unflat_res, (TracingTensor, int, float, str)):
+            return unflat_res
+
+        if isinstance(unflat_res, (list, tuple)):
+            results: List[Any] = []
+            for i, item in enumerate(unflat_res):
+                if isinstance(item, TracingTensor):
+                    get_node = self.graph.call_function(
+                        operator.getitem, args=(node, i), kwargs={}
+                    )
+                    get_node.meta["val"] = item
+                    if "stack_trace" in node.meta:
+                        get_node.meta["stack_trace"] = node.meta["stack_trace"]
+                    results.append(
+                        self._make_tracing_tensor(item.shape, item.dtype, item.device, get_node)
+                    )
+                else:
+                    assert isinstance(
+                        item, (float, int, str)
+                    ), f"Unexpected type for one item={item}"
+                    results.append(item)
+            return type(unflat_res)(results)
+
+        raise NotImplementedError(f"Unexpected type {type(unflat_res)}")
 
     # ------------------------------------------------------------------
     # Public tracing entry point
     # ------------------------------------------------------------------
+
+    def make_names(self, n: int, name: str, arg, treespec):
+        if isinstance(arg, (list, tuple)):
+            return [f"{name}_i" for i in range(n)]
+        if isinstance(arg, dict) and len(arg) == n:
+            return [f"{name}_{k}" for k in arg]
+        raise NotImplementedError(
+            f"make_names is not implemented for type {type(arg)}, n={n}, {treespec=}"
+        )
+
+    def make_tracing_arg(self, arg, dynamic_shapes, name: Union[int, str]):
+        if isinstance(name, int):
+            name = f"arg_{name}"
+        if isinstance(arg, torch.Tensor):
+            node = self.placeholder(
+                name,
+                TracingShape.from_existing_shape(arg.shape, dynamic_shapes),
+                arg.dtype,
+                device=arg.device,
+            )
+            return node.meta["val"]
+
+        new_arg, treespec_arg = torch.utils._pytree.tree_flatten(arg)
+        if dynamic_shapes:
+            flat_ds, _ = torch.utils._pytree.tree_flatten(dynamic_shapes)
+            assert len(flat_ds) == len(new_arg), (
+                f"Length mismatch between arg ({len(new_arg)}) and "
+                f"the dynamic_shapes ({len(flat_ds)}), name={name!r}"
+            )
+        else:
+            flat_ds = [None for _ in new_arg]
+        names = self.make_names(len(new_arg), name, arg, treespec_arg)
+        flat_args = [
+            self.placeholder(
+                nom, TracingShape.from_existing_shape(a.shape, ds), a.dtype, device=a.device
+            )
+            for nom, a, ds in zip(names, new_arg, flat_ds)
+        ]
+        return torch.utils._pytree.tree_unflatten(flat_args, treespec_arg)
+
+    def make_tracing_args(
+        self,
+        args: Tuple[Any, ...],
+        kwargs: Optional[Dict[str, Any]] = None,
+        dynamic_shapes: Optional[Dict[str, Any]] = None,
+        sig_names: Optional[List[str]] = None,
+    ) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
+        """Creates tracing arguments."""
+        tracing_args = []
+        tracing_kwargs = {}
+        if args:
+            for i, a in enumerate(args):
+                ds = (
+                    (
+                        dynamic_shapes[i]
+                        if isinstance(dynamic_shapes, tuple)
+                        else dynamic_shapes[sig_names[i]]
+                    )
+                    if dynamic_shapes
+                    else None
+                )
+                tracing_args.append(
+                    self.make_tracing_arg(a, ds, name=sig_names[i] if sig_names else i)
+                )
+        if kwargs:
+            for k, v in kwargs.items():
+                ds = dynamic_shapes[k] if dynamic_shapes else None
+                tracing_kwargs[k] = self.make_tracing_arg(v, ds, name=k)
+        return tuple(tracing_args), tracing_kwargs
 
     def trace(
         self,
@@ -266,46 +326,15 @@ class GraphTracer:
         if isinstance(func, torch.nn.Module):
             self._register_module_parameters(func, verbose=verbose)
 
-        new_args, treespec_args = torch.utils._pytree.tree_flatten(args)
-        new_kwargs, treespec_kwargs = torch.utils._pytree.tree_flatten(kwargs or {})
-
-        assert all(
-            isinstance(t, (TracingTensor, int, float, str)) for t in new_args
-        ), f"Unexpected type in args {[type(t) for t in new_args]}"
-        assert all(
-            isinstance(t, (TracingTensor, int, float, str)) for t in new_kwargs
-        ), f"Unexpected type in args {[type(t) for t in new_kwargs]}"
-
-        # Collect positional parameter names from func's signature.
-        _sig_params = [
+        sig_params = [
             p.name
             for p in inspect.signature(func).parameters.values()
             if p.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
         ]
 
-        def _arg_name(i: int) -> str:
-            """Return the parameter name for positional argument *i*."""
-            if i < len(_sig_params):
-                return _sig_params[i]
-            return f"x_{i}"
-
-        tracing_args = []
-        tracing_kwargs = {}
-        if dynamic_shapes:
-            # walk through along new_args, kwargs and dynamic_shapes to create TracingTensor
-            pass
-        else:
-            # walk through along new_args, kwargs to create TracingTensor
-            pass
-
-        # Replace all torch.Tensor inputs with TracingTensor placeholders.
-        # tracing_args = tuple(
-        #    self._make_placeholder(arg, _arg_name(i), dynamic_shapes)
-        #    for i, arg in enumerate(args)
-        # )
-        # tracing_kwargs = {
-        #    k: self._make_placeholder(v, k, dynamic_shapes) for k, v in kwargs.items()
-        # }
+        tracing_args, tracing_kwargs = self.make_tracing_args(
+            args, kwargs, dynamic_shapes=dynamic_shapes, sig_names=sig_params
+        )
 
         if verbose:
             print(f"[GraphTracer.trace] trace {func}")
@@ -314,16 +343,14 @@ class GraphTracer:
         def _to_output_node(x: Any) -> Any:
             if isinstance(x, TracingTensor):
                 return self._get_node(x)
-            if isinstance(x, torch.Tensor):
-                raise RuntimeError(
-                    f"Function returned a real torch.Tensor: {x!r}. "
-                    "All tensor outputs must be TracingTensor instances produced during tracing."
-                )
+            assert not isinstance(x, torch.Tensor), (
+                f"Function {func} returned a real torch.Tensor. "
+                "All tensor outputs must be TracingTensor instances produced during tracing."
+            )
             return x
 
         output_val = pytree.tree_map(_to_output_node, out)
         self.graph.output(output_val)
-
         return self.graph
 
 
