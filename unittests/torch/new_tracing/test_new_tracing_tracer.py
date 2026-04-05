@@ -543,6 +543,210 @@ class TestNewTracingTracer(ExtTestCase):
             f"No parameter placeholder in sub-graph: {ph_names}",
         )
 
+    # ------------------------------------------------------------------
+    # module_leaves support
+    # ------------------------------------------------------------------
+
+    def test_trace_module_leaves_no_params(self):
+        """A leaf module with no parameters emits a single call_function node."""
+
+        class LeafModule(torch.nn.Module):
+            def forward(self, x):
+                return x * 2
+
+        class OuterModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.leaf = LeafModule()
+
+            def forward(self, x):
+                return self.leaf(x) + 1
+
+        model = OuterModule()
+        tracer = GraphTracer(
+            module_leaves={LeafModule: lambda m, module_qualified_name=None: True}
+        )
+        graph = tracer.trace(model, (torch.randn(2, 4),))
+        graph.lint()
+
+        # The leaf module should appear as a single call_function node.
+        leaf_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is model.leaf
+        ]
+        self.assertEqual(len(leaf_nodes), 1, f"Expected 1 leaf node, got: {leaf_nodes}")
+
+    def test_trace_module_leaves_with_params_not_in_graph(self):
+        """Parameters of a leaf module must NOT appear as graph placeholders."""
+
+        class LeafModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.fc = torch.nn.Linear(4, 4)
+
+            def forward(self, x):
+                return self.fc(x)
+
+        class OuterModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.leaf = LeafModule()
+
+            def forward(self, x):
+                return self.leaf(x) + 1
+
+        model = OuterModule()
+        tracer = GraphTracer(
+            module_leaves={LeafModule: lambda m, module_qualified_name=None: True}
+        )
+        graph = tracer.trace(model, (torch.randn(2, 4),))
+        graph.lint()
+
+        ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
+        # The input tensor should be a placeholder; no leaf-module params.
+        self.assertFalse(
+            any("fc" in n for n in ph_names),
+            f"Leaf module parameters should not be graph placeholders, got: {ph_names}",
+        )
+
+        # The leaf module itself must appear as a call_function node.
+        leaf_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is model.leaf
+        ]
+        self.assertEqual(len(leaf_nodes), 1)
+
+    def test_trace_module_leaves_outer_params_preserved(self):
+        """Parameters of the *outer* module must still be registered."""
+
+        class LeafModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.fc = torch.nn.Linear(4, 4)
+
+            def forward(self, x):
+                return self.fc(x)
+
+        class OuterModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.leaf = LeafModule()
+                self.bias = torch.nn.Parameter(torch.zeros(4))
+
+            def forward(self, x):
+                return self.leaf(x) + self.bias
+
+        model = OuterModule()
+        tracer = GraphTracer(
+            module_leaves={LeafModule: lambda m, module_qualified_name=None: True}
+        )
+        graph = tracer.trace(model, (torch.randn(2, 4),))
+        graph.lint()
+
+        ph_names = [n.name for n in graph.nodes if n.op == "placeholder"]
+        # The outer module's own parameter should be present.
+        self.assertIn("bias", ph_names, f"Outer module bias not found in {ph_names}")
+        # Leaf module parameters should be absent.
+        self.assertFalse(
+            any("fc" in n for n in ph_names),
+            f"Leaf module parameters should not appear: {ph_names}",
+        )
+
+    def test_trace_module_leaves_predicate_false(self):
+        """When the predicate returns False the module is traced normally."""
+
+        class ConditionalLeaf(torch.nn.Module):
+            def forward(self, x):
+                return x * 3
+
+        class OuterModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.sub = ConditionalLeaf()
+
+            def forward(self, x):
+                return self.sub(x) + 1
+
+        def never_leaf(m, module_qualified_name=None):
+            return False
+
+        model = OuterModule()
+        tracer = GraphTracer(module_leaves={ConditionalLeaf: never_leaf})
+        graph = tracer.trace(model, (torch.randn(2, 4),))
+        graph.lint()
+
+        # With predicate returning False the module is traced through; no
+        # call_function node with model.sub as target should exist.
+        leaf_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is model.sub
+        ]
+        self.assertEqual(len(leaf_nodes), 0, f"Expected no leaf node, got: {leaf_nodes}")
+
+    def test_trace_module_leaves_multiple(self):
+        """Multiple leaf sub-modules each become a single call_function node."""
+
+        class LeafA(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        class LeafB(torch.nn.Module):
+            def forward(self, x):
+                return x * 2
+
+        class OuterModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.a = LeafA()
+                self.b = LeafB()
+
+            def forward(self, x):
+                return self.a(x) + self.b(x)
+
+        model = OuterModule()
+        tracer = GraphTracer(
+            module_leaves={
+                LeafA: lambda m, module_qualified_name=None: True,
+                LeafB: lambda m, module_qualified_name=None: True,
+            }
+        )
+        graph = tracer.trace(model, (torch.randn(2, 4),))
+        graph.lint()
+
+        leaf_a_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is model.a
+        ]
+        leaf_b_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is model.b
+        ]
+        self.assertEqual(len(leaf_a_nodes), 1)
+        self.assertEqual(len(leaf_b_nodes), 1)
+
+    def test_trace_model_with_module_leaves(self):
+        """trace_model convenience function honours module_leaves."""
+
+        class LeafModule(torch.nn.Module):
+            def forward(self, x):
+                return x * 2
+
+        class OuterModule(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.leaf = LeafModule()
+
+            def forward(self, x):
+                return self.leaf(x) + 1
+
+        model = OuterModule()
+        graph = trace_model(
+            model,
+            (torch.randn(2, 4),),
+            module_leaves={LeafModule: lambda m, module_qualified_name=None: True},
+        )
+        graph.lint()
+
+        leaf_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is model.leaf
+        ]
+        self.assertEqual(len(leaf_nodes), 1)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
