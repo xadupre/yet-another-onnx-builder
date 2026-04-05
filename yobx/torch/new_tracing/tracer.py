@@ -434,6 +434,7 @@ class GraphTracer:
             node.meta["val"] = unflat_res
             node.meta["fake_val"] = fake_res
             node.meta["stack_trace"] = "".join(traceback.format_stack())
+            node.meta["fn"] = func
 
         assert (
             func not in {torch.ops.aten.split.Tensor} or unflat_res is not None

@@ -157,6 +157,15 @@ class TestNewTracingTracer(ExtTestCase):
         self.assertIn("val", cf.meta)
         self.assertEqual(cf.meta["val"].shape, torch.Size([3, 5]))
 
+    def test_call_function_meta_fn(self):
+        tracer = GraphTracer()
+        graph = tracer.trace(lambda x: x + 1.0, (torch.randn(3, 5),))
+        cf = next(n for n in graph.nodes if n.op == "call_function")
+        self.assertIn("fn", cf.meta)
+        # The stored function should be callable and match the node target.
+        self.assertTrue(callable(cf.meta["fn"]))
+        self.assertIs(cf.meta["fn"], cf.target)
+
     def test_call_function_meta_stack_trace(self):
         tracer = GraphTracer()
         graph = tracer.trace(lambda x: x + 1.0, (torch.randn(3, 5),))
