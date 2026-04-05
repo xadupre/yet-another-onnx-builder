@@ -29,6 +29,47 @@ def _make_patch_info_for_rotary(submodule_class):
     return patch
 
 
+def _make_masking_patches() -> List[PatchInfo]:
+    """
+    Returns patches for :mod:`transformers.masking_utils` that make the mask-
+    creation functions compatible with FX symbolic tracing.
+
+    These patches are only added when the functions exist in the installed
+    version of :mod:`transformers`.
+    """
+    try:
+        import transformers.masking_utils as _masking_utils
+    except ImportError:
+        return []
+    from ._patches_masking_utils import (
+        patched_prepare_padding_mask,
+        patched__ignore_causal_mask_sdpa,
+    )
+
+    patches = []
+    if hasattr(_masking_utils, "prepare_padding_mask"):
+        patches.append(
+            PatchInfo.make(
+                patched_prepare_padding_mask,
+                _masking_utils,
+                "prepare_padding_mask",
+                family="transformers",
+                _last_patched_function=_masking_utils.prepare_padding_mask,
+            )
+        )
+    if hasattr(_masking_utils, "_ignore_causal_mask_sdpa"):
+        patches.append(
+            PatchInfo.make(
+                patched__ignore_causal_mask_sdpa,
+                _masking_utils,
+                "_ignore_causal_mask_sdpa",
+                family="transformers",
+                _last_patched_function=_masking_utils._ignore_causal_mask_sdpa,
+            )
+        )
+    return patches
+
+
 def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
     """
     Returns the list of patches for a specific model.
@@ -43,8 +84,9 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
     if model is None:
         from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
 
-        return [*PATCHES, _make_patch_info_for_rotary(LlamaRotaryEmbedding)]
+        return [*PATCHES, _make_patch_info_for_rotary(LlamaRotaryEmbedding), *_make_masking_patches()]
     patches = list(PATCHES)
+    patches.extend(_make_masking_patches())
     for _name, submodule in model.named_modules():
         if (
             hasattr(submodule.forward, "__wrapped__")

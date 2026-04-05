@@ -260,9 +260,14 @@ def make_dynamic_cache(
 
     from ...pv_version import PvVersion
 
+    _first_key = key_value_pairs[0][0] if key_value_pairs else None
+    _is_proxy = isinstance(_first_key, torch.fx.proxy.Proxy)
+
     if (
         key_value_pairs
-        and isinstance(key_value_pairs[0][0], torch._subclasses.fake_tensor.FakeTensor)
+        and (
+            isinstance(_first_key, torch._subclasses.fake_tensor.FakeTensor) or _is_proxy
+        )
         and PvVersion(transformers.__version__) >= PvVersion("4.56")
     ):
         cache = transformers.cache_utils.DynamicCache()

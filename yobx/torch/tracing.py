@@ -329,7 +329,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
     ) -> "CustomProxy":
         """Implements cat for tensors."""
         assert out is None, "Tracing is not implementing is out is not None."
-        if isinstance(tensors, list):
+        if isinstance(tensors, (list, tuple)):
             if any(isinstance(t, CustomProxy) for t in tensors):
                 proxy = next(t for t in tensors if isinstance(t, CustomProxy))
                 new_tensors = []
@@ -1012,6 +1012,11 @@ class CustomTracer(torch.fx.Tracer):
         # the :class:`CustomProxyInt` associated with the operand of a comparison
         # node so that constraint flags such as ``only_positive`` can be set.
         self._node_proxy_map: Dict[torch.fx.Node, CustomProxy] = {}
+        # Flat list of parameter names for the wrapped model (set in trace() when the
+        # model is wrapped with FlatArgWrap); used by _proxy_placeholder to pre-populate
+        # node.meta["val"] from _traced_concrete_args so that ndim/dtype/device
+        # comparisons in control flow resolve to concrete values during tracing.
+        self._traced_new_names: Optional[List[str]] = None
 
     @torch.fx._compatibility.compatibility(is_backward_compatible=True)
     def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
@@ -1158,19 +1163,27 @@ class CustomTracer(torch.fx.Tracer):
     def _proxy_placeholder(self, name, concrete_args, sig, fn_for_analysis):
         res = torch.fx.Tracer._proxy_placeholder(self, name, concrete_args, sig, fn_for_analysis)
         # Pre-populate node meta with the fake tensor so that CustomProxy.__getattr__
-        # can resolve static attributes (dtype, device) to concrete values during
-        # tracing, enabling dtype/device-based control flow without TraceError.
-        # Only handles the dict case; when _traced_concrete_args is a flat list
-        # (pytree-wrapped models), the wrapped parameter names differ from the
-        # originals and the mapping is handled post-trace in the trace() loop.
-        if (
-            self._traced_concrete_args is not None
-            and isinstance(self._traced_concrete_args, dict)
-            and name in self._traced_concrete_args
-        ):
-            fake = self._traced_concrete_args[name]
-            if isinstance(fake, torch.Tensor):
-                res.node.meta["val"] = fake
+        # can resolve static attributes (dtype, device, ndim) to concrete values during
+        # tracing, enabling dtype/device/ndim-based control flow without TraceError.
+        if self._traced_concrete_args is not None:
+            if isinstance(self._traced_concrete_args, dict) and name in self._traced_concrete_args:
+                fake = self._traced_concrete_args[name]
+                if isinstance(fake, torch.Tensor):
+                    res.node.meta["val"] = fake
+            elif (
+                isinstance(self._traced_concrete_args, list)
+                and self._traced_new_names is not None
+                and name in self._traced_new_names
+            ):
+                # Flat-list case: model was wrapped with FlatArgWrap.
+                # Use _traced_new_names to map placeholder name to the corresponding
+                # fake tensor so that ndim/dtype/device comparisons in control flow
+                # (e.g. ``if attention_mask.ndim == 2:``) resolve to a concrete value
+                # instead of raising RuntimeError during tracing.
+                ii = self._traced_new_names.index(name)
+                fake = self._traced_concrete_args[ii]
+                if isinstance(fake, torch.Tensor):
+                    res.node.meta["val"] = fake
         return res
 
     def create_args_for_root(self, root_fn, is_module, concrete_args=None):
@@ -1349,12 +1362,16 @@ class CustomTracer(torch.fx.Tracer):
                     f"[CustomTracer.trace] _traced_concrete_args="
                     f"{string_type(self._traced_concrete_args, with_shape=True)}"
                 )
+            # Store new_names so _proxy_placeholder can pre-populate node.meta["val"]
+            # for the flat-list case (wrapped model).
+            self._traced_new_names = new_names
             with replace_problematic_function_before_tracing():
                 # concrete arguments are replaced by constants whatever is given to the function
                 graph = super().trace(new_model)
 
         else:
             self._traced_concrete_args = None
+            self._traced_new_names = None
             new_names = None
 
             with replace_problematic_function_before_tracing():
