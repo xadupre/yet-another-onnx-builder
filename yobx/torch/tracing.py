@@ -43,12 +43,12 @@ def _infer_ndim_from_node(node: "torch.fx.Node", _visited: Optional[set] = None)
 
     if "val" in node.meta:
         val = node.meta["val"]
-        if isinstance(val, torch.Tensor) and isinstance(val.ndim, int):
+        if isinstance(val, torch.Tensor):
             return val.ndim
 
     # For intermediate nodes, propagate from tensor-valued arguments.
     best: Optional[int] = None
-    for arg in node.args:
+    for arg in list(node.args) + list(node.kwargs.values()):
         if isinstance(arg, torch.fx.Node):
             d = _infer_ndim_from_node(arg, _visited)
             if d is not None and (best is None or d > best):
