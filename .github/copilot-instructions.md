@@ -1,7 +1,7 @@
 ## Code Standards
 
 ### Required Before Each Commit
-- Run `black .&&ruff check .` before committing any changes to ensure proper code formatting
+- Run `black . && ruff check .` before committing any changes to ensure proper code formatting
 
 ### Docstring Style
 - Write docstrings using **third-person singular** verbs (e.g., "Returns the value.", "Computes the output shape.", not "Return the value." or "Compute the output shape.")
