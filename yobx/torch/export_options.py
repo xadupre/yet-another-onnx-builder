@@ -66,7 +66,8 @@ class ExportOptions:
         see :func:`torch.export.export`
     :param fake: use fake tensors as inputs
     :param tracing_module_leaves: this option is used when the module is traced
-        (``tracing=TracingMode.TRACING``), it specifies which modules should remain a *call_module*,
+        (``tracing=TracingMode.TRACING``), it specifies
+        which modules should remain a *call_module*,
         see :class:`yobx.torch.tracing.CustomTracer`.
     """
 
