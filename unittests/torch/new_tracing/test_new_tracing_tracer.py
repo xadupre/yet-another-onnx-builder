@@ -380,6 +380,169 @@ class TestNewTracingTracer(ExtTestCase):
             any("bias" in n for n in ph_names), f"Unexpected 'bias' placeholder in {ph_names}"
         )
 
+    # ------------------------------------------------------------------
+    # torch.cond support
+    # ------------------------------------------------------------------
+
+    def test_trace_cond_single_output(self):
+        """torch.cond with a single tensor output is captured as a call_function node."""
+
+        class CondModel(torch.nn.Module):
+            def forward(self, x):
+                def true_fn(x):
+                    return torch.sin(x)
+
+                def false_fn(x):
+                    return torch.cos(x)
+
+                return torch.cond(x.sum() > 0, true_fn, false_fn, [x])
+
+        model = CondModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(5, 3),))
+        graph.lint()
+
+        # Exactly one call_function node with target torch.cond
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
+        self.assertEqual(len(cond_nodes), 1, f"Expected 1 cond node, got: {cond_nodes}")
+
+        # Branch sub-graphs are stored in _sub_tracers
+        self.assertIn("_cb_cond_true_fn_0", tracer._sub_tracers)
+        self.assertIn("_cb_cond_false_fn_0", tracer._sub_tracers)
+
+        # Sub-graphs should be valid FX graphs
+        for _name, sub in tracer._sub_tracers.items():
+            sub.graph.lint()
+
+    def test_trace_cond_two_outputs(self):
+        """torch.cond whose branches return a tuple produces getitem nodes."""
+
+        class TwoOutModel(torch.nn.Module):
+            def forward(self, x):
+                def true_fn(x):
+                    return torch.sin(x), torch.cos(x)
+
+                def false_fn(x):
+                    return torch.cos(x), torch.sin(x)
+
+                return torch.cond(x.sum() > 0, true_fn, false_fn, [x])
+
+        model = TwoOutModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(5, 3),))
+        graph.lint()
+
+        # One cond node + two getitem nodes
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
+        self.assertEqual(len(cond_nodes), 1)
+        gi_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is operator.getitem
+        ]
+        self.assertGreaterEqual(len(gi_nodes), 2)
+
+    def test_trace_cond_two_inputs(self):
+        """torch.cond with two tensor operands produces a cond node."""
+
+        class TwoInputModel(torch.nn.Module):
+            def forward(self, x, y):
+                def true_fn(x, y):
+                    return torch.sin(x), torch.cos(x) + y
+
+                def false_fn(x, y):
+                    return torch.cos(x), torch.sin(x) + y
+
+                return torch.cond(x.sum() > 0, true_fn, false_fn, [x, y])
+
+        x, y = torch.randn(5, 3), torch.randn(5, 3)
+        model = TwoInputModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (x, y))
+        graph.lint()
+
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
+        self.assertEqual(len(cond_nodes), 1)
+
+    def test_trace_cond_nested(self):
+        """Nested torch.cond calls are each captured as separate cond nodes."""
+
+        class NestedCondModel(torch.nn.Module):
+            def forward(self, x):
+                def true_fn2(x):
+                    def true_fn1(x):
+                        return torch.sin(x)
+
+                    def false_fn1(x):
+                        return torch.cos(x)
+
+                    return torch.cond(x.sum() < 0, true_fn1, false_fn1, [x])
+
+                def false_fn2(x):
+                    return -x
+
+                return torch.cond(x.sum() > 0, true_fn2, false_fn2, [x])
+
+        model = NestedCondModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(5, 3),))
+        graph.lint()
+
+        # Main graph has one cond node
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
+        self.assertEqual(len(cond_nodes), 1)
+
+        # The true_fn2 sub-graph itself also contains a cond node
+        true_sub = tracer._sub_tracers.get("_cb_cond_true_fn2_0")
+        self.assertIsNotNone(true_sub, f"Keys: {list(tracer._sub_tracers)}")
+        nested_cond = [
+            n for n in true_sub.graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
+        self.assertEqual(len(nested_cond), 1)
+
+    def test_trace_cond_with_module_params(self):
+        """torch.cond branches that reference nn.Module parameters are traced correctly."""
+
+        class WeightedCond(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.tensor([42.0]))
+
+            def forward(self, x):
+                def true_fn(x):
+                    return x + self.weight
+
+                def false_fn(x):
+                    return x - self.weight
+
+                return torch.cond(x.sum() > 0, true_fn, false_fn, [x])
+
+        model = WeightedCond()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(3, 4),))
+        graph.lint()
+
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
+        self.assertEqual(len(cond_nodes), 1)
+
+        # Branch sub-graphs reference a parameter placeholder
+        true_sub = tracer._sub_tracers["_cb_cond_true_fn_0"]
+        true_sub.graph.lint()
+        # There should be a placeholder for the weight parameter in the sub-graph
+        ph_names = [n.name for n in true_sub.graph.nodes if n.op == "placeholder"]
+        self.assertTrue(
+            any("param" in n or "operand" in n for n in ph_names),
+            f"No parameter placeholder in sub-graph: {ph_names}",
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
