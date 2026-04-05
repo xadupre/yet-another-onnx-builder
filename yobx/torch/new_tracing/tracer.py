@@ -288,6 +288,21 @@ class GraphTracer:
             return torch.empty(a.shape, dtype=a.dtype, device=a.device)
 
     def _sym_shape_to_str_shape(self, sym_shape):
+        """
+        Convert a shape tuple whose elements may be :class:`torch.SymInt` into
+        a shape tuple of plain ``int`` or ``str`` (symbolic dimension names).
+
+        Each :class:`torch.SymInt` element is first stringified via
+        :meth:`_sym_int_to_str`, then canonicalised via :meth:`_token_replace`
+        (which substitutes known ``SymInt``-to-name mappings).  The resulting
+        string is also registered in ``self._mapped_dimension`` so future
+        references to the same symbol resolve to the same name.
+
+        :param sym_shape: An iterable of dimension values that may be plain
+            ``int``, ``str``, or :class:`torch.SymInt`.
+        :return: A ``tuple`` of ``int`` / ``str`` suitable for constructing a
+            :class:`TracingShape`.
+        """
         new_shape = []
         for s in sym_shape:
             if isinstance(s, (int, str)):
@@ -300,6 +315,21 @@ class GraphTracer:
         return tuple(new_shape)
 
     def _sym_int_to_str(self, value):
+        """
+        Stringify a symbolic integer into a plain ``str`` or ``int``.
+
+        The conversion follows this priority:
+        1. A plain ``str`` is returned as-is.
+        2. A :class:`torch.SymInt` whose ``.node`` attribute is a ``str`` is
+           returned as that string.
+        3. A :class:`torch.SymInt` backed by a :class:`torch.fx.experimental.sym_node.SymNode`
+           is serialised via its internal ``_expr`` (spaces stripped).
+        4. Anything else is cast to ``int`` with :func:`int`.
+
+        :param value: A ``str``, ``int``, or :class:`torch.SymInt`.
+        :return: A ``str`` (symbolic name / expression) or ``int`` (concrete
+            value).
+        """
         if isinstance(value, str):
             return value
         if hasattr(value, "node") and isinstance(value.node, str):
@@ -311,6 +341,20 @@ class GraphTracer:
         return val_int
 
     def _token_replace(self, expr: Union[str, int]) -> Union[str, int]:
+        """
+        Replace symbolic expression tokens with their user-visible dimension
+        names.
+
+        If *expr* is an ``int``, it is returned unchanged.  Otherwise the
+        method first checks ``self._sym_int_to_dynamic_dimension`` for an
+        exact match; failing that it delegates to
+        :func:`~yobx.xexpressions.rename_expression` to perform a token-level
+        substitution across the whole expression string.
+
+        :param expr: A symbolic expression string produced by
+            :meth:`_sym_int_to_str`, or a concrete ``int``.
+        :return: The renamed expression (``str``) or the original ``int``.
+        """
         if isinstance(expr, int):
             return expr
         if expr in self._sym_int_to_dynamic_dimension:
@@ -423,6 +467,22 @@ class GraphTracer:
     # ------------------------------------------------------------------
 
     def make_names(self, n: int, name: str, arg, treespec):
+        """
+        Generate a list of *n* unique child names derived from *name*.
+
+        For a list or tuple *arg*, names are ``"<name>_0"``, ``"<name>_1"``,
+        …, ``"<name>_{n-1}"``.  For a dict *arg* whose length equals *n*,
+        names are ``"<name>_<key>"`` for each key.
+
+        :param n: Number of names to generate (must equal ``len(arg)``).
+        :param name: Base name (typically the parameter name from the function
+            signature).
+        :param arg: The original argument (list, tuple, or dict).
+        :param treespec: The :class:`torch.utils._pytree.TreeSpec` of *arg*;
+            included for error messages only.
+        :return: A ``list`` of ``str`` names of length *n*.
+        :raises NotImplementedError: If *arg* has an unsupported type.
+        """
         if isinstance(arg, (list, tuple)):
             return [f"{name}_{i}" for i in range(n)]
         if isinstance(arg, dict) and len(arg) == n:
@@ -468,7 +528,23 @@ class GraphTracer:
         dynamic_shapes: Optional[Dict[str, Any]] = None,
         sig_names: Optional[List[str]] = None,
     ) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
-        """Creates tracing arguments."""
+        """
+        Convert *args* / *kwargs* into tracing counterparts.
+
+        Every :class:`torch.Tensor` (or container of tensors) in *args* and
+        *kwargs* is replaced by the corresponding :class:`TracingTensor`
+        placeholder(s).  Non-tensor values are forwarded unchanged.
+
+        :param args: Positional arguments as provided to :meth:`trace`.
+        :param kwargs: Keyword arguments as provided to :meth:`trace`.
+        :param dynamic_shapes: Optional per-argument dynamic shape mapping;
+            passed through to :meth:`make_tracing_arg`.
+        :param sig_names: Parameter names extracted from the traced function's
+            signature; used to name placeholders and look up *dynamic_shapes*
+            by name rather than by index.
+        :return: A ``(tracing_args, tracing_kwargs)`` tuple whose tensor leaves
+            are :class:`TracingTensor` instances.
+        """
         tracing_args = []
         tracing_kwargs = {}
         if args:
@@ -524,6 +600,18 @@ class GraphTracer:
             When provided, the corresponding placeholder is given a
             :class:`TracingShape` instead of a concrete :class:`torch.Size`.
         :return: A :class:`torch.fx.Graph` representing the full computation.
+
+        .. runpython::
+            :showcode:
+
+            import torch
+            from yobx.torch.new_tracing import GraphTracer
+
+            def add(x, y):
+                return x + y
+
+            graph = GraphTracer().trace(add, (torch.randn(3, 4), torch.randn(3, 4)))
+            print(graph)
         """
         if self.verbose:
             s = str(func).split("\n")[0]
@@ -579,7 +667,8 @@ def trace_model(
     :param verbose: verbosity level
     :return: A :class:`torch.fx.Graph` representing the computation.
 
-    Example::
+    .. runpython::
+        :showcode:
 
         import torch
         from yobx.torch.new_tracing import trace_model

@@ -281,6 +281,19 @@ class TracingShape:
     def from_existing_shape(
         cls, shape: Tuple[int, ...], dynamic_shapes: Optional[Dict[int, str]] = None
     ) -> "TracingShape":
+        """
+        Build a :class:`TracingShape` from a concrete shape tuple, optionally
+        making selected dimensions symbolic.
+
+        :param shape: The concrete shape (e.g. from ``tensor.shape``).
+        :param dynamic_shapes: An optional mapping from *dimension index* to
+            *symbolic name*.  For every key ``d`` the integer ``shape[d]`` is
+            replaced by the string ``dynamic_shapes[d]`` in the resulting
+            :class:`TracingShape`.  When ``None`` or empty, all dimensions
+            remain concrete integers.
+        :return: A :class:`TracingShape` whose ``dims`` are ``int`` values for
+            static dimensions and ``str`` values for dynamic ones.
+        """
         if not dynamic_shapes:
             return TracingShape(tuple(int(i) for i in shape))
         new_shape = [int(i) for i in shape]
