@@ -675,9 +675,7 @@ class TestNewTracingTracer(ExtTestCase):
 
         # With predicate returning False the module is traced through; no
         # call_function node with model.sub as target should exist.
-        leaf_nodes = [
-            n for n in graph.nodes if n.op == "call_function" and n.target is model.sub
-        ]
+        leaf_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is model.sub]
         self.assertEqual(len(leaf_nodes), 0, f"Expected no leaf node, got: {leaf_nodes}")
 
     def test_trace_module_leaves_multiple(self):
@@ -710,12 +708,8 @@ class TestNewTracingTracer(ExtTestCase):
         graph = tracer.trace(model, (torch.randn(2, 4),))
         graph.lint()
 
-        leaf_a_nodes = [
-            n for n in graph.nodes if n.op == "call_function" and n.target is model.a
-        ]
-        leaf_b_nodes = [
-            n for n in graph.nodes if n.op == "call_function" and n.target is model.b
-        ]
+        leaf_a_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is model.a]
+        leaf_b_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is model.b]
         self.assertEqual(len(leaf_a_nodes), 1)
         self.assertEqual(len(leaf_b_nodes), 1)
 

@@ -53,7 +53,7 @@ class TracingTensor(torch.Tensor):
         else:
             assert isinstance(size, tuple), f"Unexpected type {type(size)} for size"
             assert not size or all(
-                isinstance(i, (int, str)) for i in size
+                isinstance(i, int) for i in size
             ), f"Unexpected type in sizes {[type(s) for s in size]} for size"
             sizes = tuple((i if isinstance(i, int) else 0) for i in size)
 
@@ -73,7 +73,10 @@ class TracingTensor(torch.Tensor):
     ):
         self._tracer = tracer
         self._node: Optional[torch.fx.Node] = None
-        self._tracing_shape = TracingShape(size)  # type: ignore
+        assert isinstance(size, TracingShape) or all(
+            isinstance(i, int) for i in size
+        ), f"Unexpected type for shape={size!r}"
+        self._tracing_shape = size if isinstance(size, TracingShape) else TracingShape(size)
 
     @property
     def shape(self) -> TracingShape:  # type: ignore
@@ -134,9 +137,11 @@ class TracingTensor(torch.Tensor):
         for s in self.shape:
             if isinstance(s, int):
                 new_shape.append(s)
-            elif isinstance(s, str):
-                assert s in dyanmic_shape_values, f"Missing value for dynamic dimension {s!r}"
-                new_shape.append(dyanmic_shape_values[s])
+            elif isinstance(s, TracingInt):
+                assert (
+                    s.value in dyanmic_shape_values
+                ), f"Missing value for dynamic dimension {s!r}"
+                new_shape.append(dyanmic_shape_values[s.value])
             else:
                 raise NotImplementedError(f"Unexpected type {type(s)}")
         return torch.empty(tuple(new_shape), dtype=self.dtype, device=self.device)

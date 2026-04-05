@@ -10,7 +10,7 @@ from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import ShapeEnv
 from torch.fx.experimental.sym_node import SymNode
 from ...xexpressions import rename_expression
-from .shape import TracingShape
+from .shape import TracingShape, TracingInt
 from .tensor import TracingTensor
 
 # Capture the real ``torch.cond`` at import time so that it can always be
@@ -122,9 +122,7 @@ class GraphTracer:
     """
 
     def __init__(
-        self,
-        verbose: int = 0,
-        module_leaves: Optional[Dict[type, Callable[..., bool]]] = None,
+        self, verbose: int = 0, module_leaves: Optional[Dict[type, Callable[..., bool]]] = None
     ) -> None:
         self.graph: torch.fx.Graph = torch.fx.Graph()
         self._external_tensor_to_node: Dict[int, torch.fx.Node] = {}
@@ -296,10 +294,7 @@ class GraphTracer:
             if _leaf_module_paths:
                 parts = name.split(".")
                 # Check every module-path prefix (excluding the bare param name).
-                if any(
-                    ".".join(parts[:i]) in _leaf_module_paths
-                    for i in range(1, len(parts))
-                ):
+                if any(".".join(parts[:i]) in _leaf_module_paths for i in range(1, len(parts))):
                     if self.verbose:
                         print(
                             f"[GraphTracer.register_module_parameters] skip {name!r}"
@@ -396,25 +391,30 @@ class GraphTracer:
         if isinstance(a, TracingTensor):
             new_shape: List[Union[int, torch.SymInt]] = []
             for d in a.shape:
-                if isinstance(d, str):
-                    if d in self._mapped_dimension:
-                        symd = self._mapped_dimension[d]
+                if isinstance(d, TracingInt):
+                    if d.is_static:
+                        new_shape.append(d.value)  # type: ignore
+                        continue
+                    if d.value in self._mapped_dimension:
+                        symd = self._mapped_dimension[d.value]
                     else:
                         symd = self._shape_env.create_unbacked_symint()
-                        self._mapped_dimension[d] = symd
+                        self._mapped_dimension[d.value] = symd  # type: ignore
                         symd_name = self._sym_int_to_str(symd)
                         assert isinstance(symd_name, str), "type checking"
-                        self._sym_int_to_dynamic_dimension[symd_name] = d
+                        self._sym_int_to_dynamic_dimension[symd_name] = d.value  # type: ignore
                     new_shape.append(symd)
-                else:
-                    assert isinstance(d, int), f"Unexpected type for a dimension {type(d)}"
-                    new_shape.append(d)
+                    continue
+                assert isinstance(d, int), f"Unexpected type for a dimension {type(d)}"
+                new_shape.append(d)
             with self._fake_mode:
                 return torch.empty(tuple(new_shape), dtype=a.dtype, device=a.device)
         with self._fake_mode:
             return torch.empty(a.shape, dtype=a.dtype, device=a.device)
 
-    def _sym_shape_to_str_shape(self, sym_shape):
+    def _sym_shape_to_str_shape(
+        self, sym_shape: Tuple[Union[int, torch.SymInt], ...]
+    ) -> TracingShape:
         """
         Convert a shape tuple whose elements may be :class:`torch.SymInt` into
         a shape tuple of plain ``int`` or ``str`` (symbolic dimension names).
@@ -430,17 +430,21 @@ class GraphTracer:
         :return: A ``tuple`` of ``int`` / ``str`` suitable for constructing a
             :class:`TracingShape`.
         """
-        new_shape = []
+        new_shape: List[Union[int, TracingInt]] = []
         for s in sym_shape:
-            if isinstance(s, (int, str)):
+            if isinstance(s, (int, TracingInt)):
                 new_shape.append(s)
                 continue
+            assert not isinstance(s, str), f"unexpected type {type(s)}"
             ss = self._sym_int_to_str(s)
+            assert isinstance(ss, str), f"unexpected type {type(ss)}"
             ns = self._token_replace(ss)
-            assert isinstance(ns, str), "simple type checking"
+            assert isinstance(
+                ns, str
+            ), f"unexpected type {type(ns)}, ns={ns!r}, s={s!r}, ss={ss!r}"
             self._mapped_dimension[ns] = s
-            new_shape.append(ns)
-        return tuple(new_shape)
+            new_shape.append(TracingInt(ns))
+        return TracingShape(tuple(new_shape))
 
     def _sym_int_to_str(self, value):
         """
@@ -601,9 +605,7 @@ class GraphTracer:
     # Leaf module support
     # ------------------------------------------------------------------
 
-    def _make_leaf_forward(
-        self, module: torch.nn.Module, qualified_name: str
-    ) -> Callable:
+    def _make_leaf_forward(self, module: torch.nn.Module, qualified_name: str) -> Callable:
         """
         Return a replacement ``forward`` for *module* that emits a single
         ``call_function`` graph node instead of tracing through the module's
@@ -639,9 +641,7 @@ class GraphTracer:
             # Build a fresh FakeTensorMode that shares the tracer's ShapeEnv
             # so symbolic dimensions propagate correctly.  allow_non_fake_inputs
             # is required because the module's own parameters are real tensors.
-            _infer_mode = FakeTensorMode(
-                shape_env=tracer._shape_env, allow_non_fake_inputs=True
-            )
+            _infer_mode = FakeTensorMode(shape_env=tracer._shape_env, allow_non_fake_inputs=True)
             with _infer_mode:
                 # Create fake tensors *inside* the mode so they are owned by
                 # _infer_mode (avoids "fake-tensor mode mismatch" errors).
@@ -653,18 +653,14 @@ class GraphTracer:
                                 if d in tracer._mapped_dimension:
                                     new_shape.append(tracer._mapped_dimension[d])
                                 else:
-                                    new_shape.append(
-                                        tracer._shape_env.create_unbacked_symint()
-                                    )
+                                    new_shape.append(tracer._shape_env.create_unbacked_symint())
                             else:
                                 assert isinstance(d, int), (
                                     f"Unexpected dimension type {type(d)} in leaf "
                                     f"module {qualified_name!r}"
                                 )
                                 new_shape.append(d)
-                        return torch.empty(
-                            tuple(new_shape), dtype=a.dtype, device=a.device
-                        )
+                        return torch.empty(tuple(new_shape), dtype=a.dtype, device=a.device)
                     if isinstance(a, torch.Tensor):
                         return torch.empty(a.shape, dtype=a.dtype, device=a.device)
                     return a
@@ -689,11 +685,7 @@ class GraphTracer:
             # attribute (all nn.Module instances).
             node_name = f"leaf_{qualified_name.replace('.', '_')}"
             node = tracer.graph.create_node(
-                "call_function",
-                module,
-                args=node_args,
-                kwargs=node_kwargs,
-                name=node_name,
+                "call_function", module, args=node_args, kwargs=node_kwargs, name=node_name
             )
             node.meta["stack_trace"] = "".join(traceback.format_stack())
             node.meta["fn"] = module
@@ -1084,18 +1076,14 @@ class GraphTracer:
                     continue  # skip the root module
                 # Skip if an ancestor module is already patched as a leaf.
                 parts = subname.split(".")
-                if any(
-                    ".".join(parts[:i]) in _patched_names for i in range(1, len(parts))
-                ):
+                if any(".".join(parts[:i]) in _patched_names for i in range(1, len(parts))):
                     continue
                 if self._is_leaf_module(submod, subname):
                     _patched.append((submod, submod.forward))
                     submod.forward = self._make_leaf_forward(submod, subname)
                     _patched_names.add(subname)
                     if self.verbose:
-                        print(
-                            f"[GraphTracer.trace] patched leaf sub-module {subname!r}"
-                        )
+                        print(f"[GraphTracer.trace] patched leaf sub-module {subname!r}")
 
         sig_params = [
             p.name
