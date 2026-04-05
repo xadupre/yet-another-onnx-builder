@@ -31,7 +31,6 @@ def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:
     :param tracer: The :class:`GraphTracer` whose :meth:`_handle_cond` should
         be used as the replacement.
     """
-    original_cond = torch.cond
 
     def _cond_handler(
         pred: Any,
@@ -45,7 +44,7 @@ def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:
     try:
         yield
     finally:
-        torch.cond = original_cond  # type: ignore[assignment]
+        torch.cond = _ORIGINAL_TORCH_COND  # type: ignore[assignment]
 
 
 class GraphTracer:
@@ -667,9 +666,11 @@ class GraphTracer:
                     get_node.meta["val"] = tt
                     results.append(tt)
                 else:
-                    assert isinstance(
-                        item, (int, float, str)
-                    ), f"Unexpected type for cond output item: {type(item)}"
+                    assert isinstance(item, (int, float, str)), (
+                        f"Expected int, float, or str for non-tensor cond output item, "
+                        f"got: {type(item)}. Tensor outputs should have been handled as "
+                        f"TracingTensor instances earlier in the conditional flow."
+                    )
                     results.append(item)
             node.meta["val"] = type(true_out)(results)
             return type(true_out)(results)
