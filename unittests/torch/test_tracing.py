@@ -1527,6 +1527,26 @@ class TestTracingControlFlow(ExtTestCase):
         # x1 = x + 1 traces as Add; clone() of the final output is dropped by the exporter.
         self.assertEqual(["Add"], [n.op_type for n in art.graph.node])
 
+    def test_tracing_obvious_control_flow_ndim_indirect_cat(self):
+        from yobx.torch import to_onnx, ExportOptions
+
+        class Model(torch.nn.Module):
+            def forward(self, x, y):
+                x1 = x + 1
+                y1 = y + 2
+                cat = torch.cat([x1, y1], axis=1)
+                if cat.ndim == 2:
+                    return cat.clone()
+                return cat / cat.ndim
+
+        model = Model()
+        x = torch.rand((3, 4))
+        y = torch.rand((3, 4))
+        art = to_onnx(model, (x, y), export_options=ExportOptions(tracing=True))
+        # The ndim of the cat result is 2, so the true branch is taken.
+        op_types = [n.op_type for n in art.graph.node]
+        self.assertIn("Concat", op_types)
+
 
 @requires_torch("2.0")
 class TestCustomProxyShape(ExtTestCase):

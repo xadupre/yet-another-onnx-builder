@@ -116,7 +116,6 @@ class TestModelEvalCases(ExtTestCase):
             cases="ControlFlowIndirectRanks", exporters="yobx-tracing", quiet=False, dynamic=True
         )
 
-    @unittest.skip("TODO: not working yet")
     def test_run_exporter_yobx_tracing_controlflow_indirect_rank_cat(self):
         evaluation(
             cases="ControlFlowIndirectRanksCat",

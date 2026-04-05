@@ -47,12 +47,21 @@ def _infer_ndim_from_node(node: "torch.fx.Node", _visited: Optional[set] = None)
             return val.ndim
 
     # For intermediate nodes, propagate from tensor-valued arguments.
+    # We need to handle list/tuple args (e.g. torch.cat's first argument is a
+    # list of tensors) in addition to plain Node arguments.
     best: Optional[int] = None
-    for arg in list(node.args) + list(node.kwargs.values()):
-        if isinstance(arg, torch.fx.Node):
-            d = _infer_ndim_from_node(arg, _visited)
-            if d is not None and (best is None or d > best):
-                best = d
+
+    def _scan(items):
+        nonlocal best
+        for arg in items:
+            if isinstance(arg, torch.fx.Node):
+                d = _infer_ndim_from_node(arg, _visited)
+                if d is not None and (best is None or d > best):
+                    best = d
+            elif isinstance(arg, (list, tuple)):
+                _scan(arg)
+
+    _scan(list(node.args) + list(node.kwargs.values()))
     return best
 
 
@@ -329,6 +338,8 @@ class CustomProxy(torch.fx.proxy.Proxy):
     ) -> "CustomProxy":
         """Implements cat for tensors."""
         assert out is None, "Tracing is not implementing is out is not None."
+        if axis is not None and dim == 0:
+            dim = axis
         if isinstance(tensors, list):
             if any(isinstance(t, CustomProxy) for t in tensors):
                 proxy = next(t for t in tensors if isinstance(t, CustomProxy))
@@ -350,13 +361,17 @@ class CustomProxy(torch.fx.proxy.Proxy):
                         continue
 
                     raise TypeError(f"A tensor is expected not {type(t)}.")
+                # create_node expects torch.fx.Node objects in args, not Proxy
+                # objects.  Unwrap each proxy to its underlying node so that FX
+                # dependency tracking and shape-metadata propagation work correctly.
+                new_tensor_nodes = [
+                    t.node if isinstance(t, CustomProxy) else t for t in new_tensors
+                ]
                 node = proxy.tracer.create_node(
-                    "call_function", torch.cat, args=(new_tensors, dim), kwargs={}
+                    "call_function", torch.cat, args=(new_tensor_nodes, dim), kwargs={}
                 )
                 return proxy.tracer.proxy(node)
             return _torch_cat(tensors, dim)
-        if axis is not None and dim == 0:
-            dim = axis
         proxy = tensors
         node = proxy.tracer.create_node(
             "call_function", torch.cat, args=(proxy.node, dim), kwargs={}
