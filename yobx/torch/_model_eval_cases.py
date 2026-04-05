@@ -354,6 +354,19 @@ class ControlFlowIndirectRanks(torch.nn.Module):
     _dynamic = {"x": {0: DIM("batch")}}
 
 
+class ControlFlowIndirectRanksCat(torch.nn.Module):
+    def forward(self, x, y):
+        x1 = x + 1
+        y1 = y + 2
+        cat = torch.cat([x1, y1], axis=1)
+        if cat.ndim == 2:
+            return cat.clone()
+        return cat / cat.ndim
+
+    _inputs = [(torch.rand(3, 4), torch.rand(3, 4)), (torch.rand(5, 4), torch.rand(5, 2))]
+    _dynamic = {"x": {0: DIM("batch")}, "y": {0: DIM("batch"), 1: DIM("seq")}}
+
+
 class ControlFlowNumelZero1(torch.nn.Module):
     def forward(self, x):
         def empty_cache(x):
