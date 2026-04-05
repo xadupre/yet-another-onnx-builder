@@ -571,7 +571,7 @@ class GraphTracer:
                 if self.is_not_tensor(v):
                     tracing_kwargs[k] = v
                     continue
-                assert isinstance(dynamic_shapes, dict), (
+                assert dynamic_shapes is None or isinstance(dynamic_shapes, dict), (
                     f"Unexpected type {type(dynamic_shapes)} for dynamic shapes, "
                     f"dict is mandatory when kwargs is not empty."
                 )
@@ -629,7 +629,9 @@ class GraphTracer:
 
         sig_params = [
             p.name
-            for p in inspect.signature(func).parameters.values()
+            for p in inspect.signature(
+                func.forward if hasattr(func, "forward") else func
+            ).parameters.values()
             if p.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
         ]
 
