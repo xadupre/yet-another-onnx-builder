@@ -1,7 +1,8 @@
+import contextlib
 import inspect
 import operator
 import traceback
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Union
 import torch
 import torch.fx
 import torch.utils._pytree as pytree
@@ -11,6 +12,40 @@ from torch.fx.experimental.sym_node import SymNode
 from ...xexpressions import rename_expression
 from .shape import TracingShape
 from .tensor import TracingTensor
+
+# Capture the real ``torch.cond`` at import time so that it can always be
+# used as the canonical FX node target even when ``torch.cond`` has been
+# temporarily replaced by the tracing shim (nested context managers would
+# otherwise make the inner context see the outer shim as "original").
+_ORIGINAL_TORCH_COND: Callable = torch.cond  # type: ignore[attr-defined]
+
+
+@contextlib.contextmanager
+def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:
+    """
+    Context manager that temporarily replaces ``torch.cond`` with a
+    tracing-aware handler so that ``torch.cond`` calls encountered during
+    :meth:`GraphTracer.trace` are captured as FX ``call_function`` nodes
+    instead of being executed eagerly (or routed through dynamo/compile).
+
+    :param tracer: The :class:`GraphTracer` whose :meth:`_handle_cond` should
+        be used as the replacement.
+    """
+    original_cond = torch.cond
+
+    def _cond_handler(
+        pred: Any,
+        true_fn: Callable,
+        false_fn: Callable,
+        operands: Union[List, Tuple] = (),
+    ) -> Any:
+        return tracer._handle_cond(pred, true_fn, false_fn, operands)
+
+    torch.cond = _cond_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.cond = original_cond  # type: ignore[assignment]
 
 
 class GraphTracer:
@@ -65,6 +100,9 @@ class GraphTracer:
         self._mapped_dimension: Dict[str, torch.SymInt] = {}
         self._sym_int_to_dynamic_dimension: Dict[str, str] = {}
         self._unique_count = 0
+        # Storage for torch.cond branches: maps unique name -> callable / sub-tracer.
+        self._callables: Dict[str, Callable] = {}
+        self._sub_tracers: Dict[str, "GraphTracer"] = {}
 
     def _make_tracing_tensor(
         self,
@@ -472,6 +510,175 @@ class GraphTracer:
         raise NotImplementedError(f"Unexpected type {type(unflat_res)}")
 
     # ------------------------------------------------------------------
+    # torch.cond support
+    # ------------------------------------------------------------------
+
+    def _register_callable(self, prefix: str, fn: Callable) -> str:
+        """
+        Register *fn* under a unique name derived from *prefix* and the
+        function's ``__name__`` attribute, and return that name.
+
+        The registered name is unique within :attr:`_callables` and follows
+        the ``"_cb_<prefix>_<fn_name>_<counter>"`` pattern.
+
+        :param prefix: Short tag describing the higher-order operator
+            (e.g. ``"cond"``).
+        :param fn: The Python callable to register.
+        :return: The unique string key used to store *fn* in
+            :attr:`_callables`.
+        """
+        fn_name = getattr(fn, "__name__", "fn")
+        base = f"_cb_{prefix}_{fn_name}"
+        cand = f"{base}_0"
+        i = 0
+        while cand in self._callables:
+            i += 1
+            cand = f"{base}_{i}"
+        self._callables[cand] = fn
+        return cand
+
+    def _trace_branch(
+        self, fn: Callable, operands: Union[List[Any], Tuple[Any, ...]]
+    ) -> Tuple["GraphTracer", Any]:
+        """
+        Trace a branch function (*true_fn* or *false_fn* of ``torch.cond``)
+        in an isolated sub-:class:`GraphTracer`.
+
+        Input placeholders for the sub-graph are derived from *operands*:
+        each :class:`TracingTensor` in *operands* produces one placeholder
+        with matching shape, dtype, and device.  Non-tensor values are
+        forwarded unchanged.
+
+        After tracing, an ``output`` node is appended to the sub-graph.
+
+        :param fn: The callable to trace (one branch of ``torch.cond``).
+        :param operands: The operands that were passed to ``torch.cond``'s
+            fourth argument.
+        :return: A ``(sub_tracer, out)`` tuple where *sub_tracer* is the
+            fully-traced sub-:class:`GraphTracer` and *out* is the raw return
+            value of *fn* (containing :class:`TracingTensor` instances from
+            the sub-tracer).
+        """
+        sub = GraphTracer(verbose=self.verbose)
+        # Share symbolic dimension mappings so the same dynamic-dim names are
+        # reused in branch graphs.
+        sub._mapped_dimension = dict(self._mapped_dimension)
+        sub._sym_int_to_dynamic_dimension = dict(self._sym_int_to_dynamic_dimension)
+
+        sub_operands: List[Any] = []
+        for i, op in enumerate(operands):
+            if isinstance(op, TracingTensor):
+                node = sub.graph.placeholder(f"operand_{i}")
+                node.meta["val"] = op
+                fake_op = sub._make_tracing_tensor(op.shape, op.dtype, op.device, node)
+                sub_operands.append(fake_op)
+            else:
+                sub_operands.append(op)
+
+        with _cond_replacement_ctx(sub):
+            out = fn(*sub_operands)
+
+        def _to_node(x: Any) -> Any:
+            if isinstance(x, TracingTensor):
+                return sub._get_node(x)
+            return x
+
+        out_val = pytree.tree_map(_to_node, out)
+        sub.graph.output(out_val)
+        return sub, out
+
+    def _handle_cond(
+        self,
+        pred: Any,
+        true_fn: Callable,
+        false_fn: Callable,
+        operands: Union[List[Any], Tuple[Any, ...]] = (),
+    ) -> Any:
+        """
+        Handle a ``torch.cond`` call intercepted during graph tracing.
+
+        This method is invoked by :func:`_cond_replacement_ctx`'s handler
+        whenever user code calls ``torch.cond`` while a :meth:`trace` is in
+        progress.  It:
+
+        1. Registers *true_fn* and *false_fn* in :attr:`_callables`.
+        2. Traces each branch in a private sub-:class:`GraphTracer` and
+           stores the result in :attr:`_sub_tracers`.
+        3. Emits a ``call_function`` node for ``torch.cond`` in the **main**
+           graph, passing the branch callables directly as node arguments
+           (FX allows non-tensor constant args for ``call_function`` nodes).
+        4. Wraps the outputs in fresh :class:`TracingTensor` instances bound
+           to the new node and returns them.
+
+        :param pred: The predicate—either a scalar bool/int or a
+            :class:`TracingTensor` of shape ``()`` and dtype ``bool``.
+        :param true_fn: Branch called when *pred* is ``True``.
+        :param false_fn: Branch called when *pred* is ``False``.
+        :param operands: Positional operands forwarded to the selected branch.
+        :return: A :class:`TracingTensor` (single output) or a ``list`` /
+            ``tuple`` of :class:`TracingTensor` instances (multiple outputs).
+        """
+        # Always use the real torch.cond (captured at import time) as the FX
+        # node target so that nested tracing contexts do not accidentally record
+        # the shim function instead.
+        cond_target = _ORIGINAL_TORCH_COND
+        # --- node for the predicate ---
+        pred_node: Any = self._get_node(pred) if isinstance(pred, TracingTensor) else pred
+
+        # --- nodes for each operand ---
+        operand_nodes: List[Any] = [
+            (self._get_node(op) if isinstance(op, TracingTensor) else op) for op in operands
+        ]
+
+        # --- register callables + trace branches ---
+        true_name = self._register_callable("cond", true_fn)
+        false_name = self._register_callable("cond", false_fn)
+
+        sub_true, true_out = self._trace_branch(true_fn, list(operands))
+        sub_false, _ = self._trace_branch(false_fn, list(operands))
+
+        self._sub_tracers[true_name] = sub_true
+        self._sub_tracers[false_name] = sub_false
+
+        # --- emit the main cond node ---
+        node = self.graph.call_function(
+            cond_target,
+            args=(pred_node, true_fn, false_fn, operand_nodes),
+            kwargs={},
+        )
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+
+        # --- build output TracingTensors from the true branch's shapes ---
+        if isinstance(true_out, TracingTensor):
+            tt = self._make_tracing_tensor(true_out.shape, true_out.dtype, true_out.device, node)
+            node.meta["val"] = tt
+            return tt
+
+        if isinstance(true_out, (list, tuple)):
+            results: List[Any] = []
+            for i, item in enumerate(true_out):
+                if isinstance(item, TracingTensor):
+                    get_node = self.graph.call_function(
+                        operator.getitem, args=(node, i), kwargs={}
+                    )
+                    tt = self._make_tracing_tensor(
+                        item.shape, item.dtype, item.device, get_node
+                    )
+                    get_node.meta["val"] = tt
+                    results.append(tt)
+                else:
+                    assert isinstance(
+                        item, (int, float, str)
+                    ), f"Unexpected type for cond output item: {type(item)}"
+                    results.append(item)
+            node.meta["val"] = type(true_out)(results)
+            return type(true_out)(results)
+
+        raise NotImplementedError(
+            f"torch.cond: unexpected output type from branch function: {type(true_out)}"
+        )
+
+    # ------------------------------------------------------------------
     # Public tracing entry point
     # ------------------------------------------------------------------
 
@@ -648,7 +855,8 @@ class GraphTracer:
 
         if self.verbose:
             print("[GraphTracer.trace] call...")
-        out = func(*tracing_args, **tracing_kwargs)
+        with _cond_replacement_ctx(self):
+            out = func(*tracing_args, **tracing_kwargs)
 
         def _to_output_node(x: Any) -> Any:
             if isinstance(x, TracingTensor):
