@@ -338,6 +338,8 @@ class CustomProxy(torch.fx.proxy.Proxy):
     ) -> "CustomProxy":
         """Implements cat for tensors."""
         assert out is None, "Tracing is not implementing is out is not None."
+        if axis is not None and dim == 0:
+            dim = axis
         if isinstance(tensors, list):
             if any(isinstance(t, CustomProxy) for t in tensors):
                 proxy = next(t for t in tensors if isinstance(t, CustomProxy))
@@ -370,8 +372,6 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 )
                 return proxy.tracer.proxy(node)
             return _torch_cat(tensors, dim)
-        if axis is not None and dim == 0:
-            dim = axis
         proxy = tensors
         node = proxy.tracer.create_node(
             "call_function", torch.cat, args=(proxy.node, dim), kwargs={}
