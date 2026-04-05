@@ -1,7 +1,8 @@
+import contextlib
 import inspect
 import operator
 import traceback
-from typing import Any, Callable, Dict, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
 import torch
 import torch.fx
 import torch.utils._pytree as pytree
@@ -9,8 +10,38 @@ from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import ShapeEnv
 from torch.fx.experimental.sym_node import SymNode
 from ...xexpressions import rename_expression
-from .shape import TracingShape
+from .shape import TracingShape, TracingInt
 from .tensor import TracingTensor
+
+# Capture the real ``torch.cond`` at import time so that it can always be
+# used as the canonical FX node target even when ``torch.cond`` has been
+# temporarily replaced by the tracing shim (nested context managers would
+# otherwise make the inner context see the outer shim as "original").
+_ORIGINAL_TORCH_COND: Callable = torch.cond  # type: ignore[attr-defined]
+
+
+@contextlib.contextmanager
+def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:
+    """
+    Context manager that temporarily replaces ``torch.cond`` with a
+    tracing-aware handler so that ``torch.cond`` calls encountered during
+    :meth:`GraphTracer.trace` are captured as FX ``call_function`` nodes
+    instead of being executed eagerly (or routed through dynamo/compile).
+
+    :param tracer: The :class:`GraphTracer` whose :meth:`_handle_cond` should
+        be used as the replacement.
+    """
+
+    def _cond_handler(
+        pred: Any, true_fn: Callable, false_fn: Callable, operands: Union[List, Tuple] = ()
+    ) -> Any:
+        return tracer._handle_cond(pred, true_fn, false_fn, operands)
+
+    torch.cond = _cond_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.cond = _ORIGINAL_TORCH_COND  # type: ignore[assignment]
 
 
 class GraphTracer:
@@ -52,9 +83,47 @@ class GraphTracer:
         graph = tracer.trace(add, (x, y), {}, ({0:"batch"}, {}))
         print(graph)
 
+    **Leaf modules** — sub-modules that should not be traced into but instead
+    appear as a single ``call_function`` node in the graph — can be declared
+    via the *module_leaves* constructor argument:
+
+    .. runpython::
+        :showcode:
+
+        import torch
+        from yobx.torch.new_tracing.tracer import GraphTracer
+
+        class MyLeaf(torch.nn.Module):
+            def forward(self, x):
+                return x * 2
+
+        class Outer(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.leaf = MyLeaf()
+            def forward(self, x):
+                return self.leaf(x) + 1
+
+        tracer = GraphTracer(
+            module_leaves={MyLeaf: lambda m, module_qualified_name=None: True}
+        )
+        graph = tracer.trace(Outer(), (torch.randn(2, 4),))
+        print(graph)
+
+    :param verbose: Verbosity level (0 = silent).
+    :param module_leaves: Optional mapping from module *type* to a predicate
+        ``f(module, module_qualified_name=name) -> bool``.  When the predicate
+        returns ``True`` for a given sub-module instance, that sub-module is
+        treated as a leaf: a single ``call_function`` node is emitted for its
+        call site and the tracer does not descend into its ``forward`` method.
+        Internal parameters and buffers of leaf modules are also excluded from
+        the graph's placeholder nodes.
+
     """
 
-    def __init__(self, verbose: int = 0) -> None:
+    def __init__(
+        self, verbose: int = 0, module_leaves: Optional[Dict[type, Callable[..., bool]]] = None
+    ) -> None:
         self.graph: torch.fx.Graph = torch.fx.Graph()
         self._external_tensor_to_node: Dict[int, torch.fx.Node] = {}
         self._placeholder_count: int = 0
@@ -65,6 +134,34 @@ class GraphTracer:
         self._mapped_dimension: Dict[str, torch.SymInt] = {}
         self._sym_int_to_dynamic_dimension: Dict[str, str] = {}
         self._unique_count = 0
+        # Storage for torch.cond branches: maps unique name -> callable / sub-tracer.
+        self._callables: Dict[str, Callable] = {}
+        self._sub_tracers: Dict[str, "GraphTracer"] = {}
+        # Mapping from module *type* to a predicate
+        # ``f(module, module_qualified_name=name) -> bool`` that decides whether
+        # a given module instance should be treated as a leaf.  Leaf modules are
+        # not traced into; instead a single ``call_function`` node is emitted for
+        # the whole module call.
+        self.module_leaves: Optional[Dict[type, Callable[..., bool]]] = module_leaves
+
+    def _is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
+        """
+        Return ``True`` if *m* should be treated as a leaf module.
+
+        A module is a leaf when :attr:`module_leaves` maps its ``type`` to a
+        predicate ``f(m, module_qualified_name=name) -> bool`` and that predicate
+        returns ``True`` for *m*.
+
+        :param m: The :class:`~torch.nn.Module` to test.
+        :param module_qualified_name: The dot-separated path from the root
+            module to *m* (e.g. ``"encoder.layer.0"``).
+        :return: ``True`` when *m* is a leaf, ``False`` otherwise.
+        """
+        if not self.module_leaves:
+            return False
+        if type(m) not in self.module_leaves:
+            return False
+        return bool(self.module_leaves[type(m)](m, module_qualified_name=module_qualified_name))
 
     def _make_tracing_tensor(
         self,
@@ -165,6 +262,10 @@ class GraphTracer:
         tensors (the same :class:`torch.Tensor` referenced under multiple
         names) map to exactly one placeholder node.
 
+        Parameters that belong to leaf sub-modules (see :attr:`module_leaves`)
+        are **skipped**: leaf modules are treated as black boxes and their
+        internal parameters are not exposed as graph inputs.
+
         Each placeholder node receives two extra metadata entries:
 
         * ``node.meta["torch_name"]``: the original dotted parameter name as
@@ -176,10 +277,30 @@ class GraphTracer:
         :param module: The :class:`torch.nn.Module` whose parameters and
             buffers should be pre-registered.
         """
-        seen_ids: set = set()
+        # Collect dot-separated paths of all leaf sub-modules.  Parameters
+        # whose module path has a leaf ancestor are internal to that leaf and
+        # should not be registered as graph placeholders.
+        _leaf_module_paths: Set[str] = set()
+        if self.module_leaves:
+            for subname, submod in module.named_modules():
+                if subname and self._is_leaf_module(submod, subname):
+                    _leaf_module_paths.add(subname)
+
+        seen_ids: Set[int] = set()
         for name, tensor in list(module.named_parameters()) + list(module.named_buffers()):
             if tensor is None:
                 continue
+            # Skip parameters that belong to a leaf sub-module.
+            if _leaf_module_paths:
+                parts = name.split(".")
+                # Check every module-path prefix (excluding the bare param name).
+                if any(".".join(parts[:i]) in _leaf_module_paths for i in range(1, len(parts))):
+                    if self.verbose:
+                        print(
+                            f"[GraphTracer.register_module_parameters] skip {name!r}"
+                            " (belongs to a leaf sub-module)"
+                        )
+                    continue
             key = id(tensor)
             if key in seen_ids or key in self._external_tensor_to_node:
                 continue
@@ -270,25 +391,30 @@ class GraphTracer:
         if isinstance(a, TracingTensor):
             new_shape: List[Union[int, torch.SymInt]] = []
             for d in a.shape:
-                if isinstance(d, str):
-                    if d in self._mapped_dimension:
-                        symd = self._mapped_dimension[d]
+                if isinstance(d, TracingInt):
+                    if d.is_static:
+                        new_shape.append(d.value)  # type: ignore
+                        continue
+                    if d.value in self._mapped_dimension:
+                        symd = self._mapped_dimension[d.value]
                     else:
                         symd = self._shape_env.create_unbacked_symint()
-                        self._mapped_dimension[d] = symd
+                        self._mapped_dimension[d.value] = symd  # type: ignore
                         symd_name = self._sym_int_to_str(symd)
                         assert isinstance(symd_name, str), "type checking"
-                        self._sym_int_to_dynamic_dimension[symd_name] = d
+                        self._sym_int_to_dynamic_dimension[symd_name] = d.value  # type: ignore
                     new_shape.append(symd)
-                else:
-                    assert isinstance(d, int), f"Unexpected type for a dimension {type(d)}"
-                    new_shape.append(d)
+                    continue
+                assert isinstance(d, int), f"Unexpected type for a dimension {type(d)}"
+                new_shape.append(d)
             with self._fake_mode:
                 return torch.empty(tuple(new_shape), dtype=a.dtype, device=a.device)
         with self._fake_mode:
             return torch.empty(a.shape, dtype=a.dtype, device=a.device)
 
-    def _sym_shape_to_str_shape(self, sym_shape):
+    def _sym_shape_to_str_shape(
+        self, sym_shape: Tuple[Union[int, torch.SymInt], ...]
+    ) -> TracingShape:
         """
         Convert a shape tuple whose elements may be :class:`torch.SymInt` into
         a shape tuple of plain ``int`` or ``str`` (symbolic dimension names).
@@ -304,17 +430,21 @@ class GraphTracer:
         :return: A ``tuple`` of ``int`` / ``str`` suitable for constructing a
             :class:`TracingShape`.
         """
-        new_shape = []
+        new_shape: List[Union[int, TracingInt]] = []
         for s in sym_shape:
-            if isinstance(s, (int, str)):
+            if isinstance(s, (int, TracingInt)):
                 new_shape.append(s)
                 continue
+            assert not isinstance(s, str), f"unexpected type {type(s)}"
             ss = self._sym_int_to_str(s)
+            assert isinstance(ss, str), f"unexpected type {type(ss)}"
             ns = self._token_replace(ss)
-            assert isinstance(ns, str), "simple type checking"
+            assert isinstance(
+                ns, str
+            ), f"unexpected type {type(ns)}, ns={ns!r}, s={s!r}, ss={ss!r}"
             self._mapped_dimension[ns] = s
-            new_shape.append(ns)
-        return tuple(new_shape)
+            new_shape.append(TracingInt(ns))
+        return TracingShape(tuple(new_shape))
 
     def _sym_int_to_str(self, value):
         """
@@ -470,6 +600,304 @@ class GraphTracer:
             return type(unflat_res)(results)
 
         raise NotImplementedError(f"Unexpected type {type(unflat_res)}")
+
+    # ------------------------------------------------------------------
+    # Leaf module support
+    # ------------------------------------------------------------------
+
+    def _make_leaf_forward(self, module: torch.nn.Module, qualified_name: str) -> Callable:
+        """
+        Return a replacement ``forward`` for *module* that emits a single
+        ``call_function`` graph node instead of tracing through the module's
+        internals.
+
+        When the leaf-forward wrapper is called during tracing the input
+        arguments are :class:`TracingTensor` instances.  The wrapper:
+
+        1. Creates fresh :class:`~torch._subclasses.fake_tensor.FakeTensor`
+           inputs inside a new :class:`~torch._subclasses.fake_tensor.FakeTensorMode`
+           (sharing the tracer's :class:`~torch.fx.experimental.symbolic_shapes.ShapeEnv`
+           so that symbolic dimensions are consistent).
+        2. Runs the **original** ``forward`` in that mode with
+           ``allow_non_fake_inputs=True`` so the module's own real parameters
+           are accepted alongside the fake inputs.
+        3. Records a single ``call_function(module, node_args, node_kwargs)``
+           FX node and returns the corresponding :class:`TracingTensor`
+           output(s).
+
+        :param module: The leaf :class:`~torch.nn.Module` whose forward should
+            be wrapped.
+        :param qualified_name: Dot-separated path to *module* inside the root
+            module being traced (e.g. ``"encoder.layer"``) — used for error
+            messages only.
+        :return: A callable that accepts the same positional/keyword arguments
+            as ``module.forward`` but emits a single graph node.
+        """
+        original_forward = module.forward
+        tracer = self
+
+        def _leaf_forward(*args: Any, **kwargs: Any) -> Any:
+            # -- shape inference -----------------------------------------------
+            # Build a fresh FakeTensorMode that shares the tracer's ShapeEnv
+            # so symbolic dimensions propagate correctly.  allow_non_fake_inputs
+            # is required because the module's own parameters are real tensors.
+            _infer_mode = FakeTensorMode(shape_env=tracer._shape_env, allow_non_fake_inputs=True)
+            with _infer_mode:
+                # Create fake tensors *inside* the mode so they are owned by
+                # _infer_mode (avoids "fake-tensor mode mismatch" errors).
+                def _to_fake_in_mode(a: Any) -> Any:
+                    if isinstance(a, TracingTensor):
+                        new_shape: List[Any] = []
+                        for d in a.shape:
+                            if isinstance(d, str):
+                                if d in tracer._mapped_dimension:
+                                    new_shape.append(tracer._mapped_dimension[d])
+                                else:
+                                    new_shape.append(tracer._shape_env.create_unbacked_symint())
+                            else:
+                                assert isinstance(d, int), (
+                                    f"Unexpected dimension type {type(d)} in leaf "
+                                    f"module {qualified_name!r}"
+                                )
+                                new_shape.append(d)
+                        return torch.empty(tuple(new_shape), dtype=a.dtype, device=a.device)
+                    if isinstance(a, torch.Tensor):
+                        return torch.empty(a.shape, dtype=a.dtype, device=a.device)
+                    return a
+
+                fake_args = tuple(_to_fake_in_mode(a) for a in args)
+                fake_kwargs = {k: _to_fake_in_mode(v) for k, v in kwargs.items()}
+                fake_out = original_forward(*fake_args, **fake_kwargs)
+
+            # -- FX node construction ------------------------------------------
+            def _to_node(a: Any) -> Any:
+                if isinstance(a, TracingTensor):
+                    return tracer._get_node(a)
+                if isinstance(a, torch.Tensor):
+                    return tracer._node_for_external_tensor(a)
+                return a
+
+            node_args = tuple(_to_node(a) for a in args)
+            node_kwargs = {k: _to_node(v) for k, v in kwargs.items()}
+
+            # Use create_node directly (instead of call_function) so we can
+            # supply an explicit name for modules that lack a ``__name__``
+            # attribute (all nn.Module instances).
+            node_name = f"leaf_{qualified_name.replace('.', '_')}"
+            node = tracer.graph.create_node(
+                "call_function", module, args=node_args, kwargs=node_kwargs, name=node_name
+            )
+            node.meta["stack_trace"] = "".join(traceback.format_stack())
+            node.meta["fn"] = module
+
+            # -- wrap output(s) in TracingTensor --------------------------------
+            if isinstance(fake_out, torch.Tensor):
+                tt = tracer._make_tracing_tensor(
+                    tracer._sym_shape_to_str_shape(fake_out.shape),
+                    fake_out.dtype,
+                    fake_out.device,
+                    node,
+                )
+                node.meta["val"] = tt
+                return tt
+
+            if isinstance(fake_out, (list, tuple)):
+                results: List[Any] = []
+                for i, item in enumerate(fake_out):
+                    if isinstance(item, torch.Tensor):
+                        get_node = tracer.graph.call_function(
+                            operator.getitem, args=(node, i), kwargs={}
+                        )
+                        tt = tracer._make_tracing_tensor(
+                            tracer._sym_shape_to_str_shape(item.shape),
+                            item.dtype,
+                            item.device,
+                            get_node,
+                        )
+                        get_node.meta["val"] = tt
+                        results.append(tt)
+                    else:
+                        assert isinstance(item, (int, float, str)), (
+                            f"Unexpected non-tensor output item type {type(item)} "
+                            f"in leaf module {qualified_name!r}"
+                        )
+                        results.append(item)
+                node.meta["val"] = type(fake_out)(results)
+                return type(fake_out)(results)
+
+            raise NotImplementedError(
+                f"Leaf module {qualified_name!r} returned unexpected output type "
+                f"{type(fake_out)}"
+            )
+
+        return _leaf_forward
+
+    # ------------------------------------------------------------------
+    # torch.cond support
+    # ------------------------------------------------------------------
+
+    def _register_callable(self, prefix: str, fn: Callable) -> str:
+        """
+        Register *fn* under a unique name derived from *prefix* and the
+        function's ``__name__`` attribute, and return that name.
+
+        The registered name is unique within :attr:`_callables` and follows
+        the ``"_cb_<prefix>_<fn_name>_<counter>"`` pattern.
+
+        :param prefix: Short tag describing the higher-order operator
+            (e.g. ``"cond"``).
+        :param fn: The Python callable to register.
+        :return: The unique string key used to store *fn* in
+            :attr:`_callables`.
+        """
+        fn_name = getattr(fn, "__name__", "fn")
+        base = f"_cb_{prefix}_{fn_name}"
+        cand = f"{base}_0"
+        i = 0
+        while cand in self._callables:
+            i += 1
+            cand = f"{base}_{i}"
+        self._callables[cand] = fn
+        return cand
+
+    def _trace_branch(
+        self, fn: Callable, operands: Union[List[Any], Tuple[Any, ...]]
+    ) -> Tuple["GraphTracer", Any]:
+        """
+        Trace a branch function (*true_fn* or *false_fn* of ``torch.cond``)
+        in an isolated sub-:class:`GraphTracer`.
+
+        Input placeholders for the sub-graph are derived from *operands*:
+        each :class:`TracingTensor` in *operands* produces one placeholder
+        with matching shape, dtype, and device.  Non-tensor values are
+        forwarded unchanged.
+
+        After tracing, an ``output`` node is appended to the sub-graph.
+
+        :param fn: The callable to trace (one branch of ``torch.cond``).
+        :param operands: The operands that were passed to ``torch.cond``'s
+            fourth argument.
+        :return: A ``(sub_tracer, out)`` tuple where *sub_tracer* is the
+            fully-traced sub-:class:`GraphTracer` and *out* is the raw return
+            value of *fn* (containing :class:`TracingTensor` instances from
+            the sub-tracer).
+        """
+        sub = GraphTracer(verbose=self.verbose)
+        # Share symbolic dimension mappings so the same dynamic-dim names are
+        # reused in branch graphs.
+        sub._mapped_dimension = dict(self._mapped_dimension)
+        sub._sym_int_to_dynamic_dimension = dict(self._sym_int_to_dynamic_dimension)
+
+        sub_operands: List[Any] = []
+        for i, op in enumerate(operands):
+            if isinstance(op, TracingTensor):
+                node = sub.graph.placeholder(f"operand_{i}")
+                node.meta["val"] = op
+                fake_op = sub._make_tracing_tensor(op.shape, op.dtype, op.device, node)
+                sub_operands.append(fake_op)
+            else:
+                sub_operands.append(op)
+
+        with _cond_replacement_ctx(sub):
+            out = fn(*sub_operands)
+
+        def _to_node(x: Any) -> Any:
+            if isinstance(x, TracingTensor):
+                return sub._get_node(x)
+            return x
+
+        out_val = pytree.tree_map(_to_node, out)
+        sub.graph.output(out_val)
+        return sub, out
+
+    def _handle_cond(
+        self,
+        pred: Any,
+        true_fn: Callable,
+        false_fn: Callable,
+        operands: Union[List[Any], Tuple[Any, ...]] = (),
+    ) -> Any:
+        """
+        Handle a ``torch.cond`` call intercepted during graph tracing.
+
+        This method is invoked by :func:`_cond_replacement_ctx`'s handler
+        whenever user code calls ``torch.cond`` while a :meth:`trace` is in
+        progress.  It:
+
+        1. Registers *true_fn* and *false_fn* in :attr:`_callables`.
+        2. Traces each branch in a private sub-:class:`GraphTracer` and
+           stores the result in :attr:`_sub_tracers`.
+        3. Emits a ``call_function`` node for ``torch.cond`` in the **main**
+           graph, passing the branch callables directly as node arguments
+           (FX allows non-tensor constant args for ``call_function`` nodes).
+        4. Wraps the outputs in fresh :class:`TracingTensor` instances bound
+           to the new node and returns them.
+
+        :param pred: The predicate—either a scalar bool/int or a
+            :class:`TracingTensor` of shape ``()`` and dtype ``bool``.
+        :param true_fn: Branch called when *pred* is ``True``.
+        :param false_fn: Branch called when *pred* is ``False``.
+        :param operands: Positional operands forwarded to the selected branch.
+        :return: A :class:`TracingTensor` (single output) or a ``list`` /
+            ``tuple`` of :class:`TracingTensor` instances (multiple outputs).
+        """
+        # Always use the real torch.cond (captured at import time) as the FX
+        # node target so that nested tracing contexts do not accidentally record
+        # the shim function instead.
+        cond_target = _ORIGINAL_TORCH_COND
+        # --- node for the predicate ---
+        pred_node: Any = self._get_node(pred) if isinstance(pred, TracingTensor) else pred
+
+        # --- nodes for each operand ---
+        operand_nodes: List[Any] = [
+            (self._get_node(op) if isinstance(op, TracingTensor) else op) for op in operands
+        ]
+
+        # --- register callables + trace branches ---
+        true_name = self._register_callable("cond", true_fn)
+        false_name = self._register_callable("cond", false_fn)
+
+        sub_true, true_out = self._trace_branch(true_fn, list(operands))
+        sub_false, _ = self._trace_branch(false_fn, list(operands))
+
+        self._sub_tracers[true_name] = sub_true
+        self._sub_tracers[false_name] = sub_false
+
+        # --- emit the main cond node ---
+        node = self.graph.call_function(
+            cond_target, args=(pred_node, true_fn, false_fn, operand_nodes), kwargs={}  # type: ignore
+        )
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+
+        # --- build output TracingTensors from the true branch's shapes ---
+        if isinstance(true_out, TracingTensor):
+            tt = self._make_tracing_tensor(true_out.shape, true_out.dtype, true_out.device, node)
+            node.meta["val"] = tt
+            return tt
+
+        if isinstance(true_out, (list, tuple)):
+            results: List[Any] = []
+            for i, item in enumerate(true_out):
+                if isinstance(item, TracingTensor):
+                    get_node = self.graph.call_function(
+                        operator.getitem, args=(node, i), kwargs={}
+                    )
+                    tt = self._make_tracing_tensor(item.shape, item.dtype, item.device, get_node)
+                    get_node.meta["val"] = tt
+                    results.append(tt)
+                else:
+                    assert isinstance(item, (int, float, str)), (
+                        f"Expected int, float, or str for non-tensor cond output item, "
+                        f"got: {type(item)}. Tensor outputs should have been handled as "
+                        f"TracingTensor instances earlier in the conditional flow."
+                    )
+                    results.append(item)
+            node.meta["val"] = type(true_out)(results)
+            return type(true_out)(results)
+
+        raise NotImplementedError(
+            f"torch.cond: unexpected output type from branch function: {type(true_out)}"
+        )
 
     # ------------------------------------------------------------------
     # Public tracing entry point
@@ -634,6 +1062,29 @@ class GraphTracer:
         if isinstance(func, torch.nn.Module):
             self.register_module_parameters(func)
 
+        # Patch the ``forward`` of every top-level leaf sub-module so that
+        # calling the sub-module during tracing emits a single
+        # ``call_function`` node rather than tracing into its internals.
+        # Only *top-level* leaves are patched: sub-modules that are nested
+        # inside another leaf are skipped because the parent's wrapper
+        # short-circuits before their code would run.
+        _patched: List[Tuple[torch.nn.Module, Callable]] = []
+        if isinstance(func, torch.nn.Module) and self.module_leaves:
+            _patched_names: Set[str] = set()
+            for subname, submod in func.named_modules():
+                if not subname:
+                    continue  # skip the root module
+                # Skip if an ancestor module is already patched as a leaf.
+                parts = subname.split(".")
+                if any(".".join(parts[:i]) in _patched_names for i in range(1, len(parts))):
+                    continue
+                if self._is_leaf_module(submod, subname):
+                    _patched.append((submod, submod.forward))
+                    submod.forward = self._make_leaf_forward(submod, subname)
+                    _patched_names.add(subname)
+                    if self.verbose:
+                        print(f"[GraphTracer.trace] patched leaf sub-module {subname!r}")
+
         sig_params = [
             p.name
             for p in inspect.signature(
@@ -648,7 +1099,11 @@ class GraphTracer:
 
         if self.verbose:
             print("[GraphTracer.trace] call...")
-        out = func(*tracing_args, **tracing_kwargs)
+        with _cond_replacement_ctx(self):
+            out = func(*tracing_args, **tracing_kwargs)
+
+        for submod, orig_fwd in _patched:
+            submod.forward = orig_fwd
 
         def _to_output_node(x: Any) -> Any:
             if isinstance(x, TracingTensor):
@@ -670,6 +1125,7 @@ def trace_model(
     kwargs: Optional[Dict[str, Any]] = None,
     dynamic_shapes: Optional[Dict[str, Any]] = None,
     verbose: int = 0,
+    module_leaves: Optional[Dict[type, Callable[..., bool]]] = None,
 ) -> torch.fx.Graph:
     """
     Convenience wrapper: create a :class:`DispatchTracer` and trace *func*.
@@ -681,6 +1137,12 @@ def trace_model(
     :param dynamic_shapes: Optional dynamic shape specifications; see
         :meth:`DispatchTracer.trace` for the format.
     :param verbose: verbosity level
+    :param module_leaves: Optional mapping from module *type* to a predicate
+        ``f(module, module_qualified_name=name) -> bool``.  Modules whose type
+        appears in this mapping and whose predicate returns ``True`` are treated
+        as leaves: the tracer emits a single ``call_function`` node for the
+        whole module call instead of tracing through its internals.  See
+        :class:`GraphTracer` for details.
     :return: A :class:`torch.fx.Graph` representing the computation.
 
     .. runpython::
@@ -695,6 +1157,6 @@ def trace_model(
         )
         print(graph)
     """
-    return GraphTracer(verbose=verbose).trace(
+    return GraphTracer(verbose=verbose, module_leaves=module_leaves).trace(
         func, args, kwargs=kwargs, dynamic_shapes=dynamic_shapes
     )
