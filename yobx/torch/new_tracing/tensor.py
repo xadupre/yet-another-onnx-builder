@@ -73,7 +73,7 @@ class TracingTensor(torch.Tensor):
     ):
         self._tracer = tracer
         self._node: Optional[torch.fx.Node] = None
-        self._tracing_shape = TracingShape(size)
+        self._tracing_shape = TracingShape(size)  # type: ignore
 
     @property
     def shape(self) -> TracingShape:  # type: ignore

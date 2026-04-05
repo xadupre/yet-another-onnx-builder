@@ -22,7 +22,7 @@ class GraphTracer:
         :showcode:
 
         import torch
-        from yobx.torch.new_tracing import GraphTracer
+        from yobx.torch.new_tracing.tracer import GraphTracer
 
         def add(x, y):
             return x + y
@@ -41,7 +41,7 @@ class GraphTracer:
         :showcode:
 
         import torch
-        from yobx.torch.new_tracing import GraphTracer
+        from yobx.torch.new_tracing.tracer import GraphTracer
 
         def add(x, y):
             return x + y
@@ -49,7 +49,7 @@ class GraphTracer:
         x = torch.randn(3, 4)
         y = torch.randn(1, 4)
         tracer = GraphTracer()
-        graph = tracer.trace(add, (x, y), ({0:"batch"}, {}))
+        graph = tracer.trace(add, (x, y), {}, ({0:"batch"}, {}))
         print(graph)
 
     """
@@ -248,7 +248,7 @@ class GraphTracer:
         node.meta["val"] = tt
         return tt
 
-    def make_fake(self, a: Union[TracingTensor, torch.Tensor]) -> "FakeTensor":  # noqa: F821
+    def make_fake(self, a: Union[TracingTensor, torch.Tensor]) -> "FakeTensor":  # type: ignore # noqa: F821
         """
         Convert *a* into a :class:`~torch._subclasses.fake_tensor.FakeTensor`
         for shape/dtype inference inside :meth:`dispatch`.
@@ -268,7 +268,7 @@ class GraphTracer:
             for passing to ATen operations in ``FakeTensorMode``.
         """
         if isinstance(a, TracingTensor):
-            new_shape = []
+            new_shape: List[Union[int, torch.SymInt]] = []
             for d in a.shape:
                 if isinstance(d, str):
                     if d in self._mapped_dimension:
@@ -525,7 +525,7 @@ class GraphTracer:
         self,
         args: Tuple[Any, ...],
         kwargs: Optional[Dict[str, Any]] = None,
-        dynamic_shapes: Optional[Dict[str, Any]] = None,
+        dynamic_shapes: Optional[Union[Tuple[Any, ...], Dict[str, Any]]] = None,
         sig_names: Optional[List[str]] = None,
     ) -> Tuple[Tuple[Any, ...], Dict[str, Any]]:
         """
@@ -605,7 +605,7 @@ class GraphTracer:
             :showcode:
 
             import torch
-            from yobx.torch.new_tracing import GraphTracer
+            from yobx.torch.new_tracing.tracer import GraphTracer
 
             def add(x, y):
                 return x + y

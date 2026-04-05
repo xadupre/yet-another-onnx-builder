@@ -91,11 +91,17 @@ class TracingInt:
         if isinstance(other, TracingInt):
             if isinstance(self.value, int) and isinstance(other.value, int):
                 return self.value == other.value
-            return TracingBool(simplify_expression(f"({self.value}=={other.value})"))
+            simp = simplify_expression(f"({self.value}=={other.value})")
+            if isinstance(simp, str):
+                return TracingBool(simp)
+            return bool(simp)
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return self.value == other
-            return TracingBool(simplify_expression(f"({self.value}=={other})"))
+            simp = simplify_expression(f"({self.value}=={other})")
+            if isinstance(simp, str):
+                return TracingBool(simp)
+            return bool(simp)
         raise NotImplementedError(f"Unable to check equality for type {type(other)}.")
 
     def __hash__(self) -> int:
@@ -299,4 +305,4 @@ class TracingShape:
         new_shape = [int(i) for i in shape]
         for d, name in dynamic_shapes.items():
             new_shape[d] = name
-        return TracingShape(tuple(new_shape))
+        return TracingShape(tuple(new_shape))  # type: ignore
