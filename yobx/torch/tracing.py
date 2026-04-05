@@ -47,12 +47,21 @@ def _infer_ndim_from_node(node: "torch.fx.Node", _visited: Optional[set] = None)
             return val.ndim
 
     # For intermediate nodes, propagate from tensor-valued arguments.
+    # We need to handle list/tuple args (e.g. torch.cat's first argument is a
+    # list of tensors) in addition to plain Node arguments.
     best: Optional[int] = None
-    for arg in list(node.args) + list(node.kwargs.values()):
-        if isinstance(arg, torch.fx.Node):
-            d = _infer_ndim_from_node(arg, _visited)
-            if d is not None and (best is None or d > best):
-                best = d
+
+    def _scan(items):
+        nonlocal best
+        for arg in items:
+            if isinstance(arg, torch.fx.Node):
+                d = _infer_ndim_from_node(arg, _visited)
+                if d is not None and (best is None or d > best):
+                    best = d
+            elif isinstance(arg, (list, tuple)):
+                _scan(arg)
+
+    _scan(list(node.args) + list(node.kwargs.values()))
     return best
 
 
