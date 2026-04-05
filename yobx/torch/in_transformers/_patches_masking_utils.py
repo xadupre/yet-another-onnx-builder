@@ -24,9 +24,7 @@ import torch
 
 
 def patched_prepare_padding_mask(
-    attention_mask: Optional[torch.Tensor],
-    kv_length: int,
-    kv_offset: int,
+    attention_mask: Optional[torch.Tensor], kv_length: int, kv_offset: int
 ) -> Optional[torch.Tensor]:
     """
     Trace-safe replacement for

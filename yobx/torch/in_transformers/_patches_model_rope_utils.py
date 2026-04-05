@@ -322,10 +322,7 @@ class common_RotaryEmbedding(torch.nn.Module):
             attention_scaling = self.attention_scaling
 
         inv_freq_expanded = (
-            inv_freq[None, :, None]
-            .float()
-            .expand(position_ids.shape[0], -1, 1)
-            .to(x.device)
+            inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1).to(x.device)
             if not isinstance(position_ids.shape[0], torch.fx.proxy.Proxy)
             else inv_freq[None, :, None].float().to(x.device)
         )

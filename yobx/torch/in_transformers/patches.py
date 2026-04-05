@@ -84,7 +84,11 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
     if model is None:
         from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
 
-        return [*PATCHES, _make_patch_info_for_rotary(LlamaRotaryEmbedding), *_make_masking_patches()]
+        return [
+            *PATCHES,
+            _make_patch_info_for_rotary(LlamaRotaryEmbedding),
+            *_make_masking_patches(),
+        ]
     patches = list(PATCHES)
     patches.extend(_make_masking_patches())
     for _name, submodule in model.named_modules():

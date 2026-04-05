@@ -661,8 +661,9 @@ class CustomProxyShape(CustomProxy):
             if ndim is not None:
                 return ndim
             raise NotImplementedError(
-                "Cannot compute the length of a CustomProxyShape without concrete values. "
-                "Ensure concrete shape metadata is available, or use the proxy node directly."
+                f"Cannot compute the length of a CustomProxyShape without concrete values. "
+                f"Ensure concrete shape metadata is available, or use the proxy node directly. "
+                f"values={self.values}, node={self.node}, args={self.node.args}"
             )
         return len(self.values)
 
@@ -674,8 +675,9 @@ class CustomProxyShape(CustomProxy):
                     yield self[i]
                 return
             raise NotImplementedError(
-                "Cannot iterate a CustomProxyShape without concrete values. "
-                "Ensure concrete shape metadata is available."
+                f"Cannot iterate a CustomProxyShape without concrete values. "
+                f"Ensure concrete shape metadata is available. "
+                f"values={self.values}, node={self.node}, args={self.node.args}"
             )
         yield from self.values
 
@@ -1213,7 +1215,10 @@ class CustomTracer(torch.fx.Tracer):
         # can resolve static attributes (dtype, device, ndim) to concrete values during
         # tracing, enabling dtype/device/ndim-based control flow without TraceError.
         if self._traced_concrete_args is not None:
-            if isinstance(self._traced_concrete_args, dict) and name in self._traced_concrete_args:
+            if (
+                isinstance(self._traced_concrete_args, dict)
+                and name in self._traced_concrete_args
+            ):
                 fake = self._traced_concrete_args[name]
                 if isinstance(fake, torch.Tensor):
                     res.node.meta["val"] = fake
