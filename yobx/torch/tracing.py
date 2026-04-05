@@ -359,8 +359,14 @@ class CustomProxy(torch.fx.proxy.Proxy):
                         continue
 
                     raise TypeError(f"A tensor is expected not {type(t)}.")
+                # create_node expects torch.fx.Node objects in args, not Proxy
+                # objects.  Unwrap each proxy to its underlying node so that FX
+                # dependency tracking and shape-metadata propagation work correctly.
+                new_tensor_nodes = [
+                    t.node if isinstance(t, CustomProxy) else t for t in new_tensors
+                ]
                 node = proxy.tracer.create_node(
-                    "call_function", torch.cat, args=(new_tensors, dim), kwargs={}
+                    "call_function", torch.cat, args=(new_tensor_nodes, dim), kwargs={}
                 )
                 return proxy.tracer.proxy(node)
             return _torch_cat(tensors, dim)
