@@ -9,7 +9,11 @@ yobx.torch.new_tracing
     :maxdepth: 1
     :caption: modules
 
-    dispatcher
     shape
     tensor
-    tracing
+    tracer
+
+trace_model
++++++++++++
+
+.. autofunction:: trace_model
