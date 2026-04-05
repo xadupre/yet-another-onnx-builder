@@ -1,5 +1,6 @@
 import os
 import time
+from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 import torch
 from ..helpers import max_diff, string_diff, string_type
@@ -10,6 +11,18 @@ from .input_observer import InputCandidate
 # Type alias for torch operator overload
 # (forward reference avoids importing torch at module level)
 TorchOpOverload = Any
+
+
+class TracingMode(str, Enum):
+    """
+    Defines the tracing mode for :class:`ExportOptions`.
+
+    :cvar DEFAULT: no symbolic tracing, use :func:`torch.export.export`
+    :cvar TRACING: use symbolic tracing via :class:`~yobx.torch.tracing.CustomTracer`
+    """
+
+    DEFAULT = "default"
+    TRACING = "tracing"
 
 
 class ExportOptions:
@@ -25,7 +38,10 @@ class ExportOptions:
         <ybox.torch.export_options.get_decomposition_table>`,
         it can ``'all'``, ``'default'`` or a decomposition list
     :param dynamo: to use ``torch._dynamo.export`` instead of :func:`torch.export.export`
-    :param tracing: use symbolic tracing
+    :param tracing: use symbolic tracing; accepts a :class:`TracingMode` value,
+        the string ``'tracing'`` or ``'default'``, or a boolean (``True`` is
+        equivalent to ``TracingMode.TRACING``, ``False`` is equivalent to
+        ``TracingMode.DEFAULT``)
     :param jit: use jit to get a graph then converts it into a fx graph
     :param strategy: to overwrite all the previous parameters with just a value
     :param remove_inplace: remove inplace nodes
@@ -50,7 +66,8 @@ class ExportOptions:
         see :func:`torch.export.export`
     :param fake: use fake tensors as inputs
     :param tracing_module_leaves: this option is used when the module is traced
-        (``tracing=True``), it specifies which modules should remain a *call_module*,
+        (``tracing=TracingMode.TRACING``), it specifies
+        which modules should remain a *call_module*,
         see :class:`yobx.torch.tracing.CustomTracer`.
     """
 
@@ -60,7 +77,7 @@ class ExportOptions:
         "strict": {"strict": True},
         "strict-dec": {"strict": True, "decomposition_table": "default"},
         "strict-decall": {"strict": True, "decomposition_table": "all"},
-        "tracing": {"tracing": True},
+        "tracing": {"tracing": TracingMode.TRACING},
         "nostrict": {"strict": False},
         "nostrict-dec": {"strict": False, "decomposition_table": "default"},
         "nostrict-decall": {"strict": False, "decomposition_table": "all"},
@@ -75,7 +92,7 @@ class ExportOptions:
     def __init__(
         self,
         strict: bool = False,
-        tracing: bool = False,
+        tracing: Union[bool, "TracingMode"] = TracingMode.DEFAULT,
         jit: bool = False,
         decomposition_table: Optional[
             Union[str, Dict[TorchOpOverload, Callable[..., Any]]]
@@ -129,9 +146,21 @@ class ExportOptions:
             for k, v in kwargs.items():
                 setattr(self, k, v)
 
+        # Normalize self.tracing to a TracingMode value (supports bool for backward compat)
+        if isinstance(self.tracing, bool):
+            self.tracing = TracingMode.TRACING if self.tracing else TracingMode.DEFAULT
+        elif isinstance(self.tracing, str) and not isinstance(self.tracing, TracingMode):
+            valid = [m.value for m in TracingMode]
+            if self.tracing not in valid:
+                raise ValueError(
+                    f"Invalid value for tracing={self.tracing!r}, "
+                    f"expected one of {valid} or a TracingMode enum value."
+                )
+            self.tracing = TracingMode(self.tracing)
+
         assert not self.dynamo or not self.jit, "jit and dynamo cannot be true at the same time"
         assert (
-            not tracing or not dynamo
+            self.tracing != TracingMode.TRACING or not self.dynamo
         ), f"Both tracing and dynamo are incompatible options in {self!r}"
 
     def __repr__(self) -> str:
@@ -402,7 +431,7 @@ class ExportOptions:
                 print(f"[ExportOptions.export] done in {time.perf_counter() - begin}")
             return dec
 
-        if self.tracing:
+        if self.tracing == TracingMode.TRACING:
             from torch.fx._lazy_graph_module import _make_graph_module
             from .tracing import CustomTracer
 
