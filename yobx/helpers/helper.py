@@ -675,6 +675,15 @@ def string_signature(sig: Any) -> str:
     return "\n".join(text)
 
 
+def _format_enum_or_repr(p: str, v: Any) -> str:
+    """Formats a parameter value for display in string_sig."""
+    if isinstance(v, enum.IntEnum):
+        return f"{p}={v.name}"
+    if isinstance(v, enum.Enum):
+        return f"{p}={v.__class__.__name__}.{v.name}"
+    return f"{p}={v!r}"
+
+
 def string_sig(f: Any, kwargs: Optional[Dict[str, Any]] = None) -> str:
     """
     Displays the signature of a function if the default
@@ -698,11 +707,11 @@ def string_sig(f: Any, kwargs: Optional[Dict[str, Any]] = None) -> str:
         if d is inspect._empty:
             if p in kwargs:
                 v = kwargs[p]
-                rows.append(f"{p}={v!r}" if not isinstance(v, enum.IntEnum) else f"{p}={v.name}")
+                rows.append(_format_enum_or_repr(p, v))
             continue
         v = kwargs.get(p, d)
         if d != v:
-            rows.append(f"{p}={v!r}" if not isinstance(v, enum.IntEnum) else f"{p}={v.name}")
+            rows.append(_format_enum_or_repr(p, v))
             continue
     atts = ", ".join(rows)
     return f"{name}({atts})"

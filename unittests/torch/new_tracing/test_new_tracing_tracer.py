@@ -157,6 +157,23 @@ class TestNewTracingTracer(ExtTestCase):
         self.assertIn("val", cf.meta)
         self.assertEqual(cf.meta["val"].shape, torch.Size([3, 5]))
 
+    def test_call_function_meta_fn(self):
+        tracer = GraphTracer()
+        graph = tracer.trace(lambda x: x + 1.0, (torch.randn(3, 5),))
+        cf = next(n for n in graph.nodes if n.op == "call_function")
+        self.assertIn("fn", cf.meta)
+        # No nn.Module on the stack for a plain lambda: meta["fn"] must be None.
+        self.assertIsNone(cf.meta["fn"])
+
+    def test_call_function_meta_fn_module(self):
+        model = torch.nn.Linear(4, 2, bias=False)
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(2, 4),))
+        cf = next(n for n in graph.nodes if n.op == "call_function")
+        self.assertIn("fn", cf.meta)
+        # The stored module must be the nn.Module responsible for the op.
+        self.assertIsInstance(cf.meta["fn"], torch.nn.Module)
+
     def test_call_function_meta_stack_trace(self):
         tracer = GraphTracer()
         graph = tracer.trace(lambda x: x + 1.0, (torch.randn(3, 5),))
