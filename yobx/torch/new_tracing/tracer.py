@@ -33,10 +33,7 @@ def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:
     """
 
     def _cond_handler(
-        pred: Any,
-        true_fn: Callable,
-        false_fn: Callable,
-        operands: Union[List, Tuple] = (),
+        pred: Any, true_fn: Callable, false_fn: Callable, operands: Union[List, Tuple] = ()
     ) -> Any:
         return tracer._handle_cond(pred, true_fn, false_fn, operands)
 
@@ -641,9 +638,7 @@ class GraphTracer:
 
         # --- emit the main cond node ---
         node = self.graph.call_function(
-            cond_target,
-            args=(pred_node, true_fn, false_fn, operand_nodes),
-            kwargs={},
+            cond_target, args=(pred_node, true_fn, false_fn, operand_nodes), kwargs={}  # type: ignore
         )
         node.meta["stack_trace"] = "".join(traceback.format_stack())
 
@@ -660,9 +655,7 @@ class GraphTracer:
                     get_node = self.graph.call_function(
                         operator.getitem, args=(node, i), kwargs={}
                     )
-                    tt = self._make_tracing_tensor(
-                        item.shape, item.dtype, item.device, get_node
-                    )
+                    tt = self._make_tracing_tensor(item.shape, item.dtype, item.device, get_node)
                     get_node.meta["val"] = tt
                     results.append(tt)
                 else:

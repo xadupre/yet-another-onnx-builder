@@ -403,7 +403,9 @@ class TestNewTracingTracer(ExtTestCase):
         graph.lint()
 
         # Exactly one call_function node with target torch.cond
-        cond_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond]
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
         self.assertEqual(len(cond_nodes), 1, f"Expected 1 cond node, got: {cond_nodes}")
 
         # Branch sub-graphs are stored in _sub_tracers
@@ -411,7 +413,7 @@ class TestNewTracingTracer(ExtTestCase):
         self.assertIn("_cb_cond_false_fn_0", tracer._sub_tracers)
 
         # Sub-graphs should be valid FX graphs
-        for name, sub in tracer._sub_tracers.items():
+        for _name, sub in tracer._sub_tracers.items():
             sub.graph.lint()
 
     def test_trace_cond_two_outputs(self):
@@ -433,12 +435,12 @@ class TestNewTracingTracer(ExtTestCase):
         graph.lint()
 
         # One cond node + two getitem nodes
-        cond_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond]
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
         self.assertEqual(len(cond_nodes), 1)
         gi_nodes = [
-            n
-            for n in graph.nodes
-            if n.op == "call_function" and n.target is operator.getitem
+            n for n in graph.nodes if n.op == "call_function" and n.target is operator.getitem
         ]
         self.assertGreaterEqual(len(gi_nodes), 2)
 
@@ -461,7 +463,9 @@ class TestNewTracingTracer(ExtTestCase):
         graph = tracer.trace(model, (x, y))
         graph.lint()
 
-        cond_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond]
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
         self.assertEqual(len(cond_nodes), 1)
 
     def test_trace_cond_nested(self):
@@ -489,16 +493,16 @@ class TestNewTracingTracer(ExtTestCase):
         graph.lint()
 
         # Main graph has one cond node
-        cond_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond]
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
         self.assertEqual(len(cond_nodes), 1)
 
         # The true_fn2 sub-graph itself also contains a cond node
         true_sub = tracer._sub_tracers.get("_cb_cond_true_fn2_0")
         self.assertIsNotNone(true_sub, f"Keys: {list(tracer._sub_tracers)}")
         nested_cond = [
-            n
-            for n in true_sub.graph.nodes
-            if n.op == "call_function" and n.target is torch.cond
+            n for n in true_sub.graph.nodes if n.op == "call_function" and n.target is torch.cond
         ]
         self.assertEqual(len(nested_cond), 1)
 
@@ -524,7 +528,9 @@ class TestNewTracingTracer(ExtTestCase):
         graph = tracer.trace(model, (torch.randn(3, 4),))
         graph.lint()
 
-        cond_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond]
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
         self.assertEqual(len(cond_nodes), 1)
 
         # Branch sub-graphs reference a parameter placeholder
