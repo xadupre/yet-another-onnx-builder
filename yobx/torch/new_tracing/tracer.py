@@ -62,8 +62,9 @@ class GraphTracer:
         #
         self._shape_env = ShapeEnv()
         self._fake_mode = FakeTensorMode(shape_env=self._shape_env)
-        self._mapped_dimension = {}
-        self._sym_int_to_dynamic_dimension = {}
+        self._mapped_dimension: Dict[str, torch.SymInt] = {}
+        self._sym_int_to_dynamic_dimension: Dict[str, str] = {}
+        self._unique_count = 0
 
     def _make_tracing_tensor(
         self,
@@ -152,6 +153,20 @@ class GraphTracer:
             if self.verbose:
                 print(f"[GraphTracer.register_module_parameters] + {name!r}")
             self._external_tensor_to_node[key] = node
+
+    def place(self, tt: TracingTensor, name: Optional[str] = None) -> TracingTensor:
+        assert (
+            not tt._tracer or tt._tracer is self
+        ), "A TracingTensor is already traced by another tracer."
+        if tt._node:
+            return tt
+        name = f"tt_{self._unique_count}"
+        self._unique_count += 1
+        tt._tracer = self
+        node = self.graph.placeholder(name)
+        node.meta["val"] = tt
+        tt._node = node
+        return tt
 
     def placeholder(
         self,

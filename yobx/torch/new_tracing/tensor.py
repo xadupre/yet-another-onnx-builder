@@ -36,7 +36,7 @@ class TracingTensor(torch.Tensor):
         dtype: torch.dtype,
         device: Optional[Union[str, torch.device]] = None,
         requires_grad: bool = False,
-        tracer: Optional["GraphTracer"] = None,  # noqa: F821
+        tracer: Optional["GraphTracer"] = None,  # type: ignore # noqa: F821
     ) -> "TracingTensor":
         if isinstance(size, TracingShape):
             # Use concrete values where available; fall back to 1 for purely
@@ -69,15 +69,14 @@ class TracingTensor(torch.Tensor):
         dtype: torch.dtype = torch.float32,
         device: Union[str, torch.device] = "cpu",
         requires_grad: bool = False,
-        tracer: Optional["GraphTracer"] = None,  # noqa: F821
+        tracer: Optional["GraphTracer"] = None,  # type: ignore # noqa: F821
     ):
         self._tracer = tracer
         self._node: Optional[torch.fx.Node] = None
         self._tracing_shape = TracingShape(size)
-        self._node: Optional[torch.fx.Graph] = None
 
     @property
-    def shape(self) -> TracingShape:
+    def shape(self) -> TracingShape:  # type: ignore
         """Returns the shape as a TracingShape."""
         return self._tracing_shape
 
@@ -93,7 +92,7 @@ class TracingTensor(torch.Tensor):
         cls,
         t: torch.Tensor,
         dynamic_shapes: Optional[Dict[int, str]] = None,
-        tracer: Optional["GraphTracer"] = None,  # noqa: F821
+        tracer: Optional["GraphTracer"] = None,  # type: ignore # noqa: F821
     ) -> "TracingTensor":
         """Creates a tracing tensor."""
         return TracingTensor(

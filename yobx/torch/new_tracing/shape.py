@@ -83,7 +83,7 @@ class TracingInt:
         """Enable use as a sequence index (calls :meth:`__int__`)."""
         return int(self)
 
-    def __eq__(self, other: Any) -> Union[bool, "TracingBool"]:  # type: ignore # noqa: PYI032
+    def __eq__(self, other: Any) -> Union[bool, TracingBool]:  # type: ignore # noqa: PYI032
         """
         Return a plain :class:`bool` when both sides are concrete; return a
         :class:`TracingBool` when at least one side is symbolic.
@@ -96,7 +96,7 @@ class TracingInt:
             if isinstance(self.value, int):
                 return self.value == other
             return TracingBool(simplify_expression(f"({self.value}=={other})"))
-        return NotImplemented
+        raise NotImplementedError(f"Unable to check equality for type {type(other)}.")
 
     def __hash__(self) -> int:
         return hash(self.value)
@@ -283,7 +283,7 @@ class TracingShape:
     ) -> "TracingShape":
         if not dynamic_shapes:
             return TracingShape(tuple(int(i) for i in shape))
-        shape = [int(i) for i in shape]
+        new_shape = [int(i) for i in shape]
         for d, name in dynamic_shapes.items():
-            shape[d] = name
-        return TracingShape(tuple(shape))
+            new_shape[d] = name
+        return TracingShape(tuple(new_shape))

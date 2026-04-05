@@ -48,8 +48,8 @@ class TestNewTracingTensor(ExtTestCase):
     def test_tracing_tensor_add(self):
         tracer = GraphTracer()
         t = torch.rand((3, 4), dtype=torch.float16)
-        tt1 = TracingTensor.from_tensor(t, dynamic_shapes={0: "batch"}, tracer=tracer)
-        tt2 = TracingTensor((1, 4), dtype=torch.float16, tracer=tracer)
+        tt1 = tracer.place(TracingTensor.from_tensor(t, dynamic_shapes={0: "batch"}))
+        tt2 = tracer.place(TracingTensor((1, 4), dtype=torch.float16))
         tt = tt1 + tt2
         self.assertEqual(tt.dtype, torch.float16)
         self.assertEqual(tt.shape, ("batch", 4))
