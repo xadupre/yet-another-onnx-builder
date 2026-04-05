@@ -19,10 +19,13 @@ class TracingMode(str, Enum):
 
     :cvar DEFAULT: no symbolic tracing, use :func:`torch.export.export`
     :cvar TRACING: use symbolic tracing via :class:`~yobx.torch.tracing.CustomTracer`
+    :cvar NEW_TRACING: use dispatch-based tracing via
+        :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
     """
 
     DEFAULT = "default"
     TRACING = "tracing"
+    NEW_TRACING = "new-tracing"
 
 
 class ExportOptions:
@@ -39,9 +42,10 @@ class ExportOptions:
         it can ``'all'``, ``'default'`` or a decomposition list
     :param dynamo: to use ``torch._dynamo.export`` instead of :func:`torch.export.export`
     :param tracing: use symbolic tracing; accepts a :class:`TracingMode` value,
-        the string ``'tracing'`` or ``'default'``, or a boolean (``True`` is
-        equivalent to ``TracingMode.TRACING``, ``False`` is equivalent to
-        ``TracingMode.DEFAULT``)
+        the string ``'tracing'``, ``'new-tracing'``, or ``'default'``, or a boolean
+        (``True`` is equivalent to ``TracingMode.TRACING``, ``False`` is equivalent
+        to ``TracingMode.DEFAULT``); ``TracingMode.NEW_TRACING`` uses the
+        dispatch-based :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
     :param jit: use jit to get a graph then converts it into a fx graph
     :param strategy: to overwrite all the previous parameters with just a value
     :param remove_inplace: remove inplace nodes
@@ -78,6 +82,7 @@ class ExportOptions:
         "strict-dec": {"strict": True, "decomposition_table": "default"},
         "strict-decall": {"strict": True, "decomposition_table": "all"},
         "tracing": {"tracing": TracingMode.TRACING},
+        "new-tracing": {"tracing": TracingMode.NEW_TRACING},
         "nostrict": {"strict": False},
         "nostrict-dec": {"strict": False, "decomposition_table": "default"},
         "nostrict-decall": {"strict": False, "decomposition_table": "all"},
@@ -160,7 +165,7 @@ class ExportOptions:
 
         assert not self.dynamo or not self.jit, "jit and dynamo cannot be true at the same time"
         assert (
-            self.tracing != TracingMode.TRACING or not self.dynamo
+            self.tracing not in (TracingMode.TRACING, TracingMode.NEW_TRACING) or not self.dynamo
         ), f"Both tracing and dynamo are incompatible options in {self!r}"
 
     def __repr__(self) -> str:
@@ -496,6 +501,111 @@ class ExportOptions:
             # from torch.fx.passes.shape_prop import ShapeProp
             # ShapeProp(gp).propagate(**concrete_args)
             # gm = torch.fx.GraphModule(getattr(tracer, "traced_model", None) or mod, graph)
+            return gm
+
+        if self.tracing == TracingMode.NEW_TRACING:
+            import inspect
+
+            from torch.fx._lazy_graph_module import _make_graph_module
+
+            from .fake_tensor_helper import make_fake_with_dynamic_dimensions
+            from .new_tracing.tracer import GraphTracer as NewGraphTracer
+            from .new_tracing.shape import TracingInt
+            from .new_tracing.tensor import TracingTensor
+
+            trace_dynamic_shapes = (
+                None
+                if dynamic_shapes is None
+                else (dynamic_shapes.copy() if isinstance(dynamic_shapes, dict) else {})
+            )
+            if args:
+                sig = inspect.signature(mod.forward)
+                for ip, (p, _a) in enumerate(zip(sig.parameters, args)):
+                    if trace_dynamic_shapes is not None and not isinstance(dynamic_shapes, dict):
+                        trace_dynamic_shapes[p] = dynamic_shapes[ip]
+
+            if verbose:
+                print(f"[ExportOptions.export] GraphTracer().trace, verbose={verbose}")
+                print(f"[ExportOptions.export] {self.tracing_module_leaves=}")
+                print(f"[ExportOptions.export] dynamic_shapes={dynamic_shapes}")
+                print(
+                    f"[ExportOptions.export] args={string_type(args, with_shape=True, limit=20)}"
+                )
+                print(
+                    f"[ExportOptions.export] kwargs="
+                    f"{string_type(kwargs, with_shape=True, limit=20)}"
+                )
+
+            tracer = NewGraphTracer(module_leaves=self.tracing_module_leaves, verbose=verbose)
+            graph = tracer.trace(
+                mod, args if args else tuple(), kwargs=kwargs, dynamic_shapes=trace_dynamic_shapes
+            )
+
+            # Post-process the graph so that it matches what DynamoInterpreter expects:
+            # 1. Replace parameter placeholder nodes (registered by register_module_parameters)
+            #    with get_attr nodes so the interpreter can retrieve the actual weights from
+            #    the root module via named_parameters/named_buffers.
+            # 2. Replace the TracingTensor in meta["val"] of actual input placeholder nodes
+            #    with a FakeTensor so that DynamoInterpreter creates proper ONNX graph inputs
+            #    instead of treating them as weight initializers.
+
+            param_ph_nodes = [
+                n for n in list(graph.nodes) if n.op == "placeholder" and "torch_name" in n.meta
+            ]
+
+            # Find the last actual-input placeholder (non-parameter) to use as
+            # insertion point for the get_attr nodes that replace parameters.
+            last_input_ph = None
+            for n in graph.nodes:
+                if n.op == "placeholder" and "torch_name" not in n.meta:
+                    last_input_ph = n
+
+            for ph in param_ph_nodes:
+                torch_name = ph.meta["torch_name"]
+                if last_input_ph is not None:
+                    with graph.inserting_after(last_input_ph):
+                        get_attr_node = graph.create_node("get_attr", torch_name)
+                else:
+                    # No actual input placeholders; insert before first computation.
+                    first_compute = next(
+                        (n for n in graph.nodes if n.op not in ("placeholder", "output")), None
+                    )
+                    if first_compute is not None:
+                        with graph.inserting_before(first_compute):
+                            get_attr_node = graph.create_node("get_attr", torch_name)
+                    else:
+                        get_attr_node = graph.create_node("get_attr", torch_name)
+                if "val" in ph.meta:
+                    get_attr_node.meta["val"] = ph.meta["val"]
+                ph.replace_all_uses_with(get_attr_node)
+                graph.erase_node(ph)
+
+            # Convert TracingTensor meta["val"] on actual input placeholder nodes
+            # to FakeTensors so _retrieve returns None and DynamoInterpreter creates
+            # proper ONNX graph inputs rather than weight initializers.
+            for n in graph.nodes:
+                if n.op == "placeholder" and "val" in n.meta:
+                    val = n.meta["val"]
+                    if isinstance(val, TracingTensor):
+                        # Build a concrete shape, substituting 1 for symbolic dims.
+                        concrete_shape = tuple(
+                            (
+                                d.value
+                                if isinstance(d, TracingInt) and isinstance(d.value, int)
+                                else (int(d) if isinstance(d, int) else 1)
+                            )
+                            for d in val._tracing_shape
+                        )
+                        dummy = torch.empty(concrete_shape, dtype=val.dtype)
+                        fake_val, _ = make_fake_with_dynamic_dimensions(dummy, None)
+                        n.meta["val"] = fake_val
+
+            if self.save_ep:
+                save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
+                with open(f"{save_ep}.new_tracing", "w") as f:
+                    f.write(str(graph))
+
+            gm = _make_graph_module(mod, graph, mod.__class__.__name__)
             return gm
 
         if verbose:

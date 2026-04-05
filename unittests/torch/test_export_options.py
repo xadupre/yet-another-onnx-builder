@@ -6,6 +6,7 @@ from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings, requir
 from yobx.helpers.helper import get_sig_kwargs
 from yobx.torch.export_options import (
     ExportOptions,
+    TracingMode,
     _get_decomposition_table_by_name,
     _inplace_nodes,
     apply_decompositions,
@@ -485,6 +486,87 @@ class TestExportOptions(ExtTestCase):
             # With threshold=0, model is too big so .pt files should NOT be saved
             self.assertFalse(os.path.isfile(f"{save_path}.input.pt"))
             self.assertFalse(os.path.isfile(f"{save_path}.ep.pt2"))
+
+    def test_tracing_mode_new_tracing_enum_value(self):
+        """TracingMode.NEW_TRACING has the expected string value."""
+        self.assertEqual(TracingMode.NEW_TRACING, "new-tracing")
+
+    def test_tracing_mode_new_tracing_init(self):
+        """ExportOptions(tracing=TracingMode.NEW_TRACING) initialises correctly."""
+        opts = ExportOptions(tracing=TracingMode.NEW_TRACING)
+        self.assertEqual(opts.tracing, TracingMode.NEW_TRACING)
+
+    def test_tracing_mode_new_tracing_string_init(self):
+        """ExportOptions(tracing='new-tracing') normalises to TracingMode.NEW_TRACING."""
+        opts = ExportOptions(tracing="new-tracing")
+        self.assertEqual(opts.tracing, TracingMode.NEW_TRACING)
+
+    def test_strategy_new_tracing(self):
+        """ExportOptions(strategy='new-tracing') sets tracing=TracingMode.NEW_TRACING."""
+        opts = ExportOptions(strategy="new-tracing")
+        self.assertEqual(opts.tracing, TracingMode.NEW_TRACING)
+
+    def test_tracing_mode_new_tracing_incompatible_with_dynamo(self):
+        """NEW_TRACING and dynamo=True must be rejected."""
+        with self.assertRaises(AssertionError):
+            ExportOptions(tracing=TracingMode.NEW_TRACING, dynamo=True)
+
+    @ignore_warnings(UserWarning)
+    def test_export_new_tracing_returns_graph_module(self):
+        """export() with NEW_TRACING returns a torch.fx.GraphModule."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(tracing=TracingMode.NEW_TRACING)
+        gm = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        self.assertIsInstance(gm, torch.fx.GraphModule)
+
+    @ignore_warnings(UserWarning)
+    def test_export_new_tracing_graph_has_no_param_placeholders(self):
+        """After NEW_TRACING export, the graph contains no parameter placeholder nodes."""
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        opts = ExportOptions(tracing=TracingMode.NEW_TRACING)
+        gm = opts.export(
+            model,
+            args=(x,),
+            kwargs=None,
+            tracing_mode=False,
+            dynamic_shapes=None,
+            same_signature=True,
+        )
+        # Parameter nodes must be get_attr, not placeholder.
+        param_names = {name for name, _ in model.named_parameters()}
+        for node in gm.graph.nodes:
+            if node.op == "placeholder":
+                self.assertNotIn(
+                    node.name,
+                    {name.replace(".", "_") for name in param_names},
+                    f"Parameter {node.name!r} should not be a placeholder node",
+                )
+
+    @ignore_warnings(UserWarning)
+    def test_export_new_tracing_to_onnx(self):
+        """to_onnx with export_options=ExportOptions(tracing=TracingMode.NEW_TRACING) succeeds."""
+        import onnx
+        from yobx.torch.interpreter import to_onnx
+
+        model = _Neuron()
+        x = torch.rand(2, 5)
+        artifact = to_onnx(
+            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
+        onx = artifact.model_proto
+        self.assertIsInstance(onx, onnx.ModelProto)
+        # The ONNX model must have exactly one graph input ("x").
+        self.assertEqual(len(onx.graph.input), 1)
+        self.assertEqual(len(onx.graph.output), 1)
 
 
 @requires_torch("2.0")
