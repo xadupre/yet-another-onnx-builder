@@ -78,12 +78,31 @@ class GraphTracer:
         t._node = node
         return t
 
-    def _get_node(self, t: "TracingTensor") -> torch.fx.Node:
+    def _get_node(self, t: Union[TracingTensor, torch.Tensor]) -> torch.fx.Node:
         """Return the :class:`torch.fx.Node` associated with *t*."""
-        assert isinstance(t, TracingTensor), f"Unexpected type {type(t)} for a tracing tensor."
-        assert t._node, f"Tensor {t} has no node."
-        assert t._tracer is self, "The tensor seems traced by another graph."
-        return t._node
+        if isinstance(t, TracingTensor):
+            assert t._node, f"Tensor {t} has no node."
+            assert t._tracer is self, "The tensor seems traced by another graph."
+            return t._node
+        return self._node_for_external_tensor(t)
+
+    def is_not_tensor(self, value: Any) -> bool:
+        if isinstance(value, (int, float, str)):
+            return True
+        if isinstance(value, torch.Tensor):
+            return False
+        if isinstance(value, (list, tuple)):
+            if not value:
+                return True
+            return all(self.is_not_tensor(v) for v in value)
+        if isinstance(value, dict):
+            if not value:
+                return True
+            return all(self.is_not_tensor(v) for v in value.values())
+
+        from ...helpers import string_type
+
+        raise TypeError(f"Cannot determine if it is a constant argument {string_type(value)}")
 
     def _node_for_external_tensor(self, t: torch.Tensor) -> torch.fx.Node:
         """
@@ -127,8 +146,9 @@ class GraphTracer:
             # Replace "." with "_" so the FX node name is a valid identifier.
             sanitized = name.replace(".", "_")
             node = self.graph.placeholder(sanitized)
-            node.meta["val"] = tensor.detach().to(device="meta")
+            node.meta["val"] = TracingTensor.from_tensor(tensor)
             node.meta["torch_name"] = name
+            node.meta["torch_value"] = tensor
             if self.verbose:
                 print(f"[GraphTracer.register_module_parameters] + {name!r}")
             self._external_tensor_to_node[key] = node
@@ -157,23 +177,38 @@ class GraphTracer:
         node.meta["val"] = tt
         return tt
 
-    def make_fake(self, a: TracingTensor) -> "FakeTensor":  # noqa: F821
-        new_shape = []
-        for d in a.shape:
-            if isinstance(d, str):
-                if d in self._mapped_dimension:
-                    symd = self._mapped_dimension[d]
+    def make_fake(self, a: Union[TracingTensor, torch.Tensor]) -> "FakeTensor":  # noqa: F821
+        if isinstance(a, TracingTensor):
+            new_shape = []
+            for d in a.shape:
+                if isinstance(d, str):
+                    if d in self._mapped_dimension:
+                        symd = self._mapped_dimension[d]
+                    else:
+                        symd = self._shape_env.create_unbacked_symint()
+                        self._mapped_dimension[d] = symd
+                        symd_name = self._sym_int_to_str(symd)
+                        self._sym_int_to_dynamic_dimension[symd_name] = d
+                    new_shape.append(symd)
                 else:
-                    symd = self._shape_env.create_unbacked_symint()
-                    self._mapped_dimension[d] = symd
-                    symd_name = self._sym_int_to_str(symd)
-                    self._sym_int_to_dynamic_dimension[symd_name] = d
-                new_shape.append(symd)
-            else:
-                assert isinstance(d, int), f"Unexpected type for a dimension {type(d)}"
-                new_shape.append(d)
+                    assert isinstance(d, int), f"Unexpected type for a dimension {type(d)}"
+                    new_shape.append(d)
+            with self._fake_mode:
+                return torch.empty(tuple(new_shape), dtype=a.dtype, device=a.device)
         with self._fake_mode:
-            return torch.empty(tuple(new_shape), dtype=a.dtype, device=a.device)
+            return torch.empty(a.shape, dtype=a.dtype, device=a.device)
+
+    def _sym_shape_to_str_shape(self, sym_shape):
+        new_shape = []
+        for s in sym_shape:
+            if isinstance(s, (int, str)):
+                new_shape.append(s)
+                continue
+            ss = self._sym_int_to_str(s)
+            ns = self._token_replace(ss)
+            self._mapped_dimension[ns] = s
+            new_shape.append(ns)
+        return tuple(new_shape)
 
     def _sym_int_to_str(self, value):
         if isinstance(value, str):
@@ -212,7 +247,7 @@ class GraphTracer:
         # We could recompute the dynamic shapes without FakeTensor
         # but this is the first approach
         fake_combined = [
-            (self.make_fake(a) if isinstance(a, TracingTensor) else a) for a in combined_args
+            (a if self.is_not_tensor(a) else self.make_fake(a)) for a in combined_args
         ]
         unflat = torch.utils._pytree.tree_unflatten(fake_combined, treespec)
         fake_args, fake_kwargs = unflat
@@ -220,10 +255,9 @@ class GraphTracer:
         if self.verbose > 2:
             from ...helpers import string_type
 
-            print("**", [type(a) for a in combined_args])
-            print(f"[GraphTracer.dispatch] args={string_type(args, with_shape=True)}")
+            print(f"[GraphTracer.dispatch] >>>> args={string_type(args, with_shape=True)}")
             print(f"[GraphTracer.dispatch] fake_args={string_type(fake_args, with_shape=True)}")
-            print(f"[GraphTracer.dispatch] kwargs={string_type(kwargs, with_shape=True)}")
+            print(f"[GraphTracer.dispatch] >>>> kwargs={string_type(kwargs, with_shape=True)}")
             print(
                 f"[GraphTracer.dispatch] fake_kwargs={string_type(fake_kwargs, with_shape=True)}"
             )
@@ -234,7 +268,9 @@ class GraphTracer:
         assert type(fake_res) is not torch.Tensor, f"Unexpected type {type(fake_res)} for output."
 
         # add a node in the graph
-        node_combined = [(a._node if isinstance(a, TracingTensor) else a) for a in combined_args]
+        node_combined = [
+            (a if self.is_not_tensor(a) else self._get_node(a)) for a in combined_args
+        ]
         unflat_nodes = torch.utils._pytree.tree_unflatten(node_combined, treespec)
         node_args, node_kwargs = unflat_nodes
         # We need to add nodes.
@@ -242,15 +278,22 @@ class GraphTracer:
 
         flat_fake_res, treespec_res = torch.utils._pytree.tree_flatten(fake_res)
         flat_res = [
-            self._make_tracing_tensor(
-                tuple(self._token_replace(self._sym_int_to_str(s)) for s in a.shape),
-                a.dtype,
-                a.device,
-                node,
+            (
+                a
+                if self.is_not_tensor(a)
+                else self._make_tracing_tensor(
+                    self._sym_shape_to_str_shape(a.shape), a.dtype, a.device, node
+                )
             )
             for a in flat_fake_res
         ]
         unflat_res = torch.utils._pytree.tree_unflatten(flat_res, treespec_res)
+
+        if self.verbose > 2:
+            from ...helpers import string_type
+
+            print(f"[GraphTracer.dispatch] fake_res={string_type(fake_res, with_shape=True)}")
+            print(f"[GraphTracer.dispatch] <<<< res={string_type(unflat_res, with_shape=True)}")
 
         if node:
             node.meta["val"] = unflat_res
@@ -341,6 +384,9 @@ class GraphTracer:
         tracing_kwargs = {}
         if args:
             for i, a in enumerate(args):
+                if self.is_not_tensor(a):
+                    tracing_args.append(a)
+                    continue
                 ds = (
                     (
                         dynamic_shapes[i]
@@ -354,6 +400,9 @@ class GraphTracer:
                 tracing_args.append(x)
         if kwargs:
             for k, v in kwargs.items():
+                if self.is_not_tensor(v):
+                    tracing_kwargs[k] = v
+                    continue
                 ds = dynamic_shapes[k] if dynamic_shapes else None
                 tracing_kwargs[k] = self.make_tracing_arg(v, ds, name=k)
         return tuple(tracing_args), tracing_kwargs

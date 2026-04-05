@@ -3,8 +3,7 @@
 import operator
 import unittest
 import torch
-from yobx.ext_test_case import ExtTestCase
-from yobx.torch.new_tracing.shape import TracingInt
+from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.torch.new_tracing.tracer import GraphTracer
 from yobx.torch.new_tracing import trace_model
 
@@ -106,7 +105,7 @@ class TestNewTracingTracer(ExtTestCase):
         graph = tracer.trace(
             add,
             (torch.randn(4, 8), torch.randn(4, 8)),
-            dynamic_shapes={"x_0": [TracingInt("batch"), 8], "x_1": [TracingInt("batch"), 8]},
+            dynamic_shapes={"x": {0: "batch"}, "y": {0: "batch"}},
         )
         graph.lint()
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
@@ -294,6 +293,7 @@ class TestNewTracingTracer(ExtTestCase):
             any("weight" in n for n in ph_names), f"No 'weight' placeholder found in {ph_names}"
         )
 
+    @hide_stdout()
     def test_trace_custom_nn_module(self):
         class TwoLayerMLP(torch.nn.Module):
             def __init__(self):

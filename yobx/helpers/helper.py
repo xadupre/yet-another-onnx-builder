@@ -310,6 +310,12 @@ def string_type(
             return _string_tensor(obj, "F", with_shape, with_device)
 
         if isinstance(obj, torch.Tensor):
+            from ..torch.new_tracing.tensor import TracingTensor
+
+            if isinstance(obj, TracingTensor):
+                # M = chr(((ord(T) - 65) * 2) % 26 + 65)
+                return _string_tensor(obj, "M", with_shape, with_device)
+
             from ..torch.torch_helper import torch_dtype_to_onnx_dtype
 
             if with_min_max:
