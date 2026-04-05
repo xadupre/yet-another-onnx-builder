@@ -1,8 +1,10 @@
 """
-Patches for :mod:`transformers.masking_utils` to make mask-creation functions
-compatible with :class:`~yobx.torch.tracing.CustomTracer` FX symbolic tracing.
+Patches for :mod:`transformers.masking_utils` and
+:mod:`transformers.integrations.sdpa_attention` to make mask-creation and
+attention functions compatible with :class:`~yobx.torch.tracing.CustomTracer`
+FX symbolic tracing.
 
-Two functions contain control-flow on symbolic tensor-shape values
+Several functions contain control-flow on symbolic tensor-shape values
 (``CustomProxy`` instances) that raises ``TraceError`` during FX tracing:
 
 * :func:`transformers.masking_utils.prepare_padding_mask` — performs
@@ -17,9 +19,16 @@ Two functions contain control-flow on symbolic tensor-shape values
   adds an early return of ``False`` for proxy inputs, matching the result
   that the original function produces once it reaches the
   ``not is_tracing(padding_mask)`` branch (which is also ``False``).
+
+* :func:`transformers.integrations.sdpa_attention.sdpa_attention_forward` —
+  performs ``is_causal = query.shape[2] > 1 and attention_mask is None and ...``
+  where ``query.shape[2]`` is a ``CustomProxyInt``.  ``> 1`` produces a
+  ``CustomProxyBool`` which cannot be used in Python boolean logic.  The patch
+  detects proxy inputs and reconstructs the SDPA call without that control
+  flow.
 """
 
-from typing import Optional
+from typing import Optional, Tuple
 import torch
 
 
@@ -85,3 +94,65 @@ def patched__ignore_causal_mask_sdpa(
     ):
         return True
     return False
+
+
+def patched_sdpa_attention_forward(
+    module: "torch.nn.Module",
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attention_mask: Optional[torch.Tensor],
+    dropout: float = 0.0,
+    scaling: Optional[float] = None,
+    is_causal: Optional[bool] = None,
+    **kwargs,
+) -> Tuple[torch.Tensor, None]:
+    """
+    Trace-safe replacement for
+    :func:`transformers.integrations.sdpa_attention.sdpa_attention_forward`.
+
+    During FX symbolic tracing ``query.shape[2]`` is a
+    :class:`~yobx.torch.tracing.CustomProxyInt`, and
+    ``query.shape[2] > 1 and ...`` raises ``TraceError`` because a
+    ``CustomProxyBool`` cannot be evaluated as a Python bool in the ``and``
+    expression.  This patch detects proxy inputs and reconstructs the SDPA
+    call without that control flow, using ``is_causal=True`` (prefill
+    assumption) when the value cannot be determined statically.
+
+    For non-proxy inputs the original function is called unchanged.
+    """
+    if not isinstance(query, torch.fx.proxy.Proxy):
+        # Not tracing — call the original implementation.
+        from transformers.integrations.sdpa_attention import sdpa_attention_forward as _orig
+
+        return _orig(
+            module, query, key, value, attention_mask, dropout, scaling, is_causal, **kwargs
+        )
+
+    # ── Proxy / FX-tracing path ───────────────────────────────────────────────
+    # Repeat KV heads for grouped-query attention.
+    if hasattr(module, "num_key_value_groups") and module.num_key_value_groups != 1:
+        from transformers.integrations.sdpa_attention import repeat_kv
+
+        key = repeat_kv(key, module.num_key_value_groups)
+        value = repeat_kv(value, module.num_key_value_groups)
+
+    # Determine is_causal.  The original code uses ``query.shape[2] > 1``
+    # which cannot be evaluated during symbolic tracing.  We fall back to the
+    # module attribute (True for a standard causal decoder).
+    if is_causal is None:
+        is_causal = bool(getattr(module, "is_causal", True))
+    if not isinstance(is_causal, bool):
+        # Proxy or SymBool — conservatively treat as True (prefill phase).
+        is_causal = True
+
+    attn_output = torch.nn.functional.scaled_dot_product_attention(
+        query,
+        key,
+        value,
+        attn_mask=attention_mask,
+        dropout_p=dropout,
+        scale=scaling,
+        is_causal=is_causal,
+    )
+    return attn_output.transpose(1, 2).contiguous(), None

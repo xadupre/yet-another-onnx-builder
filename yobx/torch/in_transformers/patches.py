@@ -31,8 +31,9 @@ def _make_patch_info_for_rotary(submodule_class):
 
 def _make_masking_patches() -> List[PatchInfo]:
     """
-    Returns patches for :mod:`transformers.masking_utils` that make the mask-
-    creation functions compatible with FX symbolic tracing.
+    Returns patches for :mod:`transformers.masking_utils` and
+    :mod:`transformers.integrations.sdpa_attention` that make mask-creation
+    and attention functions compatible with FX symbolic tracing.
 
     These patches are only added when the functions exist in the installed
     version of :mod:`transformers`.
@@ -42,8 +43,9 @@ def _make_masking_patches() -> List[PatchInfo]:
     except ImportError:
         return []
     from ._patches_masking_utils import (
-        patched_prepare_padding_mask,
         patched__ignore_causal_mask_sdpa,
+        patched_prepare_padding_mask,
+        patched_sdpa_attention_forward,
     )
 
     patches = []
@@ -65,6 +67,20 @@ def _make_masking_patches() -> List[PatchInfo]:
                 "_ignore_causal_mask_sdpa",
                 family="transformers",
                 _last_patched_function=_masking_utils._ignore_causal_mask_sdpa,
+            )
+        )
+    try:
+        import transformers.integrations.sdpa_attention as _sdpa
+    except ImportError:
+        _sdpa = None  # type: ignore[assignment]
+    if _sdpa is not None and hasattr(_sdpa, "sdpa_attention_forward"):
+        patches.append(
+            PatchInfo.make(
+                patched_sdpa_attention_forward,
+                _sdpa,
+                "sdpa_attention_forward",
+                family="transformers",
+                _last_patched_function=_sdpa.sdpa_attention_forward,
             )
         )
     return patches
