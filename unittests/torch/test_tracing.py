@@ -1524,7 +1524,8 @@ class TestTracingControlFlow(ExtTestCase):
         model = Model()
         x = torch.rand((3, 4))
         art = to_onnx(model, (x,), export_options=ExportOptions(tracing=True))
-        self.assertIn("Identity", [n.op_type for n in art.graph.node])
+        # x1 = x + 1 traces as Add; clone() of the final output is dropped by the exporter.
+        self.assertEqual(["Add"], [n.op_type for n in art.graph.node])
 
 
 @requires_torch("2.0")
