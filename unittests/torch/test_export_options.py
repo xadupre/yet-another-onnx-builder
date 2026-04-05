@@ -488,32 +488,32 @@ class TestExportOptions(ExtTestCase):
             self.assertFalse(os.path.isfile(f"{save_path}.ep.pt2"))
 
     def test_tracing_mode_new_tracing_enum_value(self):
-        """TracingMode.NEW_TRACING has the expected string value."""
+        """Verifies that TracingMode.NEW_TRACING has the expected string value."""
         self.assertEqual(TracingMode.NEW_TRACING, "new-tracing")
 
     def test_tracing_mode_new_tracing_init(self):
-        """ExportOptions(tracing=TracingMode.NEW_TRACING) initialises correctly."""
+        """Verifies that ExportOptions(tracing=TracingMode.NEW_TRACING) initializes correctly."""
         opts = ExportOptions(tracing=TracingMode.NEW_TRACING)
         self.assertEqual(opts.tracing, TracingMode.NEW_TRACING)
 
     def test_tracing_mode_new_tracing_string_init(self):
-        """ExportOptions(tracing='new-tracing') normalises to TracingMode.NEW_TRACING."""
+        """Verifies that ExportOptions(tracing='new-tracing') normalizes to NEW_TRACING."""
         opts = ExportOptions(tracing="new-tracing")
         self.assertEqual(opts.tracing, TracingMode.NEW_TRACING)
 
     def test_strategy_new_tracing(self):
-        """ExportOptions(strategy='new-tracing') sets tracing=TracingMode.NEW_TRACING."""
+        """Verifies that ExportOptions(strategy='new-tracing') sets tracing to NEW_TRACING."""
         opts = ExportOptions(strategy="new-tracing")
         self.assertEqual(opts.tracing, TracingMode.NEW_TRACING)
 
     def test_tracing_mode_new_tracing_incompatible_with_dynamo(self):
-        """NEW_TRACING and dynamo=True must be rejected."""
+        """Verifies that NEW_TRACING and dynamo=True are rejected."""
         with self.assertRaises(AssertionError):
             ExportOptions(tracing=TracingMode.NEW_TRACING, dynamo=True)
 
     @ignore_warnings(UserWarning)
     def test_export_new_tracing_returns_graph_module(self):
-        """export() with NEW_TRACING returns a torch.fx.GraphModule."""
+        """Verifies that export() with NEW_TRACING returns a torch.fx.GraphModule."""
         model = _Neuron()
         x = torch.rand(2, 5)
         opts = ExportOptions(tracing=TracingMode.NEW_TRACING)
@@ -529,7 +529,7 @@ class TestExportOptions(ExtTestCase):
 
     @ignore_warnings(UserWarning)
     def test_export_new_tracing_graph_has_no_param_placeholders(self):
-        """After NEW_TRACING export, the graph contains no parameter placeholder nodes."""
+        """Verifies that after NEW_TRACING export no parameter placeholder nodes remain."""
         model = _Neuron()
         x = torch.rand(2, 5)
         opts = ExportOptions(tracing=TracingMode.NEW_TRACING)
@@ -553,7 +553,7 @@ class TestExportOptions(ExtTestCase):
 
     @ignore_warnings(UserWarning)
     def test_export_new_tracing_to_onnx(self):
-        """to_onnx with export_options=ExportOptions(tracing=TracingMode.NEW_TRACING) succeeds."""
+        """Verifies that to_onnx with ExportOptions(tracing=TracingMode.NEW_TRACING) succeeds."""
         import onnx
         from yobx.torch.interpreter import to_onnx
 
