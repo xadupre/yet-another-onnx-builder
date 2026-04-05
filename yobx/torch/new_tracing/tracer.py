@@ -73,7 +73,25 @@ class GraphTracer:
         device: Union[str, torch.device],
         node: torch.fx.Node,
     ) -> "TracingTensor":
-        """Create a :class:`TracingTensor` and register it with *node*."""
+        """
+        Allocate a :class:`TracingTensor` and bind it to *node*.
+
+        The tensor is created via :meth:`TracingTensor.__new__` / ``__init__``
+        so that no real storage is allocated, then its ``_node`` attribute is
+        set to *node* so that subsequent calls to :meth:`_get_node` can
+        retrieve the corresponding graph node.
+
+        :param shape: Tensor shape expressed as a plain ``tuple[int, ...]`` or
+            a :class:`TracingShape` (which may contain symbolic string
+            dimensions).
+        :param dtype: Element dtype of the tensor.
+        :param device: Target device (string such as ``"cpu"`` or a
+            :class:`torch.device` instance).
+        :param node: The :class:`torch.fx.Node` that produces this tensor in
+            the graph.
+        :return: A :class:`TracingTensor` whose ``_node`` is *node* and whose
+            ``_tracer`` is ``self``.
+        """
         t = TracingTensor.__new__(TracingTensor, shape, dtype=dtype, device=device)
         t.__init__(shape, dtype=dtype, device=device, tracer=self)  # type: ignore
         t._node = node
@@ -88,6 +106,20 @@ class GraphTracer:
         return self._node_for_external_tensor(t)
 
     def is_not_tensor(self, value: Any) -> bool:
+        """
+        Return ``True`` if *value* contains no :class:`torch.Tensor` leaves.
+
+        Scalars (``int``, ``float``, ``str``) and empty collections are
+        treated as non-tensor.  Lists and tuples are inspected recursively.
+        Dicts are inspected by their values.
+
+        :param value: The value to inspect.  May be a scalar, tensor,
+            list, tuple, or dict.
+        :return: ``True`` when *value* has no tensor leaves; ``False`` when
+            any leaf is a :class:`torch.Tensor` (including
+            :class:`TracingTensor`).
+        :raises TypeError: If *value* has a type that cannot be classified.
+        """
         if isinstance(value, (int, float, str)):
             return True
         if isinstance(value, torch.Tensor):
@@ -133,6 +165,14 @@ class GraphTracer:
         tensors (the same :class:`torch.Tensor` referenced under multiple
         names) map to exactly one placeholder node.
 
+        Each placeholder node receives two extra metadata entries:
+
+        * ``node.meta["torch_name"]``: the original dotted parameter name as
+          returned by :meth:`torch.nn.Module.named_parameters` (e.g.
+          ``"linear.weight"``).
+        * ``node.meta["torch_value"]``: the actual :class:`torch.Tensor`
+          object (useful for retrieving concrete weight values later).
+
         :param module: The :class:`torch.nn.Module` whose parameters and
             buffers should be pre-registered.
         """
@@ -155,6 +195,22 @@ class GraphTracer:
             self._external_tensor_to_node[key] = node
 
     def place(self, tt: TracingTensor, name: Optional[str] = None) -> TracingTensor:
+        """
+        Ensure *tt* is registered in this tracer's graph as a placeholder.
+
+        If *tt* already has a ``_node`` (i.e. it was produced by a previous
+        call to :meth:`placeholder` or :meth:`dispatch`), it is returned
+        unchanged.  Otherwise a new placeholder node is created, *tt* is
+        bound to it, and the updated tensor is returned.
+
+        :param tt: A :class:`TracingTensor` to register.  It must not be
+            owned by a *different* :class:`GraphTracer` instance.
+        :param name: Unused placeholder for a future name override.  The
+            actual node name is always generated as ``tt_<counter>``.
+        :return: *tt* with ``_tracer`` set to ``self`` and ``_node`` set to
+            the newly created (or pre-existing) placeholder node.
+        :raises AssertionError: If *tt* already belongs to a different tracer.
+        """
         assert (
             not tt._tracer or tt._tracer is self
         ), "A TracingTensor is already traced by another tracer."
@@ -193,6 +249,24 @@ class GraphTracer:
         return tt
 
     def make_fake(self, a: Union[TracingTensor, torch.Tensor]) -> "FakeTensor":  # noqa: F821
+        """
+        Convert *a* into a :class:`~torch._subclasses.fake_tensor.FakeTensor`
+        for shape/dtype inference inside :meth:`dispatch`.
+
+        For a :class:`TracingTensor`, each symbolic (string) dimension is
+        mapped to a :class:`~torch.SymInt` backed by the tracer's
+        :class:`~torch.fx.experimental.symbolic_shapes.ShapeEnv`; previously
+        seen dimension names are reused so that the same symbol appears
+        wherever the same dynamic dimension is referenced.
+
+        For a plain :class:`torch.Tensor`, a fake tensor with the same shape,
+        dtype, and device is created directly.
+
+        :param a: Either a :class:`TracingTensor` (possibly with symbolic
+            dimensions) or a plain :class:`torch.Tensor`.
+        :return: A :class:`~torch._subclasses.fake_tensor.FakeTensor` suitable
+            for passing to ATen operations in ``FakeTensorMode``.
+        """
         if isinstance(a, TracingTensor):
             new_shape = []
             for d in a.shape:
