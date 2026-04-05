@@ -106,8 +106,24 @@ class TracingTensor(torch.Tensor):
         self, dyanmic_shape_values: Optional[Dict[str, int]] = None
     ) -> torch.Tensor:
         """
-        Returns an instance of this tracing tensor
-        with the same type, shape, device.
+        Allocates an uninitialised :func:`torch.empty` tensor whose dtype and
+        device match this :class:`TracingTensor`.
+
+        Concrete integer dimensions are used as-is.  Symbolic (string) dimensions
+        must be resolved by supplying *dyanmic_shape_values*, a mapping from
+        dimension name to its concrete integer value.  A missing entry for any
+        symbolic dimension raises :exc:`AssertionError`.
+
+        :param dyanmic_shape_values: Optional mapping from symbolic dimension
+            names (e.g. ``"batch"``) to their concrete integer sizes.
+        :returns: A real :class:`torch.Tensor` with the resolved shape,
+            the same ``dtype``, and the same ``device`` as this
+            :class:`TracingTensor`.  The tensor is uninitialised (contents are
+            undefined).
+        :raises AssertionError: If a symbolic dimension name is not present in
+            *dyanmic_shape_values*.
+        :raises NotImplementedError: If a dimension has an unexpected type (i.e.
+            neither :class:`int` nor :class:`str`).
         """
         if not dyanmic_shape_values:
             return torch.empty(tuple(self.shape), dtype=self.dtype, device=self.device)
