@@ -129,7 +129,7 @@ class TracingTensor(torch.Tensor):
             assert all(
                 isinstance(i, int) for i in self.shape
             ), f"One shape is dynamic in {self.shape} but dyanmic_shape_values is empty."
-            return torch.empty(tuple(self.shape), dtype=self.dtype, device=self.device)
+            return torch.empty(tuple(self.shape), dtype=self.dtype, device=self.device)  # type: ignore
         new_shape = []
         for s in self.shape:
             if isinstance(s, int):
