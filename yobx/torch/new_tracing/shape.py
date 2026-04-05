@@ -63,7 +63,12 @@ class TracingInt:
     """
 
     def __init__(self, value: Union[int, str]):
+        assert isinstance(value, (int, str)), f"Unexpected type {type(value)} for value"
         self.value = value
+
+    @property
+    def is_static(self):
+        return isinstance(self.value, int)
 
     def __repr__(self) -> str:
         return f"TracingInt({self.value!r})"
@@ -98,6 +103,13 @@ class TracingInt:
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return self.value == other
+            simp = simplify_expression(f"({self.value}=={other})")
+            if isinstance(simp, str):
+                return TracingBool(simp)
+            return bool(simp)
+        if isinstance(other, str):
+            if isinstance(self.value, str) and self.value == other:
+                return True
             simp = simplify_expression(f"({self.value}=={other})")
             if isinstance(simp, str):
                 return TracingBool(simp)
@@ -213,6 +225,9 @@ class TracingShape:
     """
 
     def __init__(self, dims: "Sequence[Union[TracingInt, int]]") -> None:
+        assert all(
+            isinstance(d, (int, TracingInt)) for d in dims
+        ), f"Unexpected type in dims {[type(d) for d in dims]}"
         self.dims: Tuple[Union["TracingInt", int], ...] = tuple(dims)
 
     def __repr__(self) -> str:
@@ -304,5 +319,5 @@ class TracingShape:
             return TracingShape(tuple(int(i) for i in shape))
         new_shape = [int(i) for i in shape]
         for d, name in dynamic_shapes.items():
-            new_shape[d] = name  # type: ignore
+            new_shape[d] = TracingInt(name)  # type: ignore
         return TracingShape(tuple(new_shape))  # type: ignore
