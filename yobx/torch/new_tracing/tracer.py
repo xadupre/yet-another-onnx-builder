@@ -1111,14 +1111,11 @@ class GraphTracer:
 
         if self.verbose:
             print("[GraphTracer.trace] call...")
-        try:
-            with _cond_replacement_ctx(self):
-                out = func(*tracing_args, **tracing_kwargs)
-        finally:
-            # Always restore the original ``forward`` methods, even when
-            # tracing raises an exception.
-            for submod, orig_fwd in _patched:
-                submod.forward = orig_fwd
+        with _cond_replacement_ctx(self):
+            out = func(*tracing_args, **tracing_kwargs)
+
+        for submod, orig_fwd in _patched:
+            submod.forward = orig_fwd
 
         def _to_output_node(x: Any) -> Any:
             if isinstance(x, TracingTensor):
