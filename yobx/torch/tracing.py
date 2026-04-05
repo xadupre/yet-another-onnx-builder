@@ -30,6 +30,9 @@ def _infer_ndim_from_node(node: "torch.fx.Node", _visited: Optional[set] = None)
     operands have different numbers of dimensions the result always has at least
     as many dimensions as the largest input.
 
+    For ``call_module`` nodes backed by ``torch.nn.Embedding``, the output rank
+    equals the first-argument rank plus one (embedding adds a trailing dimension).
+
     :param node: The FX node whose rank we want to determine.
     :param _visited: Internal set used to avoid infinite loops in cyclic graphs.
     :return: The inferred rank as an :class:`int`, or ``None`` if it cannot be
@@ -45,6 +48,21 @@ def _infer_ndim_from_node(node: "torch.fx.Node", _visited: Optional[set] = None)
         val = node.meta["val"]
         if isinstance(val, torch.Tensor):
             return val.ndim
+
+    # Special case: nn.Embedding increases the input rank by 1.
+    if node.op == "call_module" and node.args:
+        try:
+            owning_module = node.graph.owning_module
+            if owning_module is not None:
+                submod = owning_module.get_submodule(node.target)
+                if isinstance(submod, torch.nn.Embedding):
+                    first_arg = node.args[0]
+                    if isinstance(first_arg, torch.fx.Node):
+                        input_ndim = _infer_ndim_from_node(first_arg, _visited)
+                        if input_ndim is not None:
+                            return input_ndim + 1
+        except Exception:
+            pass
 
     # For intermediate nodes, propagate from tensor-valued arguments.
     best: Optional[int] = None
@@ -619,8 +637,18 @@ class CustomProxyShape(CustomProxy):
     def __repr__(self):
         return f"{self.__class__.__name__}({self.values})"
 
+    def _infer_ndim(self) -> Optional[int]:
+        """Try to infer ndim from the underlying tensor node."""
+        tensor_node = self.node.args[0] if self.node.args else None
+        if isinstance(tensor_node, torch.fx.Node):
+            return _infer_ndim_from_node(tensor_node)
+        return None
+
     def __len__(self) -> int:
         if self.values is _MISSING:
+            ndim = self._infer_ndim()
+            if ndim is not None:
+                return ndim
             raise NotImplementedError(
                 "Cannot compute the length of a CustomProxyShape without concrete values. "
                 "Ensure concrete shape metadata is available, or use the proxy node directly."
@@ -629,6 +657,9 @@ class CustomProxyShape(CustomProxy):
 
     def length(self) -> int:
         if self.values is _MISSING:
+            ndim = self._infer_ndim()
+            if ndim is not None:
+                return ndim
             raise NotImplementedError(
                 "Cannot compute the length of a CustomProxyShape without concrete values. "
                 "Ensure concrete shape metadata is available, or use the proxy node directly."
@@ -637,6 +668,11 @@ class CustomProxyShape(CustomProxy):
 
     def __iter__(self):
         if self.values is _MISSING:
+            ndim = self._infer_ndim()
+            if ndim is not None:
+                for i in range(ndim):
+                    yield self[i]
+                return
             raise NotImplementedError(
                 "Cannot iterate a CustomProxyShape without concrete values. "
                 "Ensure concrete shape metadata is available."
@@ -654,6 +690,17 @@ class CustomProxyShape(CustomProxy):
             return self.values[index]
         if isinstance(index, slice):
             if self.values is _MISSING:
+                # Try to infer the rank from the tensor node that owns this shape.
+                # self.node is the size() call; self.node.args[0] is the tensor node.
+                tensor_node = self.node.args[0] if self.node.args else None
+                ndim = (
+                    _infer_ndim_from_node(tensor_node)
+                    if isinstance(tensor_node, torch.fx.Node)
+                    else None
+                )
+                if ndim is not None:
+                    indices = list(range(*index.indices(ndim)))
+                    return [self[i] for i in indices]
                 raise NotImplementedError(
                     "Slicing a CustomProxyShape requires concrete values. "
                     "Ensure concrete shape metadata is available."
