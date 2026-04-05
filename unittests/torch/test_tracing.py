@@ -1511,6 +1511,21 @@ class TestTracingControlFlow(ExtTestCase):
         art = to_onnx(model, (x,), export_options=ExportOptions(tracing=True))
         self.assertEqual(["Identity"], [n.op_type for n in art.graph.node])
 
+    def test_tracing_obvious_control_flow_ndim_indirect(self):
+        from yobx.torch import to_onnx, ExportOptions
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                x1 = x + 1
+                if x1.ndim == 2:
+                    return x1.clone()
+                return x / x1.ndim
+
+        model = Model()
+        x = torch.rand((3, 4))
+        art = to_onnx(model, (x,), export_options=ExportOptions(tracing=True))
+        self.assertIn("Identity", [n.op_type for n in art.graph.node])
+
 
 @requires_torch("2.0")
 class TestCustomProxyShape(ExtTestCase):

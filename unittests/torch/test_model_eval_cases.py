@@ -106,6 +106,11 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_yobx_tracing_controlflow_rank(self):
         evaluation(cases="ControlFlowRanks", exporters="yobx-tracing", quiet=False, dynamic=False)
 
+    def test_run_exporter_yobx_tracing_controlflow_indirect_rank(self):
+        evaluation(
+            cases="ControlFlowIndirectRanks", exporters="yobx-tracing", quiet=False, dynamic=False
+        )
+
     def test_run_exporter_yobx_tracing_controlflow_rank_type(self):
         evaluation(
             cases="ControlFlowRanksType", exporters="yobx-tracing", quiet=False, dynamic=False

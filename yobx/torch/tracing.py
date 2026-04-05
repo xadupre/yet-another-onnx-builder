@@ -18,6 +18,44 @@ _torch_cat = torch.cat
 _MISSING: Any = object()  # sentinel for "no concrete value supplied"
 
 
+def _infer_ndim_from_node(node: "torch.fx.Node", _visited: Optional[set] = None) -> Optional[int]:
+    """
+    Infer the rank (number of dimensions) of the tensor produced by ``node``.
+
+    For placeholder nodes the rank can be read directly from ``node.meta["val"]``.
+    For intermediate computation nodes (e.g. the result of ``x + 1``) the
+    metadata is not yet available at trace time, so we walk up the graph and
+    return the maximum rank found among all tensor-valued input nodes.  Using
+    the maximum is consistent with NumPy/PyTorch broadcasting semantics: when
+    operands have different numbers of dimensions the result always has at least
+    as many dimensions as the largest input.
+
+    :param node: The FX node whose rank we want to determine.
+    :param _visited: Internal set used to avoid infinite loops in cyclic graphs.
+    :return: The inferred rank as an :class:`int`, or ``None`` if it cannot be
+        determined.
+    """
+    if _visited is None:
+        _visited = set()
+    if id(node) in _visited:
+        return None
+    _visited.add(id(node))
+
+    if "val" in node.meta:
+        val = node.meta["val"]
+        if isinstance(val, torch.Tensor) and isinstance(val.ndim, int):
+            return val.ndim
+
+    # For intermediate nodes, propagate from tensor-valued arguments.
+    best: Optional[int] = None
+    for arg in node.args:
+        if isinstance(arg, torch.fx.Node):
+            d = _infer_ndim_from_node(arg, _visited)
+            if d is not None and (best is None or d > best):
+                best = d
+    return best
+
+
 class LEAVE_INPLACE:
     "Constant indicating inplace removal failed."
 
@@ -102,15 +140,10 @@ class CustomProxy(torch.fx.proxy.Proxy):
             return tt
         if k == "ndim":
             node = self.__dict__.get("node")
-            if node is not None and "val" in node.meta:
-                val = node.meta["val"]
-                if isinstance(val, torch.Tensor):
-                    ndim = val.ndim
-                    if isinstance(ndim, int):
-                        # All dimensions are concrete static integers: return
-                        # torch.Size directly so that downstream code receives
-                        # plain ints.
-                        return ndim
+            if node is not None:
+                ndim = _infer_ndim_from_node(node)
+                if ndim is not None:
+                    return ndim
             raise RuntimeError(
                 f"The rank of a tensor is always known. "
                 f"k={k!r} - {self=} - {self.node=} - {self.node.meta=}"
