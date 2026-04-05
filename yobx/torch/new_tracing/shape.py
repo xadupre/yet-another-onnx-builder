@@ -304,5 +304,5 @@ class TracingShape:
             return TracingShape(tuple(int(i) for i in shape))
         new_shape = [int(i) for i in shape]
         for d, name in dynamic_shapes.items():
-            new_shape[d] = name
+            new_shape[d] = name  # type: ignore
         return TracingShape(tuple(new_shape))  # type: ignore

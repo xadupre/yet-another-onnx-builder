@@ -126,6 +126,9 @@ class TracingTensor(torch.Tensor):
             neither :class:`int` nor :class:`str`).
         """
         if not dyanmic_shape_values:
+            assert all(
+                isinstance(i, int) for i in self.shape
+            ), f"One shape is dynamic in {self.shape} but dyanmic_shape_values is empty."
             return torch.empty(tuple(self.shape), dtype=self.dtype, device=self.device)
         new_shape = []
         for s in self.shape:

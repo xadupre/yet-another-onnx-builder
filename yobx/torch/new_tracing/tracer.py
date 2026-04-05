@@ -277,6 +277,7 @@ class GraphTracer:
                         symd = self._shape_env.create_unbacked_symint()
                         self._mapped_dimension[d] = symd
                         symd_name = self._sym_int_to_str(symd)
+                        assert isinstance(symd_name, str), "type checking"
                         self._sym_int_to_dynamic_dimension[symd_name] = d
                     new_shape.append(symd)
                 else:
@@ -310,6 +311,7 @@ class GraphTracer:
                 continue
             ss = self._sym_int_to_str(s)
             ns = self._token_replace(ss)
+            assert isinstance(ns, str), "simple type checking"
             self._mapped_dimension[ns] = s
             new_shape.append(ns)
         return tuple(new_shape)
@@ -415,7 +417,7 @@ class GraphTracer:
                 a
                 if self.is_not_tensor(a)
                 else self._make_tracing_tensor(
-                    self._sym_shape_to_str_shape(a.shape), a.dtype, a.device, node
+                    self._sym_shape_to_str_shape(a.shape), a.dtype, a.device, node  # type: ignore
                 )
             )
             for a in flat_fake_res
@@ -545,6 +547,7 @@ class GraphTracer:
         :return: A ``(tracing_args, tracing_kwargs)`` tuple whose tensor leaves
             are :class:`TracingTensor` instances.
         """
+        assert sig_names, "sig_names cannot be empty."
         tracing_args = []
         tracing_kwargs = {}
         if args:
@@ -568,6 +571,10 @@ class GraphTracer:
                 if self.is_not_tensor(v):
                     tracing_kwargs[k] = v
                     continue
+                assert isinstance(dynamic_shapes, dict), (
+                    f"Unexpected type {type(dynamic_shapes)} for dynamic shapes, "
+                    f"dict is mandatory when kwargs is not empty."
+                )
                 ds = dynamic_shapes[k] if dynamic_shapes else None
                 tracing_kwargs[k] = self.make_tracing_arg(v, ds, name=k)
         return tuple(tracing_args), tracing_kwargs
