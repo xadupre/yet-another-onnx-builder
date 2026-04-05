@@ -434,7 +434,13 @@ class GraphTracer:
             node.meta["val"] = unflat_res
             node.meta["fake_val"] = fake_res
             node.meta["stack_trace"] = "".join(traceback.format_stack())
-            node.meta["fn"] = inspect.getmodule(func)
+            _calling_module = None
+            for _frame_info in inspect.stack():
+                _frame_self = _frame_info.frame.f_locals.get("self")
+                if isinstance(_frame_self, torch.nn.Module):
+                    _calling_module = _frame_self
+                    break
+            node.meta["fn"] = _calling_module
 
         assert (
             func not in {torch.ops.aten.split.Tensor} or unflat_res is not None
