@@ -34,5 +34,11 @@ jobs:
 
       - name: Run op_db export tests
         run: |
-          pytest --durations=10 \
+          pytest --cov=yobx --cov-report=xml --durations=10 \
             unittests/torch/interpreter/test_onnx_export_common_methods.py
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: op-db

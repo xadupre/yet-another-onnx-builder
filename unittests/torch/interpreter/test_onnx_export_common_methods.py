@@ -18,6 +18,7 @@ from yobx.ext_test_case import ExtTestCase, has_onnxruntime, ignore_warnings, re
 from yobx.helpers import max_diff
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch.interpreter import to_onnx
+from yobx.torch.interpreter._exceptions import FunctionNotFoundError
 
 # Ops that generate random or non-deterministic outputs are excluded from
 # numerical validation since exported results cannot be compared to eager ones.
@@ -169,7 +170,10 @@ def _make_export_test(op: Any) -> Callable:
             expected if isinstance(expected, (tuple, list)) else (expected,)
         )
 
-        onx = to_onnx(model, inputs)
+        try:
+            onx = to_onnx(model, inputs)
+        except FunctionNotFoundError as e:
+            raise unittest.SkipTest(f"op {_op.name!r}: missing aten converter — {e}") from None
         numpy_inputs = [t.detach().numpy() for t in inputs]
 
         ref = ExtendedReferenceEvaluator(onx.proto)
