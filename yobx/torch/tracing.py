@@ -947,6 +947,13 @@ def replace_problematic_function_before_tracing() -> Generator:
     if _scan_op is not None:
         saved[(torch.ops.higher_order, "scan")] = _scan_op
         newf[(torch.ops.higher_order, "scan")] = ScanCCOp()
+    # Models may use ``torch.compiler.is_exporting()`` to branch between a
+    # plain Python loop (for eager execution) and a ``scan``-based path (for
+    # export/tracing).  During ``CustomTracer`` tracing the flag returns
+    # ``False``, so the loop branch is taken, which immediately raises
+    # ``TraceError`` because ``range(proxy_shape)`` is not supported.
+    # Replacing ``is_exporting`` with a function that always returns ``True``
+    # makes the tracer follow the scan branch instead.
     _is_exporting = getattr(torch.compiler, "is_exporting", None)
     if _is_exporting is not None:
         saved[(torch.compiler, "is_exporting")] = _is_exporting
