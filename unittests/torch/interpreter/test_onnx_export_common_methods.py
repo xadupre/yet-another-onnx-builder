@@ -5,7 +5,8 @@ to ONNX using :func:`yobx.torch.interpreter.to_onnx`.
 One test method is generated automatically for every (op, dtype) pair collected
 from ``op_db``, following the naming convention
 ``test_export_<op_name>_<dtype>`` where dots in the op name are replaced by
-underscores and *dtype* is one of ``float32``, ``float16``, ``int32``, or ``int64``.
+underscores and *dtype* is one of ``float32``, ``float16``, ``bfloat16``,
+``int32``, or ``int64``.
 """
 
 import unittest
@@ -19,6 +20,7 @@ from yobx.ext_test_case import ExtTestCase, has_onnxruntime, ignore_warnings, re
 from yobx.helpers import max_diff
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch.interpreter import to_onnx
+from yobx.torch.torch_helper import to_numpy
 
 # Ops that generate random or non-deterministic outputs are excluded from
 # numerical validation since exported results cannot be compared to eager ones.
@@ -273,6 +275,23 @@ _XFAIL_OPS_FLOAT16: FrozenSet[str] = frozenset(
     }
 )
 
+# Extra exclusions specific to torch.bfloat16.  Add an op key here when it
+# fails (export error, runtime error, or numerical mismatch) specifically for
+# bfloat16.  bfloat16 has 7 mantissa bits (vs 10 for float16) so the same
+# precision-sensitive ops can fail with larger errors.  The combined exclusion
+# set used during test collection is
+# ``_NO_CONVERTER_OPS | _XFAIL_OPS | _XFAIL_OPS_BFLOAT16``.
+_XFAIL_OPS_BFLOAT16: FrozenSet[str] = frozenset(
+    {
+        # Numerical mismatch too large for bfloat16 tolerance (2e-2):
+        "addcmul",  # ref_diff > 2e-2
+        "bmm",  # matmul numerical error exceeds bfloat16 tolerance
+        "expm1",  # reduced-precision exponential error
+        # Incorrect results (ordering) for bfloat16:
+        "argsort",  # ordering instability due to reduced precision
+    }
+)
+
 # Extra exclusions specific to torch.int32.  Add an op key here when it
 # fails specifically for int32 inputs.  The combined exclusion set used during
 # test collection is ``_NO_CONVERTER_OPS | _XFAIL_OPS | _XFAIL_OPS_INT32``.
@@ -378,8 +397,20 @@ _XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
 _DTYPE_NAMES: Dict[torch.dtype, str] = {
     torch.float32: "float32",
     torch.float16: "float16",
+    torch.bfloat16: "bfloat16",
     torch.int32: "int32",
     torch.int64: "int64",
+}
+
+# Absolute tolerance used when comparing eager vs exported outputs.
+# bfloat16 has only 7 mantissa bits (vs 10 for float16) so needs the widest
+# tolerance; integer and float32 dtypes use the tightest tolerance.
+_ATOL_DEFAULT: float = 1e-3
+_ATOL_FLOAT16: float = 1e-2
+_ATOL_BFLOAT16: float = 2e-2
+_DTYPE_ATOL: Dict[torch.dtype, float] = {
+    torch.float16: _ATOL_FLOAT16,
+    torch.bfloat16: _ATOL_BFLOAT16,
 }
 
 
@@ -429,7 +460,8 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
 
     Args:
         dtype: The :class:`torch.dtype` to collect ops for.  Must be one of
-            ``torch.float32``, ``torch.float16``, ``torch.int32``, or ``torch.int64``.
+            ``torch.float32``, ``torch.float16``, ``torch.bfloat16``,
+            ``torch.int32``, or ``torch.int64``.
 
     Returns:
         List of :class:`~torch.testing._internal.opinfo.core.OpInfo` objects.
@@ -437,6 +469,7 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
     _xfail_map: Dict[torch.dtype, FrozenSet[str]] = {
         torch.float32: _XFAIL_OPS,
         torch.float16: _XFAIL_OPS | _XFAIL_OPS_FLOAT16,
+        torch.bfloat16: _XFAIL_OPS | _XFAIL_OPS_BFLOAT16,
         torch.int32: _XFAIL_OPS | _XFAIL_OPS_INT32,
         torch.int64: _XFAIL_OPS | _XFAIL_OPS_INT64,
     }
@@ -476,6 +509,7 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
 
 _OPS_FLOAT32 = _collect_ops(torch.float32)
 _OPS_FLOAT16 = _collect_ops(torch.float16)
+_OPS_BFLOAT16 = _collect_ops(torch.bfloat16)
 _OPS_INT32 = _collect_ops(torch.int32)
 _OPS_INT64 = _collect_ops(torch.int64)
 
@@ -541,14 +575,15 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
         )
 
         onx = to_onnx(model, inputs)
-        numpy_inputs = [t.detach().numpy() for t in inputs]
+        numpy_inputs = [to_numpy(t) for t in inputs]
 
         ref = ExtendedReferenceEvaluator(onx.proto)
         ref_feeds = dict(zip(ref.input_names, numpy_inputs))
         got_ref = ref.run(None, ref_feeds)
 
-        # Use a slightly relaxed tolerance for float16 due to reduced precision.
-        atol = 1e-2 if _dtype == torch.float16 else 1e-3
+        # Use relaxed tolerances for reduced-precision dtypes: bfloat16 has
+        # only 7 mantissa bits (vs 10 for float16) so uses the widest tolerance.
+        atol = _DTYPE_ATOL.get(_dtype, _ATOL_DEFAULT)
 
         for i, (exp_i, got_i) in enumerate(zip(expected_seq, got_ref)):
             diff = max_diff(exp_i, got_i)
@@ -558,7 +593,7 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
                 msg=f"op={_op.name!r} dtype={_dtype} ref output[{i}] max abs diff={diff['abs']}",
             )
 
-        if has_onnxruntime():
+        if has_onnxruntime() and _dtype != torch.bfloat16:
             import onnxruntime
 
             sess = onnxruntime.InferenceSession(
@@ -589,10 +624,11 @@ class TestOnnxExportCommonMethods(ExtTestCase):
     """Tests :func:`yobx.torch.interpreter.to_onnx` against ops from op_db.
 
     One test method is generated automatically for every (op, dtype) pair in
-    ``_OPS_FLOAT32``, ``_OPS_FLOAT16``, ``_OPS_INT32``, and ``_OPS_INT64`` via
-    :func:`_make_export_test`.  Methods follow the naming convention
-    ``test_export_<op_name>_<dtype>`` where dots are replaced by underscores
-    and *dtype* is one of ``float32``, ``float16``, ``int32``, or ``int64``.
+    ``_OPS_FLOAT32``, ``_OPS_FLOAT16``, ``_OPS_BFLOAT16``, ``_OPS_INT32``,
+    and ``_OPS_INT64`` via :func:`_make_export_test`.  Methods follow the
+    naming convention ``test_export_<op_name>_<dtype>`` where dots are replaced
+    by underscores and *dtype* is one of ``float32``, ``float16``,
+    ``bfloat16``, ``int32``, or ``int64``.
     """
 
     @classmethod
@@ -601,6 +637,7 @@ class TestOnnxExportCommonMethods(ExtTestCase):
         for dtype, ops in (
             (torch.float32, _OPS_FLOAT32),
             (torch.float16, _OPS_FLOAT16),
+            (torch.bfloat16, _OPS_BFLOAT16),
             (torch.int32, _OPS_INT32),
             (torch.int64, _OPS_INT64),
         ):
