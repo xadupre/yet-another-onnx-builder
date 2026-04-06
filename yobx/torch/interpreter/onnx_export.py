@@ -138,11 +138,7 @@ def _retrieve(
         # so we can retrieve it without mutating node.meta["val"].
         # Input placeholders have no "torch_value" entry → return None so the
         # caller creates a proper ONNX graph input.
-        if isinstance(value, TracingTensor) or (
-            isinstance(value, torch.Tensor)
-            and not isinstance(value, torch._subclasses.fake_tensor.FakeTensor)
-            and value.device.type == "meta"
-        ):
+        if isinstance(value, TracingTensor):
             if isinstance(debug, dict) and "node" in debug:
                 torch_value = debug["node"].meta.get("torch_value")
                 if torch_value is not None:

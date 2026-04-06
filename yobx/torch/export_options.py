@@ -4,6 +4,7 @@ import time
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 import torch
+from torch.fx._lazy_graph_module import _make_graph_module
 from ..helpers import max_diff, string_diff, string_type
 from ..helpers.helper import string_sig, get_sig_kwargs
 from .torch_helper import torch_deepcopy
@@ -438,7 +439,6 @@ class ExportOptions:
             return dec
 
         if self.tracing == TracingMode.TRACING:
-            from torch.fx._lazy_graph_module import _make_graph_module
             from .tracing import CustomTracer
 
             concrete_args = kwargs.copy() if kwargs else {}
@@ -503,8 +503,6 @@ class ExportOptions:
             return gm
 
         if self.tracing == TracingMode.NEW_TRACING:
-            from torch.fx._lazy_graph_module import _make_graph_module
-
             from .new_tracing import trace_model
 
             if verbose:
@@ -527,8 +525,6 @@ class ExportOptions:
                 verbose=verbose,
                 module_leaves=self.tracing_module_leaves,
             )
-
-            graph.eliminate_dead_code()
 
             if self.save_ep:
                 save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
