@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, List, Sequence, Tuple
 import torch
 from torch.testing._internal import common_methods_invocations
 
-from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch
+from yobx.ext_test_case import ExtTestCase, has_onnxruntime, ignore_warnings, requires_torch
 from yobx.helpers import max_diff
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch.interpreter import to_onnx
@@ -170,18 +170,38 @@ def _make_export_test(op: Any) -> Callable:
         )
 
         onx = to_onnx(model, inputs)
+        numpy_inputs = [t.detach().numpy() for t in inputs]
 
         ref = ExtendedReferenceEvaluator(onx.proto)
-        feeds = dict(zip(ref.input_names, [t.detach().numpy() for t in inputs]))
-        got = ref.run(None, feeds)
+        ref_feeds = dict(zip(ref.input_names, numpy_inputs))
+        got_ref = ref.run(None, ref_feeds)
 
-        for i, (exp_i, got_i) in enumerate(zip(expected_seq, got)):
+        for i, (exp_i, got_i) in enumerate(zip(expected_seq, got_ref)):
             diff = max_diff(exp_i, got_i)
             # float32 arithmetic may introduce small rounding differences;
             # 1e-3 is a reasonable tolerance for single-precision ops.
             self.assertLess(
-                diff["abs"], 1e-3, msg=f"op={_op.name!r} output[{i}] max abs diff={diff['abs']}"
+                diff["abs"],
+                1e-3,
+                msg=f"op={_op.name!r} ref output[{i}] max abs diff={diff['abs']}",
             )
+
+        if has_onnxruntime():
+            import onnxruntime
+
+            sess = onnxruntime.InferenceSession(
+                onx.proto.SerializeToString(), providers=["CPUExecutionProvider"]
+            )
+            ort_feeds = dict(zip([inp.name for inp in sess.get_inputs()], numpy_inputs))
+            got_ort = sess.run(None, ort_feeds)
+
+            for i, (exp_i, got_i) in enumerate(zip(expected_seq, got_ort)):
+                diff = max_diff(exp_i, got_i)
+                self.assertLess(
+                    diff["abs"],
+                    1e-3,
+                    msg=f"op={_op.name!r} ort output[{i}] max abs diff={diff['abs']}",
+                )
 
     _test.__doc__ = f"Exports :func:`torch.{op.name}` to ONNX and validates numerical outputs."
     return _test
