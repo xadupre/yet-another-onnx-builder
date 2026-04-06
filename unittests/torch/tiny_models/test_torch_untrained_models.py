@@ -523,7 +523,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
         with (
             register_flattening_functions(patch_transformers=True),
-            apply_patches_for_model(patch_transformers=True, model=model),
+            apply_patches_for_model(patch_transformers=True, model=model, tracing=True),
         ):
             onx = to_onnx(
                 model,

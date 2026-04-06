@@ -103,10 +103,20 @@ def _make_masking_patches() -> List[PatchInfo]:
     return patches
 
 
-def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
+def get_patches_for(
+    model: Optional[torch.nn.Module] = None, tracing: bool = False
+) -> List[PatchInfo]:
     """
     Returns the list of patches for a specific model.
     if model is None, patches everything it can.
+
+    :param model: the model to patch; if ``None``, patches everything it can.
+    :param tracing: when ``True``, also includes patches that are required for
+        FX symbolic tracing (e.g. :func:`patched_sdpa_attention_forward`,
+        :func:`patched_prepare_padding_mask`).  These patches rewrite control
+        flow that would raise :exc:`torch.fx.proxy.TraceError` during symbolic
+        tracing but are *not* needed — and should *not* be applied — for
+        ordinary eager-mode or export-path inference.
 
     .. note::
         The function detects that ``RotaryEmbedding.forward`` is wrapped by checking
@@ -117,13 +127,13 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
     if model is None:
         from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
 
-        return [
-            *PATCHES,
-            _make_patch_info_for_rotary(LlamaRotaryEmbedding),
-            *_make_masking_patches(),
-        ]
+        result = [*PATCHES, _make_patch_info_for_rotary(LlamaRotaryEmbedding)]
+        if tracing:
+            result.extend(_make_masking_patches())
+        return result
     patches = list(PATCHES)
-    patches.extend(_make_masking_patches())
+    if tracing:
+        patches.extend(_make_masking_patches())
     for _name, submodule in model.named_modules():
         if (
             hasattr(submodule.forward, "__wrapped__")
