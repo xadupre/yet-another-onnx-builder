@@ -248,7 +248,6 @@ _XFAIL_OPS = frozenset(
         "nn_functional_cross_entropy",
         "nn_functional_l1_loss",
         "nn_functional_linear",
-        "nn_functional_mse_loss",
         "nn_functional_smooth_l1_loss",
         # Data-dependent output shapes (DataDependentOutputException):
         "corrcoef",

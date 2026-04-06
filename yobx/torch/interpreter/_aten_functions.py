@@ -7569,7 +7569,7 @@ def aten_mse_loss(
     outputs: List[str],
     x: T,
     target: T,
-    reduction: str = "mean",
+    reduction: Union[int, str] = 1,
     name: str = "mse_loss",
 ) -> T:
     "mse_loss"
@@ -7578,20 +7578,20 @@ def aten_mse_loss(
     diff_mul = g.op.Mul(diff, diff, name=name)
     if reduction in (1, "mean"):
         res = g.op.ReduceMeanAnyOpset(diff_mul, name=name, outputs=outputs, keepdims=0)
-    elif reduction == "sum":
+    elif reduction in (2, "sum"):
         res = g.op.ReduceSumAnyOpset(diff_mul, name=name, outputs=outputs, keepdims=0)
-    elif reduction == "none":
+    elif reduction in (0, "none"):
         res = g.op.Identity(diff_mul, name=name, outputs=outputs)
     else:
         raise NotImplementedError(
-            f"l1_loss with reduction={reduction!r} is not implemented{g.get_debug_msg()}"
+            f"mse_loss with reduction={reduction!r} is not implemented{g.get_debug_msg()}"
         )
     if not sts:
-        if reduction == "none":
-            set_type_shape_unary_op(res, x)
+        if reduction in (0, "none"):
+            set_type_shape_unary_op(g, res, x)
         else:
             g.set_type(res, g.get_type(x))
-            g.get_shape(res, tuple())
+            g.set_shape(res, tuple())
     return res
 
 
