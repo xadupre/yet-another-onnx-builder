@@ -979,7 +979,7 @@ class TestConvertingLibrary(ExtTestCase):
 
 @requires_torch("2.0")
 class TestToOnnxConvertingLibrary(ExtTestCase):
-    """Integration tests verifying that :func:`to_onnx` routes correctly when
+    """Verifies that :func:`to_onnx` routes correctly when
     ``TracingMode.ONNXSCRIPT`` or ``ConvertingLibrary.ONNXSCRIPT`` is used."""
 
     # A minimal toy model used by every test in this class.
@@ -989,7 +989,7 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
 
     @ignore_warnings(FutureWarning)
     def test_to_onnx_tracing_onnxscript_calls_dynamo_export(self):
-        """to_onnx with tracing=TracingMode.ONNXSCRIPT calls torch.onnx.export with dynamo=True."""
+        """Verifies that to_onnx with tracing=TracingMode.ONNXSCRIPT calls torch.onnx.export with dynamo=True."""
         import onnx
         from unittest.mock import MagicMock, patch
 
@@ -1015,7 +1015,7 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
 
     @ignore_warnings(FutureWarning)
     def test_to_onnx_tracing_onnxscript_does_not_call_export_options_export(self):
-        """to_onnx with tracing=TracingMode.ONNXSCRIPT does not call ExportOptions.export()."""
+        """Verifies that to_onnx with tracing=TracingMode.ONNXSCRIPT does not call ExportOptions.export()."""
         import onnx
         from unittest.mock import MagicMock, patch
 
@@ -1039,7 +1039,7 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
 
     @ignore_warnings(FutureWarning)
     def test_to_onnx_converting_library_onnxscript_uses_exported_program(self):
-        """to_onnx with converting_library=ONNXSCRIPT + default tracing uses
+        """Verifies that to_onnx with converting_library=ONNXSCRIPT + default tracing uses
         ExportOptions.export() to obtain an ExportedProgram, then calls
         torch.onnx.export on that program (not with dynamo=True)."""
         import onnx
@@ -1073,8 +1073,8 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
 
     @ignore_warnings(FutureWarning)
     def test_to_onnx_strategy_onnxscript_calls_dynamo_export(self):
-        """to_onnx with strategy='onnxscript' (shorthand for TracingMode.ONNXSCRIPT) calls
-        torch.onnx.export with dynamo=True on the original model."""
+        """Verifies that to_onnx with strategy='onnxscript' (shorthand for TracingMode.ONNXSCRIPT)
+        calls torch.onnx.export with dynamo=True on the original model."""
         import onnx
         from unittest.mock import MagicMock, patch
 
