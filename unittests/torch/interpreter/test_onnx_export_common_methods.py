@@ -18,7 +18,6 @@ from yobx.ext_test_case import ExtTestCase, has_onnxruntime, ignore_warnings, re
 from yobx.helpers import max_diff
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch.interpreter import to_onnx
-from yobx.torch.interpreter._exceptions import FunctionNotFoundError
 
 # Ops that generate random or non-deterministic outputs are excluded from
 # numerical validation since exported results cannot be compared to eager ones.
@@ -38,6 +37,188 @@ _NON_DETERMINISTIC_OPS = frozenset(
         "randn",
         "randn_like",
         "uniform",
+    }
+)
+
+# Ops whose aten decomposition uses an aten function for which no ONNX
+# converter has been implemented yet.  Each entry is the value of
+# ``op.name.replace(".", "_")`` (the suffix of the generated test method).
+# When a converter is added, remove the entry from this set so the test
+# starts running automatically.
+_NO_CONVERTER_OPS = frozenset(
+    {
+        "H",
+        "__rsub__",
+        "addcdiv",
+        "addr",
+        "alias_copy",
+        "amin",
+        "aminmax",
+        "angle",
+        "argwhere",
+        "atan2",
+        "atleast_1d",
+        "atleast_2d",
+        "atleast_3d",
+        "bernoulli",
+        "block_diag",
+        "cartesian_prod",
+        "clamp_max",
+        "clamp_min",
+        "conj_physical",
+        "copysign",
+        "count_nonzero",
+        "cross",
+        "cumulative_trapezoid",
+        "deg2rad",
+        "diag",
+        "diag_embed",
+        "diagflat",
+        "diagonal",
+        "diagonal_copy",
+        "diagonal_scatter",
+        "digamma",
+        "dot",
+        "erfc",
+        "erfinv",
+        "exp2",
+        "fft_fftshift",
+        "fft_ifftshift",
+        "fliplr",
+        "flipud",
+        "float_power",
+        "fmax",
+        "fmin",
+        "fmod",
+        "frac",
+        "frexp",
+        "geqrf",
+        "hash_tensor",
+        "heaviside",
+        "hypot",
+        "i0",
+        "igamma",
+        "igammac",
+        "inner",
+        "isclose",
+        "isfinite",
+        "isneginf",
+        "isposinf",
+        "isreal",
+        "kron",
+        "ldexp",
+        "lgamma",
+        "linalg_cond",
+        "linalg_cross",
+        "linalg_diagonal",
+        "linalg_householder_product",
+        "linalg_inv",
+        "linalg_inv_ex",
+        "linalg_qr",
+        "linalg_solve",
+        "linalg_solve_ex",
+        "linalg_svdvals",
+        "linalg_vecdot",
+        "log10",
+        "log1p",
+        "log2",
+        "logaddexp",
+        "logaddexp2",
+        "logical_xor",
+        "logit",
+        "lu_solve",
+        "lu_unpack",
+        "mH",
+        "mT",
+        "masked_select",
+        "matrix_exp",
+        "median",
+        "mode",
+        "msort",
+        "mv",
+        "nanmean",
+        "nanmedian",
+        "nansum",
+        "nextafter",
+        "nn_functional_bilinear",
+        "nn_functional_binary_cross_entropy",
+        "nn_functional_binary_cross_entropy_with_logits",
+        "nn_functional_celu",
+        "nn_functional_logsigmoid",
+        "nn_functional_mish",
+        "nn_functional_multi_margin_loss",
+        "nn_functional_multilabel_margin_loss",
+        "nn_functional_multilabel_soft_margin_loss",
+        "nn_functional_pairwise_distance",
+        "nn_functional_pdist",
+        "nn_functional_relu6",
+        "nn_functional_soft_margin_loss",
+        "pinverse",
+        "positive",
+        "qr",
+        "rad2deg",
+        "ravel",
+        "real",
+        "resize_as_",
+        "resolve_conj",
+        "resolve_neg",
+        "rot90",
+        "rsub",
+        "sgn",
+        "signbit",
+        "sinc",
+        "sort",
+        "special_airy_ai",
+        "special_bessel_j0",
+        "special_bessel_j1",
+        "special_bessel_y0",
+        "special_bessel_y1",
+        "special_chebyshev_polynomial_t",
+        "special_chebyshev_polynomial_u",
+        "special_chebyshev_polynomial_v",
+        "special_chebyshev_polynomial_w",
+        "special_entr",
+        "special_erfcx",
+        "special_hermite_polynomial_h",
+        "special_hermite_polynomial_he",
+        "special_i0e",
+        "special_i1",
+        "special_i1e",
+        "special_laguerre_polynomial_l",
+        "special_legendre_polynomial_p",
+        "special_log_ndtr",
+        "special_modified_bessel_i0",
+        "special_modified_bessel_i1",
+        "special_modified_bessel_k0",
+        "special_modified_bessel_k1",
+        "special_ndtr",
+        "special_ndtri",
+        "special_scaled_modified_bessel_k0",
+        "special_scaled_modified_bessel_k1",
+        "special_shifted_chebyshev_polynomial_t",
+        "special_shifted_chebyshev_polynomial_u",
+        "special_shifted_chebyshev_polynomial_v",
+        "special_shifted_chebyshev_polynomial_w",
+        "special_spherical_bessel_j0",
+        "special_xlog1py",
+        "special_zeta",
+        "squeeze_copy",
+        "std",
+        "std_mean",
+        "t_copy",
+        "tensor_split",
+        "to_sparse",
+        "trace",
+        "trapezoid",
+        "trapz",
+        "triangular_solve",
+        "true_divide",
+        "var",
+        "var_mean",
+        "vdot",
+        "view_as",
+        "xlogy",
+        "zero_",
     }
 )
 
@@ -96,6 +277,8 @@ def _collect_ops() -> List[Any]:
             if op.variant_test_name:
                 continue
             if op.name in _NON_DETERMINISTIC_OPS:
+                continue
+            if op.name.replace(".", "_") in _NO_CONVERTER_OPS:
                 continue
             samples = list(op.sample_inputs("cpu", torch.float32, requires_grad=False))
             if not samples:
@@ -170,10 +353,7 @@ def _make_export_test(op: Any) -> Callable:
             expected if isinstance(expected, (tuple, list)) else (expected,)
         )
 
-        try:
-            onx = to_onnx(model, inputs)
-        except FunctionNotFoundError as e:
-            raise unittest.SkipTest(f"op {_op.name!r}: missing aten converter — {e}") from None
+        onx = to_onnx(model, inputs)
         numpy_inputs = [t.detach().numpy() for t in inputs]
 
         ref = ExtendedReferenceEvaluator(onx.proto)
