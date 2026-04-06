@@ -249,6 +249,7 @@ class GraphTracer:
             name = f"param_{self._placeholder_count}"
             node = self.graph.placeholder(name)
             node.meta["val"] = t.detach().to(device="meta")
+            node.meta["torch_value"] = t
             self._external_tensor_to_node[key] = node
         return self._external_tensor_to_node[key]
 

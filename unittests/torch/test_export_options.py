@@ -574,7 +574,7 @@ class TestExportOptions(ExtTestCase):
         artifact = to_onnx(
             model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
         )
-        onx = artifact.model_proto
+        onx = artifact.proto
         self.assertIsInstance(onx, onnx.ModelProto)
         # The ONNX model must have exactly one graph input ("x").
         self.assertEqual(len(onx.graph.input), 1)

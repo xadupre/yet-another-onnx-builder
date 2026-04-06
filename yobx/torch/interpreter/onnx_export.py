@@ -132,12 +132,17 @@ def _retrieve(
 
         from ..new_tracing.tensor import TracingTensor
 
-        if isinstance(value, TracingTensor):
-            # For parameter placeholder nodes produced by GraphTracer, the actual
-            # weight tensor is stored in node.meta["torch_value"].  The debug dict
-            # carries the FX node so we can retrieve it here without mutating
-            # node.meta["val"].  Input placeholders have no "torch_value" entry
-            # and should remain as graph inputs (return None).
+        # For any placeholder node produced by GraphTracer (both pre-registered
+        # parameters and auto-named param_N nodes), the actual weight tensor is
+        # stored in node.meta["torch_value"].  The debug dict carries the FX node
+        # so we can retrieve it without mutating node.meta["val"].
+        # Input placeholders have no "torch_value" entry → return None so the
+        # caller creates a proper ONNX graph input.
+        if isinstance(value, TracingTensor) or (
+            isinstance(value, torch.Tensor)
+            and not isinstance(value, torch._subclasses.fake_tensor.FakeTensor)
+            and value.device.type == "meta"
+        ):
             if isinstance(debug, dict) and "node" in debug:
                 torch_value = debug["node"].meta.get("torch_value")
                 if torch_value is not None:
