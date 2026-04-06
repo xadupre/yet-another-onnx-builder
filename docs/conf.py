@@ -35,6 +35,8 @@ if shutil.which("latex"):
 graphviz_output_format = "svg"
 graphviz_dot_args = ["-Gbgcolor=transparent"]
 
+autodoc_typehints_format = "short"
+
 mermaid_init_js = """
 document.addEventListener("DOMContentLoaded", function () {
     // pydata_sphinx_theme sets data-bs-theme="dark" on <html> for dark mode.
