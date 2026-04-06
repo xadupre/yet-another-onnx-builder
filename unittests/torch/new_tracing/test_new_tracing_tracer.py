@@ -788,7 +788,7 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         if not hasattr(torch, "_check"):
             return
         from yobx.torch.new_tracing.tracer import GraphTracer
-        from yobx.torch.new_tracing.shape import TracingShape, TracingInt, clear_conditions
+        from yobx.torch.new_tracing.shape import clear_conditions
 
         class ModelWithCheck(torch.nn.Module):
             def forward(self, x):
@@ -799,11 +799,7 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         clear_conditions()
         model = ModelWithCheck()
         tracer = GraphTracer()
-        graph = tracer.trace(
-            model,
-            (torch.randn(4, 8),),
-            dynamic_shapes={"x": {0: "batch"}},
-        )
+        graph = tracer.trace(model, (torch.randn(4, 8),), dynamic_shapes={"x": {0: "batch"}})
         graph.lint()
         clear_conditions()
 
@@ -834,11 +830,7 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         clear_conditions()
         model = ModelWithGuard()
         tracer = GraphTracer()
-        graph = tracer.trace(
-            model,
-            (torch.randn(4, 8),),
-            dynamic_shapes={"x": {0: "batch"}},
-        )
+        graph = tracer.trace(model, (torch.randn(4, 8),), dynamic_shapes={"x": {0: "batch"}})
         graph.lint()
         self.assertIn("true", branch_taken, "The true branch should have been taken")
         clear_conditions()
@@ -846,4 +838,3 @@ class TestGraphTracerTorchCheck(ExtTestCase):
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
-

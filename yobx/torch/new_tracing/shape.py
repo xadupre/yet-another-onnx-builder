@@ -2,7 +2,6 @@ from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Union
 from ...xexpressions import simplify_expression
 import torch
 
-
 # ---------------------------------------------------------------------------
 # Registry of conditions known to be True (populated by _handle_check during
 # tracing via torch._check interception).  Symbolic TracingBool values whose
@@ -292,7 +291,7 @@ class TracingInt:
         """Returns ``True`` / ``False`` or :class:`TracingBool` for ``self <= other``."""
         return self._cmp("<=", other)
 
-    def __ne__(self, other: Any) -> Union[bool, "TracingBool"]:  # type: ignore[override]
+    def __ne__(self, other: Any) -> Union[bool, "TracingBool"]:  # type: ignore[override]  # noqa: PYI032
         """Returns ``True`` / ``False`` or :class:`TracingBool` for ``self != other``."""
         if isinstance(other, (int, TracingInt)):
             return self._cmp("!=", other)

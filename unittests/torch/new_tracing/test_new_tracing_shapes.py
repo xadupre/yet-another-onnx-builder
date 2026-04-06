@@ -146,11 +146,7 @@ class TestNewTracingShapes(ExtTestCase):
 
     def test_register_condition_resolves_tracing_bool(self):
         """A registered TracingBool condition resolves to True in __bool__."""
-        from yobx.torch.new_tracing.shape import (
-            register_condition,
-            clear_conditions,
-            _known_true_conditions,
-        )
+        from yobx.torch.new_tracing.shape import register_condition, clear_conditions
 
         clear_conditions()
         tb = TracingInt("batch") > 0
