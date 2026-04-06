@@ -134,12 +134,12 @@ def _retrieve(
         # Both FakeTensor and TracingTensor are excluded: they represent
         # symbolic/traced tensors (not real constants) and _retrieve should
         # return None for them so that the caller creates a proper graph input.
-        from ..new_tracing.tensor import TracingTensor as _TracingTensor
+        from ..new_tracing.tensor import TracingTensor
 
         if (
             isinstance(value, torch.Tensor)
             and not isinstance(value, torch._subclasses.fake_tensor.FakeTensor)
-            and not isinstance(value, _TracingTensor)
+            and not isinstance(value, TracingTensor)
         ):
             return value
         if len(weights) == 0 and len(buffers) == 0 and len(constants) == 0:
