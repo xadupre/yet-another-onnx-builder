@@ -1,0 +1,44 @@
+name: ci-10-torch-op-db
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: torch-op-db (ubuntu-latest, py3.13, torch-latest)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install latest stable pytorch
+        run: pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,torch,op-db]"
+
+      - name: pip freeze
+        run: pip freeze
+
+      - name: Run op_db export tests
+        run: |
+          pytest --cov=yobx --cov-report=xml --durations=10 \
+            unittests/torch/interpreter/test_onnx_export_common_methods.py
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: op-db
