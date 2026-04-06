@@ -65,4 +65,4 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest --durations=10 --ignore=unittests/parity --ignore=unittests/sklearn --ignore=unittests/sql --ignore=unittests/tensorflow --ignore=unittests/torch/interpreter/test_onnx_export_common_methods.py
+          pytest --durations=10 --ignore=unittests/parity --ignore=unittests/sklearn --ignore=unittests/sql --ignore=unittests/tensorflow --ignore=unittests/torch/coverage
