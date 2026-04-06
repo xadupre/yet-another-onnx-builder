@@ -64,7 +64,7 @@ Go to :ref:`l-this-bottom-page-coverage` to see a table summarizing the results.
             print()
             res = run_exporter(exporter, cls_model, True, quiet=True)
             case_ref = f":ref:`{name} <ledx-model-case-export-{name}>`"
-            expo = exporter.split("-", maxsplit=1)[-1]
+            expo = exporter
             if "inputs" in res:
                 print(f"* **inputs:** ``{string_type(res['inputs'], with_shape=True)}``")
             if "dynamic_shapes" in res:
