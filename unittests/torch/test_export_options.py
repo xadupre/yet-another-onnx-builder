@@ -530,7 +530,7 @@ class TestExportOptions(ExtTestCase):
     @ignore_warnings(UserWarning)
     def test_export_new_tracing_param_placeholders_have_actual_weights(self):
         """Verifies that after NEW_TRACING export, parameter placeholder nodes have
-        actual weights in meta['val']."""
+        actual weights in meta['torch_value'] and retain their TracingTensor in meta['val']."""
         model = _Neuron()
         x = torch.rand(2, 5)
         opts = ExportOptions(tracing=TracingMode.NEW_TRACING)
@@ -542,23 +542,25 @@ class TestExportOptions(ExtTestCase):
             dynamic_shapes=None,
             same_signature=True,
         )
-        # Parameter placeholder nodes must retain their actual weight tensor in meta["val"].
+        # Parameter placeholder nodes must carry the actual weight in meta["torch_value"]
+        # while meta["val"] remains a TracingTensor (never overwritten).
         param_names = {name for name, _ in model.named_parameters()}
         for node in gm.graph.nodes:
             if node.op == "placeholder" and node.meta.get("torch_name") in param_names:
-                val = node.meta.get("val")
+                torch_value = node.meta.get("torch_value")
                 self.assertIsInstance(
-                    val,
+                    torch_value,
                     torch.Tensor,
                     f"Parameter placeholder {node.name!r} should have an actual tensor "
-                    "in meta['val']",
+                    "in meta['torch_value']",
                 )
-                # Must NOT be a TracingTensor subclass.
-                self.assertNotIn(
+                # meta["val"] must remain as a TracingTensor (not overwritten).
+                val = node.meta.get("val")
+                self.assertIn(
                     "TracingTensor",
                     type(val).__name__,
-                    f"Parameter placeholder {node.name!r} meta['val'] must not be "
-                    "a TracingTensor",
+                    f"Parameter placeholder {node.name!r} meta['val'] should be a "
+                    "TracingTensor (not overwritten by export)",
                 )
 
     @ignore_warnings(UserWarning)

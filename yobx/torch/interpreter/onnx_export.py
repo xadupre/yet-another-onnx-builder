@@ -130,16 +130,25 @@ def _retrieve(
     if name not in mapping:
         import torch
 
-        # This is not a weight but a constant.
-        # Both FakeTensor and TracingTensor are excluded: they represent
-        # symbolic/traced tensors (not real constants) and _retrieve should
-        # return None for them so that the caller creates a proper graph input.
         from ..new_tracing.tensor import TracingTensor
 
-        if (
-            isinstance(value, torch.Tensor)
-            and not isinstance(value, torch._subclasses.fake_tensor.FakeTensor)
-            and not isinstance(value, TracingTensor)
+        if isinstance(value, TracingTensor):
+            # For parameter placeholder nodes produced by GraphTracer, the actual
+            # weight tensor is stored in node.meta["torch_value"].  The debug dict
+            # carries the FX node so we can retrieve it here without mutating
+            # node.meta["val"].  Input placeholders have no "torch_value" entry
+            # and should remain as graph inputs (return None).
+            if isinstance(debug, dict) and "node" in debug:
+                torch_value = debug["node"].meta.get("torch_value")
+                if torch_value is not None:
+                    return torch_value
+            return None
+
+        # This is not a weight but a constant.
+        # FakeTensor is excluded: it represents a symbolic tensor and _retrieve
+        # should return None so the caller creates a proper graph input.
+        if isinstance(value, torch.Tensor) and not isinstance(
+            value, torch._subclasses.fake_tensor.FakeTensor
         ):
             return value
         if len(weights) == 0 and len(buffers) == 0 and len(constants) == 0:

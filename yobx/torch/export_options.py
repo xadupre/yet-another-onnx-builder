@@ -528,16 +528,6 @@ class ExportOptions:
                 module_leaves=self.tracing_module_leaves,
             )
 
-            # Post-process: replace the TracingTensor in meta["val"] of parameter
-            # placeholder nodes with the actual weight tensor stored in meta["torch_value"].
-            # This allows DynamoInterpreter._retrieve to return the real weight and
-            # create a proper ONNX initializer.  Input placeholder nodes retain their
-            # TracingTensor; _retrieve treats TracingTensor the same as FakeTensor
-            # (returns None) so DynamoInterpreter creates a proper ONNX graph input.
-            for n in graph.nodes:
-                if n.op == "placeholder" and "torch_value" in n.meta:
-                    n.meta["val"] = n.meta["torch_value"]
-
             if self.save_ep:
                 save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
                 with open(f"{save_ep}.new_tracing", "w") as f:
