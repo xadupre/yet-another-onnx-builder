@@ -505,7 +505,7 @@ class ExportOptions:
         if self.tracing == TracingMode.NEW_TRACING:
             from torch.fx._lazy_graph_module import _make_graph_module
 
-            from .new_tracing import trace_model as new_trace_model
+            from .new_tracing import trace_model
 
             if verbose:
                 print(f"[ExportOptions.export] trace_model (new_tracing), verbose={verbose}")
@@ -519,7 +519,7 @@ class ExportOptions:
                     f"{string_type(kwargs, with_shape=True, limit=20)}"
                 )
 
-            graph = new_trace_model(
+            graph = trace_model(
                 mod,
                 args if args else tuple(),
                 kwargs=kwargs,
