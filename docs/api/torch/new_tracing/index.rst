@@ -1,10 +1,6 @@
 yobx.torch.new_tracing
 ======================
 
-.. automodule:: yobx.torch.new_tracing
-    :members:
-    :no-undoc-members:
-
 .. toctree::
     :maxdepth: 1
     :caption: modules
@@ -16,4 +12,4 @@ yobx.torch.new_tracing
 trace_model
 +++++++++++
 
-.. autofunction:: trace_model
+.. autofunction:: yobx.torch.new_tracing.trace_model
