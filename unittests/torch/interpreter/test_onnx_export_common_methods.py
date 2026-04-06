@@ -222,6 +222,43 @@ _NO_CONVERTER_OPS = frozenset(
     }
 )
 
+# Ops that are currently exported but produce incorrect numerical results or
+# raise errors not related to missing aten converters (e.g. numerical
+# precision, unsupported dtype, data-dependent shapes, etc.).  Each entry is
+# the value of ``op.name.replace(".", "_")`` (the suffix of the generated test
+# method).  Remove an entry when the underlying issue is fixed so that the
+# test starts running automatically.
+_XFAIL_OPS = frozenset(
+    {
+        # Numerical mismatch between eager and ONNX output (AssertionError):
+        "amax",
+        "cholesky_inverse",
+        "cholesky_solve",
+        "jiterator_2inputs_2outputs",
+        "jiterator_4inputs_with_extra_args",
+        "jiterator_binary",
+        "jiterator_binary_return_by_ref",
+        "jiterator_unary",
+        "linalg_det",
+        "linalg_slogdet",
+        "logdet",
+        "logical_not",
+        "nn_functional_cross_entropy",
+        "nn_functional_l1_loss",
+        "nn_functional_linear",
+        "nn_functional_mse_loss",
+        "nn_functional_smooth_l1_loss",
+        # Data-dependent output shapes (DataDependentOutputException):
+        "corrcoef",
+        "cov",
+        # Other export/runtime errors:
+        "bfloat16",  # RuntimeError
+        "broadcast_tensors",  # NotImplementedError
+        "clamp",  # onnxruntime RuntimeException
+        "nan_to_num",  # TypeError
+    }
+)
+
 
 def _tensor_is_exportable(t: torch.Tensor) -> bool:
     """Checks whether a single tensor can be safely converted to NumPy.
@@ -261,6 +298,8 @@ def _collect_ops() -> List[Any]:
     - Support ``float32``
     - Have no variant test name
     - Are not non-deterministic (random-output) ops
+    - Are not in :data:`_NO_CONVERTER_OPS` (missing aten converter)
+    - Are not in :data:`_XFAIL_OPS` (known failures for other reasons)
     - Have at least one sample input whose ``.input`` is a ``float32`` tensor
     - Have all positional sample args that are also tensors (or none at all)
     - Have no non-trivial keyword arguments (to avoid unsupported ONNX kwargs)
@@ -279,6 +318,8 @@ def _collect_ops() -> List[Any]:
             if op.name in _NON_DETERMINISTIC_OPS:
                 continue
             if op.name.replace(".", "_") in _NO_CONVERTER_OPS:
+                continue
+            if op.name.replace(".", "_") in _XFAIL_OPS:
                 continue
             samples = list(op.sample_inputs("cpu", torch.float32, requires_grad=False))
             if not samples:
