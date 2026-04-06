@@ -32,7 +32,7 @@ def _make_patch_info_for_rotary(submodule_class):
 def _make_masking_patches() -> List[PatchInfo]:
     """
     Returns patches for :mod:`transformers.masking_utils` and
-    :mod:`transformers.integrations.sdpa_attention` that make mask-creation
+    :class:`~transformers.modeling_utils.AttentionInterface` that make mask-creation
     and attention functions compatible with FX symbolic tracing.
 
     These patches are only added when the functions exist in the installed
@@ -69,18 +69,35 @@ def _make_masking_patches() -> List[PatchInfo]:
                 _last_patched_function=_masking_utils._ignore_causal_mask_sdpa,
             )
         )
-    try:
-        import transformers.integrations.sdpa_attention as _sdpa
-    except ImportError:
-        _sdpa = None  # type: ignore[assignment]
-    if _sdpa is not None and hasattr(_sdpa, "sdpa_attention_forward"):
+    # Models like LLaMA resolve the attention function via
+    # ``ALL_ATTENTION_FUNCTIONS.get_interface("sdpa", ...)`` which reads from
+    # ``AttentionInterface._global_mapping`` (a class-level dict shared across
+    # all instances).  Patching the module-level attribute on
+    # ``transformers.integrations.sdpa_attention`` is *not* sufficient because
+    # that dict captures the original function reference at class-definition
+    # time and is never updated by a module attribute replacement.
+    import transformers.modeling_utils as _modeling_utils
+
+    _AttnInterface = getattr(_modeling_utils, "AttentionInterface", None)
+    if _AttnInterface is not None and "sdpa" in _AttnInterface._global_mapping:
+        _mapping = _AttnInterface._global_mapping
+        _patched = patched_sdpa_attention_forward
+
+        def _do_sdpa_mapping():
+            old = _mapping["sdpa"]
+            _mapping["sdpa"] = _patched
+            return old
+
+        def _undo_sdpa_mapping(original):
+            _mapping["sdpa"] = original
+
         patches.append(
-            PatchInfo.make(
-                patched_sdpa_attention_forward,
-                _sdpa,
-                "sdpa_attention_forward",
+            PatchInfo(
+                patch=_patched,
+                do=_do_sdpa_mapping,
+                undo=_undo_sdpa_mapping,
                 family="transformers",
-                _last_patched_function=_sdpa.sdpa_attention_forward,
+                _last_patched_function=_mapping["sdpa"],
             )
         )
     return patches
