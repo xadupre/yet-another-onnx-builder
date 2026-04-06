@@ -351,6 +351,8 @@ class FunctionAttentionPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
 
         node_before = g.node_before(node.input[0])
+        if not node_before:
+            return self.none(node, inspect.currentframe().f_lineno)
         if node_before.op_type == "Add":
             # Add(X, Where(mask, 0, -inf))
             add_node = node_before

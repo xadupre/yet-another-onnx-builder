@@ -2,10 +2,7 @@
 
 import unittest
 import torch
-from yobx.ext_test_case import (
-    ExtTestCase,
-    requires_torch,
-)
+from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.torch.torch_helper import torch_deepcopy
 from yobx.torch import ExportOptions
 from yobx.torch.interpreter import to_onnx

@@ -11498,9 +11498,9 @@ def aten_split_with_sizes(
             for i, o in enumerate(res):
                 g.set_type(o, t)
                 if new_shapes:
-                    g.get_shape(o, new_shape[i])
+                    g.set_shape(o, new_shapes[i], allow_zero=True)
                 else:
-                    g.get_rank(o, new_ranks[i])
+                    g.set_rank(o, new_ranks[i])
         return res
 
     if isinstance(split_sizes, list) and all(isinstance(s, str) for s in split_sizes):

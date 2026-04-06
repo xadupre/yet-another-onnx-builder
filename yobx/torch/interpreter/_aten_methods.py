@@ -39,9 +39,7 @@ from ._aten_functions import (
 T = str
 
 
-def aten_meth_abs(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
-) -> T:
+def aten_meth_abs(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "abs."
     return aten_abs(g, sts, outputs, x, name=".abs")
 
@@ -186,9 +184,7 @@ def aten_meth_item(
     return res
 
 
-def aten_meth_log(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
-) -> T:
+def aten_meth_log(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "log."
     return aten_log(g, sts, outputs, x, name=".log")
 
@@ -214,9 +210,7 @@ def aten_meth_expand_as(
     return res
 
 
-def aten_meth_exp(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
-) -> T:
+def aten_meth_exp(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "exp."
     return aten_exp(g, sts, outputs, x, name=".exp")
 
@@ -389,19 +383,13 @@ def aten_meth_pow(
     return res
 
 
-def aten_meth_neg(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
-) -> T:
+def aten_meth_neg(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "neg."
     return aten_neg(g, sts, outputs, x, name=".neg")
 
 
 def aten_meth_permute(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    *dims: Sequence[int],
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, *dims: Sequence[int]
 ) -> T:
     "permute."
     if len(dims) == 1 and isinstance(dims[0], (list, tuple)):
@@ -409,9 +397,7 @@ def aten_meth_permute(
     return aten_permute(g, sts, outputs, x, list(dims))
 
 
-def aten_meth_relu(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
-) -> T:
+def aten_meth_relu(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "relu."
     return aten_relu(g, sts, outputs, x, name=".relu")
 
@@ -464,11 +450,7 @@ def aten_meth_sigmoid(
 
 
 def aten_meth_softmax(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    dim: int = -1,
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, dim: int = -1
 ) -> T:
     "softmax."
     res = g.op.Softmax(x, axis=dim, outputs=outputs, name=".softmax")
@@ -477,9 +459,7 @@ def aten_meth_softmax(
     return res
 
 
-def aten_meth_sqrt(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
-) -> T:
+def aten_meth_sqrt(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "sqrt."
     return aten_sqrt(g, sts, outputs, x, name=".sqrt")
 
@@ -593,9 +573,7 @@ def aten_meth_t(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[st
     return aten_t(g, sts, outputs, x, name=".t")
 
 
-def aten_meth_tanh(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
-) -> T:
+def aten_meth_tanh(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "tanh."
     return aten_tanh(g, sts, outputs, x)
 
