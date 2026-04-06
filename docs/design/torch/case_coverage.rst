@@ -56,7 +56,7 @@ Go to :ref:`l-this-bottom-page-coverage` to see a table summarizing the results.
             print("    # code is missing")
         print()
         print()
-        for exporter in ("yobx", "dynamo-ir", "tracing"):
+        for exporter in ("yobx", "dynamo-ir", "tracing", "yobx-new-tracing"):
             expname = exporter.replace("export-", "")
             print()
             print(expname)
