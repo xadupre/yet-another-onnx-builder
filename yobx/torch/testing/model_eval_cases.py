@@ -53,7 +53,7 @@ def evaluation(
     quiet: bool = True,
 ) -> List[Dict[str, Any]]:
     """
-    Evaluates exporter for a list of cases.
+    Evaluates exporters for a list of cases.
 
     :param exporters: exporters to evaluate
     :param dynamic: evaluate static shape and dynamic shapes
