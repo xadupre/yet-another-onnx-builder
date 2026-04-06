@@ -70,7 +70,6 @@ _NO_CONVERTER_OPS = frozenset(
         "clamp_min",
         "conj_physical",
         "copysign",
-        "count_nonzero",
         "cross",
         "cumulative_trapezoid",
         "deg2rad",
