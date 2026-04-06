@@ -539,7 +539,7 @@ class TestOnnxExportAtenTracing(ExtTestCase):
                 self.bias = torch.nn.Parameter(torch.rand(4))
 
             def forward(self, x):
-                y = torch.relu(x @ self.weight.T + self.bias)
+                y = torch.relu(x @ self.weight.t() + self.bias)
                 return y / y.sum(dim=-1, keepdim=True)
 
         model = Model()
