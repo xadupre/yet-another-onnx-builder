@@ -929,9 +929,20 @@ def _to_onnx_via_onnxscript(
     dynamic_shapes: Optional[Any],
     verbose: int,
     filename: Optional[str],
+    export_options: Optional[ExportOptions] = None,
 ) -> "ExportArtifact":
     """
-    Converts *mod* to ONNX via :func:`torch.onnx.export` with ``dynamo=True``.
+    Converts *mod* to ONNX via :func:`torch.onnx.export`.
+
+    Two paths are supported depending on :attr:`ExportOptions.tracing`:
+
+    * ``TracingMode.ONNXSCRIPT``: calls :func:`torch.onnx.export` directly
+      with ``dynamo=True``, letting torch handle the full tracing pipeline.
+    * Any other tracing mode (e.g. ``TracingMode.DEFAULT``) with
+      ``converting_library=ConvertingLibrary.ONNXSCRIPT``: first uses
+      :meth:`ExportOptions.export` to obtain a
+      :class:`torch.export.ExportedProgram` (which already runs decompositions),
+      then calls :func:`torch.onnx.export` on that program.
 
     This helper is called by :func:`to_onnx` when
     ``export_options.converting_library == ConvertingLibrary.ONNXSCRIPT``.
@@ -940,26 +951,64 @@ def _to_onnx_via_onnxscript(
         ONNX proto.
     """
     import torch
+    from ..export_options import TracingMode
 
-    export_kwargs: Dict[str, Any] = {"dynamo": True}
-    if input_names:
-        export_kwargs["input_names"] = list(input_names)
-    if dynamic_shapes is not None:
-        export_kwargs["dynamic_shapes"] = dynamic_shapes
-    if isinstance(target_opset, int):
-        export_kwargs["opset_version"] = target_opset
     if verbose:
-        export_kwargs["report"] = True
-        print(
-            f"[to_onnx/onnxscript] calling torch.onnx.export with {list(export_kwargs.keys())}"
+        tracing = getattr(export_options, "tracing", None)
+        print(f"[to_onnx/onnxscript] tracing={tracing!r}")
+
+    # Path 1 — tracing == DEFAULT (or other non-onnxscript mode):
+    # export the model with torch.export.export first, then hand the
+    # ExportedProgram to torch.onnx.export (no dynamo=True needed).
+    if export_options is not None and export_options.tracing != TracingMode.ONNXSCRIPT:
+        args_tuple: tuple = (
+            args if isinstance(args, tuple) else (tuple() if args is None else tuple(args))
+        )
+        exported_program = export_options.export(
+            mod,
+            args_tuple,
+            kwargs,
+            tracing_mode=False,
+            dynamic_shapes=dynamic_shapes,
+            same_signature=True,
+            input_names=list(input_names) if input_names else None,
+            verbose=verbose,
+        )
+        export_kwargs: Dict[str, Any] = {}
+        if input_names:
+            export_kwargs["input_names"] = list(input_names)
+        if isinstance(target_opset, int):
+            export_kwargs["opset_version"] = target_opset
+        if verbose:
+            export_kwargs["report"] = True
+            print(
+                f"[to_onnx/onnxscript] calling torch.onnx.export(ExportedProgram) "
+                f"with {list(export_kwargs.keys())}"
+            )
+        export_output = torch.onnx.export(exported_program, **export_kwargs)
+    else:
+        # Path 2 — tracing == ONNXSCRIPT:
+        # call torch.onnx.export directly with dynamo=True.
+        export_kwargs = {"dynamo": True}
+        if input_names:
+            export_kwargs["input_names"] = list(input_names)
+        if dynamic_shapes is not None:
+            export_kwargs["dynamic_shapes"] = dynamic_shapes
+        if isinstance(target_opset, int):
+            export_kwargs["opset_version"] = target_opset
+        if verbose:
+            export_kwargs["report"] = True
+            print(
+                f"[to_onnx/onnxscript] calling torch.onnx.export with "
+                f"{list(export_kwargs.keys())}"
+            )
+        export_output = torch.onnx.export(
+            mod,
+            args or (),
+            kwargs=kwargs or {},
+            **export_kwargs,
         )
 
-    export_output = torch.onnx.export(
-        mod,
-        args or (),
-        kwargs=kwargs or {},
-        **export_kwargs,
-    )
     proto = export_output.model_proto
     artifact = ExportArtifact(proto=proto)
     if filename:
@@ -1120,6 +1169,7 @@ def to_onnx(
             dynamic_shapes=dynamic_shapes,
             verbose=verbose,
             filename=filename,
+            export_options=export_options,
         )
 
     graph_module, builder, interpreter, mask_outputs = _make_builder_interpreter(

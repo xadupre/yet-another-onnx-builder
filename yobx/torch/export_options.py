@@ -23,11 +23,14 @@ class TracingMode(str, Enum):
     :cvar TRACING: use symbolic tracing via :class:`~yobx.torch.tracing.CustomTracer`
     :cvar NEW_TRACING: use dispatch-based tracing via
         :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+    :cvar ONNXSCRIPT: delegates to :func:`torch.onnx.export` with ``dynamo=True``
+        (implies :attr:`ConvertingLibrary.ONNXSCRIPT`)
     """
 
     DEFAULT = "default"
     TRACING = "tracing"
     NEW_TRACING = "new-tracing"
+    ONNXSCRIPT = "onnxscript"
 
 
 class ConvertingLibrary(str, Enum):
@@ -112,7 +115,7 @@ class ExportOptions:
         "dec": {"decomposition_table": "default"},
         "decall": {"decomposition_table": "all"},
         "fake": {"fake": True},
-        "onnxscript": {"converting_library": ConvertingLibrary.ONNXSCRIPT},
+        "onnxscript": {"tracing": TracingMode.ONNXSCRIPT},
     }
 
     def __init__(
@@ -185,6 +188,10 @@ class ExportOptions:
                     f"expected one of {valid} or a TracingMode enum value."
                 )
             self.tracing = TracingMode(self.tracing)
+
+        # TracingMode.ONNXSCRIPT implies ConvertingLibrary.ONNXSCRIPT.
+        if self.tracing == TracingMode.ONNXSCRIPT:
+            self.converting_library = ConvertingLibrary.ONNXSCRIPT
 
         # Normalize self.converting_library to a ConvertingLibrary value
         if isinstance(self.converting_library, str) and not isinstance(

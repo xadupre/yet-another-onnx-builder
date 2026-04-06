@@ -901,6 +901,7 @@ class TestRemoveInline(ExtTestCase):
 
 
 
+class TestConvertingLibrary(ExtTestCase):
     def test_converting_library_default_enum_value(self):
         """Verifies that ConvertingLibrary.DEFAULT has the expected string value."""
         self.assertEqual(ConvertingLibrary.DEFAULT, "default")
@@ -929,8 +930,13 @@ class TestRemoveInline(ExtTestCase):
         with self.assertRaises(ValueError):
             ExportOptions(converting_library="invalid_lib")
 
-    def test_strategy_onnxscript(self):
-        """Verifies that strategy='onnxscript' sets converting_library to ONNXSCRIPT."""
+    def test_strategy_onnxscript_sets_tracing(self):
+        """Verifies that strategy='onnxscript' sets tracing to TracingMode.ONNXSCRIPT."""
+        opts = ExportOptions(strategy="onnxscript")
+        self.assertEqual(opts.tracing, TracingMode.ONNXSCRIPT)
+
+    def test_strategy_onnxscript_implies_converting_library(self):
+        """Verifies that strategy='onnxscript' also sets converting_library to ONNXSCRIPT."""
         opts = ExportOptions(strategy="onnxscript")
         self.assertEqual(opts.converting_library, ConvertingLibrary.ONNXSCRIPT)
 
@@ -944,6 +950,29 @@ class TestRemoveInline(ExtTestCase):
         """Verifies that clone() preserves converting_library."""
         opts = ExportOptions(converting_library=ConvertingLibrary.ONNXSCRIPT)
         cloned = opts.clone()
+        self.assertEqual(cloned.converting_library, ConvertingLibrary.ONNXSCRIPT)
+
+    def test_tracing_mode_onnxscript_enum_value(self):
+        """Verifies that TracingMode.ONNXSCRIPT has the expected string value."""
+        self.assertEqual(TracingMode.ONNXSCRIPT, "onnxscript")
+
+    def test_tracing_mode_onnxscript_sets_converting_library(self):
+        """Verifies that tracing=TracingMode.ONNXSCRIPT automatically sets converting_library."""
+        opts = ExportOptions(tracing=TracingMode.ONNXSCRIPT)
+        self.assertEqual(opts.tracing, TracingMode.ONNXSCRIPT)
+        self.assertEqual(opts.converting_library, ConvertingLibrary.ONNXSCRIPT)
+
+    def test_tracing_mode_onnxscript_string_init(self):
+        """Verifies that tracing='onnxscript' normalizes to TracingMode.ONNXSCRIPT."""
+        opts = ExportOptions(tracing="onnxscript")
+        self.assertEqual(opts.tracing, TracingMode.ONNXSCRIPT)
+        self.assertEqual(opts.converting_library, ConvertingLibrary.ONNXSCRIPT)
+
+    def test_tracing_mode_onnxscript_clone(self):
+        """Verifies that clone() preserves tracing=TracingMode.ONNXSCRIPT."""
+        opts = ExportOptions(tracing=TracingMode.ONNXSCRIPT)
+        cloned = opts.clone()
+        self.assertEqual(cloned.tracing, TracingMode.ONNXSCRIPT)
         self.assertEqual(cloned.converting_library, ConvertingLibrary.ONNXSCRIPT)
 
 
