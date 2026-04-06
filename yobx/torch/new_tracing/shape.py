@@ -399,24 +399,36 @@ class TracingShape:
 
     @classmethod
     def from_existing_shape(
-        cls, shape: Tuple[int, ...], dynamic_shapes: Optional[Dict[int, str]] = None
+        cls, shape: Tuple[int, ...], dynamic_shapes: Optional[Dict[int, Any]] = None
     ) -> "TracingShape":
         """
-        Build a :class:`TracingShape` from a concrete shape tuple, optionally
+        Builds a :class:`TracingShape` from a concrete shape tuple, optionally
         making selected dimensions symbolic.
 
         :param shape: The concrete shape (e.g. from ``tensor.shape``).
         :param dynamic_shapes: An optional mapping from *dimension index* to
-            *symbolic name*.  For every key ``d`` the integer ``shape[d]`` is
-            replaced by the string ``dynamic_shapes[d]`` in the resulting
+            either a :class:`str` (symbolic name) or a
+            :class:`torch.export.Dim` object (whose ``__name__`` is used as
+            the symbolic name).  For every key ``d`` the integer ``shape[d]``
+            is replaced by a :class:`TracingInt` in the resulting
             :class:`TracingShape`.  When ``None`` or empty, all dimensions
             remain concrete integers.
-        :return: A :class:`TracingShape` whose ``dims`` are ``int`` values for
-            static dimensions and ``str`` values for dynamic ones.
+        :return: A :class:`TracingShape` whose ``dims`` are :class:`int` values
+            for static dimensions and :class:`TracingInt` for dynamic ones.
         """
         if not dynamic_shapes:
             return TracingShape(tuple(int(i) for i in shape))
         new_shape = [int(i) for i in shape]
-        for d, name in dynamic_shapes.items():
+        for d, dim_spec in dynamic_shapes.items():
+            if isinstance(dim_spec, (int, str)):
+                name = dim_spec
+            elif hasattr(dim_spec, "__name__"):
+                # torch.export.Dim objects expose their name via ``__name__``
+                name = dim_spec.__name__
+            else:
+                raise ValueError(
+                    f"Unexpected type {type(dim_spec)} for dynamic shape specification "
+                    f"at dimension {d}: {dim_spec!r}"
+                )
             new_shape[d] = TracingInt(name)  # type: ignore
         return TracingShape(tuple(new_shape))  # type: ignore

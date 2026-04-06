@@ -9954,6 +9954,10 @@ class GraphBuilder(
                         # We let it, set_shape will replace it
                         # by the dynamic dimension name and register an alias.
                         continue
+                    if isinstance(ret_shape[k], str):
+                        # Already a symbolic string dimension name (e.g. from new-tracing
+                        # where TracingInt values are converted to str); trust it as-is.
+                        continue
                     assert isinstance(ret_shape[k], int), (
                         f"Incompatible types between example_shape={example_shape}, k={k!r}, "
                         f"{string_type(example_shape)}, info={info}, "
@@ -9972,6 +9976,9 @@ class GraphBuilder(
                     if self._has_torch and isinstance(ret_shape[i], self.torch.SymInt):  # type: ignore
                         # We let it, set_shape will replace it
                         # by the dynamic dimension name and register an alias.
+                        continue
+                    if isinstance(ret_shape[i], str):
+                        # Already a symbolic string dimension name; trust it as-is.
                         continue
                     if v and not isinstance(v, (dict, tuple, list)) and hasattr(v, "__name__"):
                         # it should be (self.torch.export.Dim,

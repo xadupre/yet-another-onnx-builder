@@ -753,6 +753,36 @@ class DynamoInterpreter:
             )
         return None
 
+    @staticmethod
+    def _get_tensor_shape(val: "torch.Tensor") -> tuple:  # noqa: F821
+        """
+        Returns the shape of *val* as a plain tuple of :class:`int` and
+        :class:`str` values.
+
+        For standard :class:`torch.Tensor` and
+        :class:`~torch._subclasses.fake_tensor.FakeTensor` instances this is
+        equivalent to ``tuple(val.shape)``.  For
+        :class:`~yobx.torch.new_tracing.tensor.TracingTensor` instances each
+        :class:`~yobx.torch.new_tracing.shape.TracingInt` dimension is
+        converted to its underlying :class:`int` or :class:`str` value so that
+        downstream graph-builder code receives a type it already understands.
+
+        :param val: A tensor whose shape is to be extracted.
+
+        Returns:
+            A tuple of :class:`int` (concrete) and :class:`str` (symbolic)
+            dimension values.
+        """
+        try:
+            from ..new_tracing.shape import TracingInt
+            from ..new_tracing.tensor import TracingTensor
+
+            if isinstance(val, TracingTensor):
+                return tuple(d.value if isinstance(d, TracingInt) else d for d in val.shape)
+        except ImportError:
+            pass
+        return tuple(val.shape)
+
     def _make_tensor_input(
         self,
         name: str,
@@ -926,7 +956,7 @@ class DynamoInterpreter:
                     return self._make_tensor_input(
                         node.name,
                         elem_type=val.dtype,
-                        shape=tuple(val.shape),
+                        shape=self._get_tensor_shape(val),
                         users=node.users,
                         fake_tensor=isinstance(
                             val, self.torch._subclasses.fake_tensor.FakeTensor
@@ -940,7 +970,7 @@ class DynamoInterpreter:
                         return self._make_tensor_input(
                             node.name,
                             elem_type=val.dtype,
-                            shape=tuple(val.shape),
+                            shape=self._get_tensor_shape(val),
                             users=node.users,
                         )
                 else:
@@ -950,7 +980,7 @@ class DynamoInterpreter:
                         return self._make_tensor_input(
                             node.target,
                             elem_type=val.dtype,
-                            shape=tuple(val.shape),
+                            shape=self._get_tensor_shape(val),
                             users=node.users,
                         )
 
