@@ -287,9 +287,7 @@ class TestSqlToOnnxReturnOptimizeReport(ExtTestCase):
 
     def test_default_report_is_none(self):
         """Report is None by default (return_optimize_report=False)."""
-        art = sql_to_onnx(
-            "SELECT a + b AS total FROM t", {"a": np.float32, "b": np.float32}
-        )
+        art = sql_to_onnx("SELECT a + b AS total FROM t", {"a": np.float32, "b": np.float32})
         self.assertIsNone(art.report)
 
     def test_report_populated_when_true(self):
@@ -346,9 +344,7 @@ class TestDataframeToOnnxReturnOptimizeReport(ExtTestCase):
         from yobx.container import ExportReport
 
         art = dataframe_to_onnx(
-            _simple_transform,
-            {"a": np.float32, "b": np.float32},
-            return_optimize_report=True,
+            _simple_transform, {"a": np.float32, "b": np.float32}, return_optimize_report=True
         )
         self.assertIsNotNone(art.report)
         self.assertIsInstance(art.report, ExportReport)
@@ -395,9 +391,7 @@ class TestToOnnxReturnOptimizeReport(ExtTestCase):
         from yobx.container import ExportReport
 
         dtypes = {"a": np.float32, "b": np.float32}
-        art = to_onnx(
-            "SELECT a + b AS total FROM t", dtypes, return_optimize_report=True
-        )
+        art = to_onnx("SELECT a + b AS total FROM t", dtypes, return_optimize_report=True)
         self.assertIsNotNone(art.report)
         self.assertIsInstance(art.report, ExportReport)
         self.assertGreater(len(art.report.stats), 0)

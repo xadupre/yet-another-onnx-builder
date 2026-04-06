@@ -84,9 +84,7 @@ class TestToOnnxReturnOptimizeReport(ExtTestCase):
         """Report is None when return_optimize_report is not set (default False)."""
         from yobx import to_onnx
 
-        artifact = to_onnx(
-            "SELECT a + b AS total FROM t", {"a": np.float32, "b": np.float32}
-        )
+        artifact = to_onnx("SELECT a + b AS total FROM t", {"a": np.float32, "b": np.float32})
         self.assertIsNone(artifact.report)
 
     def test_sql_report_populated_when_true(self):

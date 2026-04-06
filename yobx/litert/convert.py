@@ -148,7 +148,9 @@ def to_onnx(
                 extra_converters=extra_converters or {},
                 name_prefix=prefix,
             )
-        return _finalize_builder(g, large_model, external_threshold, verbose, return_optimize_report)
+        return _finalize_builder(
+            g, large_model, external_threshold, verbose, return_optimize_report
+        )
 
     # --- Single-subgraph path (original behaviour) ---
     if subgraph_index >= len(tflite_model.subgraphs):
@@ -186,7 +188,10 @@ def to_onnx(
 
 
 def _finalize_builder(
-    g: Any, large_model: bool, external_threshold: int, verbose: int,
+    g: Any,
+    large_model: bool,
+    external_threshold: int,
+    verbose: int,
     return_optimize_report: bool = False,
 ) -> ExportArtifact:
     """Call ``g.to_onnx(...)`` and return the resulting :class:`ExportArtifact`."""
