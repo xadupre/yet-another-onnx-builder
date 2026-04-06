@@ -30,6 +30,19 @@ class TracingMode(str, Enum):
     NEW_TRACING = "new-tracing"
 
 
+class ConvertingLibrary(str, Enum):
+    """
+    Specifies which library performs the conversion to ONNX.
+
+    :cvar DEFAULT: use yobx's own conversion pipeline (the default)
+    :cvar ONNXSCRIPT: delegate to :func:`torch.onnx.export` with ``dynamo=True``
+        (the onnxscript-based exporter)
+    """
+
+    DEFAULT = "default"
+    ONNXSCRIPT = "onnxscript"
+
+
 class ExportOptions:
     """
     Gathers altogether all the options defining the way to export a model into a graph
@@ -75,6 +88,11 @@ class ExportOptions:
         (``tracing=TracingMode.TRACING``), it specifies
         which modules should remain a *call_module*,
         see :class:`yobx.torch.tracing.CustomTracer`.
+    :param converting_library: selects which library converts the model to ONNX;
+        accepts a :class:`ConvertingLibrary` value or the strings ``'default'``
+        or ``'onnxscript'``; ``ConvertingLibrary.DEFAULT`` (the default) uses
+        yobx's own pipeline while ``ConvertingLibrary.ONNXSCRIPT`` delegates to
+        :func:`torch.onnx.export` with ``dynamo=True``
     """
 
     _allowed = {
@@ -94,6 +112,7 @@ class ExportOptions:
         "dec": {"decomposition_table": "default"},
         "decall": {"decomposition_table": "all"},
         "fake": {"fake": True},
+        "onnxscript": {"converting_library": ConvertingLibrary.ONNXSCRIPT},
     }
 
     def __init__(
@@ -117,6 +136,7 @@ class ExportOptions:
         tracing_module_leaves: Optional[
             Dict[type, Callable[["torch.nn.Module", str], bool]]  # noqa: F821
         ] = None,
+        converting_library: Union[str, "ConvertingLibrary"] = ConvertingLibrary.DEFAULT,
     ):
         self.strict = strict
         self.tracing = tracing
@@ -137,6 +157,7 @@ class ExportOptions:
             prefer_deferred_runtime_asserts_over_guards
         )
         self.fake = fake
+        self.converting_library = converting_library
         if aten_as_function is None:
             from .interpreter.onnx_export import get_default_aten_as_function
 
@@ -164,6 +185,18 @@ class ExportOptions:
                     f"expected one of {valid} or a TracingMode enum value."
                 )
             self.tracing = TracingMode(self.tracing)
+
+        # Normalize self.converting_library to a ConvertingLibrary value
+        if isinstance(self.converting_library, str) and not isinstance(
+            self.converting_library, ConvertingLibrary
+        ):
+            valid_lib = [m.value for m in ConvertingLibrary]
+            if self.converting_library not in valid_lib:
+                raise ValueError(
+                    f"Invalid value for converting_library={self.converting_library!r}, "
+                    f"expected one of {valid_lib} or a ConvertingLibrary enum value."
+                )
+            self.converting_library = ConvertingLibrary(self.converting_library)
 
         assert not self.dynamo or not self.jit, "jit and dynamo cannot be true at the same time"
         assert (

@@ -7,6 +7,7 @@ from yobx.helpers.helper import get_sig_kwargs
 from yobx.torch.export_options import (
     ExportOptions,
     TracingMode,
+    ConvertingLibrary,
     _get_decomposition_table_by_name,
     _inplace_nodes,
     apply_decompositions,
@@ -897,6 +898,53 @@ class TestRemoveInline(ExtTestCase):
                 0,
                 msg=lambda: f"node with no users {node.name!r}\n{str(ep.graph)}",
             )
+
+
+
+    def test_converting_library_default_enum_value(self):
+        """Verifies that ConvertingLibrary.DEFAULT has the expected string value."""
+        self.assertEqual(ConvertingLibrary.DEFAULT, "default")
+
+    def test_converting_library_onnxscript_enum_value(self):
+        """Verifies that ConvertingLibrary.ONNXSCRIPT has the expected string value."""
+        self.assertEqual(ConvertingLibrary.ONNXSCRIPT, "onnxscript")
+
+    def test_converting_library_default_init(self):
+        """Verifies that ExportOptions defaults to ConvertingLibrary.DEFAULT."""
+        opts = ExportOptions()
+        self.assertEqual(opts.converting_library, ConvertingLibrary.DEFAULT)
+
+    def test_converting_library_enum_init(self):
+        """Verifies that ExportOptions accepts a ConvertingLibrary enum value."""
+        opts = ExportOptions(converting_library=ConvertingLibrary.ONNXSCRIPT)
+        self.assertEqual(opts.converting_library, ConvertingLibrary.ONNXSCRIPT)
+
+    def test_converting_library_string_init(self):
+        """Verifies that ExportOptions accepts a string and normalizes to ConvertingLibrary."""
+        opts = ExportOptions(converting_library="onnxscript")
+        self.assertEqual(opts.converting_library, ConvertingLibrary.ONNXSCRIPT)
+
+    def test_converting_library_invalid_string_raises(self):
+        """Verifies that an invalid converting_library string raises ValueError."""
+        with self.assertRaises(ValueError):
+            ExportOptions(converting_library="invalid_lib")
+
+    def test_strategy_onnxscript(self):
+        """Verifies that strategy='onnxscript' sets converting_library to ONNXSCRIPT."""
+        opts = ExportOptions(strategy="onnxscript")
+        self.assertEqual(opts.converting_library, ConvertingLibrary.ONNXSCRIPT)
+
+    def test_converting_library_repr(self):
+        """Verifies that converting_library appears in repr when non-default."""
+        opts = ExportOptions(converting_library=ConvertingLibrary.ONNXSCRIPT)
+        r = repr(opts)
+        self.assertIn("onnxscript", r)
+
+    def test_converting_library_clone(self):
+        """Verifies that clone() preserves converting_library."""
+        opts = ExportOptions(converting_library=ConvertingLibrary.ONNXSCRIPT)
+        cloned = opts.clone()
+        self.assertEqual(cloned.converting_library, ConvertingLibrary.ONNXSCRIPT)
 
 
 if __name__ == "__main__":

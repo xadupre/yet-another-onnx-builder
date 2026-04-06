@@ -11,7 +11,7 @@ from onnx.model_container import ModelContainer
 from ...container import ExportArtifact, ExportReport
 from ...helpers import string_type
 from ...xbuilder.graph_builder import GraphBuilder, OptimizationOptions, FunctionOptions
-from ..export_options import ExportOptions
+from ..export_options import ExportOptions, ConvertingLibrary
 
 
 def match_input_parameters(
@@ -920,6 +920,50 @@ def _replace_value_info_protos(x: Any, context: Any) -> Tuple[Any, Any]:
     return x, None
 
 
+def _to_onnx_via_onnxscript(
+    mod: "torch.nn.Module",  # noqa: F821
+    args: Optional[Sequence["torch.Tensor"]],  # noqa: F821
+    kwargs: Optional[Dict[str, "torch.Tensor"]],
+    input_names: Optional[Sequence[str]],
+    target_opset: Optional[Union[int, Dict[str, int]]],
+    dynamic_shapes: Optional[Any],
+    verbose: int,
+    filename: Optional[str],
+) -> "ExportArtifact":
+    """
+    Converts *mod* to ONNX via :func:`torch.onnx.export` with ``dynamo=True``.
+
+    This helper is called by :func:`to_onnx` when
+    ``export_options.converting_library == ConvertingLibrary.ONNXSCRIPT``.
+    """
+    import torch
+
+    export_kwargs: Dict[str, Any] = {"dynamo": True}
+    if input_names:
+        export_kwargs["input_names"] = list(input_names)
+    if dynamic_shapes is not None:
+        export_kwargs["dynamic_shapes"] = dynamic_shapes
+    if isinstance(target_opset, int):
+        export_kwargs["opset_version"] = target_opset
+    if verbose:
+        export_kwargs["report"] = True
+        print(
+            f"[to_onnx/onnxscript] calling torch.onnx.export with {list(export_kwargs.keys())}"
+        )
+
+    export_output = torch.onnx.export(
+        mod,
+        args or (),
+        kwargs=kwargs or {},
+        **export_kwargs,
+    )
+    proto = export_output.model_proto
+    artifact = ExportArtifact(proto=proto)
+    if filename:
+        artifact.save(filename)
+    return artifact
+
+
 def to_onnx(
     mod: Union["torch.nn.Module", "torch.fx.GraphModule"],  # noqa: F821
     args: Optional[Sequence["torch.Tensor"]] = None,  # noqa: F821
@@ -1058,6 +1102,22 @@ def to_onnx(
             print(f"[to_onnx] build the graph module with input_names={input_names}")
         if dynamic_shapes:
             print(f"[to_onnx] dynamic_shapes={dynamic_shapes}")
+
+    # Route to torch.onnx.export (onnxscript/dynamo) when requested.
+    if (
+        export_options is not None
+        and export_options.converting_library == ConvertingLibrary.ONNXSCRIPT
+    ):
+        return _to_onnx_via_onnxscript(
+            mod=mod,
+            args=args,
+            kwargs=kwargs,
+            input_names=input_names,
+            target_opset=target_opset,
+            dynamic_shapes=dynamic_shapes,
+            verbose=verbose,
+            filename=filename,
+        )
 
     graph_module, builder, interpreter, mask_outputs = _make_builder_interpreter(
         mod=mod,
