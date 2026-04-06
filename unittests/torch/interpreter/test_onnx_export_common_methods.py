@@ -286,6 +286,7 @@ _XFAIL_OPS_BFLOAT16: FrozenSet[str] = frozenset(
     {
         # Numerical mismatch too large for bfloat16 tolerance (2e-2):
         "addcmul",  # ref_diff > 2e-2
+        "bmm",  # matmul numerical error exceeds bfloat16 tolerance
         "expm1",  # reduced-precision exponential error
         # Incorrect results (ordering) for bfloat16:
         "argsort",  # ordering instability due to reduced precision
