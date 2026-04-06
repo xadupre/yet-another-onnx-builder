@@ -50,3 +50,7 @@ function and its mapping to an ONNX operator.
 :ref:`l-torch-converter` also contains an overview of exportability
 (:ref:`l-design-torch-case-coverage`) that runs a broad set of model cases
 through multiple exporters and reports which ones succeed.
+
+:ref:`l-design-torch-op-coverage` shows which ``op_db`` ops and data types
+are covered by the op-db export tests, distinguishing between ops with a
+working converter, known failures, and ops missing a converter.
