@@ -633,8 +633,12 @@ class DynamoInterpreter:
                     # Concrete tensor literal (not a traced FX node) -
                     # extract type/shape info directly from the tensor value.
                     full_shape = tuple(inp_node.shape)
+                    # Strip the scan (first) dimension so the body function sees
+                    # the per-element shape. Use > 0 (not > 1) so that 1-D scan
+                    # inputs (e.g. a position vector of shape (batch,)) correctly
+                    # produce a scalar shape () instead of keeping (batch,).
                     shape = (
-                        full_shape[1:] if strip_first_dim and len(full_shape) > 1 else full_shape
+                        full_shape[1:] if strip_first_dim and len(full_shape) > 0 else full_shape
                     )
                     onnx_dtype = torch_dtype_to_onnx_dtype(inp_node.dtype)
                     # device.index is None for CPU, int index for CUDA.
@@ -646,8 +650,9 @@ class DynamoInterpreter:
                 dtype = self.builder.get_type(name)
                 if self.builder.has_shape(name):
                     full_shape = self.builder.get_shape(name)
+                    # Same rationale: strip the scan dimension for 1-D inputs too.
                     shape = (
-                        full_shape[1:] if strip_first_dim and len(full_shape) > 1 else full_shape
+                        full_shape[1:] if strip_first_dim and len(full_shape) > 0 else full_shape
                     )
                 elif self.builder.has_rank(name):
                     rank = self.builder.get_rank(name)
