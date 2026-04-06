@@ -20,7 +20,7 @@ from yobx.ext_test_case import ExtTestCase, has_onnxruntime, ignore_warnings, re
 from yobx.helpers import max_diff
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch.interpreter import to_onnx
-from yobx.torch.op_coverage import (
+from yobx.torch.coverage.op_coverage import (
     NO_CONVERTER_OPS as _NO_CONVERTER_OPS,
     NON_DETERMINISTIC_OPS as _NON_DETERMINISTIC_OPS,
     XFAIL_OPS as _XFAIL_OPS,

@@ -1,5 +1,5 @@
 """
-Unit tests for :mod:`yobx.torch.op_coverage`.
+Unit tests for :mod:`yobx.torch.coverage.op_coverage`.
 """
 
 import unittest
@@ -13,7 +13,7 @@ class TestOpCoverageData(ExtTestCase):
 
     @classmethod
     def setUpClass(cls):
-        from yobx.torch.op_coverage import (
+        from yobx.torch.coverage.op_coverage import (
             NO_CONVERTER_OPS,
             NON_DETERMINISTIC_OPS,
             XFAIL_OPS,
