@@ -8,6 +8,7 @@ import warnings
 from typing import Any, Callable, Dict, List, Tuple
 
 import torch
+from torch.testing._internal import common_methods_invocations
 
 from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch
 from yobx.helpers import max_diff
@@ -60,16 +61,10 @@ def _collect_ops() -> List[Any]:
     - Have at least one sample input whose ``.input`` is a ``float32`` tensor
     - Have all positional sample args that are also tensors (or none at all)
     - Have no non-trivial keyword arguments (to avoid unsupported ONNX kwargs)
-    - Produce a single, real, non-conjugate tensor result when called eagerly
 
     Returns:
         List of :class:`~torch.testing._internal.opinfo.core.OpInfo` objects.
     """
-    try:
-        from torch.testing._internal import common_methods_invocations
-    except ImportError:
-        return []
-
     testable = []
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -80,10 +75,7 @@ def _collect_ops() -> List[Any]:
                 continue
             if op.name in _NON_DETERMINISTIC_OPS:
                 continue
-            try:
-                samples = list(op.sample_inputs("cpu", torch.float32, requires_grad=False))
-            except Exception:
-                continue
+            samples = list(op.sample_inputs("cpu", torch.float32, requires_grad=False))
             if not samples:
                 continue
             s = samples[0]
@@ -94,14 +86,6 @@ def _collect_ops() -> List[Any]:
             if s.kwargs:
                 # Skip ops with non-trivial keyword arguments whose semantics
                 # may not be fully supported by the ONNX exporter.
-                continue
-            try:
-                result = op.op(s.input, *s.args, **s.kwargs)
-            except Exception:
-                continue
-            if not isinstance(result, torch.Tensor):
-                continue
-            if not _result_is_exportable(result):
                 continue
             testable.append(op)
     return testable
@@ -143,17 +127,11 @@ class TestOnnxExportCommonMethods(ExtTestCase):
     def test_export_ops(self) -> None:
         """Exports op_db ops to ONNX and validates numerical outputs.
 
-        Each op is run as a sub-test.  Export or inference failures are
-        recorded but do not immediately raise; the test asserts that at least
-        one op exported and validated successfully end-to-end.
+        Each op is run as a sub-test so that individual failures are reported
+        without aborting the entire loop.
         """
         if not _OPS:
-            raise unittest.SkipTest(
-                "torch.testing._internal.common_methods_invocations not available"
-            )
-
-        n_success = 0
-        failures: List[str] = []
+            raise unittest.SkipTest("no testable ops collected from op_db")
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -167,21 +145,17 @@ class TestOnnxExportCommonMethods(ExtTestCase):
                     model = _OpWrapper(op.op, s.args, s.kwargs)
                     inputs = (s.input, *s.args)
                     expected = op.op(s.input, *s.args, **s.kwargs)
-
-                    try:
-                        onx = to_onnx(model, inputs)
-                    except Exception as exc:
-                        failures.append(f"{op_name}: {type(exc).__name__}: {exc}")
+                    if not isinstance(expected, torch.Tensor) or not _result_is_exportable(
+                        expected
+                    ):
                         continue
+
+                    onx = to_onnx(model, inputs)
 
                     # Validate the ONNX output matches the PyTorch output.
                     ref = ExtendedReferenceEvaluator(onx.proto)
                     feeds = dict(zip(ref.input_names, [t.detach().numpy() for t in inputs]))
-                    try:
-                        got = ref.run(None, feeds)
-                    except Exception as exc:
-                        failures.append(f"{op_name} (inference): {type(exc).__name__}: {exc}")
-                        continue
+                    got = ref.run(None, feeds)
 
                     diff = max_diff(expected, got[0])
                     # float32 arithmetic may introduce small rounding differences;
@@ -189,29 +163,11 @@ class TestOnnxExportCommonMethods(ExtTestCase):
                     self.assertLess(
                         diff["abs"], 1e-3, msg=f"op={op_name!r} max abs diff={diff['abs']}"
                     )
-                    n_success += 1
-
-        # At least some ops must export and validate successfully.
-        self.assertGreater(
-            n_success,
-            0,
-            msg=(
-                f"No op exported successfully out of {len(_OPS)} candidates. "
-                "Failures:\n" + "\n".join(failures[:10])
-            ),
-        )
 
     @requires_torch("2.6")
     @ignore_warnings((UserWarning, FutureWarning, DeprecationWarning))
     def test_export_abs(self) -> None:
         """Exports :func:`torch.abs` to ONNX as a quick smoke test."""
-        try:
-            from torch.testing._internal import common_methods_invocations
-        except ImportError:
-            raise unittest.SkipTest(
-                "torch.testing._internal.common_methods_invocations not available"
-            )
-
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             op = next((o for o in common_methods_invocations.op_db if o.name == "abs"), None)
@@ -238,13 +194,6 @@ class TestOnnxExportCommonMethods(ExtTestCase):
     @ignore_warnings((UserWarning, FutureWarning, DeprecationWarning))
     def test_export_binary_add(self) -> None:
         """Exports :func:`torch.add` (binary, two-tensor) to ONNX as a smoke test."""
-        try:
-            from torch.testing._internal import common_methods_invocations
-        except ImportError:
-            raise unittest.SkipTest(
-                "torch.testing._internal.common_methods_invocations not available"
-            )
-
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             op = next(
