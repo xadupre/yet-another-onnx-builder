@@ -1110,10 +1110,10 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
 
     # ------------------------------------------------------------------ helpers
 
-    def _make_model(self) -> "_LinearModel":
+    def _make_model(self) -> _LinearModel:
         return _LinearModel()
 
-    def _make_input(self) -> "torch.Tensor":
+    def _make_input(self) -> torch.Tensor:
         return torch.randn(3, 4)
 
     # ------------------------------------------------------------------ ConvertingLibrary.DEFAULT
