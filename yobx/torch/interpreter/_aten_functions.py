@@ -562,7 +562,7 @@ def aten_amax(
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
     x: T,
-    dim: Optional[int] = None,
+    dim: Optional[Union[int, List[int]]] = None,
     keepdim: bool = False,
     output_dtype: Optional["torch.dtype"] = None,  # noqa: F821
     name: str = "amax",

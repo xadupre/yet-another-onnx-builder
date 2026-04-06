@@ -232,7 +232,6 @@ _NO_CONVERTER_OPS = frozenset(
 _XFAIL_OPS = frozenset(
     {
         # Numerical mismatch between eager and ONNX output (AssertionError):
-        "amax",
         "cholesky_inverse",
         "cholesky_solve",
         "jiterator_2inputs_2outputs",

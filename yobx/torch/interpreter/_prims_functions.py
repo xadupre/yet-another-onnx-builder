@@ -32,7 +32,7 @@ def prims_amax(
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
     x: T,
-    dim: Optional[int] = None,
+    dim: Optional[Union[int, List[int]]] = None,
     keepdim: bool = False,
     output_dtype: Optional["torch.dtype"] = None,  # noqa: F821
     name: str = "prims_amax",
@@ -41,7 +41,7 @@ def prims_amax(
     assert (
         output_dtype is None
     ), f"not implemented when output_dtype={output_dtype!r}{g.get_debug_msg()}"
-    if dim is None:
+    if dim is None or (isinstance(dim, list) and len(dim) == 0):
         res = g.op.ReduceMaxAnyOpset(x, keepdims=1 if keepdim else 0, outputs=outputs)
     elif isinstance(dim, int):
         res = g.op.ReduceMaxAnyOpset(
