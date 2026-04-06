@@ -317,7 +317,16 @@ class TestOnnxExportAtenTracing(ExtTestCase):
 
     def test_aten_linear_tracing(self):
         """Tests that nn.Linear (addmm internally) works via tracing."""
-        model = torch.nn.Linear(5, 3, bias=True)
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear = torch.nn.Linear(5, 3, bias=True)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        model = Model()
         model.eval()
         inputs = (torch.rand(4, 5),)
         expected = model(*torch_deepcopy(inputs))
@@ -326,7 +335,16 @@ class TestOnnxExportAtenTracing(ExtTestCase):
 
     def test_aten_linear_no_bias_tracing(self):
         """Tests that nn.Linear without bias works via tracing."""
-        model = torch.nn.Linear(5, 3, bias=False)
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.linear = torch.nn.Linear(5, 3, bias=False)
+
+            def forward(self, x):
+                return self.linear(x)
+
+        model = Model()
         model.eval()
         inputs = (torch.rand(4, 5),)
         expected = model(*torch_deepcopy(inputs))
@@ -483,7 +501,7 @@ class TestOnnxExportAtenTracing(ExtTestCase):
     def test_aten_softmax_tracing(self):
         class Model(torch.nn.Module):
             def forward(self, x):
-                return torch.softmax(x, dim=-1)
+                return x.softmax(dim=-1)
 
         model = Model()
         inputs = (torch.rand(3, 4),)

@@ -332,7 +332,9 @@ def aten_meth_min(
     if dim is None:
         return aten_min(g, sts, outputs, x, name=".min")
     axes = np.array([dim], dtype=np.int64)
-    res = g.op.ReduceMin(x, axes, name=".min_dim", outputs=outputs[:1], keepdims=1 if keepdim else 0)
+    res = g.op.ReduceMin(
+        x, axes, name=".min_dim", outputs=outputs[:1], keepdims=1 if keepdim else 0
+    )
     if not sts:
         set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim, axes=(dim,))
     if len(outputs) == 1:
@@ -459,6 +461,20 @@ def aten_meth_sigmoid(
 ) -> T:
     "sigmoid."
     return aten_sigmoid(g, sts, outputs, x)
+
+
+def aten_meth_softmax(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: int = -1,
+) -> T:
+    "softmax."
+    res = g.op.Softmax(x, axis=dim, outputs=outputs, name=".softmax")
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
 
 
 def aten_meth_sqrt(
