@@ -3670,7 +3670,7 @@ def aten_flatten_using_ints(
     if not sts:
         g.set_type(res, g.get_type(x))
         if g.has_shape(x, full=True):
-            g.set_shape(res, (int(np.prod(g.get_shape(x)))))
+            g.set_shape(res, (int(np.prod(g.get_shape(x))),))
         else:
             g.set_rank(res, 1)
     return res
@@ -6981,7 +6981,7 @@ def aten_max(
     res = g.op.ReduceMax(x, keepdims=0, name=name, outputs=outputs)
     if not sts:
         g.set_type(res, g.get_type(x))
-        g.get_shape(res, tuple())
+        g.set_shape(res, tuple())
     return res
 
 
@@ -7445,7 +7445,7 @@ def aten_min(
     res = g.op.ReduceMin(x, keepdims=0, name=name, outputs=outputs)
     if not sts:
         g.set_type(res, g.get_type(x))
-        g.get_shape(res, tuple())
+        g.set_shape(res, tuple())
     return res
 
 
@@ -8941,7 +8941,8 @@ def aten_pow_Tensor_Tensor(
                 exponent = np.array(([exponent] if g.get_rank(x) > 0 else exponent), dtype=dtype)
         if not isinstance(exponent, np.ndarray):
             assert g.has_rank(x), f"Missing rank({x!r}){g.get_debug_msg()}"
-            exponent = np.array(([exponent] if g.get_rank(x) > 0 else exponent), dtype=dtype)
+            _dtype = tensor_dtype_to_np_dtype(g.get_type(x)) if g.has_type(x) else np.float32
+            exponent = np.array(([exponent] if g.get_rank(x) > 0 else exponent), dtype=_dtype)
     if isinstance(x, (int, float)):
         assert isinstance(exponent, str), (
             f"Unexpected type for exponent, type(x)={type(x)}, "
@@ -11426,6 +11427,19 @@ def aten_softplus(
     return res
 
 
+def aten_split(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    split_sizes: T,
+    dim: int = 0,
+    name: str = "split",
+) -> Tuple[T, ...]:
+    "split_to_sequence or split"
+    return aten_split_Tensor(g, sts, outputs, x, split_sizes, dim, name=name)
+
+
 def aten_split_Tensor(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -11484,9 +11498,9 @@ def aten_split_with_sizes(
             for i, o in enumerate(res):
                 g.set_type(o, t)
                 if new_shapes:
-                    g.get_shape(o, new_shape[i])
+                    g.set_shape(o, new_shapes[i], allow_zero=True)
                 else:
-                    g.get_rank(o, new_ranks[i])
+                    g.set_rank(o, new_ranks[i])
         return res
 
     if isinstance(split_sizes, list) and all(isinstance(s, str) for s in split_sizes):

@@ -35,6 +35,8 @@ if shutil.which("latex"):
 graphviz_output_format = "svg"
 graphviz_dot_args = ["-Gbgcolor=transparent"]
 
+autodoc_typehints_format = "short"
+
 mermaid_init_js = """
 document.addEventListener("DOMContentLoaded", function () {
     // pydata_sphinx_theme sets data-bs-theme="dark" on <html> for dark mode.
@@ -59,6 +61,8 @@ document.addEventListener("DOMContentLoaded", function () {
 
 # templates_path = ["_templates"]
 exclude_patterns = ["_build"]
+if int(os.environ.get("UNITTEST_GOING", "0")):
+    exclude_patterns.append("ci_durations.rst")
 html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
