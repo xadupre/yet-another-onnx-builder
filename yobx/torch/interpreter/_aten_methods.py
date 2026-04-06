@@ -26,6 +26,7 @@ from ._aten_functions import (
     aten_max_dim,
     aten_min,
     aten_neg,
+    aten_new_ones,
     aten_permute,
     aten_relu,
     aten_repeat,
@@ -386,6 +387,32 @@ def aten_meth_pow(
 def aten_meth_neg(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "neg."
     return aten_neg(g, sts, outputs, x, name=".neg")
+
+
+def aten_meth_new_ones(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    size: T,
+    dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    layout=None,
+    device=None,
+    pin_memory=None,
+) -> T:
+    "new_ones"
+    return aten_new_ones(
+        g,
+        sts,
+        outputs,
+        x,
+        size,
+        dtype=dtype,
+        layout=layout,
+        device=device,
+        pin_memory=pin_memory,
+        name=".new_ones",
+    )
 
 
 def aten_meth_permute(
