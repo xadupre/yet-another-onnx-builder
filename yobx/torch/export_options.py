@@ -23,7 +23,7 @@ class TracingMode(str, Enum):
     :cvar TRACING: use symbolic tracing via :class:`~yobx.torch.tracing.CustomTracer`
     :cvar NEW_TRACING: use dispatch-based tracing via
         :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
-    :cvar ONNXSCRIPT: delegates to :func:`torch.onnx.export` with ``dynamo=True``
+    :cvar ONNXSCRIPT: Delegates to :func:`torch.onnx.export` with ``dynamo=True``
         (implies :attr:`ConvertingLibrary.ONNXSCRIPT`)
     """
 
@@ -38,7 +38,7 @@ class ConvertingLibrary(str, Enum):
     Specifies which library performs the conversion to ONNX.
 
     :cvar DEFAULT: uses yobx's own conversion pipeline (the default)
-    :cvar ONNXSCRIPT: delegates to :func:`torch.onnx.export` with ``dynamo=True``
+    :cvar ONNXSCRIPT: Delegates to :func:`torch.onnx.export` with ``dynamo=True``
         (the onnxscript-based exporter)
     """
 
