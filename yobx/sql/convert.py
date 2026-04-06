@@ -84,6 +84,7 @@ def dataframe_to_onnx(
     verbose: int = 0,
     large_model: bool = False,
     external_threshold: int = 1024,
+    return_optimize_report: bool = False,
 ) -> ExportArtifact:
     """Trace *func* and convert the resulting computation to ONNX.
 
@@ -132,6 +133,10 @@ def dataframe_to_onnx(
         an :class:`~yobx.container.ExtendedModelContainer`
     :param external_threshold: if ``large_model`` is True, every tensor whose
         element count exceeds this threshold is stored as external data
+    :param return_optimize_report: if True, the returned
+        :class:`~yobx.container.ExportArtifact` has its
+        :attr:`~yobx.container.ExportArtifact.report` attribute populated with
+        per-pattern optimization statistics
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -218,6 +223,7 @@ def dataframe_to_onnx(
         verbose=verbose,
         large_model=large_model,
         external_threshold=external_threshold,
+        return_optimize_report=return_optimize_report,
     )
 
 
@@ -231,6 +237,7 @@ def trace_numpy_to_onnx(
     dynamic_shapes: Optional[Tuple[Dict[int, str], ...]] = None,
     large_model: bool = False,
     external_threshold: int = 1024,
+    return_optimize_report: bool = False,
 ) -> ExportArtifact:
     """
     Trace a numpy function and return the equivalent ONNX model.
@@ -271,6 +278,10 @@ def trace_numpy_to_onnx(
         an :class:`~yobx.container.ExtendedModelContainer`
     :param external_threshold: if ``large_model`` is True, every tensor whose
         element count exceeds this threshold is stored as external data
+    :param return_optimize_report: if True, the returned
+        :class:`~yobx.container.ExportArtifact` has its
+        :attr:`~yobx.container.ExportArtifact.report` attribute populated with
+        per-pattern optimization statistics
     :return: an :class:`~yobx.container.ExportArtifact` representing the
         traced function.
 
@@ -353,7 +364,7 @@ def trace_numpy_to_onnx(
     onx = g.to_onnx(  # type: ignore
         large_model=large_model,
         external_threshold=external_threshold,
-        return_optimize_report=True,
+        return_optimize_report=return_optimize_report,
     )
     return onx
 
@@ -383,6 +394,7 @@ def to_onnx(
     dynamic_shapes: Optional[Tuple[Dict[int, str], ...]] = None,
     large_model: bool = False,
     external_threshold: int = 1024,
+    return_optimize_report: bool = False,
 ) -> ExportArtifact:
     """Convert a SQL string, a DataFrame-tracing function, or a polars LazyFrame to ONNX.
 
@@ -481,6 +493,10 @@ def to_onnx(
         an :class:`~yobx.container.ExtendedModelContainer`
     :param external_threshold: if ``large_model`` is True, every tensor whose
         element count exceeds this threshold is stored as external data
+    :param return_optimize_report: if True, the returned
+        :class:`~yobx.container.ExportArtifact` has its
+        :attr:`~yobx.container.ExportArtifact.report` attribute populated with
+        per-pattern optimization statistics
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -576,6 +592,7 @@ def to_onnx(
                 target_opset=target_opset,
                 large_model=large_model,
                 external_threshold=external_threshold,
+                return_optimize_report=return_optimize_report,
             )
             if filename:
                 if verbose:
@@ -592,6 +609,7 @@ def to_onnx(
             verbose=verbose,
             large_model=large_model,
             external_threshold=external_threshold,
+            return_optimize_report=return_optimize_report,
         )
     args = _normalize_input_dtypes(args)  # type: ignore[assignment]
     if isinstance(dataframe_or_query, str):
@@ -605,6 +623,7 @@ def to_onnx(
             verbose=verbose,
             large_model=large_model,
             external_threshold=external_threshold,
+            return_optimize_report=return_optimize_report,
         )
     return lazyframe_to_onnx(
         dataframe_or_query,
@@ -615,4 +634,5 @@ def to_onnx(
         verbose=verbose,
         large_model=large_model,
         external_threshold=external_threshold,
+        return_optimize_report=return_optimize_report,
     )

@@ -173,6 +173,7 @@ def sql_to_onnx(
     verbose: int = 0,
     large_model: bool = False,
     external_threshold: int = 1024,
+    return_optimize_report: bool = False,
 ) -> ExportArtifact:
     """
     Convert a SQL *query* to a self-contained ONNX model.
@@ -243,6 +244,10 @@ def sql_to_onnx(
         an :class:`~yobx.container.ExtendedModelContainer`
     :param external_threshold: if ``large_model`` is True, every tensor whose
         element count exceeds this threshold is stored as external data
+    :param return_optimize_report: if True, the returned
+        :class:`~yobx.container.ExportArtifact` has its
+        :attr:`~yobx.container.ExportArtifact.report` attribute populated with
+        per-pattern optimization statistics
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
@@ -284,7 +289,7 @@ def sql_to_onnx(
         artifact = g.to_onnx(
             large_model=large_model,
             external_threshold=external_threshold,
-            return_optimize_report=True,
+            return_optimize_report=return_optimize_report,
         )
     else:
         artifact = g.to_onnx(large_model=large_model, external_threshold=external_threshold)
@@ -346,6 +351,7 @@ def parsed_query_to_onnx(
     verbose: int = 0,
     large_model: bool = False,
     external_threshold: int = 1024,
+    return_optimize_report: bool = False,
 ) -> ExportArtifact:
     """
     Convert an already-parsed :class:`~yobx.sql.parse.ParsedQuery` to ONNX.
@@ -378,6 +384,10 @@ def parsed_query_to_onnx(
         an :class:`~yobx.container.ExtendedModelContainer`
     :param external_threshold: if ``large_model`` is True, every tensor whose
         element count exceeds this threshold is stored as external data
+    :param return_optimize_report: if True, the returned
+        :class:`~yobx.container.ExportArtifact` has its
+        :attr:`~yobx.container.ExportArtifact.report` attribute populated with
+        per-pattern optimization statistics
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX model together with an :class:`~yobx.container.ExportReport`.
 
@@ -434,7 +444,7 @@ def parsed_query_to_onnx(
         artifact = g.to_onnx(
             large_model=large_model,
             external_threshold=external_threshold,
-            return_optimize_report=True,
+            return_optimize_report=return_optimize_report,
         )
     else:
         artifact = g.to_onnx(large_model=large_model, external_threshold=external_threshold)

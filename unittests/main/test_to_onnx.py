@@ -77,5 +77,85 @@ class TestToOnnxDispatcher(ExtTestCase):
         self.assertIsNotNone(artifact.proto)
 
 
+class TestToOnnxReturnOptimizeReport(ExtTestCase):
+    """Verify that :func:`yobx.to_onnx` propagates *return_optimize_report* to backends."""
+
+    def test_sql_default_report_is_none(self):
+        """Report is None when return_optimize_report is not set (default False)."""
+        from yobx import to_onnx
+
+        artifact = to_onnx("SELECT a + b AS total FROM t", {"a": np.float32, "b": np.float32})
+        self.assertIsNone(artifact.report)
+
+    def test_sql_report_populated_when_true(self):
+        """Report is an ExportReport with stats when return_optimize_report=True."""
+        from yobx import to_onnx
+        from yobx.container import ExportReport
+
+        artifact = to_onnx(
+            "SELECT a + b AS total FROM t",
+            {"a": np.float32, "b": np.float32},
+            return_optimize_report=True,
+        )
+        self.assertIsNotNone(artifact.report)
+        self.assertIsInstance(artifact.report, ExportReport)
+        self.assertIsInstance(artifact.report.stats, list)
+        self.assertGreater(len(artifact.report.stats), 0)
+
+    def test_callable_default_report_is_none(self):
+        """Report is None by default for callable (numpy function) dispatch."""
+        from yobx import to_onnx
+
+        def my_func(x):
+            return x + 1.0
+
+        x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        artifact = to_onnx(my_func, x)
+        self.assertIsNone(artifact.report)
+
+    def test_callable_report_populated_when_true(self):
+        """Report is populated for callable dispatch with return_optimize_report=True."""
+        from yobx import to_onnx
+        from yobx.container import ExportReport
+
+        def my_func(x):
+            return x + 1.0
+
+        x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        artifact = to_onnx(my_func, x, return_optimize_report=True)
+        self.assertIsNotNone(artifact.report)
+        self.assertIsInstance(artifact.report, ExportReport)
+        self.assertGreater(len(artifact.report.stats), 0)
+
+    @requires_sklearn()
+    def test_sklearn_default_report_is_none(self):
+        """Report is None by default for sklearn dispatch."""
+        from sklearn.linear_model import LinearRegression
+        from yobx import to_onnx
+
+        rng = np.random.default_rng(0)
+        X = rng.standard_normal((20, 4)).astype(np.float32)
+        y = X[:, 0] + X[:, 1]
+        model = LinearRegression().fit(X, y)
+        artifact = to_onnx(model, (X,))
+        self.assertIsNone(artifact.report)
+
+    @requires_sklearn()
+    def test_sklearn_report_populated_when_true(self):
+        """Report is populated for sklearn dispatch with return_optimize_report=True."""
+        from sklearn.linear_model import LinearRegression
+        from yobx import to_onnx
+        from yobx.container import ExportReport
+
+        rng = np.random.default_rng(0)
+        X = rng.standard_normal((20, 4)).astype(np.float32)
+        y = X[:, 0] + X[:, 1]
+        model = LinearRegression().fit(X, y)
+        artifact = to_onnx(model, (X,), return_optimize_report=True)
+        self.assertIsNotNone(artifact.report)
+        self.assertIsInstance(artifact.report, ExportReport)
+        self.assertGreater(len(artifact.report.stats), 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

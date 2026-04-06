@@ -2,14 +2,15 @@
 Tests exporting torch ops from :mod:`torch.testing._internal.common_methods_invocations`
 to ONNX using :func:`yobx.torch.interpreter.to_onnx`.
 
-One test method is generated automatically for every op collected from ``op_db``,
-following the naming convention ``test_export_<op_name>`` where dots in the op
-name are replaced by underscores.
+One test method is generated automatically for every (op, dtype) pair collected
+from ``op_db``, following the naming convention
+``test_export_<op_name>_<dtype>`` where dots in the op name are replaced by
+underscores and *dtype* is one of ``float32``, ``float16``, or ``int64``.
 """
 
 import unittest
 import warnings
-from typing import Any, Callable, Dict, List, Sequence, Tuple
+from typing import Any, Callable, Dict, FrozenSet, List, Sequence, Tuple
 
 import torch
 from torch.testing._internal import common_methods_invocations
@@ -259,6 +260,76 @@ _XFAIL_OPS = frozenset(
     }
 )
 
+# Extra exclusions specific to torch.float16.  Add an op key here when it
+# works with float32 but fails (export error, runtime error, or numerical
+# mismatch) specifically for float16.  The combined exclusion set used during
+# test collection is ``_NO_CONVERTER_OPS | _XFAIL_OPS | _XFAIL_OPS_FLOAT16``.
+_XFAIL_OPS_FLOAT16: FrozenSet[str] = frozenset(
+    {
+        # Numerical mismatch too large for float16 tolerance (1e-2):
+        "addcmul",  # ref_diff=0.03125
+        "expm1",  # ref_diff=4
+        # Incorrect results (ordering) for float16:
+        "argsort",  # ref_diff=7944
+    }
+)
+
+# Extra exclusions specific to torch.int64.  Add an op key here when it
+# fails specifically for int64 inputs.  The combined exclusion set used during
+# test collection is ``_NO_CONVERTER_OPS | _XFAIL_OPS | _XFAIL_OPS_INT64``.
+_XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
+    {
+        # Ops that produce float outputs from int64 inputs but type inference
+        # fails or ONNX model is invalid because the op only supports float:
+        "__rdiv__",  # reciprocal node type mismatch
+        "__rpow__",  # negative integer powers not allowed
+        "__rxor__",  # FunctionNotFoundError: bitwise_xor
+        "acos",  # ONNX op only supports float dtypes
+        "acosh",  # ONNX op only supports float dtypes
+        "asin",  # ONNX op only supports float dtypes
+        "asinh",  # ONNX op only supports float dtypes
+        "atan",  # ONNX op only supports float dtypes
+        "atanh",  # ONNX op only supports float dtypes
+        "bitwise_left_shift",  # FunctionNotFoundError
+        "bitwise_right_shift",  # FunctionNotFoundError
+        "bitwise_xor",  # FunctionNotFoundError
+        "ceil",  # InvalidGraph: int64 not supported by Ceil
+        "cos",  # ONNX op only supports float dtypes
+        "cosh",  # ONNX op only supports float dtypes
+        "erf",  # ONNX op only supports float dtypes
+        "exp",  # ONNX op only supports float dtypes
+        "expm1",  # ONNX op only supports float dtypes
+        "floor",  # InvalidGraph: int64 not supported by Floor
+        "floor_divide",  # ref_diff=1
+        "gcd",  # FunctionNotFoundError
+        "isinf",  # InvalidGraph: int64 not supported by IsInf
+        "isnan",  # InvalidGraph: int64 not supported by IsNaN
+        "lcm",  # FunctionNotFoundError
+        "log",  # ONNX op only supports float dtypes
+        "nn_functional_relu",  # NOT_IMPLEMENTED: Relu not supported for int64
+        "nn_functional_softsign",  # type mismatch in Div
+        "nn_functional_tanhshrink",  # ONNX Tanh only supports float dtypes
+        "reciprocal",  # ONNX op only supports float dtypes
+        "round",  # InvalidGraph: int64 not supported by Round
+        "rsqrt",  # ONNX op only supports float dtypes
+        "sigmoid",  # ONNX op only supports float dtypes
+        "sin",  # ONNX op only supports float dtypes
+        "sinh",  # ONNX op only supports float dtypes
+        "sqrt",  # ONNX op only supports float dtypes
+        "tan",  # ONNX op only supports float dtypes
+        "tanh",  # ONNX op only supports float dtypes
+        "trunc",  # InvalidGraph: int64 not supported by Round
+    }
+)
+
+# Human-readable label for each tested dtype, used as the suffix in generated
+# test method names (e.g. ``test_export_add_float32``).
+_DTYPE_NAMES: Dict[torch.dtype, str] = {
+    torch.float32: "float32",
+    torch.float16: "float16",
+    torch.int64: "int64",
+}
+
 
 def _tensor_is_exportable(t: torch.Tensor) -> bool:
     """Checks whether a single tensor can be safely converted to NumPy.
@@ -290,28 +361,41 @@ def _result_is_exportable(result: Any) -> bool:
     return False
 
 
-def _collect_ops() -> List[Any]:
-    """Collects ops from op_db that are suitable for ONNX export testing.
+def _collect_ops(dtype: torch.dtype) -> List[Any]:
+    """Collects ops from op_db that are suitable for ONNX export testing with *dtype*.
 
     Filters to ops that:
 
-    - Support ``float32``
+    - Support *dtype*
     - Have no variant test name
     - Are not non-deterministic (random-output) ops
     - Are not in :data:`_NO_CONVERTER_OPS` (missing aten converter)
-    - Are not in :data:`_XFAIL_OPS` (known failures for other reasons)
-    - Have at least one sample input whose ``.input`` is a ``float32`` tensor
+    - Are not in the dtype-specific xfail set (known failures for *dtype*)
+    - Have at least one sample input whose ``.input`` is a tensor of *dtype*
     - Have all positional sample args that are also tensors (or none at all)
     - Have no non-trivial keyword arguments (to avoid unsupported ONNX kwargs)
+
+    Args:
+        dtype: The :class:`torch.dtype` to collect ops for.  Must be one of
+            ``torch.float32``, ``torch.float16``, or ``torch.int64``.
 
     Returns:
         List of :class:`~torch.testing._internal.opinfo.core.OpInfo` objects.
     """
+    _xfail_map: Dict[torch.dtype, FrozenSet[str]] = {
+        torch.float32: _XFAIL_OPS,
+        torch.float16: _XFAIL_OPS | _XFAIL_OPS_FLOAT16,
+        torch.int64: _XFAIL_OPS | _XFAIL_OPS_INT64,
+    }
+    if dtype not in _xfail_map:
+        raise ValueError(f"Unsupported dtype {dtype!r}. Supported dtypes: {list(_xfail_map)}")
+    xfail = _xfail_map[dtype]
+
     testable = []
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         for op in common_methods_invocations.op_db:
-            if torch.float32 not in op.dtypes:
+            if dtype not in op.dtypes:
                 continue
             if op.variant_test_name:
                 continue
@@ -319,9 +403,9 @@ def _collect_ops() -> List[Any]:
                 continue
             if op.name.replace(".", "_") in _NO_CONVERTER_OPS:
                 continue
-            if op.name.replace(".", "_") in _XFAIL_OPS:
+            if op.name.replace(".", "_") in xfail:
                 continue
-            samples = list(op.sample_inputs("cpu", torch.float32, requires_grad=False))
+            samples = list(op.sample_inputs("cpu", dtype, requires_grad=False))
             if not samples:
                 continue
             s = samples[0]
@@ -337,7 +421,9 @@ def _collect_ops() -> List[Any]:
     return testable
 
 
-_OPS = _collect_ops()
+_OPS_FLOAT32 = _collect_ops(torch.float32)
+_OPS_FLOAT16 = _collect_ops(torch.float16)
+_OPS_INT64 = _collect_ops(torch.int64)
 
 
 class _OpWrapper(torch.nn.Module):
@@ -365,28 +451,34 @@ class _OpWrapper(torch.nn.Module):
         return self._fn(x, *args, **self._kwargs)
 
 
-def _make_export_test(op: Any) -> Callable:
-    """Creates a test method that exports *op* to ONNX and validates outputs.
+def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
+    """Creates a test method that exports *op* to ONNX with *dtype* and validates outputs.
+
+    Args:
+        op: An :class:`~torch.testing._internal.opinfo.core.OpInfo` instance.
+        dtype: The :class:`torch.dtype` to use for sample inputs.
 
     Returns:
-        A test method bound to *op* suitable for attaching to a
+        A test method bound to *op* and *dtype* suitable for attaching to a
         :class:`unittest.TestCase` subclass.
     """
 
     @requires_torch("2.6")
     @ignore_warnings((UserWarning, FutureWarning, DeprecationWarning))
-    def _test(self: ExtTestCase, _op: Any = op) -> None:
+    def _test(self: ExtTestCase, _op: Any = op, _dtype: torch.dtype = dtype) -> None:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            samples = list(_op.sample_inputs("cpu", torch.float32, requires_grad=False))
+            samples = list(_op.sample_inputs("cpu", _dtype, requires_grad=False))
         if not samples:
-            raise unittest.SkipTest(f"no sample inputs for op {_op.name!r}")
+            raise unittest.SkipTest(f"no sample inputs for op {_op.name!r} dtype={_dtype}")
         s = samples[0]
         model = _OpWrapper(_op.op, s.args, s.kwargs)
         inputs = (s.input, *s.args)
         expected = _op.op(s.input, *s.args, **s.kwargs)
         if not _result_is_exportable(expected):
-            raise unittest.SkipTest(f"op {_op.name!r} produces a non-exportable result")
+            raise unittest.SkipTest(
+                f"op {_op.name!r} dtype={_dtype} produces a non-exportable result"
+            )
 
         # Normalise to a sequence so single-tensor and tuple results are
         # handled uniformly below.
@@ -401,14 +493,15 @@ def _make_export_test(op: Any) -> Callable:
         ref_feeds = dict(zip(ref.input_names, numpy_inputs))
         got_ref = ref.run(None, ref_feeds)
 
+        # Use a slightly relaxed tolerance for float16 due to reduced precision.
+        atol = 1e-2 if _dtype == torch.float16 else 1e-3
+
         for i, (exp_i, got_i) in enumerate(zip(expected_seq, got_ref)):
             diff = max_diff(exp_i, got_i)
-            # float32 arithmetic may introduce small rounding differences;
-            # 1e-3 is a reasonable tolerance for single-precision ops.
             self.assertLess(
                 diff["abs"],
-                1e-3,
-                msg=f"op={_op.name!r} ref output[{i}] max abs diff={diff['abs']}",
+                atol,
+                msg=f"op={_op.name!r} dtype={_dtype} ref output[{i}] max abs diff={diff['abs']}",
             )
 
         if has_onnxruntime():
@@ -424,30 +517,45 @@ def _make_export_test(op: Any) -> Callable:
                 diff = max_diff(exp_i, got_i)
                 self.assertLess(
                     diff["abs"],
-                    1e-3,
-                    msg=f"op={_op.name!r} ort output[{i}] max abs diff={diff['abs']}",
+                    atol,
+                    msg=(
+                        f"op={_op.name!r} dtype={_dtype} ort output[{i}]"
+                        f" max abs diff={diff['abs']}"
+                    ),
                 )
 
-    _test.__doc__ = f"Exports :func:`torch.{op.name}` to ONNX and validates numerical outputs."
+    dtype_name = _DTYPE_NAMES[dtype]
+    _test.__doc__ = (
+        f"Exports :func:`torch.{op.name}` ({dtype_name}) to ONNX and validates numerical outputs."
+    )
     return _test
 
 
 class TestOnnxExportCommonMethods(ExtTestCase):
     """Tests :func:`yobx.torch.interpreter.to_onnx` against ops from op_db.
 
-    One test method is generated automatically for every op in ``_OPS`` via
+    One test method is generated automatically for every (op, dtype) pair in
+    ``_OPS_FLOAT32``, ``_OPS_FLOAT16``, and ``_OPS_INT64`` via
     :func:`_make_export_test`.  Methods follow the naming convention
-    ``test_export_<op_name>`` where dots are replaced by underscores.
+    ``test_export_<op_name>_<dtype>`` where dots are replaced by underscores
+    and *dtype* is one of ``float32``, ``float16``, or ``int64``.
     """
 
     @classmethod
     def _add_test_methods(cls) -> None:
-        """Attaches one test method per op in ``_OPS`` to *cls*."""
-        for op in _OPS:
-            # Replace dots (e.g. "special.log_ndtr") with underscores so the
-            # method name is a valid Python identifier.
-            method_name = "test_export_" + op.name.replace(".", "_")
-            setattr(cls, method_name, _make_export_test(op))
+        """Attaches one test method per (op, dtype) pair to *cls*."""
+        for dtype, ops in (
+            (torch.float32, _OPS_FLOAT32),
+            (torch.float16, _OPS_FLOAT16),
+            (torch.int64, _OPS_INT64),
+        ):
+            dtype_name = _DTYPE_NAMES[dtype]
+            for op in ops:
+                # Replace dots (e.g. "special.log_ndtr") with underscores so
+                # the method name is a valid Python identifier, then append
+                # the dtype suffix for disambiguation.
+                method_name = "test_export_" + op.name.replace(".", "_") + "_" + dtype_name
+                setattr(cls, method_name, _make_export_test(op, dtype))
 
 
 TestOnnxExportCommonMethods._add_test_methods()
