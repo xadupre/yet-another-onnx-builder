@@ -5,7 +5,7 @@ to ONNX using :func:`yobx.torch.interpreter.to_onnx`.
 One test method is generated automatically for every (op, dtype) pair collected
 from ``op_db``, following the naming convention
 ``test_export_<op_name>_<dtype>`` where dots in the op name are replaced by
-underscores and *dtype* is one of ``float32``, ``float16``, or ``int64``.
+underscores and *dtype* is one of ``float32``, ``float16``, ``int32``, or ``int64``.
 """
 
 import unittest
@@ -274,6 +274,58 @@ _XFAIL_OPS_FLOAT16: FrozenSet[str] = frozenset(
     }
 )
 
+# Extra exclusions specific to torch.int32.  Add an op key here when it
+# fails specifically for int32 inputs.  The combined exclusion set used during
+# test collection is ``_NO_CONVERTER_OPS | _XFAIL_OPS | _XFAIL_OPS_INT32``.
+_XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
+    {
+        # Ops that produce float outputs from int32 inputs but type inference
+        # fails or ONNX model is invalid because the op only supports float:
+        "__rdiv__",  # reciprocal node type mismatch
+        "__rpow__",  # negative integer powers not allowed
+        "__rxor__",  # FunctionNotFoundError: bitwise_xor
+        "acos",  # ONNX op only supports float dtypes
+        "acosh",  # ONNX op only supports float dtypes
+        "asin",  # ONNX op only supports float dtypes
+        "asinh",  # ONNX op only supports float dtypes
+        "atan",  # ONNX op only supports float dtypes
+        "atanh",  # ONNX op only supports float dtypes
+        "bitwise_left_shift",  # FunctionNotFoundError
+        "bitwise_right_shift",  # FunctionNotFoundError
+        "bitwise_xor",  # FunctionNotFoundError
+        "ceil",  # InvalidGraph: int32 not supported by Ceil
+        "cos",  # ONNX op only supports float dtypes
+        "cosh",  # ONNX op only supports float dtypes
+        "erf",  # ONNX op only supports float dtypes
+        "exp",  # ONNX op only supports float dtypes
+        "expm1",  # ONNX op only supports float dtypes
+        "floor",  # InvalidGraph: int32 not supported by Floor
+        "floor_divide",  # ref_diff=1
+        "gcd",  # FunctionNotFoundError
+        "isinf",  # InvalidGraph: int32 not supported by IsInf
+        "isnan",  # InvalidGraph: int32 not supported by IsNaN
+        "lcm",  # FunctionNotFoundError
+        "log",  # ONNX op only supports float dtypes
+        "nn_functional_relu",  # NOT_IMPLEMENTED: Relu not supported for int32
+        "nn_functional_softsign",  # type mismatch in Div
+        "nn_functional_tanhshrink",  # ONNX Tanh only supports float dtypes
+        "reciprocal",  # ONNX op only supports float dtypes
+        "round",  # InvalidGraph: int32 not supported by Round
+        "rsqrt",  # ONNX op only supports float dtypes
+        "sigmoid",  # ONNX op only supports float dtypes
+        "sin",  # ONNX op only supports float dtypes
+        "sinh",  # ONNX op only supports float dtypes
+        "sqrt",  # ONNX op only supports float dtypes
+        "tan",  # ONNX op only supports float dtypes
+        "tanh",  # ONNX op only supports float dtypes
+        "tril",  # NOT_IMPLEMENTED: Trilu(14) not supported for int32 by onnxruntime
+        "triu",  # NOT_IMPLEMENTED: Trilu(14) not supported for int32 by onnxruntime
+        "trunc",  # InvalidGraph: int32 not supported by Round
+        "prod",  # type mismatch: int32 input produces int64 output
+        "sum",  # type mismatch: int32 input produces int64 output
+    }
+)
+
 # Extra exclusions specific to torch.int64.  Add an op key here when it
 # fails specifically for int64 inputs.  The combined exclusion set used during
 # test collection is ``_NO_CONVERTER_OPS | _XFAIL_OPS | _XFAIL_OPS_INT64``.
@@ -327,6 +379,7 @@ _XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
 _DTYPE_NAMES: Dict[torch.dtype, str] = {
     torch.float32: "float32",
     torch.float16: "float16",
+    torch.int32: "int32",
     torch.int64: "int64",
 }
 
@@ -377,7 +430,7 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
 
     Args:
         dtype: The :class:`torch.dtype` to collect ops for.  Must be one of
-            ``torch.float32``, ``torch.float16``, or ``torch.int64``.
+            ``torch.float32``, ``torch.float16``, ``torch.int32``, or ``torch.int64``.
 
     Returns:
         List of :class:`~torch.testing._internal.opinfo.core.OpInfo` objects.
@@ -385,6 +438,7 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
     _xfail_map: Dict[torch.dtype, FrozenSet[str]] = {
         torch.float32: _XFAIL_OPS,
         torch.float16: _XFAIL_OPS | _XFAIL_OPS_FLOAT16,
+        torch.int32: _XFAIL_OPS | _XFAIL_OPS_INT32,
         torch.int64: _XFAIL_OPS | _XFAIL_OPS_INT64,
     }
     if dtype not in _xfail_map:
@@ -423,6 +477,7 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
 
 _OPS_FLOAT32 = _collect_ops(torch.float32)
 _OPS_FLOAT16 = _collect_ops(torch.float16)
+_OPS_INT32 = _collect_ops(torch.int32)
 _OPS_INT64 = _collect_ops(torch.int64)
 
 
@@ -535,10 +590,10 @@ class TestOnnxExportCommonMethods(ExtTestCase):
     """Tests :func:`yobx.torch.interpreter.to_onnx` against ops from op_db.
 
     One test method is generated automatically for every (op, dtype) pair in
-    ``_OPS_FLOAT32``, ``_OPS_FLOAT16``, and ``_OPS_INT64`` via
+    ``_OPS_FLOAT32``, ``_OPS_FLOAT16``, ``_OPS_INT32``, and ``_OPS_INT64`` via
     :func:`_make_export_test`.  Methods follow the naming convention
     ``test_export_<op_name>_<dtype>`` where dots are replaced by underscores
-    and *dtype* is one of ``float32``, ``float16``, or ``int64``.
+    and *dtype* is one of ``float32``, ``float16``, ``int32``, or ``int64``.
     """
 
     @classmethod
@@ -547,6 +602,7 @@ class TestOnnxExportCommonMethods(ExtTestCase):
         for dtype, ops in (
             (torch.float32, _OPS_FLOAT32),
             (torch.float16, _OPS_FLOAT16),
+            (torch.int32, _OPS_INT32),
             (torch.int64, _OPS_INT64),
         ):
             dtype_name = _DTYPE_NAMES[dtype]
