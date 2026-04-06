@@ -9,3 +9,4 @@ Additional statistics and metadata about the documentation build.
    :maxdepth: 2
 
    index_stats
+   ci_durations
