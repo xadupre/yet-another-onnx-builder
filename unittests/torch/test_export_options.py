@@ -1,6 +1,7 @@
 import os
 import tempfile
 import unittest
+import onnx
 import torch
 from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings, requires_torch
 from yobx.helpers.helper import get_sig_kwargs
@@ -1121,8 +1122,6 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
     @ignore_warnings(UserWarning)
     def test_linear_default_default(self):
         """TracingMode.DEFAULT + ConvertingLibrary.DEFAULT: torch.export + yobx pipeline."""
-        import onnx
-
         model = self._make_model()
         x = self._make_input()
         artifact = to_onnx(model, (x,), export_options=ExportOptions(tracing=TracingMode.DEFAULT))
@@ -1134,8 +1133,6 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
     @ignore_warnings(UserWarning)
     def test_linear_tracing_default(self):
         """TracingMode.TRACING + ConvertingLibrary.DEFAULT: CustomTracer + yobx pipeline."""
-        import onnx
-
         model = self._make_model()
         x = self._make_input()
         artifact = to_onnx(model, (x,), export_options=ExportOptions(tracing=TracingMode.TRACING))
@@ -1147,8 +1144,6 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
     @ignore_warnings(UserWarning)
     def test_linear_new_tracing_default(self):
         """TracingMode.NEW_TRACING + ConvertingLibrary.DEFAULT: GraphTracer + yobx pipeline."""
-        import onnx
-
         model = self._make_model()
         x = self._make_input()
         artifact = to_onnx(
@@ -1164,7 +1159,6 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
     @ignore_warnings(FutureWarning)
     def test_linear_default_onnxscript(self):
         """TracingMode.DEFAULT + ConvertingLibrary.ONNXSCRIPT: EP handed to torch.onnx.export."""
-        import onnx
         from unittest.mock import MagicMock, patch
 
         model = self._make_model()
@@ -1197,7 +1191,6 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
     @ignore_warnings(FutureWarning)
     def test_linear_tracing_onnxscript(self):
         """TracingMode.TRACING + ConvertingLibrary.ONNXSCRIPT: no dynamo=True."""
-        import onnx
         from unittest.mock import MagicMock, patch
 
         model = self._make_model()
@@ -1228,7 +1221,6 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
     @ignore_warnings(FutureWarning)
     def test_linear_new_tracing_onnxscript(self):
         """TracingMode.NEW_TRACING + ConvertingLibrary.ONNXSCRIPT: no dynamo=True."""
-        import onnx
         from unittest.mock import MagicMock, patch
 
         model = self._make_model()
@@ -1260,7 +1252,6 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
     @ignore_warnings(FutureWarning)
     def test_linear_onnxscript_onnxscript(self):
         """TracingMode.ONNXSCRIPT: torch.onnx.export called with dynamo=True."""
-        import onnx
         from unittest.mock import MagicMock, patch
 
         model = self._make_model()
