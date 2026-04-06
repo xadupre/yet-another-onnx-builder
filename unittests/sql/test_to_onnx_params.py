@@ -3,6 +3,7 @@ Unit tests for the new parameters added to all SQL to_onnx functions:
   - large_model / external_threshold (sql_to_onnx, parsed_query_to_onnx,
     lazyframe_to_onnx, dataframe_to_onnx, trace_numpy_to_onnx, to_onnx)
   - dynamic_shapes / input_names (trace_numpy_to_onnx, to_onnx)
+  - return_optimize_report (all entry points)
 """
 
 import unittest
@@ -275,6 +276,159 @@ class TestToOnnxNewParams(ExtTestCase):
         ref = ExtendedReferenceEvaluator(art)
         (out,) = ref.run(None, {"myinput": X})
         np.testing.assert_allclose(out, _simple_numpy(X), rtol=1e-6)
+
+
+# ---------------------------------------------------------------------------
+# return_optimize_report — sql_to_onnx
+# ---------------------------------------------------------------------------
+
+
+class TestSqlToOnnxReturnOptimizeReport(ExtTestCase):
+
+    def test_default_report_is_none(self):
+        """Report is None by default (return_optimize_report=False)."""
+        art = sql_to_onnx(
+            "SELECT a + b AS total FROM t", {"a": np.float32, "b": np.float32}
+        )
+        self.assertIsNone(art.report)
+
+    def test_report_populated_when_true(self):
+        """Report is populated when return_optimize_report=True."""
+        from yobx.container import ExportReport
+
+        art = sql_to_onnx(
+            "SELECT a + b AS total FROM t",
+            {"a": np.float32, "b": np.float32},
+            return_optimize_report=True,
+        )
+        self.assertIsNotNone(art.report)
+        self.assertIsInstance(art.report, ExportReport)
+        self.assertIsInstance(art.report.stats, list)
+        self.assertGreater(len(art.report.stats), 0)
+
+
+# ---------------------------------------------------------------------------
+# return_optimize_report — parsed_query_to_onnx
+# ---------------------------------------------------------------------------
+
+
+class TestParsedQueryToOnnxReturnOptimizeReport(ExtTestCase):
+
+    def _pq(self):
+        return trace_dataframe(_simple_transform, {"a": np.float32, "b": np.float32})
+
+    def test_default_report_is_none(self):
+        art = parsed_query_to_onnx(self._pq())
+        self.assertIsNone(art.report)
+
+    def test_report_populated_when_true(self):
+        from yobx.container import ExportReport
+
+        art = parsed_query_to_onnx(self._pq(), return_optimize_report=True)
+        self.assertIsNotNone(art.report)
+        self.assertIsInstance(art.report, ExportReport)
+        self.assertIsInstance(art.report.stats, list)
+        self.assertGreater(len(art.report.stats), 0)
+
+
+# ---------------------------------------------------------------------------
+# return_optimize_report — dataframe_to_onnx
+# ---------------------------------------------------------------------------
+
+
+class TestDataframeToOnnxReturnOptimizeReport(ExtTestCase):
+
+    def test_default_report_is_none(self):
+        art = dataframe_to_onnx(_simple_transform, {"a": np.float32, "b": np.float32})
+        self.assertIsNone(art.report)
+
+    def test_report_populated_when_true(self):
+        from yobx.container import ExportReport
+
+        art = dataframe_to_onnx(
+            _simple_transform,
+            {"a": np.float32, "b": np.float32},
+            return_optimize_report=True,
+        )
+        self.assertIsNotNone(art.report)
+        self.assertIsInstance(art.report, ExportReport)
+        self.assertIsInstance(art.report.stats, list)
+        self.assertGreater(len(art.report.stats), 0)
+
+
+# ---------------------------------------------------------------------------
+# return_optimize_report — trace_numpy_to_onnx
+# ---------------------------------------------------------------------------
+
+
+class TestTraceNumpyToOnnxReturnOptimizeReport(ExtTestCase):
+
+    def test_default_report_is_none(self):
+        X = np.random.randn(4, 3).astype(np.float32)
+        art = trace_numpy_to_onnx(_simple_numpy, X)
+        self.assertIsNone(art.report)
+
+    def test_report_populated_when_true(self):
+        from yobx.container import ExportReport
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        art = trace_numpy_to_onnx(_simple_numpy, X, return_optimize_report=True)
+        self.assertIsNotNone(art.report)
+        self.assertIsInstance(art.report, ExportReport)
+        self.assertIsInstance(art.report.stats, list)
+        self.assertGreater(len(art.report.stats), 0)
+
+
+# ---------------------------------------------------------------------------
+# return_optimize_report — to_onnx (unified entry point)
+# ---------------------------------------------------------------------------
+
+
+class TestToOnnxReturnOptimizeReport(ExtTestCase):
+
+    def test_sql_default_report_is_none(self):
+        dtypes = {"a": np.float32, "b": np.float32}
+        art = to_onnx("SELECT a + b AS total FROM t", dtypes)
+        self.assertIsNone(art.report)
+
+    def test_sql_report_populated_when_true(self):
+        from yobx.container import ExportReport
+
+        dtypes = {"a": np.float32, "b": np.float32}
+        art = to_onnx(
+            "SELECT a + b AS total FROM t", dtypes, return_optimize_report=True
+        )
+        self.assertIsNotNone(art.report)
+        self.assertIsInstance(art.report, ExportReport)
+        self.assertGreater(len(art.report.stats), 0)
+
+    def test_callable_default_report_is_none(self):
+        dtypes = {"a": np.float32, "b": np.float32}
+        art = to_onnx(_simple_transform, dtypes)
+        self.assertIsNone(art.report)
+
+    def test_callable_report_populated_when_true(self):
+        from yobx.container import ExportReport
+
+        dtypes = {"a": np.float32, "b": np.float32}
+        art = to_onnx(_simple_transform, dtypes, return_optimize_report=True)
+        self.assertIsNotNone(art.report)
+        self.assertIsInstance(art.report, ExportReport)
+        self.assertGreater(len(art.report.stats), 0)
+
+    def test_numpy_default_report_is_none(self):
+        X = np.random.randn(4, 3).astype(np.float32)
+        art = to_onnx(_simple_numpy, (X,))
+        self.assertIsNone(art.report)
+
+    def test_numpy_report_populated_when_true(self):
+        from yobx.container import ExportReport
+
+        X = np.random.randn(4, 3).astype(np.float32)
+        art = to_onnx(_simple_numpy, (X,), return_optimize_report=True)
+        self.assertIsNotNone(art.report)
+        self.assertIsInstance(art.report, ExportReport)
+        self.assertGreater(len(art.report.stats), 0)
 
 
 if __name__ == "__main__":
