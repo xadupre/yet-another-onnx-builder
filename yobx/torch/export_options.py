@@ -1,3 +1,4 @@
+import inspect
 import os
 import time
 from enum import Enum
@@ -447,8 +448,6 @@ class ExportOptions:
                 else (dynamic_shapes.copy() if isinstance(dynamic_shapes, dict) else {})
             )
             if args:
-                import inspect
-
                 sig = inspect.signature(mod.forward)
                 for ip, (p, a) in enumerate(zip(sig.parameters, args)):
                     if a is not None and p not in concrete_args:
@@ -504,8 +503,6 @@ class ExportOptions:
             return gm
 
         if self.tracing == TracingMode.NEW_TRACING:
-            import inspect
-
             from torch.fx._lazy_graph_module import _make_graph_module
 
             from .fake_tensor_helper import make_fake_with_dynamic_dimensions
