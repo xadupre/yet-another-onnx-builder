@@ -14,6 +14,7 @@ from yobx.torch.export_options import (
     apply_decompositions,
     insert_contiguous_between_transpose_and_view,
 )
+from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch.interpreter import to_onnx
 
 
@@ -1124,28 +1125,37 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
         """TracingMode.DEFAULT + ConvertingLibrary.DEFAULT: torch.export + yobx pipeline."""
         model = self._make_model()
         x = self._make_input()
+        expected = model(x).detach().numpy()
         artifact = to_onnx(model, (x,), export_options=ExportOptions(tracing=TracingMode.DEFAULT))
         onx = artifact.proto
         self.assertIsInstance(onx, onnx.ModelProto)
         self.assertEqual(len(onx.graph.input), 1)
         self.assertEqual(len(onx.graph.output), 1)
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, {"x": x.numpy()})
+        self.assertEqualArray(expected, got[0], atol=1e-5)
 
     @ignore_warnings(UserWarning)
     def test_linear_tracing_default(self):
         """TracingMode.TRACING + ConvertingLibrary.DEFAULT: CustomTracer + yobx pipeline."""
         model = self._make_model()
         x = self._make_input()
+        expected = model(x).detach().numpy()
         artifact = to_onnx(model, (x,), export_options=ExportOptions(tracing=TracingMode.TRACING))
         onx = artifact.proto
         self.assertIsInstance(onx, onnx.ModelProto)
         self.assertEqual(len(onx.graph.input), 1)
         self.assertEqual(len(onx.graph.output), 1)
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, {"x": x.numpy()})
+        self.assertEqualArray(expected, got[0], atol=1e-5)
 
     @ignore_warnings(UserWarning)
     def test_linear_new_tracing_default(self):
         """TracingMode.NEW_TRACING + ConvertingLibrary.DEFAULT: GraphTracer + yobx pipeline."""
         model = self._make_model()
         x = self._make_input()
+        expected = model(x).detach().numpy()
         artifact = to_onnx(
             model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
         )
@@ -1153,6 +1163,9 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
         self.assertIsInstance(onx, onnx.ModelProto)
         self.assertEqual(len(onx.graph.input), 1)
         self.assertEqual(len(onx.graph.output), 1)
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, {"x": x.numpy()})
+        self.assertEqualArray(expected, got[0], atol=1e-5)
 
     # --------------------------------------------------------------- ConvertingLibrary.ONNXSCRIPT
 
