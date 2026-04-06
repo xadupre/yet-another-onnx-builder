@@ -502,6 +502,30 @@ class TestOnnxExportControlFlow(ExtTestCase):
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @ignore_warnings((UserWarning, FutureWarning))
+    def test_control_flow_scan_decomposition_tracing(self):
+        from yobx.torch.testing._model_eval_cases import ControlFlowScanDecomposition_151564
+
+        model = ControlFlowScanDecomposition_151564()
+        x, y = ControlFlowScanDecomposition_151564._inputs[0]
+        expected = model(x, y)
+
+        name2 = self.get_dump_file("test_control_flow_scan_decomposition_tracing.onnx")
+        to_onnx(
+            model,
+            (x, y),
+            filename=name2,
+            dynamic_shapes={"images": {0: "batch", 1: "maxdim"}, "position": {0: "batch"}},
+            export_options=ExportOptions(decomposition_table="default", tracing=True),
+            verbose=0,
+        )
+        import onnxruntime
+
+        ref = onnxruntime.InferenceSession(name2, providers=["CPUExecutionProvider"])
+        feeds = dict(images=x.numpy(), position=y.numpy())
+        got = ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

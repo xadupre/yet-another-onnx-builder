@@ -947,6 +947,10 @@ def replace_problematic_function_before_tracing() -> Generator:
     if _scan_op is not None:
         saved[(torch.ops.higher_order, "scan")] = _scan_op
         newf[(torch.ops.higher_order, "scan")] = ScanCCOp()
+    _is_exporting = getattr(torch.compiler, "is_exporting", None)
+    if _is_exporting is not None:
+        saved[(torch.compiler, "is_exporting")] = _is_exporting
+        newf[(torch.compiler, "is_exporting")] = lambda: True
     for k, v in newf.items():
         if isinstance(k, tuple):
             setattr(k[0], k[1], v)
