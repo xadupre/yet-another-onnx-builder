@@ -1,6 +1,47 @@
-from typing import Any, Dict, Optional, Sequence, Tuple, Union
+from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Union
 from ...xexpressions import simplify_expression
 import torch
+
+# ---------------------------------------------------------------------------
+# Registry of conditions known to be True (populated by _handle_check during
+# tracing via torch._check interception).  Symbolic TracingBool values whose
+# expression matches an entry resolve to True in __bool__.
+# ---------------------------------------------------------------------------
+
+_known_true_conditions: Set[str] = set()
+
+
+def register_condition(cond: "TracingBool") -> None:
+    """Registers *cond* as a condition known to be True during tracing.
+
+    Only symbolic (string-valued) :class:`TracingBool` instances are
+    registered; concrete booleans are ignored.
+
+    :param cond: A :class:`TracingBool` that has been asserted via
+        :func:`torch._check` and is therefore known to hold.
+    """
+    if isinstance(cond, TracingBool) and isinstance(cond.value, str):
+        _known_true_conditions.add(cond.value)
+
+
+def clear_conditions() -> None:
+    """Clears the registry of known-True conditions.
+
+    Called at the start of each :meth:`GraphTracer.trace` invocation so that
+    constraints do not leak between independent traces.
+    """
+    _known_true_conditions.clear()
+
+
+# Mapping from comparison-operator string to the corresponding callable.
+# Defined once at module level to avoid recreating the dict on every _cmp call.
+_COMPARISON_OPS: Dict[str, Callable[[int, int], bool]] = {
+    ">": lambda a, b: a > b,
+    ">=": lambda a, b: a >= b,
+    "<": lambda a, b: a < b,
+    "<=": lambda a, b: a <= b,
+    "!=": lambda a, b: a != b,
+}
 
 
 class TracingBool:
@@ -13,6 +54,11 @@ class TracingBool:
 
     - ``TracingBool(True)`` / ``TracingBool(False)`` — concrete result.
     - ``TracingBool("(n==4)")`` — symbolic; cannot be used as a Python bool.
+
+    Symbolic :class:`TracingBool` instances can be resolved to a concrete
+    ``True`` when the condition has been registered via
+    :func:`register_condition` (typically by the :func:`torch._check`
+    interception in :class:`~yobx.torch.new_tracing.tracer.GraphTracer`).
     """
 
     def __init__(self, value: Union[bool, str]):
@@ -27,9 +73,12 @@ class TracingBool:
     def __bool__(self) -> bool:
         if isinstance(self.value, bool):
             return self.value
+        if self.value in _known_true_conditions:
+            return True
         raise ValueError(
             f"TracingBool({self.value!r}) cannot be converted to a Python bool; "
-            "the result depends on a symbolic/dynamic dimension"
+            "the result depends on a symbolic/dynamic dimension. "
+            "Use torch._check(condition) to assert the condition holds."
         )
 
     def __eq__(self, other: Any) -> bool:  # noqa: PYI032
@@ -197,6 +246,56 @@ class TracingInt:
         if isinstance(self.value, int):
             return TracingInt(-self.value)
         return TracingInt(simplify_expression(f"-({self._sym()})"))
+
+    # ------------------------------------------------------------------
+    # Comparison operators — return a plain bool for concrete values and
+    # a TracingBool for symbolic ones.  These are required so that model
+    # code such as ``if tensor.shape[0] > 0:`` or assertions via
+    # ``torch._check(tensor.shape[0] >= 1)`` work correctly during
+    # GraphTracer-based tracing.
+    # ------------------------------------------------------------------
+
+    def _cmp(self, op: str, other: Union[int, "TracingInt"]) -> Union[bool, "TracingBool"]:
+        """Applies comparison *op* to *self* and *other*.
+
+        Returns a concrete :class:`bool` when both operands are concrete, and
+        a :class:`TracingBool` with a symbolic expression string otherwise.
+
+        :param op: Comparison operator string: ``">"``, ``">="``, ``"<"``, ``"<="``, or ``"!="``.
+        :param other: The right-hand-side operand.
+        :return: :class:`bool` or :class:`TracingBool`.
+        """
+        if isinstance(other, TracingInt):
+            if isinstance(self.value, int) and isinstance(other.value, int):
+                return bool(_COMPARISON_OPS[op](self.value, other.value))
+            return TracingBool(f"({self._sym()}{op}{other._sym()})")
+        if isinstance(other, int):
+            if isinstance(self.value, int):
+                return bool(_COMPARISON_OPS[op](self.value, other))
+            return TracingBool(f"({self._sym()}{op}{other})")
+        return NotImplemented
+
+    def __gt__(self, other: Union[int, "TracingInt"]) -> Union[bool, "TracingBool"]:
+        """Returns ``True`` / ``False`` or :class:`TracingBool` for ``self > other``."""
+        return self._cmp(">", other)
+
+    def __ge__(self, other: Union[int, "TracingInt"]) -> Union[bool, "TracingBool"]:
+        """Returns ``True`` / ``False`` or :class:`TracingBool` for ``self >= other``."""
+        return self._cmp(">=", other)
+
+    def __lt__(self, other: Union[int, "TracingInt"]) -> Union[bool, "TracingBool"]:
+        """Returns ``True`` / ``False`` or :class:`TracingBool` for ``self < other``."""
+        return self._cmp("<", other)
+
+    def __le__(self, other: Union[int, "TracingInt"]) -> Union[bool, "TracingBool"]:
+        """Returns ``True`` / ``False`` or :class:`TracingBool` for ``self <= other``."""
+        return self._cmp("<=", other)
+
+    def __ne__(self, other: Any) -> Union[bool, "TracingBool"]:  # type: ignore[override]  # noqa: PYI032
+        """Returns ``True`` / ``False`` or :class:`TracingBool` for ``self != other``."""
+        if isinstance(other, (int, TracingInt)):
+            return self._cmp("!=", other)
+        return NotImplemented
 
 
 # Keep TracingDimension as a backward-compatible alias.
