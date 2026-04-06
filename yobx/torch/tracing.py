@@ -1185,6 +1185,28 @@ class CustomTracer(torch.fx.Tracer):
             return torch.float32
         if a is complex:
             return torch.complex64
+        # Handle DynamicCache instances.  torch.fx.Tracer.create_arg does not know
+        # about DynamicCache so we serialize it as a call_function node that calls
+        # make_dynamic_cache with the key/value proxy tensors as arguments.  This
+        # arises both when the DynamicCache is part of the model output (e.g. the
+        # updated past_key_values that LLaMA returns) and when it is passed as a
+        # keyword argument to a traced sub-module.
+        try:
+            import transformers.cache_utils as _cu
+
+            _DynCache = _cu.DynamicCache
+        except (ImportError, AttributeError):
+            _DynCache = None
+        if _DynCache is not None and isinstance(a, _DynCache):
+            from .in_transformers.cache_helper import CacheKeyValue, make_dynamic_cache
+
+            capi = CacheKeyValue(a)
+            if capi.key_cache is not None and capi.value_cache is not None:
+                kv_pairs_arg = self.create_arg(list(zip(capi.key_cache, capi.value_cache)))
+                extra_kwargs = {"cls_layers": capi.cls_layers} if capi.cls_layers else {}
+                return self.create_node(
+                    "call_function", make_dynamic_cache, args=(kv_pairs_arg,), kwargs=extra_kwargs
+                )
         res = super().create_arg(a)
         return res
 
