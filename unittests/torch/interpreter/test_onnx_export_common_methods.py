@@ -318,7 +318,11 @@ _XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
         "sqrt",  # ONNX op only supports float dtypes
         "tan",  # ONNX op only supports float dtypes
         "tanh",  # ONNX op only supports float dtypes
+        "tril",  # NOT_IMPLEMENTED: Trilu(14) not supported for int32 by onnxruntime
+        "triu",  # NOT_IMPLEMENTED: Trilu(14) not supported for int32 by onnxruntime
         "trunc",  # InvalidGraph: int32 not supported by Round
+        "prod",  # type mismatch: int32 input produces int64 output
+        "sum",  # type mismatch: int32 input produces int64 output
     }
 )
 
