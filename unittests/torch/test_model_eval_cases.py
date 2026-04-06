@@ -1,6 +1,6 @@
 import unittest
 from yobx.ext_test_case import ExtTestCase, requires_torch, ignore_warnings
-from yobx.torch.model_eval_cases import discover, evaluation
+from yobx.torch.testing.model_eval_cases import discover, evaluation
 
 
 class TestModelEvalCases(ExtTestCase):

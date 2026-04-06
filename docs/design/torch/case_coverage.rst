@@ -19,7 +19,7 @@ Go to :ref:`l-this-bottom-page-coverage` to see a table summarizing the results.
     import pandas
     from yobx.helpers import string_type
     from yobx.helpers.onnx_helper import pretty_onnx
-    from yobx.torch.model_eval_cases import discover, run_exporter
+    from yobx.torch.testing.model_eval_cases import discover, run_exporter
     from yobx.ext_test_case import unit_test_going
 
     cases = discover()
@@ -42,7 +42,7 @@ Go to :ref:`l-this-bottom-page-coverage` to see a table summarizing the results.
         print(name)
         print("=" * len(name))
         print()
-        print(f"code: :class:`yobx.torch._model_eval_cases.{name}`")
+        print(f"code: :class:`yobx.torch.testing._model_eval_cases.{name}`")
         print()
         print("forward")
         print("+++++++")

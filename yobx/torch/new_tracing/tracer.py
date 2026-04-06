@@ -108,7 +108,8 @@ class GraphTracer:
             module_leaves={MyLeaf: lambda m, module_qualified_name=None: True}
         )
         graph = tracer.trace(Outer(), (torch.randn(2, 4),))
-        print(graph)
+        # print(graph fails)
+        graph.print_tabular()
 
     :param verbose: Verbosity level (0 = silent).
     :param module_leaves: Optional mapping from module *type* to a predicate

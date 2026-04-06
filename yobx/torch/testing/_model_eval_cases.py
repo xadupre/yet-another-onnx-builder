@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-from ..helpers import string_type
+from ...helpers import string_type
 
 DIM = torch.export.Dim
 DYN = torch.export.Dim.DYNAMIC
@@ -20,23 +20,23 @@ def _make_vmap_scan_body(func, n_args):
 
     elif n_args == 2:
 
-        def body(arg0, arg1):
+        def body(arg0, arg1):  # type: ignore
             return [func(arg0, arg1)]
 
     elif n_args == 3:
 
-        def body(arg0, arg1, arg2):
+        def body(arg0, arg1, arg2):  # type: ignore
             return [func(arg0, arg1, arg2)]
 
     elif n_args == 4:
 
-        def body(arg0, arg1, arg2, arg3):
+        def body(arg0, arg1, arg2, arg3):  # type: ignore
             return [func(arg0, arg1, arg2, arg3)]
 
     else:
         # Fallback for larger arities.  May not trace correctly with all
         # exporters, but keeps the function working for eager execution.
-        def body(*args):
+        def body(*args):  # type: ignore
             return [func(*args)]
 
     return body
@@ -115,6 +115,7 @@ def patched_vmap(func, in_dims=0, out_dims=0, use_scan: bool = False):
                 for arg, in_dim in zip(batched_args, in_dims_)
             ]
 
+            assert batch_size is not None, "batch_size cannot be None at this stage."
             results = []
             for i in range(batch_size):
                 input_slice = [v if v is not None else arg[i] for v, arg in batched_tensors]
@@ -354,11 +355,25 @@ class ControlFlowIndirectRanks(torch.nn.Module):
     _dynamic = {"x": {0: DIM("batch")}}
 
 
+class ControlFlowShapeCheck(torch.nn.Module):
+    def forward(self, x, y):
+        x1 = x + 1
+        y1 = y + 2
+        cat = torch.cat([x1, y1], dim=1)
+        torch._check(cat.shape[0] > 0, "batch size must be positive")
+        if cat.shape[0] > 2:
+            return cat / cat.shape[0]
+        return cat / cat.ndim
+
+    _inputs = [(torch.rand(3, 4), torch.rand(3, 4)), (torch.rand(5, 4), torch.rand(5, 2))]
+    _dynamic = {"x": {0: DIM("batch")}, "y": {0: DIM("batch"), 1: DIM("seq")}}
+
+
 class ControlFlowIndirectRanksCat(torch.nn.Module):
     def forward(self, x, y):
         x1 = x + 1
         y1 = y + 2
-        cat = torch.cat([x1, y1], axis=1)
+        cat = torch.cat([x1, y1], dim=1)
         if cat.ndim == 2:
             return cat.clone()
         return cat / cat.ndim
@@ -401,7 +416,8 @@ class ControlFlowRanksType(torch.nn.Module):
             and x.ndim == 2
         ):
             return x.clone()
-        return (x / x.ndim).to(torch.float32)
+        torch._check(x is not None)
+        return (x / x.ndim).to(torch.float32)  # type: ignore
 
     _inputs = [(torch.rand(3, 4),), (torch.rand(5, 4),)]
     _dynamic = {"x": {0: DIM("batch")}}
@@ -616,7 +632,7 @@ class ControlFlowScanCDist(torch.nn.Module):
         def dist(carry: torch.Tensor, x: torch.Tensor):
             sub = carry - x.reshape((1, -1))
             sq = sub * sub
-            rd = sq.sum(axis=1) ** 0.5
+            rd = sq.sum(dim=1) ** 0.5
             # clone --> UnsupportedAliasMutationException:
             # Combine_fn might be aliasing the input!
             return [carry.clone(), rd]
@@ -639,7 +655,7 @@ class ControlFlowScanCDist2(torch.nn.Module):
         def dist(unused: torch.Tensor, x: torch.Tensor, samex: torch.Tensor):
             sub = samex - x.reshape((1, -1))
             sq = sub * sub
-            rd = torch.sqrt(sq.sum(axis=1))
+            rd = torch.sqrt(sq.sum(dim=1))
             # clone --> UnsupportedAliasMutationException:
             # Combine_fn might be aliasing the input!
             return [unused.clone(), rd]
@@ -664,7 +680,7 @@ class ControlFlowScanCDistXY(torch.nn.Module):
         def dist(y: torch.Tensor, scanned_x: torch.Tensor):
             sub = y - scanned_x.reshape((1, -1))
             sq = sub * sub
-            rd = torch.sqrt(sq.sum(axis=1))
+            rd = torch.sqrt(sq.sum(dim=1))
             # clone --> UnsupportedAliasMutationException:
             # Combine_fn might be aliasing the input!
             return [y.clone(), rd]
@@ -751,7 +767,7 @@ class ControlFlowWhileDec(torch.nn.Module):
         return torch._higher_order_ops.while_loop(cond_fn, body_fn, [ci, a, b])
 
     _inputs = [(torch.tensor(1), torch.randn(2, 3), torch.randn(2, 3))]
-    _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}
+    _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}  # type: ignore
 
 
 class ControlFlowWhileInc(torch.nn.Module):
@@ -765,7 +781,7 @@ class ControlFlowWhileInc(torch.nn.Module):
         return torch._higher_order_ops.while_loop(cond_fn, body_fn, [ci, a, b])
 
     _inputs = [(torch.tensor(1), torch.randn(2, 3), torch.randn(2, 3))]
-    _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}
+    _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}  # type: ignore
 
 
 class SignatureInt1(torch.nn.Module):
@@ -848,7 +864,7 @@ class SignatureListVariableLength(torch.nn.Module):
         self.buff = torch.nn.parameter.Buffer(torch.tensor([0.5] * n_targets))
 
     def forward(self, x, lx: list):
-        t = torch.cat(lx, dim=1).sum(axis=1, keepdim=True)
+        t = torch.cat(lx, dim=1).sum(dim=1, keepdim=True)
         return torch.sigmoid(self.linear(x)) - self.buff + t
 
     _inputs = [

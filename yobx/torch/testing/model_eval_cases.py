@@ -6,8 +6,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
 import onnx
 import torch
-from ..helpers import string_type, max_diff
-from ..helpers.onnx_helper import pretty_onnx
+from ...helpers import string_type, max_diff
+from ...helpers.onnx_helper import pretty_onnx
 
 
 def discover():
@@ -18,7 +18,7 @@ def discover():
         :showcode:
 
         import pprint
-        from yobx.torch.model_eval_cases import discover
+        from yobx.torch.testing.model_eval_cases import discover
 
         pprint.pprint(discover())
     """
@@ -53,7 +53,7 @@ def evaluation(
     quiet: bool = True,
 ) -> List[Dict[str, Any]]:
     """
-    Evaluates exporter for a list of cases.
+    Evaluates exporters for a list of cases.
 
     :param exporters: exporters to evaluate
     :param dynamic: evaluate static shape and dynamic shapes
@@ -289,7 +289,7 @@ def _make_exporter_export(
 
         import torch.utils._pytree as pytree
 
-        from .tracing import CustomTracer
+        from ..tracing import CustomTracer
 
         sig = inspect.signature(model.forward)
         params = list(sig.parameters.keys())
@@ -337,7 +337,7 @@ def _make_exporter_onnx(
     quiet: bool = True,
 ) -> Union[Dict, Tuple[onnx.ModelProto, Any]]:
     if exporter.startswith(("custom", "yobx", "tracing")):
-        from . import to_onnx, ExportOptions
+        from .. import to_onnx, ExportOptions
 
         opts = {}
         opts["strict"] = "-strict" in exporter
