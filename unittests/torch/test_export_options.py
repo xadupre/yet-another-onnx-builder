@@ -13,6 +13,7 @@ from yobx.torch.export_options import (
     apply_decompositions,
     insert_contiguous_between_transpose_and_view,
 )
+from yobx.torch.interpreter import to_onnx
 
 
 class _Neuron(torch.nn.Module):
@@ -974,6 +975,126 @@ class TestConvertingLibrary(ExtTestCase):
         cloned = opts.clone()
         self.assertEqual(cloned.tracing, TracingMode.ONNXSCRIPT)
         self.assertEqual(cloned.converting_library, ConvertingLibrary.ONNXSCRIPT)
+
+
+@requires_torch("2.0")
+class TestToOnnxConvertingLibrary(ExtTestCase):
+    """Integration tests verifying that :func:`to_onnx` routes correctly when
+    ``TracingMode.ONNXSCRIPT`` or ``ConvertingLibrary.ONNXSCRIPT`` is used."""
+
+    # A minimal toy model used by every test in this class.
+    class _Add(torch.nn.Module):
+        def forward(self, x):
+            return x + 1.0
+
+    @ignore_warnings(FutureWarning)
+    def test_to_onnx_tracing_onnxscript_calls_dynamo_export(self):
+        """to_onnx with tracing=TracingMode.ONNXSCRIPT calls torch.onnx.export with dynamo=True."""
+        import onnx
+        from unittest.mock import MagicMock, patch
+
+        model = self._Add()
+        x = torch.randn(2, 3)
+
+        fake_out = MagicMock()
+        fake_out.model_proto = onnx.ModelProto()
+
+        with patch("torch.onnx.export", return_value=fake_out) as mock_export:
+            to_onnx(
+                model,
+                (x,),
+                export_options=ExportOptions(tracing=TracingMode.ONNXSCRIPT),
+            )
+
+        mock_export.assert_called_once()
+        call_args = mock_export.call_args
+        # first positional argument must be the nn.Module, not an ExportedProgram
+        self.assertIsInstance(call_args.args[0], torch.nn.Module)
+        # dynamo=True must be present
+        self.assertTrue(call_args.kwargs.get("dynamo", False))
+
+    @ignore_warnings(FutureWarning)
+    def test_to_onnx_tracing_onnxscript_does_not_call_export_options_export(self):
+        """to_onnx with tracing=TracingMode.ONNXSCRIPT does not call ExportOptions.export()."""
+        import onnx
+        from unittest.mock import MagicMock, patch
+
+        model = self._Add()
+        x = torch.randn(2, 3)
+
+        fake_out = MagicMock()
+        fake_out.model_proto = onnx.ModelProto()
+
+        with (
+            patch("torch.onnx.export", return_value=fake_out),
+            patch.object(ExportOptions, "export") as mock_opts_export,
+        ):
+            to_onnx(
+                model,
+                (x,),
+                export_options=ExportOptions(tracing=TracingMode.ONNXSCRIPT),
+            )
+
+        mock_opts_export.assert_not_called()
+
+    @ignore_warnings(FutureWarning)
+    def test_to_onnx_converting_library_onnxscript_uses_exported_program(self):
+        """to_onnx with converting_library=ONNXSCRIPT + default tracing uses
+        ExportOptions.export() to obtain an ExportedProgram, then calls
+        torch.onnx.export on that program (not with dynamo=True)."""
+        import onnx
+        from unittest.mock import MagicMock, patch
+
+        model = self._Add()
+        x = torch.randn(2, 3)
+
+        fake_ep = MagicMock()
+        fake_onnx_out = MagicMock()
+        fake_onnx_out.model_proto = onnx.ModelProto()
+
+        with (
+            patch.object(ExportOptions, "export", return_value=fake_ep) as mock_opts_export,
+            patch("torch.onnx.export", return_value=fake_onnx_out) as mock_torch_export,
+        ):
+            to_onnx(
+                model,
+                (x,),
+                export_options=ExportOptions(converting_library=ConvertingLibrary.ONNXSCRIPT),
+            )
+
+        # ExportOptions.export() must have been called to produce the ExportedProgram.
+        mock_opts_export.assert_called_once()
+        # torch.onnx.export() must have been called with the ExportedProgram.
+        mock_torch_export.assert_called_once()
+        call_args = mock_torch_export.call_args
+        self.assertIs(call_args.args[0], fake_ep)
+        # dynamo=True must NOT appear — the EP path doesn't need it.
+        self.assertNotIn("dynamo", call_args.kwargs)
+
+    @ignore_warnings(FutureWarning)
+    def test_to_onnx_strategy_onnxscript_calls_dynamo_export(self):
+        """to_onnx with strategy='onnxscript' (shorthand for TracingMode.ONNXSCRIPT) calls
+        torch.onnx.export with dynamo=True on the original model."""
+        import onnx
+        from unittest.mock import MagicMock, patch
+
+        model = self._Add()
+        x = torch.randn(2, 3)
+
+        fake_out = MagicMock()
+        fake_out.model_proto = onnx.ModelProto()
+
+        with patch("torch.onnx.export", return_value=fake_out) as mock_export:
+            to_onnx(
+                model,
+                (x,),
+                export_options=ExportOptions(strategy="onnxscript"),
+            )
+
+        mock_export.assert_called_once()
+        call_args = mock_export.call_args
+        self.assertIsInstance(call_args.args[0], torch.nn.Module)
+        self.assertTrue(call_args.kwargs.get("dynamo", False))
 
 
 if __name__ == "__main__":
