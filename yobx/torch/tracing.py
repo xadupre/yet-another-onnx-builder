@@ -51,18 +51,19 @@ def _infer_ndim_from_node(node: "torch.fx.Node", _visited: Optional[set] = None)
 
     # Special case: nn.Embedding increases the input rank by 1.
     if node.op == "call_module" and node.args:
-        try:
-            owning_module = node.graph.owning_module
-            if owning_module is not None:
-                submod = owning_module.get_submodule(node.target)
-                if isinstance(submod, torch.nn.Embedding):
-                    first_arg = node.args[0]
-                    if isinstance(first_arg, torch.fx.Node):
-                        input_ndim = _infer_ndim_from_node(first_arg, _visited)
-                        if input_ndim is not None:
-                            return input_ndim + 1
-        except Exception:
-            pass
+        owning_module = node.graph.owning_module
+        if owning_module is not None:
+            submod: Optional[torch.nn.Module] = owning_module
+            for part in str(node.target).split("."):
+                submod = submod._modules.get(part) if hasattr(submod, "_modules") else None
+                if submod is None:
+                    break
+            if isinstance(submod, torch.nn.Embedding):
+                first_arg = node.args[0]
+                if isinstance(first_arg, torch.fx.Node):
+                    input_ndim = _infer_ndim_from_node(first_arg, _visited)
+                    if input_ndim is not None:
+                        return input_ndim + 1
 
     # For intermediate nodes, propagate from tensor-valued arguments.
     # We need to handle list/tuple args (e.g. torch.cat's first argument is a
