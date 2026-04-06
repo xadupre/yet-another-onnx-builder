@@ -944,7 +944,7 @@ class TestConvertingLibrary(ExtTestCase):
         """Verifies that converting_library appears in repr when non-default."""
         opts = ExportOptions(converting_library=ConvertingLibrary.ONNXSCRIPT)
         r = repr(opts)
-        self.assertIn("onnxscript", r)
+        self.assertIn("ONNXSCRIPT", r)
 
     def test_converting_library_clone(self):
         """Verifies that clone() preserves converting_library."""
