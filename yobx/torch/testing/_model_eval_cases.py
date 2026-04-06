@@ -20,23 +20,23 @@ def _make_vmap_scan_body(func, n_args):
 
     elif n_args == 2:
 
-        def body(arg0, arg1):
+        def body(arg0, arg1):  # type: ignore
             return [func(arg0, arg1)]
 
     elif n_args == 3:
 
-        def body(arg0, arg1, arg2):
+        def body(arg0, arg1, arg2):  # type: ignore
             return [func(arg0, arg1, arg2)]
 
     elif n_args == 4:
 
-        def body(arg0, arg1, arg2, arg3):
+        def body(arg0, arg1, arg2, arg3):  # type: ignore
             return [func(arg0, arg1, arg2, arg3)]
 
     else:
         # Fallback for larger arities.  May not trace correctly with all
         # exporters, but keeps the function working for eager execution.
-        def body(*args):
+        def body(*args):  # type: ignore
             return [func(*args)]
 
     return body
@@ -417,7 +417,7 @@ class ControlFlowRanksType(torch.nn.Module):
         ):
             return x.clone()
         torch._check(x is not None)
-        return (x / x.ndim).to(torch.float32)
+        return (x / x.ndim).to(torch.float32)  # type: ignore
 
     _inputs = [(torch.rand(3, 4),), (torch.rand(5, 4),)]
     _dynamic = {"x": {0: DIM("batch")}}
@@ -767,7 +767,7 @@ class ControlFlowWhileDec(torch.nn.Module):
         return torch._higher_order_ops.while_loop(cond_fn, body_fn, [ci, a, b])
 
     _inputs = [(torch.tensor(1), torch.randn(2, 3), torch.randn(2, 3))]
-    _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}
+    _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}  # type: ignore
 
 
 class ControlFlowWhileInc(torch.nn.Module):
@@ -781,7 +781,7 @@ class ControlFlowWhileInc(torch.nn.Module):
         return torch._higher_order_ops.while_loop(cond_fn, body_fn, [ci, a, b])
 
     _inputs = [(torch.tensor(1), torch.randn(2, 3), torch.randn(2, 3))]
-    _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}
+    _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}  # type: ignore
 
 
 class SignatureInt1(torch.nn.Module):
