@@ -507,17 +507,6 @@ class ExportOptions:
 
             from .new_tracing import trace_model as new_trace_model
 
-            trace_dynamic_shapes = (
-                None
-                if dynamic_shapes is None
-                else (dynamic_shapes.copy() if isinstance(dynamic_shapes, dict) else {})
-            )
-            if args:
-                sig = inspect.signature(mod.forward)
-                for ip, (p, _a) in enumerate(zip(sig.parameters, args)):
-                    if trace_dynamic_shapes is not None and not isinstance(dynamic_shapes, dict):
-                        trace_dynamic_shapes[p] = dynamic_shapes[ip]
-
             if verbose:
                 print(f"[ExportOptions.export] trace_model (new_tracing), verbose={verbose}")
                 print(f"[ExportOptions.export] {self.tracing_module_leaves=}")
@@ -534,7 +523,7 @@ class ExportOptions:
                 mod,
                 args if args else tuple(),
                 kwargs=kwargs,
-                dynamic_shapes=trace_dynamic_shapes,
+                dynamic_shapes=dynamic_shapes,
                 verbose=verbose,
                 module_leaves=self.tracing_module_leaves,
             )
