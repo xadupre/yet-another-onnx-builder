@@ -471,7 +471,9 @@ class TestExportArtifact(ExtTestCase):
         from yobx.reference import ExtendedReferenceEvaluator
 
         dtypes = {"a": np.float32, "b": np.float32}
-        artifact = sql_to_onnx("SELECT a + b AS total FROM t", dtypes)
+        artifact = sql_to_onnx(
+            "SELECT a + b AS total FROM t", dtypes, return_optimize_report=True
+        )
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertIsInstance(artifact.report, ExportReport)
         self.assertIsInstance(artifact.proto, onnx.ModelProto)

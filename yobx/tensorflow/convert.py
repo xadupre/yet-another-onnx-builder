@@ -22,6 +22,7 @@ def to_onnx(
     large_model: bool = False,
     external_threshold: int = 1024,
     filename: Optional[str] = None,
+    return_optimize_report: bool = False,
 ) -> ExportArtifact:
     """
     Converts a :epkg:`TensorFlow`/:epkg:`Keras` model into ONNX.
@@ -58,6 +59,10 @@ def to_onnx(
     :param filename: if set, the exported ONNX model is saved to this path and
         the :class:`~yobx.container.ExportReport` is written as a companion
         Excel file (same base name with ``.xlsx`` extension).
+    :param return_optimize_report: if True, the returned
+        :class:`~yobx.container.ExportArtifact` has its
+        :attr:`~yobx.container.ExportArtifact.report` attribute populated with
+        per-pattern optimization statistics
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
@@ -170,7 +175,7 @@ def to_onnx(
         onx = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,
-            return_optimize_report=True,
+            return_optimize_report=return_optimize_report,
         )
         if verbose and onx.report and onx.report.stats:
             import pandas
