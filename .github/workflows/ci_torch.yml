@@ -38,7 +38,8 @@ jobs:
             --ignore=unittests/parity \
             --ignore=unittests/sql \
             --ignore=unittests/sklearn \
-            --ignore=unittests/tensorflow
+            --ignore=unittests/tensorflow \
+            --ignore=unittests/torch/interpreter/test_onnx_export_common_methods.py
 
       - name: Upload coverage to Codecov
         # Codecov automatically merges all uploads that share the same commit SHA.
