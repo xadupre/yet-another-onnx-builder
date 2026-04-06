@@ -1182,6 +1182,7 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
 
         self.assertIsInstance(artifact.proto, onnx.ModelProto)
 
+    @unittest.skip("onnxscript does not support fx.graph produced by TRACING mode")
     @ignore_warnings((UserWarning, FutureWarning))
     def test_linear_tracing_onnxscript(self):
         """TracingMode.TRACING + ConvertingLibrary.ONNXSCRIPT: produces valid ONNX."""
@@ -1198,6 +1199,7 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
 
         self.assertIsInstance(artifact.proto, onnx.ModelProto)
 
+    @unittest.skip("onnxscript does not support fx.graph produced by NEW_TRACING mode")
     @ignore_warnings((UserWarning, FutureWarning))
     def test_linear_new_tracing_onnxscript(self):
         """TracingMode.NEW_TRACING + ConvertingLibrary.ONNXSCRIPT: produces valid ONNX."""
