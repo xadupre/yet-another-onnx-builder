@@ -37,11 +37,14 @@ _NON_DETERMINISTIC_OPS = frozenset(
 
 
 def _result_is_exportable(result: torch.Tensor) -> bool:
-    """Returns ``True`` when *result* can be safely converted to NumPy.
+    """Checks whether *result* can be safely converted to NumPy.
 
     Tensors with the conjugate bit set require :meth:`torch.Tensor.resolve_conj`
     before calling ``.numpy()``.  Rather than patching up every comparison,
     ops that always produce such tensors are skipped here.
+
+    Returns:
+        ``True`` when *result* is a real, non-conjugate tensor.
     """
     return not result.is_conj() and not result.dtype.is_complex
 
@@ -49,7 +52,7 @@ def _result_is_exportable(result: torch.Tensor) -> bool:
 def _collect_ops() -> List[Any]:
     """Collects ops from op_db that are suitable for ONNX export testing.
 
-    Returns only ops that:
+    Filters to ops that:
 
     - Support ``float32``
     - Have no variant test name
@@ -58,6 +61,9 @@ def _collect_ops() -> List[Any]:
     - Have all positional sample args that are also tensors (or none at all)
     - Have no non-trivial keyword arguments (to avoid unsupported ONNX kwargs)
     - Produce a single, real, non-conjugate tensor result when called eagerly
+
+    Returns:
+        List of :class:`~torch.testing._internal.opinfo.core.OpInfo` objects.
     """
     try:
         from torch.testing._internal import common_methods_invocations
@@ -121,7 +127,11 @@ class _OpWrapper(torch.nn.Module):
         self._kwargs = kwargs
 
     def forward(self, x: torch.Tensor, *args: torch.Tensor) -> torch.Tensor:
-        """Calls the wrapped op with the supplied tensors."""
+        """Calls the wrapped op with the supplied tensors.
+
+        Returns:
+            The result of applying the wrapped op to *x* and *args*.
+        """
         return self._fn(x, *args, **self._kwargs)
 
 
