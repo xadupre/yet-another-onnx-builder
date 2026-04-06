@@ -935,6 +935,9 @@ def _to_onnx_via_onnxscript(
 
     This helper is called by :func:`to_onnx` when
     ``export_options.converting_library == ConvertingLibrary.ONNXSCRIPT``.
+
+    :return: an :class:`~yobx.container.ExportArtifact` wrapping the exported
+        ONNX proto.
     """
     import torch
 

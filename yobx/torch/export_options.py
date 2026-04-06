@@ -34,8 +34,8 @@ class ConvertingLibrary(str, Enum):
     """
     Specifies which library performs the conversion to ONNX.
 
-    :cvar DEFAULT: use yobx's own conversion pipeline (the default)
-    :cvar ONNXSCRIPT: delegate to :func:`torch.onnx.export` with ``dynamo=True``
+    :cvar DEFAULT: uses yobx's own conversion pipeline (the default)
+    :cvar ONNXSCRIPT: delegates to :func:`torch.onnx.export` with ``dynamo=True``
         (the onnxscript-based exporter)
     """
 
