@@ -804,6 +804,12 @@ def _set_shape_type_op_any_gather(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Gather."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
+    elif len(node.input) > 1 and self.has_device(node.input[1]):
+        # Fallback: when the data tensor (input[0]) is a parameter/initializer with no
+        # device metadata, propagate from the index tensor (input[1]).  This occurs for
+        # embedding lookups during FX symbolic tracing where the weight initializer has
+        # no device but the input indices tensor does.
+        self.set_device(node.output[0], self.get_device(node.input[1]))
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
     if self.has_shape(node.input[0]) and self.has_shape(node.input[1]):
