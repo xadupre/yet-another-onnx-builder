@@ -131,7 +131,11 @@ def _retrieve(
         import torch
 
         # This is not a weight but a constant.
-        if isinstance(value, torch.Tensor) and "FakeTensor" not in str(type(value)):
+        if (
+            isinstance(value, torch.Tensor)
+            and "FakeTensor" not in str(type(value))
+            and "TracingTensor" not in str(type(value))
+        ):
             return value
         if len(weights) == 0 and len(buffers) == 0 and len(constants) == 0:
             # It has to be an input.

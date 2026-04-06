@@ -926,7 +926,7 @@ class DynamoInterpreter:
                     return self._make_tensor_input(
                         node.name,
                         elem_type=val.dtype,
-                        shape=val.shape,
+                        shape=tuple(val.shape),
                         users=node.users,
                         fake_tensor=isinstance(
                             val, self.torch._subclasses.fake_tensor.FakeTensor
@@ -938,14 +938,20 @@ class DynamoInterpreter:
                     value = self.retriever(node.target, val, debug={"node": node})
                     if value is None:
                         return self._make_tensor_input(
-                            node.name, elem_type=val.dtype, shape=val.shape, users=node.users
+                            node.name,
+                            elem_type=val.dtype,
+                            shape=tuple(val.shape),
+                            users=node.users,
                         )
                 else:
                     value = self.retriever(node.target, val, debug={"node": node}, exc=False)
                     if value is None:
                         # This is probably one input then.
                         return self._make_tensor_input(
-                            node.target, elem_type=val.dtype, shape=val.shape, users=node.users
+                            node.target,
+                            elem_type=val.dtype,
+                            shape=tuple(val.shape),
+                            users=node.users,
                         )
 
             if value is None or isinstance(value, self.torch._subclasses.fake_tensor.FakeTensor):

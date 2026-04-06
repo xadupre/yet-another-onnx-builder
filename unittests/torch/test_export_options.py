@@ -528,8 +528,9 @@ class TestExportOptions(ExtTestCase):
         self.assertIsInstance(gm, torch.fx.GraphModule)
 
     @ignore_warnings(UserWarning)
-    def test_export_new_tracing_graph_has_no_param_placeholders(self):
-        """Verifies that after NEW_TRACING export no parameter placeholder nodes remain."""
+    def test_export_new_tracing_param_placeholders_have_actual_weights(self):
+        """Verifies that after NEW_TRACING export, parameter placeholder nodes have
+        actual weights in meta['val']."""
         model = _Neuron()
         x = torch.rand(2, 5)
         opts = ExportOptions(tracing=TracingMode.NEW_TRACING)
@@ -541,14 +542,23 @@ class TestExportOptions(ExtTestCase):
             dynamic_shapes=None,
             same_signature=True,
         )
-        # Parameter nodes must be get_attr, not placeholder.
+        # Parameter placeholder nodes must retain their actual weight tensor in meta["val"].
         param_names = {name for name, _ in model.named_parameters()}
         for node in gm.graph.nodes:
-            if node.op == "placeholder":
+            if node.op == "placeholder" and node.meta.get("torch_name") in param_names:
+                val = node.meta.get("val")
+                self.assertIsInstance(
+                    val,
+                    torch.Tensor,
+                    f"Parameter placeholder {node.name!r} should have an actual tensor "
+                    "in meta['val']",
+                )
+                # Must NOT be a TracingTensor subclass.
                 self.assertNotIn(
-                    node.name,
-                    {name.replace(".", "_") for name in param_names},
-                    f"Parameter {node.name!r} should not be a placeholder node",
+                    "TracingTensor",
+                    type(val).__name__,
+                    f"Parameter placeholder {node.name!r} meta['val'] must not be "
+                    "a TracingTensor",
                 )
 
     @ignore_warnings(UserWarning)
