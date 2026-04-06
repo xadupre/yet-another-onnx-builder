@@ -37,13 +37,13 @@ yet-another-onnx-builder documentation
 **yet-another-onnx-builder** (``yobx``) proposes a unique API and a unique function
 :func:`yobx.to_onnx` to convert machine learning models
 to `ONNX <https://onnx.ai>`_ format and manipulating ONNX graphs programmatically.
-It can export from many libraries. Each converters relies on a common GraphBuider API
-(:class:`~yobx.typing.GraphBuiderExtendedProtocol`)
+It can export from many libraries. Each converters relies on a common GraphBuilder API
+(:class:`~yobx.typing.GraphBuilderExtendedProtocol`)
 to build the final ONNX model. One default implementation is provided but
 it can also be replaced by any implementation of your own.
 Any user can implement its own. You can see
 :class:`~yobx.builder.onnxscript.bridge_graph_builder.OnnxScriptGraphBuilder`
-or :class:`~yobx.builder.spox.bridge_graph_spox.SpoxGraphBuilder` for a reference.
+or :class:`~yobx.builder.spox.SpoxGraphBuilder` for a reference.
 These API are close to :epkg:`onnx` API, using `NodeProto` for nodes
 and strings for names. This is on purpose: what this API produces is
 what you see in the final ONNX model. You can add your own metadata,
