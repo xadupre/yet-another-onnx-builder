@@ -5,4 +5,4 @@ yobx.torch.coverage
     :maxdepth: 1
     :caption: modules
 
-    op_coverage
+    patches
