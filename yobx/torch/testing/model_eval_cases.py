@@ -337,7 +337,7 @@ def _make_exporter_onnx(
     verbose: int = 0,
     quiet: bool = True,
 ) -> Union[Dict, Tuple[onnx.ModelProto, Any]]:
-    if exporter.startswith(("custom", "yobx", "tracing")):
+    if exporter.startswith(("custom", "yobx", "tracing", "new-tracing")):
         from .. import to_onnx, ExportOptions
         from ..export_options import TracingMode
 
