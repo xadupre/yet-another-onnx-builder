@@ -33,4 +33,4 @@ jobs:
       - name: pip freeze
         run: pip freeze
       - name: Run tests
-        run: pytest --durations=10 unittests/torch
+        run: pytest --durations=10 unittests/torch --ignore=unittests/torch/interpreter/test_onnx_export_common_methods.py

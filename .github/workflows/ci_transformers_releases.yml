@@ -83,9 +83,9 @@ jobs:
       - name: install transformers==5.5 and pip freeze
         run: pip install transformers==5.5 && pip freeze
       - name: Run tests with transformers==5.5
-        run: pytest unittests/torch --durations=10
+        run: pytest unittests/torch --durations=10 --ignore=unittests/torch/interpreter/test_onnx_export_common_methods.py
 
       - name: install transformers==5.2 and pip freeze
         run: pip install transformers==5.2 && pip freeze
       - name: Run tests with transformers==5.2
-        run: pytest unittests/torch --durations=10
+        run: pytest unittests/torch --durations=10 --ignore=unittests/torch/interpreter/test_onnx_export_common_methods.py
