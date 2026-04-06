@@ -17,3 +17,4 @@ trace_model
 +++++++++++
 
 .. autofunction:: yobx.torch.new_tracing.trace_model
+    :no-index:
