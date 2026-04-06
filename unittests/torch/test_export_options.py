@@ -1169,7 +1169,7 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
 
     # --------------------------------------------------------------- ConvertingLibrary.ONNXSCRIPT
 
-    @ignore_warnings(FutureWarning)
+    @ignore_warnings((UserWarning, FutureWarning))
     def test_linear_default_onnxscript(self):
         """TracingMode.DEFAULT + ConvertingLibrary.ONNXSCRIPT: EP handed to torch.onnx.export."""
         from unittest.mock import MagicMock, patch
@@ -1177,14 +1177,10 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
         model = self._make_model()
         x = self._make_input()
 
-        fake_ep = MagicMock()
         fake_out = MagicMock()
         fake_out.model_proto = onnx.ModelProto()
 
-        with (
-            patch.object(ExportOptions, "export", return_value=fake_ep) as mock_opts_export,
-            patch("torch.onnx.export", return_value=fake_out) as mock_torch_export,
-        ):
+        with patch("torch.onnx.export", return_value=fake_out) as mock_torch_export:
             to_onnx(
                 model,
                 (x,),
@@ -1193,15 +1189,14 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
                 ),
             )
 
-        mock_opts_export.assert_called_once()
         mock_torch_export.assert_called_once()
         call_args = mock_torch_export.call_args
-        # The ExportedProgram must be passed as the first positional arg.
-        self.assertIs(call_args.args[0], fake_ep)
+        # A genuine ExportedProgram must be passed as the first positional arg.
+        self.assertIsInstance(call_args.args[0], torch.export.ExportedProgram)
         # dynamo=True must NOT be set — the EP path does not need it.
         self.assertNotIn("dynamo", call_args.kwargs)
 
-    @ignore_warnings(FutureWarning)
+    @ignore_warnings((UserWarning, FutureWarning))
     def test_linear_tracing_onnxscript(self):
         """TracingMode.TRACING + ConvertingLibrary.ONNXSCRIPT: no dynamo=True."""
         from unittest.mock import MagicMock, patch
@@ -1209,14 +1204,10 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
         model = self._make_model()
         x = self._make_input()
 
-        fake_ep = MagicMock()
         fake_out = MagicMock()
         fake_out.model_proto = onnx.ModelProto()
 
-        with (
-            patch.object(ExportOptions, "export", return_value=fake_ep) as mock_opts_export,
-            patch("torch.onnx.export", return_value=fake_out) as mock_torch_export,
-        ):
+        with patch("torch.onnx.export", return_value=fake_out) as mock_torch_export:
             to_onnx(
                 model,
                 (x,),
@@ -1225,13 +1216,12 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
                 ),
             )
 
-        mock_opts_export.assert_called_once()
         mock_torch_export.assert_called_once()
         call_args = mock_torch_export.call_args
-        self.assertIs(call_args.args[0], fake_ep)
+        self.assertIsInstance(call_args.args[0], torch.export.ExportedProgram)
         self.assertNotIn("dynamo", call_args.kwargs)
 
-    @ignore_warnings(FutureWarning)
+    @ignore_warnings((UserWarning, FutureWarning))
     def test_linear_new_tracing_onnxscript(self):
         """TracingMode.NEW_TRACING + ConvertingLibrary.ONNXSCRIPT: no dynamo=True."""
         from unittest.mock import MagicMock, patch
@@ -1239,14 +1229,10 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
         model = self._make_model()
         x = self._make_input()
 
-        fake_ep = MagicMock()
         fake_out = MagicMock()
         fake_out.model_proto = onnx.ModelProto()
 
-        with (
-            patch.object(ExportOptions, "export", return_value=fake_ep) as mock_opts_export,
-            patch("torch.onnx.export", return_value=fake_out) as mock_torch_export,
-        ):
+        with patch("torch.onnx.export", return_value=fake_out) as mock_torch_export:
             to_onnx(
                 model,
                 (x,),
@@ -1256,10 +1242,9 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
                 ),
             )
 
-        mock_opts_export.assert_called_once()
         mock_torch_export.assert_called_once()
         call_args = mock_torch_export.call_args
-        self.assertIs(call_args.args[0], fake_ep)
+        self.assertIsInstance(call_args.args[0], torch.export.ExportedProgram)
         self.assertNotIn("dynamo", call_args.kwargs)
 
     @ignore_warnings(FutureWarning)
