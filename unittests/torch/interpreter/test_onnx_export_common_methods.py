@@ -20,6 +20,7 @@ from yobx.ext_test_case import ExtTestCase, has_onnxruntime, ignore_warnings, re
 from yobx.helpers import max_diff
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch.interpreter import to_onnx
+from yobx.torch.torch_helper import to_numpy
 
 # Ops that generate random or non-deterministic outputs are excluded from
 # numerical validation since exported results cannot be compared to eager ones.
@@ -574,7 +575,7 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
         )
 
         onx = to_onnx(model, inputs)
-        numpy_inputs = [t.detach().numpy() for t in inputs]
+        numpy_inputs = [to_numpy(t) for t in inputs]
 
         ref = ExtendedReferenceEvaluator(onx.proto)
         ref_feeds = dict(zip(ref.input_names, numpy_inputs))
