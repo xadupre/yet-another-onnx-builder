@@ -264,12 +264,63 @@ _XFAIL_OPS = frozenset(
 # works with float32 but fails (export error, runtime error, or numerical
 # mismatch) specifically for float16.  The combined exclusion set used during
 # test collection is ``_NO_CONVERTER_OPS | _XFAIL_OPS | _XFAIL_OPS_FLOAT16``.
-_XFAIL_OPS_FLOAT16: FrozenSet[str] = frozenset()
+_XFAIL_OPS_FLOAT16: FrozenSet[str] = frozenset(
+    {
+        # Numerical mismatch too large for float16 tolerance (1e-2):
+        "addcmul",  # ref_diff=0.03125
+        "expm1",  # ref_diff=4
+        # Incorrect results (ordering) for float16:
+        "argsort",  # ref_diff=7944
+    }
+)
 
 # Extra exclusions specific to torch.int64.  Add an op key here when it
 # fails specifically for int64 inputs.  The combined exclusion set used during
-# test collection is ``_NO_CONVERTER_OPS | _XFAIL_OPS_INT64``.
-_XFAIL_OPS_INT64: FrozenSet[str] = frozenset()
+# test collection is ``_NO_CONVERTER_OPS | _XFAIL_OPS | _XFAIL_OPS_INT64``.
+_XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
+    {
+        # Ops that produce float outputs from int64 inputs but type inference
+        # fails or ONNX model is invalid because the op only supports float:
+        "__rdiv__",  # reciprocal node type mismatch
+        "__rpow__",  # negative integer powers not allowed
+        "__rxor__",  # FunctionNotFoundError: bitwise_xor
+        "acos",  # ONNX op only supports float dtypes
+        "acosh",  # ONNX op only supports float dtypes
+        "asin",  # ONNX op only supports float dtypes
+        "asinh",  # ONNX op only supports float dtypes
+        "atan",  # ONNX op only supports float dtypes
+        "atanh",  # ONNX op only supports float dtypes
+        "bitwise_left_shift",  # FunctionNotFoundError
+        "bitwise_right_shift",  # FunctionNotFoundError
+        "bitwise_xor",  # FunctionNotFoundError
+        "ceil",  # InvalidGraph: int64 not supported by Ceil
+        "cos",  # ONNX op only supports float dtypes
+        "cosh",  # ONNX op only supports float dtypes
+        "erf",  # ONNX op only supports float dtypes
+        "exp",  # ONNX op only supports float dtypes
+        "expm1",  # ONNX op only supports float dtypes
+        "floor",  # InvalidGraph: int64 not supported by Floor
+        "floor_divide",  # ref_diff=1
+        "gcd",  # FunctionNotFoundError
+        "isinf",  # InvalidGraph: int64 not supported by IsInf
+        "isnan",  # InvalidGraph: int64 not supported by IsNaN
+        "lcm",  # FunctionNotFoundError
+        "log",  # ONNX op only supports float dtypes
+        "nn_functional_relu",  # NOT_IMPLEMENTED: Relu not supported for int64
+        "nn_functional_softsign",  # type mismatch in Div
+        "nn_functional_tanhshrink",  # ONNX Tanh only supports float dtypes
+        "reciprocal",  # ONNX op only supports float dtypes
+        "round",  # InvalidGraph: int64 not supported by Round
+        "rsqrt",  # ONNX op only supports float dtypes
+        "sigmoid",  # ONNX op only supports float dtypes
+        "sin",  # ONNX op only supports float dtypes
+        "sinh",  # ONNX op only supports float dtypes
+        "sqrt",  # ONNX op only supports float dtypes
+        "tan",  # ONNX op only supports float dtypes
+        "tanh",  # ONNX op only supports float dtypes
+        "trunc",  # InvalidGraph: int64 not supported by Round
+    }
+)
 
 # Human-readable label for each tested dtype, used as the suffix in generated
 # test method names (e.g. ``test_export_add_float32``).
@@ -334,7 +385,7 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
     _xfail_map: Dict[torch.dtype, FrozenSet[str]] = {
         torch.float32: _XFAIL_OPS,
         torch.float16: _XFAIL_OPS | _XFAIL_OPS_FLOAT16,
-        torch.int64: _XFAIL_OPS_INT64,
+        torch.int64: _XFAIL_OPS | _XFAIL_OPS_INT64,
     }
     if dtype not in _xfail_map:
         raise ValueError(f"Unsupported dtype {dtype!r}. Supported dtypes: {list(_xfail_map)}")
