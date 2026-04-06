@@ -1,6 +1,6 @@
 from typing import Any
 import torch
-from .export_options import ExportOptions, TracingMode
+from .export_options import ExportOptions, TracingMode, ConvertingLibrary
 from .flatten import register_flattening_functions
 from .input_observer import InputObserver
 from .interpreter import to_onnx, FunctionOptions, Dispatcher, ForceDispatcher
