@@ -345,8 +345,8 @@ def _make_exporter_onnx(
         opts["strict"] = "-strict" in exporter
         if "new-tracing" in exporter:
             opts["tracing"] = TracingMode.NEW_TRACING
-        else:
-            opts["tracing"] = "-tracing" in exporter or exporter == "tracing"
+        elif "-tracing" in exporter or exporter == "tracing":
+            opts["tracing"] = TracingMode.TRACING
         opts["jit"] = "-jit" in exporter
         if "-dec" in exporter:
             opts["decomposition_table"] = "all" if "-decall" in exporter else "default"
