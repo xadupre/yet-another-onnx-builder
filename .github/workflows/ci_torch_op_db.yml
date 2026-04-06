@@ -1,4 +1,4 @@
-name: ci-torch-op-db
+name: ci-10-torch-op-db
 
 on:
   push:
