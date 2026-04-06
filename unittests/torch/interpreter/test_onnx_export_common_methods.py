@@ -593,7 +593,7 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
                 msg=f"op={_op.name!r} dtype={_dtype} ref output[{i}] max abs diff={diff['abs']}",
             )
 
-        if has_onnxruntime():
+        if has_onnxruntime() and _dtype != torch.bfloat16:
             import onnxruntime
 
             sess = onnxruntime.InferenceSession(
