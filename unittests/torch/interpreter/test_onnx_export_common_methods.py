@@ -9,7 +9,7 @@ name are replaced by underscores.
 
 import unittest
 import warnings
-from typing import Any, Callable, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Sequence, Tuple
 
 import torch
 from torch.testing._internal import common_methods_invocations
@@ -41,17 +41,34 @@ _NON_DETERMINISTIC_OPS = frozenset(
 )
 
 
-def _result_is_exportable(result: torch.Tensor) -> bool:
-    """Checks whether *result* can be safely converted to NumPy.
+def _tensor_is_exportable(t: torch.Tensor) -> bool:
+    """Checks whether a single tensor can be safely converted to NumPy.
 
     Tensors with the conjugate bit set require :meth:`torch.Tensor.resolve_conj`
     before calling ``.numpy()``.  Rather than patching up every comparison,
     ops that always produce such tensors are skipped here.
 
     Returns:
-        ``True`` when *result* is a real, non-conjugate tensor.
+        ``True`` when *t* is a real, non-conjugate tensor.
     """
-    return not result.is_conj() and not result.dtype.is_complex
+    return not t.is_conj() and not t.dtype.is_complex
+
+
+def _result_is_exportable(result: Any) -> bool:
+    """Checks whether *result* can be safely exported and compared.
+
+    Accepts a single :class:`torch.Tensor` or a tuple/list of tensors.
+    Returns ``True`` only when every tensor in *result* passes
+    :func:`_tensor_is_exportable`.
+
+    Returns:
+        ``True`` when all tensors in *result* are real and non-conjugate.
+    """
+    if isinstance(result, torch.Tensor):
+        return _tensor_is_exportable(result)
+    if isinstance(result, (tuple, list)) and result:
+        return all(isinstance(r, torch.Tensor) and _tensor_is_exportable(r) for r in result)
+    return False
 
 
 def _collect_ops() -> List[Any]:
@@ -143,8 +160,14 @@ def _make_export_test(op: Any) -> Callable:
         model = _OpWrapper(_op.op, s.args, s.kwargs)
         inputs = (s.input, *s.args)
         expected = _op.op(s.input, *s.args, **s.kwargs)
-        if not isinstance(expected, torch.Tensor) or not _result_is_exportable(expected):
+        if not _result_is_exportable(expected):
             raise unittest.SkipTest(f"op {_op.name!r} produces a non-exportable result")
+
+        # Normalise to a sequence so single-tensor and tuple results are
+        # handled uniformly below.
+        expected_seq: Sequence[torch.Tensor] = (
+            expected if isinstance(expected, (tuple, list)) else (expected,)
+        )
 
         onx = to_onnx(model, inputs)
 
@@ -152,10 +175,13 @@ def _make_export_test(op: Any) -> Callable:
         feeds = dict(zip(ref.input_names, [t.detach().numpy() for t in inputs]))
         got = ref.run(None, feeds)
 
-        diff = max_diff(expected, got[0])
-        # float32 arithmetic may introduce small rounding differences;
-        # 1e-3 is a reasonable tolerance for single-precision ops.
-        self.assertLess(diff["abs"], 1e-3, msg=f"op={_op.name!r} max abs diff={diff['abs']}")
+        for i, (exp_i, got_i) in enumerate(zip(expected_seq, got)):
+            diff = max_diff(exp_i, got_i)
+            # float32 arithmetic may introduce small rounding differences;
+            # 1e-3 is a reasonable tolerance for single-precision ops.
+            self.assertLess(
+                diff["abs"], 1e-3, msg=f"op={_op.name!r} output[{i}] max abs diff={diff['abs']}"
+            )
 
     _test.__doc__ = f"Exports :func:`torch.{op.name}` to ONNX and validates numerical outputs."
     return _test
