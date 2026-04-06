@@ -248,7 +248,8 @@ class GraphTracer:
             self._placeholder_count += 1
             name = f"param_{self._placeholder_count}"
             node = self.graph.placeholder(name)
-            node.meta["val"] = t.detach().to(device="meta")
+            node.meta["val"] = TracingTensor.from_tensor(t)
+            node.meta["torch_value"] = t
             self._external_tensor_to_node[key] = node
         return self._external_tensor_to_node[key]
 
@@ -1116,6 +1117,7 @@ class GraphTracer:
 
         output_val = pytree.tree_map(_to_output_node, out)
         self.graph.output(output_val)
+        self.graph.eliminate_dead_code()
         return self.graph
 
 

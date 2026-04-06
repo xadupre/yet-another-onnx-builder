@@ -13,17 +13,35 @@ from ...xshape.shape_type_compute import (
 from ._aten_functions import (
     torch_dtype_to_onnx_dtype,
     # aten_add__Tensor,
+    aten_abs,
     aten_clamp_max,
     aten_clamp_min,
     aten_cos,
+    aten_exp,
     aten_expand,
     aten_eq,
+    aten_flatten,
+    aten_log,
+    aten_max,
+    aten_max_dim,
+    aten_min,
+    aten_neg,
+    aten_permute,
+    aten_relu,
     aten_repeat,
+    aten_sigmoid,
     aten_sin,
+    aten_sqrt,
     aten_t,
+    aten_tanh,
 )
 
 T = str
+
+
+def aten_meth_abs(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "abs."
+    return aten_abs(g, sts, outputs, x, name=".abs")
 
 
 def aten_meth_bool(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
@@ -126,6 +144,18 @@ def aten_meth_float(
     return aten_meth_to(g, sts, outputs, x, dtype=torch.float32)
 
 
+def aten_meth_flatten(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    start_dim: int = 0,
+    end_dim: int = -1,
+) -> T:
+    "flatten."
+    return aten_flatten(g, sts, outputs, x, start_dim=start_dim, end_dim=end_dim, name=".flatten")
+
+
 def aten_meth_item(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -154,6 +184,11 @@ def aten_meth_item(
     return res
 
 
+def aten_meth_log(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "log."
+    return aten_log(g, sts, outputs, x, name=".log")
+
+
 def aten_meth_expand_as(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -173,6 +208,11 @@ def aten_meth_expand_as(
         if g.has_type(x):
             g.set_type(res, g.get_type(x))
     return res
+
+
+def aten_meth_exp(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "exp."
+    return aten_exp(g, sts, outputs, x, name=".exp")
 
 
 def aten_meth_masked_fill(
@@ -226,15 +266,36 @@ def aten_meth_masked_fill_(
     )
 
 
+def aten_meth_max(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[int] = None,
+    keepdim: bool = False,
+) -> T:
+    "max."
+    if dim is None:
+        return aten_max(g, sts, outputs, x, name=".max")
+    return aten_max_dim(g, sts, outputs, x, dim=dim, keepdim=keepdim, name=".max_dim")
+
+
 def aten_meth_mean(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
     x: T,
-    dim: T,
+    dim: Optional[T] = None,
     keepdim: bool = False,
 ) -> T:
-    "reducemean"
+    "reducemean."
+    if dim is None:
+        res = g.op.ReduceMeanAnyOpset(
+            x, outputs=outputs, keepdims=1 if keepdim else 0, name=".mean"
+        )
+        if not sts:
+            set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim)
+        return res
     if isinstance(dim, int):
         cst = g.make_initializer(
             "", np.array([dim], dtype=np.int64), source="aten_meth_mean.cst.1"
@@ -251,6 +312,33 @@ def aten_meth_mean(
             g, outputs[0], x, keepdim=keepdim, axes=(dim,) if isinstance(dim, int) else dim
         )
     return res
+
+
+def aten_meth_min(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[int] = None,
+    keepdim: bool = False,
+) -> T:
+    "min."
+    if dim is None:
+        return aten_min(g, sts, outputs, x, name=".min")
+    axes = np.array([dim], dtype=np.int64)
+    res = g.op.ReduceMin(
+        x, axes, name=".min_dim", outputs=outputs[:1], keepdims=1 if keepdim else 0
+    )
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim, axes=(dim,))
+    if len(outputs) == 1:
+        return res
+    indices = g.op.ArgMin(
+        x, axis=dim, keepdims=1 if keepdim else 0, name=".min_dim", outputs=outputs[1:]
+    )
+    if not sts:
+        g.set_type(indices, TensorProto.INT64)
+    return res, indices
 
 
 def aten_meth_numel(
@@ -295,6 +383,25 @@ def aten_meth_pow(
     return res
 
 
+def aten_meth_neg(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "neg."
+    return aten_neg(g, sts, outputs, x, name=".neg")
+
+
+def aten_meth_permute(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, *dims: Sequence[int]
+) -> T:
+    "permute."
+    if len(dims) == 1 and isinstance(dims[0], (list, tuple)):
+        dims = dims[0]
+    return aten_permute(g, sts, outputs, x, list(dims))
+
+
+def aten_meth_relu(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "relu."
+    return aten_relu(g, sts, outputs, x, name=".relu")
+
+
 def aten_meth_repeat(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, *repeats: List[int]
 ) -> T:
@@ -333,6 +440,58 @@ def aten_meth_reshape(
 def aten_meth_sin(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "sin"
     return aten_sin(g, sts, outputs, x, name=".sin")
+
+
+def aten_meth_sigmoid(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
+) -> T:
+    "sigmoid."
+    return aten_sigmoid(g, sts, outputs, x)
+
+
+def aten_meth_softmax(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, dim: int = -1
+) -> T:
+    "softmax."
+    res = g.op.Softmax(x, axis=dim, outputs=outputs, name=".softmax")
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_meth_sqrt(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "sqrt."
+    return aten_sqrt(g, sts, outputs, x, name=".sqrt")
+
+
+def aten_meth_squeeze(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[int] = None,
+) -> T:
+    "squeeze."
+    if dim is None:
+        res = g.op.SqueezeAnyOpset(x, name=".squeeze", outputs=outputs)
+    else:
+        res = g.op.SqueezeAnyOpset(
+            x, np.array([dim], dtype=np.int64), name=".squeeze_dim", outputs=outputs
+        )
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            shape = list(g.get_shape(x))
+            if dim is None:
+                new_shape = tuple(d for d in shape if d != 1)
+            else:
+                new_dim = dim if dim >= 0 else len(shape) + dim
+                new_shape = tuple(d for i, d in enumerate(shape) if i != new_dim)
+            g.set_shape(res, new_shape)
+        elif g.has_rank(x):
+            if dim is not None:
+                g.set_rank(res, g.get_rank(x) - 1)
+    return res
 
 
 def aten_meth_shape(
@@ -381,9 +540,11 @@ def aten_meth_sum(
     keepdim: bool = False,
     dim: Optional[int] = None,
 ) -> T:
-    "reducesum"
-    if axis is None:
-        # reduction on all dimension
+    "reducesum."
+    # Normalise: accept both `axis` (positional) and `dim` (keyword) as dimension spec.
+    effective_dim = axis if axis is not None else dim
+    if effective_dim is None:
+        # reduction on all dimensions
         res = g.op.ReduceSumAnyOpset(
             x, outputs=outputs, keepdims=1 if keepdim else 0, name=".sum"
         )
@@ -391,10 +552,10 @@ def aten_meth_sum(
             set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim)
         return res
 
-    if axis is not None and isinstance(axis, int):
-        axes = np.array([axis], dtype=np.int64)
-    elif dim is not None and isinstance(dim, int):
-        axes = np.array([dim], dtype=np.int64)
+    if isinstance(effective_dim, int):
+        axes = np.array([effective_dim], dtype=np.int64)
+    elif isinstance(effective_dim, (list, tuple)):
+        axes = np.array(effective_dim, dtype=np.int64)
     else:
         raise AssertionError(
             f"Unexpected value for dim={dim!r} or axis={axis!r}{g.get_debug_msg()}"
@@ -410,6 +571,11 @@ def aten_meth_sum(
 def aten_meth_t(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "transpose"
     return aten_t(g, sts, outputs, x, name=".t")
+
+
+def aten_meth_tanh(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "tanh."
+    return aten_tanh(g, sts, outputs, x)
 
 
 def aten_meth_to(

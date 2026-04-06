@@ -1,8 +1,10 @@
+import inspect
 import os
 import time
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 import torch
+from torch.fx._lazy_graph_module import _make_graph_module
 from ..helpers import max_diff, string_diff, string_type
 from ..helpers.helper import string_sig, get_sig_kwargs
 from .torch_helper import torch_deepcopy
@@ -19,10 +21,13 @@ class TracingMode(str, Enum):
 
     :cvar DEFAULT: no symbolic tracing, use :func:`torch.export.export`
     :cvar TRACING: use symbolic tracing via :class:`~yobx.torch.tracing.CustomTracer`
+    :cvar NEW_TRACING: use dispatch-based tracing via
+        :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
     """
 
     DEFAULT = "default"
     TRACING = "tracing"
+    NEW_TRACING = "new-tracing"
 
 
 class ExportOptions:
@@ -39,9 +44,10 @@ class ExportOptions:
         it can ``'all'``, ``'default'`` or a decomposition list
     :param dynamo: to use ``torch._dynamo.export`` instead of :func:`torch.export.export`
     :param tracing: use symbolic tracing; accepts a :class:`TracingMode` value,
-        the string ``'tracing'`` or ``'default'``, or a boolean (``True`` is
-        equivalent to ``TracingMode.TRACING``, ``False`` is equivalent to
-        ``TracingMode.DEFAULT``)
+        the string ``'tracing'``, ``'new-tracing'``, or ``'default'``, or a boolean
+        (``True`` is equivalent to ``TracingMode.TRACING``, ``False`` is equivalent
+        to ``TracingMode.DEFAULT``); ``TracingMode.NEW_TRACING`` uses the
+        dispatch-based :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
     :param jit: use jit to get a graph then converts it into a fx graph
     :param strategy: to overwrite all the previous parameters with just a value
     :param remove_inplace: remove inplace nodes
@@ -78,6 +84,7 @@ class ExportOptions:
         "strict-dec": {"strict": True, "decomposition_table": "default"},
         "strict-decall": {"strict": True, "decomposition_table": "all"},
         "tracing": {"tracing": TracingMode.TRACING},
+        "new-tracing": {"tracing": TracingMode.NEW_TRACING},
         "nostrict": {"strict": False},
         "nostrict-dec": {"strict": False, "decomposition_table": "default"},
         "nostrict-decall": {"strict": False, "decomposition_table": "all"},
@@ -160,7 +167,7 @@ class ExportOptions:
 
         assert not self.dynamo or not self.jit, "jit and dynamo cannot be true at the same time"
         assert (
-            self.tracing != TracingMode.TRACING or not self.dynamo
+            self.tracing not in (TracingMode.TRACING, TracingMode.NEW_TRACING) or not self.dynamo
         ), f"Both tracing and dynamo are incompatible options in {self!r}"
 
     def __repr__(self) -> str:
@@ -432,7 +439,6 @@ class ExportOptions:
             return dec
 
         if self.tracing == TracingMode.TRACING:
-            from torch.fx._lazy_graph_module import _make_graph_module
             from .tracing import CustomTracer
 
             concrete_args = kwargs.copy() if kwargs else {}
@@ -442,8 +448,6 @@ class ExportOptions:
                 else (dynamic_shapes.copy() if isinstance(dynamic_shapes, dict) else {})
             )
             if args:
-                import inspect
-
                 sig = inspect.signature(mod.forward)
                 for ip, (p, a) in enumerate(zip(sig.parameters, args)):
                     if a is not None and p not in concrete_args:
@@ -496,6 +500,38 @@ class ExportOptions:
             # from torch.fx.passes.shape_prop import ShapeProp
             # ShapeProp(gp).propagate(**concrete_args)
             # gm = torch.fx.GraphModule(getattr(tracer, "traced_model", None) or mod, graph)
+            return gm
+
+        if self.tracing == TracingMode.NEW_TRACING:
+            from .new_tracing import trace_model
+
+            if verbose:
+                print(f"[ExportOptions.export] trace_model (new_tracing), verbose={verbose}")
+                print(f"[ExportOptions.export] {self.tracing_module_leaves=}")
+                print(f"[ExportOptions.export] dynamic_shapes={dynamic_shapes}")
+                print(
+                    f"[ExportOptions.export] args={string_type(args, with_shape=True, limit=20)}"
+                )
+                print(
+                    f"[ExportOptions.export] kwargs="
+                    f"{string_type(kwargs, with_shape=True, limit=20)}"
+                )
+
+            graph = trace_model(
+                mod,
+                args if args else tuple(),
+                kwargs=kwargs,
+                dynamic_shapes=dynamic_shapes,
+                verbose=verbose,
+                module_leaves=self.tracing_module_leaves,
+            )
+
+            if self.save_ep:
+                save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
+                with open(f"{save_ep}.new_tracing", "w") as f:
+                    f.write(str(graph))
+
+            gm = _make_graph_module(mod, graph, mod.__class__.__name__)
             return gm
 
         if verbose:
