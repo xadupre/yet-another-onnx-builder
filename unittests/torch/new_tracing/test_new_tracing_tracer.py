@@ -742,5 +742,108 @@ class TestNewTracingTracer(ExtTestCase):
         self.assertEqual(len(leaf_nodes), 1)
 
 
+class TestGraphTracerTorchCheck(ExtTestCase):
+    """Tests for torch._check interception in GraphTracer."""
+
+    def test_handle_check_tracing_bool_registers_condition(self):
+        """_handle_check registers a TracingBool condition so it resolves to True."""
+        if not hasattr(torch, "_check"):
+            return
+        from yobx.torch.new_tracing.tracer import GraphTracer
+        from yobx.torch.new_tracing.shape import (
+            TracingInt,
+            TracingBool,
+            clear_conditions,
+            _known_true_conditions,
+        )
+
+        clear_conditions()
+        tracer = GraphTracer()
+        tb = TracingInt("batch") > 0
+        self.assertIsInstance(tb, TracingBool)
+
+        tracer._handle_check(tb)
+        self.assertIn(tb.value, _known_true_conditions)
+        clear_conditions()
+
+    def test_handle_check_concrete_true_noop(self):
+        """_handle_check silently accepts concrete True."""
+        tracer = GraphTracer()
+        # Must not raise.
+        tracer._handle_check(True)
+
+    def test_handle_check_concrete_false_noop(self):
+        """_handle_check silently accepts concrete False (symbolic dim stored as 0)."""
+        tracer = GraphTracer()
+        # Must not raise even for False – symbolic dims are stored as 0, making
+        # conditions like 0>0 evaluate to False at trace time.
+        tracer._handle_check(False)
+
+    def test_trace_with_torch_check_dynamic_shape(self):
+        """Tracing a model that calls torch._check on a dynamic shape succeeds.
+
+        The assertion uses a symbolic dim; the condition should be registered and
+        any subsequent use of the same condition resolves to True.
+        """
+        if not hasattr(torch, "_check"):
+            return
+        from yobx.torch.new_tracing.tracer import GraphTracer
+        from yobx.torch.new_tracing.shape import TracingShape, TracingInt, clear_conditions
+
+        class ModelWithCheck(torch.nn.Module):
+            def forward(self, x):
+                # x.shape[0] is TracingInt("batch") during tracing.
+                torch._check(x.shape[0] > 0)
+                return x + 1
+
+        clear_conditions()
+        model = ModelWithCheck()
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            model,
+            (torch.randn(4, 8),),
+            dynamic_shapes={"x": {0: "batch"}},
+        )
+        graph.lint()
+        clear_conditions()
+
+    def test_trace_with_torch_check_condition_resolves_if(self):
+        """torch._check registers a condition that resolves a later if-guard.
+
+        The model calls torch._check(x.shape[0] > 0) and then uses
+        ``if x.shape[0] > 0:`` as a guard.  During tracing the condition should
+        resolve to True (via the registry) so the true branch is taken.
+        """
+        if not hasattr(torch, "_check"):
+            return
+        from yobx.torch.new_tracing.tracer import GraphTracer
+        from yobx.torch.new_tracing.shape import clear_conditions
+
+        branch_taken = []
+
+        class ModelWithGuard(torch.nn.Module):
+            def forward(self, x):
+                torch._check(x.shape[0] > 0)
+                if x.shape[0] > 0:
+                    branch_taken.append("true")
+                    return x * 2
+                else:
+                    branch_taken.append("false")
+                    return x + 1
+
+        clear_conditions()
+        model = ModelWithGuard()
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            model,
+            (torch.randn(4, 8),),
+            dynamic_shapes={"x": {0: "batch"}},
+        )
+        graph.lint()
+        self.assertIn("true", branch_taken, "The true branch should have been taken")
+        clear_conditions()
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+

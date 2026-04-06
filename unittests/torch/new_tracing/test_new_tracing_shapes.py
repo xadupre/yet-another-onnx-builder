@@ -80,6 +80,119 @@ class TestNewTracingShapes(ExtTestCase):
             bool(tb)
 
     # ------------------------------------------------------------------
+    # TracingInt comparison operators
+    # ------------------------------------------------------------------
+
+    def test_tracing_int_gt_concrete(self):
+        """Concrete TracingInt > int returns plain bool."""
+        self.assertIs(TracingInt(5) > 3, True)
+        self.assertIs(TracingInt(3) > 5, False)
+        self.assertIs(TracingInt(5) > 5, False)
+
+    def test_tracing_int_ge_concrete(self):
+        """Concrete TracingInt >= int returns plain bool."""
+        self.assertIs(TracingInt(5) >= 5, True)
+        self.assertIs(TracingInt(4) >= 5, False)
+
+    def test_tracing_int_lt_concrete(self):
+        """Concrete TracingInt < int returns plain bool."""
+        self.assertIs(TracingInt(3) < 5, True)
+        self.assertIs(TracingInt(5) < 3, False)
+
+    def test_tracing_int_le_concrete(self):
+        """Concrete TracingInt <= int returns plain bool."""
+        self.assertIs(TracingInt(5) <= 5, True)
+        self.assertIs(TracingInt(6) <= 5, False)
+
+    def test_tracing_int_ne_concrete(self):
+        """Concrete TracingInt != int returns plain bool."""
+        self.assertIs(TracingInt(5) != 0, True)
+        self.assertIs(TracingInt(0) != 0, False)
+
+    def test_tracing_int_gt_symbolic(self):
+        """Symbolic TracingInt > int returns TracingBool."""
+        result = TracingInt("batch") > 0
+        self.assertIsInstance(result, TracingBool)
+        self.assertIn("batch", result.value)
+        self.assertIn(">", result.value)
+
+    def test_tracing_int_ge_symbolic(self):
+        """Symbolic TracingInt >= int returns TracingBool."""
+        result = TracingInt("batch") >= 1
+        self.assertIsInstance(result, TracingBool)
+        self.assertIn("batch", result.value)
+
+    def test_tracing_int_lt_symbolic(self):
+        """Symbolic TracingInt < int returns TracingBool."""
+        result = TracingInt("n") < 10
+        self.assertIsInstance(result, TracingBool)
+        self.assertIn("n", result.value)
+
+    def test_tracing_int_le_symbolic(self):
+        """Symbolic TracingInt <= int returns TracingBool."""
+        result = TracingInt("n") <= 10
+        self.assertIsInstance(result, TracingBool)
+        self.assertIn("n", result.value)
+
+    def test_tracing_int_ne_symbolic(self):
+        """Symbolic TracingInt != int returns TracingBool."""
+        result = TracingInt("batch") != 0
+        self.assertIsInstance(result, TracingBool)
+        self.assertIn("batch", result.value)
+
+    # ------------------------------------------------------------------
+    # Conditions registry — register_condition / TracingBool.__bool__
+    # ------------------------------------------------------------------
+
+    def test_register_condition_resolves_tracing_bool(self):
+        """A registered TracingBool condition resolves to True in __bool__."""
+        from yobx.torch.new_tracing.shape import (
+            register_condition,
+            clear_conditions,
+            _known_true_conditions,
+        )
+
+        clear_conditions()
+        tb = TracingInt("batch") > 0
+        self.assertIsInstance(tb, TracingBool)
+
+        # Before registering, __bool__ raises.
+        with self.assertRaises(ValueError):
+            bool(tb)
+
+        register_condition(tb)
+
+        # After registering, __bool__ returns True.
+        self.assertTrue(bool(tb))
+
+        # Cleanup.
+        clear_conditions()
+
+    def test_clear_conditions_removes_all(self):
+        """clear_conditions empties the registry."""
+        from yobx.torch.new_tracing.shape import (
+            register_condition,
+            clear_conditions,
+            _known_true_conditions,
+        )
+
+        clear_conditions()
+        register_condition(TracingInt("x") > 0)
+        self.assertGreater(len(_known_true_conditions), 0)
+        clear_conditions()
+        self.assertEqual(len(_known_true_conditions), 0)
+
+    def test_unregistered_condition_still_raises(self):
+        """A symbolic TracingBool not in the registry still raises ValueError."""
+        from yobx.torch.new_tracing.shape import clear_conditions
+
+        clear_conditions()
+        tb = TracingInt("unknown") >= 1
+        self.assertIsInstance(tb, TracingBool)
+        with self.assertRaises(ValueError):
+            bool(tb)
+
+    # ------------------------------------------------------------------
     # TracingShape
     # ------------------------------------------------------------------
 
