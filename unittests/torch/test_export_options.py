@@ -27,6 +27,17 @@ class _Neuron(torch.nn.Module):
         return torch.relu(self.linear(x))
 
 
+class _LinearModel(torch.nn.Module):
+    """Dummy model with a single Linear layer, used to test TracingMode combinations."""
+
+    def __init__(self, n_dims: int = 4, n_targets: int = 2):
+        super().__init__()
+        self.linear = torch.nn.Linear(n_dims, n_targets)
+
+    def forward(self, x):
+        return self.linear(x)
+
+
 @requires_torch("2.0")
 class TestExportOptions(ExtTestCase):
     def test_default_init(self):
@@ -1083,6 +1094,189 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
         mock_export.assert_called_once()
         call_args = mock_export.call_args
         self.assertIsInstance(call_args.args[0], torch.nn.Module)
+        self.assertTrue(call_args.kwargs.get("dynamo", False))
+
+
+@requires_torch("2.0")
+class TestTracingModeCombinationsLinear(ExtTestCase):
+    """Tests every combination of TracingMode × ConvertingLibrary for a single Linear layer.
+
+    Combinations with ``ConvertingLibrary.DEFAULT`` are exercised end-to-end via
+    :func:`~yobx.torch.interpreter.to_onnx`.  Combinations that route through
+    ``ConvertingLibrary.ONNXSCRIPT`` mock :func:`torch.onnx.export` so the tests
+    run without a live dynamo/onnxscript stack and verify only that the correct
+    code-path is taken.
+    """
+
+    # ------------------------------------------------------------------ helpers
+
+    def _make_model(self) -> "_LinearModel":
+        return _LinearModel()
+
+    def _make_input(self) -> "torch.Tensor":
+        return torch.randn(3, 4)
+
+    # ------------------------------------------------------------------ ConvertingLibrary.DEFAULT
+
+    @ignore_warnings(UserWarning)
+    def test_linear_default_default(self):
+        """TracingMode.DEFAULT + ConvertingLibrary.DEFAULT: torch.export + yobx pipeline."""
+        import onnx
+
+        model = self._make_model()
+        x = self._make_input()
+        artifact = to_onnx(model, (x,), export_options=ExportOptions(tracing=TracingMode.DEFAULT))
+        onx = artifact.proto
+        self.assertIsInstance(onx, onnx.ModelProto)
+        self.assertEqual(len(onx.graph.input), 1)
+        self.assertEqual(len(onx.graph.output), 1)
+
+    @ignore_warnings(UserWarning)
+    def test_linear_tracing_default(self):
+        """TracingMode.TRACING + ConvertingLibrary.DEFAULT: CustomTracer + yobx pipeline."""
+        import onnx
+
+        model = self._make_model()
+        x = self._make_input()
+        artifact = to_onnx(model, (x,), export_options=ExportOptions(tracing=TracingMode.TRACING))
+        onx = artifact.proto
+        self.assertIsInstance(onx, onnx.ModelProto)
+        self.assertEqual(len(onx.graph.input), 1)
+        self.assertEqual(len(onx.graph.output), 1)
+
+    @ignore_warnings(UserWarning)
+    def test_linear_new_tracing_default(self):
+        """TracingMode.NEW_TRACING + ConvertingLibrary.DEFAULT: GraphTracer + yobx pipeline."""
+        import onnx
+
+        model = self._make_model()
+        x = self._make_input()
+        artifact = to_onnx(
+            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
+        onx = artifact.proto
+        self.assertIsInstance(onx, onnx.ModelProto)
+        self.assertEqual(len(onx.graph.input), 1)
+        self.assertEqual(len(onx.graph.output), 1)
+
+    # --------------------------------------------------------------- ConvertingLibrary.ONNXSCRIPT
+
+    @ignore_warnings(FutureWarning)
+    def test_linear_default_onnxscript(self):
+        """TracingMode.DEFAULT + ConvertingLibrary.ONNXSCRIPT: EP handed to torch.onnx.export."""
+        import onnx
+        from unittest.mock import MagicMock, patch
+
+        model = self._make_model()
+        x = self._make_input()
+
+        fake_ep = MagicMock()
+        fake_out = MagicMock()
+        fake_out.model_proto = onnx.ModelProto()
+
+        with (
+            patch.object(ExportOptions, "export", return_value=fake_ep) as mock_opts_export,
+            patch("torch.onnx.export", return_value=fake_out) as mock_torch_export,
+        ):
+            to_onnx(
+                model,
+                (x,),
+                export_options=ExportOptions(
+                    tracing=TracingMode.DEFAULT, converting_library=ConvertingLibrary.ONNXSCRIPT
+                ),
+            )
+
+        mock_opts_export.assert_called_once()
+        mock_torch_export.assert_called_once()
+        call_args = mock_torch_export.call_args
+        # The ExportedProgram must be passed as the first positional arg.
+        self.assertIs(call_args.args[0], fake_ep)
+        # dynamo=True must NOT be set — the EP path does not need it.
+        self.assertNotIn("dynamo", call_args.kwargs)
+
+    @ignore_warnings(FutureWarning)
+    def test_linear_tracing_onnxscript(self):
+        """TracingMode.TRACING + ConvertingLibrary.ONNXSCRIPT: no dynamo=True."""
+        import onnx
+        from unittest.mock import MagicMock, patch
+
+        model = self._make_model()
+        x = self._make_input()
+
+        fake_ep = MagicMock()
+        fake_out = MagicMock()
+        fake_out.model_proto = onnx.ModelProto()
+
+        with (
+            patch.object(ExportOptions, "export", return_value=fake_ep) as mock_opts_export,
+            patch("torch.onnx.export", return_value=fake_out) as mock_torch_export,
+        ):
+            to_onnx(
+                model,
+                (x,),
+                export_options=ExportOptions(
+                    tracing=TracingMode.TRACING, converting_library=ConvertingLibrary.ONNXSCRIPT
+                ),
+            )
+
+        mock_opts_export.assert_called_once()
+        mock_torch_export.assert_called_once()
+        call_args = mock_torch_export.call_args
+        self.assertIs(call_args.args[0], fake_ep)
+        self.assertNotIn("dynamo", call_args.kwargs)
+
+    @ignore_warnings(FutureWarning)
+    def test_linear_new_tracing_onnxscript(self):
+        """TracingMode.NEW_TRACING + ConvertingLibrary.ONNXSCRIPT: no dynamo=True."""
+        import onnx
+        from unittest.mock import MagicMock, patch
+
+        model = self._make_model()
+        x = self._make_input()
+
+        fake_ep = MagicMock()
+        fake_out = MagicMock()
+        fake_out.model_proto = onnx.ModelProto()
+
+        with (
+            patch.object(ExportOptions, "export", return_value=fake_ep) as mock_opts_export,
+            patch("torch.onnx.export", return_value=fake_out) as mock_torch_export,
+        ):
+            to_onnx(
+                model,
+                (x,),
+                export_options=ExportOptions(
+                    tracing=TracingMode.NEW_TRACING,
+                    converting_library=ConvertingLibrary.ONNXSCRIPT,
+                ),
+            )
+
+        mock_opts_export.assert_called_once()
+        mock_torch_export.assert_called_once()
+        call_args = mock_torch_export.call_args
+        self.assertIs(call_args.args[0], fake_ep)
+        self.assertNotIn("dynamo", call_args.kwargs)
+
+    @ignore_warnings(FutureWarning)
+    def test_linear_onnxscript_onnxscript(self):
+        """TracingMode.ONNXSCRIPT: torch.onnx.export called with dynamo=True."""
+        import onnx
+        from unittest.mock import MagicMock, patch
+
+        model = self._make_model()
+        x = self._make_input()
+
+        fake_out = MagicMock()
+        fake_out.model_proto = onnx.ModelProto()
+
+        with patch("torch.onnx.export", return_value=fake_out) as mock_export:
+            to_onnx(model, (x,), export_options=ExportOptions(tracing=TracingMode.ONNXSCRIPT))
+
+        mock_export.assert_called_once()
+        call_args = mock_export.call_args
+        # The original nn.Module must be passed directly (not an ExportedProgram).
+        self.assertIsInstance(call_args.args[0], torch.nn.Module)
+        # dynamo=True is required for this path.
         self.assertTrue(call_args.kwargs.get("dynamo", False))
 
 
