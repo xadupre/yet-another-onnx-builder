@@ -1187,10 +1187,13 @@ class CustomTracer(torch.fx.Tracer):
             return torch.complex64
         # Handle DynamicCache instances.  torch.fx.Tracer.create_arg does not know
         # about DynamicCache so we serialize it as a call_function node that calls
-        # make_dynamic_cache with the key/value proxy tensors as arguments.  This
-        # arises both when the DynamicCache is part of the model output (e.g. the
-        # updated past_key_values that LLaMA returns) and when it is passed as a
-        # keyword argument to a traced sub-module.
+        # make_dynamic_cache with the flattened tensor list as its sole argument.
+        # The flat format is [k0, v0, k1, v1, ...] which make_dynamic_cache
+        # reconstructs via _preprocess_key_value_pairs.  Passing cls_layers as a
+        # kwarg is intentionally avoided: it would embed Python class objects
+        # (e.g. <class 'transformers.cache_utils.DynamicLayer'>) directly into the
+        # generated graph source code, producing a SyntaxError when that code is
+        # later compiled by _make_graph_module.
         try:
             import transformers.cache_utils as _cu
 
@@ -1202,10 +1205,11 @@ class CustomTracer(torch.fx.Tracer):
 
             capi = CacheKeyValue(a)
             if capi.key_cache is not None and capi.value_cache is not None:
-                kv_pairs_arg = self.create_arg(list(zip(capi.key_cache, capi.value_cache)))
-                extra_kwargs = {"cls_layers": capi.cls_layers} if capi.cls_layers else {}
+                # Flatten into [k0, v0, k1, v1, ...] — each element is already a
+                # CustomProxy so create_arg returns its node directly.
+                flat_args = self.create_arg(capi.aslist())
                 return self.create_node(
-                    "call_function", make_dynamic_cache, args=(kv_pairs_arg,), kwargs=extra_kwargs
+                    "call_function", make_dynamic_cache, args=(flat_args,), kwargs={}
                 )
         res = super().create_arg(a)
         return res
