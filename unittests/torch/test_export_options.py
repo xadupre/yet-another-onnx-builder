@@ -901,7 +901,6 @@ class TestRemoveInline(ExtTestCase):
             )
 
 
-
 class TestConvertingLibrary(ExtTestCase):
     def test_converting_library_default_enum_value(self):
         """Verifies that ConvertingLibrary.DEFAULT has the expected string value."""
@@ -989,7 +988,8 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
 
     @ignore_warnings(FutureWarning)
     def test_to_onnx_tracing_onnxscript_calls_dynamo_export(self):
-        """Verifies that to_onnx with tracing=TracingMode.ONNXSCRIPT calls torch.onnx.export with dynamo=True."""
+        """Verifies that to_onnx with tracing=TracingMode.ONNXSCRIPT
+        calls torch.onnx.export with dynamo=True."""
         import onnx
         from unittest.mock import MagicMock, patch
 
@@ -1000,11 +1000,7 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
         fake_out.model_proto = onnx.ModelProto()
 
         with patch("torch.onnx.export", return_value=fake_out) as mock_export:
-            to_onnx(
-                model,
-                (x,),
-                export_options=ExportOptions(tracing=TracingMode.ONNXSCRIPT),
-            )
+            to_onnx(model, (x,), export_options=ExportOptions(tracing=TracingMode.ONNXSCRIPT))
 
         mock_export.assert_called_once()
         call_args = mock_export.call_args
@@ -1015,7 +1011,8 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
 
     @ignore_warnings(FutureWarning)
     def test_to_onnx_tracing_onnxscript_does_not_call_export_options_export(self):
-        """Verifies that to_onnx with tracing=TracingMode.ONNXSCRIPT does not call ExportOptions.export()."""
+        """Verifies that to_onnx with tracing=TracingMode.ONNXSCRIPT
+        does not call ExportOptions.export()."""
         import onnx
         from unittest.mock import MagicMock, patch
 
@@ -1029,11 +1026,7 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
             patch("torch.onnx.export", return_value=fake_out),
             patch.object(ExportOptions, "export") as mock_opts_export,
         ):
-            to_onnx(
-                model,
-                (x,),
-                export_options=ExportOptions(tracing=TracingMode.ONNXSCRIPT),
-            )
+            to_onnx(model, (x,), export_options=ExportOptions(tracing=TracingMode.ONNXSCRIPT))
 
         mock_opts_export.assert_not_called()
 
@@ -1085,11 +1078,7 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
         fake_out.model_proto = onnx.ModelProto()
 
         with patch("torch.onnx.export", return_value=fake_out) as mock_export:
-            to_onnx(
-                model,
-                (x,),
-                export_options=ExportOptions(strategy="onnxscript"),
-            )
+            to_onnx(model, (x,), export_options=ExportOptions(strategy="onnxscript"))
 
         mock_export.assert_called_once()
         call_args = mock_export.call_args

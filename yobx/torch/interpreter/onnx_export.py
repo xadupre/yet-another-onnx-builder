@@ -923,7 +923,7 @@ def _replace_value_info_protos(x: Any, context: Any) -> Tuple[Any, Any]:
 def _to_onnx_via_onnxscript(
     mod: "torch.nn.Module",  # noqa: F821
     args: Optional[Sequence["torch.Tensor"]],  # noqa: F821
-    kwargs: Optional[Dict[str, "torch.Tensor"]],
+    kwargs: Optional[Dict[str, "torch.Tensor"]],  # noqa: F821
     input_names: Optional[Sequence[str]],
     target_opset: Optional[Union[int, Dict[str, int]]],
     dynamic_shapes: Optional[Any],
@@ -1002,12 +1002,7 @@ def _to_onnx_via_onnxscript(
                 f"[to_onnx/onnxscript] calling torch.onnx.export with "
                 f"{list(export_kwargs.keys())}"
             )
-        export_output = torch.onnx.export(
-            mod,
-            args or (),
-            kwargs=kwargs or {},
-            **export_kwargs,
-        )
+        export_output = torch.onnx.export(mod, args or (), kwargs=kwargs or {}, **export_kwargs)
 
     proto = export_output.model_proto
     artifact = ExportArtifact(proto=proto)
