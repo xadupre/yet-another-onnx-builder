@@ -25,6 +25,7 @@ def to_onnx(
     large_model: bool = False,
     external_threshold: int = 1024,
     subgraph_index: Optional[int] = 0,
+    return_optimize_report: bool = False,
 ) -> ExportArtifact:
     """Convert a :epkg:`TFLite`/:epkg:`LiteRT` model to ONNX.
 
@@ -70,6 +71,10 @@ def to_onnx(
         Pass ``None`` to **merge all** subgraphs into a single ONNX model.
         Tensor names are automatically prefixed with ``sg{i}_`` (where *i* is
         the subgraph index) to avoid name collisions across subgraphs.
+    :param return_optimize_report: if True, the returned
+        :class:`~yobx.container.ExportArtifact` has its
+        :attr:`~yobx.container.ExportArtifact.report` attribute populated with
+        per-pattern optimization statistics
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
         ONNX proto together with an :class:`~yobx.container.ExportReport`.
 
@@ -143,7 +148,7 @@ def to_onnx(
                 extra_converters=extra_converters or {},
                 name_prefix=prefix,
             )
-        return _finalize_builder(g, large_model, external_threshold, verbose)
+        return _finalize_builder(g, large_model, external_threshold, verbose, return_optimize_report)
 
     # --- Single-subgraph path (original behaviour) ---
     if subgraph_index >= len(tflite_model.subgraphs):
@@ -177,18 +182,19 @@ def to_onnx(
         extra_converters=extra_converters or {},
     )
 
-    return _finalize_builder(g, large_model, external_threshold, verbose)
+    return _finalize_builder(g, large_model, external_threshold, verbose, return_optimize_report)
 
 
 def _finalize_builder(
-    g: Any, large_model: bool, external_threshold: int, verbose: int
+    g: Any, large_model: bool, external_threshold: int, verbose: int,
+    return_optimize_report: bool = False,
 ) -> ExportArtifact:
     """Call ``g.to_onnx(...)`` and return the resulting :class:`ExportArtifact`."""
     if isinstance(g, GraphBuilder):
         onx = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,
-            return_optimize_report=True,
+            return_optimize_report=return_optimize_report,
         )
         if verbose and onx.report and onx.report.stats:
             import pandas
