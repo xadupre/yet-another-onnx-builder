@@ -1,6 +1,10 @@
 """
 Tests exporting torch ops from :mod:`torch.testing._internal.common_methods_invocations`
 to ONNX using :func:`yobx.torch.interpreter.to_onnx`.
+
+One test method is generated automatically for every op collected from ``op_db``,
+following the naming convention ``test_export_<op_name>`` where dots in the op
+name are replaced by underscores.
 """
 
 import unittest
@@ -119,115 +123,63 @@ class _OpWrapper(torch.nn.Module):
         return self._fn(x, *args, **self._kwargs)
 
 
-class TestOnnxExportCommonMethods(ExtTestCase):
-    """Tests :func:`yobx.torch.interpreter.to_onnx` against ops from op_db."""
+def _make_export_test(op: Any) -> Callable:
+    """Creates a test method that exports *op* to ONNX and validates outputs.
+
+    Returns:
+        A test method bound to *op* suitable for attaching to a
+        :class:`unittest.TestCase` subclass.
+    """
 
     @requires_torch("2.6")
     @ignore_warnings((UserWarning, FutureWarning, DeprecationWarning))
-    def test_export_ops(self) -> None:
-        """Exports op_db ops to ONNX and validates numerical outputs.
-
-        Each op is run as a sub-test so that individual failures are reported
-        without aborting the entire loop.
-        """
-        if not _OPS:
-            raise unittest.SkipTest("no testable ops collected from op_db")
-
+    def _test(self: ExtTestCase, _op: Any = op) -> None:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            for op in _OPS:
-                op_name = op.name
-                with self.subTest(op=op_name):
-                    samples = list(op.sample_inputs("cpu", torch.float32, requires_grad=False))
-                    if not samples:
-                        continue
-                    s = samples[0]
-                    model = _OpWrapper(op.op, s.args, s.kwargs)
-                    inputs = (s.input, *s.args)
-                    expected = op.op(s.input, *s.args, **s.kwargs)
-                    if not isinstance(expected, torch.Tensor) or not _result_is_exportable(
-                        expected
-                    ):
-                        continue
-
-                    onx = to_onnx(model, inputs)
-
-                    # Validate the ONNX output matches the PyTorch output.
-                    ref = ExtendedReferenceEvaluator(onx.proto)
-                    feeds = dict(zip(ref.input_names, [t.detach().numpy() for t in inputs]))
-                    got = ref.run(None, feeds)
-
-                    diff = max_diff(expected, got[0])
-                    # float32 arithmetic may introduce small rounding differences;
-                    # 1e-3 is a reasonable tolerance for single-precision ops.
-                    self.assertLess(
-                        diff["abs"], 1e-3, msg=f"op={op_name!r} max abs diff={diff['abs']}"
-                    )
-
-    @requires_torch("2.6")
-    @ignore_warnings((UserWarning, FutureWarning, DeprecationWarning))
-    def test_export_abs(self) -> None:
-        """Exports :func:`torch.abs` to ONNX as a quick smoke test."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            op = next((o for o in common_methods_invocations.op_db if o.name == "abs"), None)
-        if op is None:
-            raise unittest.SkipTest("abs op not found in op_db")
-
-        samples = list(op.sample_inputs("cpu", torch.float32, requires_grad=False))
+            samples = list(_op.sample_inputs("cpu", torch.float32, requires_grad=False))
+        if not samples:
+            raise unittest.SkipTest(f"no sample inputs for op {_op.name!r}")
         s = samples[0]
-        model = _OpWrapper(op.op, s.args, s.kwargs)
-        inputs = (s.input,)
-        expected = op.op(s.input, *s.args, **s.kwargs)
-
-        onx = to_onnx(model, inputs)
-        self.assertIsNotNone(onx.proto)
-
-        ref = ExtendedReferenceEvaluator(onx.proto)
-        feeds = dict(zip(ref.input_names, [s.input.detach().numpy()]))
-        got = ref.run(None, feeds)
-
-        diff = max_diff(expected, got[0])
-        self.assertLess(diff["abs"], 1e-5)
-
-    @requires_torch("2.6")
-    @ignore_warnings((UserWarning, FutureWarning, DeprecationWarning))
-    def test_export_binary_add(self) -> None:
-        """Exports :func:`torch.add` (binary, two-tensor) to ONNX as a smoke test."""
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            op = next(
-                (
-                    o
-                    for o in common_methods_invocations.op_db
-                    if o.name == "add" and not o.variant_test_name
-                ),
-                None,
-            )
-        if op is None:
-            raise unittest.SkipTest("add op not found in op_db")
-
-        samples = list(op.sample_inputs("cpu", torch.float32, requires_grad=False))
-        s = samples[0]
-        if not isinstance(s.input, torch.Tensor) or not all(
-            isinstance(a, torch.Tensor) for a in s.args
-        ):
-            raise unittest.SkipTest("add sample inputs are not all tensors")
-
-        model = _OpWrapper(op.op, s.args, s.kwargs)
+        model = _OpWrapper(_op.op, s.args, s.kwargs)
         inputs = (s.input, *s.args)
-        expected = op.op(s.input, *s.args, **s.kwargs)
+        expected = _op.op(s.input, *s.args, **s.kwargs)
+        if not isinstance(expected, torch.Tensor) or not _result_is_exportable(expected):
+            raise unittest.SkipTest(f"op {_op.name!r} produces a non-exportable result")
 
         onx = to_onnx(model, inputs)
-        self.assertIsNotNone(onx.proto)
 
         ref = ExtendedReferenceEvaluator(onx.proto)
         feeds = dict(zip(ref.input_names, [t.detach().numpy() for t in inputs]))
         got = ref.run(None, feeds)
 
         diff = max_diff(expected, got[0])
-        self.assertLess(diff["abs"], 1e-5)
+        # float32 arithmetic may introduce small rounding differences;
+        # 1e-3 is a reasonable tolerance for single-precision ops.
+        self.assertLess(diff["abs"], 1e-3, msg=f"op={_op.name!r} max abs diff={diff['abs']}")
 
+    _test.__doc__ = f"Exports :func:`torch.{op.name}` to ONNX and validates numerical outputs."
+    return _test
+
+
+class TestOnnxExportCommonMethods(ExtTestCase):
+    """Tests :func:`yobx.torch.interpreter.to_onnx` against ops from op_db.
+
+    One test method is generated automatically for every op in ``_OPS`` via
+    :func:`_make_export_test`.  Methods follow the naming convention
+    ``test_export_<op_name>`` where dots are replaced by underscores.
+    """
+
+    @classmethod
+    def _add_test_methods(cls) -> None:
+        """Attaches one test method per op in ``_OPS`` to *cls*."""
+        for op in _OPS:
+            # Replace dots (e.g. "special.log_ndtr") with underscores so the
+            # method name is a valid Python identifier.
+            method_name = "test_export_" + op.name.replace(".", "_")
+            setattr(cls, method_name, _make_export_test(op))
+
+
+TestOnnxExportCommonMethods._add_test_methods()
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
