@@ -1073,3 +1073,23 @@ class ExportWithDimension1(torch.nn.Module):
     _inputs = [(torch.zeros((1, 3), dtype=torch.float32),)]
     _dynamic = {"x": {0: DYN, 1: DYN}}
     _valid = [(torch.rand((2, 3), dtype=torch.float32),)]
+
+
+class ExportWithNewConstant(torch.nn.Module):
+    def forward(self, x):
+        new_shape = (x.shape[0], 1)
+        ones = torch.ones(new_shape, dtype=x.dtype, device=x.device)
+        return torch.cat([x, ones], dim=1)
+
+    _inputs = [(torch.rand((4, 4)),), (torch.rand((5, 6)),)]
+    _dynamic = {"x": {0: DIM("batch"), 1: DIM("seq")}}
+
+
+class ExportWithNewConstantTo(torch.nn.Module):
+    def forward(self, x):
+        new_shape = (x.shape[0], 1)
+        ones = torch.ones(new_shape, dtype=x.dtype)
+        return torch.cat([x, ones.to(x.device)], dim=1)
+
+    _inputs = [(torch.rand((4, 4)),), (torch.rand((5, 6)),)]
+    _dynamic = {"x": {0: DIM("batch"), 1: DIM("seq")}}
