@@ -1709,6 +1709,8 @@ class GraphBuilder(
                     d2 = self._torch_sym_int_to_str(d2)
                 elif isinstance(d2, self.torch.export.dynamic_shapes._Dim):  # type: ignore
                     d2 = self._torch_sym_int_to_str(d2)  # type: ignore
+                elif isinstance(d2, self.TracingInt):
+                    d2 = d2.value
 
             if isinstance(d1, (int, str)) and isinstance(d2, (int, str)):
                 if d1 == d2:
@@ -3243,6 +3245,8 @@ class GraphBuilder(
         self._dynamic_examples[name].add(value)
 
     def _torch_sym_int(self, d, add: bool = False) -> Optional[Union[int, str, float]]:
+        if isinstance(d, self.TracingInt):
+            return d.value
         assert isinstance(d, str) or (
             self._has_torch and isinstance(d, (self.torch.SymInt, str, self.torch.SymFloat))  # type: ignore
         ), f"unexpected type for d={d}, type={type(d)}"
