@@ -1466,9 +1466,9 @@ def aten_bilinear(
     bias: Optional[T] = None,
     name: str = "bilinear",
 ) -> T:
-    """bilinear - computes the bilinear form.
+    """Computes the bilinear form.
 
-    Computes output[...,k] = Σ_{i,j} input1[...,i] * weight[k,i,j] * input2[...,j].
+    Computes ``output[..., k] = Σ_{i,j} input1[..., i] * weight[k, i, j] * input2[..., j]``.
 
     Args:
         g: graph builder
@@ -1481,7 +1481,7 @@ def aten_bilinear(
         name: node name prefix
 
     Returns:
-        Output tensor of shape (..., out).
+        Returns the output tensor of shape (..., out).
     """
     # Implements the bilinear transform using matmul and reshape:
     #   weight: (out, H1, H2) -transpose-> (H1, out, H2) -reshape-> (H1, out*H2)
@@ -1530,7 +1530,7 @@ def aten_bilinear(
 
     # Element-wise multiply and reduce: (..., out, H2) * (..., 1, H2) -> sum -> (..., out)
     mul_result = g.op.Mul(x1_w_r, input2_e, name=name)
-    if bias:
+    if bias is not None:
         reduced = g.op.ReduceSum(
             mul_result, np.array([-1], dtype=np.int64), keepdims=0, name=name
         )
