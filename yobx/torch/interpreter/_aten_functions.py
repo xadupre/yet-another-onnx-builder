@@ -6866,6 +6866,76 @@ def aten_isin_Tensor_Tensor(
     )
 
 
+def aten_isclose(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    a: T,
+    b: T,
+    rtol: float = 1e-05,
+    atol: float = 1e-08,
+    equal_nan: bool = False,
+    name: str = "isclose",
+) -> T:
+    """Checks element-wise closeness: ``|a - b| <= atol + rtol * |b|``."""
+    assert g.has_type(a), f"isclose: type of {a!r} must be known{g.get_debug_msg()}"
+    itype = g.get_type(a)
+    _float_types = {
+        TensorProto.FLOAT,
+        TensorProto.DOUBLE,
+        TensorProto.FLOAT16,
+        TensorProto.BFLOAT16,
+    }
+    if itype not in _float_types:
+        fa = g.op.Cast(a, to=TensorProto.DOUBLE, name=name)
+        fb = g.op.Cast(b, to=TensorProto.DOUBLE, name=name)
+        dtype = np.float64
+    else:
+        fa = a
+        fb = b
+        dtype = tensor_dtype_to_np_dtype(itype)
+    diff = g.op.Abs(g.op.Sub(fa, fb, name=name), name=name)
+    abs_b = g.op.Abs(fb, name=name)
+    c_rtol = np.array(rtol, dtype=dtype)
+    c_atol = np.array(atol, dtype=dtype)
+    threshold = g.op.Add(c_atol, g.op.Mul(c_rtol, abs_b, name=name), name=name)
+    if equal_nan:
+        close = g.op.LessOrEqual(diff, threshold, name=name)
+        nan_a = g.op.IsNaN(fa, name=name)
+        nan_b = g.op.IsNaN(fb, name=name)
+        both_nan = g.op.And(nan_a, nan_b, name=name)
+        res = g.op.Or(close, both_nan, outputs=outputs, name=name)
+    else:
+        res = g.op.LessOrEqual(diff, threshold, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_binary_op(g, outputs[0], a, b, cmp_op=True)
+    return res
+
+
+def aten_isfinite(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "isfinite",
+) -> T:
+    """Checks whether each element is finite (not NaN and not infinity)."""
+    if g.get_type(x) in {TensorProto.FLOAT, TensorProto.DOUBLE} or (
+        g.main_opset >= 20 and g.get_type(x) in {TensorProto.FLOAT16, TensorProto.BFLOAT16}
+    ):
+        xi = x
+    else:
+        # opset < 20 only supports float32/float64; integer types are never NaN/inf.
+        xi = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+    is_nan = g.op.IsNaN(xi, name=name)
+    is_inf = g.op.IsInf(xi, name=name)
+    nan_or_inf = g.op.Or(is_nan, is_inf, name=name)
+    res = g.op.Not(nan_or_inf, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x, itype=TensorProto.BOOL)
+    return res
+
+
 def aten_isinf(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "isinf"
 ) -> T:
@@ -6893,6 +6963,48 @@ def aten_isnan(
         res = g.op.IsNaN(
             g.op.Cast(x, to=TensorProto.FLOAT, name=name), outputs=outputs, name=name
         )
+    if not sts:
+        set_type_shape_unary_op(g, res, x, itype=TensorProto.BOOL)
+    return res
+
+
+def aten_isneginf(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "isneginf",
+) -> T:
+    """Checks whether each element is negative infinity."""
+    if g.get_type(x) in {TensorProto.FLOAT, TensorProto.DOUBLE} or (
+        g.main_opset >= 20 and g.get_type(x) in {TensorProto.FLOAT16, TensorProto.BFLOAT16}
+    ):
+        xi = x
+    else:
+        # opset < 20 only supports float32/float64; integer types are never inf.
+        xi = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+    res = g.op.IsInf(xi, detect_negative=1, detect_positive=0, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x, itype=TensorProto.BOOL)
+    return res
+
+
+def aten_isposinf(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "isposinf",
+) -> T:
+    """Checks whether each element is positive infinity."""
+    if g.get_type(x) in {TensorProto.FLOAT, TensorProto.DOUBLE} or (
+        g.main_opset >= 20 and g.get_type(x) in {TensorProto.FLOAT16, TensorProto.BFLOAT16}
+    ):
+        xi = x
+    else:
+        # opset < 20 only supports float32/float64; integer types are never inf.
+        xi = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+    res = g.op.IsInf(xi, detect_negative=0, detect_positive=1, outputs=outputs, name=name)
     if not sts:
         set_type_shape_unary_op(g, res, x, itype=TensorProto.BOOL)
     return res
