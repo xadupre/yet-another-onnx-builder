@@ -71,8 +71,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "bernoulli",
         "block_diag",
         "cartesian_prod",
-        "clamp_max",
-        "clamp_min",
         "conj_physical",
         "copysign",
         "count_nonzero",

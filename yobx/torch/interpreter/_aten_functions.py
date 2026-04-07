@@ -2162,6 +2162,40 @@ def aten_clamp_min(
     return res
 
 
+def aten_clamp_max_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    max_: T,
+    name: str = "clamp_max_Tensor",
+) -> T:
+    """Clamps maximum with a tensor upper bound."""
+    if g.get_type(max_) != g.get_type(x):
+        max_ = g.op.Cast(max_, to=g.get_type(x), name=name)
+    res = g.op.Min(x, max_, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_clamp_min_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    min_: T,
+    name: str = "clamp_min_Tensor",
+) -> T:
+    """Clamps minimum with a tensor lower bound."""
+    if g.get_type(min_) != g.get_type(x):
+        min_ = g.op.Cast(min_, to=g.get_type(x), name=name)
+    res = g.op.Max(x, min_, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
 def aten_clamp_Tensor(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
