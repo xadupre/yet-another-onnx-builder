@@ -226,7 +226,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "var_mean",
         "vdot",
         "view_as",
-        "xlogy",
         "zero_",
     }
 )
