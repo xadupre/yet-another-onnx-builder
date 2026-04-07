@@ -316,6 +316,7 @@ XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
         "isnan",  # InvalidGraph: int32 not supported by IsNaN
         "lcm",  # FunctionNotFoundError
         "log",  # ONNX op only supports float dtypes
+        "logit",  # ONNX Log op only supports float dtypes
         "nn_functional_relu",  # NOT_IMPLEMENTED: Relu not supported for int32
         "nn_functional_softsign",  # type mismatch in Div
         "nn_functional_tanhshrink",  # ONNX Tanh only supports float dtypes
@@ -368,6 +369,7 @@ XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
         "isnan",  # InvalidGraph: int64 not supported by IsNaN
         "lcm",  # FunctionNotFoundError
         "log",  # ONNX op only supports float dtypes
+        "logit",  # ONNX Log op only supports float dtypes
         "nn_functional_relu",  # NOT_IMPLEMENTED: Relu not supported for int64
         "nn_functional_softsign",  # type mismatch in Div
         "nn_functional_tanhshrink",  # ONNX Tanh only supports float dtypes
@@ -403,6 +405,7 @@ ATOL_OPS_FLOAT16: Dict[str, float] = {
 # bfloat16 has only 7 mantissa bits, so statistical ops need an even wider
 # tolerance than the global _ATOL_BFLOAT16 = 2e-2.
 ATOL_OPS_BFLOAT16: Dict[str, float] = {
+    "logit": 5e-2,  # bfloat16 log precision compounds across Sub(Log(x), Log(1-x))
     "std": 2e-1,  # bfloat16 precision loss is larger than float16
     "std_mean": 2e-1,  # same compound error as std
 }
