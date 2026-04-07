@@ -991,7 +991,7 @@ class DynamoInterpreter:
                 allow_empty=True,
             )
 
-        if isinstance(val, (self.torch.SymInt, self.torch.SymFloat)):
+        if isinstance(val, (self.torch.SymInt, self.torch.SymFloat, self.builder.TracingInt)):
             return self.builder.make_dynamic_object(node.name, val, shape_as_input=True)
 
         if isinstance(val, (int, float)):
@@ -1759,7 +1759,8 @@ class DynamoInterpreter:
 
     def _verify_new_shape(self, shape, node):
         for axis, dim in enumerate(shape):
-            if isinstance(dim, self.torch.SymInt):
+            if isinstance(dim, (self.torch.SymInt, self.builder.TracingInt)):
+                assert not isinstance(dim, self.builder.TracingInt), "not yet implemented"
                 sdim = self.builder._torch_sym_int_to_str(dim)
                 tokens = parse_expression_tokens(sdim)
                 if len(tokens) == 1:
@@ -1898,7 +1899,10 @@ class DynamoInterpreter:
                 and len(node.args[0].users) == 1
             )
             # if an int, it cannot be modified inplace
-            or ("val" in node.meta and isinstance(node.meta["val"], (int, self.torch.SymInt)))
+            or (
+                "val" in node.meta
+                and isinstance(node.meta["val"], (int, self.torch.SymInt, self.TracingInt))
+            )
         ), (
             f"This is probably one inplace function node={node!r}, "
             f"aten_name={aten_name!r}, node.meta={node.meta!r}, "
@@ -2285,6 +2289,8 @@ class DynamoInterpreter:
                 )
             if isinstance(val, (int, self.torch.SymInt)):
                 return self.torch.SymInt
+            if isinstance(val, self.builder.TracingInt):
+                return self.TracingInt
             if isinstance(val, self.torch.SymBool):
                 return self.torch.SymBool
             if isinstance(val, (float, self.torch.SymFloat)):
@@ -2751,9 +2757,11 @@ class DynamoInterpreter:
                     )
                     if not builder.has_device(name):
                         builder.set_device(name, val[i].get_device())
-                elif isinstance(val[i], (self.builder.torch.SymInt)):
+                elif isinstance(val[i], (self.builder.torch.SymInt, self.builder.TracingInt)):
                     self.builder.set_shapes_types(
-                        source_node.name, "call_module", (self.builder.torch.SymInt, tuple())
+                        source_node.name,
+                        "call_module",
+                        (self.builder.torch.SymInt, self.builder.TracingInt, tuple()),
                     )
                 elif isinstance(val[i], (self.builder.torch.SymFloat)):
                     self.builder.set_shapes_types(

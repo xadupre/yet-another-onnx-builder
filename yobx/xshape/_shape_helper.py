@@ -3,7 +3,7 @@ from typing import Any, Sequence, Tuple, Union
 import numpy as np
 
 STATIC_SHAPE = Tuple[int, ...]
-DYNAMIC_SHAPE = Tuple[Union[int, "torch.SymInt", "torch.SymFloat", float, str], ...]  # type: ignore[name-defined]  # noqa: F821
+DYNAMIC_SHAPE = Tuple[Union[int, "torch.SymInt", "torch.SymFloat", "TracingInt", float, str], ...]  # type: ignore[name-defined]  # noqa: F821
 
 
 def reshape_implementation_with_zero(data: Any, shape: Sequence[int], allowzero: int = 0) -> Any:
@@ -61,17 +61,18 @@ def is_static_dimension(d: Any) -> bool:
         return False
 
     import torch
+    from ..torch.new_tracing.shape import TracingInt
 
     if isinstance(d, torch.export.dynamic_shapes._Dim):
         return False
     if isinstance(d, int):
         assert not isinstance(
-            d, (torch.SymInt, torch.SymFloat)
+            d, (torch.SymInt, torch.SymFloat, TracingInt)
         ), f"Unexpected type {type(d)} for a dimension {d!r}"
         return True
 
     assert isinstance(
-        d, (torch.SymInt, torch.SymFloat)
+        d, (torch.SymInt, torch.SymFloat, TracingInt)
     ), f"Unexpected type {type(d)} for a dimension {d!r}"
     return False
 

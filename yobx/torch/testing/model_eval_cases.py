@@ -117,12 +117,13 @@ def _flatten_inputs(x: Any) -> List["torch.Tensor"]:  # noqa: F821
     if x is None:
         return x
     import torch
+    from ..new_tracing.shape import TracingInt
 
     if isinstance(x, (list, tuple)):
         res = []
         for i in x:
             if i is None or isinstance(
-                i, (torch.Tensor, torch.SymInt, torch.SymFloat, int, float)
+                i, (torch.Tensor, torch.SymInt, torch.SymFloat, int, float, TracingInt)
             ):
                 res.append(i)
             else:
