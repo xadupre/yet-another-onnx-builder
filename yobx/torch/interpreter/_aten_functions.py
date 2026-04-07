@@ -11851,7 +11851,7 @@ def aten_std_dim(
     outputs: List[str],
     x: T,
     dims: Sequence[int],
-    correction: float,
+    correction: Optional[float],
     keepdim: bool = False,
     name: str = "std_dim",
 ) -> T:
@@ -11866,7 +11866,8 @@ def aten_std_dim(
     sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
     var = g.op.ReduceMeanAnyOpset(sqr_mean, cdims, keepdims=1 if keepdim else 0, name=name)
 
-    if correction > 0:
+    # correction=None means no Bessel correction (same as correction=0)
+    if correction is not None and correction > 0:
         assert g.has_shape(
             x
         ), f"not implemented if shape of x={x!r} is missing{g.get_debug_msg()}"
@@ -11886,6 +11887,109 @@ def aten_std_dim(
     if not sts:
         g.set_type(res, g.get_type(x))
     return res
+
+
+def _std_var_correction(
+    g: GraphBuilder,
+    x: T,
+    dim: Optional[Union[int, List[int]]],
+    correction: Optional[float],
+    keepdim: bool,
+    name: str,
+) -> T:
+    """Computes biased or unbiased variance (before sqrt for std).
+
+    Returns:
+        The variance tensor (same dtype as *x*).
+    """
+    itype = g.get_type(x)
+    dtype = tensor_dtype_to_np_dtype(itype)
+    # correction=None means no Bessel correction (same as correction=0)
+    apply_correction = correction is not None and correction > 0
+
+    if dim is None:
+        mean = g.op.ReduceMeanAnyOpset(x, name=name, keepdims=1)
+        sub_mean = g.op.Sub(x, mean, name=name)
+        sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
+        var = g.op.ReduceMeanAnyOpset(sqr_mean, name=name, keepdims=1 if keepdim else 0)
+        if apply_correction:
+            assert g.has_shape(
+                x
+            ), f"not implemented if shape of x={x!r} is missing{g.get_debug_msg()}"
+            shape = g.get_shape(x)
+            assert is_static_shape(
+                shape
+            ), f"not implemented for shape={shape!r} for x={x!r}{g.get_debug_msg()}"
+            numel = np.prod(shape).astype(dtype)
+            mul = g.op.Mul(var, numel, name=name)
+            sub = g.op.Sub(numel, np.array([correction], dtype=dtype), name=name)
+            var = g.op.Div(mul, sub, name=name)
+    else:
+        cdims = np.array([dim] if isinstance(dim, int) else list(dim), dtype=np.int64)
+        mean = g.op.ReduceMeanAnyOpset(x, cdims, name=name, keepdims=1)
+        sub_mean = g.op.Sub(x, mean, name=name)
+        sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
+        var = g.op.ReduceMeanAnyOpset(sqr_mean, cdims, name=name, keepdims=1 if keepdim else 0)
+        if apply_correction:
+            assert g.has_shape(
+                x
+            ), f"not implemented if shape of x={x!r} is missing{g.get_debug_msg()}"
+            shape = g.get_shape(x)
+            assert is_static_shape(
+                shape
+            ), f"not implemented for shape={shape!r} for x={x!r}{g.get_debug_msg()}"
+            dim_size = np.array(shape)[cdims]
+            numel = np.prod(dim_size).astype(dtype)
+            mul = g.op.Mul(var, numel, name=name)
+            sub = g.op.Sub(numel, np.array([correction], dtype=dtype), name=name)
+            var = g.op.Div(mul, sub, name=name)
+    return var
+
+
+def aten_std_correction(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    correction: Optional[float] = 1,
+    keepdim: bool = False,
+    name: str = "std_correction",
+) -> T:
+    """Computes the standard deviation with optional Bessel correction."""
+    var = _std_var_correction(g, x, dim, correction, keepdim, name)
+    res = g.op.Sqrt(var, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
+    return res
+
+
+def aten_std_mean_correction(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    correction: Optional[float] = 1,
+    keepdim: bool = False,
+    name: str = "std_mean_correction",
+) -> Tuple[T, T]:
+    """Computes the standard deviation and mean with optional Bessel correction."""
+    var = _std_var_correction(g, x, dim, correction, keepdim, name)
+    std = g.op.Sqrt(var, outputs=outputs[:1], name=name)
+    if dim is None:
+        mean = g.op.ReduceMeanAnyOpset(
+            x, name=name, keepdims=1 if keepdim else 0, outputs=outputs[1:2]
+        )
+    else:
+        cdims = np.array([dim] if isinstance(dim, int) else list(dim), dtype=np.int64)
+        mean = g.op.ReduceMeanAnyOpset(
+            x, cdims, name=name, keepdims=1 if keepdim else 0, outputs=outputs[1:2]
+        )
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
+        set_type_shape_reduce_op(g, outputs[1], x, keepdim=1 if keepdim else 0)
+    return std, mean
 
 
 def aten_sub(
