@@ -573,6 +573,52 @@ def aten_amax(
     return prims_amax(g, sts, outputs, x, dim, keepdim, output_dtype=output_dtype, name=name)
 
 
+def aten_amin(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    keepdim: bool = False,
+    name: str = "amin",
+) -> T:
+    "Reduces the tensor along specified dimensions using the minimum operation."
+    from ._prims_functions import prims_amin
+
+    return prims_amin(g, sts, outputs, x, dim, keepdim, name=name)
+
+
+def aten_aminmax(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[int] = None,
+    keepdim: bool = False,
+    name: str = "aminmax",
+) -> T:
+    "Returns both minimum and maximum reductions along the specified dimension."
+    if dim is None:
+        res_min = g.op.ReduceMinAnyOpset(
+            x, keepdims=1 if keepdim else 0, outputs=outputs[:1], name=name
+        )
+        res_max = g.op.ReduceMaxAnyOpset(
+            x, keepdims=1 if keepdim else 0, outputs=outputs[1:], name=name
+        )
+    else:
+        axes = np.array([dim], dtype=np.int64)
+        res_min = g.op.ReduceMinAnyOpset(
+            x, axes, keepdims=1 if keepdim else 0, outputs=outputs[:1], name=name
+        )
+        res_max = g.op.ReduceMaxAnyOpset(
+            x, axes, keepdims=1 if keepdim else 0, outputs=outputs[1:], name=name
+        )
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim)
+        set_type_shape_reduce_op(g, outputs[1], x, keepdim=keepdim)
+    return res_min, res_max
+
+
 def aten_and(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -687,6 +733,21 @@ def aten_and_(
 ) -> T:
     "inplace `and`, we assume inplace modifications were removed"
     return aten_and(g, sts, outputs, x, y, name=name)
+
+
+def aten_angle(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "angle"
+) -> T:
+    """Computes the angle of a real tensor: 0 if x >= 0, pi if x < 0."""
+    assert g.has_type(x), f"Type missing for {x!r}{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    np_dtype = tensor_dtype_to_np_dtype(itype)
+    zero = np.array(0, dtype=np_dtype)
+    pi = np.array(np.pi, dtype=np_dtype)
+    res = g.op.Where(g.op.Less(x, zero, name=name), pi, zero, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
 
 
 def aten_logical_and(
@@ -1090,6 +1151,55 @@ def aten_atan(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str]
     res = g.make_node("Atan", [x], outputs, name="atan")
     if not sts:
         set_type_shape_unary_op(g, outputs[0], x)
+    return res
+
+
+def aten_atan2(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    y: T,
+    x: T,
+    name: str = "atan2",
+) -> T:
+    """Computes element-wise two-argument arctangent atan2(y, x)."""
+    assert g.has_type(y), f"Type missing for {y!r}{g.get_debug_msg()}"
+    itype = g.get_type(y)
+    np_dtype = tensor_dtype_to_np_dtype(itype)
+    zero = np.array(0, dtype=np_dtype)
+    one = np.array(1, dtype=np_dtype)
+    pi = np.array(np.pi, dtype=np_dtype)
+    pi_2 = np.array(np.pi / 2, dtype=np_dtype)
+
+    # When x == 0, division by x is undefined; replace with 1 to avoid NaN in atan.
+    x_is_zero = g.op.Equal(x, zero, name=name)
+    safe_x = g.op.Where(x_is_zero, one, x, name=name)
+    atan_base = g.op.Atan(g.op.Div(y, safe_x, name=name), name=name)
+
+    # Quadrant correction for x < 0.
+    x_lt_zero = g.op.Less(x, zero, name=name)
+    y_lt_zero = g.op.Less(y, zero, name=name)
+    correction = g.op.Where(y_lt_zero, g.op.Neg(pi, name=name), pi, name=name)
+    result_x_neg = g.op.Add(atan_base, correction, name=name)
+
+    # Special values when x == 0.
+    y_gt_zero = g.op.Greater(y, zero, name=name)
+    result_x_zero = g.op.Where(
+        y_gt_zero,
+        pi_2,
+        g.op.Where(y_lt_zero, g.op.Neg(pi_2, name=name), zero, name=name),
+        name=name,
+    )
+
+    res = g.op.Where(
+        x_is_zero,
+        result_x_zero,
+        g.op.Where(x_lt_zero, result_x_neg, atan_base, name=name),
+        name=name,
+        outputs=outputs,
+    )
+    if not sts:
+        set_type_shape_binary_op(g, res, y, x)
     return res
 
 
