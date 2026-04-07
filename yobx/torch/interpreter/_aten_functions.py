@@ -7023,7 +7023,7 @@ def aten_log(
 def aten_log10(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "log10"
 ) -> T:
-    """log10 — computes log base 10 as ``log(x) * log10(e)``."""
+    """log10 — Computes log base 10 as ``log(x) * log10(e)``."""
     assert g.has_type(x), f"log10: type of {x!r} must be known{g.get_debug_msg()}"
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     log10_e = np.array(math.log10(math.e), dtype=dtype)
@@ -7038,7 +7038,7 @@ def aten_log10(
 def aten_log1p(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "log1p"
 ) -> T:
-    """log1p — computes ``log(1 + x)``."""
+    """log1p — Computes ``log(1 + x)``."""
     assert g.has_type(x), f"log1p: type of {x!r} must be known{g.get_debug_msg()}"
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     one = np.array(1, dtype=dtype)
@@ -7053,7 +7053,7 @@ def aten_log1p(
 def aten_log2(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "log2"
 ) -> T:
-    """log2 — computes log base 2 as ``log(x) * log2(e)``."""
+    """log2 — Computes log base 2 as ``log(x) * log2(e)``."""
     assert g.has_type(x), f"log2: type of {x!r} must be known{g.get_debug_msg()}"
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     log2_e = np.array(math.log2(math.e), dtype=dtype)
@@ -7073,7 +7073,7 @@ def aten_logaddexp(
     y: T,
     name: str = "logaddexp",
 ) -> T:
-    """logaddexp — computes ``log(exp(x) + exp(y))`` in a numerically stable way."""
+    """logaddexp — Computes ``log(exp(x) + exp(y))`` in a numerically stable way."""
     m = g.op.Max(x, y, name=name)
     set_type_shape_binary_op(g, m, x, y)
     diff_x = g.op.Sub(x, m, name=name)
@@ -7102,7 +7102,7 @@ def aten_logaddexp2(
     y: T,
     name: str = "logaddexp2",
 ) -> T:
-    """logaddexp2 — computes ``log2(2**x + 2**y)`` in a numerically stable way."""
+    """logaddexp2 — Computes ``log2(2**x + 2**y)`` in a numerically stable way."""
     assert g.has_type(x), f"logaddexp2: type of {x!r} must be known{g.get_debug_msg()}"
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     log2_e = np.array(math.log2(math.e), dtype=dtype)
