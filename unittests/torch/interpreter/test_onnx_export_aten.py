@@ -211,6 +211,39 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    def test_aten_nn_functional_bilinear(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.randn(5, 3, 4))
+                self.bias = torch.nn.Parameter(torch.randn(5))
+
+            def forward(self, x1, x2):
+                return torch.nn.functional.bilinear(x1, x2, self.weight, self.bias)
+
+        model = Model()
+        x1 = torch.randn(2, 3)
+        x2 = torch.randn(2, 4)
+        expected = model(x1, x2)
+        model_path = self._call_exporter(
+            "test_aten_nn_functional_bilinear", "custom", model, (x1, x2)
+        )
+        check_model(model_path)
+
+        import onnxruntime
+
+        sess_options = onnxruntime.SessionOptions()
+        sess = onnxruntime.InferenceSession(
+            model_path, sess_options=sess_options, providers=["CPUExecutionProvider"]
+        )
+        feeds = dict(
+            zip([i.name for i in sess.get_inputs()], [x1.detach().numpy(), x2.detach().numpy()])
+        )
+        got = sess.run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=1e-5)
+
     def test_aten_nonzero_1(self):
         import torch
 

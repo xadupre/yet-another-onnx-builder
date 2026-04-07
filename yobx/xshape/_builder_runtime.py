@@ -679,12 +679,6 @@ class _BuilderRuntime:
                 for s, e, a, d in zip(starts, ends, axes, steps):
                     slices[a] = slice(s, e, d)
         res = data[tuple(slices)]
-        assert len(res.shape) == 0 or min(res.shape) > 0, (
-            f"Empty shape found {res.shape} after Slice when x.shape={data.shape}, "
-            f"starts={starts}, ends={ends}, axes={axes}, steps={steps}, "
-            f"node.name={node.name!r}, input names={node.input}, "
-            f"slices={slices}"
-        )
         assert len(res.shape) == len(data.shape), (
             f"Shape mismatch input shape is {data.shape}, output shape is {res.shape}, "
             f"axes={axes}, starts={starts}, ends={ends}, steps={steps}, "
