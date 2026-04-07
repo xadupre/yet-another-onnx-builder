@@ -161,6 +161,17 @@ class LLMWrapper(torch.nn.Module):
         past_key_0: torch.Tensor,
         past_value_0: torch.Tensor,
     ):
+        """Reconstructs ``DynamicCache`` from flat tensors and runs the inner model.
+
+        Args:
+            input_ids: Token id tensor of shape ``(batch, seq_length)``.
+            attention_mask: Attention mask of shape ``(batch, past_length + seq_length)``.
+            past_key_0: Past key tensor for layer 0, shape ``(batch, heads, past_length, dim)``.
+            past_value_0: Past value tensor for layer 0, same shape as ``past_key_0``.
+
+        Returns:
+            The output of the inner model.
+        """
         past_key_values = make_dynamic_cache([(past_key_0, past_value_0)])
         return self.inner_model(
             input_ids=input_ids, attention_mask=attention_mask, past_key_values=past_key_values
@@ -173,13 +184,13 @@ wrapped_model = LLMWrapper(model)
 # Run the exporters
 # -----------------
 
-_past_key = torch.rand((2, 1, 30, 96)).to(device)
-_past_value = torch.rand((2, 1, 30, 96)).to(device)
+past_key = torch.rand((2, 1, 30, 96)).to(device)
+past_value = torch.rand((2, 1, 30, 96)).to(device)
 inputs = dict(
     input_ids=torch.randint(0, 1000, (2, 3), dtype=torch.int64).to(device),
     attention_mask=torch.randint(0, 1, (2, 33), dtype=torch.int64).to(device),
-    past_key_0=_past_key,
-    past_value_0=_past_value,
+    past_key_0=past_key,
+    past_value_0=past_value,
 )
 dynamic_shapes = {
     "input_ids": {0: "batch", 1: "seq_length"},
