@@ -296,7 +296,9 @@ XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
         "acosh",  # ONNX op only supports float dtypes
         "asin",  # ONNX op only supports float dtypes
         "asinh",  # ONNX op only supports float dtypes
+        "angle",  # ONNX Atan not supported for integer dtypes
         "atan",  # ONNX op only supports float dtypes
+        "atan2",  # ONNX Atan not supported for integer dtypes
         "atanh",  # ONNX op only supports float dtypes
         "bitwise_left_shift",  # FunctionNotFoundError
         "bitwise_right_shift",  # FunctionNotFoundError
@@ -346,7 +348,9 @@ XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
         "acosh",  # ONNX op only supports float dtypes
         "asin",  # ONNX op only supports float dtypes
         "asinh",  # ONNX op only supports float dtypes
+        "angle",  # ONNX Atan not supported for integer dtypes
         "atan",  # ONNX op only supports float dtypes
+        "atan2",  # ONNX Atan not supported for integer dtypes
         "atanh",  # ONNX op only supports float dtypes
         "bitwise_left_shift",  # FunctionNotFoundError
         "bitwise_right_shift",  # FunctionNotFoundError
