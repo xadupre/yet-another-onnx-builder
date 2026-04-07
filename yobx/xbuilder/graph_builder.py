@@ -1792,7 +1792,6 @@ class GraphBuilder(
         for sdim in shape:
             if not isinstance(sdim, str):
                 continue
-            assert not isinstance(sdim, self.TracingInt)
             self.register_dynamic_objects_from_dim(sdim)
         shape0 = shape
         verified = self.verify_shape(shape, 0, name=name)
