@@ -111,6 +111,54 @@ class TestNewTracingTracer(ExtTestCase):
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
         self.assertEqual(len(ph_nodes), 2)
 
+    def test_trace_dynamic_shapes_torch_export_dim(self):
+        """GraphTracer accepts torch.export.Dim objects in dynamic_shapes."""
+
+        def add(x, y):
+            return x + y
+
+        batch = torch.export.Dim("batch")
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            add,
+            (torch.randn(4, 8), torch.randn(4, 8)),
+            dynamic_shapes={"x": {0: batch}, "y": {0: batch}},
+        )
+        graph.lint()
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(ph_nodes), 2)
+        # The placeholder meta shapes should be symbolic (TracingInt).
+        from yobx.torch.new_tracing.shape import TracingInt
+
+        for node in ph_nodes:
+            shape = node.meta["val"].shape
+            self.assertIsInstance(shape.dims[0], TracingInt)
+            self.assertEqual(str(shape.dims[0]), "batch")
+
+    def test_trace_dynamic_shapes_dim_dynamic(self):
+        """GraphTracer accepts unnamed Dim hints (Dim.DYNAMIC) in dynamic_shapes."""
+
+        def add(x, y):
+            return x + y
+
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            add,
+            (torch.randn(4, 8), torch.randn(4, 8)),
+            dynamic_shapes={
+                "x": {0: torch.export.Dim.DYNAMIC},
+                "y": {0: torch.export.Dim.DYNAMIC},
+            },
+        )
+        graph.lint()
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(ph_nodes), 2)
+        from yobx.torch.new_tracing.shape import TracingInt
+
+        for node in ph_nodes:
+            shape = node.meta["val"].shape
+            self.assertIsInstance(shape.dims[0], TracingInt)
+
     def test_trace_model_function(self):
         graph = trace_model(lambda x: x * 2, (torch.randn(3, 3),))
         graph.lint()
