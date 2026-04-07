@@ -7020,6 +7020,35 @@ def aten_log(
     return res
 
 
+def aten_logit(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    eps: Optional[float] = None,
+    name: str = "logit",
+) -> T:
+    """Computes the logit of each element: log(x / (1 - x)), with optional eps clamping."""
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    x_in = x
+    if eps is not None:
+        x = g.op.Clip(
+            x, np.array([eps], dtype=dtype), np.array([1.0 - eps], dtype=dtype), name=name
+        )
+        set_type_shape_unary_op(g, x, x_in)
+    one = np.array([1], dtype=dtype)
+    one_minus_x = g.op.Sub(one, x, name=name)
+    set_type_shape_unary_op(g, one_minus_x, x_in)
+    log_x = g.op.Log(x, name=name)
+    set_type_shape_unary_op(g, log_x, x_in)
+    log_one_minus_x = g.op.Log(one_minus_x, name=name)
+    set_type_shape_unary_op(g, log_one_minus_x, x_in)
+    res = g.op.Sub(log_x, log_one_minus_x, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x_in)
+    return res
+
+
 def aten_logsumexp(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
