@@ -214,8 +214,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "special_xlog1py",
         "special_zeta",
         "squeeze_copy",
-        "std",
-        "std_mean",
         "t_copy",
         "tensor_split",
         "to_sparse",
