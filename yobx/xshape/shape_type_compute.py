@@ -2107,8 +2107,8 @@ def _set_shape_type_op_any_identity(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_shape(self: ShapeBuilder, node: NodeProto):
     "Sets the output type and rank for Shape op."
-    if self.has_device(node.input[0]):
-        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if not self.has_device(node.output[0]):
+        self.set_device(node.output[0], -1)
     if not self.has_type(node.output[0]):
         self.set_type(node.output[0], TensorProto.INT64)
     if self.has_rank(node.input[0]):

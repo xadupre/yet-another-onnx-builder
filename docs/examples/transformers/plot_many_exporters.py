@@ -77,7 +77,7 @@ parser.add_argument(
     ),
 )
 parser.add_argument(
-    "--exporter", type=str, default="dynamo,yobx,tracing", help=("Tells which exporter to run.")
+    "--exporter", type=str, default="yobx,dynamo,tracing", help=("Tells which exporter to run.")
 )
 
 # parse_known_args avoids failures when sphinx-gallery passes extra arguments.
@@ -144,12 +144,11 @@ model = model.to(device)
 # ``forward`` signature takes only plain :class:`torch.Tensor` arguments.
 # The wrapper reconstructs the ``DynamicCache`` internally before forwarding
 # to the original model.  This keeps the exported ONNX model's input interface
-# clean (all inputs are tensors) without requiring any pytree registration.
+# clean (all inputs are tensors) without requiring any pytree registration
+# to flatten the caches.
 
 
 class LLMWrapper(torch.nn.Module):
-    """Wraps an LLM to accept flat tensor key/value inputs instead of ``DynamicCache``."""
-
     def __init__(self, inner_model: torch.nn.Module):
         super().__init__()
         self.inner_model = inner_model
@@ -161,20 +160,14 @@ class LLMWrapper(torch.nn.Module):
         past_key_0: torch.Tensor,
         past_value_0: torch.Tensor,
     ):
-        """Reconstructs ``DynamicCache`` from flat tensors and runs the inner model.
-
-        Args:
-            input_ids: Token id tensor of shape ``(batch, seq_length)``.
-            attention_mask: Attention mask of shape ``(batch, past_length + seq_length)``.
-            past_key_0: Past key tensor for layer 0, shape ``(batch, heads, past_length, dim)``.
-            past_value_0: Past value tensor for layer 0, same shape as ``past_key_0``.
-
-        Returns:
-            The output of the inner model.
-        """
         past_key_values = make_dynamic_cache([(past_key_0, past_value_0)])
-        return self.inner_model(
+        outputs = self.inner_model(
             input_ids=input_ids, attention_mask=attention_mask, past_key_values=past_key_values
+        )
+        return (
+            outputs.logits,
+            outputs.past_key_values.layers[0].keys,
+            outputs.past_key_values.layers[0].values,
         )
 
 
@@ -218,7 +211,12 @@ for exporter in exporters:
         if exporter == "dynamo":
             try:
                 torch.onnx.export(
-                    wrapped_model, (), filename, kwargs=inputs, dynamic_shapes=dynamic_shapes
+                    wrapped_model,
+                    (),
+                    filename,
+                    kwargs=inputs,
+                    dynamic_shapes=dynamic_shapes,
+                    opset_version=22,
                 )
                 print("-- export ok")
             except Exception as e:
@@ -227,7 +225,11 @@ for exporter in exporters:
         elif exporter == "yobx":
             try:
                 to_onnx(
-                    wrapped_model, kwargs=inputs, filename=filename, dynamic_shapes=dynamic_shapes
+                    wrapped_model,
+                    kwargs=inputs,
+                    filename=filename,
+                    dynamic_shapes=dynamic_shapes,
+                    target_opset=22,
                 )
                 print("-- export ok")
             except Exception as e:
@@ -241,6 +243,7 @@ for exporter in exporters:
                     filename=filename,
                     dynamic_shapes=dynamic_shapes,
                     export_options=ExportOptions(tracing=True),
+                    target_opset=22,
                 )
                 print("-- export ok")
             except Exception as e:
@@ -254,7 +257,11 @@ for exporter in exporters:
     print("-- running")
     sess = onnxruntime.InferenceSession(filename, providers=providers)
     feeds = make_feeds([i.name for i in sess.get_inputs()], inputs, use_numpy=True)
-    got = sess.run(None, feeds)
+    try:
+        got = sess.run(None, feeds)
+    except Exception as e:
+        print(f"-- not running due to {e}")
+        continue
     diff = max_diff(expected, got)
     if diff["abs"] < 1e-2:
         print(f"-- discrepancies ok - {diff['abs']}")
@@ -315,4 +322,5 @@ if successful_exports:
     ax.set_title("ONNX node frequencies per exporter", fontsize=10)
     ax.legend(fontsize=9)
     fig.tight_layout()
+    fig.savefig("plot_many_exporters.png")
     plt.show()
