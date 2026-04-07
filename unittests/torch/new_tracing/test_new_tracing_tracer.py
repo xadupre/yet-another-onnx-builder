@@ -145,7 +145,10 @@ class TestNewTracingTracer(ExtTestCase):
         graph = tracer.trace(
             add,
             (torch.randn(4, 8), torch.randn(4, 8)),
-            dynamic_shapes={"x": {0: torch.export.Dim.DYNAMIC}, "y": {0: torch.export.Dim.DYNAMIC}},
+            dynamic_shapes={
+                "x": {0: torch.export.Dim.DYNAMIC},
+                "y": {0: torch.export.Dim.DYNAMIC},
+            },
         )
         graph.lint()
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
