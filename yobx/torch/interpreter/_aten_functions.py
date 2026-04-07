@@ -1051,6 +1051,174 @@ def aten_argsort(
     return res
 
 
+def aten_atleast_1d(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "atleast_1d",
+) -> T:
+    """atleast_1d — ensures the result has at least 1 dimension.
+
+    A 0-D (scalar) tensor is unsqueezed to shape ``(1,)``.
+    Tensors with rank >= 1 are returned unchanged.
+    """
+    if g.has_rank(x) and g.get_rank(x) == 0:
+        res = g.op.UnsqueezeAnyOpset(x, np.array([0], dtype=np.int64), outputs=outputs, name=name)
+        if not sts:
+            g.set_type(res, g.get_type(x))
+            g.set_shape(res, (1,))
+        return res
+    res = g.op.Identity(x, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(res, g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x))
+    return res
+
+
+def aten_atleast_2d(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "atleast_2d",
+) -> T:
+    """atleast_2d — ensures the result has at least 2 dimensions.
+
+    * rank 0 → shape ``(1, 1)``
+    * rank 1 → shape ``(1, n)``
+    * rank >= 2 → unchanged
+    """
+    if g.has_rank(x):
+        rank = g.get_rank(x)
+        if rank == 0:
+            cst = g.make_initializer("", np.array([1, 1], dtype=np.int64), source="atleast_2d.0")
+            res = g.make_node("Reshape", [x, cst], outputs, name=name)
+            if not sts:
+                g.set_type(res, g.get_type(x))
+                g.set_shape(res, (1, 1))
+            return res
+        if rank == 1:
+            res = g.op.UnsqueezeAnyOpset(
+                x, np.array([0], dtype=np.int64), outputs=outputs, name=name
+            )
+            if not sts:
+                g.set_type(res, g.get_type(x))
+                if g.has_shape(x):
+                    n = g.get_shape(x)[0]
+                    g.set_shape(res, (1, n))
+                else:
+                    g.set_rank(res, 2)
+            return res
+    res = g.op.Identity(x, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(res, g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x))
+    return res
+
+
+def aten_atleast_3d(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "atleast_3d",
+) -> T:
+    """atleast_3d — ensures the result has at least 3 dimensions.
+
+    * rank 0 → shape ``(1, 1, 1)``
+    * rank 1 → shape ``(1, n, 1)``
+    * rank 2 → shape ``(m, n, 1)``
+    * rank >= 3 → unchanged
+    """
+    if g.has_rank(x):
+        rank = g.get_rank(x)
+        if rank == 0:
+            cst = g.make_initializer(
+                "", np.array([1, 1, 1], dtype=np.int64), source="atleast_3d.0"
+            )
+            res = g.make_node("Reshape", [x, cst], outputs, name=name)
+            if not sts:
+                g.set_type(res, g.get_type(x))
+                g.set_shape(res, (1, 1, 1))
+            return res
+        if rank == 1:
+            if g.has_shape(x):
+                n = g.get_shape(x)[0]
+                if isinstance(n, int):
+                    cst = g.make_initializer(
+                        "", np.array([1, n, 1], dtype=np.int64), source="atleast_3d.1_static"
+                    )
+                    res = g.make_node("Reshape", [x, cst], outputs, name=name)
+                    if not sts:
+                        g.set_type(res, g.get_type(x))
+                        g.set_shape(res, (1, n, 1))
+                    return res
+                # dynamic n
+                dim_n = g.op.Shape(x, start=0, end=1, name=name)
+                shape_1n1 = g.op.Concat(
+                    g.make_initializer(
+                        "", np.array([1], dtype=np.int64), source="atleast_3d.1_a"
+                    ),
+                    dim_n,
+                    g.make_initializer(
+                        "", np.array([1], dtype=np.int64), source="atleast_3d.1_b"
+                    ),
+                    axis=0,
+                    name=name,
+                )
+                res = g.make_node("Reshape", [x, shape_1n1], outputs, name=name)
+                if not sts:
+                    g.set_type(res, g.get_type(x))
+                    g.set_shape(res, (1, n, 1))
+                return res
+            else:
+                # rank known but shape not known
+                dim_n = g.op.Shape(x, start=0, end=1, name=name)
+                shape_1n1 = g.op.Concat(
+                    g.make_initializer(
+                        "", np.array([1], dtype=np.int64), source="atleast_3d.1_a"
+                    ),
+                    dim_n,
+                    g.make_initializer(
+                        "", np.array([1], dtype=np.int64), source="atleast_3d.1_b"
+                    ),
+                    axis=0,
+                    name=name,
+                )
+                res = g.make_node("Reshape", [x, shape_1n1], outputs, name=name)
+                if not sts:
+                    g.set_type(res, g.get_type(x))
+                    g.set_rank(res, 3)
+                return res
+        if rank == 2:
+            res = g.op.UnsqueezeAnyOpset(
+                x, np.array([-1], dtype=np.int64), outputs=outputs, name=name
+            )
+            if not sts:
+                g.set_type(res, g.get_type(x))
+                if g.has_shape(x):
+                    shape = g.get_shape(x)
+                    g.set_shape(res, (*shape, 1))
+                else:
+                    g.set_rank(res, 3)
+            return res
+    res = g.op.Identity(x, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(res, g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x))
+    return res
+
+
 def aten_as_strided(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
