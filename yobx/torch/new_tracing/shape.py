@@ -1,4 +1,5 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Union
+import itertools
 from ...xexpressions import simplify_expression
 import torch
 
@@ -7,6 +8,35 @@ import torch
 # tracing via torch._check interception).  Symbolic TracingBool values whose
 # expression matches an entry resolve to True in __bool__.
 # ---------------------------------------------------------------------------
+
+# Counter used to generate unique names for unnamed dynamic-dimension hints
+# such as ``torch.export.Dim.DYNAMIC`` or ``torch.export.Dim.AUTO``.
+_unnamed_dim_counter: itertools.count = itertools.count()
+
+
+def _dim_spec_to_name(dim: Any) -> str:
+    """Converts a dynamic-shape dimension specification to a string name.
+
+    Accepts plain strings, named :class:`torch.export.Dim` instances, and
+    unnamed :class:`torch.export.Dim` sentinel values (``Dim.DYNAMIC``,
+    ``Dim.AUTO``).
+
+    :param dim: A ``str``, a named ``torch.export.Dim`` object, or an unnamed
+        ``_DimHint`` value.
+
+    Returns:
+        A string suitable for use as a :class:`TracingInt` symbolic name.
+    """
+    if isinstance(dim, str):
+        return dim
+    # Named torch.export.Dim objects expose their user-given name via __name__.
+    name = getattr(dim, "__name__", None)
+    if isinstance(name, str):
+        return name
+    # Unnamed dynamic hints (torch.export.Dim.DYNAMIC / AUTO) – treat each
+    # occurrence as an independent symbolic dimension.
+    return f"_dyn_{next(_unnamed_dim_counter)}"
+
 
 _known_true_conditions: Set[str] = set()
 
@@ -399,7 +429,7 @@ class TracingShape:
 
     @classmethod
     def from_existing_shape(
-        cls, shape: Tuple[int, ...], dynamic_shapes: Optional[Dict[int, str]] = None
+        cls, shape: Tuple[int, ...], dynamic_shapes: Optional[Dict[int, Any]] = None
     ) -> "TracingShape":
         """
         Build a :class:`TracingShape` from a concrete shape tuple, optionally
@@ -407,16 +437,19 @@ class TracingShape:
 
         :param shape: The concrete shape (e.g. from ``tensor.shape``).
         :param dynamic_shapes: An optional mapping from *dimension index* to
-            *symbolic name*.  For every key ``d`` the integer ``shape[d]`` is
-            replaced by the string ``dynamic_shapes[d]`` in the resulting
-            :class:`TracingShape`.  When ``None`` or empty, all dimensions
-            remain concrete integers.
+            a symbolic name.  Each value may be a plain ``str``, a named
+            :class:`torch.export.Dim` instance (e.g. ``torch.export.Dim("batch")``),
+            or an unnamed ``torch.export.Dim`` sentinel such as
+            ``torch.export.Dim.DYNAMIC`` or ``torch.export.Dim.AUTO``.
+            For every key ``d`` the integer ``shape[d]`` is replaced by the
+            resolved symbolic name in the resulting :class:`TracingShape`.
+            When ``None`` or empty, all dimensions remain concrete integers.
         :return: A :class:`TracingShape` whose ``dims`` are ``int`` values for
-            static dimensions and ``str`` values for dynamic ones.
+            static dimensions and :class:`TracingInt` values for dynamic ones.
         """
         if not dynamic_shapes:
             return TracingShape(tuple(int(i) for i in shape))
         new_shape = [int(i) for i in shape]
-        for d, name in dynamic_shapes.items():
-            new_shape[d] = TracingInt(name)  # type: ignore
+        for d, dim_spec in dynamic_shapes.items():
+            new_shape[d] = TracingInt(_dim_spec_to_name(dim_spec))  # type: ignore
         return TracingShape(tuple(new_shape))  # type: ignore
