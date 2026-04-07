@@ -302,9 +302,9 @@ XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
         "cos",  # ONNX op only supports float dtypes
         "cosh",  # ONNX op only supports float dtypes
         "erf",  # ONNX op only supports float dtypes
+        "erfc",  # ONNX Erf only supports float dtypes
+        "erfinv",  # ONNX Erf/Log/Exp only support float dtypes
         "exp",  # ONNX op only supports float dtypes
-        "expm1",  # ONNX op only supports float dtypes
-        "floor",  # InvalidGraph: int32 not supported by Floor
         "floor_divide",  # ref_diff=1
         "gcd",  # FunctionNotFoundError
         "isinf",  # InvalidGraph: int32 not supported by IsInf
@@ -358,9 +358,9 @@ XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
         "cos",  # ONNX op only supports float dtypes
         "cosh",  # ONNX op only supports float dtypes
         "erf",  # ONNX op only supports float dtypes
+        "erfc",  # ONNX Erf only supports float dtypes
+        "erfinv",  # ONNX Erf/Log/Exp only support float dtypes
         "exp",  # ONNX op only supports float dtypes
-        "expm1",  # ONNX op only supports float dtypes
-        "floor",  # InvalidGraph: int64 not supported by Floor
         "floor_divide",  # ref_diff=1
         "gcd",  # FunctionNotFoundError
         "isinf",  # InvalidGraph: int64 not supported by IsInf
