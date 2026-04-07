@@ -1759,8 +1759,8 @@ class DynamoInterpreter:
 
     def _verify_new_shape(self, shape, node):
         for axis, dim in enumerate(shape):
-            if isinstance(dim, (self.torch.SymInt, self.TracingInt)):
-                assert not isinstance(dim, self.TracingInt), "not yet implemented"
+            if isinstance(dim, (self.torch.SymInt, self.builder.TracingInt)):
+                assert not isinstance(dim, self.builder.TracingInt), "not yet implemented"
                 sdim = self.builder._torch_sym_int_to_str(dim)
                 tokens = parse_expression_tokens(sdim)
                 if len(tokens) == 1:
