@@ -332,6 +332,8 @@ XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
         "trunc",  # InvalidGraph: int32 not supported by Round
         "prod",  # type mismatch: int32 input produces int64 output
         "sum",  # type mismatch: int32 input produces int64 output
+        "nanmean",  # IsNaN not supported for integer dtypes
+        "nansum",  # IsNaN not supported for integer dtypes
     }
 )
 
@@ -380,6 +382,8 @@ XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
         "tan",  # ONNX op only supports float dtypes
         "tanh",  # ONNX op only supports float dtypes
         "trunc",  # InvalidGraph: int64 not supported by Round
+        "nanmean",  # IsNaN not supported for integer dtypes
+        "nansum",  # IsNaN not supported for integer dtypes
     }
 )
 
