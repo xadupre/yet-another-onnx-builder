@@ -3845,6 +3845,22 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
+    def test_aten_atan2(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, y, x):
+                return torch.atan2(y, x)
+
+        model = Model()
+        # Values covering all four quadrants, x == 0, and y == 0.
+        y = torch.tensor([-1.0, 0.0, 1.0, 0.0, 1.0, -1.0, 0.0])
+        x = torch.tensor([0.0, -1.0, 0.0, 1.0, 1.0, -1.0, 0.0])
+        inputs = (y, x)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
     def test_aten_div_tensor_mode_trunc_float(self):
         import torch
 

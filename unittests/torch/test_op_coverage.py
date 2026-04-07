@@ -82,7 +82,7 @@ class TestOpCoverageData(ExtTestCase):
 
     def test_well_known_no_converter_ops_present(self):
         """A sample of well-known missing-converter ops should be in the set."""
-        for op in ("atan2", "dot", "diag", "sort"):
+        for op in ("dot", "diag", "sort"):
             self.assertIn(op, self.NO_CONVERTER_OPS, f"expected {op!r} in NO_CONVERTER_OPS")
 
     def test_well_known_xfail_ops_present(self):
