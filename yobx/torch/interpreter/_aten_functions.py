@@ -764,6 +764,30 @@ def aten_logical_or(
     return aten_or(g, sts, outputs, x, y, name="logical_or")
 
 
+def aten_xor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "xor",
+) -> T:
+    "xor"
+    res, x, y = prepare_inputs_homogeneous_operator(
+        g, x, y, f=g.op.Xor, name=name, outputs=outputs, sts=sts, force_type=TensorProto.BOOL
+    )
+    if not sts:
+        set_type_shape_binary_op(g, outputs[0], x, y, itype=TensorProto.BOOL)
+    return res
+
+
+def aten_logical_xor(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T, name="xor"
+) -> T:
+    "xor"
+    return aten_xor(g, sts, outputs, x, y, name="logical_xor")
+
+
 def aten_any(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "any"
 ) -> T:
