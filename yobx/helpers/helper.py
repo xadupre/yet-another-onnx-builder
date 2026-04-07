@@ -357,6 +357,9 @@ def string_type(
         )
         return f"{obj.__class__.__name__}{s[4:]}"
 
+    if obj.__class__.__name__ == "TracingInt":
+        return str(obj)
+
     if obj.__class__.__name__ == "OrtValue":
         if not obj.has_value():
             return "OV(<novalue>)"

@@ -57,9 +57,11 @@ class _ExtraPackages:
         if os.environ.get("NOTORCH", "0") in ("1", "true"):
             self._has_torch_ = False
             self._torch = None
+            self._TracingInt = None
         else:
             self._has_torch_ = None
             self._torch = None
+            self._TracingInt = None
 
         if os.environ.get("NOTF", "0") in ("1", "true"):
             self._has_tensorflow_ = False
@@ -76,6 +78,15 @@ class _ExtraPackages:
 
             self._torch = torch
         return self._torch
+
+    @property
+    def TracingInt(self):
+        assert self._has_torch, "torch is missing"
+        if self._TracingInt is None:
+            from ..torch.new_tracing.shape import TracingInt
+
+            self._TracingInt = TracingInt
+        return self._TracingInt
 
     @property
     def _has_torch(self) -> bool:

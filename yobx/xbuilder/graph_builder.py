@@ -3290,7 +3290,7 @@ class GraphBuilder(
                 pass
 
         if value in self.dynamic_objects:
-            assert not isinstance(value, self.torch.SymInt)  # type: ignore
+            assert not isinstance(value, (self.torch.SymInt, self.TracingInt))  # type: ignore
             return value
 
         if value not in self.dynamic_objects_rev and value not in self._known_value_shape and add:
@@ -3355,7 +3355,7 @@ class GraphBuilder(
         new_shape: List[Union[int, str]] = []
         for dim, d in enumerate(shape):
             if isinstance(d, (str, self.WrapDim)) or (
-                self._has_torch and isinstance(d, self.torch.SymInt)  # type: ignore
+                self._has_torch and isinstance(d, (self.torch.SymInt, self.TracingInt))  # type: ignore
             ):
                 dyn_name = None if name is None else self._get_dynamic_dimension(name, dim)
                 if dyn_name is not None:
@@ -3690,6 +3690,9 @@ class GraphBuilder(
                     return self._dynamic_to_str(
                         i, exc=exc, register_if_not_exist=register_if_not_exist
                     )
+            if isinstance(obj, self.TracingInt):
+                assert not obj.is_static, f"Dimension {obj!r} is static{self.get_debug_msg()}"
+                return obj.value
             if exc:
                 raise AssertionError(
                     f"Object has {type(obj)} but could not find a dynamic interpretation"
@@ -9936,6 +9939,8 @@ class GraphBuilder(
         # We could return example_shape.shape (s0, ...) when info is (batch, ...)
         # In case example_shape is missing, then dynamic_shape should prevail.
         if example_shape is not None:
+            from ..torch.new_tracing.shape import TracingInt
+
             if info is None:
                 return tuple(example_shape)
 
@@ -9950,7 +9955,9 @@ class GraphBuilder(
                         f"{self.get_debug_msg()}"
                     )
 
-                    if self._has_torch and isinstance(ret_shape[k], self.torch.SymInt):  # type: ignore
+                    if self._has_torch and isinstance(
+                        ret_shape[k], (TracingInt, self.torch.SymInt)  # type: ignore
+                    ):
                         # We let it, set_shape will replace it
                         # by the dynamic dimension name and register an alias.
                         continue
@@ -9969,7 +9976,9 @@ class GraphBuilder(
                     if i >= len(ret_shape):
                         # torch.export.export flattens everything
                         continue
-                    if self._has_torch and isinstance(ret_shape[i], self.torch.SymInt):  # type: ignore
+                    if self._has_torch and isinstance(
+                        ret_shape[i], (TracingInt, self.torch.SymInt)  # type: ignore
+                    ):
                         # We let it, set_shape will replace it
                         # by the dynamic dimension name and register an alias.
                         continue
