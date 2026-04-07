@@ -271,6 +271,11 @@ XFAIL_OPS_BFLOAT16: FrozenSet[str] = frozenset(
         "addcmul",  # ref_diff > 2e-2
         "bmm",  # matmul numerical error exceeds bfloat16 tolerance
         "expm1",  # reduced-precision exponential error
+        "log10",  # bfloat16 precision loss in Log
+        "log1p",  # bfloat16 precision loss in Log
+        "log2",  # bfloat16 precision loss in Log
+        "logaddexp",  # bfloat16 precision loss in Log/Exp
+        "logaddexp2",  # bfloat16 precision loss in Log/Exp
         # Incorrect results (ordering) for bfloat16:
         "argsort",  # ordering instability due to reduced precision
     }
