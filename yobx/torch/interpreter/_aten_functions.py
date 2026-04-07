@@ -2445,6 +2445,48 @@ def aten_conv_transpose3d_input(
     )
 
 
+def aten_count_nonzero(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    name: str = "count_nonzero",
+) -> T:
+    """Counts the number of non-zero elements."""
+    # Cast to bool (non-zero → True) then to int64 before summing.
+    int_x = g.op.Cast(
+        g.op.Cast(x, to=TensorProto.BOOL, name=name), to=TensorProto.INT64, name=name
+    )
+    if dim is None:
+        result = g.op.ReduceSumAnyOpset(int_x, keepdims=0, outputs=outputs, name=name)
+    else:
+        adim = np.array([dim] if isinstance(dim, int) else dim, dtype=np.int64)
+        result = g.op.ReduceSumAnyOpset(int_x, adim, keepdims=0, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_reduce_op(
+            g,
+            outputs[0],
+            x,
+            keepdim=0,
+            axes=None if dim is None else ((dim,) if isinstance(dim, int) else tuple(dim)),
+        )
+        g.set_type(outputs[0], TensorProto.INT64)
+    return result
+
+
+def aten_count_nonzero_dim_IntList(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Union[int, List[int]],
+    name: str = "count_nonzero_dim_IntList",
+) -> T:
+    """Counts the number of non-zero elements along specified dimensions."""
+    return aten_count_nonzero(g, sts, outputs, x, dim=dim, name=name)
+
+
 def aten_copy(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],

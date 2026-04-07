@@ -37,7 +37,7 @@ jobs:
       - name: Install nightly version
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,docs,imblearn,lightgbm,polars,sklearn,sksurv,spox,statmodels,tensorflow,torch,transformers,xgboost]"
+        run: pip install -e ".[category_encoders,docs,imblearn,lightgbm,op-db,polars,sklearn,sksurv,spox,statmodels,tensorflow,torch,transformers,xgboost]"
       - name: pip freeze
         run: pip freeze
       - name: Build TensorFlow gallery examples
