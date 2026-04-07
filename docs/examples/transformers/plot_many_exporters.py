@@ -24,12 +24,7 @@ from yobx.helpers import max_diff
 from yobx.helpers.rt_helper import make_feeds
 from yobx.torch.torch_helper import torch_deepcopy
 from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
-from yobx.torch import (
-    apply_patches_for_model,
-    register_flattening_functions,
-    to_onnx,
-    ExportOptions,
-)
+from yobx.torch import apply_patches_for_model, to_onnx, ExportOptions
 
 # %%
 # Command-line arguments
@@ -140,20 +135,68 @@ print(f"  device={device}")
 model = model.to(device)
 
 # %%
+# Wrap the model
+# --------------
+#
+# Rather than registering ``DynamicCache`` as a pytree node with
+# :func:`register_flattening_functions <yobx.torch.flatten.register_flattening_functions>`,
+# we wrap the model in a thin :class:`torch.nn.Module` subclass whose
+# ``forward`` signature takes only plain :class:`torch.Tensor` arguments.
+# The wrapper reconstructs the ``DynamicCache`` internally before forwarding
+# to the original model.  This keeps the exported ONNX model's input interface
+# clean (all inputs are tensors) without requiring any pytree registration.
+
+
+class LLMWrapper(torch.nn.Module):
+    """Wraps an LLM to accept flat tensor key/value inputs instead of ``DynamicCache``."""
+
+    def __init__(self, inner_model: torch.nn.Module):
+        super().__init__()
+        self.inner_model = inner_model
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        past_key_0: torch.Tensor,
+        past_value_0: torch.Tensor,
+    ):
+        """Reconstructs ``DynamicCache`` from flat tensors and runs the inner model.
+
+        Args:
+            input_ids: Token id tensor of shape ``(batch, seq_length)``.
+            attention_mask: Attention mask of shape ``(batch, past_length + seq_length)``.
+            past_key_0: Past key tensor for layer 0, shape ``(batch, heads, past_length, dim)``.
+            past_value_0: Past value tensor for layer 0, same shape as ``past_key_0``.
+
+        Returns:
+            The output of the inner model.
+        """
+        past_key_values = make_dynamic_cache([(past_key_0, past_value_0)])
+        return self.inner_model(
+            input_ids=input_ids, attention_mask=attention_mask, past_key_values=past_key_values
+        )
+
+
+wrapped_model = LLMWrapper(model)
+
+# %%
 # Run the exporters
 # -----------------
 
+past_key = torch.rand((2, 1, 30, 96)).to(device)
+past_value = torch.rand((2, 1, 30, 96)).to(device)
 inputs = dict(
     input_ids=torch.randint(0, 1000, (2, 3), dtype=torch.int64).to(device),
     attention_mask=torch.randint(0, 1, (2, 33), dtype=torch.int64).to(device),
-    past_key_values=make_dynamic_cache(
-        [(torch.rand((2, 1, 30, 96)).to(device), torch.rand((2, 1, 30, 96)).to(device))]
-    ),
+    past_key_0=past_key,
+    past_value_0=past_value,
 )
 dynamic_shapes = {
     "input_ids": {0: "batch", 1: "seq_length"},
     "attention_mask": {0: "batch", 1: "past_length+seq_length"},
-    "past_key_values": [{0: "batch", 2: "past_length"}, {0: "batch", 2: "past_length"}],
+    "past_key_0": {0: "batch", 2: "past_length"},
+    "past_value_0": {0: "batch", 2: "past_length"},
 }
 providers = (
     ["CUDAExecutionProvider", "CPUExecutionProvider"]
@@ -164,21 +207,18 @@ providers = (
 
 exporters = args.exporter.split(",")
 copy_inputs = torch_deepcopy(inputs)
-expected = model(**copy_inputs)
+expected = wrapped_model(**copy_inputs)
 
 successful_exports: dict[str, str] = {}
 
 for exporter in exporters:
     filename = f"plot_many_exporter.{exporter}.onnx"
     print(f"-- run exporter {exporter!r}")
-    with (
-        register_flattening_functions(patch_transformers=True),
-        apply_patches_for_model(patch_transformers=True, model=model),
-    ):
+    with apply_patches_for_model(patch_transformers=True, model=model):
         if exporter == "dynamo":
             try:
                 torch.onnx.export(
-                    model, (), filename, kwargs=inputs, dynamic_shapes=dynamic_shapes
+                    wrapped_model, (), filename, kwargs=inputs, dynamic_shapes=dynamic_shapes
                 )
                 print("-- export ok")
             except Exception as e:
@@ -186,7 +226,9 @@ for exporter in exporters:
                 continue
         elif exporter == "yobx":
             try:
-                to_onnx(model, kwargs=inputs, filename=filename, dynamic_shapes=dynamic_shapes)
+                to_onnx(
+                    wrapped_model, kwargs=inputs, filename=filename, dynamic_shapes=dynamic_shapes
+                )
                 print("-- export ok")
             except Exception as e:
                 print(f"-- export failed due to {e}")
@@ -194,7 +236,7 @@ for exporter in exporters:
         elif exporter == "tracing":
             try:
                 to_onnx(
-                    model,
+                    wrapped_model,
                     kwargs=inputs,
                     filename=filename,
                     dynamic_shapes=dynamic_shapes,
