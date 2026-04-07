@@ -269,6 +269,11 @@ class TestModelEvalCases(ExtTestCase):
             cases="ControlFlowNumelZero2", exporters="export-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_aten_interpolate_new_tracing(self):
+        evaluation(
+            cases="AtenInterpolate", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
