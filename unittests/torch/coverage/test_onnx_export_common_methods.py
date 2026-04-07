@@ -21,15 +21,16 @@ from yobx.helpers import max_diff
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch.interpreter import to_onnx
 from yobx.torch.coverage.op_coverage import (
-    NO_CONVERTER_OPS as _NO_CONVERTER_OPS,
-    NON_DETERMINISTIC_OPS as _NON_DETERMINISTIC_OPS,
-    XFAIL_OPS as _XFAIL_OPS,
-    XFAIL_OPS_BFLOAT16 as _XFAIL_OPS_BFLOAT16,
-    XFAIL_OPS_FLOAT16 as _XFAIL_OPS_FLOAT16,
-    XFAIL_OPS_INT32 as _XFAIL_OPS_INT32,
-    XFAIL_OPS_INT64 as _XFAIL_OPS_INT64,
-    ATOL_OPS_FLOAT16 as _ATOL_OPS_FLOAT16,
-    ATOL_OPS_BFLOAT16 as _ATOL_OPS_BFLOAT16,
+    NO_CONVERTER_OPS,
+    NON_DETERMINISTIC_OPS,
+    XFAIL_OPS,
+    XFAIL_OPS_BFLOAT16,
+    XFAIL_OPS_FLOAT16,
+    XFAIL_OPS_INT32,
+    XFAIL_OPS_INT64,
+    ATOL_OPS_FLOAT16,
+    ATOL_OPS_FLOAT32,
+    ATOL_OPS_BFLOAT16,
 )
 from yobx.torch.torch_helper import to_numpy
 
@@ -57,8 +58,9 @@ _DTYPE_ATOL: Dict[torch.dtype, float] = {
 # Per-dtype per-op atol overrides (op name → float).  Ops that accumulate
 # more floating-point error than the global dtype tolerance are listed here.
 _DTYPE_ATOL_OPS: Dict[torch.dtype, Dict[str, float]] = {
-    torch.float16: _ATOL_OPS_FLOAT16,
-    torch.bfloat16: _ATOL_OPS_BFLOAT16,
+    torch.float16: ATOL_OPS_FLOAT16,
+    torch.float32: ATOL_OPS_FLOAT32,
+    torch.bfloat16: ATOL_OPS_BFLOAT16,
 }
 
 
@@ -100,7 +102,7 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
     - Support *dtype*
     - Have no variant test name
     - Are not non-deterministic (random-output) ops
-    - Are not in :data:`_NO_CONVERTER_OPS` (missing aten converter)
+    - Are not in :data:`NO_CONVERTER_OPS` (missing aten converter)
     - Are not in the dtype-specific xfail set (known failures for *dtype*)
     - Have at least one sample input whose ``.input`` is a tensor of *dtype*
     - Have all positional sample args that are also tensors (or none at all)
@@ -115,11 +117,11 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
         List of :class:`~torch.testing._internal.opinfo.core.OpInfo` objects.
     """
     _xfail_map: Dict[torch.dtype, FrozenSet[str]] = {
-        torch.float32: _XFAIL_OPS,
-        torch.float16: _XFAIL_OPS | _XFAIL_OPS_FLOAT16,
-        torch.bfloat16: _XFAIL_OPS | _XFAIL_OPS_BFLOAT16,
-        torch.int32: _XFAIL_OPS | _XFAIL_OPS_INT32,
-        torch.int64: _XFAIL_OPS | _XFAIL_OPS_INT64,
+        torch.float32: XFAIL_OPS,
+        torch.float16: XFAIL_OPS | XFAIL_OPS_FLOAT16,
+        torch.bfloat16: XFAIL_OPS | XFAIL_OPS_BFLOAT16,
+        torch.int32: XFAIL_OPS | XFAIL_OPS_INT32,
+        torch.int64: XFAIL_OPS | XFAIL_OPS_INT64,
     }
     if dtype not in _xfail_map:
         raise ValueError(f"Unsupported dtype {dtype!r}. Supported dtypes: {list(_xfail_map)}")
@@ -133,9 +135,9 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
                 continue
             if op.variant_test_name:
                 continue
-            if op.name in _NON_DETERMINISTIC_OPS:
+            if op.name in NON_DETERMINISTIC_OPS:
                 continue
-            if op.name.replace(".", "_") in _NO_CONVERTER_OPS:
+            if op.name.replace(".", "_") in NO_CONVERTER_OPS:
                 continue
             if op.name.replace(".", "_") in xfail:
                 continue

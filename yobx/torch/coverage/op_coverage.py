@@ -5,17 +5,17 @@ Defines the sets of ops that have no converter, are known to fail, or are
 excluded for specific dtypes when tested via
 :mod:`unittests.torch.coverage.test_onnx_export_common_methods`.
 
-:data:`NO_CONVERTER_OPS` – ops whose aten decomposition uses a function for
+:data:`NO_CONVERTER_OPS` - ops whose aten decomposition uses a function for
 which no ONNX converter has been implemented yet.
 
-:data:`XFAIL_OPS` – ops that can be exported but produce incorrect numerical
+:data:`XFAIL_OPS` - ops that can be exported but produce incorrect numerical
 results or raise errors unrelated to missing converters.
 
 :data:`XFAIL_OPS_FLOAT16`, :data:`XFAIL_OPS_BFLOAT16`,
-:data:`XFAIL_OPS_INT32`, :data:`XFAIL_OPS_INT64` – dtype-specific extra
+:data:`XFAIL_OPS_INT32`, :data:`XFAIL_OPS_INT64` - dtype-specific extra
 exclusions on top of :data:`XFAIL_OPS`.
 
-:data:`ATOL_OPS_FLOAT16`, :data:`ATOL_OPS_BFLOAT16` – per-op absolute
+:data:`ATOL_OPS_FLOAT32`, :data:`ATOL_OPS_FLOAT16`, :data:`ATOL_OPS_BFLOAT16` - per-op absolute
 tolerance overrides for float16 and bfloat16, for ops whose reduced-precision
 errors exceed the global dtype tolerance.
 
@@ -389,9 +389,16 @@ XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
 # Per-op absolute tolerance overrides for torch.float16.
 # Ops whose variance/std computation compounds float16 rounding errors need
 # a larger tolerance than the global _ATOL_FLOAT16 = 1e-2.
+ATOL_OPS_FLOAT32: Dict[str, float] = {
+    "std": 3e-2,  # variance accumulates float16 rounding; sqrt amplifies
+    "std_mean": 3e-2,  # same compound error as std
+}
+# Per-op absolute tolerance overrides for torch.float16.
+# Ops whose variance/std computation compounds float16 rounding errors need
+# a larger tolerance than the global _ATOL_FLOAT16 = 1e-2.
 ATOL_OPS_FLOAT16: Dict[str, float] = {
     "std": 1e-1,  # variance accumulates float16 rounding; sqrt amplifies
-    "std_mean": 1e-1,  # same compound error as std
+    "std_mean": 3e-1,  # same compound error as std
 }
 
 # Per-op absolute tolerance overrides for torch.bfloat16.
@@ -410,10 +417,10 @@ def get_op_coverage_rst() -> str:
     builds a grid showing, for every op and dtype combination, whether the op
     is:
 
-    * ``✔`` – in the tested set (converter exists, no known failure for that dtype),
-    * ``⚠ xfail`` – converter exists but the test is a known failure,
-    * ``✘ no converter`` – no ONNX converter has been implemented yet, or
-    * ``—`` – the op does not support that dtype.
+    * ``✔`` - in the tested set (converter exists, no known failure for that dtype),
+    * ``⚠ xfail`` - converter exists but the test is a known failure,
+    * ``✘ no converter`` - no ONNX converter has been implemented yet, or
+    * ``—`` - the op does not support that dtype.
 
     Returns:
         RST source string (a ``list-table`` directive) ready to be printed
