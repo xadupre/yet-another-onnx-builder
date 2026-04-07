@@ -1456,6 +1456,101 @@ def aten_baddbmm(
     return res
 
 
+def aten_bilinear(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    input1: T,
+    input2: T,
+    weight: T,
+    bias: Optional[T] = None,
+    name: str = "bilinear",
+) -> T:
+    """bilinear - computes the bilinear form.
+
+    Computes output[...,k] = Σ_{i,j} input1[...,i] * weight[k,i,j] * input2[...,j].
+
+    Args:
+        g: graph builder
+        sts: optional shape/type information
+        outputs: output names
+        input1: first input tensor of shape (..., H1)
+        input2: second input tensor of shape (..., H2)
+        weight: weight tensor of shape (out, H1, H2)
+        bias: optional bias tensor of shape (out,)
+        name: node name prefix
+
+    Returns:
+        Output tensor of shape (..., out).
+    """
+    # Implements the bilinear transform using matmul and reshape:
+    #   weight: (out, H1, H2) -transpose-> (H1, out, H2) -reshape-> (H1, out*H2)
+    #   x1_w:  input1 @ weight_r            -> (..., out*H2)
+    #   x1_w_r: reshape x1_w               -> (..., out, H2)
+    #   output: (x1_w_r * unsqueeze(input2, -2)).sum(-1) -> (..., out)
+    weight_shape = g.op.Shape(weight, name=name)
+    out_dim = g.op.Gather(weight_shape, np.array(0, dtype=np.int64), name=name)
+    h2_dim = g.op.Gather(weight_shape, np.array(2, dtype=np.int64), name=name)
+    out_x_h2 = g.op.Mul(out_dim, h2_dim, name=name)
+    h1_shape = g.op.Slice(
+        weight_shape, np.array([1], dtype=np.int64), np.array([2], dtype=np.int64), name=name
+    )
+
+    # Transpose weight: (out, H1, H2) -> (H1, out, H2)
+    weight_t = g.op.Transpose(weight, perm=[1, 0, 2], name=name)
+
+    # Reshape weight: (H1, out, H2) -> (H1, out*H2)
+    new_weight_shape = g.op.Concat(
+        h1_shape,
+        g.op.Unsqueeze(out_x_h2, np.array([0], dtype=np.int64), name=name),
+        axis=0,
+        name=name,
+    )
+    weight_r = g.op.Reshape(weight_t, new_weight_shape, name=name)
+
+    # x1_w = input1 @ weight_r -> (..., out*H2)
+    x1_w = g.op.MatMul(input1, weight_r, name=name)
+
+    # Reshape x1_w: (..., out*H2) -> (..., out, H2)
+    input1_shape = g.op.Shape(input1, name=name)
+    batch_shape = g.op.Slice(
+        input1_shape, np.array([0], dtype=np.int64), np.array([-1], dtype=np.int64), name=name
+    )
+    x1_w_shape = g.op.Concat(
+        batch_shape,
+        g.op.Unsqueeze(out_dim, np.array([0], dtype=np.int64), name=name),
+        g.op.Unsqueeze(h2_dim, np.array([0], dtype=np.int64), name=name),
+        axis=0,
+        name=name,
+    )
+    x1_w_r = g.op.Reshape(x1_w, x1_w_shape, name=name)
+
+    # Unsqueeze input2: (..., H2) -> (..., 1, H2)
+    input2_e = g.op.Unsqueeze(input2, np.array([-2], dtype=np.int64), name=name)
+
+    # Element-wise multiply and reduce: (..., out, H2) * (..., 1, H2) -> sum -> (..., out)
+    mul_result = g.op.Mul(x1_w_r, input2_e, name=name)
+    if bias:
+        reduced = g.op.ReduceSum(
+            mul_result, np.array([-1], dtype=np.int64), keepdims=0, name=name
+        )
+        res = g.op.Add(reduced, bias, outputs=outputs, name=name)
+    else:
+        res = g.op.ReduceSum(
+            mul_result, np.array([-1], dtype=np.int64), keepdims=0, outputs=outputs, name=name
+        )
+    if not sts:
+        if g.has_type(input1):
+            g.set_type(res, g.get_type(input1))
+        if g.has_shape(input1) and g.has_shape(weight):
+            i1_shape = g.get_shape(input1)
+            w_shape = g.get_shape(weight)
+            g.set_shape(res, (*i1_shape[:-1], w_shape[0]))
+        elif g.has_rank(input1):
+            g.set_rank(res, g.get_rank(input1))
+    return res
+
+
 def aten_bitwise_not(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],

@@ -151,7 +151,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "nanmedian",
         "nansum",
         "nextafter",
-        "nn_functional_bilinear",
         "nn_functional_binary_cross_entropy",
         "nn_functional_binary_cross_entropy_with_logits",
         "nn_functional_celu",
