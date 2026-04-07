@@ -3413,7 +3413,7 @@ def aten_erf(
 def aten_erfc(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "erfc"
 ) -> T:
-    """erfc: complementary error function, erfc(x) = 1 - erf(x)."""
+    """Computes the complementary error function, erfc(x) = 1 - erf(x)."""
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     one = np.array([1], dtype=dtype)
     res = g.op.Sub(one, g.op.Erf(x, name=name), name=name, outputs=outputs)
@@ -3425,7 +3425,7 @@ def aten_erfc(
 def aten_erfinv(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "erfinv"
 ) -> T:
-    """erfinv: Inverse error function via Winitzki approximation + Newton refinement."""
+    """Computes the inverse error function via Winitzki approximation + Newton refinement."""
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     # Winitzki (2008) single-formula approximation:
     #   u = ln((1 - x) * (1 + x))            [= ln(1 - x^2), negative for |x| < 1]
