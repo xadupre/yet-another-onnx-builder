@@ -28,6 +28,8 @@ from yobx.torch.coverage.op_coverage import (
     XFAIL_OPS_FLOAT16 as _XFAIL_OPS_FLOAT16,
     XFAIL_OPS_INT32 as _XFAIL_OPS_INT32,
     XFAIL_OPS_INT64 as _XFAIL_OPS_INT64,
+    ATOL_OPS_FLOAT16 as _ATOL_OPS_FLOAT16,
+    ATOL_OPS_BFLOAT16 as _ATOL_OPS_BFLOAT16,
 )
 from yobx.torch.torch_helper import to_numpy
 
@@ -50,6 +52,13 @@ _ATOL_BFLOAT16: float = 2e-2
 _DTYPE_ATOL: Dict[torch.dtype, float] = {
     torch.float16: _ATOL_FLOAT16,
     torch.bfloat16: _ATOL_BFLOAT16,
+}
+
+# Per-dtype per-op atol overrides (op name → float).  Ops that accumulate
+# more floating-point error than the global dtype tolerance are listed here.
+_DTYPE_ATOL_OPS: Dict[torch.dtype, Dict[str, float]] = {
+    torch.float16: _ATOL_OPS_FLOAT16,
+    torch.bfloat16: _ATOL_OPS_BFLOAT16,
 }
 
 
@@ -222,7 +231,10 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
 
         # Use relaxed tolerances for reduced-precision dtypes: bfloat16 has
         # only 7 mantissa bits (vs 10 for float16) so uses the widest tolerance.
-        atol = _DTYPE_ATOL.get(_dtype, _ATOL_DEFAULT)
+        # Some ops (e.g. std, std_mean) accumulate more rounding error and get
+        # a further per-op override via _DTYPE_ATOL_OPS.
+        _dtype_default_atol = _DTYPE_ATOL.get(_dtype, _ATOL_DEFAULT)
+        atol = _DTYPE_ATOL_OPS.get(_dtype, {}).get(_op.name, _dtype_default_atol)
 
         for i, (exp_i, got_i) in enumerate(zip(expected_seq, got_ref)):
             diff = max_diff(exp_i, got_i)
