@@ -13801,6 +13801,52 @@ def aten_wrap_with_set_grad_enabled(
     )
 
 
+def aten_xlogy(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "xlogy",
+) -> T:
+    """xlogy: computes ``x * log(y)`` with the convention that ``xlogy(0, y) == 0``."""
+    x, y = prepare_inputs_homogeneous_operator(g, x, y)
+    itype = g.get_type(x)
+    dtype = tensor_dtype_to_np_dtype(itype)
+    zero = np.array(0, dtype=dtype)
+    is_zero = g.op.Equal(x, zero, name=name)
+    log_y = g.op.Log(y, name=name)
+    x_times_log_y = g.op.Mul(x, log_y, name=name)
+    res = g.op.Where(is_zero, zero, x_times_log_y, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_binary_op(g, res, x, y)
+    return res
+
+
+def aten_xlogy_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "xlogy_Tensor",
+) -> T:
+    """xlogy.Tensor: computes ``x * log(y)`` with the convention that ``xlogy(0, y) == 0``."""
+    return aten_xlogy(g, sts, outputs, x, y, name=name)
+
+
+def aten_xlogy_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "xlogy_Scalar",
+) -> T:
+    """xlogy.Scalar: computes ``x * log(y)`` with the convention that ``xlogy(0, y) == 0``."""
+    return aten_xlogy(g, sts, outputs, x, y, name=name)
+
+
 def aten_zero(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],

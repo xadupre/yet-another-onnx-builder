@@ -225,7 +225,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "var_mean",
         "vdot",
         "view_as",
-        "xlogy",
         "zero_",
     }
 )
@@ -334,6 +333,7 @@ XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
         "trunc",  # InvalidGraph: int32 not supported by Round
         "prod",  # type mismatch: int32 input produces int64 output
         "sum",  # type mismatch: int32 input produces int64 output
+        "xlogy",  # ONNX Log only supports float dtypes
     }
 )
 
@@ -382,6 +382,7 @@ XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
         "tan",  # ONNX op only supports float dtypes
         "tanh",  # ONNX op only supports float dtypes
         "trunc",  # InvalidGraph: int64 not supported by Round
+        "xlogy",  # ONNX Log only supports float dtypes
     }
 )
 
