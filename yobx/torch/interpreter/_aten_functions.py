@@ -7977,6 +7977,74 @@ def aten_nan_to_num(
     return res
 
 
+def aten_nansum(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    keepdim: bool = False,
+    dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    name: str = "nansum",
+) -> T:
+    """Reduces sum while treating NaN values as zero."""
+    zero = np.array([0], dtype=tensor_dtype_to_np_dtype(g.get_type(x)))
+    x_no_nan = g.op.Where(g.op.IsNaN(x, name=name), zero, x, name=name)
+    return aten_sum(g, sts, outputs, x_no_nan, dim=dim, keepdim=keepdim, dtype=dtype, name=name)
+
+
+def aten_nansum_dim_IntList(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]],
+    keepdim: bool,
+    dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    name: str = "nansum_dim_IntList",
+) -> T:
+    """Reduces sum with explicit dim list while treating NaN values as zero."""
+    zero = np.array([0], dtype=tensor_dtype_to_np_dtype(g.get_type(x)))
+    x_no_nan = g.op.Where(g.op.IsNaN(x, name=name), zero, x, name=name)
+    return aten_sum_dim_IntList(g, sts, outputs, x_no_nan, dim=dim, keepdim=keepdim, dtype=dtype)
+
+
+def aten_nanmean(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    keepdim: bool = False,
+    dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    name: str = "nanmean",
+) -> T:
+    """Reduces mean while treating NaN values as absent (excluded from count)."""
+    xtype = g.get_type(x)
+    np_dtype = tensor_dtype_to_np_dtype(xtype)
+    zero = np.array([0], dtype=np_dtype)
+    nan_mask = g.op.IsNaN(x, name=name)
+    x_no_nan = g.op.Where(nan_mask, zero, x, name=name)
+    not_nan_float = g.op.Cast(g.op.Not(nan_mask, name=name), to=xtype, name=name)
+    if dim is None:
+        total = g.op.ReduceSumAnyOpset(x_no_nan, keepdims=1 if keepdim else 0, name=name)
+        count = g.op.ReduceSumAnyOpset(not_nan_float, keepdims=1 if keepdim else 0, name=name)
+    else:
+        adim = np.array([dim] if isinstance(dim, int) else dim, dtype=np.int64)
+        total = g.op.ReduceSumAnyOpset(x_no_nan, adim, keepdims=1 if keepdim else 0, name=name)
+        count = g.op.ReduceSumAnyOpset(
+            not_nan_float, adim, keepdims=1 if keepdim else 0, name=name
+        )
+    if dtype is not None:
+        itype = torch_dtype_to_onnx_dtype(dtype)
+        total = g.op.Cast(total, to=itype, name=name)
+        count = g.op.Cast(count, to=itype, name=name)
+    result = g.op.Div(total, count, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim)
+    return result
+
+
 def aten_narrow(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
