@@ -991,7 +991,7 @@ class DynamoInterpreter:
                 allow_empty=True,
             )
 
-        if isinstance(val, (self.torch.SymInt, self.torch.SymFloat, self.TracingInt)):
+        if isinstance(val, (self.torch.SymInt, self.torch.SymFloat, self.builder.TracingInt)):
             return self.builder.make_dynamic_object(node.name, val, shape_as_input=True)
 
         if isinstance(val, (int, float)):
@@ -2289,7 +2289,7 @@ class DynamoInterpreter:
                 )
             if isinstance(val, (int, self.torch.SymInt)):
                 return self.torch.SymInt
-            if isinstance(val, self.TracingInt):
+            if isinstance(val, self.builder.TracingInt):
                 return self.TracingInt
             if isinstance(val, self.torch.SymBool):
                 return self.torch.SymBool
