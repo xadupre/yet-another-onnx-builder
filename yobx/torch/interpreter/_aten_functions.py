@@ -9915,7 +9915,7 @@ def aten_ravel(
     x: T,
     name: str = "ravel",
 ) -> T:
-    """ravel --> Reshape to 1D."""
+    """Reshapes the input tensor to 1D."""
     return aten_flatten_using_ints(g, sts, outputs, x, start_dim=0, end_dim=-1, name=name)
 
 
