@@ -1792,6 +1792,7 @@ class GraphBuilder(
         for sdim in shape:
             if not isinstance(sdim, str):
                 continue
+            assert not isinstance(sdim, self.TracingInt)
             self.register_dynamic_objects_from_dim(sdim)
         shape0 = shape
         verified = self.verify_shape(shape, 0, name=name)
@@ -3060,8 +3061,10 @@ class GraphBuilder(
             dim = self._dynamic_alias[str(dim)]
         if isinstance(dim, str):
             return True
+        if self._has_torch and isinstance(dim, self.TracingInt):
+            return not dim.is_static
         if not isinstance(dim, int) and (
-            not self._has_torch or isinstance(dim, self.torch.SymInt)  # type: ignore
+            not self._has_torch or isinstance(dim, self.torch.SymInt)
         ):
             return False
         assert (

@@ -13771,7 +13771,7 @@ def aten_upsample_bilinear2d(
 ) -> T:
     """resize"""
     assert output_size is not None, "Not implemented when size is None"
-    assert scale_d is None, f"Not implemented when scale_h={scale_h}"
+    assert scale_d is None, f"Not implemented when scale_d={scale_d}"
     assert scale_h is None, f"Not implemented when scale_h={scale_h}"
 
     return _aten_upsample_output_size(

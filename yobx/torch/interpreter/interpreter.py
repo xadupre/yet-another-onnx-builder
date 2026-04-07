@@ -1760,8 +1760,10 @@ class DynamoInterpreter:
     def _verify_new_shape(self, shape, node):
         for axis, dim in enumerate(shape):
             if isinstance(dim, (self.torch.SymInt, self.builder.TracingInt)):
-                assert not isinstance(dim, self.builder.TracingInt), "not yet implemented"
-                sdim = self.builder._torch_sym_int_to_str(dim)
+                if isinstance(dim, self.builder.TracingInt):
+                    sdim = dim.value
+                else:
+                    sdim = self.builder._torch_sym_int_to_str(dim)
                 tokens = parse_expression_tokens(sdim)
                 if len(tokens) == 1:
                     # Only one token, possibly knew
@@ -2394,6 +2396,11 @@ class DynamoInterpreter:
                     for t in shape:
                         if isinstance(t, self.builder.torch.SymInt):
                             expr = str(t.node._expr).replace(" ", "")
+                            if expr not in self.builder.dynamic_objects:
+                                # A new shape may be given to a result.
+                                self.builder.add_dynamic_object(expr, t, parse=True)
+                        elif isinstance(t, self.builder.TracingInt) and not t.is_static:
+                            expr = t.value
                             if expr not in self.builder.dynamic_objects:
                                 # A new shape may be given to a result.
                                 self.builder.add_dynamic_object(expr, t, parse=True)
