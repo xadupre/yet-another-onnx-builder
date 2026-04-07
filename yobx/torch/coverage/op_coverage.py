@@ -130,11 +130,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "linalg_solve_ex",
         "linalg_svdvals",
         "linalg_vecdot",
-        "log10",
-        "log1p",
-        "log2",
-        "logaddexp",
-        "logaddexp2",
         "logical_xor",
         "lu_solve",
         "lu_unpack",
@@ -276,6 +271,11 @@ XFAIL_OPS_BFLOAT16: FrozenSet[str] = frozenset(
         "addcmul",  # ref_diff > 2e-2
         "bmm",  # matmul numerical error exceeds bfloat16 tolerance
         "expm1",  # reduced-precision exponential error
+        "log10",  # bfloat16 precision loss in Log
+        "log1p",  # bfloat16 precision loss in Log
+        "log2",  # bfloat16 precision loss in Log
+        "logaddexp",  # bfloat16 precision loss in Log/Exp
+        "logaddexp2",  # bfloat16 precision loss in Log/Exp
         # Incorrect results (ordering) for bfloat16:
         "argsort",  # ordering instability due to reduced precision
     }
@@ -313,6 +313,11 @@ XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
         "isnan",  # InvalidGraph: int32 not supported by IsNaN
         "lcm",  # FunctionNotFoundError
         "log",  # ONNX op only supports float dtypes
+        "log10",  # ONNX Log op only supports float dtypes
+        "log1p",  # ONNX Log op only supports float dtypes
+        "log2",  # ONNX Log op only supports float dtypes
+        "logaddexp",  # ONNX Log/Exp ops only support float dtypes
+        "logaddexp2",  # ONNX Log/Exp ops only support float dtypes
         "logit",  # ONNX Log op only supports float dtypes
         "nanmean",  # IsNaN not supported for integer dtypes
         "nansum",  # IsNaN not supported for integer dtypes
@@ -369,6 +374,11 @@ XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
         "isnan",  # InvalidGraph: int64 not supported by IsNaN
         "lcm",  # FunctionNotFoundError
         "log",  # ONNX op only supports float dtypes
+        "log10",  # ONNX Log op only supports float dtypes
+        "log1p",  # ONNX Log op only supports float dtypes
+        "log2",  # ONNX Log op only supports float dtypes
+        "logaddexp",  # ONNX Log/Exp ops only support float dtypes
+        "logaddexp2",  # ONNX Log/Exp ops only support float dtypes
         "logit",  # ONNX Log op only supports float dtypes
         "nanmean",  # IsNaN not supported for integer dtypes
         "nansum",  # IsNaN not supported for integer dtypes
