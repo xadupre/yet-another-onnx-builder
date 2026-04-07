@@ -1058,7 +1058,7 @@ def aten_atleast_1d(
     x: T,
     name: str = "atleast_1d",
 ) -> T:
-    """atleast_1d — ensures the result has at least 1 dimension.
+    """atleast_1d — Ensures the result has at least 1 dimension.
 
     A 0-D (scalar) tensor is unsqueezed to shape ``(1,)``.
     Tensors with rank >= 1 are returned unchanged.
@@ -1086,7 +1086,7 @@ def aten_atleast_2d(
     x: T,
     name: str = "atleast_2d",
 ) -> T:
-    """atleast_2d — ensures the result has at least 2 dimensions.
+    """atleast_2d — Ensures the result has at least 2 dimensions.
 
     * rank 0 → shape ``(1, 1)``
     * rank 1 → shape ``(1, n)``
@@ -1130,7 +1130,7 @@ def aten_atleast_3d(
     x: T,
     name: str = "atleast_3d",
 ) -> T:
-    """atleast_3d — ensures the result has at least 3 dimensions.
+    """atleast_3d — Ensures the result has at least 3 dimensions.
 
     * rank 0 → shape ``(1, 1, 1)``
     * rank 1 → shape ``(1, n, 1)``
@@ -1160,43 +1160,25 @@ def aten_atleast_3d(
                         g.set_type(res, g.get_type(x))
                         g.set_shape(res, (1, n, 1))
                     return res
-                # dynamic n
-                dim_n = g.op.Shape(x, start=0, end=1, name=name)
-                shape_1n1 = g.op.Concat(
-                    g.make_initializer(
-                        "", np.array([1], dtype=np.int64), source="atleast_3d.1_a"
-                    ),
-                    dim_n,
-                    g.make_initializer(
-                        "", np.array([1], dtype=np.int64), source="atleast_3d.1_b"
-                    ),
-                    axis=0,
-                    name=name,
-                )
-                res = g.make_node("Reshape", [x, shape_1n1], outputs, name=name)
-                if not sts:
-                    g.set_type(res, g.get_type(x))
-                    g.set_shape(res, (1, n, 1))
-                return res
             else:
-                # rank known but shape not known
-                dim_n = g.op.Shape(x, start=0, end=1, name=name)
-                shape_1n1 = g.op.Concat(
-                    g.make_initializer(
-                        "", np.array([1], dtype=np.int64), source="atleast_3d.1_a"
-                    ),
-                    dim_n,
-                    g.make_initializer(
-                        "", np.array([1], dtype=np.int64), source="atleast_3d.1_b"
-                    ),
-                    axis=0,
-                    name=name,
-                )
-                res = g.make_node("Reshape", [x, shape_1n1], outputs, name=name)
-                if not sts:
-                    g.set_type(res, g.get_type(x))
+                n = None
+            # dynamic n: build shape [1, n, 1] at runtime
+            dim_n = g.op.Shape(x, start=0, end=1, name=name)
+            shape_1n1 = g.op.Concat(
+                g.make_initializer("", np.array([1], dtype=np.int64), source="atleast_3d.1_a"),
+                dim_n,
+                g.make_initializer("", np.array([1], dtype=np.int64), source="atleast_3d.1_b"),
+                axis=0,
+                name=name,
+            )
+            res = g.make_node("Reshape", [x, shape_1n1], outputs, name=name)
+            if not sts:
+                g.set_type(res, g.get_type(x))
+                if n is not None:
+                    g.set_shape(res, (1, n, 1))
+                else:
                     g.set_rank(res, 3)
-                return res
+            return res
         if rank == 2:
             res = g.op.UnsqueezeAnyOpset(
                 x, np.array([-1], dtype=np.int64), outputs=outputs, name=name
