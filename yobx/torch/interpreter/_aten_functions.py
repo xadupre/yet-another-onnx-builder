@@ -7028,7 +7028,7 @@ def aten_logit(
     eps: Optional[float] = None,
     name: str = "logit",
 ) -> T:
-    """logit(x[, eps]) = log(x) - log(1 - x), with optional clamping."""
+    """Computes the logit of each element: log(x / (1 - x)), with optional eps clamping."""
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     x_in = x
     if eps is not None:
