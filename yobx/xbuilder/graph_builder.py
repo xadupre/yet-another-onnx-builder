@@ -3245,7 +3245,7 @@ class GraphBuilder(
         self._dynamic_examples[name].add(value)
 
     def _torch_sym_int(self, d, add: bool = False) -> Optional[Union[int, str, float]]:
-        if isinstance(d, self.TracingInt):
+        if self._has_torch and isinstance(d, self.TracingInt):
             return d.value
         assert isinstance(d, str) or (
             self._has_torch and isinstance(d, (self.torch.SymInt, str, self.torch.SymFloat))  # type: ignore
