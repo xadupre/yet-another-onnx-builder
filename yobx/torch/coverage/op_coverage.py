@@ -136,7 +136,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "logaddexp",
         "logaddexp2",
         "logical_xor",
-        "logit",
         "lu_solve",
         "lu_unpack",
         "mH",
