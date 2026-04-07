@@ -7020,6 +7020,116 @@ def aten_log(
     return res
 
 
+def aten_log10(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "log10"
+) -> T:
+    """log10 — computes log base 10 as ``log(x) * log10(e)``."""
+    assert g.has_type(x), f"log10: type of {x!r} must be known{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    log10_e = np.array(math.log10(math.e), dtype=dtype)
+    log_x = g.op.Log(x, name=name)
+    set_type_shape_unary_op(g, log_x, x)
+    res = g.op.Mul(log_x, log10_e, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_log1p(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "log1p"
+) -> T:
+    """log1p — computes ``log(1 + x)``."""
+    assert g.has_type(x), f"log1p: type of {x!r} must be known{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    one = np.array(1, dtype=dtype)
+    xp1 = g.op.Add(x, one, name=name)
+    set_type_shape_unary_op(g, xp1, x)
+    res = g.op.Log(xp1, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_log2(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "log2"
+) -> T:
+    """log2 — computes log base 2 as ``log(x) * log2(e)``."""
+    assert g.has_type(x), f"log2: type of {x!r} must be known{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    log2_e = np.array(math.log2(math.e), dtype=dtype)
+    log_x = g.op.Log(x, name=name)
+    set_type_shape_unary_op(g, log_x, x)
+    res = g.op.Mul(log_x, log2_e, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_logaddexp(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "logaddexp",
+) -> T:
+    """logaddexp — computes ``log(exp(x) + exp(y))`` in a numerically stable way."""
+    m = g.op.Max(x, y, name=name)
+    set_type_shape_binary_op(g, m, x, y)
+    diff_x = g.op.Sub(x, m, name=name)
+    set_type_shape_unary_op(g, diff_x, x)
+    diff_y = g.op.Sub(y, m, name=name)
+    set_type_shape_unary_op(g, diff_y, y)
+    exp_dx = g.op.Exp(diff_x, name=name)
+    set_type_shape_unary_op(g, exp_dx, x)
+    exp_dy = g.op.Exp(diff_y, name=name)
+    set_type_shape_unary_op(g, exp_dy, y)
+    sum_exp = g.op.Add(exp_dx, exp_dy, name=name)
+    set_type_shape_binary_op(g, sum_exp, exp_dx, exp_dy)
+    log_sum = g.op.Log(sum_exp, name=name)
+    set_type_shape_unary_op(g, log_sum, sum_exp)
+    res = g.op.Add(m, log_sum, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_binary_op(g, res, x, y)
+    return res
+
+
+def aten_logaddexp2(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "logaddexp2",
+) -> T:
+    """logaddexp2 — computes ``log2(2**x + 2**y)`` in a numerically stable way."""
+    assert g.has_type(x), f"logaddexp2: type of {x!r} must be known{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    log2_e = np.array(math.log2(math.e), dtype=dtype)
+    m = g.op.Max(x, y, name=name)
+    set_type_shape_binary_op(g, m, x, y)
+    diff_x = g.op.Sub(x, m, name=name)
+    set_type_shape_unary_op(g, diff_x, x)
+    diff_y = g.op.Sub(y, m, name=name)
+    set_type_shape_unary_op(g, diff_y, y)
+    # 2^(x-m) = exp((x-m) * ln(2)) = exp((x-m) / log2(e))
+    ln2 = np.array(math.log(2), dtype=dtype)
+    pow_x = g.op.Exp(g.op.Mul(diff_x, ln2, name=name), name=name)
+    set_type_shape_unary_op(g, pow_x, x)
+    pow_y = g.op.Exp(g.op.Mul(diff_y, ln2, name=name), name=name)
+    set_type_shape_unary_op(g, pow_y, y)
+    sum_pow = g.op.Add(pow_x, pow_y, name=name)
+    set_type_shape_binary_op(g, sum_pow, pow_x, pow_y)
+    log_sum = g.op.Log(sum_pow, name=name)
+    set_type_shape_unary_op(g, log_sum, sum_pow)
+    log2_sum = g.op.Mul(log_sum, log2_e, name=name)
+    set_type_shape_unary_op(g, log2_sum, log_sum)
+    res = g.op.Add(m, log2_sum, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_binary_op(g, res, x, y)
+    return res
+
+
 def aten_logit(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
