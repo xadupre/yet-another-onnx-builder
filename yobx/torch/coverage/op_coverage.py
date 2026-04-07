@@ -308,6 +308,11 @@ XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
         "isnan",  # InvalidGraph: int32 not supported by IsNaN
         "lcm",  # FunctionNotFoundError
         "log",  # ONNX op only supports float dtypes
+        "log10",  # ONNX Log op only supports float dtypes
+        "log1p",  # ONNX Log op only supports float dtypes
+        "log2",  # ONNX Log op only supports float dtypes
+        "logaddexp",  # ONNX Log/Exp ops only support float dtypes
+        "logaddexp2",  # ONNX Log/Exp ops only support float dtypes
         "logit",  # ONNX Log op only supports float dtypes
         "nanmean",  # IsNaN not supported for integer dtypes
         "nansum",  # IsNaN not supported for integer dtypes
@@ -364,6 +369,11 @@ XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
         "isnan",  # InvalidGraph: int64 not supported by IsNaN
         "lcm",  # FunctionNotFoundError
         "log",  # ONNX op only supports float dtypes
+        "log10",  # ONNX Log op only supports float dtypes
+        "log1p",  # ONNX Log op only supports float dtypes
+        "log2",  # ONNX Log op only supports float dtypes
+        "logaddexp",  # ONNX Log/Exp ops only support float dtypes
+        "logaddexp2",  # ONNX Log/Exp ops only support float dtypes
         "logit",  # ONNX Log op only supports float dtypes
         "nanmean",  # IsNaN not supported for integer dtypes
         "nansum",  # IsNaN not supported for integer dtypes
