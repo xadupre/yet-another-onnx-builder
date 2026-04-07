@@ -3410,6 +3410,73 @@ def aten_erf(
     return res
 
 
+def aten_erfc(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "erfc"
+) -> T:
+    """Computes the complementary error function, erfc(x) = 1 - erf(x)."""
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    one = np.array([1], dtype=dtype)
+    res = g.op.Sub(one, g.op.Erf(x, name=name), name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_erfinv(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "erfinv"
+) -> T:
+    """Computes the inverse error function via Winitzki approximation + Newton refinement."""
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    # Winitzki (2008) single-formula approximation:
+    #   u = ln((1 - x) * (1 + x))            [= ln(1 - x^2), negative for |x| < 1]
+    #   p = 2/(pi*a) + u/2,  a = 0.147
+    #   erfinv(x) ~ sign(x) * sqrt(sqrt(p^2 - u/a) - p)
+    # max error ~ 1.2e-4; three Newton steps bring it to float32 precision.
+    a = 0.147
+    two_over_pi_a = np.array([2.0 / (math.pi * a)], dtype=dtype)
+    inv_a = np.array([1.0 / a], dtype=dtype)
+    half = np.array([0.5], dtype=dtype)
+    one = np.array([1], dtype=dtype)
+    sqrt_pi_over_2 = np.array([math.sqrt(math.pi) / 2.0], dtype=dtype)
+
+    # u = ln((1 - x) * (1 + x))  — more numerically stable than ln(1 - x^2)
+    u = g.op.Log(
+        g.op.Mul(g.op.Sub(one, x, name=name), g.op.Add(one, x, name=name), name=name), name=name
+    )
+    # p = 2/(pi*a) + u/2
+    p = g.op.Add(two_over_pi_a, g.op.Mul(half, u, name=name), name=name)
+    # inner = sqrt(p^2 - u/a) - p  (always >= 0 for |x| < 1)
+    inner = g.op.Sub(
+        g.op.Sqrt(
+            g.op.Sub(g.op.Mul(p, p, name=name), g.op.Mul(inv_a, u, name=name), name=name),
+            name=name,
+        ),
+        p,
+        name=name,
+    )
+    # Initial estimate: y = sign(x) * sqrt(inner)
+    y = g.op.Mul(g.op.Sign(x, name=name), g.op.Sqrt(inner, name=name), name=name)
+    # Newton refinement: y -= (erf(y) - x) * sqrt(pi)/2 * exp(y^2)
+    # Step 1
+    y2 = g.op.Mul(y, y, name=name)
+    err = g.op.Sub(g.op.Erf(y, name=name), x, name=name)
+    corr = g.op.Mul(err, g.op.Mul(sqrt_pi_over_2, g.op.Exp(y2, name=name), name=name), name=name)
+    y = g.op.Sub(y, corr, name=name)
+    # Step 2
+    y2 = g.op.Mul(y, y, name=name)
+    err = g.op.Sub(g.op.Erf(y, name=name), x, name=name)
+    corr = g.op.Mul(err, g.op.Mul(sqrt_pi_over_2, g.op.Exp(y2, name=name), name=name), name=name)
+    y = g.op.Sub(y, corr, name=name)
+    # Step 3 (final, writes to outputs)
+    y2 = g.op.Mul(y, y, name=name)
+    err = g.op.Sub(g.op.Erf(y, name=name), x, name=name)
+    corr = g.op.Mul(err, g.op.Mul(sqrt_pi_over_2, g.op.Exp(y2, name=name), name=name), name=name)
+    res = g.op.Sub(y, corr, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
 def aten_eq(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T, name="eq"
 ) -> T:

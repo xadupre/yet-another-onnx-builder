@@ -90,8 +90,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "diagonal_scatter",
         "digamma",
         "dot",
-        "erfc",
-        "erfinv",
         "exp2",
         "fft_fftshift",
         "fft_ifftshift",
@@ -270,6 +268,7 @@ XFAIL_OPS_BFLOAT16: FrozenSet[str] = frozenset(
         # Numerical mismatch too large for bfloat16 tolerance (2e-2):
         "addcmul",  # ref_diff > 2e-2
         "bmm",  # matmul numerical error exceeds bfloat16 tolerance
+        "erfinv",  # bfloat16 precision insufficient for erfinv computation
         "expm1",  # reduced-precision exponential error
         "log10",  # bfloat16 precision loss in Log
         "log1p",  # bfloat16 precision loss in Log
@@ -304,6 +303,8 @@ XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
         "cos",  # ONNX op only supports float dtypes
         "cosh",  # ONNX op only supports float dtypes
         "erf",  # ONNX op only supports float dtypes
+        "erfc",  # ONNX Erf only supports float dtypes
+        "erfinv",  # ONNX Erf/Log/Exp only support float dtypes
         "exp",  # ONNX op only supports float dtypes
         "expm1",  # ONNX op only supports float dtypes
         "floor",  # InvalidGraph: int32 not supported by Floor
@@ -365,6 +366,8 @@ XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
         "cos",  # ONNX op only supports float dtypes
         "cosh",  # ONNX op only supports float dtypes
         "erf",  # ONNX op only supports float dtypes
+        "erfc",  # ONNX Erf only supports float dtypes
+        "erfinv",  # ONNX Erf/Log/Exp only support float dtypes
         "exp",  # ONNX op only supports float dtypes
         "expm1",  # ONNX op only supports float dtypes
         "floor",  # InvalidGraph: int64 not supported by Floor
