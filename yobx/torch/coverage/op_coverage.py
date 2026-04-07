@@ -15,6 +15,10 @@ results or raise errors unrelated to missing converters.
 :data:`XFAIL_OPS_INT32`, :data:`XFAIL_OPS_INT64` – dtype-specific extra
 exclusions on top of :data:`XFAIL_OPS`.
 
+:data:`ATOL_OPS_FLOAT16`, :data:`ATOL_OPS_BFLOAT16` – per-op absolute
+tolerance overrides for float16 and bfloat16, for ops whose reduced-precision
+errors exceed the global dtype tolerance.
+
 These sets are consumed by the op-db test module
 :mod:`unittests.torch.coverage.test_onnx_export_common_methods` and by
 :func:`get_op_coverage_rst` which builds a documentation coverage table.
@@ -22,7 +26,7 @@ These sets are consumed by the op-db test module
 
 from __future__ import annotations
 
-from typing import FrozenSet
+from typing import Dict, FrozenSet
 
 # ---------------------------------------------------------------------------
 # Status symbols (used by get_op_coverage_rst)
@@ -381,6 +385,22 @@ XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
         "trunc",  # InvalidGraph: int64 not supported by Round
     }
 )
+
+# Per-op absolute tolerance overrides for torch.float16.
+# Ops whose variance/std computation compounds float16 rounding errors need
+# a larger tolerance than the global _ATOL_FLOAT16 = 1e-2.
+ATOL_OPS_FLOAT16: Dict[str, float] = {
+    "std": 1e-1,  # variance accumulates float16 rounding; sqrt amplifies
+    "std_mean": 1e-1,  # same compound error as std
+}
+
+# Per-op absolute tolerance overrides for torch.bfloat16.
+# bfloat16 has only 7 mantissa bits, so statistical ops need an even wider
+# tolerance than the global _ATOL_BFLOAT16 = 2e-2.
+ATOL_OPS_BFLOAT16: Dict[str, float] = {
+    "std": 2e-1,  # bfloat16 precision loss is larger than float16
+    "std_mean": 2e-1,  # same compound error as std
+}
 
 
 def get_op_coverage_rst() -> str:

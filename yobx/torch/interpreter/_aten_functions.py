@@ -11741,7 +11741,7 @@ def aten_std_dim(
     outputs: List[str],
     x: T,
     dims: Sequence[int],
-    correction: float,
+    correction: Optional[float],
     keepdim: bool = False,
     name: str = "std_dim",
 ) -> T:
@@ -11756,7 +11756,8 @@ def aten_std_dim(
     sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
     var = g.op.ReduceMeanAnyOpset(sqr_mean, cdims, keepdims=1 if keepdim else 0, name=name)
 
-    if correction > 0:
+    # correction=None means no Bessel correction (same as correction=0)
+    if correction is not None and correction > 0:
         assert g.has_shape(
             x
         ), f"not implemented if shape of x={x!r} is missing{g.get_debug_msg()}"
@@ -11782,7 +11783,7 @@ def _std_var_correction(
     g: GraphBuilder,
     x: T,
     dim: Optional[Union[int, List[int]]],
-    correction: float,
+    correction: Optional[float],
     keepdim: bool,
     name: str,
 ) -> T:
@@ -11793,13 +11794,15 @@ def _std_var_correction(
     """
     itype = g.get_type(x)
     dtype = tensor_dtype_to_np_dtype(itype)
+    # correction=None means no Bessel correction (same as correction=0)
+    apply_correction = correction is not None and correction > 0
 
     if dim is None:
         mean = g.op.ReduceMeanAnyOpset(x, name=name, keepdims=1)
         sub_mean = g.op.Sub(x, mean, name=name)
         sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
         var = g.op.ReduceMeanAnyOpset(sqr_mean, name=name, keepdims=1 if keepdim else 0)
-        if correction > 0:
+        if apply_correction:
             assert g.has_shape(
                 x
             ), f"not implemented if shape of x={x!r} is missing{g.get_debug_msg()}"
@@ -11817,7 +11820,7 @@ def _std_var_correction(
         sub_mean = g.op.Sub(x, mean, name=name)
         sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
         var = g.op.ReduceMeanAnyOpset(sqr_mean, cdims, name=name, keepdims=1 if keepdim else 0)
-        if correction > 0:
+        if apply_correction:
             assert g.has_shape(
                 x
             ), f"not implemented if shape of x={x!r} is missing{g.get_debug_msg()}"
@@ -11839,7 +11842,7 @@ def aten_std_correction(
     outputs: List[str],
     x: T,
     dim: Optional[Union[int, List[int]]] = None,
-    correction: float = 1,
+    correction: Optional[float] = 1,
     keepdim: bool = False,
     name: str = "std_correction",
 ) -> T:
@@ -11857,7 +11860,7 @@ def aten_std_mean_correction(
     outputs: List[str],
     x: T,
     dim: Optional[Union[int, List[int]]] = None,
-    correction: float = 1,
+    correction: Optional[float] = 1,
     keepdim: bool = False,
     name: str = "std_mean_correction",
 ) -> Tuple[T, T]:
