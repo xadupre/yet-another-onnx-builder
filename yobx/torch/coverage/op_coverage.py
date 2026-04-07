@@ -146,9 +146,7 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "mode",
         "msort",
         "mv",
-        "nanmean",
         "nanmedian",
-        "nansum",
         "nextafter",
         "nn_functional_binary_cross_entropy",
         "nn_functional_binary_cross_entropy_with_logits",
@@ -316,6 +314,8 @@ XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
         "lcm",  # FunctionNotFoundError
         "log",  # ONNX op only supports float dtypes
         "logit",  # ONNX Log op only supports float dtypes
+        "nanmean",  # IsNaN not supported for integer dtypes
+        "nansum",  # IsNaN not supported for integer dtypes
         "nn_functional_relu",  # NOT_IMPLEMENTED: Relu not supported for int32
         "nn_functional_softsign",  # type mismatch in Div
         "nn_functional_tanhshrink",  # ONNX Tanh only supports float dtypes
@@ -370,6 +370,8 @@ XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
         "lcm",  # FunctionNotFoundError
         "log",  # ONNX op only supports float dtypes
         "logit",  # ONNX Log op only supports float dtypes
+        "nanmean",  # IsNaN not supported for integer dtypes
+        "nansum",  # IsNaN not supported for integer dtypes
         "nn_functional_relu",  # NOT_IMPLEMENTED: Relu not supported for int64
         "nn_functional_softsign",  # type mismatch in Div
         "nn_functional_tanhshrink",  # ONNX Tanh only supports float dtypes
