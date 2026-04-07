@@ -1972,6 +1972,46 @@ def aten_bucketize_Tensor(
     return res
 
 
+def aten_cartesian_prod(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    tensors: Sequence[T],
+    name: str = "cartesian_prod",
+) -> T:
+    """Computes the Cartesian product of input 1D tensors.
+
+    Returns a 2D tensor where each row contains one combination of elements
+    from the input tensors.
+    """
+    n = len(tensors)
+    # Collects the 1-element shape tensors [s_i] for each input 1D tensor.
+    shapes = [g.op.Shape(t, name=name) for t in tensors]
+    # Concatenates to form the full grid shape [s_0, s_1, ..., s_{n-1}].
+    full_shape = g.op.Concat(*shapes, axis=0, name=name)
+
+    flat_cols = []
+    for i, t in enumerate(tensors):
+        # Reshapes 1D tensor [s_i] to [1, ..., s_i, ..., 1] with s_i at axis i.
+        new_shape = np.ones(n, dtype=np.int64)
+        new_shape[i] = -1
+        r = g.op.Reshape(t, new_shape, name=name)
+        # Expands to the full grid shape [s_0, s_1, ..., s_{n-1}].
+        e = g.op.Expand(r, full_shape, name=name)
+        # Flattens to [s_0 * s_1 * ... * s_{n-1}].
+        flat = g.op.Reshape(e, g.MINUS_ONE, name=name)
+        flat_cols.append(flat)
+
+    # Unsqueezes each flat column to [total, 1] then concatenates along axis 1.
+    unsqueezed = [g.op.UnsqueezeAnyOpset(f, g.ONE, name=name) for f in flat_cols]
+    res = g.op.Concat(*unsqueezed, axis=1, outputs=outputs, name=name)
+    if not sts:
+        itype = g.get_type(tensors[0])
+        g.set_type(res, itype)
+        g.set_rank(res, 2)
+    return res
+
+
 def aten_cat(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
