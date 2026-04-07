@@ -90,8 +90,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "diagonal_scatter",
         "digamma",
         "dot",
-        "erfc",
-        "erfinv",
         "exp2",
         "fft_fftshift",
         "fft_ifftshift",
