@@ -22,6 +22,7 @@ yobx.torch
     torch_helper
     tracing
     validate
+    coverage/index
     in_torch/index
     in_transformers/index
     interpreter/index
