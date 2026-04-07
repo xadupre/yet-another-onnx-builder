@@ -3692,7 +3692,7 @@ class GraphBuilder(
                     )
             if isinstance(obj, self.TracingInt):
                 assert not obj.is_static, f"Dimension {obj!r} is static{self.get_debug_msg()}"
-                return obj.value
+                return obj.value  # type: ignore
             if exc:
                 raise AssertionError(
                     f"Object has {type(obj)} but could not find a dynamic interpretation"
