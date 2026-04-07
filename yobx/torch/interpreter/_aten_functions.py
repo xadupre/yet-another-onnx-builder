@@ -11786,7 +11786,7 @@ def _std_var_correction(
     keepdim: bool,
     name: str,
 ) -> T:
-    """Shared helper that computes biased or unbiased variance (before sqrt for std).
+    """Computes biased or unbiased variance (before sqrt for std).
 
     Returns:
         The variance tensor (same dtype as *x*).
@@ -11843,7 +11843,7 @@ def aten_std_correction(
     keepdim: bool = False,
     name: str = "std_correction",
 ) -> T:
-    """std_correction"""
+    """Computes the standard deviation with optional Bessel correction."""
     var = _std_var_correction(g, x, dim, correction, keepdim, name)
     res = g.op.Sqrt(var, outputs=outputs, name=name)
     if not sts:
@@ -11861,7 +11861,7 @@ def aten_std_mean_correction(
     keepdim: bool = False,
     name: str = "std_mean_correction",
 ) -> Tuple[T, T]:
-    """std_mean_correction"""
+    """Computes the standard deviation and mean with optional Bessel correction."""
     var = _std_var_correction(g, x, dim, correction, keepdim, name)
     std = g.op.Sqrt(var, outputs=outputs[:1], name=name)
     if dim is None:
