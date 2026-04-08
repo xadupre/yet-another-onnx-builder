@@ -2004,7 +2004,10 @@ def aten_cartesian_prod(
 
     # Unsqueezes each flat column to [total, 1] then concatenates along axis 1.
     unsqueezed = [g.op.UnsqueezeAnyOpset(f, g.ONE, name=name) for f in flat_cols]
-    res = g.op.Concat(*unsqueezed, axis=1, outputs=outputs, name=name)
+    if len(unsqueezed) == 1:
+        res = g.op.Identity(unsqueezed[0], outputs=outputs, name=name)
+    else:
+        res = g.op.Concat(*unsqueezed, axis=1, outputs=outputs, name=name)
     if not sts:
         itype = g.get_type(tensors[0])
         g.set_type(res, itype)
