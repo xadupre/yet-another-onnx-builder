@@ -119,7 +119,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "linalg_solve_ex",
         "linalg_svdvals",
         "linalg_vecdot",
-        "logical_xor",
         "lu_solve",
         "lu_unpack",
         "mH",
