@@ -1988,7 +1988,10 @@ def aten_cartesian_prod(
     # Collects the 1-element shape tensors [s_i] for each input 1D tensor.
     shapes = [g.op.Shape(t, name=name) for t in tensors]
     # Concatenates to form the full grid shape [s_0, s_1, ..., s_{n-1}].
-    full_shape = g.op.Concat(*shapes, axis=0, name=name)
+    if len(shapes) == 1:
+        full_shape = shapes[0]
+    else:
+        full_shape = g.op.Concat(*shapes, axis=0, name=name)
 
     flat_cols = []
     for i, t in enumerate(tensors):
