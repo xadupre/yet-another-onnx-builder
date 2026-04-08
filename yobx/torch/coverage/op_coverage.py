@@ -70,7 +70,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "argwhere",
         "bernoulli",
         "block_diag",
-        "cartesian_prod",
         "conj_physical",
         "copysign",
         "count_nonzero",
