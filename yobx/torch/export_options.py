@@ -566,6 +566,10 @@ class ExportOptions:
                 module_leaves=self.tracing_module_leaves,
             )
 
+            from .tracing import CustomTracer
+
+            CustomTracer._replace_inplace_aten_functions(graph, verbose=verbose)
+
             if self.save_ep:
                 save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
                 with open(f"{save_ep}.new_tracing", "w") as f:

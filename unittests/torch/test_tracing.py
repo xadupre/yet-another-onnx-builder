@@ -310,6 +310,52 @@ class TestCustomTracer(ExtTestCase):
         result = CustomTracer.remove_inplace(graph)
         self.assertEqual(result, 0)
 
+    def test_replace_inplace_aten_functions_no_op(self):
+        # Graph with only a non-inplace add — nothing should be replaced.
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        y = graph.placeholder("y")
+        add_node = graph.call_function(torch.ops.aten.add.Tensor, args=(x, y))
+        graph.output(add_node)
+
+        result = CustomTracer._replace_inplace_aten_functions(graph)
+        self.assertEqual(result, 0)
+        # Target unchanged
+        add_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertEqual(len(add_nodes), 1)
+        self.assertEqual(add_nodes[0].target, torch.ops.aten.add.Tensor)
+
+    def test_replace_inplace_aten_functions_tensor(self):
+        # Graph with an inplace aten.add_.Tensor node — it should be rewritten
+        # to aten.add.Tensor and its users preserved.
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        y = graph.placeholder("y")
+        add_node = graph.call_function(torch.ops.aten.add_.Tensor, args=(x, y))
+        graph.output(add_node)
+
+        result = CustomTracer._replace_inplace_aten_functions(graph)
+        self.assertEqual(result, 1)
+        # Target must be the non-inplace variant now
+        fn_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertEqual(len(fn_nodes), 1)
+        self.assertEqual(fn_nodes[0].target, torch.ops.aten.add.Tensor)
+        # Output still references the (now non-inplace) node
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        self.assertIs(output_node.args[0], fn_nodes[0])
+
+    def test_replace_inplace_aten_functions_scalar(self):
+        # Graph with aten.add_.Scalar — should become aten.add.Scalar.
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        add_node = graph.call_function(torch.ops.aten.add_.Scalar, args=(x, 2))
+        graph.output(add_node)
+
+        result = CustomTracer._replace_inplace_aten_functions(graph)
+        self.assertEqual(result, 1)
+        fn_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertEqual(fn_nodes[0].target, torch.ops.aten.add.Scalar)
+
     def test_remove_unnecessary_slices_no_slice(self):
         class Model(torch.nn.Module):
             def forward(self, x, y):
