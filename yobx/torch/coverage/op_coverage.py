@@ -147,7 +147,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "positive",
         "qr",
         "rad2deg",
-        "ravel",
         "real",
         "resize_as_",
         "resolve_conj",
