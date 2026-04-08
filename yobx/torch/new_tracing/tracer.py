@@ -80,6 +80,84 @@ def _check_replacement_ctx(tracer: "GraphTracer") -> Generator:
         torch._check = _ORIGINAL_TORCH_CHECK  # type: ignore[assignment]
 
 
+@contextlib.contextmanager
+def _roll_dynamic_shape_ctx() -> Generator:
+    """
+    Temporarily replaces the ``aten.roll.default`` decomposition with a
+    version that handles dynamic shapes.
+
+    The standard ``torch._refs.roll`` decomposition calls ``a.numel() == 0``
+    to short-circuit on empty tensors.  When the tensor has dynamic (symbolic)
+    dimensions this comparison raises
+    :exc:`torch.fx.experimental.symbolic_shapes.GuardOnDataDependentSymNode`
+    because the shape environment cannot statically evaluate whether the
+    element count is zero.
+
+    Replaces the decomposition with a patched variant that catches that error
+    and proceeds to the normal roll logic (which is safe for dynamic shapes).
+    The original decomposition is restored on exit.
+    """
+    from collections.abc import Iterable as _Iterable
+
+    import torch._prims_common as _prims_common
+    from torch._decomp import decomposition_table as _decomp_table
+    import torch.fx.experimental.symbolic_shapes as _sym_shapes
+
+    _roll_op = torch.ops.aten.roll.default
+    _orig_decomp = _decomp_table.get(_roll_op)
+
+    def _roll_with_dynamic_shapes(a: torch.Tensor, shifts: Any, dims: Any = ()) -> torch.Tensor:
+        """Reimplements torch._refs.roll, handling dynamic-shape numel check."""
+        dims = _prims_common.canonicalize_dims(a.ndim, dims)
+        if not isinstance(shifts, _Iterable):
+            shifts = (shifts,)
+        if not isinstance(dims, _Iterable):
+            dims = (dims,)
+
+        # Avoid modulo by zero — handle dynamic shapes gracefully.
+        try:
+            if a.numel() == 0:
+                return a.clone()
+        except _sym_shapes.GuardOnDataDependentSymNode:
+            pass  # Cannot determine at trace time; assume non-empty and proceed.
+
+        if a.dim() == 0 and len(dims) > 0:
+            raise IndexError(f"Dimension specified as {dims[0]} but tensor has no dimensions")
+
+        len_shifts = len(shifts)
+        len_dims = len(dims)
+        if len_shifts != 1 or len_dims != 1:
+            if len_shifts == 0:
+                raise RuntimeError("`shifts` required")
+            if len_dims == 0 and len_shifts == 1:
+                return torch.roll(torch.flatten(a), shifts, 0).view(a.shape)
+            if len_shifts != len_dims:
+                raise RuntimeError(
+                    f"shifts and dimensions must align. "
+                    f"shifts: {len_shifts}, dims: {len_dims}"
+                )
+            if len_dims <= 1:
+                raise AssertionError(f"Expected len_dims > 1, got {len_dims}")
+            tail_shifts = shifts[1:]
+            tail_dims = dims[1:]
+            first_dim_rolled = torch.roll(a, (shifts[0],), dims[0])
+            return torch.roll(first_dim_rolled, tail_shifts, tail_dims)
+
+        dim = dims[0]
+        size = a.shape[dim]
+        start = (size - shifts[0]) % size
+        idx = torch.arange(size, device=a.device)
+        return a.index_select(dim, torch.fmod(start + idx, size))
+
+    if _orig_decomp is not None:
+        _decomp_table[_roll_op] = _roll_with_dynamic_shapes
+    try:
+        yield
+    finally:
+        if _orig_decomp is not None:
+            _decomp_table[_roll_op] = _orig_decomp
+
+
 class GraphTracer:
     """
     Traces a callable by intercepting all tensor operations via
@@ -1178,7 +1256,7 @@ class GraphTracer:
         if self.verbose:
             print("[GraphTracer.trace] call...")
         clear_conditions()
-        with _cond_replacement_ctx(self), _check_replacement_ctx(self):
+        with _cond_replacement_ctx(self), _check_replacement_ctx(self), _roll_dynamic_shape_ctx():
             out = func(*tracing_args, **tracing_kwargs)
 
         for submod, orig_fwd in _patched:
