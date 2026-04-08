@@ -12681,6 +12681,60 @@ def aten_std_mean_correction(
     return std, mean
 
 
+def aten_var_correction(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    correction: Optional[float] = 1,
+    keepdim: bool = False,
+    name: str = "var_correction",
+) -> T:
+    """Computes the variance with optional Bessel correction.
+
+    Returns:
+        The variance tensor (same dtype as *x*).
+    """
+    res = _std_var_correction(g, x, dim, correction, keepdim, name)
+    res = g.op.Identity(res, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
+    return res
+
+
+def aten_var_mean_correction(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    correction: Optional[float] = 1,
+    keepdim: bool = False,
+    name: str = "var_mean_correction",
+) -> Tuple[T, T]:
+    """Computes the variance and mean with optional Bessel correction.
+
+    Returns:
+        A tuple ``(variance, mean)`` both with the same dtype as *x*.
+    """
+    var = _std_var_correction(g, x, dim, correction, keepdim, name)
+    var = g.op.Identity(var, outputs=outputs[:1], name=name)
+    if dim is None:
+        mean = g.op.ReduceMeanAnyOpset(
+            x, name=name, keepdims=1 if keepdim else 0, outputs=outputs[1:2]
+        )
+    else:
+        cdims = np.array([dim] if isinstance(dim, int) else list(dim), dtype=np.int64)
+        mean = g.op.ReduceMeanAnyOpset(
+            x, cdims, name=name, keepdims=1 if keepdim else 0, outputs=outputs[1:2]
+        )
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
+        set_type_shape_reduce_op(g, outputs[1], x, keepdim=1 if keepdim else 0)
+    return var, mean
+
+
 def aten_sub(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T, name="sub"
 ) -> T:
