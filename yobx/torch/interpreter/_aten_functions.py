@@ -12578,11 +12578,6 @@ def aten_std_dim(
     return res
 
 
-# Epsilon used inside _var_via_layernorm.  Small enough that the resulting
-# error in variance is well below float32 machine epsilon for typical values.
-_LN_EPS = np.float32(1e-7)
-
-
 def _layernorm_compatible_axis(
     dim: Optional[Union[int, List[int]]],
     rank: int,
@@ -12615,23 +12610,23 @@ def _var_via_layernorm(
     keepdim: bool,
     itype: int,
     name: str,
-) -> T:
-    """Computes population variance using ONNX LayerNormalization.
+) -> Tuple[T, T]:
+    """Computes population variance and mean using ONNX LayerNormalization.
 
     ONNX runtimes implement ``LayerNormalization`` with higher-precision
-    internal accumulators (float32 for float16/bfloat16 inputs).  This helper
-    exploits the ``InvStdDev`` output to recover variance:
-    ``var = 1 / InvStdDev² − eps``.
+    internal accumulators (float32 for float16/bfloat16 inputs).  The mean
+    output is reused to compute variance as ``E[(x − mean)²]``, which is
+    simpler and avoids the ``1/InvStdDev² − eps`` inversion.
 
     Returns:
-        The population variance tensor (same dtype as *x*, keepdim semantics
-        preserved).
+        A tuple ``(variance, mean)`` with keepdim semantics and the same dtype
+        as *x*.
     """
     dtype = tensor_dtype_to_np_dtype(itype)
-    # InvStdDev is float32 for float16/bfloat16 inputs; float64 for double.
-    eps_dtype = np.float64 if itype == TensorProto.DOUBLE else np.float32
+    # LayerNorm outputs mean in float32 for float16/bfloat16 inputs.
+    needs_upcast = itype in (TensorProto.FLOAT16, TensorProto.BFLOAT16)
 
-    # Scale must match the input dtype (ones = no scaling, just centre x).
+    # Scale: ones (no scaling); bias: omitted (no shift).
     norm_shape = g.op.Shape(x, start=axis, name=name)
     scale = g.op.ConstantOfShape(
         norm_shape,
@@ -12641,31 +12636,35 @@ def _var_via_layernorm(
 
     y_name = g.unique_name(f"{name}_ln_y")
     mean_name = g.unique_name(f"{name}_ln_mean")
-    inv_std_name = g.unique_name(f"{name}_ln_inv_std")
     g.make_node(
         "LayerNormalization",
         [x, scale, ""],
-        [y_name, mean_name, inv_std_name],
+        [y_name, mean_name],
         axis=axis,
-        epsilon=float(_LN_EPS),
+        epsilon=1e-7,
         name=name,
     )
 
-    # var = 1 / InvStdDev² - eps
-    inv_std_sq = g.op.Mul(inv_std_name, inv_std_name, name=name)
-    var = g.op.Reciprocal(inv_std_sq, name=name)
-    var = g.op.Sub(var, np.array([float(_LN_EPS)], dtype=eps_dtype), name=name)
+    # Compute variance as E[(x − mean)²] using the accurate LayerNorm mean.
+    # Upcast x to float32 for fp16/bf16 to match the mean's dtype.
+    xc = g.op.Cast(x, to=TensorProto.FLOAT, name=name) if needs_upcast else x
+    cdims = np.array(list(range(axis, rank)), dtype=np.int64)
+    sub_mean = g.op.Sub(xc, mean_name, name=name)
+    sqr = g.op.Mul(sub_mean, sub_mean, name=name)
+    var = g.op.ReduceMeanAnyOpset(sqr, cdims, name=name, keepdims=1 if keepdim else 0)
 
-    if not keepdim:
-        # InvStdDev has shape [d0, …, d_{axis-1}, 1, …, 1]; squeeze trailing 1s.
-        sq_axes = np.array(list(range(axis, rank)), dtype=np.int64)
-        var = g.op.SqueezeAnyOpset(var, sq_axes, name=name)
+    # mean_name has shape [d0, …, d_{axis-1}, 1, …, 1]; adjust to keepdim.
+    if keepdim:
+        mean_out: T = mean_name
+    else:
+        mean_out = g.op.SqueezeAnyOpset(mean_name, cdims, name=name)
 
-    # LayerNorm always outputs float32 for float16/bfloat16 inputs; cast back.
-    if itype in (TensorProto.FLOAT16, TensorProto.BFLOAT16):
+    # Cast back to input dtype for fp16/bf16.
+    if needs_upcast:
         var = g.op.Cast(var, to=itype, name=name)
+        mean_out = g.op.Cast(mean_out, to=itype, name=name)
 
-    return var
+    return var, mean_out
 
 
 def _std_var_correction(
@@ -12675,8 +12674,8 @@ def _std_var_correction(
     correction: Optional[float],
     keepdim: bool,
     name: str,
-) -> T:
-    """Computes biased or unbiased variance (before sqrt for std).
+) -> Tuple[T, T]:
+    """Computes biased or unbiased variance and mean (before sqrt for std).
 
     When there is no Bessel correction *and* the reduction dimensions form a
     contiguous trailing range (or cover all dims), ``LayerNormalization`` is
@@ -12686,7 +12685,7 @@ def _std_var_correction(
     internal behaviour.
 
     Returns:
-        The variance tensor (same dtype as *x*).
+        A tuple ``(variance, mean)`` both with the same dtype as *x*.
     """
     itype = g.get_type(x)
     dtype = tensor_dtype_to_np_dtype(itype)
@@ -12713,6 +12712,7 @@ def _std_var_correction(
         compute_dtype = dtype
 
     if dim is None:
+        # Compute mean with keepdims=1 for broadcasting in variance computation.
         mean = g.op.ReduceMeanAnyOpset(xc, name=name, keepdims=1)
         sub_mean = g.op.Sub(xc, mean, name=name)
         sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
@@ -12729,8 +12729,11 @@ def _std_var_correction(
             mul = g.op.Mul(var, numel, name=name)
             sub = g.op.Sub(numel, np.array([correction], dtype=compute_dtype), name=name)
             var = g.op.Div(mul, sub, name=name)
+        # mean has keepdims=1 (all dims are 1); squeeze to scalar if not keepdim.
+        mean_out: T = mean if keepdim else g.op.SqueezeAnyOpset(mean, name=name)
     else:
         cdims = np.array([dim] if isinstance(dim, int) else list(dim), dtype=np.int64)
+        # Compute mean with keepdims=1 for broadcasting in variance computation.
         mean = g.op.ReduceMeanAnyOpset(xc, cdims, name=name, keepdims=1)
         sub_mean = g.op.Sub(xc, mean, name=name)
         sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
@@ -12748,10 +12751,13 @@ def _std_var_correction(
             mul = g.op.Mul(var, numel, name=name)
             sub = g.op.Sub(numel, np.array([correction], dtype=compute_dtype), name=name)
             var = g.op.Div(mul, sub, name=name)
+        # mean has keepdims=1; squeeze reduced dims if not keepdim.
+        mean_out = mean if keepdim else g.op.SqueezeAnyOpset(mean, cdims, name=name)
 
     if needs_upcast:
         var = g.op.Cast(var, to=itype, name=name)
-    return var
+        mean_out = g.op.Cast(mean_out, to=itype, name=name)
+    return var, mean_out
 
 
 def aten_std_correction(
@@ -12765,7 +12771,7 @@ def aten_std_correction(
     name: str = "std_correction",
 ) -> T:
     """Computes the standard deviation with optional Bessel correction."""
-    var = _std_var_correction(g, x, dim, correction, keepdim, name)
+    var, _ = _std_var_correction(g, x, dim, correction, keepdim, name)
     res = g.op.Sqrt(var, outputs=outputs, name=name)
     if not sts:
         set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
@@ -12783,17 +12789,9 @@ def aten_std_mean_correction(
     name: str = "std_mean_correction",
 ) -> Tuple[T, T]:
     """Computes the standard deviation and mean with optional Bessel correction."""
-    var = _std_var_correction(g, x, dim, correction, keepdim, name)
+    var, mean = _std_var_correction(g, x, dim, correction, keepdim, name)
     std = g.op.Sqrt(var, outputs=outputs[:1], name=name)
-    if dim is None:
-        mean = g.op.ReduceMeanAnyOpset(
-            x, name=name, keepdims=1 if keepdim else 0, outputs=outputs[1:2]
-        )
-    else:
-        cdims = np.array([dim] if isinstance(dim, int) else list(dim), dtype=np.int64)
-        mean = g.op.ReduceMeanAnyOpset(
-            x, cdims, name=name, keepdims=1 if keepdim else 0, outputs=outputs[1:2]
-        )
+    mean = g.op.Identity(mean, outputs=outputs[1:2], name=name)
     if not sts:
         set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
         set_type_shape_reduce_op(g, outputs[1], x, keepdim=1 if keepdim else 0)
@@ -12815,8 +12813,8 @@ def aten_var_correction(
     Returns:
         The variance tensor (same dtype as *x*).
     """
-    res = _std_var_correction(g, x, dim, correction, keepdim, name)
-    res = g.op.Identity(res, outputs=outputs, name=name)
+    var, _ = _std_var_correction(g, x, dim, correction, keepdim, name)
+    res = g.op.Identity(var, outputs=outputs, name=name)
     if not sts:
         set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
     return res
@@ -12837,17 +12835,9 @@ def aten_var_mean_correction(
     Returns:
         A tuple ``(variance, mean)`` both with the same dtype as *x*.
     """
-    var = _std_var_correction(g, x, dim, correction, keepdim, name)
+    var, mean = _std_var_correction(g, x, dim, correction, keepdim, name)
     var = g.op.Identity(var, outputs=outputs[:1], name=name)
-    if dim is None:
-        mean = g.op.ReduceMeanAnyOpset(
-            x, name=name, keepdims=1 if keepdim else 0, outputs=outputs[1:2]
-        )
-    else:
-        cdims = np.array([dim] if isinstance(dim, int) else list(dim), dtype=np.int64)
-        mean = g.op.ReduceMeanAnyOpset(
-            x, cdims, name=name, keepdims=1 if keepdim else 0, outputs=outputs[1:2]
-        )
+    mean = g.op.Identity(mean, outputs=outputs[1:2], name=name)
     if not sts:
         set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
         set_type_shape_reduce_op(g, outputs[1], x, keepdim=1 if keepdim else 0)
