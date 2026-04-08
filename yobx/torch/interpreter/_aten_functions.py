@@ -12588,6 +12588,9 @@ def _std_var_correction(
 ) -> T:
     """Computes biased or unbiased variance (before sqrt for std).
 
+    Matches PyTorch's internal behaviour: float16/bfloat16 inputs are upcast to
+    float32 for the reduction, then cast back, reducing numerical error.
+
     Returns:
         The variance tensor (same dtype as *x*).
     """
@@ -12596,9 +12599,19 @@ def _std_var_correction(
     # correction=None means no Bessel correction (same as correction=0)
     apply_correction = correction is not None and correction > 0
 
+    # PyTorch accumulates variance in float32 for float16/bfloat16 inputs.
+    # Mirror that here to keep errors comparable to std_atol.
+    needs_upcast = itype in (TensorProto.FLOAT16, TensorProto.BFLOAT16)
+    if needs_upcast:
+        xc = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+        compute_dtype = np.float32
+    else:
+        xc = x
+        compute_dtype = dtype
+
     if dim is None:
-        mean = g.op.ReduceMeanAnyOpset(x, name=name, keepdims=1)
-        sub_mean = g.op.Sub(x, mean, name=name)
+        mean = g.op.ReduceMeanAnyOpset(xc, name=name, keepdims=1)
+        sub_mean = g.op.Sub(xc, mean, name=name)
         sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
         var = g.op.ReduceMeanAnyOpset(sqr_mean, name=name, keepdims=1 if keepdim else 0)
         if apply_correction:
@@ -12609,14 +12622,14 @@ def _std_var_correction(
             assert is_static_shape(
                 shape
             ), f"not implemented for shape={shape!r} for x={x!r}{g.get_debug_msg()}"
-            numel = np.prod(shape).astype(dtype)
+            numel = np.prod(shape).astype(compute_dtype)
             mul = g.op.Mul(var, numel, name=name)
-            sub = g.op.Sub(numel, np.array([correction], dtype=dtype), name=name)
+            sub = g.op.Sub(numel, np.array([correction], dtype=compute_dtype), name=name)
             var = g.op.Div(mul, sub, name=name)
     else:
         cdims = np.array([dim] if isinstance(dim, int) else list(dim), dtype=np.int64)
-        mean = g.op.ReduceMeanAnyOpset(x, cdims, name=name, keepdims=1)
-        sub_mean = g.op.Sub(x, mean, name=name)
+        mean = g.op.ReduceMeanAnyOpset(xc, cdims, name=name, keepdims=1)
+        sub_mean = g.op.Sub(xc, mean, name=name)
         sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
         var = g.op.ReduceMeanAnyOpset(sqr_mean, cdims, name=name, keepdims=1 if keepdim else 0)
         if apply_correction:
@@ -12628,10 +12641,13 @@ def _std_var_correction(
                 shape
             ), f"not implemented for shape={shape!r} for x={x!r}{g.get_debug_msg()}"
             dim_size = np.array(shape)[cdims]
-            numel = np.prod(dim_size).astype(dtype)
+            numel = np.prod(dim_size).astype(compute_dtype)
             mul = g.op.Mul(var, numel, name=name)
-            sub = g.op.Sub(numel, np.array([correction], dtype=dtype), name=name)
+            sub = g.op.Sub(numel, np.array([correction], dtype=compute_dtype), name=name)
             var = g.op.Div(mul, sub, name=name)
+
+    if needs_upcast:
+        var = g.op.Cast(var, to=itype, name=name)
     return var
 
 
