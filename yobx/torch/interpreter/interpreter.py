@@ -1903,7 +1903,9 @@ class DynamoInterpreter:
             # if an int, it cannot be modified inplace
             or (
                 "val" in node.meta
-                and isinstance(node.meta["val"], (int, self.torch.SymInt, self.TracingInt))
+                and isinstance(
+                    node.meta["val"], (int, self.torch.SymInt, self.builder.TracingInt)
+                )
             )
         ), (
             f"This is probably one inplace function node={node!r}, "
