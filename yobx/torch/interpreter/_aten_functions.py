@@ -12578,6 +12578,96 @@ def aten_std_dim(
     return res
 
 
+# Epsilon used inside _var_via_layernorm.  Small enough that the resulting
+# error in variance is well below float32 machine epsilon for typical values.
+_LN_EPS = np.float32(1e-7)
+
+
+def _layernorm_compatible_axis(
+    dim: Optional[Union[int, List[int]]],
+    rank: int,
+) -> Optional[int]:
+    """Returns the LayerNorm axis when *dim* covers contiguous trailing dims.
+
+    ``LayerNormalization`` normalises over axes ``[axis, …, rank-1]``.
+    Returns the correct ``axis`` when *dim* is ``None`` (all dimensions) or
+    when *dim* specifies exactly the contiguous trailing range of dimensions.
+    Returns ``None`` otherwise.
+
+    Returns:
+        The ``axis`` value for ``LayerNormalization``, or ``None`` if it
+        cannot be used for the given *dim*.
+    """
+    if dim is None:
+        return 0
+    dims = [dim] if isinstance(dim, int) else list(dim)
+    dims = sorted(d % rank for d in dims)
+    if dims == list(range(dims[0], rank)):
+        return dims[0]
+    return None
+
+
+def _var_via_layernorm(
+    g: GraphBuilder,
+    x: T,
+    axis: int,
+    rank: int,
+    keepdim: bool,
+    itype: int,
+    name: str,
+) -> T:
+    """Computes population variance using ONNX LayerNormalization.
+
+    ONNX runtimes implement ``LayerNormalization`` with higher-precision
+    internal accumulators (float32 for float16/bfloat16 inputs).  This helper
+    exploits the ``InvStdDev`` output to recover variance:
+    ``var = 1 / InvStdDev² − eps``.
+
+    Returns:
+        The population variance tensor (same dtype as *x*, keepdim semantics
+        preserved).
+    """
+    dtype = tensor_dtype_to_np_dtype(itype)
+    # InvStdDev is float32 for float16/bfloat16 inputs; float64 for double.
+    eps_dtype = np.float64 if itype == TensorProto.DOUBLE else np.float32
+
+    # Scale must match the input dtype (ones = no scaling, just centre x).
+    norm_shape = g.op.Shape(x, start=axis, name=name)
+    scale = g.op.ConstantOfShape(
+        norm_shape,
+        value=onh.from_array(np.ones(1, dtype=dtype)),
+        name=name,
+    )
+
+    y_name = g.unique_name(f"{name}_ln_y")
+    mean_name = g.unique_name(f"{name}_ln_mean")
+    inv_std_name = g.unique_name(f"{name}_ln_inv_std")
+    g.make_node(
+        "LayerNormalization",
+        [x, scale, ""],
+        [y_name, mean_name, inv_std_name],
+        axis=axis,
+        epsilon=float(_LN_EPS),
+        name=name,
+    )
+
+    # var = 1 / InvStdDev² - eps
+    inv_std_sq = g.op.Mul(inv_std_name, inv_std_name, name=name)
+    var = g.op.Reciprocal(inv_std_sq, name=name)
+    var = g.op.Sub(var, np.array([float(_LN_EPS)], dtype=eps_dtype), name=name)
+
+    if not keepdim:
+        # InvStdDev has shape [d0, …, d_{axis-1}, 1, …, 1]; squeeze trailing 1s.
+        sq_axes = np.array(list(range(axis, rank)), dtype=np.int64)
+        var = g.op.SqueezeAnyOpset(var, sq_axes, name=name)
+
+    # LayerNorm always outputs float32 for float16/bfloat16 inputs; cast back.
+    if itype in (TensorProto.FLOAT16, TensorProto.BFLOAT16):
+        var = g.op.Cast(var, to=itype, name=name)
+
+    return var
+
+
 def _std_var_correction(
     g: GraphBuilder,
     x: T,
@@ -12588,8 +12678,12 @@ def _std_var_correction(
 ) -> T:
     """Computes biased or unbiased variance (before sqrt for std).
 
-    Matches PyTorch's internal behaviour: float16/bfloat16 inputs are upcast to
-    float32 for the reduction, then cast back, reducing numerical error.
+    When there is no Bessel correction *and* the reduction dimensions form a
+    contiguous trailing range (or cover all dims), ``LayerNormalization`` is
+    used so that ONNX runtimes can exploit their higher-precision internal
+    accumulators.  For all other cases float16/bfloat16 inputs are upcast to
+    float32 before the manual variance computation, mirroring PyTorch's
+    internal behaviour.
 
     Returns:
         The variance tensor (same dtype as *x*).
@@ -12598,6 +12692,15 @@ def _std_var_correction(
     dtype = tensor_dtype_to_np_dtype(itype)
     # correction=None means no Bessel correction (same as correction=0)
     apply_correction = correction is not None and correction > 0
+
+    # When no Bessel correction, LayerNormalization can be used when the dims
+    # form a contiguous trailing range (which is what LayerNorm reduces over).
+    if not apply_correction and g.has_rank(x):
+        rank = g.get_rank(x)
+        if rank > 0:
+            ln_axis = _layernorm_compatible_axis(dim, rank)
+            if ln_axis is not None:
+                return _var_via_layernorm(g, x, ln_axis, rank, keepdim, itype, name)
 
     # PyTorch accumulates variance in float32 for float16/bfloat16 inputs.
     # Mirror that here to keep errors comparable to std_atol.
