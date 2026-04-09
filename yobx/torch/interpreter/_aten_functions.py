@@ -13707,24 +13707,39 @@ def aten_unique_consecutive(
     assert (
         len(outputs) == 3
     ), f"Unexpected number of expected outputs={outputs}{g.get_debug_msg()}"
+
+    # PyTorch nightly changed unique_consecutive to return int64 for inverse and
+    # counts even when the input is int32.  Determine per-output types from sts
+    # (sts["dtype"] is a tuple for multi-output ops) so that the ONNX ops
+    # produce the correct dtype and avoid a type-conflict with _set_shape_and_type.
+    sts_dtype = sts.get("dtype") if sts else None
+
+    def _out_itype(idx: int) -> int:
+        if isinstance(sts_dtype, tuple) and len(sts_dtype) > idx and sts_dtype[idx] is not None:
+            return torch_dtype_to_onnx_dtype(sts_dtype[idx])
+        return itype
+
+    inv_itype = _out_itype(1)
+    cnt_itype = _out_itype(2)
+
     inverse = g.op.Sub(
-        g.op.CumSum(g.op.Cast(diff, to=itype, name=name), g.ZERO, name=name),
-        g.ONE if itype == TensorProto.INT64 else np.array([1], dtype=np.int32),
+        g.op.CumSum(g.op.Cast(diff, to=inv_itype, name=name), g.ZERO, name=name),
+        g.ONE if inv_itype == TensorProto.INT64 else np.array([1], dtype=np.int32),
         name=name,
         outputs=outputs[1:2],
     )
     shape_x = g.op.Shape(x, name=name)
     shape_x_cast = (
-        shape_x if itype == TensorProto.INT64 else g.op.Cast(shape_x, to=itype, name=name)
+        shape_x if cnt_itype == TensorProto.INT64 else g.op.Cast(shape_x, to=cnt_itype, name=name)
     )
     indices = g.op.Range(
-        g.ZERO_NO_DIM if itype == TensorProto.INT64 else np.array(0, dtype=np.int32),
+        g.ZERO_NO_DIM if cnt_itype == TensorProto.INT64 else np.array(0, dtype=np.int32),
         g.op.SqueezeAnyOpset(shape_x_cast, name=name),
-        g.ONE_NO_DIM if itype == TensorProto.INT64 else np.array(1, dtype=np.int32),
+        g.ONE_NO_DIM if cnt_itype == TensorProto.INT64 else np.array(1, dtype=np.int32),
         name=name,
     )
     points = g.op.Compress(indices, diff, axis=0, name=name)
-    g.set_type(points, g.get_type(x))
+    g.set_type(points, cnt_itype)
     g.set_shape(points, (new_dim,))
     lagp = g.op.Concat(
         g.op.Slice(points, g.ONE, g.op.Shape(points), g.ZERO, name=name),
@@ -13734,8 +13749,9 @@ def aten_unique_consecutive(
     )
     counts = g.op.Sub(lagp, points, name=name, outputs=outputs[2:])
     if not sts:
-        set_type_shape_unary_op(g, inverse, x)
-        g.set_type(counts, g.get_type(x))
+        g.set_type(inverse, inv_itype)
+        g.set_shape(inverse, g.get_shape(x) if g.has_shape(x) else None)
+        g.set_type(counts, cnt_itype)
         g.set_shape(counts, (new_dim,))
     return (res, inverse, counts)
 
