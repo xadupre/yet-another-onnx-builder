@@ -568,7 +568,7 @@ class ExportOptions:
 
             from .tracing import CustomTracer
 
-            CustomTracer._replace_inplace_aten_functions(graph, verbose=verbose)
+            CustomTracer.remove_inplace(graph, verbose=verbose)
 
             if self.save_ep:
                 save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
