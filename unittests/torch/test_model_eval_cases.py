@@ -277,6 +277,12 @@ class TestModelEvalCases(ExtTestCase):
             cases="AtenInterpolate", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_aten_roll_pos_new_tracing(self):
+        evaluation(cases="AtenRollPos", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
+    def test_run_exporter_aten_roll_relu_new_tracing(self):
+        evaluation(cases="AtenRollRelu", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
