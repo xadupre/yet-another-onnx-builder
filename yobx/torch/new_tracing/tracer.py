@@ -1,8 +1,7 @@
-import contextlib
 import inspect
 import operator
 import traceback
-from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 import torch
 import torch.fx
 import torch.utils._pytree as pytree
@@ -12,72 +11,12 @@ from torch.fx.experimental.sym_node import SymNode
 from ...xexpressions import rename_expression
 from .shape import TracingShape, TracingInt, TracingBool, register_condition, clear_conditions
 from .tensor import TracingTensor
-
-# Capture the real ``torch.cond`` at import time so that it can always be
-# used as the canonical FX node target even when ``torch.cond`` has been
-# temporarily replaced by the tracing shim (nested context managers would
-# otherwise make the inner context see the outer shim as "original").
-_ORIGINAL_TORCH_COND: Callable = torch.cond  # type: ignore[attr-defined]
-
-# Capture the real ``torch._check`` at import time so that it can be
-# restored after tracing.  ``torch._check`` may not exist on older versions.
-_ORIGINAL_TORCH_CHECK: Optional[Callable] = getattr(torch, "_check", None)
-
-
-@contextlib.contextmanager
-def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:
-    """
-    Context manager that temporarily replaces ``torch.cond`` with a
-    tracing-aware handler so that ``torch.cond`` calls encountered during
-    :meth:`GraphTracer.trace` are captured as FX ``call_function`` nodes
-    instead of being executed eagerly (or routed through dynamo/compile).
-
-    :param tracer: The :class:`GraphTracer` whose :meth:`_handle_cond` should
-        be used as the replacement.
-    """
-
-    def _cond_handler(
-        pred: Any, true_fn: Callable, false_fn: Callable, operands: Union[List, Tuple] = ()
-    ) -> Any:
-        return tracer._handle_cond(pred, true_fn, false_fn, operands)
-
-    torch.cond = _cond_handler  # type: ignore[assignment]
-    try:
-        yield
-    finally:
-        torch.cond = _ORIGINAL_TORCH_COND  # type: ignore[assignment]
-
-
-@contextlib.contextmanager
-def _check_replacement_ctx(tracer: "GraphTracer") -> Generator:
-    """
-    Context manager that temporarily replaces ``torch._check`` with a
-    tracing-aware handler so that ``torch._check`` calls encountered during
-    :meth:`GraphTracer.trace` register symbolic conditions instead of
-    crashing when the condition is a :class:`TracingBool` or a concrete
-    ``False`` produced by a symbolic dimension that is stored as ``0`` in the
-    underlying tensor.
-
-    Registered conditions are stored in the module-level
-    :data:`~yobx.torch.new_tracing.shape._known_true_conditions` set and are
-    consulted by :meth:`TracingBool.__bool__` to resolve comparisons that
-    would otherwise raise :exc:`ValueError`.
-
-    :param tracer: The :class:`GraphTracer` whose :meth:`_handle_check` should
-        be used as the replacement.
-    """
-    if _ORIGINAL_TORCH_CHECK is None:
-        yield
-        return
-
-    def _check_handler(cond: Any, msg: Any = None) -> None:
-        tracer._handle_check(cond, msg)
-
-    torch._check = _check_handler  # type: ignore[assignment]
-    try:
-        yield
-    finally:
-        torch._check = _ORIGINAL_TORCH_CHECK  # type: ignore[assignment]
+from ._patches import (
+    _ORIGINAL_TORCH_COND,
+    _cond_replacement_ctx,
+    _check_replacement_ctx,
+    _roll_dynamic_shape_ctx,
+)
 
 
 class GraphTracer:
@@ -1178,7 +1117,7 @@ class GraphTracer:
         if self.verbose:
             print("[GraphTracer.trace] call...")
         clear_conditions()
-        with _cond_replacement_ctx(self), _check_replacement_ctx(self):
+        with _cond_replacement_ctx(self), _check_replacement_ctx(self), _roll_dynamic_shape_ctx():
             out = func(*tracing_args, **tracing_kwargs)
 
         for submod, orig_fwd in _patched:
