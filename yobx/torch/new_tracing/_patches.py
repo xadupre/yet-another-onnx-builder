@@ -8,7 +8,7 @@ call.
 """
 
 import contextlib
-from typing import Any, Callable, Generator, List, Optional, Tuple, Union
+from typing import Any, Callable, Generator, List, Optional, Sequence, Tuple, Union
 import torch
 
 # Capture the real ``torch.cond`` at import time so that it can always be
@@ -106,7 +106,9 @@ def _roll_dynamic_shape_ctx() -> Generator:
     _roll_op = torch.ops.aten.roll.default
     _orig_decomp = _decomp_table.get(_roll_op)
 
-    def _roll_with_dynamic_shapes(a: torch.Tensor, shifts: Any, dims: Any = ()) -> torch.Tensor:
+    def _roll_with_dynamic_shapes(
+        a: torch.Tensor, shifts: Sequence, dims: Sequence = ()
+    ) -> torch.Tensor:
         """Reimplements torch._refs.roll, handling dynamic-shape numel check."""
         dims = _prims_common.canonicalize_dims(a.ndim, dims)
         if not isinstance(shifts, _Iterable):
