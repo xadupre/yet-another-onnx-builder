@@ -142,12 +142,19 @@ share some of them. The common parameters accepted by all backends are:
   tensors.  When omitted, names are derived automatically.
 * ``dynamic_shapes`` — declares which tensor dimensions are symbolic
   (variable-length).  The exact format depends on the backend: torch
-  follows :func:`torch.export.export` conventions while the other backends
+  follows :func:`torch.export.export` conventions while the other backends,
+  the default is different is different for every library but it is usually
+  empty for :epkg:`pytorch` or :epkg:`tensorflow` (so static shape),
+  first dimension is batch dimesnion for :epkg:`scikit-learn`.
   use a tuple of ``{axis: dim_name}`` dicts.
 * ``verbose`` — verbosity level (integer, 0 = silent).
 * ``return_optimize_report`` — when ``True``, the returned artifact
   has its ``report`` attribute populated with per-pattern optimization
   statistics.
+
+Oother options are specific to every converter and control the way
+a model is captured or converted. It is possible to output
+the decision path for trees or ensembles in :epkg:`scikit-learn`.
 
 .. toctree::
    :maxdepth: 1
