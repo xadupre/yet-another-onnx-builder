@@ -90,8 +90,8 @@ def _check_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
 @contextlib.contextmanager
 def _scan_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
     """
-    Temporarily replaces ``torch.ops.higher_order.scan`` with a tracing-aware
-    handler so that scan calls encountered during
+    A context manager that temporarily replaces ``torch.ops.higher_order.scan``
+    with a tracing-aware handler so that scan calls encountered during
     :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.trace` are captured as
     FX ``call_function`` nodes instead of being executed eagerly.
 

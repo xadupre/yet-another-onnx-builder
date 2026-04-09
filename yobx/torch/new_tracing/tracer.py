@@ -892,7 +892,7 @@ class GraphTracer:
         reverse: bool = False,
     ) -> Any:
         """
-        Handle a ``torch.ops.higher_order.scan`` call intercepted during graph
+        Handles a ``torch.ops.higher_order.scan`` call intercepted during graph
         tracing.
 
         This method is invoked by :func:`_scan_replacement_ctx`'s handler
@@ -904,8 +904,8 @@ class GraphTracer:
            determine output shapes and stores the result in :attr:`_sub_tracers`.
         3. Emits a ``call_function`` node for ``torch.ops.higher_order.scan``
            in the **main** graph.
-        4. Wraps the outputs in fresh :class:`TracingTensor` instances and
-           returns them as a flat tuple
+        4. Wraps the outputs in fresh :class:`TracingTensor` instances,
+           returning them as a flat tuple
            ``(carry_0_final, ..., carry_n_final, scan_out_0, ..., scan_out_m)``,
            mirroring what the real scan operator returns.
 
