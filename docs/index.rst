@@ -117,8 +117,16 @@ Its unique API:
 .. code-block:: python
 
     # the model is called 
+    from yobx import to_onnx
     expected = model(*args, **kwargs)
     onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, **options)
+
+`options` are different across the libraries producing the model even they
+share some of them such as `large_model` which tells the function
+to write a unique ONNX file or split into ONNX model and ONNX data,
+or `target_opset` which defines the set of opsets supported by
+your runtime. About that, adding `com.microsoft` will trigger optimization
+specific to :epkg:`onnxruntime`.
 
 .. toctree::
    :maxdepth: 1
