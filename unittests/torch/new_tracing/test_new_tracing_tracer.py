@@ -592,6 +592,80 @@ class TestNewTracingTracer(ExtTestCase):
         )
 
     # ------------------------------------------------------------------
+    # torch.ops.higher_order.scan support
+    # ------------------------------------------------------------------
+
+    @unittest.skipIf(
+        not hasattr(getattr(torch.ops, "higher_order", None), "scan"),
+        "torch.ops.higher_order.scan not available",
+    )
+    def test_trace_scan_single_carry_single_output(self):
+        """torch.ops.higher_order.scan is captured as a call_function node."""
+
+        class ScanModel(torch.nn.Module):
+            def forward(self, x):
+                def add(carry, y):
+                    next_carry = carry + y
+                    return [next_carry, next_carry]
+
+                init = torch.zeros_like(x[0])
+                carry, _out = torch.ops.higher_order.scan(add, [init], [x], additional_inputs=[])
+                return carry
+
+        model = ScanModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(3, 4),))
+        graph.lint()
+
+        # Exactly one call_function node with scan target
+        scan_op = torch.ops.higher_order.scan
+        scan_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is scan_op]
+        self.assertEqual(len(scan_nodes), 1, f"Expected 1 scan node, got: {scan_nodes}")
+
+        # The scan body should be registered
+        self.assertTrue(
+            any("scan" in k for k in tracer._sub_tracers),
+            f"No scan sub-tracer found in {list(tracer._sub_tracers)}",
+        )
+
+    @unittest.skipIf(
+        not hasattr(getattr(torch.ops, "higher_order", None), "scan"),
+        "torch.ops.higher_order.scan not available",
+    )
+    def test_trace_scan_cdist(self):
+        """ControlFlowScanCDist-like model is correctly traced."""
+
+        class ScanCDistModel(torch.nn.Module):
+            def forward(self, x):
+                def dist(carry, xi):
+                    sub = carry - xi.reshape((1, -1))
+                    sq = sub * sub
+                    rd = sq.sum(dim=1) ** 0.5
+                    return [carry.clone(), rd]
+
+                _carry, out = torch.ops.higher_order.scan(dist, [x], [x], additional_inputs=[])
+                return out
+
+        model = ScanCDistModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(3, 4),))
+        graph.lint()
+
+        scan_op = torch.ops.higher_order.scan
+        scan_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is scan_op]
+        self.assertEqual(len(scan_nodes), 1)
+
+        # The scan body sub-tracer is registered
+        self.assertTrue(
+            any("scan" in k for k in tracer._sub_tracers),
+            f"No scan sub-tracer: {list(tracer._sub_tracers)}",
+        )
+
+        # get_attr node for the callable exists
+        get_attr_nodes = [n for n in graph.nodes if n.op == "get_attr"]
+        self.assertGreater(len(get_attr_nodes), 0, "No get_attr node for scan callable")
+
+    # ------------------------------------------------------------------
     # module_leaves support
     # ------------------------------------------------------------------
 
