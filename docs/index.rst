@@ -121,12 +121,33 @@ Its unique API:
     expected = model(*args, **kwargs)
     onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, **options)
 
+The function returns an :class:`~yobx.container.ExportArtifact` that
+wraps the exported ONNX proto together with an
+:class:`~yobx.container.ExportReport`. The ONNX model can be retrieved
+with `artifact.model_proto` and saved to disk via `artifact.save(path)`.
+
 `options` are different across the libraries producing the model even they
-share some of them such as `large_model` which tells the function
-to write a unique ONNX file or split into ONNX model and ONNX data,
-or `target_opset` which defines the set of opsets supported by
-your runtime. About that, adding `com.microsoft` will trigger optimization
-specific to :epkg:`onnxruntime`.
+share some of them. The common parameters accepted by all backends are:
+
+* ``target_opset`` — an integer or a dict mapping ONNX domain names to
+  their opset version (e.g. ``{"": 18, "com.microsoft": 1}``).  Adding
+  ``"com.microsoft"`` will trigger operator fusions specific to
+  :epkg:`onnxruntime` such as fused attention and layer normalization.
+* ``large_model`` — when ``True`` the weights are stored in a separate
+  ``.onnx_data`` file next to the model (ONNX external-data format).
+  This is required for models whose size exceeds the 2 GB protobuf limit.
+* ``external_threshold`` — size in bytes above which individual initializers
+  are stored externally when ``large_model=True`` (default: 1024).
+* ``input_names`` — an explicit list of names for the ONNX graph input
+  tensors.  When omitted, names are derived automatically.
+* ``dynamic_shapes`` — declares which tensor dimensions are symbolic
+  (variable-length).  The exact format depends on the backend: torch
+  follows :func:`torch.export.export` conventions while the other backends
+  use a tuple of ``{axis: dim_name}`` dicts.
+* ``verbose`` — verbosity level (integer, 0 = silent).
+* ``return_optimize_report`` — when ``True``, the returned artifact
+  has its ``report`` attribute populated with per-pattern optimization
+  statistics.
 
 .. toctree::
    :maxdepth: 1
