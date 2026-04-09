@@ -969,5 +969,37 @@ class TestSklearnConvertersBasicInvocation(ExtTestCase):
         self.assertEqualArray(X * 2.0, result, atol=1e-5)
 
 
+@requires_sklearn("1.4")
+class TestSklearnToOnnxReturnOptimizeReport(ExtTestCase):
+    """Tests for *return_optimize_report* parameter in yobx.sklearn.to_onnx."""
+
+    def test_default_report_is_none(self):
+        """Report is None by default (return_optimize_report=False)."""
+        from yobx.container import ExportArtifact
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        ss = StandardScaler()
+        ss.fit(X)
+
+        artifact = to_onnx(ss, (X,))
+        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertIsNone(artifact.report)
+
+    def test_report_populated_when_true(self):
+        """Report is an ExportReport with stats when return_optimize_report=True."""
+        from yobx.container import ExportArtifact, ExportReport
+
+        X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
+        ss = StandardScaler()
+        ss.fit(X)
+
+        artifact = to_onnx(ss, (X,), return_optimize_report=True)
+        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertIsNotNone(artifact.report)
+        self.assertIsInstance(artifact.report, ExportReport)
+        self.assertIsInstance(artifact.report.stats, list)
+        self.assertGreater(len(artifact.report.stats), 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

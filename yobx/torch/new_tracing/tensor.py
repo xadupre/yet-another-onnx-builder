@@ -94,7 +94,7 @@ class TracingTensor(torch.Tensor):
     def from_tensor(
         cls,
         t: torch.Tensor,
-        dynamic_shapes: Optional[Dict[int, str]] = None,
+        dynamic_shapes: Optional[Dict[int, Any]] = None,
         tracer: Optional["GraphTracer"] = None,  # type: ignore # noqa: F821
     ) -> "TracingTensor":
         """Creates a tracing tensor."""

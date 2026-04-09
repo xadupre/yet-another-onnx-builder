@@ -32,7 +32,7 @@ def prims_amax(
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
     x: T,
-    dim: Optional[int] = None,
+    dim: Optional[Union[int, List[int]]] = None,
     keepdim: bool = False,
     output_dtype: Optional["torch.dtype"] = None,  # noqa: F821
     name: str = "prims_amax",
@@ -41,7 +41,7 @@ def prims_amax(
     assert (
         output_dtype is None
     ), f"not implemented when output_dtype={output_dtype!r}{g.get_debug_msg()}"
-    if dim is None:
+    if dim is None or (isinstance(dim, list) and len(dim) == 0):
         res = g.op.ReduceMaxAnyOpset(x, keepdims=1 if keepdim else 0, outputs=outputs)
     elif isinstance(dim, int):
         res = g.op.ReduceMaxAnyOpset(
@@ -49,6 +49,37 @@ def prims_amax(
         )
     elif isinstance(dim, list) and all_int(dim):
         res = g.op.ReduceMaxAnyOpset(
+            x, np.array(dim, dtype=np.int64), keepdims=1 if keepdim else 0, outputs=outputs
+        )
+    else:
+        raise RuntimeError(f"Unexpected type {type(dim)} for dim")
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim)
+    return res
+
+
+def prims_amin(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    keepdim: bool = False,
+    output_dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    name: str = "prims_amin",
+) -> T:
+    "Reduces the tensor along specified dimensions using the minimum operation."
+    assert (
+        output_dtype is None
+    ), f"not implemented when output_dtype={output_dtype!r}{g.get_debug_msg()}"
+    if dim is None or (isinstance(dim, list) and len(dim) == 0):
+        res = g.op.ReduceMinAnyOpset(x, keepdims=1 if keepdim else 0, outputs=outputs)
+    elif isinstance(dim, int):
+        res = g.op.ReduceMinAnyOpset(
+            x, np.array([dim], dtype=np.int64), keepdims=1 if keepdim else 0, outputs=outputs
+        )
+    elif isinstance(dim, list) and all_int(dim):
+        res = g.op.ReduceMinAnyOpset(
             x, np.array(dim, dtype=np.int64), keepdims=1 if keepdim else 0, outputs=outputs
         )
     else:

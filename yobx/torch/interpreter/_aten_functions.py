@@ -562,7 +562,7 @@ def aten_amax(
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
     x: T,
-    dim: Optional[int] = None,
+    dim: Optional[Union[int, List[int]]] = None,
     keepdim: bool = False,
     output_dtype: Optional["torch.dtype"] = None,  # noqa: F821
     name: str = "amax",
@@ -571,6 +571,52 @@ def aten_amax(
     from ._prims_functions import prims_amax
 
     return prims_amax(g, sts, outputs, x, dim, keepdim, output_dtype=output_dtype, name=name)
+
+
+def aten_amin(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    keepdim: bool = False,
+    name: str = "amin",
+) -> T:
+    "Reduces the tensor along specified dimensions using the minimum operation."
+    from ._prims_functions import prims_amin
+
+    return prims_amin(g, sts, outputs, x, dim, keepdim, name=name)
+
+
+def aten_aminmax(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[int] = None,
+    keepdim: bool = False,
+    name: str = "aminmax",
+) -> T:
+    "Returns both minimum and maximum reductions along the specified dimension."
+    if dim is None:
+        res_min = g.op.ReduceMinAnyOpset(
+            x, keepdims=1 if keepdim else 0, outputs=outputs[:1], name=name
+        )
+        res_max = g.op.ReduceMaxAnyOpset(
+            x, keepdims=1 if keepdim else 0, outputs=outputs[1:], name=name
+        )
+    else:
+        axes = np.array([dim], dtype=np.int64)
+        res_min = g.op.ReduceMinAnyOpset(
+            x, axes, keepdims=1 if keepdim else 0, outputs=outputs[:1], name=name
+        )
+        res_max = g.op.ReduceMaxAnyOpset(
+            x, axes, keepdims=1 if keepdim else 0, outputs=outputs[1:], name=name
+        )
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim)
+        set_type_shape_reduce_op(g, outputs[1], x, keepdim=keepdim)
+    return res_min, res_max
 
 
 def aten_and(
@@ -689,6 +735,21 @@ def aten_and_(
     return aten_and(g, sts, outputs, x, y, name=name)
 
 
+def aten_angle(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "angle"
+) -> T:
+    """Computes the angle of a real tensor: 0 if x >= 0, pi if x < 0."""
+    assert g.has_type(x), f"Type missing for {x!r}{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    np_dtype = tensor_dtype_to_np_dtype(itype)
+    zero = np.array(0, dtype=np_dtype)
+    pi = np.array(np.pi, dtype=np_dtype)
+    res = g.op.Where(g.op.Less(x, zero, name=name), pi, zero, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
 def aten_logical_and(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T, name="and"
 ) -> T:
@@ -701,6 +762,30 @@ def aten_logical_or(
 ) -> T:
     "or"
     return aten_or(g, sts, outputs, x, y, name="logical_or")
+
+
+def aten_xor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "xor",
+) -> T:
+    "xor"
+    res, x, y = prepare_inputs_homogeneous_operator(
+        g, x, y, f=g.op.Xor, name=name, outputs=outputs, sts=sts, force_type=TensorProto.BOOL
+    )
+    if not sts:
+        set_type_shape_binary_op(g, outputs[0], x, y, itype=TensorProto.BOOL)
+    return res
+
+
+def aten_logical_xor(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T, name="xor"
+) -> T:
+    "xor"
+    return aten_xor(g, sts, outputs, x, y, name="logical_xor")
 
 
 def aten_any(
@@ -990,6 +1075,156 @@ def aten_argsort(
     return res
 
 
+def aten_atleast_1d(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "atleast_1d",
+) -> T:
+    """atleast_1d — Ensures the result has at least 1 dimension.
+
+    A 0-D (scalar) tensor is unsqueezed to shape ``(1,)``.
+    Tensors with rank >= 1 are returned unchanged.
+    """
+    if g.has_rank(x) and g.get_rank(x) == 0:
+        res = g.op.UnsqueezeAnyOpset(x, np.array([0], dtype=np.int64), outputs=outputs, name=name)
+        if not sts:
+            g.set_type(res, g.get_type(x))
+            g.set_shape(res, (1,))
+        return res
+    res = g.op.Identity(x, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(res, g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x))
+    return res
+
+
+def aten_atleast_2d(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "atleast_2d",
+) -> T:
+    """atleast_2d — Ensures the result has at least 2 dimensions.
+
+    * rank 0 → shape ``(1, 1)``
+    * rank 1 → shape ``(1, n)``
+    * rank >= 2 → unchanged
+    """
+    if g.has_rank(x):
+        rank = g.get_rank(x)
+        if rank == 0:
+            cst = g.make_initializer("", np.array([1, 1], dtype=np.int64), source="atleast_2d.0")
+            res = g.make_node("Reshape", [x, cst], outputs, name=name)
+            if not sts:
+                g.set_type(res, g.get_type(x))
+                g.set_shape(res, (1, 1))
+            return res
+        if rank == 1:
+            res = g.op.UnsqueezeAnyOpset(
+                x, np.array([0], dtype=np.int64), outputs=outputs, name=name
+            )
+            if not sts:
+                g.set_type(res, g.get_type(x))
+                if g.has_shape(x):
+                    n = g.get_shape(x)[0]
+                    g.set_shape(res, (1, n))
+                else:
+                    g.set_rank(res, 2)
+            return res
+    res = g.op.Identity(x, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(res, g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x))
+    return res
+
+
+def aten_atleast_3d(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "atleast_3d",
+) -> T:
+    """atleast_3d — Ensures the result has at least 3 dimensions.
+
+    * rank 0 → shape ``(1, 1, 1)``
+    * rank 1 → shape ``(1, n, 1)``
+    * rank 2 → shape ``(m, n, 1)``
+    * rank >= 3 → unchanged
+    """
+    if g.has_rank(x):
+        rank = g.get_rank(x)
+        if rank == 0:
+            cst = g.make_initializer(
+                "", np.array([1, 1, 1], dtype=np.int64), source="atleast_3d.0"
+            )
+            res = g.make_node("Reshape", [x, cst], outputs, name=name)
+            if not sts:
+                g.set_type(res, g.get_type(x))
+                g.set_shape(res, (1, 1, 1))
+            return res
+        if rank == 1:
+            if g.has_shape(x):
+                n = g.get_shape(x)[0]
+                if isinstance(n, int):
+                    cst = g.make_initializer(
+                        "", np.array([1, n, 1], dtype=np.int64), source="atleast_3d.1_static"
+                    )
+                    res = g.make_node("Reshape", [x, cst], outputs, name=name)
+                    if not sts:
+                        g.set_type(res, g.get_type(x))
+                        g.set_shape(res, (1, n, 1))
+                    return res
+            else:
+                n = None
+            # dynamic n: build shape [1, n, 1] at runtime
+            dim_n = g.op.Shape(x, start=0, end=1, name=name)
+            shape_1n1 = g.op.Concat(
+                g.make_initializer("", np.array([1], dtype=np.int64), source="atleast_3d.1_a"),
+                dim_n,
+                g.make_initializer("", np.array([1], dtype=np.int64), source="atleast_3d.1_b"),
+                axis=0,
+                name=name,
+            )
+            res = g.make_node("Reshape", [x, shape_1n1], outputs, name=name)
+            if not sts:
+                g.set_type(res, g.get_type(x))
+                if n is not None:
+                    g.set_shape(res, (1, n, 1))
+                else:
+                    g.set_rank(res, 3)
+            return res
+        if rank == 2:
+            res = g.op.UnsqueezeAnyOpset(
+                x, np.array([-1], dtype=np.int64), outputs=outputs, name=name
+            )
+            if not sts:
+                g.set_type(res, g.get_type(x))
+                if g.has_shape(x):
+                    shape = g.get_shape(x)
+                    g.set_shape(res, (*shape, 1))
+                else:
+                    g.set_rank(res, 3)
+            return res
+    res = g.op.Identity(x, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(res, g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x))
+    return res
+
+
 def aten_as_strided(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -1090,6 +1325,55 @@ def aten_atan(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str]
     res = g.make_node("Atan", [x], outputs, name="atan")
     if not sts:
         set_type_shape_unary_op(g, outputs[0], x)
+    return res
+
+
+def aten_atan2(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    y: T,
+    x: T,
+    name: str = "atan2",
+) -> T:
+    """Computes element-wise two-argument arctangent atan2(y, x)."""
+    assert g.has_type(y), f"Type missing for {y!r}{g.get_debug_msg()}"
+    itype = g.get_type(y)
+    np_dtype = tensor_dtype_to_np_dtype(itype)
+    zero = np.array(0, dtype=np_dtype)
+    one = np.array(1, dtype=np_dtype)
+    pi = np.array(np.pi, dtype=np_dtype)
+    pi_2 = np.array(np.pi / 2, dtype=np_dtype)
+
+    # When x == 0, division by x is undefined; replace with 1 to avoid NaN in atan.
+    x_is_zero = g.op.Equal(x, zero, name=name)
+    safe_x = g.op.Where(x_is_zero, one, x, name=name)
+    atan_base = g.op.Atan(g.op.Div(y, safe_x, name=name), name=name)
+
+    # Quadrant correction for x < 0.
+    x_lt_zero = g.op.Less(x, zero, name=name)
+    y_lt_zero = g.op.Less(y, zero, name=name)
+    correction = g.op.Where(y_lt_zero, g.op.Neg(pi, name=name), pi, name=name)
+    result_x_neg = g.op.Add(atan_base, correction, name=name)
+
+    # Special values when x == 0.
+    y_gt_zero = g.op.Greater(y, zero, name=name)
+    result_x_zero = g.op.Where(
+        y_gt_zero,
+        pi_2,
+        g.op.Where(y_lt_zero, g.op.Neg(pi_2, name=name), zero, name=name),
+        name=name,
+    )
+
+    res = g.op.Where(
+        x_is_zero,
+        result_x_zero,
+        g.op.Where(x_lt_zero, result_x_neg, atan_base, name=name),
+        name=name,
+        outputs=outputs,
+    )
+    if not sts:
+        set_type_shape_binary_op(g, res, y, x)
     return res
 
 
@@ -1343,6 +1627,101 @@ def aten_baddbmm(
     )
     mul_b = x if alpha is None else g.op.Mul(x, np.array([beta], dtype=dtype), name=name)
     res = g.op.Add(mul_a, mul_b, name=name)
+    return res
+
+
+def aten_bilinear(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    input1: T,
+    input2: T,
+    weight: T,
+    bias: Optional[T] = None,
+    name: str = "bilinear",
+) -> T:
+    """Computes the bilinear form.
+
+    Computes ``output[..., k] = Σ_{i,j} input1[..., i] * weight[k, i, j] * input2[..., j]``.
+
+    Args:
+        g: graph builder
+        sts: optional shape/type information
+        outputs: output names
+        input1: first input tensor of shape (..., H1)
+        input2: second input tensor of shape (..., H2)
+        weight: weight tensor of shape (out, H1, H2)
+        bias: optional bias tensor of shape (out,)
+        name: node name prefix
+
+    Returns:
+        Returns the output tensor of shape (..., out).
+    """
+    # Implements the bilinear transform using matmul and reshape:
+    #   weight: (out, H1, H2) -transpose-> (H1, out, H2) -reshape-> (H1, out*H2)
+    #   x1_w:  input1 @ weight_r            -> (..., out*H2)
+    #   x1_w_r: reshape x1_w               -> (..., out, H2)
+    #   output: (x1_w_r * unsqueeze(input2, -2)).sum(-1) -> (..., out)
+    weight_shape = g.op.Shape(weight, name=name)
+    out_dim = g.op.Gather(weight_shape, np.array(0, dtype=np.int64), name=name)
+    h2_dim = g.op.Gather(weight_shape, np.array(2, dtype=np.int64), name=name)
+    out_x_h2 = g.op.Mul(out_dim, h2_dim, name=name)
+    h1_shape = g.op.Slice(
+        weight_shape, np.array([1], dtype=np.int64), np.array([2], dtype=np.int64), name=name
+    )
+
+    # Transpose weight: (out, H1, H2) -> (H1, out, H2)
+    weight_t = g.op.Transpose(weight, perm=[1, 0, 2], name=name)
+
+    # Reshape weight: (H1, out, H2) -> (H1, out*H2)
+    new_weight_shape = g.op.Concat(
+        h1_shape,
+        g.op.Unsqueeze(out_x_h2, np.array([0], dtype=np.int64), name=name),
+        axis=0,
+        name=name,
+    )
+    weight_r = g.op.Reshape(weight_t, new_weight_shape, name=name)
+
+    # x1_w = input1 @ weight_r -> (..., out*H2)
+    x1_w = g.op.MatMul(input1, weight_r, name=name)
+
+    # Reshape x1_w: (..., out*H2) -> (..., out, H2)
+    input1_shape = g.op.Shape(input1, name=name)
+    batch_shape = g.op.Slice(
+        input1_shape, np.array([0], dtype=np.int64), np.array([-1], dtype=np.int64), name=name
+    )
+    x1_w_shape = g.op.Concat(
+        batch_shape,
+        g.op.Unsqueeze(out_dim, np.array([0], dtype=np.int64), name=name),
+        g.op.Unsqueeze(h2_dim, np.array([0], dtype=np.int64), name=name),
+        axis=0,
+        name=name,
+    )
+    x1_w_r = g.op.Reshape(x1_w, x1_w_shape, name=name)
+
+    # Unsqueeze input2: (..., H2) -> (..., 1, H2)
+    input2_e = g.op.Unsqueeze(input2, np.array([-2], dtype=np.int64), name=name)
+
+    # Element-wise multiply and reduce: (..., out, H2) * (..., 1, H2) -> sum -> (..., out)
+    mul_result = g.op.Mul(x1_w_r, input2_e, name=name)
+    if bias is not None:
+        reduced = g.op.ReduceSum(
+            mul_result, np.array([-1], dtype=np.int64), keepdims=0, name=name
+        )
+        res = g.op.Add(reduced, bias, outputs=outputs, name=name)
+    else:
+        res = g.op.ReduceSum(
+            mul_result, np.array([-1], dtype=np.int64), keepdims=0, outputs=outputs, name=name
+        )
+    if not sts:
+        if g.has_type(input1):
+            g.set_type(res, g.get_type(input1))
+        if g.has_shape(input1) and g.has_shape(weight):
+            i1_shape = g.get_shape(input1)
+            w_shape = g.get_shape(weight)
+            g.set_shape(res, (*i1_shape[:-1], w_shape[0]))
+        elif g.has_rank(input1):
+            g.set_rank(res, g.get_rank(input1))
     return res
 
 
@@ -1617,6 +1996,55 @@ def aten_bucketize_Tensor(
     return res
 
 
+def aten_cartesian_prod(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    tensors: Sequence[T],
+    name: str = "cartesian_prod",
+) -> T:
+    """Computes the Cartesian product of input 1D tensors.
+
+    Returns a 1D tensor when a single input is given, or a 2D tensor where
+    each row contains one combination of elements from the input tensors.
+    """
+    n = len(tensors)
+    if n == 1:
+        # torch.cartesian_prod of a single 1D tensor returns that tensor unchanged.
+        res = g.op.Identity(tensors[0], outputs=outputs, name=name)
+        if not sts:
+            itype = g.get_type(tensors[0])
+            g.set_type(res, itype)
+            g.set_rank(res, 1)
+        return res
+
+    # Collects the 1-element shape tensors [s_i] for each input 1D tensor.
+    shapes = [g.op.Shape(t, name=name) for t in tensors]
+    # Concatenates to form the full grid shape [s_0, s_1, ..., s_{n-1}].
+    full_shape = g.op.Concat(*shapes, axis=0, name=name)
+
+    flat_cols = []
+    for i, t in enumerate(tensors):
+        # Reshapes 1D tensor [s_i] to [1, ..., s_i, ..., 1] with s_i at axis i.
+        new_shape = np.ones(n, dtype=np.int64)
+        new_shape[i] = -1
+        r = g.op.Reshape(t, new_shape, name=name)
+        # Expands to the full grid shape [s_0, s_1, ..., s_{n-1}].
+        e = g.op.Expand(r, full_shape, name=name)
+        # Flattens to [s_0 * s_1 * ... * s_{n-1}].
+        flat = g.op.Reshape(e, g.MINUS_ONE, name=name)
+        flat_cols.append(flat)
+
+    # Unsqueezes each flat column to [total, 1] then concatenates along axis 1.
+    unsqueezed = [g.op.UnsqueezeAnyOpset(f, g.ONE, name=name) for f in flat_cols]
+    res = g.op.Concat(*unsqueezed, axis=1, outputs=outputs, name=name)
+    if not sts:
+        itype = g.get_type(tensors[0])
+        g.set_type(res, itype)
+        g.set_rank(res, 2)
+    return res
+
+
 def aten_cat(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -1802,6 +2230,40 @@ def aten_clamp_min(
     else:
         assert isinstance(min_, str), f"Unexpected type {type(min_)}{g.get_debug_msg()}"
         res = g.op.Max(x, min_, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_clamp_max_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    max_: T,
+    name: str = "clamp_max_Tensor",
+) -> T:
+    """Clamps maximum with a tensor upper bound."""
+    if g.get_type(max_) != g.get_type(x):
+        max_ = g.op.Cast(max_, to=g.get_type(x), name=name)
+    res = g.op.Min(x, max_, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_clamp_min_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    min_: T,
+    name: str = "clamp_min_Tensor",
+) -> T:
+    """Clamps minimum with a tensor lower bound."""
+    if g.get_type(min_) != g.get_type(x):
+        min_ = g.op.Cast(min_, to=g.get_type(x), name=name)
+    res = g.op.Max(x, min_, name=name, outputs=outputs)
     if not sts:
         set_type_shape_unary_op(g, res, x)
     return res
@@ -2333,6 +2795,48 @@ def aten_conv_transpose3d_input(
         None,
         name=name,
     )
+
+
+def aten_count_nonzero(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    name: str = "count_nonzero",
+) -> T:
+    """Counts the number of non-zero elements."""
+    # Cast to bool (non-zero → True) then to int64 before summing.
+    int_x = g.op.Cast(
+        g.op.Cast(x, to=TensorProto.BOOL, name=name), to=TensorProto.INT64, name=name
+    )
+    if dim is None:
+        result = g.op.ReduceSumAnyOpset(int_x, keepdims=0, outputs=outputs, name=name)
+    else:
+        adim = np.array([dim] if isinstance(dim, int) else dim, dtype=np.int64)
+        result = g.op.ReduceSumAnyOpset(int_x, adim, keepdims=0, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_reduce_op(
+            g,
+            outputs[0],
+            x,
+            keepdim=0,
+            axes=None if dim is None else ((dim,) if isinstance(dim, int) else tuple(dim)),
+        )
+        g.set_type(outputs[0], TensorProto.INT64)
+    return result
+
+
+def aten_count_nonzero_dim_IntList(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Union[int, List[int]],
+    name: str = "count_nonzero_dim_IntList",
+) -> T:
+    """Counts the number of non-zero elements along specified dimensions."""
+    return aten_count_nonzero(g, sts, outputs, x, dim=dim, name=name)
 
 
 def aten_copy(
@@ -3158,6 +3662,73 @@ def aten_erf(
     """erf"""
 
     res = g.op.Erf(x, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_erfc(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "erfc"
+) -> T:
+    """Computes the complementary error function, erfc(x) = 1 - erf(x)."""
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    one = np.array([1], dtype=dtype)
+    res = g.op.Sub(one, g.op.Erf(x, name=name), name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_erfinv(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "erfinv"
+) -> T:
+    """Computes the inverse error function via Winitzki approximation + Newton refinement."""
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    # Winitzki (2008) single-formula approximation:
+    #   u = ln((1 - x) * (1 + x))            [= ln(1 - x^2), negative for |x| < 1]
+    #   p = 2/(pi*a) + u/2,  a = 0.147
+    #   erfinv(x) ~ sign(x) * sqrt(sqrt(p^2 - u/a) - p)
+    # max error ~ 1.2e-4; three Newton steps bring it to float32 precision.
+    a = 0.147
+    two_over_pi_a = np.array([2.0 / (math.pi * a)], dtype=dtype)
+    inv_a = np.array([1.0 / a], dtype=dtype)
+    half = np.array([0.5], dtype=dtype)
+    one = np.array([1], dtype=dtype)
+    sqrt_pi_over_2 = np.array([math.sqrt(math.pi) / 2.0], dtype=dtype)
+
+    # u = ln((1 - x) * (1 + x))  — more numerically stable than ln(1 - x^2)
+    u = g.op.Log(
+        g.op.Mul(g.op.Sub(one, x, name=name), g.op.Add(one, x, name=name), name=name), name=name
+    )
+    # p = 2/(pi*a) + u/2
+    p = g.op.Add(two_over_pi_a, g.op.Mul(half, u, name=name), name=name)
+    # inner = sqrt(p^2 - u/a) - p  (always >= 0 for |x| < 1)
+    inner = g.op.Sub(
+        g.op.Sqrt(
+            g.op.Sub(g.op.Mul(p, p, name=name), g.op.Mul(inv_a, u, name=name), name=name),
+            name=name,
+        ),
+        p,
+        name=name,
+    )
+    # Initial estimate: y = sign(x) * sqrt(inner)
+    y = g.op.Mul(g.op.Sign(x, name=name), g.op.Sqrt(inner, name=name), name=name)
+    # Newton refinement: y -= (erf(y) - x) * sqrt(pi)/2 * exp(y^2)
+    # Step 1
+    y2 = g.op.Mul(y, y, name=name)
+    err = g.op.Sub(g.op.Erf(y, name=name), x, name=name)
+    corr = g.op.Mul(err, g.op.Mul(sqrt_pi_over_2, g.op.Exp(y2, name=name), name=name), name=name)
+    y = g.op.Sub(y, corr, name=name)
+    # Step 2
+    y2 = g.op.Mul(y, y, name=name)
+    err = g.op.Sub(g.op.Erf(y, name=name), x, name=name)
+    corr = g.op.Mul(err, g.op.Mul(sqrt_pi_over_2, g.op.Exp(y2, name=name), name=name), name=name)
+    y = g.op.Sub(y, corr, name=name)
+    # Step 3 (final, writes to outputs)
+    y2 = g.op.Mul(y, y, name=name)
+    err = g.op.Sub(g.op.Erf(y, name=name), x, name=name)
+    corr = g.op.Mul(err, g.op.Mul(sqrt_pi_over_2, g.op.Exp(y2, name=name), name=name), name=name)
+    res = g.op.Sub(y, corr, name=name, outputs=outputs)
     if not sts:
         set_type_shape_unary_op(g, res, x)
     return res
@@ -6402,6 +6973,76 @@ def aten_isin_Tensor_Tensor(
     )
 
 
+def aten_isclose(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    a: T,
+    b: T,
+    rtol: float = 1e-05,
+    atol: float = 1e-08,
+    equal_nan: bool = False,
+    name: str = "isclose",
+) -> T:
+    """Checks element-wise closeness: ``|a - b| <= atol + rtol * |b|``."""
+    assert g.has_type(a), f"isclose: type of {a!r} must be known{g.get_debug_msg()}"
+    itype = g.get_type(a)
+    _float_types = {
+        TensorProto.FLOAT,
+        TensorProto.DOUBLE,
+        TensorProto.FLOAT16,
+        TensorProto.BFLOAT16,
+    }
+    if itype not in _float_types:
+        fa = g.op.Cast(a, to=TensorProto.DOUBLE, name=name)
+        fb = g.op.Cast(b, to=TensorProto.DOUBLE, name=name)
+        dtype = np.float64
+    else:
+        fa = a
+        fb = b
+        dtype = tensor_dtype_to_np_dtype(itype)
+    diff = g.op.Abs(g.op.Sub(fa, fb, name=name), name=name)
+    abs_b = g.op.Abs(fb, name=name)
+    c_rtol = np.array(rtol, dtype=dtype)
+    c_atol = np.array(atol, dtype=dtype)
+    threshold = g.op.Add(c_atol, g.op.Mul(c_rtol, abs_b, name=name), name=name)
+    if equal_nan:
+        close = g.op.LessOrEqual(diff, threshold, name=name)
+        nan_a = g.op.IsNaN(fa, name=name)
+        nan_b = g.op.IsNaN(fb, name=name)
+        both_nan = g.op.And(nan_a, nan_b, name=name)
+        res = g.op.Or(close, both_nan, outputs=outputs, name=name)
+    else:
+        res = g.op.LessOrEqual(diff, threshold, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_binary_op(g, outputs[0], a, b, cmp_op=True)
+    return res
+
+
+def aten_isfinite(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "isfinite",
+) -> T:
+    """Checks whether each element is finite (not NaN and not infinity)."""
+    if g.get_type(x) in {TensorProto.FLOAT, TensorProto.DOUBLE} or (
+        g.main_opset >= 20 and g.get_type(x) in {TensorProto.FLOAT16, TensorProto.BFLOAT16}
+    ):
+        xi = x
+    else:
+        # opset < 20 only supports float32/float64; integer types are never NaN/inf.
+        xi = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+    is_nan = g.op.IsNaN(xi, name=name)
+    is_inf = g.op.IsInf(xi, name=name)
+    nan_or_inf = g.op.Or(is_nan, is_inf, name=name)
+    res = g.op.Not(nan_or_inf, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x, itype=TensorProto.BOOL)
+    return res
+
+
 def aten_isinf(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "isinf"
 ) -> T:
@@ -6429,6 +7070,48 @@ def aten_isnan(
         res = g.op.IsNaN(
             g.op.Cast(x, to=TensorProto.FLOAT, name=name), outputs=outputs, name=name
         )
+    if not sts:
+        set_type_shape_unary_op(g, res, x, itype=TensorProto.BOOL)
+    return res
+
+
+def aten_isneginf(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "isneginf",
+) -> T:
+    """Checks whether each element is negative infinity."""
+    if g.get_type(x) in {TensorProto.FLOAT, TensorProto.DOUBLE} or (
+        g.main_opset >= 20 and g.get_type(x) in {TensorProto.FLOAT16, TensorProto.BFLOAT16}
+    ):
+        xi = x
+    else:
+        # opset < 20 only supports float32/float64; integer types are never inf.
+        xi = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+    res = g.op.IsInf(xi, detect_negative=1, detect_positive=0, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x, itype=TensorProto.BOOL)
+    return res
+
+
+def aten_isposinf(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "isposinf",
+) -> T:
+    """Checks whether each element is positive infinity."""
+    if g.get_type(x) in {TensorProto.FLOAT, TensorProto.DOUBLE} or (
+        g.main_opset >= 20 and g.get_type(x) in {TensorProto.FLOAT16, TensorProto.BFLOAT16}
+    ):
+        xi = x
+    else:
+        # opset < 20 only supports float32/float64; integer types are never inf.
+        xi = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+    res = g.op.IsInf(xi, detect_negative=0, detect_positive=1, outputs=outputs, name=name)
     if not sts:
         set_type_shape_unary_op(g, res, x, itype=TensorProto.BOOL)
     return res
@@ -6770,6 +7453,145 @@ def aten_log(
     res = g.op.Log(x, name=name, outputs=outputs)
     if not sts:
         set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_log10(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "log10"
+) -> T:
+    """log10 — Computes log base 10 as ``log(x) * log10(e)``."""
+    assert g.has_type(x), f"log10: type of {x!r} must be known{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    log10_e = np.array(math.log10(math.e), dtype=dtype)
+    log_x = g.op.Log(x, name=name)
+    set_type_shape_unary_op(g, log_x, x)
+    res = g.op.Mul(log_x, log10_e, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_log1p(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "log1p"
+) -> T:
+    """log1p — Computes ``log(1 + x)``."""
+    assert g.has_type(x), f"log1p: type of {x!r} must be known{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    one = np.array(1, dtype=dtype)
+    xp1 = g.op.Add(x, one, name=name)
+    set_type_shape_unary_op(g, xp1, x)
+    res = g.op.Log(xp1, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_log2(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "log2"
+) -> T:
+    """log2 — Computes log base 2 as ``log(x) * log2(e)``."""
+    assert g.has_type(x), f"log2: type of {x!r} must be known{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    log2_e = np.array(math.log2(math.e), dtype=dtype)
+    log_x = g.op.Log(x, name=name)
+    set_type_shape_unary_op(g, log_x, x)
+    res = g.op.Mul(log_x, log2_e, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_logaddexp(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "logaddexp",
+) -> T:
+    """logaddexp — Computes ``log(exp(x) + exp(y))`` in a numerically stable way."""
+    m = g.op.Max(x, y, name=name)
+    set_type_shape_binary_op(g, m, x, y)
+    diff_x = g.op.Sub(x, m, name=name)
+    set_type_shape_unary_op(g, diff_x, x)
+    diff_y = g.op.Sub(y, m, name=name)
+    set_type_shape_unary_op(g, diff_y, y)
+    exp_dx = g.op.Exp(diff_x, name=name)
+    set_type_shape_unary_op(g, exp_dx, x)
+    exp_dy = g.op.Exp(diff_y, name=name)
+    set_type_shape_unary_op(g, exp_dy, y)
+    sum_exp = g.op.Add(exp_dx, exp_dy, name=name)
+    set_type_shape_binary_op(g, sum_exp, exp_dx, exp_dy)
+    log_sum = g.op.Log(sum_exp, name=name)
+    set_type_shape_unary_op(g, log_sum, sum_exp)
+    res = g.op.Add(m, log_sum, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_binary_op(g, res, x, y)
+    return res
+
+
+def aten_logaddexp2(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "logaddexp2",
+) -> T:
+    """logaddexp2 — Computes ``log2(2**x + 2**y)`` in a numerically stable way."""
+    assert g.has_type(x), f"logaddexp2: type of {x!r} must be known{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    log2_e = np.array(math.log2(math.e), dtype=dtype)
+    m = g.op.Max(x, y, name=name)
+    set_type_shape_binary_op(g, m, x, y)
+    diff_x = g.op.Sub(x, m, name=name)
+    set_type_shape_unary_op(g, diff_x, x)
+    diff_y = g.op.Sub(y, m, name=name)
+    set_type_shape_unary_op(g, diff_y, y)
+    # 2^(x-m) = exp((x-m) * ln(2)) = exp((x-m) / log2(e))
+    ln2 = np.array(math.log(2), dtype=dtype)
+    pow_x = g.op.Exp(g.op.Mul(diff_x, ln2, name=name), name=name)
+    set_type_shape_unary_op(g, pow_x, x)
+    pow_y = g.op.Exp(g.op.Mul(diff_y, ln2, name=name), name=name)
+    set_type_shape_unary_op(g, pow_y, y)
+    sum_pow = g.op.Add(pow_x, pow_y, name=name)
+    set_type_shape_binary_op(g, sum_pow, pow_x, pow_y)
+    log_sum = g.op.Log(sum_pow, name=name)
+    set_type_shape_unary_op(g, log_sum, sum_pow)
+    log2_sum = g.op.Mul(log_sum, log2_e, name=name)
+    set_type_shape_unary_op(g, log2_sum, log_sum)
+    res = g.op.Add(m, log2_sum, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_binary_op(g, res, x, y)
+    return res
+
+
+def aten_logit(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    eps: Optional[float] = None,
+    name: str = "logit",
+) -> T:
+    """Computes the logit of each element: log(x / (1 - x)), with optional eps clamping."""
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    x_in = x
+    if eps is not None:
+        x = g.op.Clip(
+            x, np.array([eps], dtype=dtype), np.array([1.0 - eps], dtype=dtype), name=name
+        )
+        set_type_shape_unary_op(g, x, x_in)
+    one = np.array([1], dtype=dtype)
+    one_minus_x = g.op.Sub(one, x, name=name)
+    set_type_shape_unary_op(g, one_minus_x, x_in)
+    log_x = g.op.Log(x, name=name)
+    set_type_shape_unary_op(g, log_x, x_in)
+    log_one_minus_x = g.op.Log(one_minus_x, name=name)
+    set_type_shape_unary_op(g, log_one_minus_x, x_in)
+    res = g.op.Sub(log_x, log_one_minus_x, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x_in)
     return res
 
 
@@ -7569,7 +8391,7 @@ def aten_mse_loss(
     outputs: List[str],
     x: T,
     target: T,
-    reduction: str = "mean",
+    reduction: Union[int, str] = 1,
     name: str = "mse_loss",
 ) -> T:
     "mse_loss"
@@ -7578,20 +8400,20 @@ def aten_mse_loss(
     diff_mul = g.op.Mul(diff, diff, name=name)
     if reduction in (1, "mean"):
         res = g.op.ReduceMeanAnyOpset(diff_mul, name=name, outputs=outputs, keepdims=0)
-    elif reduction == "sum":
+    elif reduction in (2, "sum"):
         res = g.op.ReduceSumAnyOpset(diff_mul, name=name, outputs=outputs, keepdims=0)
-    elif reduction == "none":
+    elif reduction in (0, "none"):
         res = g.op.Identity(diff_mul, name=name, outputs=outputs)
     else:
         raise NotImplementedError(
-            f"l1_loss with reduction={reduction!r} is not implemented{g.get_debug_msg()}"
+            f"mse_loss with reduction={reduction!r} is not implemented{g.get_debug_msg()}"
         )
     if not sts:
-        if reduction == "none":
-            set_type_shape_unary_op(res, x)
+        if reduction in (0, "none"):
+            set_type_shape_unary_op(g, res, x)
         else:
             g.set_type(res, g.get_type(x))
-            g.get_shape(res, tuple())
+            g.set_shape(res, tuple())
     return res
 
 
@@ -7728,6 +8550,74 @@ def aten_nan_to_num(
     if not sts:
         set_type_shape_unary_op(g, res, x)
     return res
+
+
+def aten_nansum(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    keepdim: bool = False,
+    dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    name: str = "nansum",
+) -> T:
+    """Reduces sum while treating NaN values as zero."""
+    zero = np.array([0], dtype=tensor_dtype_to_np_dtype(g.get_type(x)))
+    x_no_nan = g.op.Where(g.op.IsNaN(x, name=name), zero, x, name=name)
+    return aten_sum(g, sts, outputs, x_no_nan, dim=dim, keepdim=keepdim, dtype=dtype, name=name)
+
+
+def aten_nansum_dim_IntList(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]],
+    keepdim: bool,
+    dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    name: str = "nansum_dim_IntList",
+) -> T:
+    """Reduces sum with explicit dim list while treating NaN values as zero."""
+    zero = np.array([0], dtype=tensor_dtype_to_np_dtype(g.get_type(x)))
+    x_no_nan = g.op.Where(g.op.IsNaN(x, name=name), zero, x, name=name)
+    return aten_sum_dim_IntList(g, sts, outputs, x_no_nan, dim=dim, keepdim=keepdim, dtype=dtype)
+
+
+def aten_nanmean(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    keepdim: bool = False,
+    dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    name: str = "nanmean",
+) -> T:
+    """Reduces mean while treating NaN values as absent (excluded from count)."""
+    xtype = g.get_type(x)
+    np_dtype = tensor_dtype_to_np_dtype(xtype)
+    zero = np.array([0], dtype=np_dtype)
+    nan_mask = g.op.IsNaN(x, name=name)
+    x_no_nan = g.op.Where(nan_mask, zero, x, name=name)
+    not_nan_float = g.op.Cast(g.op.Not(nan_mask, name=name), to=xtype, name=name)
+    if dim is None:
+        total = g.op.ReduceSumAnyOpset(x_no_nan, keepdims=1 if keepdim else 0, name=name)
+        count = g.op.ReduceSumAnyOpset(not_nan_float, keepdims=1 if keepdim else 0, name=name)
+    else:
+        adim = np.array([dim] if isinstance(dim, int) else dim, dtype=np.int64)
+        total = g.op.ReduceSumAnyOpset(x_no_nan, adim, keepdims=1 if keepdim else 0, name=name)
+        count = g.op.ReduceSumAnyOpset(
+            not_nan_float, adim, keepdims=1 if keepdim else 0, name=name
+        )
+    if dtype is not None:
+        itype = torch_dtype_to_onnx_dtype(dtype)
+        total = g.op.Cast(total, to=itype, name=name)
+        count = g.op.Cast(count, to=itype, name=name)
+    result = g.op.Div(total, count, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim)
+    return result
 
 
 def aten_narrow(
@@ -9089,6 +9979,13 @@ def aten_prod_dim_int(
         outputs=outputs,
         name=name,
     )
+
+
+def aten_ravel(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "ravel"
+) -> T:
+    """Reshapes the input tensor to 1D."""
+    return aten_flatten_using_ints(g, sts, outputs, x, start_dim=0, end_dim=-1, name=name)
 
 
 def aten_reciprocal(
@@ -11699,7 +12596,7 @@ def aten_std_dim(
     outputs: List[str],
     x: T,
     dims: Sequence[int],
-    correction: float,
+    correction: Optional[float],
     keepdim: bool = False,
     name: str = "std_dim",
 ) -> T:
@@ -11714,7 +12611,8 @@ def aten_std_dim(
     sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
     var = g.op.ReduceMeanAnyOpset(sqr_mean, cdims, keepdims=1 if keepdim else 0, name=name)
 
-    if correction > 0:
+    # correction=None means no Bessel correction (same as correction=0)
+    if correction is not None and correction > 0:
         assert g.has_shape(
             x
         ), f"not implemented if shape of x={x!r} is missing{g.get_debug_msg()}"
@@ -11734,6 +12632,109 @@ def aten_std_dim(
     if not sts:
         g.set_type(res, g.get_type(x))
     return res
+
+
+def _std_var_correction(
+    g: GraphBuilder,
+    x: T,
+    dim: Optional[Union[int, List[int]]],
+    correction: Optional[float],
+    keepdim: bool,
+    name: str,
+) -> T:
+    """Computes biased or unbiased variance (before sqrt for std).
+
+    Returns:
+        The variance tensor (same dtype as *x*).
+    """
+    itype = g.get_type(x)
+    dtype = tensor_dtype_to_np_dtype(itype)
+    # correction=None means no Bessel correction (same as correction=0)
+    apply_correction = correction is not None and correction > 0
+
+    if dim is None:
+        mean = g.op.ReduceMeanAnyOpset(x, name=name, keepdims=1)
+        sub_mean = g.op.Sub(x, mean, name=name)
+        sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
+        var = g.op.ReduceMeanAnyOpset(sqr_mean, name=name, keepdims=1 if keepdim else 0)
+        if apply_correction:
+            assert g.has_shape(
+                x
+            ), f"not implemented if shape of x={x!r} is missing{g.get_debug_msg()}"
+            shape = g.get_shape(x)
+            assert is_static_shape(
+                shape
+            ), f"not implemented for shape={shape!r} for x={x!r}{g.get_debug_msg()}"
+            numel = np.prod(shape).astype(dtype)
+            mul = g.op.Mul(var, numel, name=name)
+            sub = g.op.Sub(numel, np.array([correction], dtype=dtype), name=name)
+            var = g.op.Div(mul, sub, name=name)
+    else:
+        cdims = np.array([dim] if isinstance(dim, int) else list(dim), dtype=np.int64)
+        mean = g.op.ReduceMeanAnyOpset(x, cdims, name=name, keepdims=1)
+        sub_mean = g.op.Sub(x, mean, name=name)
+        sqr_mean = g.op.Mul(sub_mean, sub_mean, name=name)
+        var = g.op.ReduceMeanAnyOpset(sqr_mean, cdims, name=name, keepdims=1 if keepdim else 0)
+        if apply_correction:
+            assert g.has_shape(
+                x
+            ), f"not implemented if shape of x={x!r} is missing{g.get_debug_msg()}"
+            shape = g.get_shape(x)
+            assert is_static_shape(
+                shape
+            ), f"not implemented for shape={shape!r} for x={x!r}{g.get_debug_msg()}"
+            dim_size = np.array(shape)[cdims]
+            numel = np.prod(dim_size).astype(dtype)
+            mul = g.op.Mul(var, numel, name=name)
+            sub = g.op.Sub(numel, np.array([correction], dtype=dtype), name=name)
+            var = g.op.Div(mul, sub, name=name)
+    return var
+
+
+def aten_std_correction(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    correction: Optional[float] = 1,
+    keepdim: bool = False,
+    name: str = "std_correction",
+) -> T:
+    """Computes the standard deviation with optional Bessel correction."""
+    var = _std_var_correction(g, x, dim, correction, keepdim, name)
+    res = g.op.Sqrt(var, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
+    return res
+
+
+def aten_std_mean_correction(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    correction: Optional[float] = 1,
+    keepdim: bool = False,
+    name: str = "std_mean_correction",
+) -> Tuple[T, T]:
+    """Computes the standard deviation and mean with optional Bessel correction."""
+    var = _std_var_correction(g, x, dim, correction, keepdim, name)
+    std = g.op.Sqrt(var, outputs=outputs[:1], name=name)
+    if dim is None:
+        mean = g.op.ReduceMeanAnyOpset(
+            x, name=name, keepdims=1 if keepdim else 0, outputs=outputs[1:2]
+        )
+    else:
+        cdims = np.array([dim] if isinstance(dim, int) else list(dim), dtype=np.int64)
+        mean = g.op.ReduceMeanAnyOpset(
+            x, cdims, name=name, keepdims=1 if keepdim else 0, outputs=outputs[1:2]
+        )
+    if not sts:
+        set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
+        set_type_shape_reduce_op(g, outputs[1], x, keepdim=1 if keepdim else 0)
+    return std, mean
 
 
 def aten_sub(
@@ -12887,8 +13888,6 @@ def aten_upsample_nearest2d(
 ) -> T:
     """resize"""
     assert output_size is not None, "Not implemented when size is None"
-    assert scale_h is None, f"Not implemented when scale_h={scale_h}"
-    assert scale_w is None, f"Not implemented when scale_w={scale_w}"
 
     return _aten_upsample_output_size(
         g,
@@ -12916,9 +13915,6 @@ def aten_upsample_nearest3d(
 ) -> T:
     """resize"""
     assert output_size is not None, "Not implemented when size is None"
-    assert scale_d is None, f"Not implemented when scale_h={scale_h}"
-    assert scale_h is None, f"Not implemented when scale_h={scale_h}"
-    assert scale_w is None, f"Not implemented when scale_h={scale_w}"
 
     return _aten_upsample_output_size(
         g,
@@ -12965,8 +13961,6 @@ def aten_upsample_bicubic2d(
 ) -> T:
     """resize"""
     assert output_size is not None, "Not implemented when size is None"
-    assert scale_d is None, f"Not implemented when scale_h={scale_h}"
-    assert scale_h is None, f"Not implemented when scale_h={scale_h}"
 
     return _aten_upsample_output_size(
         g,
@@ -12996,8 +13990,6 @@ def aten_upsample_bilinear2d(
 ) -> T:
     """resize"""
     assert output_size is not None, "Not implemented when size is None"
-    assert scale_d is None, f"Not implemented when scale_h={scale_h}"
-    assert scale_h is None, f"Not implemented when scale_h={scale_h}"
 
     return _aten_upsample_output_size(
         g,
@@ -13114,9 +14106,6 @@ def aten_upsample_trilinear3d(
 ) -> T:
     """resize"""
     assert output_size is not None, "Not implemented when size is None"
-    assert scale_d is None, f"Not implemented when scale_d={scale_d}"
-    assert scale_h is None, f"Not implemented when scale_h={scale_h}"
-    assert scale_w is None, f"Not implemented when scale_w={scale_w}"
 
     return _aten_upsample_output_size(
         g,
@@ -13448,6 +14437,52 @@ def aten_wrap_with_set_grad_enabled(
     return g.make_node(
         wrapped_func, args, new_outputs, name="wrap_with_set_grad_enabled", domain=g.local_domain
     )
+
+
+def aten_xlogy(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "xlogy",
+) -> T:
+    """xlogy: computes ``x * log(y)`` with the convention that ``xlogy(0, y) == 0``."""
+    x, y = prepare_inputs_homogeneous_operator(g, x, y)
+    itype = g.get_type(x)
+    dtype = tensor_dtype_to_np_dtype(itype)
+    zero = np.array(0, dtype=dtype)
+    is_zero = g.op.Equal(x, zero, name=name)
+    log_y = g.op.Log(y, name=name)
+    x_times_log_y = g.op.Mul(x, log_y, name=name)
+    res = g.op.Where(is_zero, zero, x_times_log_y, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_binary_op(g, res, x, y)
+    return res
+
+
+def aten_xlogy_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "xlogy_Tensor",
+) -> T:
+    """xlogy.Tensor: computes ``x * log(y)`` with the convention that ``xlogy(0, y) == 0``."""
+    return aten_xlogy(g, sts, outputs, x, y, name=name)
+
+
+def aten_xlogy_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "xlogy_Scalar",
+) -> T:
+    """xlogy.Scalar: computes ``x * log(y)`` with the convention that ``xlogy(0, y) == 0``."""
+    return aten_xlogy(g, sts, outputs, x, y, name=name)
 
 
 def aten_zero(

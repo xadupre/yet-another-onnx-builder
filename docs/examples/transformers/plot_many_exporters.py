@@ -24,12 +24,7 @@ from yobx.helpers import max_diff
 from yobx.helpers.rt_helper import make_feeds
 from yobx.torch.torch_helper import torch_deepcopy
 from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
-from yobx.torch import (
-    apply_patches_for_model,
-    register_flattening_functions,
-    to_onnx,
-    ExportOptions,
-)
+from yobx.torch import apply_patches_for_model, to_onnx, ExportOptions
 
 # %%
 # Command-line arguments
@@ -82,7 +77,7 @@ parser.add_argument(
     ),
 )
 parser.add_argument(
-    "--exporter", type=str, default="dynamo,yobx,tracing", help=("Tells which exporter to run.")
+    "--exporter", type=str, default="yobx,dynamo,tracing", help=("Tells which exporter to run.")
 )
 
 # parse_known_args avoids failures when sphinx-gallery passes extra arguments.
@@ -140,20 +135,61 @@ print(f"  device={device}")
 model = model.to(device)
 
 # %%
+# Wrap the model
+# --------------
+#
+# Rather than registering ``DynamicCache`` as a pytree node with
+# :func:`register_flattening_functions <yobx.torch.flatten.register_flattening_functions>`,
+# we wrap the model in a thin :class:`torch.nn.Module` subclass whose
+# ``forward`` signature takes only plain :class:`torch.Tensor` arguments.
+# The wrapper reconstructs the ``DynamicCache`` internally before forwarding
+# to the original model.  This keeps the exported ONNX model's input interface
+# clean (all inputs are tensors) without requiring any pytree registration
+# to flatten the caches.
+
+
+class LLMWrapper(torch.nn.Module):
+    def __init__(self, inner_model: torch.nn.Module):
+        super().__init__()
+        self.inner_model = inner_model
+
+    def forward(
+        self,
+        input_ids: torch.Tensor,
+        attention_mask: torch.Tensor,
+        past_key_0: torch.Tensor,
+        past_value_0: torch.Tensor,
+    ):
+        past_key_values = make_dynamic_cache([(past_key_0, past_value_0)])
+        outputs = self.inner_model(
+            input_ids=input_ids, attention_mask=attention_mask, past_key_values=past_key_values
+        )
+        return (
+            outputs.logits,
+            outputs.past_key_values.layers[0].keys,
+            outputs.past_key_values.layers[0].values,
+        )
+
+
+wrapped_model = LLMWrapper(model)
+
+# %%
 # Run the exporters
 # -----------------
 
+past_key = torch.rand((2, 1, 30, 96)).to(device)
+past_value = torch.rand((2, 1, 30, 96)).to(device)
 inputs = dict(
     input_ids=torch.randint(0, 1000, (2, 3), dtype=torch.int64).to(device),
     attention_mask=torch.randint(0, 1, (2, 33), dtype=torch.int64).to(device),
-    past_key_values=make_dynamic_cache(
-        [(torch.rand((2, 1, 30, 96)).to(device), torch.rand((2, 1, 30, 96)).to(device))]
-    ),
+    past_key_0=past_key,
+    past_value_0=past_value,
 )
 dynamic_shapes = {
     "input_ids": {0: "batch", 1: "seq_length"},
     "attention_mask": {0: "batch", 1: "past_length+seq_length"},
-    "past_key_values": [{0: "batch", 2: "past_length"}, {0: "batch", 2: "past_length"}],
+    "past_key_0": {0: "batch", 2: "past_length"},
+    "past_value_0": {0: "batch", 2: "past_length"},
 }
 providers = (
     ["CUDAExecutionProvider", "CPUExecutionProvider"]
@@ -164,21 +200,23 @@ providers = (
 
 exporters = args.exporter.split(",")
 copy_inputs = torch_deepcopy(inputs)
-expected = model(**copy_inputs)
+expected = wrapped_model(**copy_inputs)
 
 successful_exports: dict[str, str] = {}
 
 for exporter in exporters:
     filename = f"plot_many_exporter.{exporter}.onnx"
     print(f"-- run exporter {exporter!r}")
-    with (
-        register_flattening_functions(patch_transformers=True),
-        apply_patches_for_model(patch_transformers=True, model=model),
-    ):
+    with apply_patches_for_model(patch_transformers=True, model=model):
         if exporter == "dynamo":
             try:
                 torch.onnx.export(
-                    model, (), filename, kwargs=inputs, dynamic_shapes=dynamic_shapes
+                    wrapped_model,
+                    (),
+                    filename,
+                    kwargs=inputs,
+                    dynamic_shapes=dynamic_shapes,
+                    opset_version=22,
                 )
                 print("-- export ok")
             except Exception as e:
@@ -186,7 +224,13 @@ for exporter in exporters:
                 continue
         elif exporter == "yobx":
             try:
-                to_onnx(model, kwargs=inputs, filename=filename, dynamic_shapes=dynamic_shapes)
+                to_onnx(
+                    wrapped_model,
+                    kwargs=inputs,
+                    filename=filename,
+                    dynamic_shapes=dynamic_shapes,
+                    target_opset=22,
+                )
                 print("-- export ok")
             except Exception as e:
                 print(f"-- export failed due to {e}")
@@ -194,11 +238,12 @@ for exporter in exporters:
         elif exporter == "tracing":
             try:
                 to_onnx(
-                    model,
+                    wrapped_model,
                     kwargs=inputs,
                     filename=filename,
                     dynamic_shapes=dynamic_shapes,
                     export_options=ExportOptions(tracing=True),
+                    target_opset=22,
                 )
                 print("-- export ok")
             except Exception as e:
@@ -212,7 +257,11 @@ for exporter in exporters:
     print("-- running")
     sess = onnxruntime.InferenceSession(filename, providers=providers)
     feeds = make_feeds([i.name for i in sess.get_inputs()], inputs, use_numpy=True)
-    got = sess.run(None, feeds)
+    try:
+        got = sess.run(None, feeds)
+    except Exception as e:
+        print(f"-- not running due to {e}")
+        continue
     diff = max_diff(expected, got)
     if diff["abs"] < 1e-2:
         print(f"-- discrepancies ok - {diff['abs']}")
@@ -273,4 +322,5 @@ if successful_exports:
     ax.set_title("ONNX node frequencies per exporter", fontsize=10)
     ax.legend(fontsize=9)
     fig.tight_layout()
+    fig.savefig("plot_many_exporters.png")
     plt.show()

@@ -2652,6 +2652,51 @@ class CustomTracer(torch.fx.Tracer):
         return n
 
     @classmethod
+    def _replace_inplace_aten_functions(cls, graph: torch.fx.Graph, verbose: int = 0) -> int:
+        """
+        Replaces ``call_function`` nodes whose target is an inplace ATen binary
+        op (e.g. ``aten.add_.Tensor``, ``aten.mul_.Scalar``) with their
+        non-inplace equivalents (e.g. ``aten.add.Tensor``,
+        ``aten.mul.Scalar``).
+
+        This is the counterpart of :meth:`_replace_inplace_call_methods` for
+        graphs produced by :class:`~yobx.torch.new_tracing.GraphTracer` where
+        inplace dispatch operations are already recorded as ``call_function``
+        ATen nodes with the trailing ``_`` in the overload name.  Because
+        :class:`~yobx.torch.new_tracing.GraphTracer` correctly reassigns
+        Python-level references on each inplace call, downstream users of the
+        result already point to the inplace node — no user-rerouting is needed;
+        only the target needs to be rewritten.
+
+        :param graph: graph to modify
+        :param verbose: verbosity level
+        :return: number of nodes replaced
+        """
+        _aten_inplace_to_non_inplace = {
+            torch.ops.aten.add_.Tensor: torch.ops.aten.add.Tensor,
+            torch.ops.aten.add_.Scalar: torch.ops.aten.add.Scalar,
+            torch.ops.aten.mul_.Tensor: torch.ops.aten.mul.Tensor,
+            torch.ops.aten.mul_.Scalar: torch.ops.aten.mul.Scalar,
+            torch.ops.aten.sub_.Tensor: torch.ops.aten.sub.Tensor,
+            torch.ops.aten.sub_.Scalar: torch.ops.aten.sub.Scalar,
+            torch.ops.aten.div_.Tensor: torch.ops.aten.div.Tensor,
+            torch.ops.aten.div_.Scalar: torch.ops.aten.div.Scalar,
+        }
+        n = 0
+        for node in graph.nodes:
+            if node.op != "call_function" or node.target not in _aten_inplace_to_non_inplace:
+                continue
+            old_target = node.target
+            node.target = _aten_inplace_to_non_inplace[old_target]
+            n += 1
+            if verbose > 1:
+                print(
+                    f"[CustomTracer._replace_inplace_aten_functions] replaced "
+                    f"aten inplace {old_target!r} -> non-inplace at {node.name!r}"
+                )
+        return n
+
+    @classmethod
     def remove_inplace(
         cls,
         graph: torch.fx.Graph,
@@ -2692,6 +2737,8 @@ class CustomTracer(torch.fx.Tracer):
                         return inpl
                     n_inplace_submobules += inpl
 
+        # Convert call_function inplace ATen nodes (aten.add_.Tensor, etc.) to non-inplace.
+        cls._replace_inplace_aten_functions(graph, verbose=verbose)
         # Convert call_method inplace nodes (add_, mul_, etc.) to call_function equivalents.
         cls._replace_inplace_call_methods(graph, verbose=verbose)
 

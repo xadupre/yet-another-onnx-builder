@@ -19,6 +19,7 @@ def to_onnx(
     large_model: bool = False,
     external_threshold: int = 1024,
     filename: Optional[str] = None,
+    return_optimize_report: bool = False,
     **kwargs: Any,
 ) -> Any:
     """
@@ -96,6 +97,10 @@ def to_onnx(
         Supported by torch, sklearn, tensorflow, and sql backends.
         Not supported by the LiteRT backend (ignored when *model* is a
         ``.tflite`` file or raw flatbuffer bytes).
+    :param return_optimize_report: if True, the returned
+        :class:`~yobx.container.ExportArtifact` has its
+        :attr:`~yobx.container.ExportArtifact.report` attribute populated with
+        per-pattern optimization statistics.  Supported by all backends.
     :param kwargs: additional backend-specific keyword arguments forwarded
         verbatim to the selected converter.  See the backend-specific
         ``to_onnx`` functions listed above for their full parameter lists.
@@ -164,6 +169,7 @@ def to_onnx(
         large_model=large_model,
         external_threshold=external_threshold,
         filename=filename,
+        return_optimize_report=return_optimize_report,
     )
 
     # ------------------------------------------------------------------ #

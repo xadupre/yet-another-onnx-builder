@@ -10,7 +10,7 @@ from torch._subclasses.fake_tensor import FakeTensorMode
 from torch.fx.experimental.symbolic_shapes import ShapeEnv
 from torch.fx.experimental.sym_node import SymNode
 from ...xexpressions import rename_expression
-from .shape import TracingShape, TracingInt
+from .shape import TracingShape, TracingInt, TracingBool, register_condition, clear_conditions
 from .tensor import TracingTensor
 
 # Capture the real ``torch.cond`` at import time so that it can always be
@@ -18,6 +18,10 @@ from .tensor import TracingTensor
 # temporarily replaced by the tracing shim (nested context managers would
 # otherwise make the inner context see the outer shim as "original").
 _ORIGINAL_TORCH_COND: Callable = torch.cond  # type: ignore[attr-defined]
+
+# Capture the real ``torch._check`` at import time so that it can be
+# restored after tracing.  ``torch._check`` may not exist on older versions.
+_ORIGINAL_TORCH_CHECK: Optional[Callable] = getattr(torch, "_check", None)
 
 
 @contextlib.contextmanager
@@ -42,6 +46,38 @@ def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:
         yield
     finally:
         torch.cond = _ORIGINAL_TORCH_COND  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _check_replacement_ctx(tracer: "GraphTracer") -> Generator:
+    """
+    Context manager that temporarily replaces ``torch._check`` with a
+    tracing-aware handler so that ``torch._check`` calls encountered during
+    :meth:`GraphTracer.trace` register symbolic conditions instead of
+    crashing when the condition is a :class:`TracingBool` or a concrete
+    ``False`` produced by a symbolic dimension that is stored as ``0`` in the
+    underlying tensor.
+
+    Registered conditions are stored in the module-level
+    :data:`~yobx.torch.new_tracing.shape._known_true_conditions` set and are
+    consulted by :meth:`TracingBool.__bool__` to resolve comparisons that
+    would otherwise raise :exc:`ValueError`.
+
+    :param tracer: The :class:`GraphTracer` whose :meth:`_handle_check` should
+        be used as the replacement.
+    """
+    if _ORIGINAL_TORCH_CHECK is None:
+        yield
+        return
+
+    def _check_handler(cond: Any, msg: Any = None) -> None:
+        tracer._handle_check(cond, msg)
+
+    torch._check = _check_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch._check = _ORIGINAL_TORCH_CHECK  # type: ignore[assignment]
 
 
 class GraphTracer:
@@ -800,7 +836,7 @@ class GraphTracer:
             else:
                 sub_operands.append(op)
 
-        with _cond_replacement_ctx(sub):
+        with _cond_replacement_ctx(sub), _check_replacement_ctx(sub):
             out = fn(*sub_operands)
 
         def _to_node(x: Any) -> Any:
@@ -900,6 +936,46 @@ class GraphTracer:
         raise NotImplementedError(
             f"torch.cond: unexpected output type from branch function: {type(true_out)}"
         )
+
+    def _handle_check(self, cond: Any, msg: Any = None) -> None:
+        """
+        Tracing-aware replacement for ``torch._check`` called via
+        :func:`_check_replacement_ctx`.
+
+        ``torch._check`` is a runtime assertion that *cond* holds.  During
+        :class:`GraphTracer` tracing the condition is frequently a
+        :class:`TracingBool` (produced by comparing a symbolic
+        :class:`TracingInt` dimension, e.g. ``tensor.shape[0] > 0``) or a
+        concrete ``False`` caused by symbolic dimensions being stored as ``0``
+        in the underlying tensor storage.
+
+        This method:
+
+        1. **Silently accepts** any :class:`TracingBool` condition without
+           calling ``bool()`` on it (which would raise :exc:`ValueError`).
+        2. **Registers** symbolic :class:`TracingBool` conditions in the
+           module-level :data:`~yobx.torch.new_tracing.shape._known_true_conditions`
+           set so that later uses of the same comparison (e.g. ``if
+           tensor.shape[0] > 0:``) can resolve to ``True`` via
+           :meth:`TracingBool.__bool__`.
+        3. **Silently skips** concrete ``False`` values — these occur when a
+           symbolic dimension (stored as ``0``) makes a comparison that is
+           normally True at runtime evaluate to ``False`` at trace time.
+        4. **No-ops** on concrete ``True`` values.
+
+        :param cond: The condition passed to ``torch._check``.  May be a
+            concrete :class:`bool`, a :class:`TracingBool`, or any other value.
+        :param msg: Optional error message (ignored during tracing).
+        """
+        if isinstance(cond, TracingBool):
+            register_condition(cond)
+            return
+        if isinstance(cond, bool):
+            # Silently accept both True and False during tracing; a False
+            # value typically arises when a symbolic dimension stored as 0
+            # makes an otherwise-True condition evaluate to False.
+            return
+        # For any other type (including ints from shape ops), accept silently.
 
     # ------------------------------------------------------------------
     # Public tracing entry point
@@ -1101,7 +1177,8 @@ class GraphTracer:
 
         if self.verbose:
             print("[GraphTracer.trace] call...")
-        with _cond_replacement_ctx(self):
+        clear_conditions()
+        with _cond_replacement_ctx(self), _check_replacement_ctx(self):
             out = func(*tracing_args, **tracing_kwargs)
 
         for submod, orig_fwd in _patched:
