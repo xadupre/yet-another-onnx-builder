@@ -9982,11 +9982,7 @@ def aten_prod_dim_int(
 
 
 def aten_ravel(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    x: T,
-    name: str = "ravel",
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "ravel"
 ) -> T:
     """Reshapes the input tensor to 1D."""
     return aten_flatten_using_ints(g, sts, outputs, x, start_dim=0, end_dim=-1, name=name)
