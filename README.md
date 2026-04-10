@@ -76,31 +76,32 @@ ref = InferenceSession(artifact.SerializeToString(), providers=["CPUExecutionPro
 Its unique API across all converters:
 
 ```python
-import torch
+import numpy as np
 import onnxruntime
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import FunctionTransformer, StandardScaler
 from yobx import to_onnx
 
-# Define any PyTorch model
-class Neuron(torch.nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.linear = torch.nn.Linear(4, 2)
+# A custom numpy function traced to ONNX automatically
+def log1p_abs(X):
+    return np.log1p(np.abs(X))
 
-    def forward(self, x):
-        return torch.relu(self.linear(x))
+pipe = Pipeline([
+    ("func", FunctionTransformer(func=log1p_abs)),
+    ("scaler", StandardScaler()),
+])
 
-model = Neuron()
-x = torch.randn(3, 4)
+X_train = np.random.default_rng(0).standard_normal((80, 4)).astype(np.float32)
+pipe.fit(X_train)
 
-# Export to ONNX — dynamic batch dimension
-batch_dim = torch.export.Dim("batch", min=1, max=256)
-artifact = to_onnx(model, (x,), dynamic_shapes={"x": {0: batch_dim}})
+# Export the whole pipeline to ONNX in one call
+artifact = to_onnx(pipe, (X_train[:1],))
 
 # Run with onnxruntime
 sess = onnxruntime.InferenceSession(
     artifact.proto.SerializeToString(), providers=["CPUExecutionProvider"]
 )
-(result,) = sess.run(None, {"x": x.numpy()})
+(result,) = sess.run(None, {"X": X_train})
 ```
 
 [onnxruntime](https://onnxruntime.ai/) optimizations are triggered with
