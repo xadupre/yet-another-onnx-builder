@@ -557,6 +557,13 @@ def aten_alias(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str
     return g.make_node("Identity", [x], outputs, name="alias")
 
 
+def aten_alias_copy(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
+) -> T:
+    "identity"
+    return g.make_node("Identity", [x], outputs, name="alias_copy")
+
+
 def aten_amax(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -3115,9 +3122,7 @@ def aten_div_Tensor_mode(
     return g.op.Floor(g.op.Div(x, y, name=name), name=name, outputs=outputs)
 
 
-def aten_dot(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
-) -> T:
+def aten_dot(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T) -> T:
     """Computes the dot product of two 1-D tensors."""
     res = g.op.MatMul(x, y, outputs=outputs, name="dot")
     if not sts:
@@ -3784,6 +3789,29 @@ def aten_exp(
     return res
 
 
+def aten_exp2(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "exp2"
+) -> T:
+    """exp2 — Computes ``2 ** x``, casting integer inputs to float32 first."""
+    assert g.has_type(x), f"exp2: type of {x!r} must be known{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    if itype not in {
+        TensorProto.FLOAT,
+        TensorProto.DOUBLE,
+        TensorProto.FLOAT16,
+        TensorProto.BFLOAT16,
+    }:
+        # torch.exp2 returns float32 for integer inputs
+        x = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+        itype = TensorProto.FLOAT
+    dtype = tensor_dtype_to_np_dtype(itype)
+    ln2 = np.array(math.log(2), dtype=dtype)
+    res = g.op.Exp(g.op.Mul(x, ln2, name=name), name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, outputs[0], x)
+    return res
+
+
 def aten_expm1(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "expm1"
 ) -> T:
@@ -4150,6 +4178,90 @@ def aten_fft_ifft2(
     return aten__fft_r2c(
         g, sts, outputs, x, n=s, dim=dim, norm=norm, name=name, inverse=True, onesided=False
     )
+
+
+def aten_fft_fftshift(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    name: str = "fft_fftshift",
+) -> T:
+    """Shifts the zero-frequency component to the center of the spectrum.
+
+    Equivalent to rolling each specified dimension by ``n // 2`` where ``n``
+    is the size of that dimension.  Supports dynamic shapes.
+    """
+    assert g.has_rank(x), f"Missing rank for {x!r}{g.get_debug_msg()}"
+    rank = g.rank(x)
+
+    if dim is None:
+        dims = list(range(rank))
+    elif isinstance(dim, int):
+        dims = [dim]
+    else:
+        dims = list(dim)
+
+    result = x
+    for d in dims:
+        # n = size along dimension d (1-D int64 tensor of length 1)
+        n_tensor = g.op.Shape(result, start=d, end=d + 1, name=name)
+        # floor_half = n // 2, ceil_half = n - n // 2
+        floor_half = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
+        ceil_half = g.op.Sub(n_tensor, floor_half, name=name)
+        # fftshift: split at ceil(n/2): head=x[:ceil], tail=x[ceil:]; result=concat(tail, head)
+        split_sizes = g.op.Concat(ceil_half, floor_half, axis=0, name=name)
+        head, tail = g.op.Split(result, split_sizes, axis=d, outputs=2, name=name)
+        result = g.op.Concat(tail, head, axis=d, name=name)
+        g.set_type(result, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(result, g.get_shape(x))
+
+    return g.op.Identity(result, name=name, outputs=outputs)
+
+
+def aten_fft_ifftshift(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    name: str = "fft_ifftshift",
+) -> T:
+    """Computes the inverse of fftshift.
+
+    Equivalent to rolling each specified dimension by ``-(n // 2)`` (i.e.
+    rolling by ``+n // 2`` in the opposite direction), where ``n`` is the
+    size of that dimension.  Supports dynamic shapes.
+    """
+    assert g.has_rank(x), f"Missing rank for {x!r}{g.get_debug_msg()}"
+    rank = g.rank(x)
+
+    if dim is None:
+        dims = list(range(rank))
+    elif isinstance(dim, int):
+        dims = [dim]
+    else:
+        dims = list(dim)
+
+    result = x
+    for d in dims:
+        # n = size along dimension d (1-D int64 tensor of length 1)
+        n_tensor = g.op.Shape(result, start=d, end=d + 1, name=name)
+        # floor_half = n // 2, ceil_half = n - n // 2
+        floor_half = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
+        ceil_half = g.op.Sub(n_tensor, floor_half, name=name)
+        # ifftshift: split at floor(n/2): head=x[:floor], tail=x[floor:];
+        # result=concat(tail, head)
+        split_sizes = g.op.Concat(floor_half, ceil_half, axis=0, name=name)
+        head, tail = g.op.Split(result, split_sizes, axis=d, outputs=2, name=name)
+        result = g.op.Concat(tail, head, axis=d, name=name)
+        g.set_type(result, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(result, g.get_shape(x))
+
+    return g.op.Identity(result, name=name, outputs=outputs)
 
 
 def aten_fill_Scalar(

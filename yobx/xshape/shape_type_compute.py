@@ -1425,7 +1425,12 @@ def _set_shape_type_op_any_split(self: ShapeBuilder, node: NodeProto):
         _splits_cst = None
         if self.is_constant(node.input[1]):
             spl_cst = self.get_constant(node.input[1])
-            if len(spl_cst.shape) == 1:
+            if isinstance(spl_cst, NodeProto):
+                # constant is not yet evaluated; try value_as_shape instead
+                sv = self.value_as_shape(node.input[1])
+                if isinstance(sv, tuple) and all(isinstance(x, int) for x in sv):
+                    _splits_cst = list(sv)
+            elif len(spl_cst.shape) == 1:
                 _splits_cst = list(self.get_constant(node.input[1]))
             else:
                 split_size = int(spl_cst)
