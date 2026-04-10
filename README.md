@@ -76,14 +76,58 @@ ref = InferenceSession(artifact.SerializeToString(), providers=["CPUExecutionPro
 Its unique API across all converters:
 
 ```python
-# the model is called 
+import torch
+import onnxruntime
 from yobx import to_onnx
 
-expected = model(*args, **kwargs)
-onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, target_opset=22, **options)
+# Define any PyTorch model
+class Neuron(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.linear = torch.nn.Linear(4, 2)
+
+    def forward(self, x):
+        return torch.relu(self.linear(x))
+
+model = Neuron()
+x = torch.randn(3, 4)
+
+# Export to ONNX — dynamic batch dimension
+batch_dim = torch.export.Dim("batch", min=1, max=256)
+artifact = to_onnx(model, (x,), dynamic_shapes={"x": {0: batch_dim}})
+
+# Run with onnxruntime
+sess = onnxruntime.InferenceSession(
+    artifact.proto.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+(result,) = sess.run(None, {"x": x.numpy()})
 ```
 
 [onnxruntime](https://onnxruntime.ai/) optimizations are triggered with
 ``target_opset={"": 22, "com.microsoft": 1}``.
+
+## Comparison with existing ONNX conversion tools
+
+| Tool | Scope | Notes |
+|------|-------|-------|
+| [torch.onnx.export](https://pytorch.org/docs/stable/onnx.html) | PyTorch only | Official PyTorch exporter; `yobx` can delegate to it or use its own FX-based path |
+| [onnxscript](https://microsoft.github.io/onnxscript/) | PyTorch (dynamo) | Microsoft's new exporter; `yobx` can use it as a graph-builder backend |
+| [sklearn-onnx](https://onnx.ai/sklearn-onnx/) | scikit-learn only | Covers the scikit-learn ecosystem; `yobx` extends this with a unified API |
+| [tf2onnx](https://github.com/onnx/tensorflow-onnx) | TensorFlow / Keras | Converts TensorFlow models; `yobx` wraps the same models under one entry point |
+| [ModelBuilder](https://onnxruntime.ai/docs/genai/howto/build-model.html) | LLM inference (genai) | ONNX Runtime GenAI builder for large language models; `yobx` can produce models that target the same ORT execution providers |
+
+**Pros of `yobx`**
+
+* **Single entry point** — `yobx.to_onnx` dispatches to the right backend automatically; no need to learn a different API for every framework.
+* **Pluggable graph-builder** — the intermediate ONNX graph can be built with the built-in `GraphBuilder`, with [onnxscript](https://microsoft.github.io/onnxscript/)/[ir-py](https://onnx.ai/ir-py/), or with [Spox](https://spox.readthedocs.io/en/latest/), keeping the conversion code framework-agnostic.
+* **Transparent names** — node names, initializer names and result names are preserved as-is; what the builder writes is what ends up in the ONNX file.
+* **Built-in optimizer** — pattern-based graph rewrites (constant folding, fused ops, …) run automatically before serialization.
+* **ORT-specific targets** — passing `target_opset={"": 22, "com.microsoft": 1}` enables `com.microsoft` domain operators consumed directly by [onnxruntime](https://onnxruntime.ai/).
+* **Broad framework coverage** — PyTorch, scikit-learn, TensorFlow/Keras, LiteRT, pandas/polars/SQL under one package.
+
+**Cons / limitations**
+
+* Younger project; operator coverage for some exotic models may lag behind the official per-framework exporters.
+* The pluggable builder abstraction adds a thin indirection layer that advanced users may want to bypass.
 
 This package was initially starting using [Vibe Coding](https://en.wikipedia.org/wiki/Vibe_coding).
