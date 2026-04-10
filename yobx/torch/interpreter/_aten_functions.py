@@ -4177,13 +4177,13 @@ def aten_fft_fftshift(
     for d in dims:
         # n = size along dimension d (1-D int64 tensor of length 1)
         n_tensor = g.op.Shape(result, start=d, end=d + 1, name=name)
-        # floor_half = n // 2,  ceil_half = n - n // 2
+        # floor_half = n // 2, ceil_half = n - n // 2
         floor_half = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
         ceil_half = g.op.Sub(n_tensor, floor_half, name=name)
-        # fftshift: split at ceil(n/2) → concat(right_part, left_part)
+        # fftshift: split at ceil(n/2): head=x[:ceil], tail=x[ceil:]; result=concat(tail, head)
         split_sizes = g.op.Concat(ceil_half, floor_half, axis=0, name=name)
-        left_part, right_part = g.op.Split(result, split_sizes, axis=d, outputs=2, name=name)
-        result = g.op.Concat(right_part, left_part, axis=d, name=name)
+        head, tail = g.op.Split(result, split_sizes, axis=d, outputs=2, name=name)
+        result = g.op.Concat(tail, head, axis=d, name=name)
         g.set_type(result, g.get_type(x))
         if g.has_shape(x):
             g.set_shape(result, g.get_shape(x))
@@ -4219,13 +4219,14 @@ def aten_fft_ifftshift(
     for d in dims:
         # n = size along dimension d (1-D int64 tensor of length 1)
         n_tensor = g.op.Shape(result, start=d, end=d + 1, name=name)
-        # floor_half = n // 2,  ceil_half = n - n // 2
+        # floor_half = n // 2, ceil_half = n - n // 2
         floor_half = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
         ceil_half = g.op.Sub(n_tensor, floor_half, name=name)
-        # ifftshift: split at floor(n/2) → concat(right_part, left_part)
+        # ifftshift: split at floor(n/2): head=x[:floor], tail=x[floor:];
+        # result=concat(tail, head)
         split_sizes = g.op.Concat(floor_half, ceil_half, axis=0, name=name)
-        left_part, right_part = g.op.Split(result, split_sizes, axis=d, outputs=2, name=name)
-        result = g.op.Concat(right_part, left_part, axis=d, name=name)
+        head, tail = g.op.Split(result, split_sizes, axis=d, outputs=2, name=name)
+        result = g.op.Concat(tail, head, axis=d, name=name)
         g.set_type(result, g.get_type(x))
         if g.has_shape(x):
             g.set_shape(result, g.get_shape(x))
