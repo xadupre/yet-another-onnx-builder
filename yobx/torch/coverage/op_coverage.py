@@ -400,6 +400,7 @@ ATOL_OPS_FLOAT32: Dict[str, float] = {
 # Ops whose variance/std computation compounds float16 rounding errors need
 # a larger tolerance than the global _ATOL_FLOAT16 = 1e-2.
 ATOL_OPS_FLOAT16: Dict[str, float] = {
+    "exp2": 1e-1,  # Mul(x, ln2) adds a rounding step before Exp; error scales with magnitude
     "std": 1e-1,  # variance accumulates float16 rounding; sqrt amplifies
     "std_mean": 3e-1,  # same compound error as std
 }
@@ -408,6 +409,7 @@ ATOL_OPS_FLOAT16: Dict[str, float] = {
 # bfloat16 has only 7 mantissa bits, so statistical ops need an even wider
 # tolerance than the global _ATOL_BFLOAT16 = 2e-2.
 ATOL_OPS_BFLOAT16: Dict[str, float] = {
+    "exp2": 2e-1,  # Mul(x, ln2) adds rounding step before Exp; bfloat16 7-bit mantissa amplifies
     "logit": 5e-2,  # bfloat16 log precision compounds across Sub(Log(x), Log(1-x))
     "std": 2e-1,  # bfloat16 precision loss is larger than float16
     "std_mean": 2e-1,  # same compound error as std
