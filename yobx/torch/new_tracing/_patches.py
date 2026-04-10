@@ -21,6 +21,13 @@ _ORIGINAL_TORCH_COND: Callable = torch.cond  # type: ignore[attr-defined]
 # restored after tracing.  ``torch._check`` may not exist on older versions.
 _ORIGINAL_TORCH_CHECK: Optional[Callable] = getattr(torch, "_check", None)
 
+# Capture the real ``torch.ops.higher_order.scan`` at import time so that it
+# can always be used as the canonical FX node target.  The op may not exist on
+# older PyTorch versions.
+_ORIGINAL_TORCH_SCAN: Optional[Callable] = getattr(
+    getattr(torch.ops, "higher_order", None), "scan", None
+)
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -78,6 +85,38 @@ def _check_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         yield
     finally:
         torch._check = _ORIGINAL_TORCH_CHECK  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _scan_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    A context manager that temporarily replaces ``torch.ops.higher_order.scan``
+    with a tracing-aware handler so that scan calls encountered during
+    :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.trace` are captured as
+    FX ``call_function`` nodes instead of being executed eagerly.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_scan` should be used as the replacement.
+    """
+    if _ORIGINAL_TORCH_SCAN is None:
+        yield
+        return
+
+    def _scan_handler(
+        f: Callable,
+        init_states: List,
+        scan_inputs: List,
+        additional_inputs: Optional[List] = None,
+        dim: int = 0,
+        reverse: bool = False,
+    ) -> Any:
+        return tracer._handle_scan(f, init_states, scan_inputs, additional_inputs, dim, reverse)
+
+    torch.ops.higher_order.scan = _scan_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.ops.higher_order.scan = _ORIGINAL_TORCH_SCAN  # type: ignore[assignment]
 
 
 @contextlib.contextmanager

@@ -1093,3 +1093,17 @@ class ExportWithNewConstantTo(torch.nn.Module):
 
     _inputs = [(torch.rand((4, 4)),), (torch.rand((5, 6)),)]
     _dynamic = {"x": {0: DIM("batch"), 1: DIM("seq")}}
+
+
+class LayerNorm(torch.nn.Module):
+    """Wraps :class:`torch.nn.LayerNorm` to export it as an ONNX model."""
+
+    def __init__(self):
+        super().__init__()
+        self.layer_norm = torch.nn.LayerNorm(4)
+
+    def forward(self, x):
+        return self.layer_norm(x)
+
+    _inputs = [(torch.rand(3, 4),), (torch.rand(5, 4),)]
+    _dynamic = {"x": {0: DIM("batch")}}
