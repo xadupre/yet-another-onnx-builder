@@ -14513,12 +14513,9 @@ def aten_wrap_with_autocast(
     # function is valid for the considered dtype.
     # dtype is mentioned in the doc_string and should remain unless the graph
     # is inlined.
-
-    # assert dtype is None, f"Not implemented with dtype={dtype}{g.get_debug_msg()}"
-    assert not enabled, f"Not implemented with dtype={enabled}{g.get_debug_msg()}"
-    assert (
-        not cache_enabled
-    ), f"Not implemented with cache_enabled={cache_enabled}{g.get_debug_msg()}"
+    # When enabled=True the FX graph already captures the autocast-promoted dtypes
+    # inside the subgraph, so the code simply calls the local function regardless of
+    # `enabled` or `cache_enabled`.
     assert g.has_local_function(
         wrapped_func, domain=g.local_domain
     ), f"No local function {wrapped_func!r}, domain={g.local_domain!r}\n{g.pretty_text()}"

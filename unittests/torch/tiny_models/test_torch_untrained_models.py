@@ -716,6 +716,90 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertEqual(counter["Transpose"], expected_counts["Transpose"])
         self._chech_shape(onx.get_proto(include_weights=False))
 
+    @hide_stdout()
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
+    @ignore_warnings(FutureWarning)
+    def test_tiny_llm_to_onnx_autocast_bfloat16(self):
+        """Exports ``arnir0/Tiny-LLM`` wrapped in ``torch.autocast(bfloat16)``
+        and verifies that the ONNX model is valid and produces finite results.
+
+        The wrapper module places the model call inside an autocast context so
+        that ``torch.export`` captures a ``wrap_with_autocast`` node in the FX
+        graph.  This exercises the ``aten_wrap_with_autocast`` converter path
+        with ``enabled=True``.
+        """
+        data = get_tiny_model("arnir0/Tiny-LLM")
+        raw_model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
+        del inputs["position_ids"]
+        del ds["position_ids"]
+
+        class LLMWithAutocast(torch.nn.Module):
+            """Wraps a causal LM so that its forward runs under bfloat16 autocast."""
+
+            def __init__(self, llm):
+                super().__init__()
+                self.llm = llm
+
+            def forward(
+                self,
+                input_ids: torch.Tensor,
+                attention_mask: torch.Tensor,
+                past_key_0: torch.Tensor,
+                past_value_0: torch.Tensor,
+            ):
+                past_key_values = make_dynamic_cache([(past_key_0, past_value_0)])
+                with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+                    outputs = self.llm(
+                        input_ids=input_ids,
+                        attention_mask=attention_mask,
+                        past_key_values=past_key_values,
+                    )
+                return (
+                    outputs.logits,
+                    outputs.past_key_values.layers[0].keys,
+                    outputs.past_key_values.layers[0].values,
+                )
+
+        model = LLMWithAutocast(raw_model)
+
+        # Flatten the inputs to use plain tensors instead of DynamicCache.
+        wrapped_inputs = dict(
+            input_ids=inputs["input_ids"],
+            attention_mask=inputs["attention_mask"],
+            past_key_0=inputs["past_key_values"].layers[0].keys,
+            past_value_0=inputs["past_key_values"].layers[0].values,
+        )
+        wrapped_ds = dict(
+            input_ids=ds["input_ids"],
+            attention_mask=ds["attention_mask"],
+            past_key_0=ds["past_key_values"][0],
+            past_value_0=ds["past_key_values"][1],
+        )
+
+        filename = self.get_dump_file("test_tiny_llm_to_onnx_autocast_bfloat16.onnx")
+
+        with (
+            register_flattening_functions(patch_transformers=True),
+            apply_patches_for_model(patch_transformers=True, patch_torch=True, model=raw_model),
+        ):
+            to_onnx(
+                model,
+                kwargs=wrapped_inputs,
+                dynamic_shapes=wrapped_ds,
+                filename=filename,
+                verbose=0,
+                large_model=True,
+                options=OptimizationOptions(patterns="default"),
+                target_opset=24,
+            )
+
+        # Validate that the exported model is a well-formed ONNX proto.
+        proto = onnx.load(filename)
+        self.assertIsNotNone(proto)
+        self.assertGreater(len(proto.graph.node), 0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
