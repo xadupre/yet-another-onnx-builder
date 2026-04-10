@@ -557,6 +557,13 @@ def aten_alias(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str
     return g.make_node("Identity", [x], outputs, name="alias")
 
 
+def aten_alias_copy(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
+) -> T:
+    "identity"
+    return g.make_node("Identity", [x], outputs, name="alias_copy")
+
+
 def aten_amax(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -3115,9 +3122,7 @@ def aten_div_Tensor_mode(
     return g.op.Floor(g.op.Div(x, y, name=name), name=name, outputs=outputs)
 
 
-def aten_dot(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
-) -> T:
+def aten_dot(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T) -> T:
     """Computes the dot product of two 1-D tensors."""
     res = g.op.MatMul(x, y, outputs=outputs, name="dot")
     if not sts:
