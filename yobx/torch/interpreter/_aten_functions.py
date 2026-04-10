@@ -4177,15 +4177,13 @@ def aten_fft_fftshift(
     for d in dims:
         # n = size along dimension d (1-D int64 tensor of length 1)
         n_tensor = g.op.Shape(result, start=d, end=d + 1, name=name)
-        # shift = n // 2
-        shift = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
-        # neg_shift = -n // 2  (used as negative start index in Slice)
-        neg_shift = g.op.Neg(shift, name=name)
-        axis = np.array([d], dtype=np.int64)
-        # fftshift: concat(x[-n//2:], x[:-n//2])
-        part1 = g.op.Slice(result, neg_shift, n_tensor, axis, name=name)
-        part2 = g.op.Slice(result, g.ZERO, neg_shift, axis, name=name)
-        result = g.op.Concat(part1, part2, axis=d, name=name)
+        # floor_half = n // 2,  ceil_half = n - n // 2
+        floor_half = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
+        ceil_half = g.op.Sub(n_tensor, floor_half, name=name)
+        # fftshift: split at ceil(n/2) → concat(right_part, left_part)
+        split_sizes = g.op.Concat(ceil_half, floor_half, axis=0, name=name)
+        left_part, right_part = g.op.Split(result, split_sizes, axis=d, outputs=2, name=name)
+        result = g.op.Concat(right_part, left_part, axis=d, name=name)
         g.set_type(result, g.get_type(x))
         if g.has_shape(x):
             g.set_shape(result, g.get_shape(x))
@@ -4221,13 +4219,13 @@ def aten_fft_ifftshift(
     for d in dims:
         # n = size along dimension d (1-D int64 tensor of length 1)
         n_tensor = g.op.Shape(result, start=d, end=d + 1, name=name)
-        # shift = n // 2
-        shift = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
-        axis = np.array([d], dtype=np.int64)
-        # ifftshift: concat(x[n//2:], x[:n//2])
-        part1 = g.op.Slice(result, shift, n_tensor, axis, name=name)
-        part2 = g.op.Slice(result, g.ZERO, shift, axis, name=name)
-        result = g.op.Concat(part1, part2, axis=d, name=name)
+        # floor_half = n // 2,  ceil_half = n - n // 2
+        floor_half = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
+        ceil_half = g.op.Sub(n_tensor, floor_half, name=name)
+        # ifftshift: split at floor(n/2) → concat(right_part, left_part)
+        split_sizes = g.op.Concat(floor_half, ceil_half, axis=0, name=name)
+        left_part, right_part = g.op.Split(result, split_sizes, axis=d, outputs=2, name=name)
+        result = g.op.Concat(right_part, left_part, axis=d, name=name)
         g.set_type(result, g.get_type(x))
         if g.has_shape(x):
             g.set_shape(result, g.get_shape(x))
