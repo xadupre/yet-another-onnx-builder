@@ -592,6 +592,13 @@ def aten_alias(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str
     return g.make_node("Identity", [x], outputs, name="alias")
 
 
+def aten_alias_copy(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
+) -> T:
+    "identity"
+    return g.make_node("Identity", [x], outputs, name="alias_copy")
+
+
 def aten_amax(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
