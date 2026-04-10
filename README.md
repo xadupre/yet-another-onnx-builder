@@ -111,9 +111,9 @@ sess = onnxruntime.InferenceSession(
 
 | Tool | Scope | Notes |
 |------|-------|-------|
-| [torch.onnx.export](https://pytorch.org/docs/stable/onnx.html) | PyTorch only | Official PyTorch exporter; `yobx` can delegate to it or use its own FX-based path |
+| [torch.onnx.export](https://pytorch.org/docs/stable/onnx.html) | PyTorch only | Official PyTorch exporter; `yobx` can delegate to it or use its own FX-based path, and offers several options to trace the `fx.Graph` (default, symbolic tracing, new tracing) |
 | [onnxscript](https://microsoft.github.io/onnxscript/) | PyTorch (dynamo) | Microsoft's new exporter; `yobx` can use it as a graph-builder backend |
-| [sklearn-onnx](https://onnx.ai/sklearn-onnx/) | scikit-learn only | Covers the scikit-learn ecosystem; `yobx` extends this with a unified API |
+| [sklearn-onnx](https://onnx.ai/sklearn-onnx/) | scikit-learn only | Covers the scikit-learn ecosystem; `yobx` extends this with a unified API and adds support for custom functions written with NumPy via automatic tracing |
 | [tf2onnx](https://github.com/onnx/tensorflow-onnx) | TensorFlow / Keras | Converts TensorFlow models; `yobx` wraps the same models under one entry point |
 | [ModelBuilder](https://onnxruntime.ai/docs/genai/howto/build-model.html) | LLM inference (genai) | ONNX Runtime GenAI builder for large language models; `yobx` can produce models that target the same ORT execution providers |
 
@@ -124,7 +124,7 @@ sess = onnxruntime.InferenceSession(
 * **Transparent names** — node names, initializer names and result names are preserved as-is; what the builder writes is what ends up in the ONNX file.
 * **Built-in optimizer** — pattern-based graph rewrites (constant folding, fused ops, …) run automatically before serialization.
 * **ORT-specific targets** — passing `target_opset={"": 22, "com.microsoft": 1}` enables `com.microsoft` domain operators consumed directly by [onnxruntime](https://onnxruntime.ai/).
-* **Broad framework coverage** — PyTorch, scikit-learn, TensorFlow/Keras, LiteRT, pandas/polars/SQL under one package.
+* **Broad framework coverage** — PyTorch, scikit-learn, TensorFlow/Keras, LiteRT, pandas/polars/SQL under one package; supports tracing functions written with NumPy, functions operating on DataFrames, and SQL queries.
 
 **Cons / limitations**
 
