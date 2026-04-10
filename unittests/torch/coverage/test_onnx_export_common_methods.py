@@ -117,11 +117,11 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
         List of :class:`~torch.testing._internal.opinfo.core.OpInfo` objects.
     """
     _xfail_map: Dict[torch.dtype, FrozenSet[str]] = {
-        torch.float32: XFAIL_OPS,
-        torch.float16: XFAIL_OPS | XFAIL_OPS_FLOAT16,
-        torch.bfloat16: XFAIL_OPS | XFAIL_OPS_BFLOAT16,
-        torch.int32: XFAIL_OPS | XFAIL_OPS_INT32,
-        torch.int64: XFAIL_OPS | XFAIL_OPS_INT64,
+        torch.float32: XFAIL_OPS["default"],
+        torch.float16: XFAIL_OPS["default"] | XFAIL_OPS_FLOAT16["default"],
+        torch.bfloat16: XFAIL_OPS["default"] | XFAIL_OPS_BFLOAT16["default"],
+        torch.int32: XFAIL_OPS["default"] | XFAIL_OPS_INT32["default"],
+        torch.int64: XFAIL_OPS["default"] | XFAIL_OPS_INT64["default"],
     }
     if dtype not in _xfail_map:
         raise ValueError(f"Unsupported dtype {dtype!r}. Supported dtypes: {list(_xfail_map)}")

@@ -9,24 +9,17 @@ excluded for specific dtypes when tested via
 :data:`NO_CONVERTER_OPS` - ops whose aten decomposition uses a function for
 which no ONNX converter has been implemented yet.
 
-:data:`XFAIL_OPS` - ops that can be exported but produce incorrect numerical
-results or raise errors unrelated to missing converters.
-
-:data:`XFAIL_OPS_FLOAT16`, :data:`XFAIL_OPS_BFLOAT16`,
-:data:`XFAIL_OPS_INT32`, :data:`XFAIL_OPS_INT64` - dtype-specific extra
-exclusions on top of :data:`XFAIL_OPS`.
+:data:`XFAIL_OPS`, :data:`XFAIL_OPS_FLOAT16`, :data:`XFAIL_OPS_BFLOAT16`,
+:data:`XFAIL_OPS_INT32`, :data:`XFAIL_OPS_INT64` - dicts mapping export-path
+name (``"default"`` or ``"tracing"``) to a :class:`frozenset` of op keys that
+are expected to fail on that path.  The ``"default"`` entry covers the
+standard export path; the ``"tracing"`` entry lists additional ops that fail
+specifically under ``ExportOptions(tracing=True)``.  The dtype-specific dicts
+contain only the *extra* exclusions beyond the dtype-agnostic :data:`XFAIL_OPS`.
 
 :data:`ATOL_OPS_FLOAT32`, :data:`ATOL_OPS_FLOAT16`, :data:`ATOL_OPS_BFLOAT16` - per-op absolute
 tolerance overrides for float16 and bfloat16, for ops whose reduced-precision
 errors exceed the global dtype tolerance.
-
-:data:`XFAIL_OPS_TRACING` - ops that fail specifically under the torch tracing
-(``ExportOptions(tracing=True)``) export path, in addition to :data:`XFAIL_OPS`.
-
-:data:`XFAIL_OPS_TRACING_FLOAT16`, :data:`XFAIL_OPS_TRACING_BFLOAT16`,
-:data:`XFAIL_OPS_TRACING_INT32`, :data:`XFAIL_OPS_TRACING_INT64` -
-dtype-specific extra exclusions for the tracing path on top of
-:data:`XFAIL_OPS_TRACING`.
 
 These sets are consumed by the op-db test modules
 :mod:`unittests.torch.coverage.test_onnx_export_common_methods`,
@@ -218,186 +211,214 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
 
 # Ops that are currently exported but produce incorrect numerical results or
 # raise errors unrelated to missing aten converters.
-XFAIL_OPS: FrozenSet[str] = frozenset(
-    {
-        # Numerical mismatch between eager and ONNX output (AssertionError):
-        "cholesky_inverse",
-        "cholesky_solve",
-        "jiterator_2inputs_2outputs",
-        "jiterator_4inputs_with_extra_args",
-        "jiterator_binary",
-        "jiterator_binary_return_by_ref",
-        "jiterator_unary",
-        "linalg_det",
-        "linalg_slogdet",
-        "logdet",
-        "logical_not",
-        "nn_functional_cross_entropy",
-        "nn_functional_l1_loss",
-        "nn_functional_linear",
-        "nn_functional_mse_loss",
-        "nn_functional_smooth_l1_loss",
-        # Data-dependent output shapes (DataDependentOutputException):
-        "corrcoef",
-        "cov",
-        # Other export/runtime errors:
-        "bfloat16",  # RuntimeError
-        "broadcast_tensors",  # NotImplementedError
-        "clamp",  # onnxruntime RuntimeException
-        "nan_to_num",  # TypeError
-    }
-)
+# Each key is an export-path name: ``"default"`` for the standard path and
+# ``"tracing"`` for the ``ExportOptions(tracing=True)`` path.  The ``"tracing"``
+# entry lists *additional* ops that fail beyond those in ``"default"``.
+XFAIL_OPS: Dict[str, FrozenSet[str]] = {
+    "default": frozenset(
+        {
+            # Numerical mismatch between eager and ONNX output (AssertionError):
+            "cholesky_inverse",
+            "cholesky_solve",
+            "jiterator_2inputs_2outputs",
+            "jiterator_4inputs_with_extra_args",
+            "jiterator_binary",
+            "jiterator_binary_return_by_ref",
+            "jiterator_unary",
+            "linalg_det",
+            "linalg_slogdet",
+            "logdet",
+            "logical_not",
+            "nn_functional_cross_entropy",
+            "nn_functional_l1_loss",
+            "nn_functional_linear",
+            "nn_functional_mse_loss",
+            "nn_functional_smooth_l1_loss",
+            # Data-dependent output shapes (DataDependentOutputException):
+            "corrcoef",
+            "cov",
+            # Other export/runtime errors:
+            "bfloat16",  # RuntimeError
+            "broadcast_tensors",  # NotImplementedError
+            "clamp",  # onnxruntime RuntimeException
+            "nan_to_num",  # TypeError
+        }
+    ),
+    # Ops that fail specifically under ``ExportOptions(tracing=True)``,
+    # beyond those already listed under ``"default"``.
+    "tracing": frozenset(),
+}
 
 # Extra exclusions specific to torch.float16.
-XFAIL_OPS_FLOAT16: FrozenSet[str] = frozenset(
-    {
-        # Numerical mismatch too large for float16 tolerance (1e-2):
-        "addcmul",  # ref_diff=0.03125
-        "expm1",  # ref_diff=4
-        # Incorrect results (ordering) for float16:
-        "argsort",  # ref_diff=7944
-    }
-)
+# ``"default"`` contains float16-specific failures on the standard path;
+# ``"tracing"`` lists additional failures specific to the tracing path.
+XFAIL_OPS_FLOAT16: Dict[str, FrozenSet[str]] = {
+    "default": frozenset(
+        {
+            # Numerical mismatch too large for float16 tolerance (1e-2):
+            "addcmul",  # ref_diff=0.03125
+            "expm1",  # ref_diff=4
+            # Incorrect results (ordering) for float16:
+            "argsort",  # ref_diff=7944
+        }
+    ),
+    "tracing": frozenset(),
+}
 
 # Extra exclusions specific to torch.bfloat16.
-XFAIL_OPS_BFLOAT16: FrozenSet[str] = frozenset(
-    {
-        # Numerical mismatch too large for bfloat16 tolerance (2e-2):
-        "addcmul",  # ref_diff > 2e-2
-        "bmm",  # matmul numerical error exceeds bfloat16 tolerance
-        "erfinv",  # bfloat16 precision insufficient for erfinv computation
-        "expm1",  # reduced-precision exponential error
-        "log10",  # bfloat16 precision loss in Log
-        "log1p",  # bfloat16 precision loss in Log
-        "log2",  # bfloat16 precision loss in Log
-        "logaddexp",  # bfloat16 precision loss in Log/Exp
-        "logaddexp2",  # bfloat16 precision loss in Log/Exp
-        # Incorrect results (ordering) for bfloat16:
-        "argsort",  # ordering instability due to reduced precision
-    }
-)
+# ``"default"`` contains bfloat16-specific failures on the standard path;
+# ``"tracing"`` lists additional failures specific to the tracing path.
+XFAIL_OPS_BFLOAT16: Dict[str, FrozenSet[str]] = {
+    "default": frozenset(
+        {
+            # Numerical mismatch too large for bfloat16 tolerance (2e-2):
+            "addcmul",  # ref_diff > 2e-2
+            "bmm",  # matmul numerical error exceeds bfloat16 tolerance
+            "erfinv",  # bfloat16 precision insufficient for erfinv computation
+            "expm1",  # reduced-precision exponential error
+            "log10",  # bfloat16 precision loss in Log
+            "log1p",  # bfloat16 precision loss in Log
+            "log2",  # bfloat16 precision loss in Log
+            "logaddexp",  # bfloat16 precision loss in Log/Exp
+            "logaddexp2",  # bfloat16 precision loss in Log/Exp
+            # Incorrect results (ordering) for bfloat16:
+            "argsort",  # ordering instability due to reduced precision
+        }
+    ),
+    "tracing": frozenset(),
+}
 
 # Extra exclusions specific to torch.int32.
-XFAIL_OPS_INT32: FrozenSet[str] = frozenset(
-    {
-        # Ops that produce float outputs from int32 inputs but type inference
-        # fails or ONNX model is invalid because the op only supports float:
-        "__rdiv__",  # reciprocal node type mismatch
-        "__rpow__",  # negative integer powers not allowed
-        "__rxor__",  # FunctionNotFoundError: bitwise_xor
-        "acos",  # ONNX op only supports float dtypes
-        "acosh",  # ONNX op only supports float dtypes
-        "asin",  # ONNX op only supports float dtypes
-        "asinh",  # ONNX op only supports float dtypes
-        "angle",  # ONNX Atan not supported for integer dtypes
-        "atan",  # ONNX op only supports float dtypes
-        "atan2",  # ONNX Atan not supported for integer dtypes
-        "atanh",  # ONNX op only supports float dtypes
-        "bitwise_left_shift",  # FunctionNotFoundError
-        "bitwise_right_shift",  # FunctionNotFoundError
-        "bitwise_xor",  # FunctionNotFoundError
-        "ceil",  # InvalidGraph: int32 not supported by Ceil
-        "cos",  # ONNX op only supports float dtypes
-        "cosh",  # ONNX op only supports float dtypes
-        "erf",  # ONNX op only supports float dtypes
-        "erfc",  # ONNX Erf only supports float dtypes
-        "erfinv",  # ONNX Erf/Log/Exp only support float dtypes
-        "exp",  # ONNX op only supports float dtypes
-        "expm1",  # ONNX op only supports float dtypes
-        "floor",  # InvalidGraph: int32 not supported by Floor
-        "floor_divide",  # ref_diff=1
-        "gcd",  # FunctionNotFoundError
-        "isinf",  # InvalidGraph: int32 not supported by IsInf
-        "isnan",  # InvalidGraph: int32 not supported by IsNaN
-        "lcm",  # FunctionNotFoundError
-        "log",  # ONNX op only supports float dtypes
-        "log10",  # ONNX Log op only supports float dtypes
-        "log1p",  # ONNX Log op only supports float dtypes
-        "log2",  # ONNX Log op only supports float dtypes
-        "logaddexp",  # ONNX Log/Exp ops only support float dtypes
-        "logaddexp2",  # ONNX Log/Exp ops only support float dtypes
-        "logit",  # ONNX Log op only supports float dtypes
-        "nanmean",  # IsNaN not supported for integer dtypes
-        "nansum",  # IsNaN not supported for integer dtypes
-        "nn_functional_relu",  # NOT_IMPLEMENTED: Relu not supported for int32
-        "nn_functional_softsign",  # type mismatch in Div
-        "nn_functional_tanhshrink",  # ONNX Tanh only supports float dtypes
-        "reciprocal",  # ONNX op only supports float dtypes
-        "round",  # InvalidGraph: int32 not supported by Round
-        "rsqrt",  # ONNX op only supports float dtypes
-        "sigmoid",  # ONNX op only supports float dtypes
-        "sin",  # ONNX op only supports float dtypes
-        "sinh",  # ONNX op only supports float dtypes
-        "sqrt",  # ONNX op only supports float dtypes
-        "tan",  # ONNX op only supports float dtypes
-        "tanh",  # ONNX op only supports float dtypes
-        "tril",  # NOT_IMPLEMENTED: Trilu(14) not supported for int32 by onnxruntime
-        "triu",  # NOT_IMPLEMENTED: Trilu(14) not supported for int32 by onnxruntime
-        "trunc",  # InvalidGraph: int32 not supported by Round
-        "prod",  # type mismatch: int32 input produces int64 output
-        "sum",  # type mismatch: int32 input produces int64 output
-        "xlogy",  # ONNX Log only supports float dtypes
-    }
-)
+# ``"default"`` contains int32-specific failures on the standard path;
+# ``"tracing"`` lists additional failures specific to the tracing path.
+XFAIL_OPS_INT32: Dict[str, FrozenSet[str]] = {
+    "default": frozenset(
+        {
+            # Ops that produce float outputs from int32 inputs but type inference
+            # fails or ONNX model is invalid because the op only supports float:
+            "__rdiv__",  # reciprocal node type mismatch
+            "__rpow__",  # negative integer powers not allowed
+            "__rxor__",  # FunctionNotFoundError: bitwise_xor
+            "acos",  # ONNX op only supports float dtypes
+            "acosh",  # ONNX op only supports float dtypes
+            "asin",  # ONNX op only supports float dtypes
+            "asinh",  # ONNX op only supports float dtypes
+            "angle",  # ONNX Atan not supported for integer dtypes
+            "atan",  # ONNX op only supports float dtypes
+            "atan2",  # ONNX Atan not supported for integer dtypes
+            "atanh",  # ONNX op only supports float dtypes
+            "bitwise_left_shift",  # FunctionNotFoundError
+            "bitwise_right_shift",  # FunctionNotFoundError
+            "bitwise_xor",  # FunctionNotFoundError
+            "ceil",  # InvalidGraph: int32 not supported by Ceil
+            "cos",  # ONNX op only supports float dtypes
+            "cosh",  # ONNX op only supports float dtypes
+            "erf",  # ONNX op only supports float dtypes
+            "erfc",  # ONNX Erf only supports float dtypes
+            "erfinv",  # ONNX Erf/Log/Exp only support float dtypes
+            "exp",  # ONNX op only supports float dtypes
+            "expm1",  # ONNX op only supports float dtypes
+            "floor",  # InvalidGraph: int32 not supported by Floor
+            "floor_divide",  # ref_diff=1
+            "gcd",  # FunctionNotFoundError
+            "isinf",  # InvalidGraph: int32 not supported by IsInf
+            "isnan",  # InvalidGraph: int32 not supported by IsNaN
+            "lcm",  # FunctionNotFoundError
+            "log",  # ONNX op only supports float dtypes
+            "log10",  # ONNX Log op only supports float dtypes
+            "log1p",  # ONNX Log op only supports float dtypes
+            "log2",  # ONNX Log op only supports float dtypes
+            "logaddexp",  # ONNX Log/Exp ops only support float dtypes
+            "logaddexp2",  # ONNX Log/Exp ops only support float dtypes
+            "logit",  # ONNX Log op only supports float dtypes
+            "nanmean",  # IsNaN not supported for integer dtypes
+            "nansum",  # IsNaN not supported for integer dtypes
+            "nn_functional_relu",  # NOT_IMPLEMENTED: Relu not supported for int32
+            "nn_functional_softsign",  # type mismatch in Div
+            "nn_functional_tanhshrink",  # ONNX Tanh only supports float dtypes
+            "reciprocal",  # ONNX op only supports float dtypes
+            "round",  # InvalidGraph: int32 not supported by Round
+            "rsqrt",  # ONNX op only supports float dtypes
+            "sigmoid",  # ONNX op only supports float dtypes
+            "sin",  # ONNX op only supports float dtypes
+            "sinh",  # ONNX op only supports float dtypes
+            "sqrt",  # ONNX op only supports float dtypes
+            "tan",  # ONNX op only supports float dtypes
+            "tanh",  # ONNX op only supports float dtypes
+            "tril",  # NOT_IMPLEMENTED: Trilu(14) not supported for int32 by onnxruntime
+            "triu",  # NOT_IMPLEMENTED: Trilu(14) not supported for int32 by onnxruntime
+            "trunc",  # InvalidGraph: int32 not supported by Round
+            "prod",  # type mismatch: int32 input produces int64 output
+            "sum",  # type mismatch: int32 input produces int64 output
+            "xlogy",  # ONNX Log only supports float dtypes
+        }
+    ),
+    "tracing": frozenset(),
+}
 
 # Extra exclusions specific to torch.int64.
-XFAIL_OPS_INT64: FrozenSet[str] = frozenset(
-    {
-        # Ops that produce float outputs from int64 inputs but type inference
-        # fails or ONNX model is invalid because the op only supports float:
-        "__rdiv__",  # reciprocal node type mismatch
-        "__rpow__",  # negative integer powers not allowed
-        "__rxor__",  # FunctionNotFoundError: bitwise_xor
-        "acos",  # ONNX op only supports float dtypes
-        "acosh",  # ONNX op only supports float dtypes
-        "asin",  # ONNX op only supports float dtypes
-        "asinh",  # ONNX op only supports float dtypes
-        "angle",  # ONNX Atan not supported for integer dtypes
-        "atan",  # ONNX op only supports float dtypes
-        "atan2",  # ONNX Atan not supported for integer dtypes
-        "atanh",  # ONNX op only supports float dtypes
-        "bitwise_left_shift",  # FunctionNotFoundError
-        "bitwise_right_shift",  # FunctionNotFoundError
-        "bitwise_xor",  # FunctionNotFoundError
-        "ceil",  # InvalidGraph: int64 not supported by Ceil
-        "cos",  # ONNX op only supports float dtypes
-        "cosh",  # ONNX op only supports float dtypes
-        "erf",  # ONNX op only supports float dtypes
-        "erfc",  # ONNX Erf only supports float dtypes
-        "erfinv",  # ONNX Erf/Log/Exp only support float dtypes
-        "exp",  # ONNX op only supports float dtypes
-        "expm1",  # ONNX op only supports float dtypes
-        "floor",  # InvalidGraph: int64 not supported by Floor
-        "floor_divide",  # ref_diff=1
-        "gcd",  # FunctionNotFoundError
-        "isinf",  # InvalidGraph: int64 not supported by IsInf
-        "isnan",  # InvalidGraph: int64 not supported by IsNaN
-        "lcm",  # FunctionNotFoundError
-        "log",  # ONNX op only supports float dtypes
-        "log10",  # ONNX Log op only supports float dtypes
-        "log1p",  # ONNX Log op only supports float dtypes
-        "log2",  # ONNX Log op only supports float dtypes
-        "logaddexp",  # ONNX Log/Exp ops only support float dtypes
-        "logaddexp2",  # ONNX Log/Exp ops only support float dtypes
-        "logit",  # ONNX Log op only supports float dtypes
-        "nanmean",  # IsNaN not supported for integer dtypes
-        "nansum",  # IsNaN not supported for integer dtypes
-        "nn_functional_relu",  # NOT_IMPLEMENTED: Relu not supported for int64
-        "nn_functional_softsign",  # type mismatch in Div
-        "nn_functional_tanhshrink",  # ONNX Tanh only supports float dtypes
-        "reciprocal",  # ONNX op only supports float dtypes
-        "round",  # InvalidGraph: int64 not supported by Round
-        "rsqrt",  # ONNX op only supports float dtypes
-        "sigmoid",  # ONNX op only supports float dtypes
-        "sin",  # ONNX op only supports float dtypes
-        "sinh",  # ONNX op only supports float dtypes
-        "sqrt",  # ONNX op only supports float dtypes
-        "tan",  # ONNX op only supports float dtypes
-        "tanh",  # ONNX op only supports float dtypes
-        "trunc",  # InvalidGraph: int64 not supported by Round
-        "xlogy",  # ONNX Log only supports float dtypes
-    }
-)
+# ``"default"`` contains int64-specific failures on the standard path;
+# ``"tracing"`` lists additional failures specific to the tracing path.
+XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
+    "default": frozenset(
+        {
+            # Ops that produce float outputs from int64 inputs but type inference
+            # fails or ONNX model is invalid because the op only supports float:
+            "__rdiv__",  # reciprocal node type mismatch
+            "__rpow__",  # negative integer powers not allowed
+            "__rxor__",  # FunctionNotFoundError: bitwise_xor
+            "acos",  # ONNX op only supports float dtypes
+            "acosh",  # ONNX op only supports float dtypes
+            "asin",  # ONNX op only supports float dtypes
+            "asinh",  # ONNX op only supports float dtypes
+            "angle",  # ONNX Atan not supported for integer dtypes
+            "atan",  # ONNX op only supports float dtypes
+            "atan2",  # ONNX Atan not supported for integer dtypes
+            "atanh",  # ONNX op only supports float dtypes
+            "bitwise_left_shift",  # FunctionNotFoundError
+            "bitwise_right_shift",  # FunctionNotFoundError
+            "bitwise_xor",  # FunctionNotFoundError
+            "ceil",  # InvalidGraph: int64 not supported by Ceil
+            "cos",  # ONNX op only supports float dtypes
+            "cosh",  # ONNX op only supports float dtypes
+            "erf",  # ONNX op only supports float dtypes
+            "erfc",  # ONNX Erf only supports float dtypes
+            "erfinv",  # ONNX Erf/Log/Exp only support float dtypes
+            "exp",  # ONNX op only supports float dtypes
+            "expm1",  # ONNX op only supports float dtypes
+            "floor",  # InvalidGraph: int64 not supported by Floor
+            "floor_divide",  # ref_diff=1
+            "gcd",  # FunctionNotFoundError
+            "isinf",  # InvalidGraph: int64 not supported by IsInf
+            "isnan",  # InvalidGraph: int64 not supported by IsNaN
+            "lcm",  # FunctionNotFoundError
+            "log",  # ONNX op only supports float dtypes
+            "log10",  # ONNX Log op only supports float dtypes
+            "log1p",  # ONNX Log op only supports float dtypes
+            "log2",  # ONNX Log op only supports float dtypes
+            "logaddexp",  # ONNX Log/Exp ops only support float dtypes
+            "logaddexp2",  # ONNX Log/Exp ops only support float dtypes
+            "logit",  # ONNX Log op only supports float dtypes
+            "nanmean",  # IsNaN not supported for integer dtypes
+            "nansum",  # IsNaN not supported for integer dtypes
+            "nn_functional_relu",  # NOT_IMPLEMENTED: Relu not supported for int64
+            "nn_functional_softsign",  # type mismatch in Div
+            "nn_functional_tanhshrink",  # ONNX Tanh only supports float dtypes
+            "reciprocal",  # ONNX op only supports float dtypes
+            "round",  # InvalidGraph: int64 not supported by Round
+            "rsqrt",  # ONNX op only supports float dtypes
+            "sigmoid",  # ONNX op only supports float dtypes
+            "sin",  # ONNX op only supports float dtypes
+            "sinh",  # ONNX op only supports float dtypes
+            "sqrt",  # ONNX op only supports float dtypes
+            "tan",  # ONNX op only supports float dtypes
+            "tanh",  # ONNX op only supports float dtypes
+            "trunc",  # InvalidGraph: int64 not supported by Round
+            "xlogy",  # ONNX Log only supports float dtypes
+        }
+    ),
+    "tracing": frozenset(),
+}
 
 # Per-op absolute tolerance overrides for torch.float16.
 # Ops whose variance/std computation compounds float16 rounding errors need
@@ -422,24 +443,6 @@ ATOL_OPS_BFLOAT16: Dict[str, float] = {
     "std": 2e-1,  # bfloat16 precision loss is larger than float16
     "std_mean": 2e-1,  # same compound error as std
 }
-
-# Ops that fail specifically under the torch tracing export path
-# (``ExportOptions(tracing=True)``), beyond the shared :data:`XFAIL_OPS` set.
-# These are ops whose tracing-time graph construction differs from the default
-# dispatcher path in a way that currently breaks export or produces wrong outputs.
-XFAIL_OPS_TRACING: FrozenSet[str] = frozenset()
-
-# Extra exclusions for the tracing path, specific to torch.float16.
-XFAIL_OPS_TRACING_FLOAT16: FrozenSet[str] = frozenset()
-
-# Extra exclusions for the tracing path, specific to torch.bfloat16.
-XFAIL_OPS_TRACING_BFLOAT16: FrozenSet[str] = frozenset()
-
-# Extra exclusions for the tracing path, specific to torch.int32.
-XFAIL_OPS_TRACING_INT32: FrozenSet[str] = frozenset()
-
-# Extra exclusions for the tracing path, specific to torch.int64.
-XFAIL_OPS_TRACING_INT64: FrozenSet[str] = frozenset()
 
 
 def get_op_coverage_rst() -> str:
@@ -474,23 +477,39 @@ def get_op_coverage_rst() -> str:
     }
     # Xfail sets for the default export path.
     xfail_map = {
-        torch.float32: XFAIL_OPS,
-        torch.float16: XFAIL_OPS | XFAIL_OPS_FLOAT16,
-        torch.bfloat16: XFAIL_OPS | XFAIL_OPS_BFLOAT16,
-        torch.int32: XFAIL_OPS | XFAIL_OPS_INT32,
-        torch.int64: XFAIL_OPS | XFAIL_OPS_INT64,
+        torch.float32: XFAIL_OPS["default"],
+        torch.float16: XFAIL_OPS["default"] | XFAIL_OPS_FLOAT16["default"],
+        torch.bfloat16: XFAIL_OPS["default"] | XFAIL_OPS_BFLOAT16["default"],
+        torch.int32: XFAIL_OPS["default"] | XFAIL_OPS_INT32["default"],
+        torch.int64: XFAIL_OPS["default"] | XFAIL_OPS_INT64["default"],
     }
     # Xfail sets for the torch tracing export path.
     xfail_map_tracing = {
-        torch.float32: XFAIL_OPS | XFAIL_OPS_TRACING,
+        torch.float32: XFAIL_OPS["default"] | XFAIL_OPS["tracing"],
         torch.float16: (
-            XFAIL_OPS | XFAIL_OPS_FLOAT16 | XFAIL_OPS_TRACING | XFAIL_OPS_TRACING_FLOAT16
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_FLOAT16["default"]
+            | XFAIL_OPS["tracing"]
+            | XFAIL_OPS_FLOAT16["tracing"]
         ),
         torch.bfloat16: (
-            XFAIL_OPS | XFAIL_OPS_BFLOAT16 | XFAIL_OPS_TRACING | XFAIL_OPS_TRACING_BFLOAT16
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_BFLOAT16["default"]
+            | XFAIL_OPS["tracing"]
+            | XFAIL_OPS_BFLOAT16["tracing"]
         ),
-        torch.int32: (XFAIL_OPS | XFAIL_OPS_INT32 | XFAIL_OPS_TRACING | XFAIL_OPS_TRACING_INT32),
-        torch.int64: (XFAIL_OPS | XFAIL_OPS_INT64 | XFAIL_OPS_TRACING | XFAIL_OPS_TRACING_INT64),
+        torch.int32: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_INT32["default"]
+            | XFAIL_OPS["tracing"]
+            | XFAIL_OPS_INT32["tracing"]
+        ),
+        torch.int64: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_INT64["default"]
+            | XFAIL_OPS["tracing"]
+            | XFAIL_OPS_INT64["tracing"]
+        ),
     }
 
     with warnings.catch_warnings():
