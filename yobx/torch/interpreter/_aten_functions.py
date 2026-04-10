@@ -3115,9 +3115,7 @@ def aten_div_Tensor_mode(
     return g.op.Floor(g.op.Div(x, y, name=name), name=name, outputs=outputs)
 
 
-def aten_dot(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
-) -> T:
+def aten_dot(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T) -> T:
     """Computes the dot product of two 1-D tensors."""
     res = g.op.MatMul(x, y, outputs=outputs, name="dot")
     if not sts:
@@ -12667,10 +12665,7 @@ def aten_std_dim(
     return res
 
 
-def _layernorm_compatible_axis(
-    dim: Optional[Union[int, List[int]]],
-    rank: int,
-) -> Optional[int]:
+def _layernorm_compatible_axis(dim: Optional[Union[int, List[int]]], rank: int) -> Optional[int]:
     """Returns the LayerNorm axis when *dim* covers contiguous trailing dims.
 
     ``LayerNormalization`` normalises over axes ``[axis, …, rank-1]``.
@@ -12692,13 +12687,7 @@ def _layernorm_compatible_axis(
 
 
 def _var_via_layernorm(
-    g: GraphBuilder,
-    x: T,
-    axis: int,
-    rank: int,
-    keepdim: bool,
-    itype: int,
-    name: str,
+    g: GraphBuilder, x: T, axis: int, rank: int, keepdim: bool, itype: int, name: str
 ) -> Tuple[T, T]:
     """Computes population variance and mean using ONNX LayerNormalization.
 
@@ -12718,9 +12707,7 @@ def _var_via_layernorm(
     # Scale: ones (no scaling); bias: omitted (no shift).
     norm_shape = g.op.Shape(x, start=axis, name=name)
     scale = g.op.ConstantOfShape(
-        norm_shape,
-        value=onh.from_array(np.ones(1, dtype=dtype)),
-        name=name,
+        norm_shape, value=onh.from_array(np.ones(1, dtype=dtype)), name=name
     )
 
     y_name = g.unique_name(f"{name}_ln_y")
