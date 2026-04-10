@@ -443,11 +443,11 @@ XFAIL_OPS_TRACING_INT64: FrozenSet[str] = frozenset()
 
 
 def get_op_coverage_rst() -> str:
-    """Returns an RST table showing op-db coverage per op and dtype.
+    """Returns RST tables showing op-db coverage per op and dtype.
 
     Queries ``torch.testing._internal.common_methods_invocations.op_db`` and
-    builds a grid showing, for every op and dtype combination, whether the op
-    is:
+    builds two grids (one for the default export path, one for the torch tracing
+    path) showing, for every op and dtype combination, whether the op is:
 
     * ``✔`` - in the tested set (converter exists, no known failure for that dtype),
     * ``⚠ xfail`` - converter exists but the test is a known failure,
@@ -455,8 +455,9 @@ def get_op_coverage_rst() -> str:
     * ``—`` - the op does not support that dtype.
 
     Returns:
-        RST source string (a ``list-table`` directive) ready to be printed
-        inside a ``.. runpython::`` block with ``:rst:`` enabled.
+        RST source string with two ``list-table`` directives (default path and
+        tracing path) ready to be printed inside a ``.. runpython::`` block with
+        ``:rst:`` enabled.
     """
     import warnings
 
@@ -471,12 +472,25 @@ def get_op_coverage_rst() -> str:
         torch.int32: "int32",
         torch.int64: "int64",
     }
+    # Xfail sets for the default export path.
     xfail_map = {
         torch.float32: XFAIL_OPS,
         torch.float16: XFAIL_OPS | XFAIL_OPS_FLOAT16,
         torch.bfloat16: XFAIL_OPS | XFAIL_OPS_BFLOAT16,
         torch.int32: XFAIL_OPS | XFAIL_OPS_INT32,
         torch.int64: XFAIL_OPS | XFAIL_OPS_INT64,
+    }
+    # Xfail sets for the torch tracing export path.
+    xfail_map_tracing = {
+        torch.float32: XFAIL_OPS | XFAIL_OPS_TRACING,
+        torch.float16: (
+            XFAIL_OPS | XFAIL_OPS_FLOAT16 | XFAIL_OPS_TRACING | XFAIL_OPS_TRACING_FLOAT16
+        ),
+        torch.bfloat16: (
+            XFAIL_OPS | XFAIL_OPS_BFLOAT16 | XFAIL_OPS_TRACING | XFAIL_OPS_TRACING_BFLOAT16
+        ),
+        torch.int32: (XFAIL_OPS | XFAIL_OPS_INT32 | XFAIL_OPS_TRACING | XFAIL_OPS_TRACING_INT32),
+        torch.int64: (XFAIL_OPS | XFAIL_OPS_INT64 | XFAIL_OPS_TRACING | XFAIL_OPS_TRACING_INT64),
     }
 
     with warnings.catch_warnings():
@@ -488,34 +502,55 @@ def get_op_coverage_rst() -> str:
         ]
     ops.sort(key=lambda o: o.name)
 
-    header = ["Op"]
-    for dt in dtypes:
-        header.append(dtype_names[dt])
+    def _make_table(title: str, xmap: dict) -> str:
+        """Builds an RST list-table for *xmap* (dtype → xfail set).
 
-    rows = []
-    for op in ops:
-        key = op.name.replace(".", "_")
-        row = [f"``{op.name}``"]
+        Args:
+            title: Section title placed above the table.
+            xmap: Mapping from :class:`torch.dtype` to the set of xfail op keys.
+
+        Returns:
+            RST string containing a rubric directive followed by a list-table.
+        """
+        header = ["Op"]
         for dt in dtypes:
-            if dt not in op.dtypes:
-                row.append(_NOT_APPLICABLE)
-            elif key in NO_CONVERTER_OPS:
-                row.append(_NO_CONVERTER)
-            elif key in xfail_map[dt]:
-                row.append(_XFAIL)
-            else:
-                row.append(_SUPPORTED)
-        rows.append(row)
+            header.append(dtype_names[dt])
 
-    n_cols = len(header)
-    widths = " ".join(["20"] + ["16"] * (n_cols - 1))
-    lines = [".. list-table::", "    :header-rows: 1", f"    :widths: {widths}", ""]
-    lines.append("    * - " + header[0])
-    for h in header[1:]:
-        lines.append("      - " + h)
-    for row in rows:
-        lines.append("    * - " + row[0])
-        for cell in row[1:]:
-            lines.append("      - " + cell)
-    lines.append("")
-    return "\n".join(lines)
+        rows = []
+        for op in ops:
+            key = op.name.replace(".", "_")
+            row = [f"``{op.name}``"]
+            for dt in dtypes:
+                if dt not in op.dtypes:
+                    row.append(_NOT_APPLICABLE)
+                elif key in NO_CONVERTER_OPS:
+                    row.append(_NO_CONVERTER)
+                elif key in xmap[dt]:
+                    row.append(_XFAIL)
+                else:
+                    row.append(_SUPPORTED)
+            rows.append(row)
+
+        n_cols = len(header)
+        widths = " ".join(["20"] + ["16"] * (n_cols - 1))
+        lines = [
+            f".. rubric:: {title}",
+            "",
+            ".. list-table::",
+            "    :header-rows: 1",
+            f"    :widths: {widths}",
+            "",
+        ]
+        lines.append("    * - " + header[0])
+        for h in header[1:]:
+            lines.append("      - " + h)
+        for row in rows:
+            lines.append("    * - " + row[0])
+            for cell in row[1:]:
+                lines.append("      - " + cell)
+        lines.append("")
+        return "\n".join(lines)
+
+    default_table = _make_table("Default export path", xfail_map)
+    tracing_table = _make_table("Torch tracing export path (``tracing=True``)", xfail_map_tracing)
+    return default_table + "\n" + tracing_table
