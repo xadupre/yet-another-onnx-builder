@@ -3115,9 +3115,7 @@ def aten_div_Tensor_mode(
     return g.op.Floor(g.op.Div(x, y, name=name), name=name, outputs=outputs)
 
 
-def aten_dot(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
-) -> T:
+def aten_dot(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T) -> T:
     """Computes the dot product of two 1-D tensors."""
     res = g.op.MatMul(x, y, outputs=outputs, name="dot")
     if not sts:
@@ -4150,6 +4148,91 @@ def aten_fft_ifft2(
     return aten__fft_r2c(
         g, sts, outputs, x, n=s, dim=dim, norm=norm, name=name, inverse=True, onesided=False
     )
+
+
+def aten_fft_fftshift(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    name: str = "fft_fftshift",
+) -> T:
+    """fft_fftshift - shifts the zero-frequency component to the center.
+
+    Equivalent to rolling each specified dimension by ``n // 2`` where ``n``
+    is the size of that dimension.  Supports dynamic shapes.
+    """
+    assert g.has_rank(x), f"Missing rank for {x!r}{g.get_debug_msg()}"
+    rank = g.rank(x)
+
+    if dim is None:
+        dims = list(range(rank))
+    elif isinstance(dim, int):
+        dims = [dim]
+    else:
+        dims = list(dim)
+
+    result = x
+    for d in dims:
+        # n = size along dimension d (1-D int64 tensor of length 1)
+        n_tensor = g.op.Shape(result, start=d, end=d + 1, name=name)
+        # shift = n // 2
+        shift = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
+        # neg_shift = -n // 2  (used as negative start index in Slice)
+        neg_shift = g.op.Neg(shift, name=name)
+        axis = np.array([d], dtype=np.int64)
+        # fftshift: concat(x[-n//2:], x[:-n//2])
+        part1 = g.op.Slice(result, neg_shift, n_tensor, axis, name=name)
+        part2 = g.op.Slice(result, g.ZERO, neg_shift, axis, name=name)
+        result = g.op.Concat(part1, part2, axis=d, name=name)
+        g.set_type(result, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(result, g.get_shape(x))
+
+    return g.op.Identity(result, name=name, outputs=outputs)
+
+
+def aten_fft_ifftshift(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    name: str = "fft_ifftshift",
+) -> T:
+    """fft_ifftshift - inverse of fftshift.
+
+    Equivalent to rolling each specified dimension by ``-(n // 2)`` (i.e.
+    rolling by ``+n // 2`` in the opposite direction), where ``n`` is the
+    size of that dimension.  Supports dynamic shapes.
+    """
+    assert g.has_rank(x), f"Missing rank for {x!r}{g.get_debug_msg()}"
+    rank = g.rank(x)
+
+    if dim is None:
+        dims = list(range(rank))
+    elif isinstance(dim, int):
+        dims = [dim]
+    else:
+        dims = list(dim)
+
+    result = x
+    for d in dims:
+        # n = size along dimension d (1-D int64 tensor of length 1)
+        n_tensor = g.op.Shape(result, start=d, end=d + 1, name=name)
+        # shift = n // 2
+        shift = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
+        axis = np.array([d], dtype=np.int64)
+        # ifftshift: concat(x[n//2:], x[:n//2])
+        part1 = g.op.Slice(result, shift, n_tensor, axis, name=name)
+        part2 = g.op.Slice(result, g.ZERO, shift, axis, name=name)
+        result = g.op.Concat(part1, part2, axis=d, name=name)
+        g.set_type(result, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(result, g.get_shape(x))
+
+    return g.op.Identity(result, name=name, outputs=outputs)
 
 
 def aten_fill_Scalar(
