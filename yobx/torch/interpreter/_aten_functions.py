@@ -489,6 +489,41 @@ def aten_addmm(
     return res
 
 
+def aten_addr(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    vec1: T,
+    vec2: T,
+    beta: float = 1.0,
+    alpha: float = 1.0,
+    name: str = "addr",
+) -> T:
+    """Computes the outer product of vec1 and vec2 and adds it to the matrix x.
+
+    Implements ``out = beta * x + alpha * outer(vec1, vec2)``.
+    """
+    assert g.has_rank(vec1) and g.get_rank(vec1) == 1, f"rank(vec1) must be 1{g.get_debug_msg()}"
+    assert g.has_rank(vec2) and g.get_rank(vec2) == 1, f"rank(vec2) must be 1{g.get_debug_msg()}"
+    outer = g.op.Mul(
+        g.op.UnsqueezeAnyOpset(vec1, g.ONE, name=name),
+        g.op.UnsqueezeAnyOpset(vec2, g.ZERO, name=name),
+        name=name,
+    )
+    itype = g.get_type(x)
+    dtype = tensor_dtype_to_np_dtype(itype)
+    if alpha != 1.0:
+        outer = g.op.Mul(outer, np.array(alpha, dtype=dtype), name=name)
+    if beta != 1.0:
+        x = g.op.Mul(x, np.array(beta, dtype=dtype), name=name)
+    res = g.op.Add(x, outer, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, itype)
+        g.set_rank(res, 2)
+    return res
+
+
 def aten_iadd(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "iadd"
 ) -> T:
@@ -3115,9 +3150,7 @@ def aten_div_Tensor_mode(
     return g.op.Floor(g.op.Div(x, y, name=name), name=name, outputs=outputs)
 
 
-def aten_dot(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
-) -> T:
+def aten_dot(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T) -> T:
     """Computes the dot product of two 1-D tensors."""
     res = g.op.MatMul(x, y, outputs=outputs, name="dot")
     if not sts:

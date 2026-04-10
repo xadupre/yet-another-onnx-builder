@@ -65,7 +65,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "H",
         "__rsub__",
         "addcdiv",
-        "addr",
         "alias_copy",
         "argwhere",
         "bernoulli",
