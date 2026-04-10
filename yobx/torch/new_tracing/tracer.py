@@ -1002,7 +1002,7 @@ class GraphTracer:
         # --- Emit the scan call_function node ---
         scan_op = _ORIGINAL_TORCH_SCAN
         node = self.graph.call_function(
-            scan_op,
+            scan_op,  # type: ignore
             args=(get_attr_node, init_nodes, scan_input_nodes, add_input_nodes),
             kwargs={},
         )
