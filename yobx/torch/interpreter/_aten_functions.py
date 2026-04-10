@@ -3780,13 +3780,12 @@ def aten_exp2(
     """exp2 — Computes ``2 ** x``, casting integer inputs to float32 first."""
     assert g.has_type(x), f"exp2: type of {x!r} must be known{g.get_debug_msg()}"
     itype = g.get_type(x)
-    _FLOAT_TYPES = {
+    if itype not in {
         TensorProto.FLOAT,
         TensorProto.DOUBLE,
         TensorProto.FLOAT16,
         TensorProto.BFLOAT16,
-    }
-    if itype not in _FLOAT_TYPES:
+    }:
         # torch.exp2 returns float32 for integer inputs
         x = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
         itype = TensorProto.FLOAT
