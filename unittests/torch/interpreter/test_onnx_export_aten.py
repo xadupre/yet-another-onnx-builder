@@ -2992,8 +2992,7 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model()
         x = torch.tensor([0, 1, 2, 2, 3, 3, 3, 0, 0], dtype=torch.int32)
-        # type in fx graph differs from one we can see here
-        expected = tuple(t.to(torch.int32) for t in model(x))
+        expected_raw = model(x)
         onx = to_onnx(
             model,
             (x,),
@@ -3003,6 +3002,17 @@ class TestOnnxExportAten(ExtTestCase):
             ),
         )
         self.dump_onnx("test_aten_unique_consecutive_return_32.onnx", onx)
+        # Cast expected to ONNX output types: older torch versions report int32 in
+        # the FX graph for inverse/counts even though the runtime returns int64; newer
+        # (nightly) versions correctly report int64.  The ONNX model follows the FX
+        # graph types, so we align the expected values accordingly.
+        _dtype_map = {onnx.TensorProto.INT32: torch.int32, onnx.TensorProto.INT64: torch.int64}
+        onnx_dtypes = [
+            _dtype_map.get(o.type.tensor_type.elem_type, None) for o in onx.graph.output
+        ]
+        expected = tuple(
+            e.to(d) if d is not None else e for e, d in zip(expected_raw, onnx_dtypes)
+        )
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
 
     def test_aten_split_int(self):

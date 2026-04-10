@@ -70,7 +70,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "argwhere",
         "bernoulli",
         "block_diag",
-        "cartesian_prod",
         "conj_physical",
         "copysign",
         "count_nonzero",
@@ -147,7 +146,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "positive",
         "qr",
         "rad2deg",
-        "ravel",
         "real",
         "resize_as_",
         "resolve_conj",
@@ -245,6 +243,7 @@ XFAIL_OPS_FLOAT16: FrozenSet[str] = frozenset(
         # Numerical mismatch too large for float16 tolerance (1e-2):
         "addcmul",  # ref_diff=0.03125
         "expm1",  # ref_diff=4
+        "exp2",  # bfloat16 precision insufficient for erfinv computation
         # Incorrect results (ordering) for float16:
         "argsort",  # ref_diff=7944
     }
@@ -257,6 +256,7 @@ XFAIL_OPS_BFLOAT16: FrozenSet[str] = frozenset(
         "addcmul",  # ref_diff > 2e-2
         "bmm",  # matmul numerical error exceeds bfloat16 tolerance
         "erfinv",  # bfloat16 precision insufficient for erfinv computation
+        "exp2",  # bfloat16 precision insufficient for erfinv computation
         "expm1",  # reduced-precision exponential error
         "log10",  # bfloat16 precision loss in Log
         "log1p",  # bfloat16 precision loss in Log

@@ -1996,6 +1996,55 @@ def aten_bucketize_Tensor(
     return res
 
 
+def aten_cartesian_prod(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    tensors: Sequence[T],
+    name: str = "cartesian_prod",
+) -> T:
+    """Computes the Cartesian product of input 1D tensors.
+
+    Returns a 1D tensor when a single input is given, or a 2D tensor where
+    each row contains one combination of elements from the input tensors.
+    """
+    n = len(tensors)
+    if n == 1:
+        # torch.cartesian_prod of a single 1D tensor returns that tensor unchanged.
+        res = g.op.Identity(tensors[0], outputs=outputs, name=name)
+        if not sts:
+            itype = g.get_type(tensors[0])
+            g.set_type(res, itype)
+            g.set_rank(res, 1)
+        return res
+
+    # Collects the 1-element shape tensors [s_i] for each input 1D tensor.
+    shapes = [g.op.Shape(t, name=name) for t in tensors]
+    # Concatenates to form the full grid shape [s_0, s_1, ..., s_{n-1}].
+    full_shape = g.op.Concat(*shapes, axis=0, name=name)
+
+    flat_cols = []
+    for i, t in enumerate(tensors):
+        # Reshapes 1D tensor [s_i] to [1, ..., s_i, ..., 1] with s_i at axis i.
+        new_shape = np.ones(n, dtype=np.int64)
+        new_shape[i] = -1
+        r = g.op.Reshape(t, new_shape, name=name)
+        # Expands to the full grid shape [s_0, s_1, ..., s_{n-1}].
+        e = g.op.Expand(r, full_shape, name=name)
+        # Flattens to [s_0 * s_1 * ... * s_{n-1}].
+        flat = g.op.Reshape(e, g.MINUS_ONE, name=name)
+        flat_cols.append(flat)
+
+    # Unsqueezes each flat column to [total, 1] then concatenates along axis 1.
+    unsqueezed = [g.op.UnsqueezeAnyOpset(f, g.ONE, name=name) for f in flat_cols]
+    res = g.op.Concat(*unsqueezed, axis=1, outputs=outputs, name=name)
+    if not sts:
+        itype = g.get_type(tensors[0])
+        g.set_type(res, itype)
+        g.set_rank(res, 2)
+    return res
+
+
 def aten_cat(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -3066,6 +3115,16 @@ def aten_div_Tensor_mode(
     return g.op.Floor(g.op.Div(x, y, name=name), name=name, outputs=outputs)
 
 
+def aten_dot(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    """Computes the dot product of two 1-D tensors."""
+    res = g.op.MatMul(x, y, outputs=outputs, name="dot")
+    if not sts:
+        set_type_shape_matmul(g, res, x, y)
+    return res
+
+
 def aten_dropout(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -3720,6 +3779,29 @@ def aten_exp(
 ) -> T:
     "exp"
     res = g.make_node("Exp", [x], outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, outputs[0], x)
+    return res
+
+
+def aten_exp2(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "exp2"
+) -> T:
+    """exp2 — Computes ``2 ** x``, casting integer inputs to float32 first."""
+    assert g.has_type(x), f"exp2: type of {x!r} must be known{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    if itype not in {
+        TensorProto.FLOAT,
+        TensorProto.DOUBLE,
+        TensorProto.FLOAT16,
+        TensorProto.BFLOAT16,
+    }:
+        # torch.exp2 returns float32 for integer inputs
+        x = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+        itype = TensorProto.FLOAT
+    dtype = tensor_dtype_to_np_dtype(itype)
+    ln2 = np.array(math.log(2), dtype=dtype)
+    res = g.op.Exp(g.op.Mul(x, ln2, name=name), name=name, outputs=outputs)
     if not sts:
         set_type_shape_unary_op(g, outputs[0], x)
     return res
@@ -9932,6 +10014,13 @@ def aten_prod_dim_int(
     )
 
 
+def aten_ravel(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "ravel"
+) -> T:
+    """Reshapes the input tensor to 1D."""
+    return aten_flatten_using_ints(g, sts, outputs, x, start_dim=0, end_dim=-1, name=name)
+
+
 def aten_reciprocal(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -13814,24 +13903,39 @@ def aten_unique_consecutive(
     assert (
         len(outputs) == 3
     ), f"Unexpected number of expected outputs={outputs}{g.get_debug_msg()}"
+
+    # PyTorch nightly changed unique_consecutive to return int64 for inverse and
+    # counts even when the input is int32.  Determine per-output types from sts
+    # (sts["dtype"] is a tuple for multi-output ops) so that the ONNX ops
+    # produce the correct dtype and avoid a type-conflict with _set_shape_and_type.
+    sts_dtype = sts.get("dtype") if sts else None
+
+    def _out_itype(idx: int) -> int:
+        if isinstance(sts_dtype, tuple) and len(sts_dtype) > idx and sts_dtype[idx] is not None:
+            return torch_dtype_to_onnx_dtype(sts_dtype[idx])
+        return itype
+
+    inv_itype = _out_itype(1)
+    cnt_itype = _out_itype(2)
+
     inverse = g.op.Sub(
-        g.op.CumSum(g.op.Cast(diff, to=itype, name=name), g.ZERO, name=name),
-        g.ONE if itype == TensorProto.INT64 else np.array([1], dtype=np.int32),
+        g.op.CumSum(g.op.Cast(diff, to=inv_itype, name=name), g.ZERO, name=name),
+        g.ONE if inv_itype == TensorProto.INT64 else np.array([1], dtype=np.int32),
         name=name,
         outputs=outputs[1:2],
     )
     shape_x = g.op.Shape(x, name=name)
     shape_x_cast = (
-        shape_x if itype == TensorProto.INT64 else g.op.Cast(shape_x, to=itype, name=name)
+        shape_x if cnt_itype == TensorProto.INT64 else g.op.Cast(shape_x, to=cnt_itype, name=name)
     )
     indices = g.op.Range(
-        g.ZERO_NO_DIM if itype == TensorProto.INT64 else np.array(0, dtype=np.int32),
+        g.ZERO_NO_DIM if cnt_itype == TensorProto.INT64 else np.array(0, dtype=np.int32),
         g.op.SqueezeAnyOpset(shape_x_cast, name=name),
-        g.ONE_NO_DIM if itype == TensorProto.INT64 else np.array(1, dtype=np.int32),
+        g.ONE_NO_DIM if cnt_itype == TensorProto.INT64 else np.array(1, dtype=np.int32),
         name=name,
     )
     points = g.op.Compress(indices, diff, axis=0, name=name)
-    g.set_type(points, g.get_type(x))
+    g.set_type(points, cnt_itype)
     g.set_shape(points, (new_dim,))
     lagp = g.op.Concat(
         g.op.Slice(points, g.ONE, g.op.Shape(points), g.ZERO, name=name),
@@ -13841,8 +13945,9 @@ def aten_unique_consecutive(
     )
     counts = g.op.Sub(lagp, points, name=name, outputs=outputs[2:])
     if not sts:
-        set_type_shape_unary_op(g, inverse, x)
-        g.set_type(counts, g.get_type(x))
+        g.set_type(inverse, inv_itype)
+        g.set_shape(inverse, g.get_shape(x) if g.has_shape(x) else None)
+        g.set_type(counts, cnt_itype)
         g.set_shape(counts, (new_dim,))
     return (res, inverse, counts)
 
