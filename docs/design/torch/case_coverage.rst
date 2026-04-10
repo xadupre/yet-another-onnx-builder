@@ -78,7 +78,7 @@ Go to :ref:`l-this-bottom-page-coverage` to see a table summarizing the results.
                 print()
                 print()
                 if "error" not in res:
-                    obs.append(dict(case=case_ref, error="", exporter=expo))
+                    obs.append(dict(case=case_ref, n_nodes=len(res["onx"].graph.node), exporter=expo))
             if "error" in res:
                 print("**FAILED**")
                 print()
@@ -91,7 +91,7 @@ Go to :ref:`l-this-bottom-page-coverage` to see a table summarizing the results.
                     print("    # no error found for the failure")
                 print()
                 print()
-                obs.append(dict(case=case_ref, error="FAIL", exporter=expo))
+                obs.append(dict(case=case_ref, n_nodes="FAIL", exporter=expo))
 
     print()
     print(".. _ledx-summary-exported-program:")
@@ -100,7 +100,7 @@ Go to :ref:`l-this-bottom-page-coverage` to see a table summarizing the results.
     print("+++++++")
     print()
     df = pandas.DataFrame(obs)
-    piv = df.pivot(index="case", columns="exporter", values="error")
+    piv = df.pivot(index="case", columns="exporter", values="n_nodes")
     print(piv.to_markdown(tablefmt="rst"))
     print()
 
