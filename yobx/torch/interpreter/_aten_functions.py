@@ -3774,6 +3774,19 @@ def aten_exp(
     return res
 
 
+def aten_exp2(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "exp2"
+) -> T:
+    """exp2 — Computes ``2 ** x``."""
+    assert g.has_type(x), f"exp2: type of {x!r} must be known{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    ln2 = np.array(math.log(2), dtype=dtype)
+    res = g.op.Exp(g.op.Mul(x, ln2, name=name), name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, outputs[0], x)
+    return res
+
+
 def aten_expm1(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "expm1"
 ) -> T:
