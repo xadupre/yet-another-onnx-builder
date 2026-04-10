@@ -84,8 +84,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "digamma",
         "dot",
         "exp2",
-        "fft_fftshift",
-        "fft_ifftshift",
         "fliplr",
         "flipud",
         "float_power",
