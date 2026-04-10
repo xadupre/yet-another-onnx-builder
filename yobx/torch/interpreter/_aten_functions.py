@@ -3115,6 +3115,16 @@ def aten_div_Tensor_mode(
     return g.op.Floor(g.op.Div(x, y, name=name), name=name, outputs=outputs)
 
 
+def aten_dot(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    """Computes the dot product of two 1-D tensors."""
+    res = g.op.MatMul(x, y, outputs=outputs, name="dot")
+    if not sts:
+        set_type_shape_matmul(g, res, x, y)
+    return res
+
+
 def aten_dropout(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
