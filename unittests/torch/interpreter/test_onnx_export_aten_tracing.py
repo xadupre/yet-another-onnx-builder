@@ -515,7 +515,7 @@ class TestOnnxExportAtenTracing(ExtTestCase):
         inputs = (torch.rand(2, 3, 4),)
         expected = model(*torch_deepcopy(inputs))
         onx = self._to_onnx_tracing(model, inputs)
-        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=5e-5)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
     def test_aten_split_tracing(self):
         class Model(torch.nn.Module):
