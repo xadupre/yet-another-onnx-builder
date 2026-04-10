@@ -4158,7 +4158,7 @@ def aten_fft_fftshift(
     dim: Optional[Union[int, List[int]]] = None,
     name: str = "fft_fftshift",
 ) -> T:
-    """fft_fftshift - shifts the zero-frequency component to the center.
+    """Shifts the zero-frequency component to the center of the spectrum.
 
     Equivalent to rolling each specified dimension by ``n // 2`` where ``n``
     is the size of that dimension.  Supports dynamic shapes.
@@ -4201,7 +4201,7 @@ def aten_fft_ifftshift(
     dim: Optional[Union[int, List[int]]] = None,
     name: str = "fft_ifftshift",
 ) -> T:
-    """fft_ifftshift - inverse of fftshift.
+    """Computes the inverse of fftshift.
 
     Equivalent to rolling each specified dimension by ``-(n // 2)`` (i.e.
     rolling by ``+n // 2`` in the opposite direction), where ``n`` is the
