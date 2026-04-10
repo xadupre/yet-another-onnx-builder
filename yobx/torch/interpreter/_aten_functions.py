@@ -3118,7 +3118,7 @@ def aten_div_Tensor_mode(
 def aten_dot(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
 ) -> T:
-    """dot product of two 1-D tensors"""
+    """Computes the dot product of two 1-D tensors."""
     res = g.op.MatMul(x, y, outputs=outputs, name="dot")
     if not sts:
         set_type_shape_matmul(g, res, x, y)
