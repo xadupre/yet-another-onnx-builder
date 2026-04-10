@@ -108,7 +108,9 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
     - Are not in the dtype-specific xfail set (known failures for *dtype*),
       including the tracing-specific xfail sets
     - Have at least one sample input whose ``.input`` is a tensor of *dtype*
-    - Have all positional sample args that are also tensors (or none at all)
+    - Have all positional sample args that are also tensors (or none at all);
+      these are captured as module constants in :class:`_OpWrapper`, not as
+      traced inputs (avoids ``*args`` issues with :class:`~yobx.torch.tracing.CustomTracer`)
     - Have no non-trivial keyword arguments (to avoid unsupported ONNX kwargs)
 
     Args:
@@ -190,9 +192,12 @@ _OPS_INT64 = _collect_ops(torch.int64)
 class _OpWrapper(torch.nn.Module):
     """Wraps a single op invocation as a :class:`torch.nn.Module`.
 
-    The module's ``forward`` receives the primary tensor input followed by
-    any additional tensor positional arguments from the sample.  Keyword
-    arguments are captured at construction time and forwarded as constants.
+    The module's ``forward`` receives only the primary tensor input *x*.
+    All additional positional arguments from the sample are captured at
+    construction time in ``_extra_args`` and forwarded as constants,
+    because :class:`~yobx.torch.tracing.CustomTracer` cannot trace
+    ``*args`` variadic parameters.  Keyword arguments are also captured
+    as constants via ``_kwargs``.
     """
 
     def __init__(
@@ -203,13 +208,14 @@ class _OpWrapper(torch.nn.Module):
         self._extra_args = extra_args
         self._kwargs = kwargs
 
-    def forward(self, x: torch.Tensor, *args: torch.Tensor) -> torch.Tensor:
-        """Calls the wrapped op with the supplied tensors.
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Calls the wrapped op with *x* and the stored constant extra args.
 
         Returns:
-            The result of applying the wrapped op to *x* and *args*.
+            The result of applying the wrapped op to *x* and the constant
+            extra positional arguments captured at construction time.
         """
-        return self._fn(x, *args, **self._kwargs)
+        return self._fn(x, *self._extra_args, **self._kwargs)
 
 
 def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
@@ -236,7 +242,9 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
             raise unittest.SkipTest(f"no sample inputs for op {_op.name!r} dtype={_dtype}")
         s = samples[0]
         model = _OpWrapper(_op.op, s.args, s.kwargs)
-        inputs = (s.input, *s.args)
+        # Extra positional args (s.args) are baked into the module as constants;
+        # only the primary tensor is a traced input for the CustomTracer path.
+        inputs = (s.input,)
         expected = _op.op(s.input, *s.args, **s.kwargs)
         if not _result_is_exportable(expected):
             raise unittest.SkipTest(
