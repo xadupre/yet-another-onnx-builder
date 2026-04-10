@@ -3,7 +3,8 @@ Op-db coverage data for PyTorch-to-ONNX operator export.
 
 Defines the sets of ops that have no converter, are known to fail, or are
 excluded for specific dtypes when tested via
-:mod:`unittests.torch.coverage.test_onnx_export_common_methods`.
+:mod:`unittests.torch.coverage.test_onnx_export_common_methods` and
+:mod:`unittests.torch.coverage.test_onnx_export_common_methods_tracing`.
 
 :data:`NO_CONVERTER_OPS` - ops whose aten decomposition uses a function for
 which no ONNX converter has been implemented yet.
@@ -19,8 +20,17 @@ exclusions on top of :data:`XFAIL_OPS`.
 tolerance overrides for float16 and bfloat16, for ops whose reduced-precision
 errors exceed the global dtype tolerance.
 
-These sets are consumed by the op-db test module
-:mod:`unittests.torch.coverage.test_onnx_export_common_methods` and by
+:data:`XFAIL_OPS_TRACING` - ops that fail specifically under the torch tracing
+(``ExportOptions(tracing=True)``) export path, in addition to :data:`XFAIL_OPS`.
+
+:data:`XFAIL_OPS_TRACING_FLOAT16`, :data:`XFAIL_OPS_TRACING_BFLOAT16`,
+:data:`XFAIL_OPS_TRACING_INT32`, :data:`XFAIL_OPS_TRACING_INT64` -
+dtype-specific extra exclusions for the tracing path on top of
+:data:`XFAIL_OPS_TRACING`.
+
+These sets are consumed by the op-db test modules
+:mod:`unittests.torch.coverage.test_onnx_export_common_methods`,
+:mod:`unittests.torch.coverage.test_onnx_export_common_methods_tracing`, and by
 :func:`get_op_coverage_rst` which builds a documentation coverage table.
 """
 
@@ -412,6 +422,24 @@ ATOL_OPS_BFLOAT16: Dict[str, float] = {
     "std": 2e-1,  # bfloat16 precision loss is larger than float16
     "std_mean": 2e-1,  # same compound error as std
 }
+
+# Ops that fail specifically under the torch tracing export path
+# (``ExportOptions(tracing=True)``), beyond the shared :data:`XFAIL_OPS` set.
+# These are ops whose tracing-time graph construction differs from the default
+# dispatcher path in a way that currently breaks export or produces wrong outputs.
+XFAIL_OPS_TRACING: FrozenSet[str] = frozenset()
+
+# Extra exclusions for the tracing path, specific to torch.float16.
+XFAIL_OPS_TRACING_FLOAT16: FrozenSet[str] = frozenset()
+
+# Extra exclusions for the tracing path, specific to torch.bfloat16.
+XFAIL_OPS_TRACING_BFLOAT16: FrozenSet[str] = frozenset()
+
+# Extra exclusions for the tracing path, specific to torch.int32.
+XFAIL_OPS_TRACING_INT32: FrozenSet[str] = frozenset()
+
+# Extra exclusions for the tracing path, specific to torch.int64.
+XFAIL_OPS_TRACING_INT64: FrozenSet[str] = frozenset()
 
 
 def get_op_coverage_rst() -> str:
