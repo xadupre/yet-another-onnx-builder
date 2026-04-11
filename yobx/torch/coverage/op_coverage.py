@@ -284,6 +284,9 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "std_mean",
         }
     ),
+    # Ops that fail specifically under ``ExportOptions(tracing=True)``,
+    # beyond those already listed under ``"default"``.
+    "new-tracing": frozenset({"std", "std_mean"}),
 }
 
 # Extra exclusions specific to torch.float16.
@@ -300,11 +303,13 @@ XFAIL_OPS_FLOAT16: Dict[str, FrozenSet[str]] = {
         }
     ),
     "tracing": frozenset(),
+    "new-tracing": frozenset(),
 }
 
 # Extra exclusions specific to torch.bfloat16.
 # ``"default"`` contains bfloat16-specific failures on the standard path;
 # ``"tracing"`` lists additional failures specific to the tracing path.
+# ``"new-tracing"`` lists additional failures specific to the new-tracing path.
 XFAIL_OPS_BFLOAT16: Dict[str, FrozenSet[str]] = {
     "default": frozenset(
         {
@@ -323,11 +328,13 @@ XFAIL_OPS_BFLOAT16: Dict[str, FrozenSet[str]] = {
         }
     ),
     "tracing": frozenset(),
+    "new-tracing": frozenset(),
 }
 
 # Extra exclusions specific to torch.int32.
 # ``"default"`` contains int32-specific failures on the standard path;
 # ``"tracing"`` lists additional failures specific to the tracing path.
+# ``"new-tracing"`` lists additional failures specific to the tracing path.
 XFAIL_OPS_INT32: Dict[str, FrozenSet[str]] = {
     "default": frozenset(
         {
@@ -391,11 +398,13 @@ XFAIL_OPS_INT32: Dict[str, FrozenSet[str]] = {
         }
     ),
     "tracing": frozenset(),
+    "new-tracing": frozenset(),
 }
 
 # Extra exclusions specific to torch.int64.
 # ``"default"`` contains int64-specific failures on the standard path;
 # ``"tracing"`` lists additional failures specific to the tracing path.
+# ``"new-tracing"`` lists additional failures specific to the tracing path.
 XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
     "default": frozenset(
         {
@@ -457,6 +466,7 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
     # short.int64: FX tracing produces call_method[target=short] with no
     # aten_meth_short converter in the tracing path.
     "tracing": frozenset({"short"}),  # FunctionNotFoundError: aten_meth_short
+    "new-tracing": frozenset({"short"}),  # FunctionNotFoundError: aten_meth_short
 }
 
 # Per-op absolute tolerance overrides for torch.float16.
@@ -475,32 +485,18 @@ ATOL_OPS_FLOAT16: Dict[str, float] = {
     "std_mean": 3e-1,  # same compound error as std
 }
 
-# Per-op absolute tolerance overrides for torch.bfloat16.
-# bfloat16 has only 7 mantissa bits, so statistical ops need an even wider
-# tolerance than the global _ATOL_BFLOAT16 = 2e-2.
-ATOL_OPS_BFLOAT16: Dict[str, float] = {
-    "logit": 5e-2,  # bfloat16 log precision compounds across Sub(Log(x), Log(1-x))
-    "std": 2e-1,  # bfloat16 precision loss is larger than float16
-    "std_mean": 2e-1,  # same compound error as std
-}
-
 
 def get_op_coverage_rst() -> str:
     """Returns RST tables showing op-db coverage per op and dtype.
 
     Queries ``torch.testing._internal.common_methods_invocations.op_db`` and
-    builds two grids (one for the default export path, one for the torch tracing
-    path) showing, for every op and dtype combination, whether the op is:
+    builds three grids (default export path, torch tracing path, and
+    new-tracing path) showing, for every op and dtype combination, whether the
 
     * ``✔`` - in the tested set (converter exists, no known failure for that dtype),
-    * ``⚠ xfail`` - converter exists but the test is a known failure,
-    * ``✘ no converter`` - no ONNX converter has been implemented yet, or
-    * ``—`` - the op does not support that dtype.
-
-    Returns:
-        RST source string with two ``list-table`` directives (default path and
-        tracing path) ready to be printed inside a ``.. runpython::`` block with
-        ``:rst:`` enabled.
+        RST source string with three ``list-table`` directives (default path,
+        tracing path, and new-tracing path) ready to be printed inside a
+        ``.. runpython::`` block with ``:rst:`` enabled.
     """
     import warnings
 
@@ -550,6 +546,14 @@ def get_op_coverage_rst() -> str:
             | XFAIL_OPS["tracing"]
             | XFAIL_OPS_INT64["tracing"]
         ),
+    }
+    # Xfail sets for the new-tracing export path.
+    xfail_map_new_tracing = {
+        torch.float32: XFAIL_OPS["default"],
+        torch.float16: XFAIL_OPS["default"] | XFAIL_OPS_FLOAT16["default"],
+        torch.bfloat16: XFAIL_OPS["default"] | XFAIL_OPS_BFLOAT16["default"],
+        torch.int32: XFAIL_OPS["default"] | XFAIL_OPS_INT32["default"],
+        torch.int64: XFAIL_OPS["default"] | XFAIL_OPS_INT64["default"],
     }
 
     with warnings.catch_warnings():
@@ -612,4 +616,7 @@ def get_op_coverage_rst() -> str:
 
     default_table = _make_table("Default export path", xfail_map)
     tracing_table = _make_table("Torch tracing export path (``tracing=True``)", xfail_map_tracing)
-    return default_table + "\n" + tracing_table
+    new_tracing_table = _make_table(
+        "New-tracing export path (``tracing=TracingMode.NEW_TRACING``)", xfail_map_new_tracing
+    )
+    return default_table + "\n" + tracing_table + "\n" + new_tracing_table
