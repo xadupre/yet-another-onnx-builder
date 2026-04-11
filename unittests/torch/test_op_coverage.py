@@ -104,7 +104,7 @@ class TestOpCoverageRst(ExtTestCase):
     """Tests RST rendering for each tracing method."""
 
     def test_get_op_coverage_rst_method_selection(self):
-        """Tests that get_op_coverage_rst returns one method-specific section."""
+        """Verifies that get_op_coverage_rst returns one method-specific section."""
         from yobx.torch.coverage import op_coverage as cov
 
         torch_mod = ModuleType("torch")
@@ -180,7 +180,7 @@ class TestOpCoverageRst(ExtTestCase):
         self.assertNotIn("New-tracing export path", default_rst)
 
     def test_get_op_coverage_rst_rejects_unknown_method(self):
-        """Tests that get_op_coverage_rst rejects unsupported method values."""
+        """Verifies that get_op_coverage_rst rejects unsupported method values."""
         from yobx.torch.coverage.op_coverage import get_op_coverage_rst
 
         with self.assertRaises(ValueError):
