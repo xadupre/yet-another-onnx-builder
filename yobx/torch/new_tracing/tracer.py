@@ -1189,16 +1189,17 @@ class GraphTracer:
                 if self.is_not_tensor(a):
                     tracing_args.append(a)
                     continue
+                arg_name = sig_names[i] if i < len(sig_names) else f"vararg_{i - len(sig_names)}"
                 ds = (
                     (
                         dynamic_shapes[i]
                         if isinstance(dynamic_shapes, tuple)
-                        else dynamic_shapes[sig_names[i]]
+                        else dynamic_shapes.get(arg_name, None)
                     )
                     if dynamic_shapes
                     else None
                 )
-                x = self.make_tracing_arg(a, ds, name=sig_names[i] if sig_names else i)
+                x = self.make_tracing_arg(a, ds, name=arg_name)
                 tracing_args.append(x)
         if kwargs:
             for k, v in kwargs.items():
