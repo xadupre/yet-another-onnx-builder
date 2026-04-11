@@ -1812,6 +1812,98 @@ class CustomTracer(torch.fx.Tracer):
         return modified
 
     @classmethod
+    def fix_autocast_subgraph_dtypes(cls, graph: "torch.fx.Graph", verbose: int = 0) -> int:
+        """
+        Fixes dtype inconsistency in body subgraphs used by ``wrap_with_autocast``.
+
+        When :func:`torch.export.export` traces a model that uses
+        :func:`torch.autocast`, the body subgraph's placeholder nodes keep
+        their original (pre-promotion) dtype in ``meta["val"]`` (e.g.
+        ``float32``), while op outputs such as ``aten.mm`` already carry the
+        promoted dtype (e.g. ``bfloat16``).  This float32-input /
+        bfloat16-output inconsistency is invalid in ONNX.
+
+        This method scans the outer graph for ``wrap_with_autocast`` call nodes
+        with ``enabled=True`` and a floating-point target *dtype*.  For each
+        such node it locates the referenced body
+        :class:`~torch.fx.GraphModule` and replaces the ``meta["val"]`` on
+        every floating-point ``placeholder`` node with a
+        :class:`~yobx.xbuilder._virtual_tensor.VirtualTensor` that uses the
+        promoted dtype.  The rest of the body graph (op outputs) is left
+        unchanged because :func:`torch.export` already sets the correct
+        promoted dtype there.
+
+        :param graph: outer FX graph to scan; modified in-place if changes are
+            made
+        :param verbose: verbosity level
+        :return: number of body subgraphs whose placeholder types were fixed
+        """
+        from ..xbuilder._virtual_tensor import VirtualTensor
+
+        _FLOAT_TORCH_DTYPES = frozenset(
+            {torch.float16, torch.float32, torch.float64, torch.bfloat16}
+        )
+
+        fixed = 0
+        for node in graph.nodes:
+            if node.op != "call_function":
+                continue
+            if getattr(node.target, "__name__", "") != "wrap_with_autocast":
+                continue
+            # args = (device_type, dtype, enabled, cache_enabled, wrapped_fn, *inputs)
+            if len(node.args) < 5:
+                continue
+            dtype = node.args[1]  # torch.dtype or None
+            enabled = node.args[2]  # bool
+            wrapped_fn_node = node.args[4]  # get_attr node for body callable
+
+            if not enabled or dtype is None or dtype not in _FLOAT_TORCH_DTYPES:
+                continue
+
+            # Locate the body callable referenced by the get_attr node.
+            if not (hasattr(wrapped_fn_node, "op") and wrapped_fn_node.op == "get_attr"):
+                continue
+            body_module = getattr(graph.owning_module, wrapped_fn_node.target, None)
+            if body_module is None or not hasattr(body_module, "graph"):
+                continue
+
+            # Promote float placeholder meta["val"] to the autocast target dtype.
+            modified_count = 0
+            for ph_node in body_module.graph.nodes:
+                if ph_node.op != "placeholder":
+                    continue
+                val = ph_node.meta.get("val", None)
+                if val is None or not hasattr(val, "dtype"):
+                    continue
+                if val.dtype not in _FLOAT_TORCH_DTYPES:
+                    continue
+                shape = tuple(val.shape) if hasattr(val, "shape") else None
+                device = val.get_device() if hasattr(val, "get_device") else None
+                ph_node.meta["val"] = VirtualTensor(
+                    name=ph_node.name,
+                    dtype=dtype,
+                    shape=shape,
+                    device=device,
+                )
+                modified_count += 1
+                if verbose > 1:
+                    print(
+                        f"[CustomTracer.fix_autocast_subgraph_dtypes] "
+                        f"placeholder {ph_node.name!r}: {val.dtype} -> {dtype}"
+                    )
+
+            if modified_count:
+                fixed += 1
+                if verbose:
+                    print(
+                        f"[CustomTracer.fix_autocast_subgraph_dtypes] "
+                        f"fixed {modified_count} placeholder(s) in "
+                        f"{wrapped_fn_node.target!r} body"
+                    )
+
+        return fixed
+
+    @classmethod
     def graph_erase_node(cls, graph: torch.fx.Graph, node: torch.fx.Node):
         """
         Removes a node and all predecessors with are only consumed by this one.

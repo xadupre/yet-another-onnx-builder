@@ -14553,9 +14553,9 @@ def aten_wrap_with_autocast(
 
     # When autocast is enabled with a floating-point target dtype, torch.export
     # captures the body subgraph with the *original* input dtypes (e.g. float32).
-    # _get_autocast_input_args_for_callable (in interpreter.py) promotes the
-    # local-function's placeholder inputs to the autocast dtype so the function
-    # body is consistently typed.  The casts here additionally cover the
+    # CustomTracer.fix_autocast_subgraph_dtypes (called from remove_inplace_nodes)
+    # promotes the body's placeholder meta["val"] to the autocast dtype so the
+    # function body is consistently typed.  The casts here additionally cover the
     # call-site: the main graph still passes float32 tensors, so we must cast
     # them to the autocast target dtype before calling the local function.
     _FLOAT_DTYPES = frozenset(

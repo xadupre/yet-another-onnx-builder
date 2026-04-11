@@ -736,6 +736,12 @@ class ExportOptions:
         """
         from .tracing import CustomTracer
 
+        autocast_fixed = CustomTracer.fix_autocast_subgraph_dtypes(graph, verbose=verbose)
+        if autocast_fixed and verbose:
+            print(
+                f"[ExportOptions.export] autocast: "
+                f"{autocast_fixed} body subgraph(s) had dtypes fixed"
+            )
         removed = CustomTracer.remove_unnecessary_slices(graph)
         if removed:
             if verbose:
