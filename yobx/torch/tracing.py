@@ -1827,11 +1827,11 @@ class CustomTracer(torch.fx.Tracer):
         with ``enabled=True`` and a floating-point target *dtype*.  For each
         such node it locates the referenced body
         :class:`~torch.fx.GraphModule` and replaces the ``meta["val"]`` on
-        every floating-point ``placeholder`` node with a
-        :class:`~yobx.xbuilder._virtual_tensor.VirtualTensor` that uses the
-        promoted dtype.  The rest of the body graph (op outputs) is left
-        unchanged because :func:`torch.export` already sets the correct
-        promoted dtype there.
+        every floating-point ``placeholder`` node with a dtype-promoted version
+        of the same tensor object (e.g. a :class:`~torch._subclasses.fake_tensor.FakeTensor`
+        cast to the autocast dtype via :meth:`~torch.Tensor.to`).  The rest of
+        the body graph (op outputs) is left unchanged because
+        :func:`torch.export` already sets the correct promoted dtype there.
 
         :param graph: outer FX graph to scan; modified in-place if changes are
             made
@@ -1840,8 +1840,6 @@ class CustomTracer(torch.fx.Tracer):
         Returns:
             Number of body subgraphs whose placeholder types were fixed.
         """
-        from ..xbuilder._virtual_tensor import VirtualTensor
-
         _FLOAT_TORCH_DTYPES = frozenset(
             {torch.float16, torch.float32, torch.float64, torch.bfloat16}
         )
@@ -1870,6 +1868,8 @@ class CustomTracer(torch.fx.Tracer):
                 continue
 
             # Promote float placeholder meta["val"] to the autocast target dtype.
+            # Preserve the exact type of val (FakeTensor, regular Tensor, etc.)
+            # so that the rest of the pipeline sees a consistent object type.
             modified_count = 0
             for ph_node in body_module.graph.nodes:
                 if ph_node.op != "placeholder":
@@ -1879,14 +1879,15 @@ class CustomTracer(torch.fx.Tracer):
                     continue
                 if val.dtype not in _FLOAT_TORCH_DTYPES:
                     continue
-                shape = tuple(val.shape) if hasattr(val, "shape") else None
-                device = val.get_device() if hasattr(val, "get_device") else None
-                ph_node.meta["val"] = VirtualTensor(
-                    name=ph_node.name,
-                    dtype=dtype,
-                    shape=shape,
-                    device=device,
-                )
+                fake_mode = getattr(val, "fake_mode", None)
+                if fake_mode is not None:
+                    # FakeTensor: cast within the same FakeTensorMode so that
+                    # symbolic shapes are preserved correctly.
+                    with fake_mode:
+                        ph_node.meta["val"] = val.to(dtype=dtype)
+                else:
+                    # Plain tensor (rare in torch.export graphs) — just cast.
+                    ph_node.meta["val"] = val.to(dtype=dtype)
                 modified_count += 1
                 if verbose > 1:
                     print(
