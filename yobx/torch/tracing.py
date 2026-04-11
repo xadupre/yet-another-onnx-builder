@@ -1858,7 +1858,7 @@ class CustomTracer(torch.fx.Tracer):
             modified_count = 0
             all_sub_nodes = list(body_module.graph.nodes)
             for ph_node in all_sub_nodes:
-                if "val" not in ph_node.meta:
+                if "val" not in ph_node.meta or not isinstance(ph_node.meta["val"], torch.Tensor):
                     continue
                 val = ph_node.meta["val"]
 

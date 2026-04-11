@@ -721,8 +721,8 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @requires_torch("2.10")
     @requires_transformers("5.2")
     @ignore_warnings(FutureWarning)
-    def test_tiny_llm_to_onnx_autocast_bfloat16(self):
-        """Exports ``arnir0/Tiny-LLM`` wrapped in ``torch.autocast(bfloat16)``
+    def test_tiny_llm_to_onnx_autocast_float16(self):
+        """Exports ``arnir0/Tiny-LLM`` wrapped in ``torch.autocast(float16)``
         and verifies that the ONNX model is valid and produces finite results.
 
         The wrapper module places the model call inside an autocast context so
@@ -736,7 +736,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         del ds["position_ids"]
 
         class LLMWithAutocast(torch.nn.Module):
-            """Wraps a causal LM so that its forward runs under bfloat16 autocast."""
+            """Wraps a causal LM so that its forward runs under float16 autocast."""
 
             def __init__(self, llm):
                 super().__init__()
@@ -750,7 +750,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
                 past_value_0: torch.Tensor,
             ):
                 past_key_values = make_dynamic_cache([(past_key_0, past_value_0)])
-                with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+                with torch.autocast(device_type="cpu", dtype=torch.float16):
                     outputs = self.llm(
                         input_ids=input_ids,
                         attention_mask=attention_mask,
@@ -778,7 +778,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             past_value_0=ds["past_key_values"][1],
         )
 
-        filename = self.get_dump_file("test_tiny_llm_to_onnx_autocast_bfloat16.onnx")
+        filename = self.get_dump_file("test_tiny_llm_to_onnx_autocast_float16.onnx")
 
         with (
             register_flattening_functions(patch_transformers=True),
