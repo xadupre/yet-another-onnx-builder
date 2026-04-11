@@ -1816,33 +1816,18 @@ class CustomTracer(torch.fx.Tracer):
         """
         Fixes the dtype inconsistency in body subgraphs used by ``wrap_with_autocast``.
 
-        When :func:`torch.export.export` traces a model that uses
-        :func:`torch.autocast`, the body subgraph's placeholder nodes keep
-        their original (pre-promotion) dtype in ``meta["val"]`` (e.g.
-        ``float32``), while op outputs such as ``aten.mm`` already carry the
-        promoted dtype (e.g. ``bfloat16``).  This float32-input /
-        bfloat16-output inconsistency is invalid in ONNX.
-
-        This method scans the outer graph for ``wrap_with_autocast`` call nodes
-        with ``enabled=True`` and a floating-point target *dtype*.  For each
-        such node it locates the referenced body
-        :class:`~torch.fx.GraphModule` and replaces the ``meta["val"]`` on
-        every floating-point ``placeholder`` node with a dtype-promoted version
-        of the same tensor object (e.g. a :class:`~torch._subclasses.fake_tensor.FakeTensor`
-        cast to the autocast dtype via :meth:`~torch.Tensor.to`).  The rest of
-        the body graph (op outputs) is left unchanged because
-        :func:`torch.export` already sets the correct promoted dtype there.
-
-        :param graph: outer FX graph to scan; modified in-place if changes are
-            made
+        :param graph: outer FX graph to scan; modified in-place if changes are made
         :param verbose: verbosity level
-
-        Returns:
-            Returns the number of body subgraphs whose placeholder types were fixed.
+        :return: Returns the number of body subgraphs whose placeholder types were fixed.
         """
         _FLOAT_TORCH_DTYPES = frozenset(
             {torch.float16, torch.float32, torch.float64, torch.bfloat16}
         )
+
+        subgraphs = {}
+        for node in graph.nodes:
+            if node.op == "get_attr":
+                subgraphs[node.name] = node.target
 
         fixed = 0
         for node in graph.nodes:
@@ -1850,19 +1835,20 @@ class CustomTracer(torch.fx.Tracer):
                 continue
             if getattr(node.target, "__name__", "") != "wrap_with_autocast":
                 continue
+
             # args = (device_type, dtype, enabled, cache_enabled, wrapped_fn, *inputs)
             if len(node.args) < 5:
                 continue
             dtype = node.args[1]  # torch.dtype or None
             enabled = node.args[2]  # bool
             wrapped_fn_node = node.args[4]  # get_attr node for body callable
-
             if not enabled or dtype is None or dtype not in _FLOAT_TORCH_DTYPES:
                 continue
 
-            # Locate the body callable referenced by the get_attr node.
-            if not (hasattr(wrapped_fn_node, "op") and wrapped_fn_node.op == "get_attr"):
-                continue
+            assert (
+                wrapped_fn_node.name in subgraphs
+            ), f"Unable to find subgraphs {node.name!r} in {set(subgraphs)}\n---\n{graph}"
+
             body_module = getattr(graph.owning_module, wrapped_fn_node.target, None)
             if body_module is None or not hasattr(body_module, "graph"):
                 continue
@@ -1879,15 +1865,9 @@ class CustomTracer(torch.fx.Tracer):
                     continue
                 if val.dtype not in _FLOAT_TORCH_DTYPES:
                     continue
-                fake_mode = getattr(val, "fake_mode", None)
-                if fake_mode is not None:
-                    # FakeTensor: cast within the same FakeTensorMode so that
-                    # symbolic shapes are preserved correctly.
-                    with fake_mode:
-                        ph_node.meta["val"] = val.to(dtype=dtype)
-                else:
-                    # Plain tensor (rare in torch.export graphs) — just cast.
-                    ph_node.meta["val"] = val.to(dtype=dtype)
+
+                # insert a cast node
+
                 modified_count += 1
                 if verbose > 1:
                     print(
@@ -2596,7 +2576,7 @@ class CustomTracer(torch.fx.Tracer):
         return n_inplace
 
     @classmethod
-    def _replace_inplace_call_methods(cls, graph: torch.fx.Graph, verbose: int = 0) -> int:
+    def replace_inplace_call_methods(cls, graph: torch.fx.Graph, verbose: int = 0) -> int:
         """
         Replaces ``call_method`` nodes with inplace targets (e.g. ``add_``, ``mul_``,
         ``sub_``, ``div_``) with their non-inplace ``call_function`` equivalents.
@@ -2645,20 +2625,20 @@ class CustomTracer(torch.fx.Tracer):
                     )
             if verbose > 1:
                 print(
-                    f"[CustomTracer._replace_inplace_call_methods] replaced "
+                    f"[CustomTracer.replace_inplace_call_methods] replaced "
                     f"call_method {old_target!r} -> aten at {node.name!r}"
                 )
         return n
 
     @classmethod
-    def _replace_inplace_aten_functions(cls, graph: torch.fx.Graph, verbose: int = 0) -> int:
+    def replace_inplace_aten_functions(cls, graph: torch.fx.Graph, verbose: int = 0) -> int:
         """
         Replaces ``call_function`` nodes whose target is an inplace ATen binary
         op (e.g. ``aten.add_.Tensor``, ``aten.mul_.Scalar``) with their
         non-inplace equivalents (e.g. ``aten.add.Tensor``,
         ``aten.mul.Scalar``).
 
-        This is the counterpart of :meth:`_replace_inplace_call_methods` for
+        This is the counterpart of :meth:`replace_inplace_call_methods` for
         graphs produced by :class:`~yobx.torch.new_tracing.GraphTracer` where
         inplace dispatch operations are already recorded as ``call_function``
         ATen nodes with the trailing ``_`` in the overload name.  Because
@@ -2690,7 +2670,7 @@ class CustomTracer(torch.fx.Tracer):
             n += 1
             if verbose > 1:
                 print(
-                    f"[CustomTracer._replace_inplace_aten_functions] replaced "
+                    f"[CustomTracer.replace_inplace_aten_functions] replaced "
                     f"aten inplace {old_target!r} -> non-inplace at {node.name!r}"
                 )
         return n
@@ -2737,9 +2717,9 @@ class CustomTracer(torch.fx.Tracer):
                     n_inplace_submobules += inpl
 
         # Convert call_function inplace ATen nodes (aten.add_.Tensor, etc.) to non-inplace.
-        cls._replace_inplace_aten_functions(graph, verbose=verbose)
+        cls.replace_inplace_aten_functions(graph, verbose=verbose)
         # Convert call_method inplace nodes (add_, mul_, etc.) to call_function equivalents.
-        cls._replace_inplace_call_methods(graph, verbose=verbose)
+        cls.replace_inplace_call_methods(graph, verbose=verbose)
 
         # Remove obvious unused nodes.
         rem = []
