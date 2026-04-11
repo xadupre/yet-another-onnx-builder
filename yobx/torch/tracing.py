@@ -1856,16 +1856,10 @@ class CustomTracer(torch.fx.Tracer):
             # Promote float placeholder meta["val"] to the autocast target dtype.
             # Collect placeholders first to avoid modifying the graph while iterating.
             modified_count = 0
-            float_placeholders = []
-            for ph in body_module.graph.nodes:
-                if ph.op != "placeholder":
+            all_sub_nodes = list(body_module.graph.nodes)
+            for ph_node in all_sub_nodes:
+                if "val" not in ph_node.meta:
                     continue
-                placeholder_val = ph.meta.get("val", None)
-                if placeholder_val is None or not hasattr(placeholder_val, "dtype"):
-                    continue
-                if placeholder_val.dtype in _FLOAT_TORCH_DTYPES:
-                    float_placeholders.append(ph)
-            for ph_node in float_placeholders:
                 val = ph_node.meta["val"]
 
                 # Build the promoted FakeTensor for the cast node output.
@@ -1880,9 +1874,7 @@ class CustomTracer(torch.fx.Tracer):
                 # so that downstream ops see the promoted dtype.
                 with body_module.graph.inserting_after(ph_node):
                     cast_node = body_module.graph.call_function(
-                        torch.ops.aten._to_copy.default,
-                        args=(ph_node,),
-                        kwargs={"dtype": dtype},
+                        torch.ops.aten._to_copy.default, args=(ph_node,), kwargs={"dtype": dtype}
                     )
 
                 # Move "val" and "tensor_meta" from the placeholder to the cast

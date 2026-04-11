@@ -3,7 +3,13 @@
 import unittest
 from onnx import TensorProto
 from onnx.inliner import inline_local_functions
-from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch, skipif_ci_windows
+from yobx.ext_test_case import (
+    ExtTestCase,
+    ignore_warnings,
+    requires_torch,
+    skipif_ci_windows,
+    hide_stdout,
+)
 from yobx.torch.interpreter import to_onnx
 
 
@@ -49,8 +55,8 @@ class TestOnnxExportAutocast(ExtTestCase):
 
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning, FutureWarning))
-    def test_autocast_bfloat16_enabled(self):
-        """Exports a model whose forward uses ``torch.autocast(enabled=True)`` with bfloat16.
+    def test_autocast_float16_enabled(self):
+        """Exports a model whose forward uses ``torch.autocast(enabled=True)`` with float16.
 
         This exercises the ``aten_wrap_with_autocast`` path where ``enabled=True``
         and verifies that the resulting ONNX model runs without error and
@@ -60,7 +66,7 @@ class TestOnnxExportAutocast(ExtTestCase):
 
         class Model(torch.nn.Module):
             def forward(self, x):
-                with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+                with torch.autocast(device_type="cpu", dtype=torch.float16):
                     return torch.mm(x, x.T)
 
         model = Model()
@@ -68,7 +74,7 @@ class TestOnnxExportAutocast(ExtTestCase):
         inputs = (x,)
         expected = model(x).float()
         onx = to_onnx(model, inputs)
-        # The ONNX output is bfloat16; cast to float32 for comparison.
+        # The ONNX output is float16; cast to float32 for comparison.
         import numpy as np
         import onnxruntime
 
@@ -82,8 +88,8 @@ class TestOnnxExportAutocast(ExtTestCase):
 
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning, FutureWarning))
-    def test_autocast_linear_bfloat16(self):
-        """Exports a model with a Linear layer under ``torch.autocast(bfloat16)``."""
+    def test_autocast_linear_float16(self):
+        """Exports a model with a Linear layer under ``torch.autocast(float16)``."""
         import torch
 
         class Model(torch.nn.Module):
@@ -92,7 +98,7 @@ class TestOnnxExportAutocast(ExtTestCase):
                 self.linear = torch.nn.Linear(4, 3)
 
             def forward(self, x):
-                with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+                with torch.autocast(device_type="cpu", dtype=torch.float16):
                     return self.linear(x)
 
         model = Model()
@@ -113,12 +119,13 @@ class TestOnnxExportAutocast(ExtTestCase):
 
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning, FutureWarning))
-    def test_autocast_bfloat16_cast_nodes_present(self):
-        """Verifies that Cast nodes to bfloat16 are present in the ONNX graph.
+    @hide_stdout()
+    def test_autocast_float16_cast_nodes_present(self):
+        """Verifies that Cast nodes to float16 are present in the ONNX graph.
 
-        When a model uses ``torch.autocast(dtype=bfloat16)``, the exported ONNX
+        When a model uses ``torch.autocast(dtype=float16)``, the exported ONNX
         graph must contain at least one ``Cast`` node whose ``to`` attribute is
-        ``TensorProto.BFLOAT16``.  This test catches the regression where the
+        ``TensorProto.FLOAT16``.  This test catches the regression where the
         cast operations were missing from the FX graph and therefore absent from
         the ONNX output.
         """
@@ -126,9 +133,9 @@ class TestOnnxExportAutocast(ExtTestCase):
 
         class Model(torch.nn.Module):
             def forward(self, x):
-                with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
-                    # Under bfloat16 autocast the input tensor must be cast to
-                    # bfloat16 before the matmul; that Cast must appear in the
+                with torch.autocast(device_type="cpu", dtype=torch.float16):
+                    # Under float16 autocast the input tensor must be cast to
+                    # float16 before the matmul; that Cast must appear in the
                     # exported ONNX graph.
                     return torch.mm(x, x.T)
 
@@ -142,9 +149,9 @@ class TestOnnxExportAutocast(ExtTestCase):
         cast_tos = _cast_targets(flat)
 
         self.assertIn(
-            TensorProto.BFLOAT16,
+            TensorProto.FLOAT16,
             cast_tos,
-            "Expected a Cast node with to=BFLOAT16 in the ONNX graph, "
+            "Expected a Cast node with to=FLOAT16 in the ONNX graph, "
             f"but only found casts to dtypes: {cast_tos}. "
             "This likely means the autocast dtype-promotion casts are missing "
             "from the FX graph.",
@@ -152,12 +159,12 @@ class TestOnnxExportAutocast(ExtTestCase):
 
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning, FutureWarning))
-    def test_autocast_linear_bfloat16_cast_nodes_and_output_dtype(self):
+    def test_autocast_linear_float16_cast_nodes_and_output_dtype(self):
         """Verifies Cast nodes and correct output dtype for a Linear model under autocast.
 
         Checks two things:
-        1. The ONNX graph (after inlining) contains a Cast to ``BFLOAT16``.
-        2. The model's graph output is declared as ``BFLOAT16`` in the ONNX proto.
+        1. The ONNX graph (after inlining) contains a Cast to ``FLOAT16``.
+        2. The model's graph output is declared as ``FLOAT16`` in the ONNX proto.
         """
         import torch
 
@@ -167,7 +174,7 @@ class TestOnnxExportAutocast(ExtTestCase):
                 self.linear = torch.nn.Linear(4, 3)
 
             def forward(self, x):
-                with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+                with torch.autocast(device_type="cpu", dtype=torch.float16):
                     return self.linear(x)
 
         model = Model()
@@ -175,23 +182,23 @@ class TestOnnxExportAutocast(ExtTestCase):
         inputs = (x,)
         onx = to_onnx(model, inputs)
 
-        # 1. Check that a Cast to bfloat16 is present anywhere in the model.
+        # 1. Check that a Cast to float16 is present anywhere in the model.
         flat = inline_local_functions(onx)
         cast_tos = _cast_targets(flat)
         self.assertIn(
-            TensorProto.BFLOAT16,
+            TensorProto.FLOAT16,
             cast_tos,
-            "Expected a Cast node with to=BFLOAT16 in the ONNX graph, "
+            "Expected a Cast node with to=FLOAT16 in the ONNX graph, "
             f"but only found casts to dtypes: {cast_tos}. "
             "This likely means the autocast dtype-promotion casts are missing.",
         )
 
-        # 2. The graph-level output should be typed as bfloat16.
+        # 2. The graph-level output should be typed as float16.
         output_elem_types = [o.type.tensor_type.elem_type for o in flat.graph.output]
         self.assertIn(
-            TensorProto.BFLOAT16,
+            TensorProto.FLOAT16,
             output_elem_types,
-            "Expected the ONNX graph output to have elem_type=BFLOAT16, "
+            "Expected the ONNX graph output to have elem_type=FLOAT16, "
             f"but got elem_types={output_elem_types}.",
         )
 
