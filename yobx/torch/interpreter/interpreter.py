@@ -2729,6 +2729,26 @@ class DynamoInterpreter:
                 getattr(tracer, "traced_model", None) or sub_module, graph
             )
 
+        # When new_args provide VirtualTensors with explicitly promoted dtypes
+        # (e.g. from _get_autocast_input_args_for_callable for wrap_with_autocast),
+        # temporarily override the placeholder meta["val"] on the body GraphModule
+        # so the builder sees the promoted dtype rather than the original FakeTensor
+        # dtype from torch.export.  This fixes the inconsistency where a
+        # wrap_with_autocast body has float32 placeholder meta but bfloat16
+        # op outputs (e.g. aten.mm), which is invalid in ONNX.
+        # The original values are restored after processing.
+        _saved_placeholder_meta: Dict[Any, Any] = {}
+        if new_args and hasattr(gm, "graph"):
+            _ii = 0
+            for _node in gm.graph.nodes:
+                if _node.op == "placeholder":
+                    if _ii < len(new_args):
+                        _ag = new_args[_ii]
+                        if isinstance(_ag, VirtualTensor):
+                            _saved_placeholder_meta[_node] = _node.meta.get("val", None)
+                            _node.meta["val"] = _ag
+                    _ii += 1
+
         graph_module, builder, interpreter, mask_outputs = _make_builder_interpreter(
             gm,
             args=None if new_args is None else tuple(new_args),
@@ -2788,6 +2808,15 @@ class DynamoInterpreter:
 
         # processes the submodules
         builder.process(graph_module, interpreter)
+
+        # Restore the original placeholder meta["val"] that was temporarily overridden.
+        for _saved_node, _saved_val in _saved_placeholder_meta.items():
+            if _saved_val is None:
+                _saved_node.meta.pop("val", None)
+            else:
+                _saved_node.meta["val"] = _saved_val
+        _saved_placeholder_meta.clear()
+
         if not builder.outputs:
             return builder, None, None, []
 
