@@ -1194,7 +1194,7 @@ class GraphTracer:
                     (
                         dynamic_shapes[i]
                         if isinstance(dynamic_shapes, tuple)
-                        else dynamic_shapes.get(arg_name)
+                        else dynamic_shapes.get(arg_name, None)
                     )
                     if dynamic_shapes
                     else None
