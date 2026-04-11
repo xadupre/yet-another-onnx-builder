@@ -2737,17 +2737,18 @@ class DynamoInterpreter:
         # wrap_with_autocast body has float32 placeholder meta but bfloat16
         # op outputs (e.g. aten.mm), which is invalid in ONNX.
         # The original values are restored after processing.
-        _saved_placeholder_meta: Dict[Any, Any] = {}
+        saved_placeholder_meta: List[Tuple[Any, Any]] = []
         if new_args and hasattr(gm, "graph"):
-            _ii = 0
-            for _node in gm.graph.nodes:
-                if _node.op == "placeholder":
-                    if _ii < len(new_args):
-                        _ag = new_args[_ii]
-                        if isinstance(_ag, VirtualTensor):
-                            _saved_placeholder_meta[_node] = _node.meta.get("val", None)
-                            _node.meta["val"] = _ag
-                    _ii += 1
+            arg_index = 0
+            for ph_node in gm.graph.nodes:
+                if ph_node.op == "placeholder":
+                    if arg_index < len(new_args):
+                        arg = new_args[arg_index]
+                        if isinstance(arg, VirtualTensor):
+                            original_val = ph_node.meta.get("val", None)
+                            saved_placeholder_meta.append((ph_node, original_val))
+                            ph_node.meta["val"] = arg
+                    arg_index += 1
 
         graph_module, builder, interpreter, mask_outputs = _make_builder_interpreter(
             gm,
@@ -2810,12 +2811,12 @@ class DynamoInterpreter:
         builder.process(graph_module, interpreter)
 
         # Restore the original placeholder meta["val"] that was temporarily overridden.
-        for _saved_node, _saved_val in _saved_placeholder_meta.items():
-            if _saved_val is None:
-                _saved_node.meta.pop("val", None)
+        for ph_node, original_val in saved_placeholder_meta:
+            if original_val is None:
+                ph_node.meta.pop("val", None)
             else:
-                _saved_node.meta["val"] = _saved_val
-        _saved_placeholder_meta.clear()
+                ph_node.meta["val"] = original_val
+        saved_placeholder_meta.clear()
 
         if not builder.outputs:
             return builder, None, None, []
