@@ -1838,7 +1838,7 @@ class CustomTracer(torch.fx.Tracer):
         :param verbose: verbosity level
 
         Returns:
-            Number of body subgraphs whose placeholder types were fixed.
+            Returns the number of body subgraphs whose placeholder types were fixed.
         """
         _FLOAT_TORCH_DTYPES = frozenset(
             {torch.float16, torch.float32, torch.float64, torch.bfloat16}
