@@ -12894,6 +12894,23 @@ def aten_std_mean_correction(
     return std, mean
 
 
+def aten_std_mean(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    *,
+    correction: Optional[float] = 1,
+    keepdim: bool = False,
+    name: str = "std_mean",
+) -> Tuple[T, T]:
+    """std_mean: delegates to :func:`aten_std_mean_correction` with the same defaults."""
+    return aten_std_mean_correction(
+        g, sts, outputs, x, dim=dim, correction=correction, keepdim=keepdim, name=name
+    )
+
+
 def aten_sub(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T, name="sub"
 ) -> T:
