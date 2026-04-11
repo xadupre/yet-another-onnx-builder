@@ -7,6 +7,8 @@ Overview of Exportability Comparison
 The following script shows the exported program for many short cases
 to retrieve an ONNX model equivalent to the original model.
 Go to :ref:`l-this-bottom-page-coverage` to see a table summarizing the results.
+The summary explicitly includes the ``new-tracing`` exporter next to
+``yobx``, ``dynamo-ir``, and ``tracing``.
 
 .. runpython::
     :showcode:

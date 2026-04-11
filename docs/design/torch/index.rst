@@ -40,7 +40,7 @@ The pipeline has three main stages:
    :class:`~torch.export.ExportedProgram` (or :class:`~torch.fx.GraphModule`)
    using one of the strategies provided by
    :class:`~yobx.torch.export_options.ExportOptions` (``strict``,
-   ``nostrict``, ``tracing``, ``jit``, ``dynamo``, ``fake``, …).
+   ``nostrict``, ``tracing``, ``new-tracing``, ``jit``, ``dynamo``, ``fake``, …).
 2. **Interpret** — :class:`~yobx.torch.interpreter.interpreter.DynamoInterpreter`
    walks the FX graph node by node and emits the corresponding ONNX operators
    into a :class:`~yobx.xbuilder.GraphBuilder`.
