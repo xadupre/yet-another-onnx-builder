@@ -1853,14 +1853,16 @@ class CustomTracer(torch.fx.Tracer):
             if body_module is None or not hasattr(body_module, "graph"):
                 continue
 
-            # Promote float placeholder meta["val"] to the autocast target dtype.
-            # Collect placeholders first to avoid modifying the graph while iterating.
+            # Promote float tensor meta["val"] to the autocast target dtype.
+            # Collect nodes first to avoid modifying the graph while iterating.
             modified_count = 0
             all_sub_nodes = list(body_module.graph.nodes)
             for ph_node in all_sub_nodes:
                 if "val" not in ph_node.meta or not isinstance(ph_node.meta["val"], torch.Tensor):
                     continue
                 val = ph_node.meta["val"]
+                if not hasattr(val, "dtype") or val.dtype not in _FLOAT_TORCH_DTYPES:
+                    continue
 
                 # Build the promoted FakeTensor for the cast node output.
                 fake_mode = getattr(val, "fake_mode", None)
