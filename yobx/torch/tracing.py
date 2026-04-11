@@ -1854,19 +1854,58 @@ class CustomTracer(torch.fx.Tracer):
                 continue
 
             # Promote float placeholder meta["val"] to the autocast target dtype.
-            # Preserve the exact type of val (FakeTensor, regular Tensor, etc.)
-            # so that the rest of the pipeline sees a consistent object type.
+            # Collect placeholders first to avoid modifying the graph while iterating.
             modified_count = 0
-            for ph_node in body_module.graph.nodes:
-                if ph_node.op != "placeholder":
+            float_placeholders = []
+            for ph in body_module.graph.nodes:
+                if ph.op != "placeholder":
                     continue
-                val = ph_node.meta.get("val", None)
-                if val is None or not hasattr(val, "dtype"):
+                _val = ph.meta.get("val", None)
+                if _val is None or not hasattr(_val, "dtype"):
                     continue
-                if val.dtype not in _FLOAT_TORCH_DTYPES:
-                    continue
+                if _val.dtype in _FLOAT_TORCH_DTYPES:
+                    float_placeholders.append(ph)
+            for ph_node in float_placeholders:
+                val = ph_node.meta["val"]
 
-                # insert a cast node
+                # Build the promoted FakeTensor for the cast node output.
+                fake_mode = getattr(val, "fake_mode", None)
+                if fake_mode is not None:
+                    with fake_mode:
+                        promoted_val = val.to(dtype=dtype)
+                else:
+                    promoted_val = val.to(dtype=dtype)
+
+                # Insert an explicit _to_copy cast node right after the placeholder
+                # so that downstream ops see the promoted dtype.
+                with body_module.graph.inserting_after(ph_node):
+                    cast_node = body_module.graph.call_function(
+                        torch.ops.aten._to_copy.default,
+                        args=(ph_node,),
+                        kwargs={"dtype": dtype},
+                    )
+
+                # Move "val" and "tensor_meta" from the placeholder to the cast
+                # node so that the cast output carries the promoted dtype, and the
+                # placeholder is left without an explicit dtype annotation.
+                cast_node.meta["val"] = promoted_val
+                old_tensor_meta = ph_node.meta.get("tensor_meta", None)
+                if old_tensor_meta is not None:
+                    try:
+                        cast_node.meta["tensor_meta"] = old_tensor_meta._replace(
+                            dtype=dtype
+                        )
+                    except (TypeError, AttributeError):
+                        cast_node.meta["tensor_meta"] = old_tensor_meta
+                    del ph_node.meta["tensor_meta"]
+                ph_node.meta.pop("val", None)
+
+                # Redirect all downstream uses of the placeholder to the cast
+                # node (but keep the cast node's own reference to the placeholder).
+                ph_node.replace_all_uses_with(
+                    cast_node,
+                    delete_user_cb=lambda user, _cast=cast_node: user is not _cast,
+                )
 
                 modified_count += 1
                 if verbose > 1:
