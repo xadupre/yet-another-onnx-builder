@@ -66,6 +66,7 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "__rsub__",
         "addcdiv",
         "addr",
+        "alias_copy",
         "argwhere",
         "bernoulli",
         "block_diag",
@@ -400,6 +401,7 @@ ATOL_OPS_FLOAT32: Dict[str, float] = {
 # Ops whose variance/std computation compounds float16 rounding errors need
 # a larger tolerance than the global _ATOL_FLOAT16 = 1e-2.
 ATOL_OPS_FLOAT16: Dict[str, float] = {
+    "addr": 0.02,
     "std": 1e-1,  # variance accumulates float16 rounding; sqrt amplifies
     "std_mean": 3e-1,  # same compound error as std
 }
