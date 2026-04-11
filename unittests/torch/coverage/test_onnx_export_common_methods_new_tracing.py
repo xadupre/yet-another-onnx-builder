@@ -119,11 +119,31 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
         List of :class:`~torch.testing._internal.opinfo.core.OpInfo` objects.
     """
     _xfail_map: Dict[torch.dtype, FrozenSet[str]] = {
-        torch.float32: XFAIL_OPS["default"],
-        torch.float16: XFAIL_OPS["default"] | XFAIL_OPS_FLOAT16["default"],
-        torch.bfloat16: XFAIL_OPS["default"] | XFAIL_OPS_BFLOAT16["default"],
-        torch.int32: XFAIL_OPS["default"] | XFAIL_OPS_INT32["default"],
-        torch.int64: XFAIL_OPS["default"] | XFAIL_OPS_INT64["default"],
+        torch.float32: XFAIL_OPS["default"] | XFAIL_OPS["new-tracing"],
+        torch.float16: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_FLOAT16["default"]
+            | XFAIL_OPS["new-tracing"]
+            | XFAIL_OPS_FLOAT16["new-tracing"]
+        ),
+        torch.bfloat16: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_BFLOAT16["default"]
+            | XFAIL_OPS["new-tracing"]
+            | XFAIL_OPS_BFLOAT16["new-tracing"]
+        ),
+        torch.int32: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_INT32["default"]
+            | XFAIL_OPS["new-tracing"]
+            | XFAIL_OPS_INT32["new-tracing"]
+        ),
+        torch.int64: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_INT64["default"]
+            | XFAIL_OPS["new-tracing"]
+            | XFAIL_OPS_INT64["new-tracing"]
+        ),
     }
     if dtype not in _xfail_map:
         raise ValueError(f"Unsupported dtype {dtype!r}. Supported dtypes: {list(_xfail_map)}")

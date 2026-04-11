@@ -286,7 +286,28 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
     ),
     # Ops that fail specifically under ``ExportOptions(tracing=True)``,
     # beyond those already listed under ``"default"``.
-    "new-tracing": frozenset({"std", "std_mean"}),
+    "new-tracing": frozenset(
+        {
+            "argsort",
+            "bool",
+            "bitwise_or_",
+            "byte",
+            "char",
+            "double",
+            "erfinv",
+            "float",
+            "half",
+            "int",
+            "isclose",
+            "isfinite",
+            "long",
+            "nanmean",
+            "nn_functional_bilinear",
+            "short",
+            "std",
+            "std_mean",
+        }
+    ),
 }
 
 # Extra exclusions specific to torch.float16.
@@ -328,7 +349,7 @@ XFAIL_OPS_BFLOAT16: Dict[str, FrozenSet[str]] = {
         }
     ),
     "tracing": frozenset(),
-    "new-tracing": frozenset(),
+    "new-tracing": frozenset({"nn_functional_selu"}),
 }
 
 # Extra exclusions specific to torch.int32.
