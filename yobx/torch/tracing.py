@@ -1891,12 +1891,7 @@ class CustomTracer(torch.fx.Tracer):
                 cast_node.meta["val"] = promoted_val
                 old_tensor_meta = ph_node.meta.get("tensor_meta", None)
                 if old_tensor_meta is not None:
-                    try:
-                        cast_node.meta["tensor_meta"] = old_tensor_meta._replace(
-                            dtype=dtype
-                        )
-                    except (TypeError, AttributeError):
-                        cast_node.meta["tensor_meta"] = old_tensor_meta
+                    cast_node.meta["tensor_meta"] = old_tensor_meta._replace(dtype=dtype)
                     del ph_node.meta["tensor_meta"]
                 ph_node.meta.pop("val", None)
 
