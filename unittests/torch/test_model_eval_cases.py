@@ -272,6 +272,19 @@ class TestModelEvalCases(ExtTestCase):
             cases="ControlFlowNumelZero2", exporters="export-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_controlflow_cond_new_tracing(self):
+        evaluation(
+            cases="ControlFlowCond", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_cond_2outputs_new_tracing(self):
+        evaluation(
+            cases="ControlFlowCond2Outputs",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_aten_interpolate_new_tracing(self):
         evaluation(
             cases="AtenInterpolate", exporters="yobx-new-tracing", quiet=False, dynamic=True
