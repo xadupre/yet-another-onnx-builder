@@ -30,4 +30,6 @@ so that both sources always stay in sync.
     :warningout: UserWarning
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
-    print(get_op_coverage_rst())
+    print(get_op_coverage_rst("default"))
+    print(get_op_coverage_rst("tracing"))
+    print(get_op_coverage_rst("new-tracing"))
