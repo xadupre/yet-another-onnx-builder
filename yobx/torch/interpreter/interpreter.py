@@ -692,8 +692,8 @@ class DynamoInterpreter:
         self, node: "torch.fx.Node"  # noqa: F821
     ) -> Optional[List[VirtualTensor]]:
         """
-        When a callable (get_attr node) is used in a ``wrap_with_autocast`` call,
-        looks up the type and shape of the actual tensor inputs and—when
+        Looks up the type and shape of the actual tensor inputs when a callable
+        (get_attr node) is used in a ``wrap_with_autocast`` call, and—when
         ``enabled=True`` and a floating-point *dtype* is specified—promotes
         every floating-point input to the autocast target dtype.
 
@@ -703,7 +703,9 @@ class DynamoInterpreter:
         ops like ``aten.mm`` inside the subgraph would have float32 inputs
         but a bfloat16 output (from the FX meta), which is invalid in ONNX.
 
-        Returns *None* if the info cannot be determined.
+        Returns:
+            A list of :class:`VirtualTensor` objects if the info can be
+            determined, or *None* otherwise.
         """
         _FLOAT_ONNX_DTYPES = frozenset(
             {TensorProto.FLOAT, TensorProto.DOUBLE, TensorProto.FLOAT16, TensorProto.BFLOAT16}
