@@ -14552,13 +14552,12 @@ def aten_wrap_with_autocast(
     ), f"Unexpected input types args={args}{g.get_debug_msg()}"
 
     # When autocast is enabled with a floating-point target dtype, torch.export
-    # captures the body subgraph with the *original* input dtypes (e.g. float32),
-    # but certain ops (like aten.mm) have their output meta-values set to the
-    # promoted dtype (e.g. bfloat16) without any explicit Cast nodes for the
-    # inputs.  This is correct at the PyTorch dispatch level (autocast handles it
-    # transparently), but ONNX requires explicit Cast nodes.  We insert those
-    # casts here — at the context boundary — to promote floating-point inputs to
-    # the autocast target dtype before calling the wrapped local function.
+    # captures the body subgraph with the *original* input dtypes (e.g. float32).
+    # _get_autocast_input_args_for_callable (in interpreter.py) promotes the
+    # local-function's placeholder inputs to the autocast dtype so the function
+    # body is consistently typed.  The casts here additionally cover the
+    # call-site: the main graph still passes float32 tensors, so we must cast
+    # them to the autocast target dtype before calling the local function.
     _FLOAT_DTYPES = frozenset(
         {TensorProto.FLOAT, TensorProto.DOUBLE, TensorProto.FLOAT16, TensorProto.BFLOAT16}
     )

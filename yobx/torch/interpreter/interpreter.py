@@ -400,12 +400,14 @@ class DynamoInterpreter:
             else:
                 trace_init = init
 
-            # When the callable is used in a torch.cond or scan call (tracing
-            # exporter path), try to pass input type/shape info so the local
-            # function's outputs are typed.
+            # When the callable is used in a torch.cond, scan, or wrap_with_autocast
+            # call (tracing exporter path), try to pass input type/shape info so the
+            # local function's outputs are typed.
             sub_args = self._get_cond_input_args_for_callable(node)
             if sub_args is None:
                 sub_args = self._get_scan_input_args_for_callable(node)
+            if sub_args is None:
+                sub_args = self._get_autocast_input_args_for_callable(node)
 
             builder, _args, _kwargs, output_names = self._interpret_sub_module(
                 trace_init, sub_args, None, source_node=node, local_domain=f"{root}.{n}"
@@ -682,6 +684,73 @@ class DynamoInterpreter:
                     sub_args = None
                     break
                 sub_args.append(vt)
+            if sub_args is not None:
+                return sub_args
+        return None
+
+    def _get_autocast_input_args_for_callable(
+        self, node: "torch.fx.Node"  # noqa: F821
+    ) -> Optional[List[VirtualTensor]]:
+        """
+        When a callable (get_attr node) is used in a ``wrap_with_autocast`` call,
+        looks up the type and shape of the actual tensor inputs and—when
+        ``enabled=True`` and a floating-point *dtype* is specified—promotes
+        every floating-point input to the autocast target dtype.
+
+        The promoted :class:`VirtualTensor` objects are forwarded to
+        :meth:`_interpret_sub_module` so the local-function builder receives
+        consistently-typed placeholders (e.g. bfloat16).  Without this,
+        ops like ``aten.mm`` inside the subgraph would have float32 inputs
+        but a bfloat16 output (from the FX meta), which is invalid in ONNX.
+
+        Returns *None* if the info cannot be determined.
+        """
+        _FLOAT_ONNX_DTYPES = frozenset(
+            {TensorProto.FLOAT, TensorProto.DOUBLE, TensorProto.FLOAT16, TensorProto.BFLOAT16}
+        )
+        for user_node in node.users:
+            if not (
+                user_node.op == "call_function"
+                and callable(user_node.target)
+                and getattr(user_node.target, "__name__", "") == "wrap_with_autocast"
+            ):
+                continue
+            # user_node.args = (device_type, dtype, enabled, cache_enabled, wrapped_fn, *inputs)
+            if len(user_node.args) < 5:
+                continue
+            dtype = user_node.args[1]  # torch.dtype or None
+            enabled = user_node.args[2]  # bool
+            input_nodes = user_node.args[5:]  # actual tensor input FX nodes
+
+            # Determine the ONNX target dtype if enabled and dtype is float-like.
+            target_onnx_dtype = None
+            if enabled and dtype is not None:
+                target_onnx_dtype = torch_dtype_to_onnx_dtype(dtype)
+                if target_onnx_dtype not in _FLOAT_ONNX_DTYPES:
+                    target_onnx_dtype = None
+
+            sub_args: Optional[List[VirtualTensor]] = []
+            for inp_node in input_nodes:
+                if not hasattr(inp_node, "name") or not self.builder.has_type(inp_node.name):
+                    sub_args = None
+                    break
+                name = inp_node.name
+                onnx_dtype = self.builder.get_type(name)
+                # Promote floating-point inputs to the autocast target dtype.
+                if target_onnx_dtype is not None and onnx_dtype in _FLOAT_ONNX_DTYPES:
+                    onnx_dtype = target_onnx_dtype
+                if self.builder.has_shape(name):
+                    shape = self.builder.get_shape(name)
+                elif self.builder.has_rank(name):
+                    shape = tuple(None for _ in range(self.builder.get_rank(name)))
+                else:
+                    shape = None
+                device = (
+                    self.builder.get_device(name) if self.builder.has_device(name) else None
+                )
+                sub_args.append(
+                    VirtualTensor(name=name, dtype=onnx_dtype, shape=shape, device=device)
+                )
             if sub_args is not None:
                 return sub_args
         return None
