@@ -549,6 +549,8 @@ class _BuilderRuntime:
                 return [np.sqrt(x).astype(ttype)]
             if node.op_type == "Exp":
                 return [np.exp(x).astype(ttype)]
+            if node.op_type == "Log":
+                return [np.log(x).astype(ttype)]
             if node.op_type == "Reciprocal":
                 return [(np.array([1], dtype=x.dtype) / x).astype(ttype)]
             raise AssertionError(
@@ -560,6 +562,8 @@ class _BuilderRuntime:
             return [self.torch.sqrt(x).to(ttype)]
         if node.op_type == "Exp":
             return [self.torch.exp(x).to(ttype)]
+        if node.op_type == "Log":
+            return [self.torch.log(x).to(ttype)]
         if node.op_type == "Reciprocal":
             return [(self.torch.tensor([1], dtype=x.dtype) / x).to(ttype)]
         raise AssertionError(

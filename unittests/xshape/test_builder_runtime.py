@@ -388,7 +388,7 @@ class TestApplyUnaryFunction(ExtTestCase):
         self.assertEqualArray(result[0], np.array([0.5, 0.25], dtype=np.float32))
 
     def test_unknown_op_numpy_raises(self):
-        node = oh.make_node("Log", ["x"], ["y"])
+        node = oh.make_node("LogRaise", ["x"], ["y"])
         x = np.array([1.0, 2.0], dtype=np.float32)
         self.assertRaises(AssertionError, self.b._apply_unary_function, node, {"x": x})
 
@@ -405,12 +405,14 @@ class TestApplyUnaryFunction(ExtTestCase):
         self.assertEqualArray(result[0].numpy(), np.array([0.5, 0.25], dtype=np.float32))
 
     @requires_torch()
-    def test_unknown_op_torch_raises(self):
+    def test_unknown_op_torch_log(self):
         import torch
 
         node = oh.make_node("Log", ["x"], ["y"])
         x = torch.tensor([1.0, 2.0], dtype=torch.float32)
-        self.assertRaises(AssertionError, self.b._apply_unary_function, node, {"x": x})
+        result = self.b._apply_unary_function(node, {"x": x})
+        self.assertEqual(len(result), 1)
+        self.assertEqualArray(result[0], np.array([0.0, 0.693147], dtype=np.float32), atol=1e-5)
 
     def test_sqrt_numpy(self):
         node = oh.make_node("Sqrt", ["x"], ["y"])
