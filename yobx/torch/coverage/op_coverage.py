@@ -489,8 +489,9 @@ def get_op_coverage_rst() -> str:
     """Returns RST tables showing op-db coverage per op and dtype.
 
     Queries ``torch.testing._internal.common_methods_invocations.op_db`` and
-    builds two grids (one for the default export path, one for the torch tracing
-    path) showing, for every op and dtype combination, whether the op is:
+    builds three grids (default export path, torch tracing path, and
+    new-tracing path) showing, for every op and dtype combination, whether the
+    op is:
 
     * ``✔`` - in the tested set (converter exists, no known failure for that dtype),
     * ``⚠ xfail`` - converter exists but the test is a known failure,
@@ -498,9 +499,9 @@ def get_op_coverage_rst() -> str:
     * ``—`` - the op does not support that dtype.
 
     Returns:
-        RST source string with two ``list-table`` directives (default path and
-        tracing path) ready to be printed inside a ``.. runpython::`` block with
-        ``:rst:`` enabled.
+        RST source string with three ``list-table`` directives (default path,
+        tracing path, and new-tracing path) ready to be printed inside a
+        ``.. runpython::`` block with ``:rst:`` enabled.
     """
     import warnings
 
@@ -550,6 +551,14 @@ def get_op_coverage_rst() -> str:
             | XFAIL_OPS["tracing"]
             | XFAIL_OPS_INT64["tracing"]
         ),
+    }
+    # Xfail sets for the new-tracing export path.
+    xfail_map_new_tracing = {
+        torch.float32: XFAIL_OPS["default"],
+        torch.float16: XFAIL_OPS["default"] | XFAIL_OPS_FLOAT16["default"],
+        torch.bfloat16: XFAIL_OPS["default"] | XFAIL_OPS_BFLOAT16["default"],
+        torch.int32: XFAIL_OPS["default"] | XFAIL_OPS_INT32["default"],
+        torch.int64: XFAIL_OPS["default"] | XFAIL_OPS_INT64["default"],
     }
 
     with warnings.catch_warnings():
@@ -612,4 +621,7 @@ def get_op_coverage_rst() -> str:
 
     default_table = _make_table("Default export path", xfail_map)
     tracing_table = _make_table("Torch tracing export path (``tracing=True``)", xfail_map_tracing)
-    return default_table + "\n" + tracing_table
+    new_tracing_table = _make_table(
+        "New-tracing export path (``tracing=TracingMode.NEW_TRACING``)", xfail_map_new_tracing
+    )
+    return default_table + "\n" + tracing_table + "\n" + new_tracing_table
