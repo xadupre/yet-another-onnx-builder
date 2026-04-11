@@ -1860,10 +1860,10 @@ class CustomTracer(torch.fx.Tracer):
             for ph in body_module.graph.nodes:
                 if ph.op != "placeholder":
                     continue
-                _val = ph.meta.get("val", None)
-                if _val is None or not hasattr(_val, "dtype"):
+                placeholder_val = ph.meta.get("val", None)
+                if placeholder_val is None or not hasattr(placeholder_val, "dtype"):
                     continue
-                if _val.dtype in _FLOAT_TORCH_DTYPES:
+                if placeholder_val.dtype in _FLOAT_TORCH_DTYPES:
                     float_placeholders.append(ph)
             for ph_node in float_placeholders:
                 val = ph_node.meta["val"]
@@ -1902,10 +1902,10 @@ class CustomTracer(torch.fx.Tracer):
 
                 # Redirect all downstream uses of the placeholder to the cast
                 # node (but keep the cast node's own reference to the placeholder).
-                ph_node.replace_all_uses_with(
-                    cast_node,
-                    delete_user_cb=lambda user, _cast=cast_node: user is not _cast,
-                )
+                def _not_cast(user, expected=cast_node):
+                    return user is not expected
+
+                ph_node.replace_all_uses_with(cast_node, delete_user_cb=_not_cast)
 
                 modified_count += 1
                 if verbose > 1:
