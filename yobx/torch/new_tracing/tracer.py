@@ -1189,7 +1189,7 @@ class GraphTracer:
                 if self.is_not_tensor(a):
                     tracing_args.append(a)
                     continue
-                arg_name = sig_names[i] if i < len(sig_names) else str(i)
+                arg_name = sig_names[i] if i < len(sig_names) else f"arg_{i}"
                 ds = (
                     (
                         dynamic_shapes[i]
