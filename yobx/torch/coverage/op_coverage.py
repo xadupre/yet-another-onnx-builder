@@ -454,7 +454,9 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
             "xlogy",  # ONNX Log only supports float dtypes
         }
     ),
-    "tracing": frozenset(),
+    # short.int64: FX tracing produces call_method[target=short] with no
+    # aten_meth_short converter in the tracing path.
+    "tracing": frozenset({"short"}),  # FunctionNotFoundError: aten_meth_short
 }
 
 # Per-op absolute tolerance overrides for torch.float16.
