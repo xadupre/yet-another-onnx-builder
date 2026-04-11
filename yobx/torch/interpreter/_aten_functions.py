@@ -8352,7 +8352,7 @@ def aten_mean(
     res = g.op.ReduceMean(x, keepdims=0, name=name, outputs=outputs)
     if not sts:
         g.set_type(res, g.get_type(x) if dtype is None else itype)
-        g.get_shape(res, tuple())
+        g.set_shape(res, tuple())
     return res
 
 

@@ -245,7 +245,45 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
     ),
     # Ops that fail specifically under ``ExportOptions(tracing=True)``,
     # beyond those already listed under ``"default"``.
-    "tracing": frozenset(),
+    "tracing": frozenset(
+        {
+            "T",  # no attr
+            "__radd__",  # not implemented
+            "__rand__",  # not implemented
+            "__rdiv__",  # not implemented
+            "__rmatmul__",  # not implemented
+            "__rmod__",  # not implemented
+            "__rmul__",  # not implemented
+            "__ror__",  # not implemented
+            "__rpow__",  # not implemented
+            "__rsub__",  # not implemented
+            "__rxor__",  # not implemented
+            "aminmax",  # list index out of range
+            "argsort",
+            "bitwise_and",
+            "bitwise_or",
+            "byte",
+            "char",
+            "conj",
+            "double",
+            "erfinv",
+            "flatten",
+            "half",
+            "int",
+            "logical_and",
+            "logical_or",
+            "logical_xor",
+            "long",
+            "nn_functional_bilinear",
+            "nn_functional_hardsigmoid",
+            "nn_functional_softsign",
+            "nn_functional_tanhshrink",
+            "reshape_as",
+            "short",
+            "std",
+            "std_mean",
+        }
+    ),
 }
 
 # Extra exclusions specific to torch.float16.
