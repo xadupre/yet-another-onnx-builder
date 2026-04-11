@@ -245,7 +245,17 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
     ),
     # Ops that fail specifically under ``ExportOptions(tracing=True)``,
     # beyond those already listed under ``"default"``.
-    "tracing": frozenset(),
+    "tracing": frozenset(
+        {
+            # FX tracing produces call_function[target=torch.std] with no matching
+            # aten_std converter (only aten_std_correction/aten_std_dim exist):
+            "std",  # FunctionNotFoundError: torch.std
+            # FX tracing produces call_function[target=torch.std_mean]; the
+            # aten_std_mean converter generates a Mul with a numpy scalar numel
+            # constant that constant-folding cannot evaluate yet:
+            "std_mean",  # AssertionError: Not implemented for type(i)=numpy.float* in Mul
+        }
+    ),
 }
 
 # Extra exclusions specific to torch.float16.
@@ -416,7 +426,9 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
             "xlogy",  # ONNX Log only supports float dtypes
         }
     ),
-    "tracing": frozenset(),
+    # short.int64: FX tracing produces call_method[target=short] with no
+    # aten_meth_short converter in the tracing path.
+    "tracing": frozenset({"short"}),  # FunctionNotFoundError: aten_meth_short
 }
 
 # Per-op absolute tolerance overrides for torch.float16.
