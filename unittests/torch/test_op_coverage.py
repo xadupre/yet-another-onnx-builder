@@ -45,24 +45,25 @@ class TestOpCoverageData(ExtTestCase):
 
     def test_xfail_ops_is_frozenset(self):
         """XFAIL_OPS is a non-empty frozenset of strings."""
-        self.assertIsInstance(self.XFAIL_OPS, frozenset)
+        self.assertIsInstance(self.XFAIL_OPS["default"], frozenset)
         self.assertTrue(self.XFAIL_OPS)
 
     def test_xfail_float16_is_frozenset(self):
         """XFAIL_OPS_FLOAT16 is a frozenset of strings."""
-        self.assertIsInstance(self.XFAIL_OPS_FLOAT16, frozenset)
+        self.assertIsInstance(self.XFAIL_OPS_FLOAT16["default"], frozenset)
 
     def test_xfail_bfloat16_is_frozenset(self):
         """XFAIL_OPS_BFLOAT16 is a frozenset of strings."""
-        self.assertIsInstance(self.XFAIL_OPS_BFLOAT16, frozenset)
+        self.assertIsInstance(self.XFAIL_OPS_BFLOAT16["default"], frozenset)
+        self.assertIsInstance(self.XFAIL_OPS_BFLOAT16["tracing"], frozenset)
 
     def test_xfail_int32_is_frozenset(self):
         """XFAIL_OPS_INT32 is a frozenset of strings."""
-        self.assertIsInstance(self.XFAIL_OPS_INT32, frozenset)
+        self.assertIsInstance(self.XFAIL_OPS_INT32["default"], frozenset)
 
     def test_xfail_int64_is_frozenset(self):
         """XFAIL_OPS_INT64 is a frozenset of strings."""
-        self.assertIsInstance(self.XFAIL_OPS_INT64, frozenset)
+        self.assertIsInstance(self.XFAIL_OPS_INT64["default"], frozenset)
 
     def test_no_overlap_no_converter_and_xfail(self):
         """NO_CONVERTER_OPS and XFAIL_OPS should be disjoint.
@@ -70,7 +71,7 @@ class TestOpCoverageData(ExtTestCase):
         An op should not appear in both sets; it either has no converter or it
         has a converter with a known failure, not both.
         """
-        overlap = self.NO_CONVERTER_OPS & self.XFAIL_OPS
+        overlap = self.NO_CONVERTER_OPS & self.XFAIL_OPS["default"]
         self.assertEqual(
             overlap, frozenset(), f"ops in both NO_CONVERTER_OPS and XFAIL_OPS: {sorted(overlap)}"
         )
@@ -88,7 +89,7 @@ class TestOpCoverageData(ExtTestCase):
     def test_well_known_xfail_ops_present(self):
         """A sample of well-known xfail ops should be in XFAIL_OPS."""
         for op in ("clamp", "nan_to_num", "corrcoef"):
-            self.assertIn(op, self.XFAIL_OPS, f"expected {op!r} in XFAIL_OPS")
+            self.assertIn(op, self.XFAIL_OPS["default"], f"expected {op!r} in XFAIL_OPS")
 
     def test_well_known_non_deterministic_present(self):
         """A sample of non-deterministic ops should be in NON_DETERMINISTIC_OPS."""

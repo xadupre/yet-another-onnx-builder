@@ -1,6 +1,7 @@
 """
 Tests exporting torch ops from :mod:`torch.testing._internal.common_methods_invocations`
-to ONNX using :func:`yobx.torch.interpreter.to_onnx`.
+to ONNX using :func:`yobx.torch.interpreter.to_onnx` with torch tracing enabled
+(``ExportOptions(tracing=True)``).
 
 One test method is generated automatically for every (op, dtype) pair collected
 from ``op_db``, following the naming convention
@@ -19,6 +20,7 @@ from torch.testing._internal import common_methods_invocations
 from yobx.ext_test_case import ExtTestCase, has_onnxruntime, ignore_warnings, requires_torch
 from yobx.helpers import max_diff
 from yobx.reference import ExtendedReferenceEvaluator
+from yobx.torch import ExportOptions
 from yobx.torch.interpreter import to_onnx
 from yobx.torch.coverage.op_coverage import (
     NO_CONVERTER_OPS,
@@ -95,7 +97,7 @@ def _result_is_exportable(result: Any) -> bool:
 
 
 def _collect_ops(dtype: torch.dtype) -> List[Any]:
-    """Collects ops from op_db that are suitable for ONNX export testing with *dtype*.
+    """Collects ops from op_db suitable for ONNX export testing with *dtype* via tracing.
 
     Filters to ops that:
 
@@ -103,9 +105,12 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
     - Have no variant test name
     - Are not non-deterministic (random-output) ops
     - Are not in :data:`NO_CONVERTER_OPS` (missing aten converter)
-    - Are not in the dtype-specific xfail set (known failures for *dtype*)
+    - Are not in the dtype-specific xfail set (known failures for *dtype*),
+      including the tracing-specific xfail sets
     - Have at least one sample input whose ``.input`` is a tensor of *dtype*
-    - Have all positional sample args that are also tensors (or none at all)
+    - Have all positional sample args that are also tensors (or none at all);
+      these are captured as module constants in :class:`_OpWrapper`, not as
+      traced inputs (avoids ``*args`` issues with :class:`~yobx.torch.tracing.CustomTracer`)
     - Have no non-trivial keyword arguments (to avoid unsupported ONNX kwargs)
 
     Args:
@@ -117,11 +122,31 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
         List of :class:`~torch.testing._internal.opinfo.core.OpInfo` objects.
     """
     _xfail_map: Dict[torch.dtype, FrozenSet[str]] = {
-        torch.float32: XFAIL_OPS["default"],
-        torch.float16: XFAIL_OPS["default"] | XFAIL_OPS_FLOAT16["default"],
-        torch.bfloat16: XFAIL_OPS["default"] | XFAIL_OPS_BFLOAT16["default"],
-        torch.int32: XFAIL_OPS["default"] | XFAIL_OPS_INT32["default"],
-        torch.int64: XFAIL_OPS["default"] | XFAIL_OPS_INT64["default"],
+        torch.float32: XFAIL_OPS["default"] | XFAIL_OPS["tracing"],
+        torch.float16: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_FLOAT16["default"]
+            | XFAIL_OPS["tracing"]
+            | XFAIL_OPS_FLOAT16["tracing"]
+        ),
+        torch.bfloat16: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_BFLOAT16["default"]
+            | XFAIL_OPS["tracing"]
+            | XFAIL_OPS_BFLOAT16["tracing"]
+        ),
+        torch.int32: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_INT32["default"]
+            | XFAIL_OPS["tracing"]
+            | XFAIL_OPS_INT32["tracing"]
+        ),
+        torch.int64: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_INT64["default"]
+            | XFAIL_OPS["tracing"]
+            | XFAIL_OPS_INT64["tracing"]
+        ),
     }
     if dtype not in _xfail_map:
         raise ValueError(f"Unsupported dtype {dtype!r}. Supported dtypes: {list(_xfail_map)}")
@@ -167,9 +192,12 @@ _OPS_INT64 = _collect_ops(torch.int64)
 class _OpWrapper(torch.nn.Module):
     """Wraps a single op invocation as a :class:`torch.nn.Module`.
 
-    The module's ``forward`` receives the primary tensor input followed by
-    any additional tensor positional arguments from the sample.  Keyword
-    arguments are captured at construction time and forwarded as constants.
+    The module's ``forward`` receives only the primary tensor input *x*.
+    All additional positional arguments from the sample are captured at
+    construction time in ``_extra_args`` and forwarded as constants,
+    because :class:`~yobx.torch.tracing.CustomTracer` cannot trace
+    ``*args`` variadic parameters.  Keyword arguments are also captured
+    as constants via ``_kwargs``.
     """
 
     def __init__(
@@ -180,17 +208,20 @@ class _OpWrapper(torch.nn.Module):
         self._extra_args = extra_args
         self._kwargs = kwargs
 
-    def forward(self, x: torch.Tensor, *args: torch.Tensor) -> torch.Tensor:
-        """Calls the wrapped op with the supplied tensors.
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Calls the wrapped op with *x* and the stored constant extra args.
 
         Returns:
-            The result of applying the wrapped op to *x* and *args*.
+            The result of applying the wrapped op to *x* and the constant
+            extra positional arguments captured at construction time.
         """
-        return self._fn(x, *args, **self._kwargs)
+        return self._fn(x, *self._extra_args, **self._kwargs)
 
 
 def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
-    """Creates a test method that exports *op* to ONNX with *dtype* and validates outputs.
+    """Creates a test method that exports *op* to ONNX via tracing with *dtype*.
+
+    Validates numerical outputs against the eager PyTorch result.
 
     Args:
         op: An :class:`~torch.testing._internal.opinfo.core.OpInfo` instance.
@@ -211,7 +242,9 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
             raise unittest.SkipTest(f"no sample inputs for op {_op.name!r} dtype={_dtype}")
         s = samples[0]
         model = _OpWrapper(_op.op, s.args, s.kwargs)
-        inputs = (s.input, *s.args)
+        # Extra positional args (s.args) are baked into the module as constants;
+        # only the primary tensor is a traced input for the CustomTracer path.
+        inputs = (s.input,)
         expected = _op.op(s.input, *s.args, **s.kwargs)
         if not _result_is_exportable(expected):
             raise unittest.SkipTest(
@@ -224,7 +257,7 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
             expected if isinstance(expected, (tuple, list)) else (expected,)
         )
 
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, export_options=ExportOptions(tracing=True))
         numpy_inputs = [to_numpy(t) for t in inputs]
 
         ref = ExtendedReferenceEvaluator(onx.proto)
@@ -268,13 +301,17 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
 
     dtype_name = _DTYPE_NAMES[dtype]
     _test.__doc__ = (
-        f"Exports :func:`torch.{op.name}` ({dtype_name}) to ONNX and validates numerical outputs."
+        f"Exports :func:`torch.{op.name}` ({dtype_name}) to ONNX via tracing"
+        f" and validates numerical outputs."
     )
     return _test
 
 
-class TestOnnxExportCommonMethods(ExtTestCase):
-    """Tests :func:`yobx.torch.interpreter.to_onnx` against ops from op_db.
+class TestOnnxExportCommonMethodsTracing(ExtTestCase):
+    """Tests :func:`yobx.torch.interpreter.to_onnx` with tracing against ops from op_db.
+
+    Uses ``ExportOptions(tracing=True)`` so the graph is captured via torch
+    tracing (``CustomTracer``) rather than the default dispatcher path.
 
     One test method is generated automatically for every (op, dtype) pair in
     ``_OPS_FLOAT32``, ``_OPS_FLOAT16``, ``_OPS_BFLOAT16``, ``_OPS_INT32``,
@@ -303,7 +340,7 @@ class TestOnnxExportCommonMethods(ExtTestCase):
                 setattr(cls, method_name, _make_export_test(op, dtype))
 
 
-TestOnnxExportCommonMethods._add_test_methods()
+TestOnnxExportCommonMethodsTracing._add_test_methods()
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

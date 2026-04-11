@@ -8352,7 +8352,7 @@ def aten_mean(
     res = g.op.ReduceMean(x, keepdims=0, name=name, outputs=outputs)
     if not sts:
         g.set_type(res, g.get_type(x) if dtype is None else itype)
-        g.get_shape(res, tuple())
+        g.set_shape(res, tuple())
     return res
 
 
@@ -12892,6 +12892,23 @@ def aten_std_mean_correction(
         set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
         set_type_shape_reduce_op(g, outputs[1], x, keepdim=1 if keepdim else 0)
     return std, mean
+
+
+def aten_std_mean(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    *,
+    correction: Optional[float] = 1,
+    keepdim: bool = False,
+    name: str = "std_mean",
+) -> Tuple[T, T]:
+    """std_mean: delegates to :func:`aten_std_mean_correction` with the same defaults."""
+    return aten_std_mean_correction(
+        g, sts, outputs, x, dim=dim, correction=correction, keepdim=keepdim, name=name
+    )
 
 
 def aten_sub(
