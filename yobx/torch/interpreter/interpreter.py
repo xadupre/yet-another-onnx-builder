@@ -1830,6 +1830,8 @@ class DynamoInterpreter:
 
     def call_function(self, node: "torch.fx.Node") -> Union[str, Tuple[str]]:  # noqa: F821
         """Called for a function."""
+        if self.builder.verbose > 1:
+            print(f"[DynamoInterpreter-{self._hash()}.call_function][{node.target}]")
         aten_name = self._get_aten_name(node)
         fx_args, fx_kwargs = self._fill_in_default_kwargs(node)
 
@@ -2043,6 +2045,8 @@ class DynamoInterpreter:
 
     def call_method(self, node: "torch.fx.Node") -> Union[str, Tuple[str]]:  # noqa: F821
         """Called for a method."""
+        if self.builder.verbose > 1:
+            print(f"[DynamoInterpreter-{self._hash()}.call_method][{node.target}]")
         method_name = node.target
         if self.builder.verbose > 1:
             print(f"[DynamoInterpreter-{self._hash()}.call_method][{method_name}]")

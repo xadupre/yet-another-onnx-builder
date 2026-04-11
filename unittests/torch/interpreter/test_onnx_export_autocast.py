@@ -135,7 +135,7 @@ class TestOnnxExportAutocast(ExtTestCase):
         model = Model()
         x = torch.randn(3, 4)
         inputs = (x,)
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, verbose=10)
 
         # Inline local functions so every Cast node is visible in the flat graph.
         flat = inline_local_functions(onx)
