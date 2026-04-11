@@ -1814,7 +1814,7 @@ class CustomTracer(torch.fx.Tracer):
     @classmethod
     def fix_autocast_subgraph_dtypes(cls, graph: "torch.fx.Graph", verbose: int = 0) -> int:
         """
-        Fixes dtype inconsistency in body subgraphs used by ``wrap_with_autocast``.
+        Fixes the dtype inconsistency in body subgraphs used by ``wrap_with_autocast``.
 
         When :func:`torch.export.export` traces a model that uses
         :func:`torch.autocast`, the body subgraph's placeholder nodes keep
@@ -1836,7 +1836,9 @@ class CustomTracer(torch.fx.Tracer):
         :param graph: outer FX graph to scan; modified in-place if changes are
             made
         :param verbose: verbosity level
-        :return: number of body subgraphs whose placeholder types were fixed
+
+        Returns:
+            Number of body subgraphs whose placeholder types were fixed.
         """
         from ..xbuilder._virtual_tensor import VirtualTensor
 
