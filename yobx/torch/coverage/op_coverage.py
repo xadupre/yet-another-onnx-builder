@@ -485,6 +485,15 @@ ATOL_OPS_FLOAT16: Dict[str, float] = {
     "std_mean": 3e-1,  # same compound error as std
 }
 
+# Per-op absolute tolerance overrides for torch.bfloat16.
+# bfloat16 has only 7 mantissa bits, so statistical ops need an even wider
+# tolerance than the global _ATOL_BFLOAT16 = 2e-2.
+ATOL_OPS_BFLOAT16: Dict[str, float] = {
+    "logit": 5e-2,  # bfloat16 log precision compounds across Sub(Log(x), Log(1-x))
+    "std": 2e-1,  # bfloat16 precision loss is larger than float16
+    "std_mean": 2e-1,  # same compound error as std
+}
+
 
 def get_op_coverage_rst() -> str:
     """Returns RST tables showing op-db coverage per op and dtype.
