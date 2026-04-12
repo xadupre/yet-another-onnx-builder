@@ -87,7 +87,11 @@ time-series charts — one chart per CI workflow.
 
 
     def _load_cache():
-        """Returns cached workflow data or an empty dict."""
+        """Loads cached workflow data.
+
+        Returns:
+            dict: Cached workflow payload or an empty dict when unavailable.
+        """
         if not os.path.exists(_CACHE_PATH):
             return {}
         try:
@@ -108,7 +112,11 @@ time-series charts — one chart per CI workflow.
 
 
     def _cache_is_recent(cache_entry, now):
-        """Returns True if a cache entry is newer than the cache max age."""
+        """Checks whether a cache entry is newer than the cache max age.
+
+        Returns:
+            bool: True when the cache entry is recent enough.
+        """
         fetched_at = cache_entry.get("fetched_at")
         if not fetched_at:
             return False
@@ -123,7 +131,11 @@ time-series charts — one chart per CI workflow.
 
 
     def _run_duration_minutes(run):
-        """Returns the wall-clock duration of a successfully completed run in minutes, or None."""
+        """Computes the wall-clock duration of a successful completed run.
+
+        Returns:
+            float | None: Duration in minutes, or None when unavailable.
+        """
         if run.get("status") != "completed":
             return None
         if run.get("conclusion") != "success":
@@ -143,7 +155,11 @@ time-series charts — one chart per CI workflow.
 
 
     def _collect_data():
-        """Returns a dict mapping workflow_name -> list of (datetime, duration_min)."""
+        """Collects workflow duration data from cache and/or GitHub API.
+
+        Returns:
+            dict: Mapping ``workflow_name -> list[(datetime, duration_min)]``.
+        """
         now = datetime.datetime.now(datetime.timezone.utc)
         cutoff = (
             now - datetime.timedelta(days=62)
