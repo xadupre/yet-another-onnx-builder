@@ -11787,7 +11787,7 @@ def aten_slice_Tensor(
         if is_static_dimension(start) and is_static_dimension(end):
             shape = g.get_shape(x)
             new_shape = g._apply_slice_to_shape(
-                shape, slice(start, end, step), axes=[dim], expand_axes=[]
+                shape, [slice(start, end, step)], axes=[dim], expand_axes=[]
             )
             g.set_shape(res, new_shape)
         else:
