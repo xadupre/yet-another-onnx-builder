@@ -597,7 +597,7 @@ class ControlFlowScan(torch.nn.Module):
             next_carry = carry + y
             return [next_carry, next_carry]
 
-        init = torch.zeros_like(x[0])
+        init = x.new_zeros(x.shape[1:])
         carry, _out = torch.ops.higher_order.scan(add, [init], [x], additional_inputs=[])
         return carry
 

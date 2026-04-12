@@ -297,6 +297,12 @@ class TestModelEvalCases(ExtTestCase):
         evaluation(cases="AtenRollRelu", exporters="yobx-new-tracing", quiet=False, dynamic=True)
 
     @requires_torch("2.7", "scan")
+    def test_run_exporter_yobx_scan_new_tracing(self):
+        evaluation(
+            cases="ControlFlowScan", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    @requires_torch("2.7", "scan")
     def test_run_exporter_yobx_scan_cdist_new_tracing(self):
         evaluation(
             cases="ControlFlowScanCDist", exporters="yobx-new-tracing", quiet=False, dynamic=True
