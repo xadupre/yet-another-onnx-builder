@@ -15,7 +15,8 @@ time-series charts — one chart per CI workflow.
    required for a public repository, but anonymous requests are subject to
    rate-limiting (60 requests/hour per IP).  When the API cannot be reached
    (offline build, rate-limit exceeded, …) the chart will be empty and a
-   warning is printed to the console.
+   warning is printed to the console.  Retrieved runs are cached per workflow
+   for two weeks in ``.cache/ci_durations_workflows.json``.
 
 .. runpython::
     :rst:
@@ -34,8 +35,9 @@ time-series charts — one chart per CI workflow.
     """Query the GitHub API and plot CI workflow run durations."""
 
     import datetime
-    import urllib.request
     import json
+    import os
+    import urllib.request
 
     import matplotlib
     import matplotlib.pyplot as plt
@@ -46,6 +48,8 @@ time-series charts — one chart per CI workflow.
     _REPO = "yet-another-onnx-builder"
     _API_BASE = f"https://api.github.com/repos/{_OWNER}/{_REPO}"
     _HEADERS = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+    _CACHE_MAX_AGE_DAYS = 14
+    _CACHE_PATH = os.path.join(".cache", "ci_durations_workflows.json")
 
     # Workflows that are NOT CI (skip documentation / style / spelling workflows)
     _SKIP_PATTERNS = ("docs", "style", "spelling", "pyrefly", "mypy", "doc_")
@@ -82,6 +86,42 @@ time-series charts — one chart per CI workflow.
         return runs
 
 
+    def _load_cache():
+        """Returns cached workflow data, or an empty cache."""
+        if not os.path.exists(_CACHE_PATH):
+            return {}
+        try:
+            with open(_CACHE_PATH, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+        return {}
+
+
+    def _save_cache(cache):
+        """Saves workflow cache data on disk."""
+        os.makedirs(os.path.dirname(_CACHE_PATH), exist_ok=True)
+        with open(_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(cache, f, indent=2, sort_keys=True)
+
+
+    def _cache_is_recent(cache_entry, now):
+        """Returns True if a cache entry is newer than the cache max age."""
+        fetched_at = cache_entry.get("fetched_at")
+        if not fetched_at:
+            return False
+        try:
+            fetched_dt = datetime.datetime.strptime(fetched_at, "%Y-%m-%dT%H:%M:%SZ").replace(
+                tzinfo=datetime.timezone.utc
+            )
+        except ValueError:
+            return False
+        age = now - fetched_dt
+        return age <= datetime.timedelta(days=_CACHE_MAX_AGE_DAYS)
+
+
     def _run_duration_minutes(run):
         """Returns the wall-clock duration of a successfully completed run in minutes, or None."""
         if run.get("status") != "completed":
@@ -104,14 +144,18 @@ time-series charts — one chart per CI workflow.
 
     def _collect_data():
         """Returns a dict mapping workflow_name -> list of (datetime, duration_min)."""
+        now = datetime.datetime.now(datetime.timezone.utc)
         cutoff = (
-            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=62)
+            now - datetime.timedelta(days=62)
         ).strftime("%Y-%m-%d")
+        now_iso = now.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         workflows_data = _gh_get("actions/workflows")
         if not workflows_data:
             return {}
 
+        cache = _load_cache()
+        cache_changed = False
         result = {}
         for wf in workflows_data.get("workflows", []):
             name = wf.get("name", "")
@@ -122,7 +166,18 @@ time-series charts — one chart per CI workflow.
             if any(filename.startswith(p) for p in _SKIP_PATTERNS):
                 continue
 
-            runs = _fetch_workflow_runs(wf_id, cutoff)
+            cache_key = str(wf_id)
+            cached = cache.get(cache_key, {})
+            if _cache_is_recent(cached, now):
+                runs = cached.get("runs", [])
+            else:
+                fetched = _fetch_workflow_runs(wf_id, cutoff)
+                if fetched:
+                    runs = fetched
+                    cache[cache_key] = {"fetched_at": now_iso, "runs": runs}
+                    cache_changed = True
+                else:
+                    runs = cached.get("runs", [])
             points = []
             for run in runs:
                 dur = _run_duration_minutes(run)
@@ -137,6 +192,9 @@ time-series charts — one chart per CI workflow.
             if points:
                 points.sort(key=lambda x: x[0])
                 result[name] = points
+
+        if cache_changed:
+            _save_cache(cache)
 
         return result
 
