@@ -57,7 +57,7 @@ the appropriate backend-specific converter:
 * a :class:`sklearn.base.BaseEstimator` → :func:`yobx.sklearn.to_onnx`
 * a :class:`tensorflow.Module` (including Keras models) → :func:`yobx.tensorflow.to_onnx`
 * raw ``.tflite`` bytes or a path ending in ``".tflite"`` → :func:`yobx.litert.to_onnx`
-* a SQL string, a Python callable, or a :class:`polars.LazyFrame` → :func:`yobx.sql.to_onnx`
+* a SQL string, a Python callable, or a `polars.LazyFrame <https://docs.pola.rs/api/python/stable/reference/lazyframe/api/polars.LazyFrame.html>`_ → :func:`yobx.sql.to_onnx`
 
 All extra keyword arguments are forwarded verbatim to the selected converter,
 so the backend-specific parameters (``export_options``, ``function_options``,
@@ -92,7 +92,7 @@ operations on a DataFrame and compiles them to ONNX directly.
 +-----------------------------+------------------------------------+----------------------------------+
 | sql                         | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-converter`    |
 +-----------------------------+------------------------------------+----------------------------------+
-| :class:`polars.LazyFrame`   | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-polars`       |
+| `polars.LazyFrame <https://docs.pola.rs/api/python/stable/reference/lazyframe/api/polars.LazyFrame.html>`_ | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-polars`       |
 +-----------------------------+------------------------------------+----------------------------------+
 | :class:`pandas.DataFrame`   | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-dataframe`    |
 +-----------------------------+------------------------------------+----------------------------------+
