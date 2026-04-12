@@ -131,7 +131,7 @@ time-series charts — one chart per CI workflow.
 
 
     def _run_duration_minutes(run):
-        """Computes the wall-clock duration of a successful completed run.
+        """Computes the wall-clock duration of a successfully completed run.
 
         Returns:
             float | None: Duration in minutes, or None when unavailable.
