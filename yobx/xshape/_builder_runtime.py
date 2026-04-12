@@ -220,10 +220,6 @@ class _BuilderRuntime:
             for index, axis_ in zip(indices, axes):
                 axis = axis_ if axis_ >= 0 else (axis_ + len(shape)) % len(shape)
                 while len(new_shape) < axis:
-                    assert shape[len(new_shape)] >= 0, (
-                        f"Negative value in shape {shape}, indices={indices}, "
-                        f"axes={axes}, expand_axes={expand_axes}"
-                    )
                     new_shape.append(shape[len(new_shape)])
                 assert axis < len(shape), (
                     f"axis={axis} is out of order (shape={shape}, "
@@ -232,13 +228,19 @@ class _BuilderRuntime:
                 n = shape[axis]
                 start = index.start or 0
                 end = index.stop or n
-                diff = end - start
-                dim = diff // index.step if index.step else diff
-                dim = max(dim, 0)
-                assert dim >= 0, (
-                    f"Negative dim={dim}, axis={axis}, shape={shape}, indices={indices}, "
-                    f"axes={axes}, expand_axes={expand_axes}"
-                )
+                if isinstance(end, int):
+                    diff = end - start
+                    dim = diff // index.step if index.step else diff
+                    dim = max(dim, 0)
+                    assert dim >= 0, (
+                        f"Negative dim={dim}, axis={axis}, shape={shape}, indices={indices}, "
+                        f"axes={axes}, expand_axes={expand_axes}"
+                    )
+                else:
+                    dim = f"({n})-({start})"
+                    if index.step and index.step != 1:
+                        dim = f"({dim})//({index.step})"
+                    dim = simplify_expression(dim)
                 new_shape.append(dim)
         elif all_int(indices):
             assert len(axes) == 1, (

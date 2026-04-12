@@ -791,7 +791,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
                 filename=filename,
                 verbose=0,
                 large_model=True,
-                options=OptimizationOptions(patterns="default"),
+                options=OptimizationOptions(patterns=None),
                 target_opset=24,
             )
 
