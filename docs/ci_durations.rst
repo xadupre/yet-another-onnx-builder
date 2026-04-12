@@ -87,7 +87,7 @@ time-series charts — one chart per CI workflow.
 
 
     def _load_cache():
-        """Returns cached workflow data, or an empty cache."""
+        """Returns cached workflow data or an empty dict."""
         if not os.path.exists(_CACHE_PATH):
             return {}
         try:
@@ -101,7 +101,7 @@ time-series charts — one chart per CI workflow.
 
 
     def _save_cache(cache):
-        """Saves workflow cache data on disk."""
+        """Saves workflow cache data to disk."""
         os.makedirs(os.path.dirname(_CACHE_PATH), exist_ok=True)
         with open(_CACHE_PATH, "w", encoding="utf-8") as f:
             json.dump(cache, f, indent=2, sort_keys=True)
