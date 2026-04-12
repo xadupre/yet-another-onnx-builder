@@ -16,7 +16,7 @@ time-series charts — one chart per CI workflow.
    rate-limiting (60 requests/hour per IP).  When the API cannot be reached
    (offline build, rate-limit exceeded, …) the chart will be empty and a
    warning is printed to the console.  Retrieved runs are cached per workflow
-   for two weeks in ``.cache/ci_durations_workflows.json``.
+   for two weeks in the user cache directory.
 
 .. runpython::
     :rst:
@@ -49,7 +49,10 @@ time-series charts — one chart per CI workflow.
     _API_BASE = f"https://api.github.com/repos/{_OWNER}/{_REPO}"
     _HEADERS = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
     _CACHE_MAX_AGE_DAYS = 14
-    _CACHE_PATH = os.path.join(".cache", "ci_durations_workflows.json")
+    _USER_CACHE_DIR = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+    _CACHE_PATH = os.path.join(
+        _USER_CACHE_DIR, "yet-another-onnx-builder", "ci_durations_workflows.json"
+    )
 
     # Workflows that are NOT CI (skip documentation / style / spelling workflows)
     _SKIP_PATTERNS = ("docs", "style", "spelling", "pyrefly", "mypy", "doc_")
