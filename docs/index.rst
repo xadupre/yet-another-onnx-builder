@@ -92,7 +92,7 @@ operations on a DataFrame and compiles them to ONNX directly.
 +-----------------------------+------------------------------------+----------------------------------+
 | sql                         | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-converter`    |
 +-----------------------------+------------------------------------+----------------------------------+
-| :epkg:`polars.LazyFrame`   | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-polars`       |
+| :epkg:`polars.LazyFrame`    | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-polars`       |
 +-----------------------------+------------------------------------+----------------------------------+
 | :class:`pandas.DataFrame`   | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-dataframe`    |
 +-----------------------------+------------------------------------+----------------------------------+
