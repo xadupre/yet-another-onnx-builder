@@ -784,6 +784,21 @@ class ControlFlowWhileInc(torch.nn.Module):
     _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}  # type: ignore
 
 
+class ControlFlowWhile(torch.nn.Module):
+    def forward(self, ci, a, b):
+        def cond_fn(i, x, y):
+            return i > 0
+
+        def body_fn(i, x, y):
+            z = x + y
+            return i - 1, z, y - z
+
+        return torch._higher_order_ops.while_loop(cond_fn, body_fn, [ci, a, b])
+
+    _inputs = [(torch.tensor(2), torch.randn(2, 3), torch.randn(2, 3))]
+    _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}  # type: ignore
+
+
 class SignatureInt1(torch.nn.Module):
     def __init__(self, n_dims: int = 3, n_targets: int = 1):
         super().__init__()

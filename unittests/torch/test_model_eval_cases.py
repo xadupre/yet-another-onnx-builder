@@ -202,10 +202,8 @@ class TestModelEvalCases(ExtTestCase):
         )
 
     @requires_torch("2.7", "while_loop")
-    def test_run_exporter_yobx_tracing_controlflow_while_inc(self):
-        evaluation(
-            cases="ControlFlowWhileInc", exporters="yobx-tracing", quiet=False, dynamic=True
-        )
+    def test_run_exporter_yobx_tracing_controlflow_while(self):
+        evaluation(cases="ControlFlowWhile", exporters="yobx-tracing", quiet=False, dynamic=True)
 
     def test_run_exporter_inplace_add2_tracing(self):
         evaluation(cases="InplaceAdd2", exporters="yobx-tracing", quiet=False, dynamic=True)
