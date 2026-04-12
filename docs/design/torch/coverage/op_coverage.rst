@@ -25,9 +25,32 @@ The exclusion sets (:data:`~yobx.torch.coverage.op_coverage.NO_CONVERTER_OPS`,
 defined in :mod:`yobx.torch.coverage.op_coverage` and are imported by the test module
 so that both sources always stay in sync.
 
+Default export path
++++++++++++++++++++
+
 .. runpython::
     :rst:
     :warningout: UserWarning
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
-    print(get_op_coverage_rst())
+    print(get_op_coverage_rst("default"))
+
+Torch tracing export path
++++++++++++++++++++++++++
+
+.. runpython::
+    :rst:
+    :warningout: UserWarning
+
+    from yobx.torch.coverage.op_coverage import get_op_coverage_rst
+    print(get_op_coverage_rst("tracing"))
+
+New-tracing export path
++++++++++++++++++++++++
+
+.. runpython::
+    :rst:
+    :warningout: UserWarning
+
+    from yobx.torch.coverage.op_coverage import get_op_coverage_rst
+    print(get_op_coverage_rst("new-tracing"))

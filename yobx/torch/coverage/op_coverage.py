@@ -516,18 +516,40 @@ ATOL_OPS_BFLOAT16: Dict[str, float] = {
 }
 
 
-def get_op_coverage_rst() -> str:
-    """Returns RST tables showing op-db coverage per op and dtype.
+def get_op_coverage_rst(tracing_method: str) -> str:
+    """Returns an RST table showing op-db coverage for one export path.
 
     Queries ``torch.testing._internal.common_methods_invocations.op_db`` and
-    builds three grids (default export path, torch tracing path, and
-    new-tracing path) showing, for every op and dtype combination, whether the
+    builds one grid (default export path, torch tracing path, or new-tracing
+    path) showing, for every op and dtype combination, whether the
 
-    * ``✔`` - in the tested set (converter exists, no known failure for that dtype),
-        RST source string with three ``list-table`` directives (default path,
-        tracing path, and new-tracing path) ready to be printed inside a
-        ``.. runpython::`` block with ``:rst:`` enabled.
+    * ``✔`` - in the tested set (converter exists, no known failure for that dtype).
+    * ``⚠ xfail`` - converter exists, but this dtype is a known failing case.
+    * ``✘ no converter`` - no ONNX converter has been implemented for this op.
+    * ``—`` - this op does not support this dtype.
+
+    Args:
+        tracing_method: Export path key. Supported values are ``"default"``,
+            ``"tracing"``, and ``"new-tracing"``.
+
+    Returns:
+        RST source string with one ``list-table`` directive, ready to be
+        printed inside a ``.. runpython::`` block with ``:rst:`` enabled.
+
+    Raises:
+        ValueError: If *tracing_method* is not one of the supported values.
     """
+    table_names = {
+        "default": "Default export path",
+        "tracing": "Torch tracing export path (``tracing=True``)",
+        "new-tracing": "New-tracing export path (``tracing=TracingMode.NEW_TRACING``)",
+    }
+    if tracing_method not in table_names:
+        expected = sorted(table_names)
+        raise ValueError(
+            f"Unsupported tracing_method={tracing_method!r}, expected one of {expected}."
+        )
+
     import warnings
 
     import torch
@@ -644,9 +666,11 @@ def get_op_coverage_rst() -> str:
         lines.append("")
         return "\n".join(lines)
 
-    default_table = _make_table("Default export path", xfail_map)
-    tracing_table = _make_table("Torch tracing export path (``tracing=True``)", xfail_map_tracing)
-    new_tracing_table = _make_table(
-        "New-tracing export path (``tracing=TracingMode.NEW_TRACING``)", xfail_map_new_tracing
-    )
-    return default_table + "\n" + tracing_table + "\n" + new_tracing_table
+    table_map = {
+        "default": xfail_map,
+        "tracing": xfail_map_tracing,
+        "new-tracing": xfail_map_new_tracing,
+    }
+    title = table_names[tracing_method]
+    selected_map = table_map[tracing_method]
+    return _make_table(title, selected_map)
