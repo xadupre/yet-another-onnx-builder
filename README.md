@@ -109,26 +109,28 @@ sess = onnxruntime.InferenceSession(
 
 ## Comparison with existing ONNX conversion tools
 
-| Tool | Scope | Notes |
-|------|-------|-------|
-| [torch.onnx.export](https://pytorch.org/docs/stable/onnx.html) | PyTorch only | Official PyTorch exporter; `yobx` can delegate to it or use its own FX-based path, and offers several options to trace the `fx.Graph` (default, symbolic tracing, new tracing) |
-| [onnxscript](https://microsoft.github.io/onnxscript/) | PyTorch (dynamo) | Microsoft's new exporter; `yobx` can use it as a graph-builder backend |
-| [sklearn-onnx](https://onnx.ai/sklearn-onnx/) | scikit-learn only | Covers the scikit-learn ecosystem; `yobx` extends this with a unified API and adds support for custom functions written with NumPy via automatic tracing |
-| [tf2onnx](https://github.com/onnx/tensorflow-onnx) | TensorFlow / Keras | Converts TensorFlow models; `yobx` wraps the same models under one entry point |
-| [ModelBuilder](https://onnxruntime.ai/docs/genai/howto/build-model.html) | LLM inference (genai) | ONNX Runtime GenAI builder for large language models; `yobx` can produce models that target the same ORT execution providers |
-
-**Pros of `yobx`**
+**Design choices `yobx`**
 
 * **Single entry point** — `yobx.to_onnx` dispatches to the right backend automatically; no need to learn a different API for every framework.
 * **Pluggable graph-builder** — the intermediate ONNX graph can be built with the built-in `GraphBuilder`, with [onnxscript](https://microsoft.github.io/onnxscript/)/[ir-py](https://onnx.ai/ir-py/), or with [Spox](https://spox.readthedocs.io/en/latest/), keeping the conversion code framework-agnostic.
-* **Transparent names** — node names, initializer names and result names are preserved as-is; what the builder writes is what ends up in the ONNX file.
-* **Built-in optimizer** — pattern-based graph rewrites (constant folding, fused ops, …) run automatically before serialization.
+* **Transparent names** — node names, initializer names and result names are preserved as-is (unless they are not unique); what the builder writes is what ends up in the ONNX file.
+* **Built-in optimizer** — pattern-based graph rewrites (constant folding, fused ops, …) can be run before serialization.
 * **ORT-specific targets** — passing `target_opset={"": 22, "com.microsoft": 1}` enables `com.microsoft` domain operators consumed directly by [onnxruntime](https://onnxruntime.ai/).
-* **Broad framework coverage** — PyTorch, scikit-learn, TensorFlow/Keras, LiteRT, pandas/polars/SQL under one package; supports tracing functions written with NumPy, functions operating on DataFrames, and SQL queries.
 
-**Cons / limitations**
+**Comparison with existing tools**
 
-* Younger project; operator coverage for some exotic models may lag behind the official per-framework exporters.
-* The pluggable builder abstraction adds a thin indirection layer that advanced users may want to bypass.
+The main new features is the possibility to trace functions written with NumPy, functions operating on DataFrames, and SQL queries.
+User can now convert `FunctionTransformer` from scikit-learn or preprocessing through SQL queries or DataFrames.
+
+The implementation was simplified to only handle recent versions of scikit-learn, TensorFlow/Keras, LiteRT. It was extended to other famous packages such `category_encoders`.
+
+One single package for one single repository, one possible source of issues, making it easier for contributors to answer.
+
+| Tool | Scope | Notes |
+|------|-------|-------|
+| [torch.onnx.export](https://pytorch.org/docs/stable/onnx.html) | PyTorch only | Official PyTorch exporter; `yobx` can delegate to it or use its own FX-based path, and offers several options to trace the `fx.Graph` (default, symbolic tracing, new tracing) to have more options to overcome complex models |
+| [sklearn-onnx](https://onnx.ai/sklearn-onnx/) | scikit-learn only | Covers the scikit-learn ecosystem; `yobx` extends this with a unified API and adds support for custom functions written with NumPy via automatic tracing, `yobx` supports new packages such as `category_encoders`, ... |
+| [tf2onnx](https://github.com/onnx/tensorflow-onnx) | TensorFlow / Keras | Converts TensorFlow models; `yobx` wraps the same models under one entry point |
+| [ModelBuilder](https://onnxruntime.ai/docs/genai/howto/build-model.html) | LLM inference (genai) | ModelBuilder produces models better optimized for `onnxruntime`, `yobx` supports more models but is less efficient for this specific scenario. |
 
 This package was initially starting using [Vibe Coding](https://en.wikipedia.org/wiki/Vibe_coding).
