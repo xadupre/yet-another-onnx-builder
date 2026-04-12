@@ -95,10 +95,7 @@ time-series charts — one chart per CI workflow.
         if not os.path.exists(_CACHE_PATH):
             return {}
         with open(_CACHE_PATH, "r", encoding="utf-8") as f:
-            content = f.read().strip()
-        if not content or not content.startswith("{") or not content.endswith("}"):
-            return {}
-        data = json.loads(content)
+            data = json.load(f)
         if isinstance(data, dict):
             return data
         return {}
