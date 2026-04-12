@@ -3,6 +3,8 @@ Unit tests for :mod:`yobx.torch.coverage.op_coverage`.
 """
 
 import unittest
+from types import ModuleType
+from unittest.mock import patch
 
 from yobx.ext_test_case import ExtTestCase, requires_torch
 
@@ -95,6 +97,94 @@ class TestOpCoverageData(ExtTestCase):
         """A sample of non-deterministic ops should be in NON_DETERMINISTIC_OPS."""
         for op in ("randn", "rand", "normal"):
             self.assertIn(op, self.NON_DETERMINISTIC_OPS)
+
+
+@requires_torch("2.0")
+class TestOpCoverageRst(ExtTestCase):
+    """Tests RST rendering for each tracing method."""
+
+    def test_get_op_coverage_rst_method_selection(self):
+        """Verifies that get_op_coverage_rst returns one method-specific section."""
+        from yobx.torch.coverage import op_coverage as cov
+
+        torch_mod = ModuleType("torch")
+        torch_mod.float32 = object()
+        torch_mod.float16 = object()
+        torch_mod.bfloat16 = object()
+        torch_mod.int32 = object()
+        torch_mod.int64 = object()
+        torch_mod.dtype = object
+
+        common_methods_mod = ModuleType("torch.testing._internal.common_methods_invocations")
+        common_methods_mod.op_db = [
+            type(
+                "FakeOp",
+                (),
+                {
+                    "name": "add",
+                    "variant_test_name": "",
+                    "dtypes": {torch_mod.float32, torch_mod.float16},
+                },
+            )(),
+            type(
+                "FakeOp",
+                (),
+                {"name": "diag", "variant_test_name": "", "dtypes": {torch_mod.float32}},
+            )(),
+        ]
+        internal_mod = ModuleType("torch.testing._internal")
+        internal_mod.common_methods_invocations = common_methods_mod
+        testing_mod = ModuleType("torch.testing")
+        testing_mod._internal = internal_mod
+        torch_mod.testing = testing_mod
+
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "torch": torch_mod,
+                    "torch.testing": testing_mod,
+                    "torch.testing._internal": internal_mod,
+                    "torch.testing._internal.common_methods_invocations": common_methods_mod,
+                },
+            ),
+            patch.object(cov, "NO_CONVERTER_OPS", frozenset({"diag"})),
+            patch.object(cov, "NON_DETERMINISTIC_OPS", frozenset()),
+            patch.object(
+                cov, "XFAIL_OPS", {"default": frozenset(), "tracing": frozenset({"add"})}
+            ),
+            patch.object(
+                cov, "XFAIL_OPS_FLOAT16", {"default": frozenset({"add"}), "tracing": frozenset()}
+            ),
+            patch.object(
+                cov, "XFAIL_OPS_BFLOAT16", {"default": frozenset(), "tracing": frozenset()}
+            ),
+            patch.object(
+                cov, "XFAIL_OPS_INT32", {"default": frozenset(), "tracing": frozenset()}
+            ),
+            patch.object(
+                cov, "XFAIL_OPS_INT64", {"default": frozenset(), "tracing": frozenset()}
+            ),
+        ):
+            default_rst = cov.get_op_coverage_rst("default")
+            tracing_rst = cov.get_op_coverage_rst("tracing")
+            new_tracing_rst = cov.get_op_coverage_rst("new-tracing")
+
+        self.assertIn(".. rubric:: Default export path", default_rst)
+        self.assertIn(".. rubric:: Torch tracing export path (``tracing=True``)", tracing_rst)
+        self.assertIn(
+            ".. rubric:: New-tracing export path (``tracing=TracingMode.NEW_TRACING``)",
+            new_tracing_rst,
+        )
+        self.assertNotIn("Torch tracing export path", default_rst)
+        self.assertNotIn("New-tracing export path", default_rst)
+
+    def test_get_op_coverage_rst_rejects_unknown_method(self):
+        """Verifies that get_op_coverage_rst rejects unsupported method values."""
+        from yobx.torch.coverage.op_coverage import get_op_coverage_rst
+
+        with self.assertRaises(ValueError):
+            get_op_coverage_rst("other")
 
 
 if __name__ == "__main__":

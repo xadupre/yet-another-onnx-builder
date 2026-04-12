@@ -210,6 +210,7 @@ epkg_dictionary = {
     "optree": "https://github.com/metaopt/optree",
     "pandas": "https://pandas.pydata.org/",
     "Pattern-based Rewrite Using Rules With onnxscript": "https://microsoft.github.io/onnxscript/tutorial/rewriter/rewrite_patterns.html",
+    "polars.LazyFrame": "https://docs.polars.io/api/python/stable/reference/lazyframe/api/polars.LazyFrame.html",
     "opsets": "https://onnx.ai/onnx/intro/concepts.html#what-is-an-opset-version",
     "pyinstrument": "https://pyinstrument.readthedocs.io/en/latest/",
     "psutil": "https://psutil.readthedocs.io/en/latest/",

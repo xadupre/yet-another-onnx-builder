@@ -842,9 +842,17 @@ class GraphTracer:
         self._sub_tracers[true_name] = sub_true
         self._sub_tracers[false_name] = sub_false
 
+        # --- create callable attribute nodes ---
+        true_fn_node = self.graph.get_attr(true_name)
+        true_fn_node.meta["stack_trace"] = "".join(traceback.format_stack())
+        true_fn_node.meta["callable"] = true_fn
+        false_fn_node = self.graph.get_attr(false_name)
+        false_fn_node.meta["stack_trace"] = "".join(traceback.format_stack())
+        false_fn_node.meta["callable"] = false_fn
+
         # --- emit the main cond node ---
         node = self.graph.call_function(
-            cond_target, args=(pred_node, true_fn, false_fn, operand_nodes), kwargs={}  # type: ignore
+            cond_target, args=(pred_node, true_fn_node, false_fn_node, operand_nodes), kwargs={}  # type: ignore
         )
         node.meta["stack_trace"] = "".join(traceback.format_stack())
 
