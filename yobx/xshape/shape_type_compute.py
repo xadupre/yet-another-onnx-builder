@@ -2712,21 +2712,30 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             # Nothing we can do.
             return
         proto_local_function = self.get_local_function(node.op_type, domain=node.domain)
-        local_shapes = [
-            local_function_builder.get_shape(i) if local_function_builder.has_shape(i) else None
-            for i in proto_local_function.input
-        ]
+        function_inputs = list(proto_local_function.input)
         # The builder creating the local function may have less inputs because
         # when exported to FunctionProto, constants were promoted as inputs.
+        if (
+            len(function_inputs) != len(node.input)
+            and hasattr(local_function_builder, "input_names")
+            and len(local_function_builder.input_names) == len(node.input)
+        ):
+            function_inputs = list(local_function_builder.input_names)
+
+        local_shapes = [
+            local_function_builder.get_shape(i) if local_function_builder.has_shape(i) else None
+            for i in function_inputs
+        ]
         assert len(shapes) == len(local_shapes), (
             f"Mismatch between the number of inputs, node '{node.domain}.{node.op_type}' "
             f"has {node.input} ({len(node.input)}), "
-            f"function has {proto_local_function.input} ({len(proto_local_function.input)})"
+            f"function has {proto_local_function.input} ({len(proto_local_function.input)}), "
+            f"matched-function-inputs={function_inputs} ({len(function_inputs)})"
             f"{self.get_debug_msg()}"
         )
         if local_shapes != shapes:
             local_function_builder.reset_types_and_shapes()
-            for ni, i, sh in zip(node.input, proto_local_function.input, shapes):
+            for ni, i, sh in zip(node.input, function_inputs, shapes):
                 if self.has_type(ni):
                     local_function_builder.set_type(i, self.get_type(ni))
                 if self.has_device(ni):
