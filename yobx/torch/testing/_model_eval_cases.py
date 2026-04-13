@@ -597,7 +597,7 @@ class ControlFlowScan(torch.nn.Module):
             next_carry = carry + y
             return [next_carry, next_carry]
 
-        init = torch.zeros_like(x[0])
+        init = x.new_zeros(x.shape[1:])
         carry, _out = torch.ops.higher_order.scan(add, [init], [x], additional_inputs=[])
         return carry
 
@@ -781,6 +781,21 @@ class ControlFlowWhileInc(torch.nn.Module):
         return torch._higher_order_ops.while_loop(cond_fn, body_fn, [ci, a, b])
 
     _inputs = [(torch.tensor(1), torch.randn(2, 3), torch.randn(2, 3))]
+    _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}  # type: ignore
+
+
+class ControlFlowWhile(torch.nn.Module):
+    def forward(self, ci, a, b):
+        def cond_fn(i, x, y):
+            return i > 0
+
+        def body_fn(i, x, y):
+            z = x + y
+            return i - 1, z, y - z
+
+        return torch._higher_order_ops.while_loop(cond_fn, body_fn, [ci, a, b])
+
+    _inputs = [(torch.tensor(2), torch.randn(2, 3), torch.randn(2, 3))]
     _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}  # type: ignore
 
 
