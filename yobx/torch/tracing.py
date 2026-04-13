@@ -1836,8 +1836,6 @@ class CustomTracer(torch.fx.Tracer):
             if getattr(node.target, "__name__", "") != "wrap_with_autocast":
                 continue
 
-            # we need to cast all users for this, they are accessed through getitem.
-
             # args = (device_type, dtype, enabled, cache_enabled, wrapped_fn, *inputs)
             if len(node.args) < 5:
                 continue
@@ -1913,6 +1911,63 @@ class CustomTracer(torch.fx.Tracer):
                         f"fixed {modified_count} placeholder(s) in "
                         f"{wrapped_fn_node.target!r} body"
                     )
+
+            # Insert cast nodes after each getitem user of the wrap_with_autocast
+            # node in the outer graph, the same way we do for placeholders in the
+            # subgraph.  This ensures the outer graph's downstream ops see the
+            # promoted dtype and avoids "Type for name '...' already exists" errors
+            # when the subgraph output dtype (autocast dtype) differs from the
+            # getitem node's meta["val"] dtype (original dtype).
+            outer_cast_count = 0
+            for user in list(node.users):
+                if user.op != "call_function" or user.target is not operator.getitem:
+                    continue
+                if "val" not in user.meta or not isinstance(user.meta["val"], torch.Tensor):
+                    continue
+                user_val = user.meta["val"]
+                if not hasattr(user_val, "dtype") or user_val.dtype not in _FLOAT_TORCH_DTYPES:
+                    continue
+
+                # Build the promoted FakeTensor for the cast node output.
+                fake_mode = getattr(user_val, "fake_mode", None)
+                if fake_mode is not None:
+                    with fake_mode:
+                        promoted_val = user_val.to(dtype=dtype)
+                else:
+                    promoted_val = user_val.to(dtype=dtype)
+
+                # Insert a _to_copy cast right after the getitem node.
+                with graph.inserting_after(user):
+                    outer_cast_node = graph.call_function(
+                        torch.ops.aten._to_copy.default, args=(user,), kwargs={"dtype": dtype}
+                    )
+
+                # Move "val" and "tensor_meta" from the getitem to the cast node.
+                outer_cast_node.meta["val"] = promoted_val
+                old_tensor_meta = user.meta.get("tensor_meta", None)
+                if old_tensor_meta is not None:
+                    outer_cast_node.meta["tensor_meta"] = old_tensor_meta._replace(dtype=dtype)
+                    del user.meta["tensor_meta"]
+                user.meta.pop("val", None)
+
+                # Redirect all downstream uses of the getitem to the cast node.
+                def _not_outer_cast(u, expected=outer_cast_node):
+                    return u is not expected
+
+                user.replace_all_uses_with(outer_cast_node, delete_user_cb=_not_outer_cast)
+                outer_cast_count += 1
+                if verbose > 1:
+                    print(
+                        f"[CustomTracer.fix_autocast_subgraph_dtypes] "
+                        f"outer getitem {user.name!r}: {user_val.dtype} -> {dtype}"
+                    )
+
+            if outer_cast_count and verbose:
+                print(
+                    f"[CustomTracer.fix_autocast_subgraph_dtypes] "
+                    f"inserted {outer_cast_count} outer cast(s) after "
+                    f"{node.name!r} getitem outputs"
+                )
 
         return fixed
 
