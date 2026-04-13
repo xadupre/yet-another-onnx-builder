@@ -1836,6 +1836,8 @@ class CustomTracer(torch.fx.Tracer):
             if getattr(node.target, "__name__", "") != "wrap_with_autocast":
                 continue
 
+            # we need to cast all users for this, they are accessed through getitem.
+
             # args = (device_type, dtype, enabled, cache_enabled, wrapped_fn, *inputs)
             if len(node.args) < 5:
                 continue
