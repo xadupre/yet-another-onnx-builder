@@ -2720,7 +2720,9 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
         # when exported to FunctionProto, constants were promoted as inputs.
         assert len(shapes) == len(local_shapes), (
             f"Mismatch between the number of inputs, node '{node.domain}.{node.op_type}' "
-            f"has {node.input}, function has {proto_local_function.input}{self.get_debug_msg()}"
+            f"has {node.input} ({len(node.input)}), "
+            f"function has {proto_local_function.input} ({len(proto_local_function.input)})"
+            f"{self.get_debug_msg()}"
         )
         if local_shapes != shapes:
             local_function_builder.reset_types_and_shapes()

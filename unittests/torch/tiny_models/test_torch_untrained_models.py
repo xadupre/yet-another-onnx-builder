@@ -721,7 +721,18 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @requires_torch("2.10")
     @requires_transformers("5.2")
     @ignore_warnings(FutureWarning)
-    def test_tiny_llm_to_onnx_autocast_float16(self):
+    def test_tiny_llm_to_onnx_autocast_float16_none(self):
+        self.common_test_tiny_llm_to_onnx_autocast_float16(None)
+
+    @hide_stdout()
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
+    @ignore_warnings(FutureWarning)
+    def test_tiny_llm_to_onnx_autocast_float16_default(self):
+        self.common_test_tiny_llm_to_onnx_autocast_float16("default")
+
+    def common_test_tiny_llm_to_onnx_autocast_float16(self, patterns):
         """Exports ``arnir0/Tiny-LLM`` wrapped in ``torch.autocast(float16)``
         and verifies that the ONNX model is valid and produces finite results.
 
@@ -791,7 +802,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
                 filename=filename,
                 verbose=0,
                 large_model=True,
-                options=OptimizationOptions(patterns=None),
+                options=OptimizationOptions(patterns=patterns),
                 target_opset=24,
             )
 
