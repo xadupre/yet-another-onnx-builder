@@ -11787,7 +11787,7 @@ def aten_slice_Tensor(
         if is_static_dimension(start) and is_static_dimension(end):
             shape = g.get_shape(x)
             new_shape = g._apply_slice_to_shape(
-                shape, slice(start, end, step), axes=[dim], expand_axes=[]
+                shape, [slice(start, end, step)], axes=[dim], expand_axes=[]
             )
             g.set_shape(res, new_shape)
         else:
@@ -14560,28 +14560,41 @@ def aten_wrap_with_autocast(
     **kwargs,
 ) -> T:
     "identity, calling a local function"
-    # We don't need to check for the type, the module is converted as a function,
-    # hopefully this will go smoothly. Maybe here, we should check the local
-    # function is valid for the considered dtype.
-    # dtype is mentioned in the doc_string and should remain unless the graph
-    # is inlined.
-
-    # assert dtype is None, f"Not implemented with dtype={dtype}{g.get_debug_msg()}"
-    assert not enabled, f"Not implemented with dtype={enabled}{g.get_debug_msg()}"
-    assert (
-        not cache_enabled
-    ), f"Not implemented with cache_enabled={cache_enabled}{g.get_debug_msg()}"
+    # dtype is mentioned in the doc_string and should remain unless the graph is inlined.
     assert g.has_local_function(
         wrapped_func, domain=g.local_domain
     ), f"No local function {wrapped_func!r}, domain={g.local_domain!r}\n{g.pretty_text()}"
     assert all(
         isinstance(_, str) for _ in args
     ), f"Unexpected input types args={args}{g.get_debug_msg()}"
+
+    # When autocast is enabled with a floating-point target dtype, torch.export
+    # captures the body subgraph with the *original* input dtypes (e.g. float32).
+    # CustomTracer.fix_autocast_subgraph_dtypes (called from remove_inplace_nodes)
+    # promotes the body's placeholder meta["val"] to the autocast dtype so the
+    # function body is consistently typed.  The casts here additionally cover the
+    # call-site: the main graph still passes float32 tensors, so we must cast
+    # them to the autocast target dtype before calling the local function.
+    _FLOAT_DTYPES = frozenset(
+        {TensorProto.FLOAT, TensorProto.DOUBLE, TensorProto.FLOAT16, TensorProto.BFLOAT16}
+    )
+    cast_args = list(args)
+    if enabled and dtype is not None:
+        onnx_dtype = torch_dtype_to_onnx_dtype(dtype)
+        if onnx_dtype in _FLOAT_DTYPES:
+            for i, a in enumerate(cast_args):
+                if g.has_type(a):
+                    a_type = g.get_type(a)
+                    if a_type in _FLOAT_DTYPES and a_type != onnx_dtype:
+                        cast_args[i] = _cast_inputs(
+                            g, a, onnx_dtype, name="wrap_with_autocast_cast"
+                        )
+
     local_outputs = g.get_local_function_outputs(wrapped_func, domain=g.local_domain)
     if len(outputs) == len(local_outputs):
         return g.make_node(
             wrapped_func,
-            args,
+            cast_args,
             outputs,
             name="wrap_with_autocast",
             domain=g.local_domain,
@@ -14593,7 +14606,7 @@ def aten_wrap_with_autocast(
     )
     new_outputs = [f"{outputs[0]}#{i}" for i in range(len(local_outputs))]
     return g.make_node(
-        wrapped_func, args, new_outputs, name="wrap_with_autocast", domain=g.local_domain
+        wrapped_func, cast_args, new_outputs, name="wrap_with_autocast", domain=g.local_domain
     )
 
 
