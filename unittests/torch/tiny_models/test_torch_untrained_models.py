@@ -789,7 +789,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             past_value_0=ds["past_key_values"][1],
         )
 
-        filename = self.get_dump_file("test_tiny_llm_to_onnx_autocast_float16.onnx")
+        filename = self.get_dump_file(f"test_tiny_llm_to_onnx_autocast_float16_{patterns}.onnx")
 
         with (
             register_flattening_functions(patch_transformers=True),

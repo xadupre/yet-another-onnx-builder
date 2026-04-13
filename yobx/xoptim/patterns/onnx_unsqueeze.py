@@ -123,7 +123,7 @@ class SqueezeUnsqueezePattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         diff = self._diff_axes(g, node_before, node)
         if diff is None:
-            return diff
+            return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(
             self,
             [node_before, node],
