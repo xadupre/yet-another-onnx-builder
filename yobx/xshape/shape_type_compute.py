@@ -2713,8 +2713,8 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             return
         proto_local_function = self.get_local_function(node.op_type, domain=node.domain)
         function_inputs = list(proto_local_function.input)
-        # The builder creating the local function may have less inputs because
-        # when exported to FunctionProto, constants were promoted as inputs.
+        # The builder creating the local function can have a different number of
+        # inputs because constants can be promoted as FunctionProto inputs at export.
         if (
             len(function_inputs) != len(node.input)
             and hasattr(local_function_builder, "input_names")
@@ -2727,8 +2727,8 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             for i in function_inputs
         ]
         assert len(shapes) == len(local_shapes), (
-            f"Mismatch between the number of inputs, node '{node.domain}.{node.op_type}' "
-            f"has {node.input} ({len(node.input)}), "
+            f"Mismatch in the number of provided input shapes for "
+            f"node '{node.domain}.{node.op_type}': node has {node.input} ({len(node.input)}), "
             f"function has {proto_local_function.input} ({len(proto_local_function.input)}), "
             f"matched-function-inputs={function_inputs} ({len(function_inputs)})"
             f"{self.get_debug_msg()}"
