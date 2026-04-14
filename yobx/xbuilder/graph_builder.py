@@ -9706,6 +9706,14 @@ class GraphBuilder(
             for att in attributes:
                 mapatt[att.name] = att
         renamed = dict(zip(proto.input, inputs))
+        if len(inputs) < len(proto.input):
+            for missing_input in proto.input[len(inputs) :]:
+                if (
+                    missing_input in self.initializers_dict
+                    or self.is_constant(missing_input)
+                    or self.has_name(missing_input)
+                ):
+                    renamed[missing_input] = missing_input
         renamed.update(dict(zip(proto.output, outputs)))
         if self.verbose >= 5:
 

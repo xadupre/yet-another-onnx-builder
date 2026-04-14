@@ -1558,7 +1558,7 @@ class ShapeBasedEditDistanceReshapePattern(PatternOptimization):
 
 class ShapeBasedReshapeIsSqueezePattern(PatternOptimization):
     """
-    Replaces a replaces by a squeeze or unsqueeze pattern if possible.
+    Replaces a Reshape by a Squeeze or Unsqueeze pattern if possible.
     It is only available for ``opset >= 18``.
 
     Model with nodes to be fused:
