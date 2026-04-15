@@ -1805,12 +1805,10 @@ class DynamoInterpreter:
                     for n in self.builder.dynamic_objects
                     if isinstance(n, str) and n.startswith("DYN")
                 )
-                if (
-                    i.value in dyn_names
-                    and len(dyn_names) == len(dim_names)
-                    and len(dim_names) > 0
-                ):
-                    return dim_names[dyn_names.index(i.value)]
+                if len(dyn_names) == len(dim_names):
+                    mapped = dict(zip(dyn_names, dim_names)).get(i.value)
+                    if mapped is not None:
+                        return mapped
             return i.value
         if isinstance(i, self.torch.SymInt):
             return self.builder._torch_sym_int_to_str(i)
