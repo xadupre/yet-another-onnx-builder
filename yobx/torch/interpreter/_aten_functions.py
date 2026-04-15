@@ -12231,12 +12231,16 @@ def aten_signbit(
     x: T,
     name: str = "signbit",
 ) -> T:
-    """Returns True where the input has a negative sign bit.
+    """Returns a boolean tensor indicating where the input has a negative sign bit.
 
     For floating-point types this includes negative zero (``-0.0``), since
     ``-0.0 < 0`` is ``False`` in IEEE 754 but ``signbit(-0.0)`` is ``True``.
     The formula ``(x < 0) OR (x == 0 AND 1/x < 0)`` detects negative zero via
     ``1 / -0.0 == -inf``.  For integer types a simple ``x < 0`` suffices.
+
+    Returns:
+        A boolean tensor with the same shape as *x*; ``True`` where the sign
+        bit is set (i.e. the element is negative or negative zero).
     """
     assert g.has_type(x), f"Type missing for {x!r}{g.get_debug_msg()}"
     itype = g.get_type(x)
