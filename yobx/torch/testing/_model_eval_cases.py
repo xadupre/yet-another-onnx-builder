@@ -387,8 +387,9 @@ class ControlFlowNumelZero1(torch.nn.Module):
         def empty_cache(x):
             return x.shape[-2]
 
-        shape = x[..., :1].sum(dim=(0, 1))
-        return torch.ones_like(shape) * 2
+        # x[..., :1] keeps the last axis as size 1; summing fixed axes 0 and 1 yields (x.shape[-2], 1).
+        template = x[..., :1].sum(dim=(0, 1))
+        return torch.ones_like(template) * 2
 
     _inputs = [(torch.rand(3, 2, 2, 5),), (torch.rand(3, 2, 1, 5),), (torch.rand(3, 2, 0, 5),)]
     _dynamic = {"x": {0: torch.export.Dim.DYNAMIC, 2: torch.export.Dim.DYNAMIC}}
