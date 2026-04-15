@@ -8467,13 +8467,19 @@ def aten_mH(
 ) -> T:
     "Computes the conjugate transpose of the last two dimensions."
     assert g.has_rank(x), f"{x!r} must have a rank{g.get_debug_msg()}"
+    assert g.has_type(x), f"missing type for {x!r}{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    assert itype not in {TensorProto.COMPLEX64, TensorProto.COMPLEX128}, (
+        f"aten_mH: complex tensors are not supported (type={itype}), "
+        f"only real tensors are supported for {x!r}{g.get_debug_msg()}"
+    )
     rank = g.get_rank(x)
     assert rank >= 2, f"aten_mH: rank must be >= 2, got {rank} for {x!r}{g.get_debug_msg()}"
     perm = list(range(rank))
     perm[-2], perm[-1] = perm[-1], perm[-2]
     res = g.op.Transpose(x, perm=perm, outputs=outputs, name=name)
     if not sts:
-        g.set_type(res, g.get_type(x))
+        g.set_type(res, itype)
         if g.has_shape(x):
             shape = list(g.get_shape(x))
             shape[-2], shape[-1] = shape[-1], shape[-2]
