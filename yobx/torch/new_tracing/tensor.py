@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional, Tuple, Union
 import torch
 import torch.fx
+import torch.utils._pytree as _pytree
 from .shape import TracingInt, TracingShape
 
 
@@ -161,8 +162,6 @@ class TracingTensor(torch.Tensor):
         # Use pytree to find the tracer from any TracingTensor in the
         # (possibly nested) args.  This handles ops like ``aten.cat.default``
         # where the first argument is a *list* of tensors, not a bare tensor.
-        import torch.utils._pytree as _pytree
-
         tracer = next(
             (a._tracer for a in _pytree.tree_leaves(args) if isinstance(a, TracingTensor)), None
         )
@@ -224,6 +223,10 @@ class TracingTensor(torch.Tensor):
             tracer=tracer,
         )
         shape_dim_tt._node = sym_node
+        # Set meta["val"] so that dispatch() can read the TracingTensor's
+        # shape/dtype when this node is used as an argument in subsequent
+        # FX nodes (e.g. aten.div.Tensor below).  This mirrors the
+        # convention used throughout dispatch() for all produced nodes.
         sym_node.meta["val"] = shape_dim_tt
 
         # Delegate to aten.div.Tensor(self, shape_dim_tt).  Both operands are

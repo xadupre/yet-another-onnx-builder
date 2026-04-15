@@ -245,8 +245,8 @@ class GraphTracer:
         if ti.value in self._mapped_dimension:
             return self._mapped_dimension[ti.value]
         # Fall back to the concrete trace-time value if available.
-        if ti._concrete_value is not None:
-            return ti._concrete_value
+        if ti.concrete_value is not None:
+            return ti.concrete_value
         return 0  # Last-resort fallback for unknown symbolic dims.
 
     def _tracing_int_to_const(self, ti: TracingInt) -> int:
@@ -272,8 +272,8 @@ class GraphTracer:
         """
         if ti.is_static:
             return int(ti)
-        if ti._concrete_value is not None:
-            return ti._concrete_value
+        if ti.concrete_value is not None:
+            return ti.concrete_value
         return 0  # Last-resort fallback.
 
     def _node_for_external_tensor(self, t: torch.Tensor) -> torch.fx.Node:
@@ -441,11 +441,8 @@ class GraphTracer:
                     # Record the concrete trace-time value for this dimension
                     # so that it can be propagated to intermediate TracingInts
                     # produced by _sym_shape_to_str_shape.
-                    if (
-                        d._concrete_value is not None
-                        and d.value not in self._dim_name_to_concrete
-                    ):
-                        self._dim_name_to_concrete[d.value] = d._concrete_value  # type: ignore
+                    if d.concrete_value is not None and d.value not in self._dim_name_to_concrete:
+                        self._dim_name_to_concrete[d.value] = d.concrete_value  # type: ignore
                     if d.value in self._mapped_dimension:
                         symd = self._mapped_dimension[d.value]
                     else:

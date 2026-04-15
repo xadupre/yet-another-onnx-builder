@@ -176,6 +176,18 @@ class TracingInt:
         """Enable use as a sequence index (calls :meth:`__int__`)."""
         return int(self)
 
+    @property
+    def concrete_value(self) -> Optional[int]:
+        """
+        Returns the concrete trace-time integer value, or ``None`` if unknown.
+
+        For static :class:`TracingInt` instances (where ``value`` is an
+        ``int``) this is the same as ``int(self)``.  For symbolic instances
+        it is the integer observed at trace time (e.g. the actual batch size
+        from the tracing inputs), used to evaluate comparisons concretely.
+        """
+        return self._concrete_value
+
     def __eq__(self, other: Any) -> Union[bool, TracingBool]:  # type: ignore # noqa: PYI032
         """
         Return a plain :class:`bool` when both sides are concrete; return a
