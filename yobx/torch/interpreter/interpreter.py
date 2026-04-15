@@ -1795,7 +1795,22 @@ class DynamoInterpreter:
             return i.name
         if isinstance(i, self.builder.TracingInt):
             if isinstance(i.value, str) and i.value.startswith("_dyn_"):
-                return f"DYN{i.value[len('_dyn_'):]}"
+                dyn_names = sorted(
+                    n
+                    for n in self.builder.dynamic_objects
+                    if isinstance(n, str) and n.startswith("_dyn_")
+                )
+                dim_names = sorted(
+                    n
+                    for n in self.builder.dynamic_objects
+                    if isinstance(n, str) and n.startswith("DYN")
+                )
+                if (
+                    i.value in dyn_names
+                    and len(dyn_names) == len(dim_names)
+                    and len(dim_names) > 0
+                ):
+                    return dim_names[dyn_names.index(i.value)]
             return i.value
         if isinstance(i, self.torch.SymInt):
             return self.builder._torch_sym_int_to_str(i)
