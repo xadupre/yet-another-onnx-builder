@@ -84,6 +84,34 @@ class TestNewTracingTracer(ExtTestCase):
         graph = tracer.trace(model, (torch.randn(3, 5),))
         graph.lint()
 
+    def test_trace_inplace_iadd(self):
+        """Inplace += on a module parameter must appear in the output, not be dead code."""
+
+        class InplaceAddModel(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.bias = torch.ones((1, 4), dtype=torch.float32)
+
+            def forward(self, x):
+                x += self.bias
+                return x
+
+        model = InplaceAddModel()
+        x = torch.rand(3, 4)
+
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (x.clone(),))
+        graph.lint()
+
+        # The inplace add_ should be present and the output should reference it.
+        call_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertGreater(len(call_nodes), 0, "Expected at least one call_function node")
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        # The output must not be the bare input placeholder — it must use the add result.
+        result_node = output_node.args[0]
+        self.assertIsNotNone(result_node)
+        self.assertNotEqual(result_node.op, "placeholder", "Output must not be the raw input")
+
     def test_trace_kwargs(self):
         def add_kw(x, y):
             return x + y

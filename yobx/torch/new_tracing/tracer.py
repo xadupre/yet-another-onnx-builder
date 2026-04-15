@@ -520,6 +520,29 @@ class GraphTracer:
         # We need to add nodes.
         node = self.graph.call_function(func, args=node_args, kwargs=node_kwargs)
 
+        # For inplace operations (e.g. aten.add_.Tensor), the first tensor
+        # argument is modified in place.  Python's __iadd__ and friends return
+        # ``self``, so the caller keeps holding the *original* TracingTensor
+        # whose ``_node`` still points to the placeholder.  Redirecting
+        # that ``_node`` to the new graph node ensures that subsequent uses of
+        # the tensor — including the function's return value — see the result
+        # of the inplace op rather than the original input.
+        if (
+            args
+            and isinstance(args[0], TracingTensor)
+            and hasattr(func, "_schema")
+            and func._schema.is_mutable
+            and func._schema.arguments
+            and func._schema.arguments[0].alias_info is not None
+            and func._schema.arguments[0].alias_info.is_write
+        ):
+            args[0]._node = node
+            if self.verbose > 1:
+                print(
+                    f"[GraphTracer.dispatch] inplace op {func!r}: "
+                    f"redirected {args[0]!r} _node -> {node.name!r}"
+                )
+
         flat_fake_res, treespec_res = torch.utils._pytree.tree_flatten(fake_res)
         flat_res = [
             (
