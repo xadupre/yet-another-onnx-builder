@@ -226,3 +226,25 @@ def _roll_dynamic_shape_ctx() -> Generator:
     finally:
         if _orig_decomp is not None:
             _decomp_table[_roll_op] = _orig_decomp
+
+
+@contextlib.contextmanager
+def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    Applies all tracing-time torch replacement context managers at once.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        using these temporary runtime patches.
+
+    Returns:
+        A context manager that enters all replacement contexts and restores all
+        original torch functions/decompositions on exit.
+    """
+    with (
+        _cond_replacement_ctx(tracer),
+        _check_replacement_ctx(tracer),
+        _full_replacement_ctx(tracer),
+        _roll_dynamic_shape_ctx(),
+        _scan_replacement_ctx(tracer),
+    ):
+        yield

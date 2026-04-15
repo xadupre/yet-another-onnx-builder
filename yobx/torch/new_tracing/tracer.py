@@ -17,9 +17,8 @@ from ._patches import (
     _ORIGINAL_TORCH_SCAN,
     _cond_replacement_ctx,
     _check_replacement_ctx,
-    _full_replacement_ctx,
-    _roll_dynamic_shape_ctx,
     _scan_replacement_ctx,
+    _trace_replacement_ctx,
 )
 
 
@@ -1381,13 +1380,7 @@ class GraphTracer:
         if self.verbose:
             print("[GraphTracer.trace] call...")
         clear_conditions()
-        with (
-            _cond_replacement_ctx(self),
-            _check_replacement_ctx(self),
-            _full_replacement_ctx(self),
-            _roll_dynamic_shape_ctx(),
-            _scan_replacement_ctx(self),
-        ):
+        with _trace_replacement_ctx(self):
             out = func(*tracing_args, **tracing_kwargs)
 
         for submod, orig_fwd in _patched:
