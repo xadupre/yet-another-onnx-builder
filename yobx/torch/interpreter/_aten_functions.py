@@ -5439,8 +5439,14 @@ def aten_heaviside(
     itype = g.get_type(x)
     dtype = tensor_dtype_to_np_dtype(itype)
     # Where x < 0 → 0; where x == 0 → values; where x > 0 → 1
-    zero = np.array([0], dtype=dtype)
-    one = np.array([1], dtype=dtype)
+    assert g.has_rank(x), f"Missing rank for {x!r}{g.get_debug_msg()}"
+    assert g.has_rank(values), f"Missing rank for {values!r}{g.get_debug_msg()}"
+    if g.get_rank(x) == g.get_rank(values) == 0:
+        zero = np.array(0, dtype=dtype)
+        one = np.array(1, dtype=dtype)
+    else:
+        zero = np.array([0], dtype=dtype)
+        one = np.array([1], dtype=dtype)
     x_eq_zero = g.op.Equal(x, zero, name=name)
     x_lt_zero = g.op.Less(x, zero, name=name)
     inner = g.op.Where(x_eq_zero, values, one, name=name)
