@@ -126,6 +126,12 @@ class TracingInt:
 
     :param value: Either a concrete :class:`int` (concrete dimension) or a
         :class:`str` (symbolic/dynamic dimension name such as ``"batch"``).
+    :param concrete_value: Optional concrete integer value known at trace time
+        for symbolic dimensions (e.g. the actual batch size from the tracing
+        inputs).  When set, comparison operators return a plain :class:`bool`
+        instead of a :class:`TracingBool`, allowing Python-level ``if``
+        statements that branch on shape values to be evaluated concretely
+        during tracing.
 
     Examples::
 
@@ -141,9 +147,12 @@ class TracingInt:
         print(s == 4)       # TracingBool('(batch==4)')
     """
 
-    def __init__(self, value: Union[int, str]):
+    def __init__(self, value: Union[int, str], concrete_value: Optional[int] = None):
         assert isinstance(value, (int, str)), f"Unexpected type {type(value)} for value"
         self.value = value
+        # Concrete integer value at trace time for symbolic dimensions.
+        # For static (int-valued) TracingInt, the concrete value equals value itself.
+        self._concrete_value: Optional[int] = value if isinstance(value, int) else concrete_value
 
     @property
     def is_static(self):
@@ -291,6 +300,13 @@ class TracingInt:
         Returns a concrete :class:`bool` when both operands are concrete, and
         a :class:`TracingBool` with a symbolic expression string otherwise.
 
+        When *self* has a concrete trace-time value (``_concrete_value is not
+        None``) and *other* is a plain :class:`int` (or a fully-concrete
+        :class:`TracingInt`), the comparison is evaluated immediately and a
+        plain :class:`bool` is returned.  This allows Python-level ``if``
+        statements that branch on dynamic shape values to be resolved during
+        tracing using the concrete values from the trace inputs.
+
         :param op: Comparison operator string: ``">"``, ``">="``, ``"<"``, ``"<="``, or ``"!="``.
         :param other: The right-hand-side operand.
         :return: :class:`bool` or :class:`TracingBool`.
@@ -298,10 +314,17 @@ class TracingInt:
         if isinstance(other, TracingInt):
             if isinstance(self.value, int) and isinstance(other.value, int):
                 return bool(_COMPARISON_OPS[op](self.value, other.value))
+            # If both sides have concrete trace-time values, evaluate concretely.
+            if self._concrete_value is not None and other._concrete_value is not None:
+                return bool(_COMPARISON_OPS[op](self._concrete_value, other._concrete_value))
             return TracingBool(f"({self._sym()}{op}{other._sym()})")
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return bool(_COMPARISON_OPS[op](self.value, other))
+            # If *self* has a known concrete trace-time value, evaluate concretely
+            # so that Python-level ``if tensor.shape[0] > 2:`` works during tracing.
+            if self._concrete_value is not None:
+                return bool(_COMPARISON_OPS[op](self._concrete_value, other))
             return TracingBool(f"({self._sym()}{op}{other})")
         return NotImplemented
 
@@ -451,5 +474,9 @@ class TracingShape:
             return TracingShape(tuple(int(i) for i in shape))
         new_shape = [int(i) for i in shape]
         for d, dim_spec in dynamic_shapes.items():
-            new_shape[d] = TracingInt(_dim_spec_to_name(dim_spec))  # type: ignore
+            # Pass the concrete trace-time value so that comparisons like
+            # ``if tensor.shape[0] > 2:`` can be evaluated during tracing.
+            new_shape[d] = TracingInt(  # type: ignore
+                _dim_spec_to_name(dim_spec), concrete_value=int(shape[d])
+            )
         return TracingShape(tuple(new_shape))  # type: ignore

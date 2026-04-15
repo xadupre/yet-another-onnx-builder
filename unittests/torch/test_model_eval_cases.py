@@ -285,6 +285,11 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    def test_run_exporter_controlflow_shape_check_new_tracing(self):
+        evaluation(
+            cases="ControlFlowShapeCheck", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
     def test_run_exporter_aten_interpolate_new_tracing(self):
         evaluation(
             cases="AtenInterpolate", exporters="yobx-new-tracing", quiet=False, dynamic=True
