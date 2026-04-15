@@ -8462,6 +8462,48 @@ def aten_min_other(
     return res
 
 
+def aten_mH(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "mH"
+) -> T:
+    "Computes the conjugate transpose of the last two dimensions."
+    assert g.has_rank(x), f"{x!r} must have a rank{g.get_debug_msg()}"
+    rank = g.get_rank(x)
+    assert rank >= 2, f"aten_mH: rank must be >= 2, got {rank} for {x!r}{g.get_debug_msg()}"
+    perm = list(range(rank))
+    perm[-2], perm[-1] = perm[-1], perm[-2]
+    res = g.op.Transpose(x, perm=perm, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            shape = list(g.get_shape(x))
+            shape[-2], shape[-1] = shape[-1], shape[-2]
+            g.set_shape(res, tuple(shape))
+        else:
+            g.set_rank(res, rank)
+    return res
+
+
+def aten_mT(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "mT"
+) -> T:
+    "Transposes the last two dimensions."
+    assert g.has_rank(x), f"{x!r} must have a rank{g.get_debug_msg()}"
+    rank = g.get_rank(x)
+    assert rank >= 2, f"aten_mT: rank must be >= 2, got {rank} for {x!r}{g.get_debug_msg()}"
+    perm = list(range(rank))
+    perm[-2], perm[-1] = perm[-1], perm[-2]
+    res = g.op.Transpose(x, perm=perm, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            shape = list(g.get_shape(x))
+            shape[-2], shape[-1] = shape[-1], shape[-2]
+            g.set_shape(res, tuple(shape))
+        else:
+            g.set_rank(res, rank)
+    return res
+
+
 def aten_mm(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T) -> T:
     "matmul"
     res = g.op.MatMul(x, y, outputs=outputs, name="mm")
