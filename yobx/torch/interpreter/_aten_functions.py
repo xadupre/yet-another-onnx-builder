@@ -5426,6 +5426,30 @@ def aten_hardtanh_backward(
     return res
 
 
+def aten_heaviside(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    values: T,
+    name: str = "heaviside",
+) -> T:
+    """heaviside — Computes 0 where *x* < 0, *values* where *x* == 0, and 1 where *x* > 0."""
+    assert g.has_type(x), f"heaviside: type of {x!r} must be known{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    dtype = tensor_dtype_to_np_dtype(itype)
+    # Where x < 0 → 0; where x == 0 → values; where x > 0 → 1
+    zero = np.array([0], dtype=dtype)
+    one = np.array([1], dtype=dtype)
+    x_eq_zero = g.op.Equal(x, zero, name=name)
+    x_lt_zero = g.op.Less(x, zero, name=name)
+    inner = g.op.Where(x_eq_zero, values, one, name=name)
+    res = g.op.Where(x_lt_zero, zero, inner, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_binary_op(g, res, x, values)
+    return res
+
+
 def aten_histc(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
