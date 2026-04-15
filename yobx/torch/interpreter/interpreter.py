@@ -1793,6 +1793,12 @@ class DynamoInterpreter:
             return name
         if hasattr(i, "name"):
             return i.name
+        if isinstance(i, self.builder.TracingInt):
+            if isinstance(i.value, str) and i.value.startswith("_dyn_"):
+                return f"DYN{i.value[len('_dyn_'):]}"
+            return i.value
+        if isinstance(i, self.torch.SymInt):
+            return self.builder._torch_sym_int_to_str(i)
         if isinstance(i, tuple):
             return tuple(self._process_arg(node, aten_name, t) for t in i)
         if isinstance(i, (float, int, tuple, complex)):

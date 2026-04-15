@@ -28,6 +28,10 @@ _ORIGINAL_TORCH_SCAN: Optional[Callable] = getattr(
     getattr(torch.ops, "higher_order", None), "scan", None
 )
 
+# Capture the real ``torch.full`` at import time so shape-only constructors
+# can be redirected during tracing when they receive TracingInt sizes.
+_ORIGINAL_TORCH_FULL: Callable = torch.full
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -117,6 +121,26 @@ def _scan_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
         yield
     finally:
         torch.ops.higher_order.scan = _ORIGINAL_TORCH_SCAN  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    Temporarily replaces ``torch.full`` with a tracing-aware handler so calls
+    using symbolic ``TracingInt`` sizes are captured as FX nodes.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_full` should be used as the replacement.
+    """
+
+    def _full_handler(size: Any, fill_value: Any, **kwargs: Any) -> Any:
+        return tracer._handle_full(size, fill_value, **kwargs)
+
+    torch.full = _full_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.full = _ORIGINAL_TORCH_FULL  # type: ignore[assignment]
 
 
 @contextlib.contextmanager
