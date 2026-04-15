@@ -1149,7 +1149,10 @@ class GraphTracer:
 
         new_arg, treespec_arg = torch.utils._pytree.tree_flatten(arg)
         if dynamic_shapes:
-            flat_ds, _ = torch.utils._pytree.tree_flatten(dynamic_shapes)
+            flat_ds, _ = torch.utils._pytree.tree_flatten(
+                dynamic_shapes,
+                is_leaf=lambda x: isinstance(x, dict) and all(isinstance(k, int) for k in x),
+            )
             assert len(flat_ds) == len(new_arg), (
                 f"Length mismatch between arg ({len(new_arg)}) and "
                 f"the dynamic_shapes ({len(flat_ds)}), name={name!r}"
