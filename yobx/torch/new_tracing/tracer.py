@@ -1142,11 +1142,11 @@ class GraphTracer:
                     continue
                 assert isinstance(
                     dim.value, str
-                ), f"Unexpected non-string symbolic dimension value {type(dim.value)} for {dim!r}"
+                ), f"Expected string symbolic dimension value, got {type(dim.value)}"
                 dim_key = self._token_replace(dim.value)
                 assert isinstance(
                     dim_key, str
-                ), f"Unexpected type {type(dim_key)} for symbolic dim key {dim_key!r}"
+                ), f"Expected string type for symbolic dimension key, got {type(dim_key)}"
                 if dim_key in self._mapped_dimension:
                     symd = self._mapped_dimension[dim_key]
                 else:
