@@ -133,7 +133,7 @@ def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
         whose :meth:`_handle_full` should be used as the replacement.
 
     Returns:
-        Generator: A context manager that yields control while ``torch.full``
+        A context manager that yields control while ``torch.full``
         is temporarily replaced, then restores the original implementation on
         exit.
     """
