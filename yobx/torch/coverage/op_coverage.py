@@ -152,7 +152,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "rot90",
         "rsub",
         "sgn",
-        "signbit",
         "sinc",
         "sort",
         "special_airy_ai",

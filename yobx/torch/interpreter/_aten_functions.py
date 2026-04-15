@@ -12224,6 +12224,46 @@ def aten_sign(
     return res
 
 
+def aten_signbit(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "signbit",
+) -> T:
+    """Returns True where the input has a negative sign bit.
+
+    For floating-point types this includes negative zero (``-0.0``), since
+    ``-0.0 < 0`` is ``False`` in IEEE 754 but ``signbit(-0.0)`` is ``True``.
+    The formula ``(x < 0) OR (x == 0 AND 1/x < 0)`` detects negative zero via
+    ``1 / -0.0 == -inf``.  For integer types a simple ``x < 0`` suffices.
+    """
+    assert g.has_type(x), f"Type missing for {x!r}{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    np_dtype = tensor_dtype_to_np_dtype(itype)
+    zero = np.array(0, dtype=np_dtype)
+
+    if itype in {
+        TensorProto.FLOAT,
+        TensorProto.DOUBLE,
+        TensorProto.FLOAT16,
+        TensorProto.BFLOAT16,
+    }:
+        one = np.array(1, dtype=np_dtype)
+        lt_zero = g.op.Less(x, zero, name=name)
+        eq_zero = g.op.Equal(x, zero, name=name)
+        inv_lt_zero = g.op.Less(g.op.Div(one, x, name=name), zero, name=name)
+        res = g.op.Or(
+            lt_zero, g.op.And(eq_zero, inv_lt_zero, name=name), outputs=outputs, name=name
+        )
+    else:
+        res = g.op.Less(x, zero, outputs=outputs, name=name)
+
+    if not sts:
+        set_type_shape_unary_op(g, res, x, itype=TensorProto.BOOL)
+    return res
+
+
 def aten_silu(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
