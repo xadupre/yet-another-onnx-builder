@@ -1120,7 +1120,9 @@ class GraphTracer:
         :param size: Full size argument passed to ``torch.full``.
         :param fill_value: Fill value passed to ``torch.full``.
         :param kwargs: Additional keyword arguments for ``torch.full``.
-        :return: A :class:`TracingTensor` when symbolic dimensions are present,
+
+        Returns:
+            A :class:`TracingTensor` when symbolic dimensions are present,
             otherwise the eager ``torch.full`` result.
         """
         if isinstance(size, torch.Size):

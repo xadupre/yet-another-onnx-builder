@@ -131,6 +131,10 @@ def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
 
     :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
         whose :meth:`_handle_full` should be used as the replacement.
+
+    Returns:
+        Yields while ``torch.full`` is temporarily replaced and restores the
+        original implementation when exiting the context.
     """
 
     def _full_handler(size: Any, fill_value: Any, **kwargs: Any) -> Any:
