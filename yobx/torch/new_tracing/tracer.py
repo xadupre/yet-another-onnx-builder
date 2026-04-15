@@ -1122,7 +1122,7 @@ class GraphTracer:
         :param kwargs: Additional keyword arguments for ``torch.full``.
 
         Returns:
-            Any: A :class:`TracingTensor` when symbolic dimensions are present,
+            Returns a :class:`TracingTensor` when symbolic dimensions are present,
             otherwise the eager ``torch.full`` result.
         """
         if isinstance(size, torch.Size):
@@ -1132,11 +1132,11 @@ class GraphTracer:
         if not any(isinstance(dim, TracingInt) for dim in size):
             return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
 
-        fake_size: List[Union[int, torch.SymInt]] = []
+        traced_size: List[Union[int, torch.SymInt]] = []
         for dim in size:
             if isinstance(dim, TracingInt):
                 if dim.is_static:
-                    fake_size.append(dim.value)  # type: ignore[arg-type]
+                    traced_size.append(dim.value)  # type: ignore[arg-type]
                     continue
                 if dim.value in self._mapped_dimension:
                     symd = self._mapped_dimension[dim.value]
@@ -1146,13 +1146,13 @@ class GraphTracer:
                     symd_name = self._sym_int_to_str(symd)
                     assert isinstance(symd_name, str), "type checking"
                     self._sym_int_to_dynamic_dimension[symd_name] = dim.value  # type: ignore[index]
-                fake_size.append(symd)
+                traced_size.append(symd)
             else:
                 assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
-                fake_size.append(dim)
+                traced_size.append(dim)
 
         with self._fake_mode:
-            fake_res = _ORIGINAL_TORCH_FULL(tuple(fake_size), fill_value, **kwargs)
+            fake_res = _ORIGINAL_TORCH_FULL(tuple(traced_size), fill_value, **kwargs)
 
         node_size = tuple(size)
         node = self.graph.call_function(
