@@ -236,8 +236,8 @@ def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
     :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
         using these temporary runtime patches.
 
-    Returns:
-        A context manager that enters all replacement contexts and restores all
+    Yields:
+        Control within a unified tracing patch context that restores all
         original torch functions/decompositions on exit.
     """
     with (
