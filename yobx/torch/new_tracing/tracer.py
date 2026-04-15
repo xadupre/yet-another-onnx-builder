@@ -112,13 +112,6 @@ class GraphTracer:
         self._mapped_dimension: Dict[str, torch.SymInt] = {}
         self._sym_int_to_dynamic_dimension: Dict[str, str] = {}
         self._unique_count = 0
-        # Mapping from symbolic dimension name (e.g. ``"batch"``) to its
-        # concrete integer value at trace time.  This is populated when
-        # placeholder nodes are created from :meth:`TracingShape.from_existing_shape`
-        # and is used to preserve the concrete value in intermediate
-        # :class:`TracingInt` objects produced during dispatch (e.g. the
-        # output shape of ``torch.cat``).
-        self._dim_name_to_concrete: Dict[str, int] = {}
         # Storage for torch.cond branches: maps unique name -> callable / sub-tracer.
         self._callables: Dict[str, Callable] = {}
         self._sub_tracers: Dict[str, "GraphTracer"] = {}
@@ -233,8 +226,8 @@ class GraphTracer:
 
         For static (integer-valued) :class:`TracingInt` instances the plain
         ``int`` value is returned.  For symbolic instances the mapped
-        :class:`torch.SymInt` is returned if one exists; otherwise the
-        concrete trace-time value is used as a fallback.
+        :class:`torch.SymInt` is returned if one exists; otherwise ``0`` is
+        used as a last-resort fallback.
 
         :param ti: The :class:`TracingInt` to convert.
         :returns: An ``int`` or :class:`torch.SymInt` suitable for fake
@@ -244,9 +237,6 @@ class GraphTracer:
             return int(ti)
         if ti.value in self._mapped_dimension:
             return self._mapped_dimension[ti.value]
-        # Fall back to the concrete trace-time value if available.
-        if ti.concrete_value is not None:
-            return ti.concrete_value
         return 0  # Last-resort fallback for unknown symbolic dims.
 
     def _tracing_int_to_const(self, ti: TracingInt) -> int:
@@ -254,26 +244,24 @@ class GraphTracer:
         Convert a :class:`~yobx.torch.new_tracing.shape.TracingInt` to a
         constant integer for embedding in an FX graph node argument.
 
-        For static instances the integer value is returned directly.  For
-        symbolic instances the concrete trace-time value is used when
-        available.
+        For static instances the integer value is returned directly.
+        Symbolic instances that have not been intercepted by a higher-level
+        override fall back to ``0``.
 
         .. note::
             This helper is a fallback for cases where a
             :class:`~yobx.torch.new_tracing.shape.TracingInt` reaches
             :meth:`dispatch` without being intercepted by a higher-level
-            override (e.g. :meth:`~TracingTensor.__truediv__`).  Hardcoding
-            a concrete value may produce an ONNX model that only works for
-            the traced input size; callers should prefer to intercept
-            :class:`TracingInt` divisors/multipliers *before* dispatching.
+            override (e.g. :meth:`~TracingTensor.__truediv__`).  Callers
+            should prefer to intercept :class:`TracingInt`
+            divisors/multipliers *before* dispatching to produce correct
+            dynamic ONNX graphs.
 
         :param ti: The :class:`TracingInt` to convert.
         :returns: A concrete ``int`` constant.
         """
         if ti.is_static:
             return int(ti)
-        if ti.concrete_value is not None:
-            return ti.concrete_value
         return 0  # Last-resort fallback.
 
     def _node_for_external_tensor(self, t: torch.Tensor) -> torch.fx.Node:
@@ -438,11 +426,6 @@ class GraphTracer:
                     if d.is_static:
                         new_shape.append(d.value)  # type: ignore
                         continue
-                    # Record the concrete trace-time value for this dimension
-                    # so that it can be propagated to intermediate TracingInts
-                    # produced by _sym_shape_to_str_shape.
-                    if d.concrete_value is not None and d.value not in self._dim_name_to_concrete:
-                        self._dim_name_to_concrete[d.value] = d.concrete_value  # type: ignore
                     if d.value in self._mapped_dimension:
                         symd = self._mapped_dimension[d.value]
                     else:
@@ -473,12 +456,6 @@ class GraphTracer:
         string is also registered in ``self._mapped_dimension`` so future
         references to the same symbol resolve to the same name.
 
-        When the symbolic dimension name is found in :attr:`_dim_name_to_concrete`,
-        the concrete trace-time value is attached to the resulting
-        :class:`~yobx.torch.new_tracing.shape.TracingInt` so that Python-level
-        control flow (e.g. ``if tensor.shape[0] > 2:``) can be evaluated
-        concretely during tracing.
-
         :param sym_shape: An iterable of dimension values that may be plain
             ``int``, ``str``, or :class:`torch.SymInt`.
         :return: A ``tuple`` of ``int`` / ``str`` suitable for constructing a
@@ -497,11 +474,7 @@ class GraphTracer:
                 ns, str
             ), f"unexpected type {type(ns)}, ns={ns!r}, s={s!r}, ss={ss!r}"
             self._mapped_dimension[ns] = s
-            # Preserve the concrete trace-time value so that Python-level
-            # conditionals on shape (e.g. ``if tensor.shape[0] > 2:``) can
-            # be evaluated during tracing.
-            concrete = self._dim_name_to_concrete.get(ns)  # type: ignore[arg-type]
-            new_shape.append(TracingInt(ns, concrete_value=concrete))
+            new_shape.append(TracingInt(ns))
         return TracingShape(tuple(new_shape))
 
     def _sym_int_to_str(self, value):

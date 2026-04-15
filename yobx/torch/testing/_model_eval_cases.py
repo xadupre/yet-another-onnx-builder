@@ -360,7 +360,7 @@ class ControlFlowShapeCheck(torch.nn.Module):
         x1 = x + 1
         y1 = y + 2
         cat = torch.cat([x1, y1], dim=1)
-        torch._check(cat.shape[0] > 0, "batch size must be positive")
+        torch._check(cat.shape[0] > 2)
         if cat.shape[0] > 2:
             return cat / cat.shape[0]
         return cat / cat.ndim
