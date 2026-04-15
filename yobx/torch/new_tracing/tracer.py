@@ -1122,7 +1122,7 @@ class GraphTracer:
         :param kwargs: Additional keyword arguments for ``torch.full``.
 
         Returns:
-            A :class:`TracingTensor` when symbolic dimensions are present,
+            Any: A :class:`TracingTensor` when symbolic dimensions are present,
             otherwise the eager ``torch.full`` result.
         """
         if isinstance(size, torch.Size):
