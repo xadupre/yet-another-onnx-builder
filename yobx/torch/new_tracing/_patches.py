@@ -28,6 +28,10 @@ _ORIGINAL_TORCH_SCAN: Optional[Callable] = getattr(
     getattr(torch.ops, "higher_order", None), "scan", None
 )
 
+# Capture the real ``torch.full`` at import time so shape-only constructors
+# can be redirected during tracing when they receive TracingInt sizes.
+_ORIGINAL_TORCH_FULL: Callable = torch.full
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -120,6 +124,31 @@ def _scan_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
 
 
 @contextlib.contextmanager
+def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    Temporarily replaces ``torch.full`` with a tracing-aware handler so calls
+    using symbolic ``TracingInt`` sizes are captured as FX nodes.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_full` should be used as the replacement.
+
+    Returns:
+        A context manager that yields control while ``torch.full``
+        is temporarily replaced, then restores the original implementation on
+        exit.
+    """
+
+    def _full_handler(size: Any, fill_value: Any, **kwargs: Any) -> Any:
+        return tracer._handle_full(size, fill_value, **kwargs)
+
+    torch.full = _full_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.full = _ORIGINAL_TORCH_FULL  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
 def _roll_dynamic_shape_ctx() -> Generator:
     """
     Temporarily replaces the ``aten.roll.default`` decomposition with a
@@ -197,3 +226,25 @@ def _roll_dynamic_shape_ctx() -> Generator:
     finally:
         if _orig_decomp is not None:
             _decomp_table[_roll_op] = _orig_decomp
+
+
+@contextlib.contextmanager
+def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    Applies all tracing-time torch replacement context managers at once.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        using these temporary runtime patches.
+
+    Returns:
+        A context manager that enters all replacement contexts and restores all
+        original torch functions/decompositions on exit.
+    """
+    with (
+        _cond_replacement_ctx(tracer),
+        _check_replacement_ctx(tracer),
+        _full_replacement_ctx(tracer),
+        _roll_dynamic_shape_ctx(),
+        _scan_replacement_ctx(tracer),
+    ):
+        yield

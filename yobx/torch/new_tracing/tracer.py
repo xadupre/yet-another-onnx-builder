@@ -13,11 +13,12 @@ from .shape import TracingShape, TracingInt, TracingBool, register_condition, cl
 from .tensor import TracingTensor
 from ._patches import (
     _ORIGINAL_TORCH_COND,
+    _ORIGINAL_TORCH_FULL,
     _ORIGINAL_TORCH_SCAN,
     _cond_replacement_ctx,
     _check_replacement_ctx,
-    _roll_dynamic_shape_ctx,
     _scan_replacement_ctx,
+    _trace_replacement_ctx,
 )
 
 
@@ -1129,6 +1130,74 @@ class GraphTracer:
             return
         # For any other type (including ints from shape ops), accept silently.
 
+    def _handle_full(self, size: Any, fill_value: Any, **kwargs: Any) -> Any:
+        """
+        Tracing-aware replacement for ``torch.full`` called via
+        :func:`_full_replacement_ctx`.
+
+        It intercepts constructor calls where *size* contains symbolic
+        :class:`TracingInt` values and emits a corresponding FX node without
+        requiring eager execution with concrete Python ``int`` dimensions.
+
+        :param size: Full size argument passed to ``torch.full``.
+        :param fill_value: Fill value passed to ``torch.full``.
+        :param kwargs: Additional keyword arguments for ``torch.full``.
+
+        Returns:
+            A :class:`TracingTensor` when symbolic dimensions are present,
+            otherwise the eager ``torch.full`` result.
+        """
+        if isinstance(size, torch.Size):
+            size = tuple(size)
+        if not isinstance(size, (tuple, list)):
+            return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
+        if not any(isinstance(dim, TracingInt) for dim in size):
+            return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
+
+        traced_size: List[Union[int, torch.SymInt]] = []
+        node_size: List[Any] = []
+        for dim in size:
+            if isinstance(dim, TracingInt):
+                if dim.is_static:
+                    traced_size.append(dim.value)  # type: ignore[arg-type]
+                    node_size.append(dim)
+                    continue
+                assert isinstance(
+                    dim.value, str
+                ), f"Expected string symbolic dimension value, got {type(dim.value)}"
+                dim_key = self._token_replace(dim.value)
+                assert isinstance(
+                    dim_key, str
+                ), f"Expected string type for symbolic dimension key, got {type(dim_key)}"
+                if dim_key in self._mapped_dimension:
+                    symd = self._mapped_dimension[dim_key]
+                else:
+                    symd = self._shape_env.create_unbacked_symint()
+                    self._mapped_dimension[dim_key] = symd
+                    symd_name = self._sym_int_to_str(symd)
+                    assert isinstance(symd_name, str), "type checking"
+                    self._sym_int_to_dynamic_dimension[symd_name] = dim_key
+                traced_size.append(symd)
+                node_size.append(TracingInt(dim_key))
+            else:
+                assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
+                traced_size.append(dim)
+                node_size.append(dim)
+
+        with self._fake_mode:
+            fake_res = _ORIGINAL_TORCH_FULL(tuple(traced_size), fill_value, **kwargs)
+
+        node = self.graph.call_function(
+            _ORIGINAL_TORCH_FULL, args=(tuple(node_size), fill_value), kwargs=kwargs
+        )
+        res = self._make_tracing_tensor(
+            self._sym_shape_to_str_shape(fake_res.shape), fake_res.dtype, fake_res.device, node
+        )
+        node.meta["val"] = res
+        node.meta["fake_val"] = fake_res
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return res
+
     # ------------------------------------------------------------------
     # Public tracing entry point
     # ------------------------------------------------------------------
@@ -1334,12 +1403,7 @@ class GraphTracer:
         if self.verbose:
             print("[GraphTracer.trace] call...")
         clear_conditions()
-        with (
-            _cond_replacement_ctx(self),
-            _check_replacement_ctx(self),
-            _roll_dynamic_shape_ctx(),
-            _scan_replacement_ctx(self),
-        ):
+        with _trace_replacement_ctx(self):
             out = func(*tracing_args, **tracing_kwargs)
 
         for submod, orig_fwd in _patched:

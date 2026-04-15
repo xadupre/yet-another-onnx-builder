@@ -2478,7 +2478,9 @@ class GraphBuilder(
                 key.append(d)
             elif isinstance(d, str):
                 assert self._debug_quiet or (
-                    self.has_shape(d) or (self.has_rank(d) and self.get_rank(d) == 0)
+                    self.has_shape(d)
+                    or (self.has_rank(d) and self.get_rank(d) == 0)
+                    or d in self.dynamic_objects
                 ), (
                     f"Missing shape for {d!r} in {shape!r}, has_rank={self.has_rank(d)}, "
                     f"has_type={self.has_type(d)}{self.get_debug_msg()}"
