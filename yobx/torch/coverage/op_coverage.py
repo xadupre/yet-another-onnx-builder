@@ -79,7 +79,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "cross",
         "cumulative_trapezoid",
         "deg2rad",
-        "diag",
         "diag_embed",
         "diagflat",
         "diagonal",
