@@ -488,10 +488,10 @@ class ControlFlowNestCond(torch.nn.Module):
 class ControlFlowCondConstant(torch.nn.Module):
     def forward(self, x):
         def true_fn(x):
-            return torch.sin(x) - torch.ones(x.shape, dtype=x.dtype)
+            return torch.sin(x) - torch.ones(x.shape, dtype=x.dtype, device=x.device)
 
         def false_fn(x):
-            return torch.cos(x) + torch.ones((1, 1024), dtype=x.dtype)
+            return torch.cos(x) + torch.ones((1, 1024), dtype=x.dtype, device=x.device)
 
         return torch.cond(x.sum() > 0, true_fn, false_fn, [x])
 
