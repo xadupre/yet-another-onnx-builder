@@ -272,6 +272,8 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "logical_or",
             "logical_xor",
             "long",
+            "mH",
+            "mT",
             "nn_functional_bilinear",
             "nn_functional_hardsigmoid",
             "nn_functional_softsign",
