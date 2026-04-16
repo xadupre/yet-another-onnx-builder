@@ -188,6 +188,8 @@ class GraphTracer:
         Scalars (``int``, ``float``, ``str``) and empty collections are
         treated as non-tensor.  Lists and tuples are inspected recursively.
         Dicts are inspected by their values.
+        :class:`~yobx.torch.new_tracing.shape.TracingInt` instances are
+        treated as scalar integers (non-tensor).
 
         :param value: The value to inspect.  May be a scalar, tensor,
             list, tuple, or dict.
@@ -200,6 +202,10 @@ class GraphTracer:
             return True
         if isinstance(value, torch.Tensor):
             return False
+        # TracingInt represents a scalar integer (a shape dimension value);
+        # it is not a tensor.
+        if isinstance(value, TracingInt):
+            return True
         if isinstance(value, (list, tuple)):
             if not value:
                 return True
@@ -212,6 +218,52 @@ class GraphTracer:
         from ...helpers import string_type
 
         raise TypeError(f"Cannot determine if it is a constant argument {string_type(value)}")
+
+    def _tracing_int_to_fake(self, ti: TracingInt) -> Union[int, "torch.SymInt"]:
+        """
+        Convert a :class:`~yobx.torch.new_tracing.shape.TracingInt` to a
+        value suitable for use in :class:`~torch._subclasses.FakeTensor`
+        computations.
+
+        For static (integer-valued) :class:`TracingInt` instances the plain
+        ``int`` value is returned.  For symbolic instances the mapped
+        :class:`torch.SymInt` is returned if one exists; otherwise ``0`` is
+        used as a last-resort fallback.
+
+        :param ti: The :class:`TracingInt` to convert.
+        :returns: An ``int`` or :class:`torch.SymInt` suitable for fake
+            tensor arithmetic.
+        """
+        if ti.is_static:
+            return int(ti)
+        if ti.value in self._mapped_dimension:
+            return self._mapped_dimension[ti.value]
+        return 0  # Last-resort fallback for unknown symbolic dims.
+
+    def _tracing_int_to_const(self, ti: TracingInt) -> int:
+        """
+        Convert a :class:`~yobx.torch.new_tracing.shape.TracingInt` to a
+        constant integer for embedding in an FX graph node argument.
+
+        For static instances the integer value is returned directly.
+        Symbolic instances that have not been intercepted by a higher-level
+        override fall back to ``0``.
+
+        .. note::
+            This helper is a fallback for cases where a
+            :class:`~yobx.torch.new_tracing.shape.TracingInt` reaches
+            :meth:`dispatch` without being intercepted by a higher-level
+            override (e.g. :meth:`~TracingTensor.__truediv__`).  Callers
+            should prefer to intercept :class:`TracingInt`
+            divisors/multipliers *before* dispatching to produce correct
+            dynamic ONNX graphs.
+
+        :param ti: The :class:`TracingInt` to convert.
+        :returns: A concrete ``int`` constant.
+        """
+        if ti.is_static:
+            return int(ti)
+        return 0  # Last-resort fallback.
 
     def _node_for_external_tensor(self, t: torch.Tensor) -> torch.fx.Node:
         """
@@ -492,7 +544,12 @@ class GraphTracer:
         # We could recompute the dynamic shapes without FakeTensor
         # but this is the first approach
         fake_combined = [
-            (a if self.is_not_tensor(a) else self.make_fake(a)) for a in combined_args
+            (
+                self._tracing_int_to_fake(a)
+                if isinstance(a, TracingInt)
+                else (a if self.is_not_tensor(a) else self.make_fake(a))
+            )
+            for a in combined_args
         ]
         unflat = torch.utils._pytree.tree_unflatten(fake_combined, treespec)
         fake_args, fake_kwargs = unflat
@@ -514,7 +571,12 @@ class GraphTracer:
 
         # add a node in the graph
         node_combined = [
-            (a if self.is_not_tensor(a) else self._get_node(a)) for a in combined_args
+            (
+                self._tracing_int_to_const(a)
+                if isinstance(a, TracingInt)
+                else (a if self.is_not_tensor(a) else self._get_node(a))
+            )
+            for a in combined_args
         ]
         unflat_nodes = torch.utils._pytree.tree_unflatten(node_combined, treespec)
         node_args, node_kwargs = unflat_nodes

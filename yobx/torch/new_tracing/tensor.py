@@ -1,6 +1,7 @@
 from typing import Any, Dict, Optional, Tuple, Union
 import torch
 import torch.fx
+import torch.utils._pytree as _pytree
 from .shape import TracingInt, TracingShape
 
 
@@ -158,6 +159,99 @@ class TracingTensor(torch.Tensor):
         Intercept every dispatched operation, create an FX graph node, and
         return a new :class:`TracingTensor` (or tuple thereof) for the result.
         """
-        tracer = next(a._tracer for a in args if isinstance(a, TracingTensor))
-        assert tracer, f"Missing tracer for func={func}, types={types}, {args}, {kwargs=}"
+        # Use pytree to find the tracer from any TracingTensor in the
+        # (possibly nested) args.  This handles ops like ``aten.cat.default``
+        # where the first argument is a *list* of tensors, not a bare tensor.
+        tracer = next(
+            (a._tracer for a in _pytree.tree_leaves(args) if isinstance(a, TracingTensor)), None
+        )
+        assert (
+            tracer is not None
+        ), f"Missing tracer for func={func}, types={types}, {args}, {kwargs=}"
         return tracer.dispatch(func, args, kwargs)
+
+    def _div_by_tracing_int(self, dim: "TracingInt") -> "TracingTensor":
+        """
+        Handles division of this tensor by a symbolic :class:`TracingInt`
+        (e.g. ``tensor / tensor.shape[0]``).
+
+        Instead of passing the :class:`TracingInt` directly to the ATen
+        dispatcher (which would fail because it is not a scalar or tensor),
+        this method:
+
+        1. Looks up which dimension index in ``self.shape`` corresponds to
+           ``dim.value``.
+        2. Emits an ``aten.sym_size.int(self, dim_idx)`` FX node that
+           computes the dimension at runtime (translates to ONNX
+           ``Shape + Squeeze``).
+        3. Wraps that node in a scalar ``int64`` :class:`TracingTensor`.
+        4. Delegates to ``aten.div.Tensor(self, scalar_tt)`` via the normal
+           dispatch path.
+
+        :param dim: The symbolic :class:`TracingInt` representing the
+            dimension to divide by.  It must appear in ``self.shape``.
+        :returns: A :class:`TracingTensor` representing ``self / dim``.
+        :raises ValueError: If *dim* is not found in ``self.shape``.
+        """
+        tracer = self._tracer
+        assert tracer is not None, "_div_by_tracing_int requires a tracer"
+
+        # Find the dimension index in self.shape that matches dim.value.
+        dim_idx: Optional[int] = None
+        for i, d in enumerate(self._tracing_shape.dims):
+            if isinstance(d, TracingInt) and d.value == dim.value:
+                dim_idx = i
+                break
+
+        if dim_idx is None:
+            raise ValueError(
+                f"TracingInt({dim.value!r}) not found in tensor shape "
+                f"{self._tracing_shape}; cannot create a shape-access node "
+                "for division.  Ensure the divisor comes from the same "
+                "tensor's shape."
+            )
+
+        # Emit aten.sym_size.int(self, dim_idx) — becomes Shape+Squeeze in ONNX.
+        sym_node = tracer.graph.call_function(
+            torch.ops.aten.sym_size.int, args=(self._node, dim_idx), kwargs={}
+        )
+        # Create a scalar int64 TracingTensor backed by the shape-access node.
+        shape_dim_tt = TracingTensor(
+            TracingShape(()),  # 0-dim (scalar)
+            dtype=torch.int64,
+            device=self.device,
+            tracer=tracer,
+        )
+        shape_dim_tt._node = sym_node
+        # Set meta["val"] so that dispatch() can read the TracingTensor's
+        # shape/dtype when this node is used as an argument in subsequent
+        # FX nodes (e.g. aten.div.Tensor below).  This mirrors the
+        # convention used throughout dispatch() for all produced nodes.
+        sym_node.meta["val"] = shape_dim_tt
+
+        # Delegate to aten.div.Tensor(self, shape_dim_tt).  Both operands are
+        # now TracingTensors, so this routes through __torch_dispatch__ →
+        # dispatch() in the tracer as usual.
+        return torch.ops.aten.div.Tensor(self, shape_dim_tt)  # type: ignore
+
+    def __truediv__(self, other: Any) -> Any:
+        """
+        Overrides true-division to handle symbolic :class:`TracingInt`
+        divisors (e.g. ``cat / cat.shape[0]``).
+
+        When *other* is a symbolic :class:`TracingInt`, calling
+        ``super().__truediv__`` would fail because the C++ dispatcher cannot
+        convert a :class:`TracingInt` to a numeric scalar.  Instead, this
+        method calls :meth:`_div_by_tracing_int` to emit the required
+        shape-access FX nodes and then performs a tensor-tensor division.
+
+        For all other divisors (plain ``int``, ``float``, or
+        :class:`TracingTensor`) the default ``torch.Tensor.__truediv__``
+        behaviour is preserved.
+
+        :param other: The divisor.
+        :returns: Result of ``self / other`` as a :class:`TracingTensor`.
+        """
+        if isinstance(other, TracingInt) and not other.is_static:
+            return self._div_by_tracing_int(other)
+        return super().__truediv__(other)
