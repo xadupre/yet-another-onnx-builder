@@ -12254,18 +12254,13 @@ def aten_signbit(
         TensorProto.BFLOAT16: (TensorProto.UINT16, np.uint16(0x8000)),
     }
 
-    if itype in _FLOAT_SIGN:
-        if g.main_opset < 26:
-            raise FunctionNotFoundError(
-                f"signbit for floating-point inputs requires opset >= 26 "
-                f"(BitCast not available in opset {g.main_opset}){g.get_debug_msg()}"
-            )
+    if itype in _FLOAT_SIGN and g.main_opset >= 26:
         uint_itype, sign_mask = _FLOAT_SIGN[itype]
         bits = g.op.BitCast(x, to=uint_itype, name=name)
         masked = g.op.BitwiseAnd(bits, np.array(sign_mask), name=name)
         res = g.op.Cast(masked, to=TensorProto.BOOL, outputs=outputs, name=name)
     else:
-        # Integer types: sign bit is equivalent to x < 0.
+        # Integer types or opset < 26: sign bit is equivalent to x < 0.
         np_dtype = tensor_dtype_to_np_dtype(itype)
         zero = np.array(0, dtype=np_dtype)
         res = g.op.Less(x, zero, outputs=outputs, name=name)
