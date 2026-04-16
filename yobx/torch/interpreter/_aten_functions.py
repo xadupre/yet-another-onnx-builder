@@ -3061,7 +3061,8 @@ def aten_diag(
     diagonal: int = 0,
     name: str = "diag",
 ) -> T:
-    """Constructs a diagonal matrix from a 1-D tensor, or extracts the diagonal of a 2-D tensor."""
+    """Constructs a diagonal matrix from a 1-D tensor, or extracts the diagonal of a 2-D tensor.
+    """
     assert g.has_rank(x), f"diag: missing rank for {x!r}{g.get_debug_msg()}"
     rank = g.get_rank(x)
     assert rank in (1, 2), f"diag: expected rank 1 or 2, got {rank}{g.get_debug_msg()}"
@@ -3073,7 +3074,7 @@ def aten_diag(
 
     if rank == 1:
         # 1-D vector -> 2-D diagonal matrix
-        n = g.op.SqueezeAnyOpset(g.op.Shape(x, start=0, end=1, name=name), name=name)
+        n = g.op.SqueezeAnyOpset(g.op.Shape(x, name=name), name=name)
         abs_k = abs(diagonal)
         if abs_k == 0:
             size = n
@@ -3084,16 +3085,18 @@ def aten_diag(
         out_shape = g.op.Concat(size_1d, size_1d, axis=0, name=name)
         # Zero matrix of the right dtype
         zeros = g.op.ConstantOfShape(
-            out_shape,
-            value=onh.from_array(np.array(0, dtype=npdtype).reshape([1])),
-            name=name,
+            out_shape, value=onh.from_array(np.array(0, dtype=npdtype).reshape([1])), name=name
         )
         # Row indices [row_start, ..., row_start + n - 1]
         row_end = g.op.Add(n, np.array(row_start, dtype=np.int64), name=name)
-        row_idx = g.op.Range(np.array(row_start, dtype=np.int64), row_end, g.ONE_NO_DIM, name=name)
+        row_idx = g.op.Range(
+            np.array(row_start, dtype=np.int64), row_end, g.ONE_NO_DIM, name=name
+        )
         # Col indices [col_start, ..., col_start + n - 1]
         col_end = g.op.Add(n, np.array(col_start, dtype=np.int64), name=name)
-        col_idx = g.op.Range(np.array(col_start, dtype=np.int64), col_end, g.ONE_NO_DIM, name=name)
+        col_idx = g.op.Range(
+            np.array(col_start, dtype=np.int64), col_end, g.ONE_NO_DIM, name=name
+        )
         # Combine into [n, 2] index tensor
         row_2d = g.op.Reshape(row_idx, np.array([-1, 1], dtype=np.int64), name=name)
         col_2d = g.op.Reshape(col_idx, np.array([-1, 1], dtype=np.int64), name=name)
@@ -3115,10 +3118,14 @@ def aten_diag(
         length = g.op.Max(length_raw, g.ZERO_NO_DIM, name=name)
         # Row indices [row_start, ..., row_start + length - 1]
         row_end = g.op.Add(length, np.array(row_start, dtype=np.int64), name=name)
-        row_idx = g.op.Range(np.array(row_start, dtype=np.int64), row_end, g.ONE_NO_DIM, name=name)
+        row_idx = g.op.Range(
+            np.array(row_start, dtype=np.int64), row_end, g.ONE_NO_DIM, name=name
+        )
         # Col indices [col_start, ..., col_start + length - 1]
         col_end = g.op.Add(length, np.array(col_start, dtype=np.int64), name=name)
-        col_idx = g.op.Range(np.array(col_start, dtype=np.int64), col_end, g.ONE_NO_DIM, name=name)
+        col_idx = g.op.Range(
+            np.array(col_start, dtype=np.int64), col_end, g.ONE_NO_DIM, name=name
+        )
         # Combine into [length, 2] index tensor
         row_2d = g.op.Reshape(row_idx, np.array([-1, 1], dtype=np.int64), name=name)
         col_2d = g.op.Reshape(col_idx, np.array([-1, 1], dtype=np.int64), name=name)
