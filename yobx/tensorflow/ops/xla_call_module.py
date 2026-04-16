@@ -343,7 +343,8 @@ def convert_exp(
     import jax.extend.mlir
 
     hlo_module = op.get_attr("module")
-    decoded_module = jax.extend.mlir.deserialize_portable_artifact(hlo_module)
+    with jax.extend.mlir.make_ir_context():
+        decoded_module = jax.extend.mlir.deserialize_portable_artifact(hlo_module)
     layers = parse_mlir(decoded_module)
     results: Dict[str, str] = {}
 
