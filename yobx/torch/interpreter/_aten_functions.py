@@ -12233,10 +12233,11 @@ def aten_signbit(
 ) -> T:
     """Returns a boolean tensor indicating where the input has a negative sign bit.
 
-    For floating-point types this includes negative zero (``-0.0``), since
-    ``-0.0 < 0`` is ``False`` in IEEE 754 but ``signbit(-0.0)`` is ``True``.
-    The formula ``(x < 0) OR (x == 0 AND 1/x < 0)`` detects negative zero via
-    ``1 / -0.0 == -inf``.  For integer types a simple ``x < 0`` suffices.
+    For floating-point types this includes negative zero (``-0.0``), which has
+    its IEEE 754 sign bit set even though ``-0.0 < 0`` is ``False``.  The
+    implementation reinterprets the float bits as an unsigned integer with
+    ``BitCast`` (requires opset >= 21) and extracts the sign bit with
+    ``BitwiseAnd``.  For integer types a simple ``x < 0`` comparison suffices.
 
     Returns:
         A boolean tensor with the same shape as *x*; ``True`` where the sign
@@ -12244,23 +12245,29 @@ def aten_signbit(
     """
     assert g.has_type(x), f"Type missing for {x!r}{g.get_debug_msg()}"
     itype = g.get_type(x)
-    np_dtype = tensor_dtype_to_np_dtype(itype)
-    zero = np.array(0, dtype=np_dtype)
 
-    if itype in {
-        TensorProto.FLOAT,
-        TensorProto.DOUBLE,
-        TensorProto.FLOAT16,
-        TensorProto.BFLOAT16,
-    }:
-        one = np.array(1, dtype=np_dtype)
-        lt_zero = g.op.Less(x, zero, name=name)
-        eq_zero = g.op.Equal(x, zero, name=name)
-        inv_lt_zero = g.op.Less(g.op.Div(one, x, name=name), zero, name=name)
-        res = g.op.Or(
-            lt_zero, g.op.And(eq_zero, inv_lt_zero, name=name), outputs=outputs, name=name
-        )
+    # Float-type → (uint reinterpretation type, sign-bit mask)
+    _FLOAT_SIGN = {
+        TensorProto.FLOAT: (TensorProto.UINT32, np.uint32(0x80000000)),
+        TensorProto.DOUBLE: (TensorProto.UINT64, np.uint64(0x8000000000000000)),
+        TensorProto.FLOAT16: (TensorProto.UINT16, np.uint16(0x8000)),
+        TensorProto.BFLOAT16: (TensorProto.UINT16, np.uint16(0x8000)),
+    }
+
+    if itype in _FLOAT_SIGN:
+        if g.main_opset < 21:
+            raise FunctionNotFoundError(
+                f"signbit for floating-point inputs requires opset >= 21 "
+                f"(BitCast not available in opset {g.main_opset}){g.get_debug_msg()}"
+            )
+        uint_itype, sign_mask = _FLOAT_SIGN[itype]
+        bits = g.op.BitCast(x, to=uint_itype, name=name)
+        masked = g.op.BitwiseAnd(bits, np.array(sign_mask), name=name)
+        res = g.op.Cast(masked, to=TensorProto.BOOL, outputs=outputs, name=name)
     else:
+        # Integer types: sign bit is equivalent to x < 0.
+        np_dtype = tensor_dtype_to_np_dtype(itype)
+        zero = np.array(0, dtype=np_dtype)
         res = g.op.Less(x, zero, outputs=outputs, name=name)
 
     if not sts:
