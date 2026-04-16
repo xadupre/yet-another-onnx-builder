@@ -1122,3 +1122,65 @@ class LayerNorm(torch.nn.Module):
 
     _inputs = [(torch.rand(3, 4),), (torch.rand(5, 4),)]
     _dynamic = {"x": {0: DIM("batch")}}
+
+
+try:
+    # TinyLLM requires transformers; skip definition if it is not installed.
+    from ..in_transformers.cache_helper import make_dynamic_cache as _make_dynamic_cache
+    from ..tiny_models import get_tiny_model as _get_tiny_model
+
+    _bsize, _nheads, _slen, _dim = 2, 1, 30, 96
+
+    class TinyLLM(torch.nn.Module):
+        """
+        Wraps ``arnir0/Tiny-LLM`` as a minimal eval case.
+
+        The wrapper accepts the five positional arguments listed below,
+        assembles a :class:`transformers.cache_utils.DynamicCache` from the
+        two past-KV tensors, and runs the inner
+        :class:`~transformers.AutoModelForCausalLM` model.  Returns the
+        ``logits`` tensor only so that all inputs and outputs are plain
+        :class:`torch.Tensor` objects.
+
+        Positional arguments:
+
+        * ``input_ids``     – ``(batch, seq_length)``  int64
+        * ``attention_mask`` – ``(batch, past_length + seq_length)``  int64
+        * ``position_ids``  – ``(batch, seq_length)``  int64
+        * ``past_key_0``    – ``(batch, n_heads, past_length, head_dim)``  float32
+        * ``past_value_0``  – ``(batch, n_heads, past_length, head_dim)``  float32
+        """
+
+        def __init__(self):
+            super().__init__()
+            self._model = _get_tiny_model("arnir0/Tiny-LLM").model
+
+        def forward(self, input_ids, attention_mask, position_ids, past_key_0, past_value_0):
+            """Performs the forward pass and returns the logits tensor."""
+            past_key_values = _make_dynamic_cache([(past_key_0, past_value_0)])
+            return self._model(
+                input_ids=input_ids,
+                attention_mask=attention_mask,
+                position_ids=position_ids,
+                past_key_values=past_key_values,
+            ).logits
+
+        _inputs = [
+            (
+                torch.randint(15, size=(_bsize, 3), dtype=torch.int64),
+                torch.ones(_bsize, _slen + 3, dtype=torch.int64),
+                torch.arange(3, dtype=torch.int64).unsqueeze(0).expand(_bsize, -1).clone(),
+                torch.zeros(_bsize, _nheads, _slen, _dim),
+                torch.zeros(_bsize, _nheads, _slen, _dim),
+            )
+        ]
+        _dynamic = {
+            "input_ids": {0: DYN, 1: DYN},
+            "attention_mask": {0: DYN, 1: DYN},
+            "position_ids": {0: DYN, 1: DYN},
+            "past_key_0": {0: DYN, 2: DYN},
+            "past_value_0": {0: DYN, 2: DYN},
+        }
+
+except ImportError:
+    pass
