@@ -3061,48 +3061,39 @@ def aten_diag(
     diagonal: int = 0,
     name: str = "diag",
 ) -> T:
-    """Constructs a diagonal matrix from a 1-D tensor, or extracts the diagonal of a 2-D tensor.
-    """
+    """Constructs a diagonal matrix from a 1-D tensor or extracts the diagonal of a 2-D tensor."""
     assert g.has_rank(x), f"diag: missing rank for {x!r}{g.get_debug_msg()}"
     rank = g.get_rank(x)
     assert rank in (1, 2), f"diag: expected rank 1 or 2, got {rank}{g.get_debug_msg()}"
     assert g.has_type(x), f"diag: missing type for {x!r}{g.get_debug_msg()}"
     itype = g.get_type(x)
-    npdtype = tensor_dtype_to_np_dtype(itype)
     row_start = max(0, -diagonal)
     col_start = max(0, diagonal)
 
     if rank == 1:
-        # 1-D vector -> 2-D diagonal matrix
+        # 1-D vector -> 2-D diagonal matrix via (range == range.T) + cast + mul
         n = g.op.SqueezeAnyOpset(g.op.Shape(x, name=name), name=name)
         abs_k = abs(diagonal)
         if abs_k == 0:
             size = n
         else:
             size = g.op.Add(n, np.array(abs_k, dtype=np.int64), name=name)
-        # Build output shape [size, size]
-        size_1d = g.op.Reshape(size, np.array([1], dtype=np.int64), name=name)
-        out_shape = g.op.Concat(size_1d, size_1d, axis=0, name=name)
-        # Zero matrix of the right dtype
-        zeros = g.op.ConstantOfShape(
-            out_shape, value=onh.from_array(np.array(0, dtype=npdtype).reshape([1])), name=name
+        # arange [0, ..., size-1]; r is a column vector, c is a row vector ("range.T")
+        arange = g.op.Range(g.ZERO_NO_DIM, size, g.ONE_NO_DIM, name=name)
+        r = g.op.Reshape(arange, np.array([-1, 1], dtype=np.int64), name=name)
+        c = g.op.Reshape(arange, np.array([1, -1], dtype=np.int64), name=name)
+        # mask[i, j] is True where j - i == diagonal
+        mask = g.op.Equal(
+            g.op.Sub(c, r, name=name), np.array(diagonal, dtype=np.int64), name=name
         )
-        # Row indices [row_start, ..., row_start + n - 1]
-        row_end = g.op.Add(n, np.array(row_start, dtype=np.int64), name=name)
-        row_idx = g.op.Range(
-            np.array(row_start, dtype=np.int64), row_end, g.ONE_NO_DIM, name=name
+        mask_float = g.op.Cast(mask, to=itype, name=name)
+        # Pad x to length size (row_start zeros before, col_start zeros after)
+        x_col = g.op.Reshape(
+            g.op.Pad(x, np.array([row_start, col_start], dtype=np.int64), name=name),
+            np.array([-1, 1], dtype=np.int64),
+            name=name,
         )
-        # Col indices [col_start, ..., col_start + n - 1]
-        col_end = g.op.Add(n, np.array(col_start, dtype=np.int64), name=name)
-        col_idx = g.op.Range(
-            np.array(col_start, dtype=np.int64), col_end, g.ONE_NO_DIM, name=name
-        )
-        # Combine into [n, 2] index tensor
-        row_2d = g.op.Reshape(row_idx, np.array([-1, 1], dtype=np.int64), name=name)
-        col_2d = g.op.Reshape(col_idx, np.array([-1, 1], dtype=np.int64), name=name)
-        indices = g.op.Concat(row_2d, col_2d, axis=1, name=name)
-        # Scatter values onto the zero matrix
-        res = g.op.ScatterND(zeros, indices, x, name=name, outputs=outputs)
+        res = g.op.Mul(mask_float, x_col, name=name, outputs=outputs)
         if not sts:
             g.set_type(res, itype)
             g.set_rank(res, 2)
