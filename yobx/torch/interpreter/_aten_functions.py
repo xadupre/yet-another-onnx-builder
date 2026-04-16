@@ -12255,9 +12255,9 @@ def aten_signbit(
     }
 
     if itype in _FLOAT_SIGN:
-        if g.main_opset < 21:
+        if g.main_opset < 26:
             raise FunctionNotFoundError(
-                f"signbit for floating-point inputs requires opset >= 21 "
+                f"signbit for floating-point inputs requires opset >= 26 "
                 f"(BitCast not available in opset {g.main_opset}){g.get_debug_msg()}"
             )
         uint_itype, sign_mask = _FLOAT_SIGN[itype]
