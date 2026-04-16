@@ -3074,19 +3074,13 @@ def aten_diag(
     if rank == 1:
         # 1-D vector -> 2-D diagonal matrix
         n = g.op.SqueezeAnyOpset(g.op.Shape(x, start=0, end=1, name=name), name=name)
-        g.set_type(n, TensorProto.INT64)
-        g.set_shape(n, tuple())
         abs_k = abs(diagonal)
         if abs_k == 0:
             size = n
         else:
             size = g.op.Add(n, np.array(abs_k, dtype=np.int64), name=name)
-            g.set_type(size, TensorProto.INT64)
-            g.set_shape(size, tuple())
         # Build output shape [size, size]
         size_1d = g.op.Reshape(size, np.array([1], dtype=np.int64), name=name)
-        g.set_type(size_1d, TensorProto.INT64)
-        g.set_shape(size_1d, (None,))
         out_shape = g.op.Concat(size_1d, size_1d, axis=0, name=name)
         # Zero matrix of the right dtype
         zeros = g.op.ConstantOfShape(
@@ -3094,32 +3088,16 @@ def aten_diag(
             value=onh.from_array(np.array(0, dtype=npdtype).reshape([1])),
             name=name,
         )
-        g.set_type(zeros, itype)
-        g.set_rank(zeros, 2)
         # Row indices [row_start, ..., row_start + n - 1]
         row_end = g.op.Add(n, np.array(row_start, dtype=np.int64), name=name)
-        g.set_type(row_end, TensorProto.INT64)
-        g.set_shape(row_end, tuple())
         row_idx = g.op.Range(np.array(row_start, dtype=np.int64), row_end, g.ONE_NO_DIM, name=name)
-        g.set_type(row_idx, TensorProto.INT64)
-        g.set_rank(row_idx, 1)
         # Col indices [col_start, ..., col_start + n - 1]
         col_end = g.op.Add(n, np.array(col_start, dtype=np.int64), name=name)
-        g.set_type(col_end, TensorProto.INT64)
-        g.set_shape(col_end, tuple())
         col_idx = g.op.Range(np.array(col_start, dtype=np.int64), col_end, g.ONE_NO_DIM, name=name)
-        g.set_type(col_idx, TensorProto.INT64)
-        g.set_rank(col_idx, 1)
         # Combine into [n, 2] index tensor
         row_2d = g.op.Reshape(row_idx, np.array([-1, 1], dtype=np.int64), name=name)
-        g.set_type(row_2d, TensorProto.INT64)
-        g.set_rank(row_2d, 2)
         col_2d = g.op.Reshape(col_idx, np.array([-1, 1], dtype=np.int64), name=name)
-        g.set_type(col_2d, TensorProto.INT64)
-        g.set_rank(col_2d, 2)
         indices = g.op.Concat(row_2d, col_2d, axis=1, name=name)
-        g.set_type(indices, TensorProto.INT64)
-        g.set_rank(indices, 2)
         # Scatter values onto the zero matrix
         res = g.op.ScatterND(zeros, indices, x, name=name, outputs=outputs)
         if not sts:
@@ -3130,47 +3108,21 @@ def aten_diag(
         # 2-D matrix -> 1-D diagonal vector
         m = g.op.SqueezeAnyOpset(g.op.Shape(x, start=0, end=1, name=name), name=name)
         n = g.op.SqueezeAnyOpset(g.op.Shape(x, start=1, end=2, name=name), name=name)
-        g.set_type(m, TensorProto.INT64)
-        g.set_shape(m, tuple())
-        g.set_type(n, TensorProto.INT64)
-        g.set_shape(n, tuple())
         # length = max(0, min(m - row_start, n - col_start))
         m_avail = g.op.Sub(m, np.array(row_start, dtype=np.int64), name=name)
         n_avail = g.op.Sub(n, np.array(col_start, dtype=np.int64), name=name)
-        g.set_type(m_avail, TensorProto.INT64)
-        g.set_shape(m_avail, tuple())
-        g.set_type(n_avail, TensorProto.INT64)
-        g.set_shape(n_avail, tuple())
         length_raw = g.op.Min(m_avail, n_avail, name=name)
-        g.set_type(length_raw, TensorProto.INT64)
-        g.set_shape(length_raw, tuple())
         length = g.op.Max(length_raw, g.ZERO_NO_DIM, name=name)
-        g.set_type(length, TensorProto.INT64)
-        g.set_shape(length, tuple())
         # Row indices [row_start, ..., row_start + length - 1]
         row_end = g.op.Add(length, np.array(row_start, dtype=np.int64), name=name)
-        g.set_type(row_end, TensorProto.INT64)
-        g.set_shape(row_end, tuple())
         row_idx = g.op.Range(np.array(row_start, dtype=np.int64), row_end, g.ONE_NO_DIM, name=name)
-        g.set_type(row_idx, TensorProto.INT64)
-        g.set_rank(row_idx, 1)
         # Col indices [col_start, ..., col_start + length - 1]
         col_end = g.op.Add(length, np.array(col_start, dtype=np.int64), name=name)
-        g.set_type(col_end, TensorProto.INT64)
-        g.set_shape(col_end, tuple())
         col_idx = g.op.Range(np.array(col_start, dtype=np.int64), col_end, g.ONE_NO_DIM, name=name)
-        g.set_type(col_idx, TensorProto.INT64)
-        g.set_rank(col_idx, 1)
         # Combine into [length, 2] index tensor
         row_2d = g.op.Reshape(row_idx, np.array([-1, 1], dtype=np.int64), name=name)
-        g.set_type(row_2d, TensorProto.INT64)
-        g.set_rank(row_2d, 2)
         col_2d = g.op.Reshape(col_idx, np.array([-1, 1], dtype=np.int64), name=name)
-        g.set_type(col_2d, TensorProto.INT64)
-        g.set_rank(col_2d, 2)
         indices = g.op.Concat(row_2d, col_2d, axis=1, name=name)
-        g.set_type(indices, TensorProto.INT64)
-        g.set_rank(indices, 2)
         # Gather diagonal elements
         res = g.op.GatherND(x, indices, batch_dims=0, name=name, outputs=outputs)
         if not sts:
