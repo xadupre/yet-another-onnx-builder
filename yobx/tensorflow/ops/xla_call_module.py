@@ -341,6 +341,10 @@ def convert_exp(
     comparison ops.
     """
     import jax.extend.mlir
+
+    # make_ir_context is not exposed in the public jax.extend.mlir namespace;
+    # it lives in jax._src.interpreters.mlir and registers all required dialects
+    # (StableHLO, MHLO, CHLO, …) that deserialize_portable_artifact depends on.
     from jax._src.interpreters.mlir import make_ir_context
 
     hlo_module = op.get_attr("module")
