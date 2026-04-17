@@ -3129,6 +3129,83 @@ def aten_diag(
         return res
 
 
+def aten_diag_embed(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    offset: int = 0,
+    dim1: int = -2,
+    dim2: int = -1,
+    name: str = "diag_embed",
+) -> T:
+    """Embeds the values of x as diagonals in a new 2-D subspace of the output tensor."""
+    assert g.has_rank(x), f"diag_embed: missing rank for {x!r}{g.get_debug_msg()}"
+    assert g.has_type(x), f"diag_embed: missing type for {x!r}{g.get_debug_msg()}"
+    rank = g.get_rank(x)  # input rank (>= 1)
+    itype = g.get_type(x)
+    out_rank = rank + 1  # output rank
+    row_start = max(0, -offset)
+    col_start = max(0, offset)
+
+    # Normalize dim1, dim2 relative to the output rank
+    dim1_norm = dim1 if dim1 >= 0 else dim1 + out_rank
+    dim2_norm = dim2 if dim2 >= 0 else dim2 + out_rank
+
+    # n = last dimension of x (length of the diagonal to embed)
+    n = g.op.SqueezeAnyOpset(g.op.Shape(x, start=rank - 1, end=rank, name=name), name=name)
+    abs_k = abs(offset)
+    if abs_k == 0:
+        size = n
+    else:
+        size = g.op.Add(n, np.array(abs_k, dtype=np.int64), name=name)
+
+    # Build [size, size] mask via range == range.T: mask[i, j] = (j - i == offset)
+    arange = g.op.Range(g.ZERO_NO_DIM, size, g.ONE_NO_DIM, name=name)
+    r = g.op.Reshape(arange, np.array([-1, 1], dtype=np.int64), name=name)
+    c = g.op.Reshape(arange, np.array([1, -1], dtype=np.int64), name=name)
+    mask = g.op.Equal(g.op.Sub(c, r, name=name), np.array(offset, dtype=np.int64), name=name)
+    mask_float = g.op.Cast(mask, to=itype, name=name)  # [size, size]
+
+    # Pad x along the last dimension: [row_start zeros] ++ x ++ [col_start zeros]
+    # ONNX Pad pads: [begin_0, ..., begin_{rank-1}, end_0, ..., end_{rank-1}]
+    pads = np.array(
+        [0] * (rank - 1) + [row_start] + [0] * (rank - 1) + [col_start], dtype=np.int64
+    )
+    padded = g.op.Pad(x, pads, name=name)  # (*batch, size)
+
+    # Add trailing dim for broadcast: (*batch, size, 1)
+    x_col = g.op.UnsqueezeAnyOpset(padded, g.MINUS_ONE, name=name)
+
+    # Multiply: (*batch, size, 1) * (size, size) -> (*batch, size, size)
+    # The 2-D diagonal plane is currently at the last two dims (out_rank-2, out_rank-1)
+    result = g.op.Mul(mask_float, x_col, name=name)
+
+    # If dim1/dim2 are not the last two dims, transpose to put them in the right positions
+    if dim1_norm != out_rank - 2 or dim2_norm != out_rank - 1:
+        # Build permutation: output position d comes from:
+        #   dim1_norm -> rank-1   (first plane dim in result, = out_rank-2)
+        #   dim2_norm -> out_rank-1 (second plane dim in result)
+        #   others    -> batch dims 0..rank-2 in order
+        batch_idx = 0
+        perm = [0] * out_rank
+        for d in range(out_rank):
+            if d == dim1_norm:
+                perm[d] = rank - 1
+            elif d == dim2_norm:
+                perm[d] = out_rank - 1
+            else:
+                perm[d] = batch_idx
+                batch_idx += 1
+        res = g.op.Transpose(result, perm=perm, name=name, outputs=outputs)
+    else:
+        res = g.op.Identity(result, name=name, outputs=outputs)
+    if not sts:
+        g.set_type(res, itype)
+        g.set_rank(res, out_rank)
+    return res
+
+
 def aten_div(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T, name="div"
 ) -> T:
