@@ -630,8 +630,19 @@ def aten_meth_to(
             continue
         if isinstance(a, bool):  # copy, non_blocking
             continue
+        if isinstance(a, str):
+            vs = g.get_constant(a, computed_value=True, exc=False)
+            if vs is not None and len(vs.shape) == 0:
+                if vs.dtype == np.int64:
+                    # This is a dtype.
+                    dtype = int(vs)
+                    continue
+                if vs.dtype == np.int32:
+                    # This is a device.
+                    device = int(vs)
+                    continue
         raise NotImplementedError(
-            f"Unexpected type for argument {type(a)}, iunput_name={input_name!r} "
+            f"Unexpected type for argument {type(a)}, input_name={input_name!r} "
             f"args={args}{g.get_debug_msg()}"
         )
     assert dtype is not None or device is not None, "dtype or device cannot be None for method to"

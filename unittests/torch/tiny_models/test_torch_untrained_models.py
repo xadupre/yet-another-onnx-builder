@@ -517,7 +517,6 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         # del inputs["position_ids"]
         # del ds["position_ids"]
         # del b1["position_ids"]
-        print("***", ds)
 
         expected_b1 = model(**torch_deepcopy(b1))
 

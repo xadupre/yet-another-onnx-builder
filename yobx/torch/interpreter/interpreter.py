@@ -1395,9 +1395,10 @@ class DynamoInterpreter:
                             )
                         )
                     else:
+                        # should be implemented something for rank>1?
                         assert self.builder.get_rank(i) == 1, (
-                            f"Unexpected rank={self.builder.get_rank(i)} for {i!r}"
-                            f"{self.builder.get_debug_msg()}"
+                            f"Unexpected rank={self.builder.get_rank(i)} for {i!r}, "
+                            f"ends={ends!r}{self.builder.get_debug_msg()}"
                         )
                         iends.append(i)
                 else:

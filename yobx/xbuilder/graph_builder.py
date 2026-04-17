@@ -253,6 +253,7 @@ class GraphBuilder(
     ZERO_NO_DIM = np.array(0, dtype=np.int64)
     # MAXINT for int64, means a slice goes up to the last element
     END = np.array([9223372036854775807], dtype=np.int64)
+    UNKNOWN_DEVICE = -999999
 
     WrapSym = _WrapSym
     WrapDim = _WrapDim
@@ -2126,12 +2127,16 @@ class GraphBuilder(
             return self._known_value_shape[name]
         if (
             self.has_type(name)
-            and self.get_type(name) == TensorProto.INT64
+            and self.get_type(name) in (TensorProto.INT64, TensorProto.INT32)
             and self.is_constant(name)
         ):
             # It is probably a shape because the user requested it as a shape.
             cst = self.get_constant(name, exc=False, computed_value=True)
-            if cst is not None and len(cst.shape) == 1 and cst.dtype == np.int64:  # type: ignore
+            if (
+                cst is not None
+                and len(cst.shape) == 1
+                and (cst.dtype == np.int64 or cst.dtype == np.int32)  # type: ignore
+            ):
                 value = tuple(map(int, cst))  # type: ignore
                 self._set_known_value_shape(name, value)
                 return value

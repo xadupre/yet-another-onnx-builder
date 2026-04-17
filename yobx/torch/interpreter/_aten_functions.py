@@ -4863,10 +4863,13 @@ def aten_getattr(
         return res
 
     if attr_name == "device":
-        assert g.has_device(x), f"Missing device for {x!r}{g.get_debug_msg()}"
-        res = g.op.Identity(np.array(g.get_device(x), dtype=np.int64), outputs=outputs, name=name)
+        res = g.op.Identity(
+            np.array(g.get_device(x) if g.has_device(x) else g.UNKNOWN_DEVICE, dtype=np.int32),
+            outputs=outputs,
+            name=name,
+        )
         if not sts:
-            g.set_type(res, TensorProto.INT64)
+            g.set_type(res, TensorProto.INT32)
             g.set_shape(res, tuple())
         return res
 
