@@ -3267,6 +3267,7 @@ def aten_div_Tensor_mode(
 ) -> T:
     "div_Tensor_mode"
     if rounding_mode is None:
+        # if it is an integer, we should check is it consistent
         return aten_div(g, sts, outputs, x, y, name=name)
 
     assert g.has_type(x) or g.has_type(
