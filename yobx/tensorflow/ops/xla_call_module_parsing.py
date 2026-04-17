@@ -389,7 +389,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
             r"(?:[^\n]*loc\(([^)]*)\))?"
         ),
         # stablehlo.get_dimension_size
-        (r"(%\w+)\s*=\s*stablehlo\.get_dimension_size\s+%\w+[^\n]*(?:loc\(([^)]*)\))?"),
+        (r"(%\w+)\s*=\s*stablehlo\.get_dimension_size\s+%\w+[^\n]*"),
     ]
     for pattern in skip_patterns:
         for m in re.finditer(pattern, scan_text):
