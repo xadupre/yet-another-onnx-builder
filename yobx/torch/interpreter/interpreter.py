@@ -1395,11 +1395,11 @@ class DynamoInterpreter:
                             )
                         )
                     else:
-                        # should be implemented something for rank>1?
-                        assert self.builder.get_rank(i) == 1, (
-                            f"Unexpected rank={self.builder.get_rank(i)} for {i!r}, "
-                            f"ends={ends!r}{self.builder.get_debug_msg()}"
-                        )
+                        rank = self.builder.get_rank(i)
+                        if rank > 1:
+                            i = self.builder.op.Reshape(
+                                i, np.array([-1], dtype=np.int64), name=f"{name}CF"
+                            )
                         iends.append(i)
                 else:
                     assert isinstance(
@@ -1441,10 +1441,11 @@ class DynamoInterpreter:
                             )
                         )
                     else:
-                        assert self.builder.get_rank(si) == 1, (
-                            f"Unexpected rank={self.builder.get_rank(i)} for {si!r}"
-                            f"{self.builder.get_debug_msg()}"
-                        )
+                        rank = self.builder.get_rank(si)
+                        if rank > 1:
+                            si = self.builder.op.Reshape(
+                                si, np.array([-1], dtype=np.int64), name=f"{name}SCF"
+                            )
                         istarts.append(si)
                 else:
                     assert isinstance(
