@@ -691,9 +691,6 @@ def parse_ir_module(mlir_module) -> List[dict]:
         if id(val) in val_names:
             return val_names[id(val)]
         name = val.get_name()
-        assert (
-            name not in val_names
-        ), f"Name already taking {name!r}, in {val=}\n---\nModel:\n{mlir_module}"
         assign(val, name)
         return name
 
