@@ -799,16 +799,26 @@ def parse_ir_module(mlir_module) -> List[dict]:
     # ------------------------------------------------------------------
     main_func = None
     wrapped_func = None
+    first_func = None  # fallback: first function-like op in the module
 
     for op in mlir_module.body.operations:
-        if op.name != "func.func":
+        # Accept both "func.func" (standard) and "func" (some MLIR dialects).
+        # Also accept any op that carries a sym_name attribute (function-like).
+        if op.name not in ("func.func", "func") and _try_attr(op, "sym_name") is None:
             continue
         name = _sym_name(op)
+        if first_func is None and name:
+            first_func = op
         if _is_public(op) and main_func is None:
             main_func = op
         if name == "_wrapped_jax_export_main":
             wrapped_func = op
 
+    # Fall back to the first function found when no function was explicitly
+    # marked public.  Some JAX 0.10 modules omit the sym_visibility attribute
+    # entirely on the main function.
+    if main_func is None:
+        main_func = first_func
     if main_func is None:
         raise ValueError("parse_ir_module: no public function found in ir.Module")
 
