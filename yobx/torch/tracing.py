@@ -1194,13 +1194,9 @@ class CustomTracer(torch.fx.Tracer):
         # (e.g. <class 'transformers.cache_utils.DynamicLayer'>) directly into the
         # generated graph source code, producing a SyntaxError when that code is
         # later compiled by _make_graph_module.
-        try:
-            import transformers.cache_utils as _cu
+        from transformers.cache_utils import DynamicCache as _DynCache
 
-            _DynCache = _cu.DynamicCache
-        except (ImportError, AttributeError):
-            _DynCache = None
-        if _DynCache is not None and isinstance(a, _DynCache):
+        if isinstance(a, _DynCache):
             from .in_transformers.cache_helper import CacheKeyValue, make_dynamic_cache
 
             capi = CacheKeyValue(a)
