@@ -350,6 +350,11 @@ def convert_exp(
     hlo_module = op.get_attr("module")
     with make_ir_context():
         decoded_module = jax.extend.mlir.deserialize_portable_artifact(hlo_module)
+        # JAX 0.10+ returns an ir.Module object; convert to text while the context
+        # is still active so that downstream string-based parsing works with both
+        # JAX 0.9 (which returned str) and JAX 0.10+ (which returns ir.Module).
+        if not isinstance(decoded_module, str):
+            decoded_module = str(decoded_module)
     layers = parse_mlir(decoded_module)
     results: Dict[str, str] = {}
 
