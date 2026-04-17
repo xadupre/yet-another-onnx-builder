@@ -662,7 +662,7 @@ def parse_mlir(mlir_string: str) -> List[dict]:
 
 
 def parse_ir_module(mlir_module) -> List[dict]:
-    """Parse an MLIR ``ir.Module`` using Python bindings (JAX 0.10+).
+    """Parses an MLIR ``ir.Module`` using Python bindings (JAX 0.10+).
 
     Walks MLIR operations directly without converting the module to a text
     string, so ``loc(...)`` annotations are not required.  Returns the same
@@ -673,7 +673,9 @@ def parse_ir_module(mlir_module) -> List[dict]:
 
     :param mlir_module: an ``ir.Module`` obtained from
         ``jax.extend.mlir.deserialize_portable_artifact``.
-    :returns: list of layer dicts in the same format as :func:`parse_mlir`.
+
+    Returns:
+        List of layer dicts in the same format as :func:`parse_mlir`.
     """
     from jaxlib.mlir import ir  # available when jaxlib >= 0.4 (JAX 0.10+)
 
@@ -685,29 +687,34 @@ def parse_ir_module(mlir_module) -> List[dict]:
     _counter = [0]
 
     def get_name(val) -> str:
+        """Returns the SSA name previously assigned to *val*, or ``"?"``."""
         return val_names.get(id(val), "?")
 
     def assign(val, name: str) -> str:
+        """Assigns *name* to *val* in the value-name map and returns *name*."""
         val_names[id(val)] = name
         return name
 
     def fresh() -> str:
+        """Returns a fresh sequential SSA name (``%0``, ``%1``, …)."""
         n = f"%{_counter[0]}"
         _counter[0] += 1
         return n
 
     def ttype(val) -> str:
+        """Returns the tensor type string for *val*, or ``""`` if not a tensor."""
         t = str(val.type)
         return t if t.startswith("tensor<") else ""
 
     def _try_attr(op, name):
+        """Returns the named attribute from *op*, or ``None`` if absent."""
         try:
             return op.attributes[name]
         except (KeyError, IndexError):
             return None
 
     def _callee(op) -> str:
-        """Return the callee function name from a func.call / call op."""
+        """Returns the callee function name from a ``func.call`` / ``call`` op."""
         attr = _try_attr(op, "callee")
         if attr is None:
             return ""
@@ -716,7 +723,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
         return m.group(1) if m else s.strip().lstrip("@").strip('"')
 
     def _sym_name(op) -> str:
-        """Return the sym_name attribute of a func.func op as a plain string."""
+        """Returns the ``sym_name`` attribute of a ``func.func`` op as a plain string."""
         attr = _try_attr(op, "sym_name")
         if attr is None:
             return ""
@@ -728,7 +735,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
             return m.group(1) if m else s.strip('"')
 
     def _is_public(op) -> bool:
-        """Return True when a func.func op has public (or absent) visibility."""
+        """Returns ``True`` when a ``func.func`` op has public (or absent) visibility."""
         attr = _try_attr(op, "sym_visibility")
         if attr is None:
             return True  # missing → public by default in func dialect
@@ -738,7 +745,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
             return "public" in str(attr)
 
     def _dense_content(op) -> str:
-        """Extract the content of a ``stablehlo.constant`` value attribute."""
+        """Extracts the content of a ``stablehlo.constant`` value attribute."""
         attr = _try_attr(op, "value")
         if attr is None:
             return ""
@@ -751,7 +758,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
         return s
 
     def _int_list(op, name) -> list:
-        """Extract a list of ints from a dense integer attribute by name."""
+        """Extracts a list of ints from a dense integer attribute by name."""
         attr = _try_attr(op, name)
         if attr is None:
             return []
@@ -763,7 +770,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
         return [int(m.group(1))] if m else []
 
     def _compare_dir(op) -> str:
-        """Extract the comparison direction from a ``stablehlo.compare`` op."""
+        """Extracts the comparison direction from a ``stablehlo.compare`` op."""
         attr = _try_attr(op, "comparison_direction")
         if attr is None:
             return ""
@@ -776,7 +783,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
         return tok[-1] if tok else ""
 
     def _dot_contracting(op):
-        """Return ``(lhs_dims, rhs_dims)`` for a ``stablehlo.dot_general`` op."""
+        """Returns ``(lhs_dims, rhs_dims)`` for a ``stablehlo.dot_general`` op."""
         attr = _try_attr(op, "dot_dimension_numbers")
         if attr is None:
             return [], []
