@@ -414,7 +414,7 @@ XFAIL_OPS_INT32: Dict[str, FrozenSet[str]] = {
         }
     ),
     "tracing": frozenset(),
-    "new-tracing": frozenset(),
+    "new-tracing": frozenset({"true_divide"}),
 }
 
 # Extra exclusions specific to torch.int64.
@@ -482,7 +482,12 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
     # short.int64: FX tracing produces call_method[target=short] with no
     # aten_meth_short converter in the tracing path.
     "tracing": frozenset({"short"}),  # FunctionNotFoundError: aten_meth_short
-    "new-tracing": frozenset({"short"}),  # FunctionNotFoundError: aten_meth_short
+    "new-tracing": frozenset(
+        {
+            "short",  # FunctionNotFoundError: aten_meth_short
+            "true_divide",  # true_divide disappears
+        }
+    ),
 }
 
 # Per-op absolute tolerance overrides for torch.float16.
