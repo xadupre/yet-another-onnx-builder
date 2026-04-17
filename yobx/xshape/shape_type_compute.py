@@ -1425,7 +1425,12 @@ def _set_shape_type_op_any_split(self: ShapeBuilder, node: NodeProto):
         _splits_cst = None
         if self.is_constant(node.input[1]):
             spl_cst = self.get_constant(node.input[1])
-            if len(spl_cst.shape) == 1:
+            if isinstance(spl_cst, NodeProto):
+                # constant is not yet evaluated; try value_as_shape instead
+                sv = self.value_as_shape(node.input[1])
+                if isinstance(sv, tuple) and all(isinstance(x, int) for x in sv):
+                    _splits_cst = list(sv)
+            elif len(spl_cst.shape) == 1:
                 _splits_cst = list(self.get_constant(node.input[1]))
             else:
                 split_size = int(spl_cst)
@@ -2107,8 +2112,8 @@ def _set_shape_type_op_any_identity(self: ShapeBuilder, node: NodeProto):
 
 def _set_shape_type_op_any_shape(self: ShapeBuilder, node: NodeProto):
     "Sets the output type and rank for Shape op."
-    if self.has_device(node.input[0]):
-        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if not self.has_device(node.output[0]):
+        self.set_device(node.output[0], -1)
     if not self.has_type(node.output[0]):
         self.set_type(node.output[0], TensorProto.INT64)
     if self.has_rank(node.input[0]):
@@ -2707,19 +2712,30 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             # Nothing we can do.
             return
         proto_local_function = self.get_local_function(node.op_type, domain=node.domain)
+        function_inputs = list(proto_local_function.input)
+        # The builder creating the local function can have a different number of
+        # inputs because constants can be promoted as FunctionProto inputs at export.
+        if (
+            len(function_inputs) != len(node.input)
+            and hasattr(local_function_builder, "input_names")
+            and len(local_function_builder.input_names) == len(node.input)
+        ):
+            function_inputs = list(local_function_builder.input_names)
+
         local_shapes = [
             local_function_builder.get_shape(i) if local_function_builder.has_shape(i) else None
-            for i in proto_local_function.input
+            for i in function_inputs
         ]
-        # The builder creating the local function may have less inputs because
-        # when exported to FunctionProto, constants were promoted as inputs.
         assert len(shapes) == len(local_shapes), (
-            f"Mismatch between the number of inputs, node '{node.domain}.{node.op_type}' "
-            f"has {node.input}, function has {proto_local_function.input}{self.get_debug_msg()}"
+            f"Mismatch in the number of provided input shapes for "
+            f"node '{node.domain}.{node.op_type}': node has {node.input} ({len(node.input)}), "
+            f"function has {proto_local_function.input} ({len(proto_local_function.input)}), "
+            f"matched-function-inputs={function_inputs} ({len(function_inputs)})"
+            f"{self.get_debug_msg()}"
         )
         if local_shapes != shapes:
             local_function_builder.reset_types_and_shapes()
-            for ni, i, sh in zip(node.input, proto_local_function.input, shapes):
+            for ni, i, sh in zip(node.input, function_inputs, shapes):
                 if self.has_type(ni):
                     local_function_builder.set_type(i, self.get_type(ni))
                 if self.has_device(ni):

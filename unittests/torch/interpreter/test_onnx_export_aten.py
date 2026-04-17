@@ -211,6 +211,39 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    def test_aten_nn_functional_bilinear(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.randn(5, 3, 4))
+                self.bias = torch.nn.Parameter(torch.randn(5))
+
+            def forward(self, x1, x2):
+                return torch.nn.functional.bilinear(x1, x2, self.weight, self.bias)
+
+        model = Model()
+        x1 = torch.randn(2, 3)
+        x2 = torch.randn(2, 4)
+        expected = model(x1, x2)
+        model_path = self._call_exporter(
+            "test_aten_nn_functional_bilinear", "custom", model, (x1, x2)
+        )
+        check_model(model_path)
+
+        import onnxruntime
+
+        sess_options = onnxruntime.SessionOptions()
+        sess = onnxruntime.InferenceSession(
+            model_path, sess_options=sess_options, providers=["CPUExecutionProvider"]
+        )
+        feeds = dict(
+            zip([i.name for i in sess.get_inputs()], [x1.detach().numpy(), x2.detach().numpy()])
+        )
+        got = sess.run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=1e-5)
+
     def test_aten_nonzero_1(self):
         import torch
 
@@ -2959,8 +2992,7 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model()
         x = torch.tensor([0, 1, 2, 2, 3, 3, 3, 0, 0], dtype=torch.int32)
-        # type in fx graph differs from one we can see here
-        expected = tuple(t.to(torch.int32) for t in model(x))
+        expected_raw = model(x)
         onx = to_onnx(
             model,
             (x,),
@@ -2970,6 +3002,17 @@ class TestOnnxExportAten(ExtTestCase):
             ),
         )
         self.dump_onnx("test_aten_unique_consecutive_return_32.onnx", onx)
+        # Cast expected to ONNX output types: older torch versions report int32 in
+        # the FX graph for inverse/counts even though the runtime returns int64; newer
+        # (nightly) versions correctly report int64.  The ONNX model follows the FX
+        # graph types, so we align the expected values accordingly.
+        _dtype_map = {onnx.TensorProto.INT32: torch.int32, onnx.TensorProto.INT64: torch.int64}
+        onnx_dtypes = [
+            _dtype_map.get(o.type.tensor_type.elem_type, None) for o in onx.graph.output
+        ]
+        expected = tuple(
+            e.to(d) if d is not None else e for e, d in zip(expected_raw, onnx_dtypes)
+        )
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
 
     def test_aten_split_int(self):
@@ -3841,6 +3884,22 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model()
         inputs = (torch.rand((3, 4), dtype=torch.float32) * 0.9,)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_atan2(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, y, x):
+                return torch.atan2(y, x)
+
+        model = Model()
+        # Values covering all four quadrants, x == 0, and y == 0.
+        y = torch.tensor([-1.0, 0.0, 1.0, 0.0, 1.0, -1.0, 0.0])
+        x = torch.tensor([0.0, -1.0, 0.0, 1.0, 1.0, -1.0, 0.0])
+        inputs = (y, x)
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)

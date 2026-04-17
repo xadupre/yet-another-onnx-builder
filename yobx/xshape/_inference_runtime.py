@@ -581,7 +581,7 @@ class _InferenceRuntime:
         assert (
             len(cst.shape) == 0
             or min(cst.shape) > 0
-            or (v.op_type in {"ConstantOfShape", "Cast", "Identity", "Constant"})
+            or (v.op_type in {"ConstantOfShape", "Cast", "Identity", "Constant", "Slice"})
         ), (
             f"Output has empty shape {cst.shape}, name={name!r} "
             f"v.op_type={v.op_type!r}, v.name={v.name!r}{self.get_debug_msg()}"

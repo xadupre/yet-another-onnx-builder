@@ -274,7 +274,7 @@ class ExportOptions:
         if self.remove_inplace:
             if verbose:
                 begin = time.perf_counter()
-                print("[ExportOptions.export] remove inplace nodes")
+                print("[ExportOptions.export] remove inplace nodes (2)")
             modified = self.remove_inplace_nodes(
                 exported_program.graph, exported_program=exported_program, verbose=verbose
             )
@@ -527,7 +527,7 @@ class ExportOptions:
             )
             if self.remove_inplace:
                 if verbose:
-                    print("[ExportOptions.export] remove_inplace_nodes")
+                    print("[ExportOptions.export] remove_inplace_nodes (1)")
                 modified = self.remove_inplace_nodes(graph, verbose=verbose)
                 if verbose:
                     print(f"[ExportOptions.export] done, modified={modified}")
@@ -565,6 +565,10 @@ class ExportOptions:
                 verbose=verbose,
                 module_leaves=self.tracing_module_leaves,
             )
+
+            from .tracing import CustomTracer
+
+            CustomTracer.remove_inplace(graph, verbose=verbose)
 
             if self.save_ep:
                 save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
@@ -732,6 +736,12 @@ class ExportOptions:
         """
         from .tracing import CustomTracer
 
+        autocast_fixed = CustomTracer.fix_autocast_subgraph_dtypes(graph, verbose=verbose)
+        if autocast_fixed and verbose:
+            print(
+                f"[ExportOptions.export] autocast: "
+                f"{autocast_fixed} body subgraph(s) had dtypes fixed"
+            )
         removed = CustomTracer.remove_unnecessary_slices(graph)
         if removed:
             if verbose:

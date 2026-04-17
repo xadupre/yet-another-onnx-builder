@@ -360,7 +360,7 @@ class ControlFlowShapeCheck(torch.nn.Module):
         x1 = x + 1
         y1 = y + 2
         cat = torch.cat([x1, y1], dim=1)
-        torch._check(cat.shape[0] > 0, "batch size must be positive")
+        torch._check(cat.shape[0] > 2)
         if cat.shape[0] > 2:
             return cat / cat.shape[0]
         return cat / cat.ndim
@@ -488,10 +488,10 @@ class ControlFlowNestCond(torch.nn.Module):
 class ControlFlowCondConstant(torch.nn.Module):
     def forward(self, x):
         def true_fn(x):
-            return torch.sin(x) - torch.ones(x.shape, dtype=x.dtype)
+            return torch.sin(x) - torch.ones(x.shape, dtype=x.dtype, device=x.device)
 
         def false_fn(x):
-            return torch.cos(x) + torch.ones((1, 1024), dtype=x.dtype)
+            return torch.cos(x) + torch.ones((1, 1024), dtype=x.dtype, device=x.device)
 
         return torch.cond(x.sum() > 0, true_fn, false_fn, [x])
 
@@ -597,7 +597,7 @@ class ControlFlowScan(torch.nn.Module):
             next_carry = carry + y
             return [next_carry, next_carry]
 
-        init = torch.zeros_like(x[0])
+        init = x.new_zeros(x.shape[1:])
         carry, _out = torch.ops.higher_order.scan(add, [init], [x], additional_inputs=[])
         return carry
 
@@ -781,6 +781,21 @@ class ControlFlowWhileInc(torch.nn.Module):
         return torch._higher_order_ops.while_loop(cond_fn, body_fn, [ci, a, b])
 
     _inputs = [(torch.tensor(1), torch.randn(2, 3), torch.randn(2, 3))]
+    _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}  # type: ignore
+
+
+class ControlFlowWhile(torch.nn.Module):
+    def forward(self, ci, a, b):
+        def cond_fn(i, x, y):
+            return i > 0
+
+        def body_fn(i, x, y):
+            z = x + y
+            return i - 1, z, y - z
+
+        return torch._higher_order_ops.while_loop(cond_fn, body_fn, [ci, a, b])
+
+    _inputs = [(torch.tensor(2), torch.randn(2, 3), torch.randn(2, 3))]
     _dynamic = {}, {0: DYN, 1: DYN}, {0: DYN}  # type: ignore
 
 
@@ -1093,3 +1108,76 @@ class ExportWithNewConstantTo(torch.nn.Module):
 
     _inputs = [(torch.rand((4, 4)),), (torch.rand((5, 6)),)]
     _dynamic = {"x": {0: DIM("batch"), 1: DIM("seq")}}
+
+
+class LayerNorm(torch.nn.Module):
+    """Wraps :class:`torch.nn.LayerNorm` to export it as an ONNX model."""
+
+    def __init__(self):
+        super().__init__()
+        self.layer_norm = torch.nn.LayerNorm(4)
+
+    def forward(self, x):
+        return self.layer_norm(x)
+
+    _inputs = [(torch.rand(3, 4),), (torch.rand(5, 4),)]
+    _dynamic = {"x": {0: DIM("batch")}}
+
+
+_bsize, _nheads, _slen, _dim = 2, 1, 30, 96
+
+
+class TinyLLM(torch.nn.Module):
+    """
+    Wraps ``arnir0/Tiny-LLM`` as a minimal eval case.
+
+    The wrapper accepts the five positional arguments listed below,
+    assembles a :class:`transformers.cache_utils.DynamicCache` from the
+    two past-KV tensors, and runs the inner
+    :class:`~transformers.AutoModelForCausalLM` model.  Returns the
+    ``logits`` tensor only so that all inputs and outputs are plain
+    :class:`torch.Tensor` objects.
+
+    Positional arguments:
+
+    * ``input_ids``     – ``(batch, seq_length)``  int64
+    * ``attention_mask`` – ``(batch, past_length + seq_length)``  int64
+    * ``position_ids``  – ``(batch, seq_length)``  int64
+    * ``past_key_0``    – ``(batch, n_heads, past_length, head_dim)``  float32
+    * ``past_value_0``  – ``(batch, n_heads, past_length, head_dim)``  float32
+    """
+
+    def __init__(self):
+        super().__init__()
+        from ..tiny_models import get_tiny_model
+
+        self._model = get_tiny_model("arnir0/Tiny-LLM").model
+
+    def forward(self, input_ids, attention_mask, position_ids, past_key_0, past_value_0):
+        """Performs the forward pass and returns the logits tensor."""
+        from ..in_transformers.cache_helper import make_dynamic_cache
+
+        past_key_values = make_dynamic_cache([(past_key_0, past_value_0)])
+        return self._model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+        ).logits
+
+    _inputs = [
+        (
+            torch.randint(15, size=(_bsize, 3), dtype=torch.int64),
+            torch.ones(_bsize, _slen + 3, dtype=torch.int64),
+            torch.arange(3, dtype=torch.int64).unsqueeze(0).expand(_bsize, -1).clone(),
+            torch.zeros(_bsize, _nheads, _slen, _dim),
+            torch.zeros(_bsize, _nheads, _slen, _dim),
+        )
+    ]
+    _dynamic = {
+        "input_ids": {0: DYN, 1: DYN},
+        "attention_mask": {0: DYN, 1: DYN},
+        "position_ids": {0: DYN, 1: DYN},
+        "past_key_0": {0: DYN, 2: DYN},
+        "past_value_0": {0: DYN, 2: DYN},
+    }

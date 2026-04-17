@@ -996,7 +996,7 @@ class DynamoInterpreter:
                 allow_empty=True,
             )
 
-        if isinstance(val, (self.torch.SymInt, self.torch.SymFloat)):
+        if isinstance(val, (self.torch.SymInt, self.torch.SymFloat, self.builder.TracingInt)):
             return self.builder.make_dynamic_object(node.name, val, shape_as_input=True)
 
         if isinstance(val, (int, float)):
@@ -1764,8 +1764,11 @@ class DynamoInterpreter:
 
     def _verify_new_shape(self, shape, node):
         for axis, dim in enumerate(shape):
-            if isinstance(dim, self.torch.SymInt):
-                sdim = self.builder._torch_sym_int_to_str(dim)
+            if isinstance(dim, (self.torch.SymInt, self.builder.TracingInt)):
+                if isinstance(dim, self.builder.TracingInt):
+                    sdim = dim.value
+                else:
+                    sdim = self.builder._torch_sym_int_to_str(dim)
                 tokens = parse_expression_tokens(sdim)
                 if len(tokens) == 1:
                     # Only one token, possibly knew
@@ -1795,6 +1798,25 @@ class DynamoInterpreter:
             return name
         if hasattr(i, "name"):
             return i.name
+        if isinstance(i, self.builder.TracingInt):
+            if isinstance(i.value, str) and i.value.startswith("_dyn_"):
+                dyn_names = sorted(
+                    n
+                    for n in self.builder.dynamic_objects
+                    if isinstance(n, str) and n.startswith("_dyn_")
+                )
+                dim_names = sorted(
+                    n
+                    for n in self.builder.dynamic_objects
+                    if isinstance(n, str) and n.startswith("DYN")
+                )
+                if len(dyn_names) == len(dim_names):
+                    mapped = dict(zip(dyn_names, dim_names)).get(i.value)
+                    if mapped is not None:
+                        return mapped
+            return i.value
+        if isinstance(i, self.torch.SymInt):
+            return self.builder._torch_sym_int_to_str(i)
         if isinstance(i, tuple):
             return tuple(self._process_arg(node, aten_name, t) for t in i)
         if isinstance(i, (float, int, tuple, complex)):
@@ -1903,7 +1925,12 @@ class DynamoInterpreter:
                 and len(node.args[0].users) == 1
             )
             # if an int, it cannot be modified inplace
-            or ("val" in node.meta and isinstance(node.meta["val"], (int, self.torch.SymInt)))
+            or (
+                "val" in node.meta
+                and isinstance(
+                    node.meta["val"], (int, self.torch.SymInt, self.builder.TracingInt)
+                )
+            )
         ), (
             f"This is probably one inplace function node={node!r}, "
             f"aten_name={aten_name!r}, node.meta={node.meta!r}, "
@@ -2290,6 +2317,8 @@ class DynamoInterpreter:
                 )
             if isinstance(val, (int, self.torch.SymInt)):
                 return self.torch.SymInt
+            if isinstance(val, self.builder.TracingInt):
+                return self.TracingInt
             if isinstance(val, self.torch.SymBool):
                 return self.torch.SymBool
             if isinstance(val, (float, self.torch.SymFloat)):
@@ -2393,6 +2422,11 @@ class DynamoInterpreter:
                     for t in shape:
                         if isinstance(t, self.builder.torch.SymInt):
                             expr = str(t.node._expr).replace(" ", "")
+                            if expr not in self.builder.dynamic_objects:
+                                # A new shape may be given to a result.
+                                self.builder.add_dynamic_object(expr, t, parse=True)
+                        elif isinstance(t, self.builder.TracingInt) and not t.is_static:
+                            expr = t.value
                             if expr not in self.builder.dynamic_objects:
                                 # A new shape may be given to a result.
                                 self.builder.add_dynamic_object(expr, t, parse=True)
@@ -2756,9 +2790,11 @@ class DynamoInterpreter:
                     )
                     if not builder.has_device(name):
                         builder.set_device(name, val[i].get_device())
-                elif isinstance(val[i], (self.builder.torch.SymInt)):
+                elif isinstance(val[i], (self.builder.torch.SymInt, self.builder.TracingInt)):
                     self.builder.set_shapes_types(
-                        source_node.name, "call_module", (self.builder.torch.SymInt, tuple())
+                        source_node.name,
+                        "call_module",
+                        (self.builder.torch.SymInt, self.builder.TracingInt, tuple()),
                     )
                 elif isinstance(val[i], (self.builder.torch.SymFloat)):
                     self.builder.set_shapes_types(

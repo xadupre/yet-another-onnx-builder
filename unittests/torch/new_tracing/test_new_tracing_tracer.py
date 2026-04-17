@@ -84,6 +84,34 @@ class TestNewTracingTracer(ExtTestCase):
         graph = tracer.trace(model, (torch.randn(3, 5),))
         graph.lint()
 
+    def test_trace_inplace_iadd(self):
+        """Inplace += on a module parameter must appear in the output, not be dead code."""
+
+        class InplaceAddModel(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.bias = torch.ones((1, 4), dtype=torch.float32)
+
+            def forward(self, x):
+                x += self.bias
+                return x
+
+        model = InplaceAddModel()
+        x = torch.rand(3, 4)
+
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (x.clone(),))
+        graph.lint()
+
+        # The inplace add_ should be present and the output should reference it.
+        call_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertGreater(len(call_nodes), 0, "Expected at least one call_function node")
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        # The output must not be the bare input placeholder — it must use the add result.
+        result_node = output_node.args[0]
+        self.assertIsNotNone(result_node)
+        self.assertNotEqual(result_node.op, "placeholder", "Output must not be the raw input")
+
     def test_trace_kwargs(self):
         def add_kw(x, y):
             return x + y
@@ -110,6 +138,54 @@ class TestNewTracingTracer(ExtTestCase):
         graph.lint()
         ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
         self.assertEqual(len(ph_nodes), 2)
+
+    def test_trace_dynamic_shapes_torch_export_dim(self):
+        """GraphTracer accepts torch.export.Dim objects in dynamic_shapes."""
+
+        def add(x, y):
+            return x + y
+
+        batch = torch.export.Dim("batch")
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            add,
+            (torch.randn(4, 8), torch.randn(4, 8)),
+            dynamic_shapes={"x": {0: batch}, "y": {0: batch}},
+        )
+        graph.lint()
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(ph_nodes), 2)
+        # The placeholder meta shapes should be symbolic (TracingInt).
+        from yobx.torch.new_tracing.shape import TracingInt
+
+        for node in ph_nodes:
+            shape = node.meta["val"].shape
+            self.assertIsInstance(shape.dims[0], TracingInt)
+            self.assertEqual(str(shape.dims[0]), "batch")
+
+    def test_trace_dynamic_shapes_dim_dynamic(self):
+        """GraphTracer accepts unnamed Dim hints (Dim.DYNAMIC) in dynamic_shapes."""
+
+        def add(x, y):
+            return x + y
+
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            add,
+            (torch.randn(4, 8), torch.randn(4, 8)),
+            dynamic_shapes={
+                "x": {0: torch.export.Dim.DYNAMIC},
+                "y": {0: torch.export.Dim.DYNAMIC},
+            },
+        )
+        graph.lint()
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(ph_nodes), 2)
+        from yobx.torch.new_tracing.shape import TracingInt
+
+        for node in ph_nodes:
+            shape = node.meta["val"].shape
+            self.assertIsInstance(shape.dims[0], TracingInt)
 
     def test_trace_model_function(self):
         graph = trace_model(lambda x: x * 2, (torch.randn(3, 3),))
@@ -544,6 +620,80 @@ class TestNewTracingTracer(ExtTestCase):
         )
 
     # ------------------------------------------------------------------
+    # torch.ops.higher_order.scan support
+    # ------------------------------------------------------------------
+
+    @unittest.skipIf(
+        not hasattr(getattr(torch.ops, "higher_order", None), "scan"),
+        "torch.ops.higher_order.scan not available",
+    )
+    def test_trace_scan_single_carry_single_output(self):
+        """torch.ops.higher_order.scan is captured as a call_function node."""
+
+        class ScanModel(torch.nn.Module):
+            def forward(self, x):
+                def add(carry, y):
+                    next_carry = carry + y
+                    return [next_carry, next_carry]
+
+                init = torch.zeros_like(x[0])
+                carry, _out = torch.ops.higher_order.scan(add, [init], [x], additional_inputs=[])
+                return carry
+
+        model = ScanModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(3, 4),))
+        graph.lint()
+
+        # Exactly one call_function node with scan target
+        scan_op = torch.ops.higher_order.scan
+        scan_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is scan_op]
+        self.assertEqual(len(scan_nodes), 1, f"Expected 1 scan node, got: {scan_nodes}")
+
+        # The scan body should be registered
+        self.assertTrue(
+            any("scan" in k for k in tracer._sub_tracers),
+            f"No scan sub-tracer found in {list(tracer._sub_tracers)}",
+        )
+
+    @unittest.skipIf(
+        not hasattr(getattr(torch.ops, "higher_order", None), "scan"),
+        "torch.ops.higher_order.scan not available",
+    )
+    def test_trace_scan_cdist(self):
+        """ControlFlowScanCDist-like model is correctly traced."""
+
+        class ScanCDistModel(torch.nn.Module):
+            def forward(self, x):
+                def dist(carry, xi):
+                    sub = carry - xi.reshape((1, -1))
+                    sq = sub * sub
+                    rd = sq.sum(dim=1) ** 0.5
+                    return [carry.clone(), rd]
+
+                _carry, out = torch.ops.higher_order.scan(dist, [x], [x], additional_inputs=[])
+                return out
+
+        model = ScanCDistModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(3, 4),))
+        graph.lint()
+
+        scan_op = torch.ops.higher_order.scan
+        scan_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is scan_op]
+        self.assertEqual(len(scan_nodes), 1)
+
+        # The scan body sub-tracer is registered
+        self.assertTrue(
+            any("scan" in k for k in tracer._sub_tracers),
+            f"No scan sub-tracer: {list(tracer._sub_tracers)}",
+        )
+
+        # get_attr node for the callable exists
+        get_attr_nodes = [n for n in graph.nodes if n.op == "get_attr"]
+        self.assertGreater(len(get_attr_nodes), 0, "No get_attr node for scan callable")
+
+    # ------------------------------------------------------------------
     # module_leaves support
     # ------------------------------------------------------------------
 
@@ -740,6 +890,100 @@ class TestNewTracingTracer(ExtTestCase):
             n for n in graph.nodes if n.op == "call_function" and n.target is model.leaf
         ]
         self.assertEqual(len(leaf_nodes), 1)
+
+
+class TestGraphTracerTorchCheck(ExtTestCase):
+    """Tests for torch._check interception in GraphTracer."""
+
+    def test_handle_check_tracing_bool_registers_condition(self):
+        """_handle_check registers a TracingBool condition so it resolves to True."""
+        if not hasattr(torch, "_check"):
+            return
+        from yobx.torch.new_tracing.tracer import GraphTracer
+        from yobx.torch.new_tracing.shape import (
+            TracingInt,
+            TracingBool,
+            clear_conditions,
+            _known_true_conditions,
+        )
+
+        clear_conditions()
+        tracer = GraphTracer()
+        tb = TracingInt("batch") > 0
+        self.assertIsInstance(tb, TracingBool)
+
+        tracer._handle_check(tb)
+        self.assertIn(tb.value, _known_true_conditions)
+        clear_conditions()
+
+    def test_handle_check_concrete_true_noop(self):
+        """_handle_check silently accepts concrete True."""
+        tracer = GraphTracer()
+        # Must not raise.
+        tracer._handle_check(True)
+
+    def test_handle_check_concrete_false_noop(self):
+        """_handle_check silently accepts concrete False (symbolic dim stored as 0)."""
+        tracer = GraphTracer()
+        # Must not raise even for False – symbolic dims are stored as 0, making
+        # conditions like 0>0 evaluate to False at trace time.
+        tracer._handle_check(False)
+
+    def test_trace_with_torch_check_dynamic_shape(self):
+        """Tracing a model that calls torch._check on a dynamic shape succeeds.
+
+        The assertion uses a symbolic dim; the condition should be registered and
+        any subsequent use of the same condition resolves to True.
+        """
+        if not hasattr(torch, "_check"):
+            return
+        from yobx.torch.new_tracing.tracer import GraphTracer
+        from yobx.torch.new_tracing.shape import clear_conditions
+
+        class ModelWithCheck(torch.nn.Module):
+            def forward(self, x):
+                # x.shape[0] is TracingInt("batch") during tracing.
+                torch._check(x.shape[0] > 0)
+                return x + 1
+
+        clear_conditions()
+        model = ModelWithCheck()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(4, 8),), dynamic_shapes={"x": {0: "batch"}})
+        graph.lint()
+        clear_conditions()
+
+    def test_trace_with_torch_check_condition_resolves_if(self):
+        """torch._check registers a condition that resolves a later if-guard.
+
+        The model calls torch._check(x.shape[0] > 0) and then uses
+        ``if x.shape[0] > 0:`` as a guard.  During tracing the condition should
+        resolve to True (via the registry) so the true branch is taken.
+        """
+        if not hasattr(torch, "_check"):
+            return
+        from yobx.torch.new_tracing.tracer import GraphTracer
+        from yobx.torch.new_tracing.shape import clear_conditions
+
+        branch_taken = []
+
+        class ModelWithGuard(torch.nn.Module):
+            def forward(self, x):
+                torch._check(x.shape[0] > 0)
+                if x.shape[0] > 0:
+                    branch_taken.append("true")
+                    return x * 2
+                else:
+                    branch_taken.append("false")
+                    return x + 1
+
+        clear_conditions()
+        model = ModelWithGuard()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(4, 8),), dynamic_shapes={"x": {0: "batch"}})
+        graph.lint()
+        self.assertIn("true", branch_taken, "The true branch should have been taken")
+        clear_conditions()
 
 
 if __name__ == "__main__":

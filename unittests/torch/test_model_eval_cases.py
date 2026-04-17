@@ -1,5 +1,5 @@
 import unittest
-from yobx.ext_test_case import ExtTestCase, requires_torch, ignore_warnings
+from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers, ignore_warnings
 from yobx.torch.testing.model_eval_cases import discover, evaluation
 
 
@@ -246,9 +246,20 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_aten_as_strided_tracing(self):
         evaluation(cases="AtenAsStrided", exporters="yobx-tracing", quiet=False, dynamic=True)
 
+    def test_run_exporter_aten_as_strided_new_tracing(self):
+        evaluation(cases="AtenAsStrided", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
+    def test_run_exporter_aten_inplace_add_new_tracing(self):
+        evaluation(cases="InplaceAdd", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
     def test_control_flow_numel_zero_1(self):
         evaluation(
             cases="ControlFlowNumelZero1", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
+    def test_control_flow_numel_zero_1_new_tracing(self):
+        evaluation(
+            cases="ControlFlowNumelZero1", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
     def test_run_exporter_controlflow_numel_zero_2_tracing(self):
@@ -265,6 +276,72 @@ class TestModelEvalCases(ExtTestCase):
         evaluation(
             cases="ControlFlowNumelZero2", exporters="export-tracing", quiet=False, dynamic=True
         )
+
+    def test_run_exporter_controlflow_cond_new_tracing(self):
+        evaluation(
+            cases="ControlFlowCond", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_cond_2outputs_new_tracing(self):
+        evaluation(
+            cases="ControlFlowCond2Outputs",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
+    def test_run_exporter_controlflow_shape_check_new_tracing(self):
+        evaluation(
+            cases="ControlFlowShapeCheck", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_aten_interpolate_new_tracing(self):
+        evaluation(
+            cases="AtenInterpolate", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_aten_roll_pos_new_tracing(self):
+        evaluation(cases="AtenRollPos", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
+    def test_run_exporter_aten_roll_relu_new_tracing(self):
+        evaluation(cases="AtenRollRelu", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_yobx_scan_new_tracing(self):
+        evaluation(
+            cases="ControlFlowScan", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_yobx_scan_cdist_new_tracing(self):
+        evaluation(
+            cases="ControlFlowScanCDist", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_yobx_scan_cdist2_new_tracing(self):
+        evaluation(
+            cases="ControlFlowScanCDist2", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_layer_norm_tracing(self):
+        evaluation(cases="LayerNorm", exporters="yobx-tracing", quiet=False, dynamic=True)
+
+    def test_run_exporter_layer_norm_new_tracing(self):
+        evaluation(cases="LayerNorm", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
+    def test_run_exporter_builtin_isinstance_new_tracing(self):
+        evaluation(
+            cases="BuildInIsInstance", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    @requires_transformers("5.0")
+    def test_run_exporter_tiny_llm_export_nostrict(self):
+        evaluation(cases="TinyLLM", exporters="export-nostrict", quiet=False, dynamic=True)
+
+    @requires_transformers("5.0")
+    def test_run_exporter_tiny_llm_yobx(self):
+        evaluation(cases="TinyLLM", exporters="yobx", quiet=False, dynamic=True)
 
 
 if __name__ == "__main__":

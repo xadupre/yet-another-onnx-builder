@@ -15,7 +15,8 @@ time-series charts — one chart per CI workflow.
    required for a public repository, but anonymous requests are subject to
    rate-limiting (60 requests/hour per IP).  When the API cannot be reached
    (offline build, rate-limit exceeded, …) the chart will be empty and a
-   warning is printed to the console.
+   warning is printed to the console.  Retrieved runs are cached per workflow
+   as CSV files for two weeks in the user cache directory.
 
 .. runpython::
     :rst:
@@ -33,9 +34,11 @@ time-series charts — one chart per CI workflow.
 
     """Query the GitHub API and plot CI workflow run durations."""
 
+    import csv
     import datetime
-    import urllib.request
     import json
+    import os
+    import urllib.request
 
     import matplotlib
     import matplotlib.pyplot as plt
@@ -46,6 +49,11 @@ time-series charts — one chart per CI workflow.
     _REPO = "yet-another-onnx-builder"
     _API_BASE = f"https://api.github.com/repos/{_OWNER}/{_REPO}"
     _HEADERS = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
+    _CACHE_MAX_AGE_DAYS = 14
+    _USER_CACHE_DIR = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
+    _CACHE_DIR = os.path.join(
+        _USER_CACHE_DIR, "yet-another-onnx-builder", "ci_durations_workflows"
+    )
 
     # Workflows that are NOT CI (skip documentation / style / spelling workflows)
     _SKIP_PATTERNS = ("docs", "style", "spelling", "pyrefly", "mypy", "doc_")
@@ -82,8 +90,79 @@ time-series charts — one chart per CI workflow.
         return runs
 
 
+    def _cache_path(workflow_id):
+        """Returns the cache file path for one workflow."""
+        return os.path.join(_CACHE_DIR, f"{workflow_id}.csv")
+
+
+    def _load_cached_runs(workflow_id):
+        """Loads cached workflow runs for one workflow.
+
+        Returns:
+            list[dict[str, str]]: Cached run rows.
+        """
+        cache_path = _cache_path(workflow_id)
+        if not os.path.exists(cache_path):
+            return []
+        with open(cache_path, "r", encoding="utf-8", newline="") as f:
+            reader = csv.DictReader(f)
+            rows = []
+            for row in reader:
+                rows.append(
+                    {
+                        "created_at": row.get("created_at", ""),
+                        "updated_at": row.get("updated_at", ""),
+                        "status": row.get("status", ""),
+                        "conclusion": row.get("conclusion", ""),
+                    }
+                )
+            return rows
+
+
+    def _save_cached_runs(workflow_id, runs):
+        """Saves cached workflow runs for one workflow."""
+        os.makedirs(_CACHE_DIR, exist_ok=True)
+        cache_path = _cache_path(workflow_id)
+        with open(cache_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=["created_at", "updated_at", "status", "conclusion"]
+            )
+            writer.writeheader()
+            for run in runs:
+                writer.writerow(
+                    {
+                        "created_at": run.get("created_at", ""),
+                        "updated_at": run.get("updated_at", ""),
+                        "status": run.get("status", ""),
+                        "conclusion": run.get("conclusion", ""),
+                    }
+                )
+
+
+    def _cache_is_recent(workflow_id, now):
+        """Checks whether a workflow cache file is newer than the cache max age.
+
+        Returns:
+            bool: True when the cache entry is recent enough.
+        """
+        cache_path = _cache_path(workflow_id)
+        if not os.path.exists(cache_path):
+            return False
+        try:
+            fetched_ts = os.path.getmtime(cache_path)
+            fetched_dt = datetime.datetime.fromtimestamp(fetched_ts, tz=datetime.timezone.utc)
+        except OSError:
+            return False
+        age = now - fetched_dt
+        return age <= datetime.timedelta(days=_CACHE_MAX_AGE_DAYS)
+
+
     def _run_duration_minutes(run):
-        """Returns the wall-clock duration of a successfully completed run in minutes, or None."""
+        """Computes the wall-clock duration of a successfully completed run.
+
+        Returns:
+            float | None: Duration in minutes, or None when unavailable.
+        """
         if run.get("status") != "completed":
             return None
         if run.get("conclusion") != "success":
@@ -103,11 +182,15 @@ time-series charts — one chart per CI workflow.
 
 
     def _collect_data():
-        """Returns a dict mapping workflow_name -> list of (datetime, duration_min)."""
-        cutoff = (
-            datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=62)
-        ).strftime("%Y-%m-%d")
+        """Collects workflow duration data from cache and/or GitHub API.
 
+        Returns:
+            dict: Mapping ``workflow_name -> list[(datetime, duration_min)]``.
+        """
+        now = datetime.datetime.now(datetime.timezone.utc)
+        cutoff = (
+            now - datetime.timedelta(days=62)
+        ).strftime("%Y-%m-%d")
         workflows_data = _gh_get("actions/workflows")
         if not workflows_data:
             return {}
@@ -122,7 +205,17 @@ time-series charts — one chart per CI workflow.
             if any(filename.startswith(p) for p in _SKIP_PATTERNS):
                 continue
 
-            runs = _fetch_workflow_runs(wf_id, cutoff)
+            cache_key = str(wf_id)
+            cached_runs = _load_cached_runs(cache_key)
+            if _cache_is_recent(cache_key, now):
+                runs = cached_runs
+            else:
+                fetched = _fetch_workflow_runs(wf_id, cutoff)
+                if fetched:
+                    runs = fetched
+                    _save_cached_runs(cache_key, runs)
+                else:
+                    runs = cached_runs
             points = []
             for run in runs:
                 dur = _run_duration_minutes(run)
