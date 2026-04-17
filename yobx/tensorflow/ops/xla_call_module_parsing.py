@@ -651,4 +651,9 @@ def parse_mlir(mlir_string: str) -> List[dict]:
     return_layers = [la for la in results if la["op"] == "return"]
 
     compute_layers.sort(key=lambda la: _get_layer_pos(la, scan_text))
-    return input_layers + compute_layers + return_layers
+    assert return_layers, (
+        f"No return was found. This is probably an issue {len(input_layers)} inputs, "
+        f"{len(compute_layers)} compute, {len(return_layers)} returns.\n---\n"
+        f"{mlir_string}"
+    )
+    return [*input_layers, *compute_layers, *return_layers]
