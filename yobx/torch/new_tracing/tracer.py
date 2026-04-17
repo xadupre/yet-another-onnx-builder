@@ -214,10 +214,15 @@ class GraphTracer:
             if not value:
                 return True
             return all(self.is_not_tensor(v) for v in value.values())
+        if isinstance(value, torch.dtype):
+            return True
 
         from ...helpers import string_type
 
-        raise TypeError(f"Cannot determine if it is a constant argument {string_type(value)}")
+        raise TypeError(
+            f"Cannot determine if type {type(value)} "
+            f"is a constant argument {string_type(value)}"
+        )
 
     def _tracing_int_to_fake(self, ti: TracingInt) -> Union[int, "torch.SymInt"]:
         """
