@@ -188,7 +188,7 @@ def _process_call_layer(
     compute_layers = [la for la in func_layers if la["op"] not in ("Input", "return")]
     return_layers = [la for la in func_layers if la["op"] == "return"]
     compute_layers.sort(key=lambda la: _get_layer_pos(la, func_body))
-    func_layers = input_layers + compute_layers + return_layers
+    func_layers = [*input_layers, *compute_layers, *return_layers]
 
     # Process function body layers (stops at return layer).
     _process_layers(func_layers, inline_results, g, decoded_module)
@@ -371,6 +371,10 @@ def convert_exp(
 
         if layer["op"] == "return":
             if len(layer["operands"]) == 1:
+                assert layer["operands"][0] in results, (
+                    f"Issue with {layer=}, unable to find {layer['operands'][0]}"
+                    f"\n---\n{decoded_module}"
+                )
                 return g.op.Identity(
                     results[layer["operands"][0]], outputs=outputs, name="XlaCallModule"
                 )

@@ -688,7 +688,14 @@ def parse_ir_module(mlir_module) -> List[dict]:
 
     def get_name(val) -> str:
         """Returns the SSA name previously assigned to *val*, or ``"?"``."""
-        return val_names.get(id(val), "?")
+        if id(val) in val_names:
+            return val_names[id(val)]
+        name = val.get_name()
+        assert (
+            name not in val_names
+        ), f"Name already taking {name!r}, in {val=}\n---\nModel:\n{mlir_module}"
+        assign(val, name)
+        return name
 
     def assign(val, name: str) -> str:
         """Assigns *name* to *val* in the value-name map and returns *name*."""
@@ -727,22 +734,14 @@ def parse_ir_module(mlir_module) -> List[dict]:
         attr = _try_attr(op, "sym_name")
         if attr is None:
             return ""
-        try:
-            return ir.StringAttr(attr).value
-        except Exception:
-            s = str(attr)
-            m = re.search(r'"([^"]+)"', s)
-            return m.group(1) if m else s.strip('"')
+        return ir.StringAttr(attr).value
 
     def _is_public(op) -> bool:
         """Returns ``True`` when a ``func.func`` op has public (or absent) visibility."""
         attr = _try_attr(op, "sym_visibility")
         if attr is None:
             return True  # missing → public by default in func dialect
-        try:
-            return ir.StringAttr(attr).value == "public"
-        except Exception:
-            return "public" in str(attr)
+        return ir.StringAttr(attr).value == "public"
 
     def _dense_content(op) -> str:
         """Extracts the content of a ``stablehlo.constant`` value attribute."""
@@ -889,15 +888,29 @@ def parse_ir_module(mlir_module) -> List[dict]:
         oname = op.name
         op_res = list(op.results)
         res_id = get_name(op_res[0]) if op_res else "?"
+
+        # ---- call @_wrapped_jax_export_main (handled via scan_entry above) ----
+        if oname in ("func.call", "call") and _callee(op) == "_wrapped_jax_export_main":
+            continue
+        # ---- skip: side-effect-only shape assertions ----
+        if oname == "stablehlo.custom_call":
+            continue
+
         operands = [get_name(v) for v in op.operands]
         rtype = ttype(op_res[0]) if op_res else ""
 
         # ---- return (terminates the function) ----
         if oname in ("func.return", "return"):
+            # cannot return '?' here
             layers_body.append(
-                {"id": "?", "op": "return", "operands": operands, "shape": "", "loc": ""}
+                {"id": res_id, "op": "return", "operands": operands, "shape": "", "loc": ""}
             )
             break
+
+        assert res_id != "?", (
+            f"oname={oname!r}, res_id={res_id!r}, this should not be allowed."
+            f"\n{operands=}\n{op=}\n{op_res=}\n---\nModule:\n{mlir_module}"
+        )
 
         # ---- skip: shape-query ops ----
         if oname == "stablehlo.get_dimension_size":
@@ -906,20 +919,12 @@ def parse_ir_module(mlir_module) -> List[dict]:
             )
             continue
 
-        # ---- skip: side-effect-only shape assertions ----
-        if oname == "stablehlo.custom_call":
-            continue
-
         # ---- skip: integer-tensor reshapes / concatenates (shape only) ----
         if oname in ("stablehlo.reshape", "stablehlo.concatenate"):
             if rtype and "f" not in rtype:  # integer element type → shape-only
                 layers_body.append(
                     {"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""}
                 )
-            continue
-
-        # ---- call @_wrapped_jax_export_main (handled via scan_entry above) ----
-        if oname in ("func.call", "call") and _callee(op) == "_wrapped_jax_export_main":
             continue
 
         # ---- constant ----
