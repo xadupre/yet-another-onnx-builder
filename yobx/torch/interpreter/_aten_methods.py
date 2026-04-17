@@ -649,7 +649,25 @@ def aten_meth_to(
 
     if dtype is None:
         return g.op.Identity(input_name, outputs=outputs, name=name)
-    onnx_to = torch_dtype_to_onnx_dtype(dtype)
+    if isinstance(dtype, torch.fx.Node):
+        # tracing only
+        assert g.has_name(dtype.name), f"issue with {dtype.name!r}{g.get_debug_msg()}"
+        cst = g.get_constant(dtype.name, computed_value=True, exc=False)
+        assert (
+            cst is not None
+        ), f"A dtype {dtype.name!r} should be always be known{g.get_debug_msg()}"
+        assert (
+            cst.dtype == np.int64
+        ), f"Unexpected dtype {cst.dtype}{dtype.name}{g.get_debug_msg()}"
+        assert len(cst.shape) == 0, f"Unexpected shape {cst.shape}{dtype.name}{g.get_debug_msg()}"
+        onnx_to = int(cst)
+    elif isinstance(dtype, int):
+        onnx_to = dtype
+    else:
+        assert isinstance(
+            dtype, torch.dtype
+        ), f"Unexpected type {type(dtype)} for dtype{g.get_debug_msg()}"
+        onnx_to = torch_dtype_to_onnx_dtype(dtype)
 
     res = g.make_node("Cast", [input_name], outputs, to=onnx_to, name=name)
     if not sts:
