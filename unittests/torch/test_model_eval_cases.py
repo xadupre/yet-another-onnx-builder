@@ -1,5 +1,5 @@
 import unittest
-from yobx.ext_test_case import ExtTestCase, requires_torch, ignore_warnings
+from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers, ignore_warnings
 from yobx.torch.testing.model_eval_cases import discover, evaluation
 
 
@@ -334,6 +334,14 @@ class TestModelEvalCases(ExtTestCase):
         evaluation(
             cases="BuildInIsInstance", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
+
+    @requires_transformers("5.0")
+    def test_run_exporter_tiny_llm_export_nostrict(self):
+        evaluation(cases="TinyLLM", exporters="export-nostrict", quiet=False, dynamic=True)
+
+    @requires_transformers("5.0")
+    def test_run_exporter_tiny_llm_yobx(self):
+        evaluation(cases="TinyLLM", exporters="yobx", quiet=False, dynamic=True)
 
 
 if __name__ == "__main__":
