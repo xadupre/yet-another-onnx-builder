@@ -202,6 +202,9 @@ class _OpWrapper(torch.nn.Module):
         self._extra_args = extra_args
         self._kwargs = kwargs
 
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}({self._fn})"
+
     def forward(self, x: torch.Tensor, *args: torch.Tensor) -> torch.Tensor:
         """Calls the wrapped op with the supplied tensors.
 
