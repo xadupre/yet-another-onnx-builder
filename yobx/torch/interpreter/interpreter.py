@@ -1315,9 +1315,7 @@ class DynamoInterpreter:
             padded.append(curr)
 
         # Compute the broadcast shape = elementwise maximum of all shape vectors.
-        shapes = [
-            self.builder.op.Shape(p, name=f"{name}_s{i}") for i, p in enumerate(padded)
-        ]
+        shapes = [self.builder.op.Shape(p, name=f"{name}_s{i}") for i, p in enumerate(padded)]
         bcast_shape = shapes[0]
         for s in shapes[1:]:
             bcast_shape = self.builder.op.Max(bcast_shape, s, name=f"{name}_bcast")
@@ -1770,11 +1768,7 @@ class DynamoInterpreter:
                     for x in index
                 ):
                     return self._getitem_advanced(
-                        node,
-                        node_output.name,
-                        list(index),
-                        sts=sts,
-                        name="_getitem_adv",
+                        node, node_output.name, list(index), sts=sts, name="_getitem_adv"
                     )
                 return self._getitem_slice(
                     node,
