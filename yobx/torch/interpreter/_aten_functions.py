@@ -12254,6 +12254,52 @@ def aten_sign(
     return res
 
 
+def aten_signbit(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "signbit",
+) -> T:
+    """Returns a boolean tensor indicating where the input has a negative sign bit.
+
+    For floating-point types this includes negative zero (``-0.0``), which has
+    its IEEE 754 sign bit set even though ``-0.0 < 0`` is ``False``.  The
+    implementation reinterprets the float bits as an unsigned integer with
+    ``BitCast`` (requires opset >= 21) and extracts the sign bit with
+    ``BitwiseAnd``.  For integer types a simple ``x < 0`` comparison suffices.
+
+    Returns:
+        A boolean tensor with the same shape as *x*; ``True`` where the sign
+        bit is set (i.e. the element is negative or negative zero).
+    """
+    assert g.has_type(x), f"Type missing for {x!r}{g.get_debug_msg()}"
+    itype = g.get_type(x)
+
+    # Float-type → (uint reinterpretation type, sign-bit mask)
+    _FLOAT_SIGN = {
+        TensorProto.FLOAT: (TensorProto.UINT32, np.uint32(0x80000000)),
+        TensorProto.DOUBLE: (TensorProto.UINT64, np.uint64(0x8000000000000000)),
+        TensorProto.FLOAT16: (TensorProto.UINT16, np.uint16(0x8000)),
+        TensorProto.BFLOAT16: (TensorProto.UINT16, np.uint16(0x8000)),
+    }
+
+    if itype in _FLOAT_SIGN and g.main_opset >= 26:
+        uint_itype, sign_mask = _FLOAT_SIGN[itype]
+        bits = g.op.BitCast(x, to=uint_itype, name=name)
+        masked = g.op.BitwiseAnd(bits, np.array(sign_mask), name=name)
+        res = g.op.Cast(masked, to=TensorProto.BOOL, outputs=outputs, name=name)
+    else:
+        # Integer types or opset < 26: sign bit is equivalent to x < 0.
+        np_dtype = tensor_dtype_to_np_dtype(itype)
+        zero = np.array(0, dtype=np_dtype)
+        res = g.op.Less(x, zero, outputs=outputs, name=name)
+
+    if not sts:
+        set_type_shape_unary_op(g, res, x, itype=TensorProto.BOOL)
+    return res
+
+
 def aten_silu(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
