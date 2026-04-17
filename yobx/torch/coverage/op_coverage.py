@@ -195,7 +195,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "trapezoid",
         "trapz",
         "triangular_solve",
-        "true_divide",
         "var",
         "var_mean",
         "vdot",

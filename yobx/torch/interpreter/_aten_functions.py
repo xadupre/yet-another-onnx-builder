@@ -13638,6 +13638,30 @@ def aten_tril(
     return res
 
 
+def aten_true_divide_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "true_divide_Tensor",
+) -> T:
+    """Performs true division (delegates to truediv)."""
+    return aten_truediv(g, sts, outputs, x, y, name=name)
+
+
+def aten_true_divide_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "true_divide_Scalar",
+) -> T:
+    """Performs true division (delegates to truediv)."""
+    return aten_truediv(g, sts, outputs, x, y, name=name)
+
+
 def aten_truediv(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
