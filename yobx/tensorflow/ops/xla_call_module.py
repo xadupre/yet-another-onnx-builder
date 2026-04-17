@@ -18,6 +18,7 @@ from .xla_call_module_parsing import (  # noqa: F401
     _parse_body,
     _parse_dense_value,
     _parse_tensor_type,
+    parse_ir_module,
     parse_mlir,
 )
 
@@ -350,12 +351,16 @@ def convert_exp(
     hlo_module = op.get_attr("module")
     with make_ir_context():
         decoded_module = jax.extend.mlir.deserialize_portable_artifact(hlo_module)
-        # JAX 0.10+ returns an ir.Module object. Convert it to text while the context
-        # is still active so that downstream string-based parsing works with both
-        # JAX 0.9 (which returned str) and JAX 0.10+ (which returns ir.Module).
-        if not isinstance(decoded_module, str):
+        if isinstance(decoded_module, str):
+            # JAX 0.9: string MLIR – use the text-based parser.
+            layers = parse_mlir(decoded_module)
+        else:
+            # JAX 0.10+: ir.Module object – use Python bindings directly,
+            # skipping the text conversion and regex-based parse step.
+            layers = parse_ir_module(decoded_module)
+            # Convert to string now (context still active) for downstream
+            # call-inlining helpers that still operate on MLIR text.
             decoded_module = str(decoded_module)
-    layers = parse_mlir(decoded_module)
     results: Dict[str, str] = {}
 
     for layer in layers:

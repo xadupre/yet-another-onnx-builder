@@ -659,3 +659,399 @@ def parse_mlir(mlir_string: str) -> List[dict]:
         f"{mlir_string}"
     )
     return [*input_layers, *compute_layers, *return_layers]
+
+
+def parse_ir_module(mlir_module) -> List[dict]:
+    """Parse an MLIR ``ir.Module`` using Python bindings (JAX 0.10+).
+
+    Walks MLIR operations directly without converting the module to a text
+    string, so ``loc(...)`` annotations are not required.  Returns the same
+    list of layer dicts as :func:`parse_mlir`.
+
+    Must be called while an active MLIR context is open (e.g., inside a
+    ``with make_ir_context():`` block).
+
+    :param mlir_module: an ``ir.Module`` obtained from
+        ``jax.extend.mlir.deserialize_portable_artifact``.
+    :returns: list of layer dicts in the same format as :func:`parse_mlir`.
+    """
+    from jaxlib.mlir import ir  # available when jaxlib >= 0.4 (JAX 0.10+)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    val_names: dict = {}  # id(ir.Value) -> SSA name str
+    _counter = [0]
+
+    def get_name(val) -> str:
+        return val_names.get(id(val), "?")
+
+    def assign(val, name: str) -> str:
+        val_names[id(val)] = name
+        return name
+
+    def fresh() -> str:
+        n = f"%{_counter[0]}"
+        _counter[0] += 1
+        return n
+
+    def ttype(val) -> str:
+        t = str(val.type)
+        return t if t.startswith("tensor<") else ""
+
+    def _try_attr(op, name):
+        try:
+            return op.attributes[name]
+        except (KeyError, IndexError):
+            return None
+
+    def _callee(op) -> str:
+        """Return the callee function name from a func.call / call op."""
+        attr = _try_attr(op, "callee")
+        if attr is None:
+            return ""
+        s = str(attr)  # e.g. "@_wrapped_jax_export_main"
+        m = re.search(r'@"?([^"@\s>]+)"?', s)
+        return m.group(1) if m else s.strip().lstrip("@").strip('"')
+
+    def _sym_name(op) -> str:
+        """Return the sym_name attribute of a func.func op as a plain string."""
+        attr = _try_attr(op, "sym_name")
+        if attr is None:
+            return ""
+        try:
+            return ir.StringAttr(attr).value
+        except Exception:
+            s = str(attr)
+            m = re.search(r'"([^"]+)"', s)
+            return m.group(1) if m else s.strip('"')
+
+    def _is_public(op) -> bool:
+        """Return True when a func.func op has public (or absent) visibility."""
+        attr = _try_attr(op, "sym_visibility")
+        if attr is None:
+            return True  # missing → public by default in func dialect
+        try:
+            return ir.StringAttr(attr).value == "public"
+        except Exception:
+            return "public" in str(attr)
+
+    def _dense_content(op) -> str:
+        """Extract the content of a ``stablehlo.constant`` value attribute."""
+        attr = _try_attr(op, "value")
+        if attr is None:
+            return ""
+        s = str(attr)  # e.g. "dense<1> : tensor<i32>"
+        colon = s.find(" : tensor")
+        if colon != -1:
+            s = s[:colon]
+        if s.startswith("dense<") and s.endswith(">"):
+            return s[len("dense<") : -1]
+        return s
+
+    def _int_list(op, name) -> list:
+        """Extract a list of ints from a dense integer attribute by name."""
+        attr = _try_attr(op, name)
+        if attr is None:
+            return []
+        s = str(attr)
+        m = re.search(r"dense<\[([^\]]*)\]>", s)
+        if m:
+            return [int(x.strip()) for x in m.group(1).split(",") if x.strip()]
+        m = re.search(r"dense<(\d+)>", s)
+        return [int(m.group(1))] if m else []
+
+    def _compare_dir(op) -> str:
+        """Extract the comparison direction from a ``stablehlo.compare`` op."""
+        attr = _try_attr(op, "comparison_direction")
+        if attr is None:
+            return ""
+        s = str(attr)
+        m = re.search(r"comparison_direction\s+(\w+)", s)
+        if m:
+            return m.group(1)
+        # Last uppercase word before closing '>'
+        tok = s.strip().rstrip(">").rsplit(None, 1)
+        return tok[-1] if tok else ""
+
+    def _dot_contracting(op):
+        """Return ``(lhs_dims, rhs_dims)`` for a ``stablehlo.dot_general`` op."""
+        attr = _try_attr(op, "dot_dimension_numbers")
+        if attr is None:
+            return [], []
+        s = str(attr)
+        lhs_m = re.search(r"lhs_contracting_dimensions\s*=\s*\[([^\]]*)\]", s)
+        rhs_m = re.search(r"rhs_contracting_dimensions\s*=\s*\[([^\]]*)\]", s)
+        lhs = [int(x.strip()) for x in lhs_m.group(1).split(",") if x.strip()] if lhs_m else []
+        rhs = [int(x.strip()) for x in rhs_m.group(1).split(",") if x.strip()] if rhs_m else []
+        return lhs, rhs
+
+    # ------------------------------------------------------------------
+    # 1. Find @main (public) and @_wrapped_jax_export_main (private)
+    # ------------------------------------------------------------------
+    main_func = None
+    wrapped_func = None
+
+    for op in mlir_module.body.operations:
+        if op.name != "func.func":
+            continue
+        name = _sym_name(op)
+        if _is_public(op) and main_func is None:
+            main_func = op
+        if name == "_wrapped_jax_export_main":
+            wrapped_func = op
+
+    if main_func is None:
+        raise ValueError("parse_ir_module: no public function found in ir.Module")
+
+    main_entry = main_func.regions[0].blocks[0]
+
+    # ------------------------------------------------------------------
+    # 2. Name @main function arguments and build Input layers
+    # ------------------------------------------------------------------
+    input_layers: list = []
+    seen_arg_names: set = set()
+
+    for i, arg in enumerate(main_entry.arguments):
+        aname = f"%arg{i}"
+        assign(arg, aname)
+        t = str(arg.type)
+        if t.startswith("tensor<") and aname not in seen_arg_names:
+            seen_arg_names.add(aname)
+            input_layers.append(
+                {"id": aname, "op": "Input", "operands": tuple(), "shape": t, "loc": "header"}
+            )
+
+    # ------------------------------------------------------------------
+    # 3. Pre-name all @main op results (needed to resolve call-arg aliases)
+    # ------------------------------------------------------------------
+    for op in main_entry.operations:
+        for r in op.results:
+            if id(r) not in val_names:
+                assign(r, fresh())
+
+    # ------------------------------------------------------------------
+    # 4. Determine scan region; build arg alias for @_wrapped helper
+    # ------------------------------------------------------------------
+    if wrapped_func is not None:
+        wrapped_entry = wrapped_func.regions[0].blocks[0]
+
+        # Assign temporary names to wrapped args, then remap those that
+        # correspond to @main tensor inputs via the call op.
+        for i, arg in enumerate(wrapped_entry.arguments):
+            assign(arg, f"%warg{i}")
+
+        for op in main_entry.operations:
+            if op.name not in ("func.call", "call"):
+                continue
+            if _callee(op) != "_wrapped_jax_export_main":
+                continue
+            for w_arg, call_arg in zip(wrapped_entry.arguments, op.operands):
+                if get_name(call_arg) in seen_arg_names:
+                    assign(w_arg, get_name(call_arg))
+            break
+
+        scan_entry = wrapped_entry
+    else:
+        scan_entry = main_entry
+
+    # Pre-name all scan_entry op results (ensures every result has a name
+    # before we build layer dicts, so back-references are always resolved).
+    for op in scan_entry.operations:
+        for r in op.results:
+            if id(r) not in val_names:
+                assign(r, fresh())
+
+    # ------------------------------------------------------------------
+    # 5. Parse scan_entry ops into layer dicts
+    # ------------------------------------------------------------------
+    layers_body: list = []
+
+    for op in scan_entry.operations:
+        oname = op.name
+        op_res = list(op.results)
+        res_id = get_name(op_res[0]) if op_res else "?"
+        operands = [get_name(v) for v in op.operands]
+        rtype = ttype(op_res[0]) if op_res else ""
+
+        # ---- return (terminates the function) ----
+        if oname in ("func.return", "return"):
+            layers_body.append(
+                {"id": "?", "op": "return", "operands": operands, "shape": "", "loc": ""}
+            )
+            break
+
+        # ---- skip: shape-query ops ----
+        if oname == "stablehlo.get_dimension_size":
+            layers_body.append(
+                {"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""}
+            )
+            continue
+
+        # ---- skip: side-effect-only shape assertions ----
+        if oname == "stablehlo.custom_call":
+            continue
+
+        # ---- skip: integer-tensor reshapes / concatenates (shape only) ----
+        if oname in ("stablehlo.reshape", "stablehlo.concatenate"):
+            if rtype and "f" not in rtype:  # integer element type → shape-only
+                layers_body.append(
+                    {"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""}
+                )
+            continue
+
+        # ---- call @_wrapped_jax_export_main (handled via scan_entry above) ----
+        if oname in ("func.call", "call") and _callee(op) == "_wrapped_jax_export_main":
+            continue
+
+        # ---- constant ----
+        if oname == "stablehlo.constant":
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": "constant",
+                    "operands": [],
+                    "shape": rtype,
+                    "loc": "",
+                    "dense_content": _dense_content(op),
+                }
+            )
+            continue
+
+        # ---- dot_general ----
+        if oname == "stablehlo.dot_general":
+            lhs_dims, rhs_dims = _dot_contracting(op)
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": "dot_general",
+                    "operands": operands[:2],
+                    "shape": rtype,
+                    "loc": "",
+                    "lhs_contracting": lhs_dims,
+                    "rhs_contracting": rhs_dims,
+                }
+            )
+            continue
+
+        # ---- broadcast_in_dim ----
+        if oname == "stablehlo.broadcast_in_dim":
+            dims = _int_list(op, "broadcast_dimensions")
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": "broadcast_in_dim",
+                    "operands": operands[:1],
+                    "shape": rtype,
+                    "loc": "",
+                    "dims": dims,
+                }
+            )
+            continue
+
+        # ---- dynamic_broadcast_in_dim ----
+        if oname == "stablehlo.dynamic_broadcast_in_dim":
+            dims = _int_list(op, "broadcast_dimensions")
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": "dynamic_broadcast_in_dim",
+                    "operands": operands[:1],  # tensor operand only; shape tensor is elided
+                    "shape": rtype,
+                    "loc": "",
+                    "dims": dims,
+                }
+            )
+            continue
+
+        # ---- compare ----
+        if oname == "stablehlo.compare":
+            direction = _compare_dir(op)
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": f"compare_{direction}",
+                    "operands": operands[:2],
+                    "shape": rtype,
+                    "loc": "",
+                }
+            )
+            continue
+
+        # ---- convert ----
+        if oname == "stablehlo.convert":
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": "convert",
+                    "operands": operands[:1],
+                    "shape": rtype,
+                    "loc": "",
+                }
+            )
+            continue
+
+        # ---- reduce ----
+        if oname == "stablehlo.reduce":
+            axes = _int_list(op, "dimensions")
+            reduce_kind = "maximum"
+            if op.regions:
+                for block in op.regions[0].blocks:
+                    for inner_op in block.operations:
+                        if inner_op.name.startswith("stablehlo.") and inner_op.name not in (
+                            "stablehlo.return",
+                        ):
+                            reduce_kind = inner_op.name[len("stablehlo.") :]
+                            break
+                    break
+            onnx_op = _REDUCE_OP_MAP.get(reduce_kind, f"reduce_{reduce_kind}")
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": onnx_op,
+                    "operands": operands[:1],
+                    "shape": rtype,
+                    "loc": "",
+                    "axes": axes,
+                }
+            )
+            continue
+
+        # ---- call (to other private helper functions, e.g. relu) ----
+        if oname in ("func.call", "call"):
+            callee = _callee(op)
+            if callee:
+                layers_body.append(
+                    {
+                        "id": res_id,
+                        "op": "call",
+                        "operands": operands,
+                        "shape": rtype,
+                        "loc": "",
+                        "func": callee,
+                    }
+                )
+            continue
+
+        # ---- general stablehlo ops (elementwise, etc.) ----
+        if oname.startswith("stablehlo."):
+            clean_op = oname[len("stablehlo.") :]
+            if operands:
+                layers_body.append(
+                    {
+                        "id": res_id,
+                        "op": clean_op,
+                        "operands": operands,
+                        "shape": rtype,
+                        "loc": "",
+                    }
+                )
+            continue
+
+    assert any(la["op"] == "return" for la in layers_body), (
+        f"parse_ir_module: no return op found. "
+        f"{len(input_layers)} inputs, {len(layers_body)} body layers.\n"
+        f"Module: {mlir_module}"
+    )
+    return [*input_layers, *layers_body]
