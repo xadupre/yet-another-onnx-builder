@@ -37,13 +37,13 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install tensorflow==${{ matrix.tensorflow-version }} jax==${{ matrix.jax-version }}
-        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" "jax==${{ matrix.jax-version }}"
+        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" "jax==${{ matrix.jax-version }}.*"
 
       - name: Install dependencies
         run: pip install -e ".[dev,tensorflow]"
 
       - name: Install tensorflow==${{ matrix.tensorflow-version }} jax==${{ matrix.jax-version }} again
-        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" "jax==${{ matrix.jax-version }}"
+        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" "jax==${{ matrix.jax-version }}.*"
 
       - name: Run tensorflow tests with coverage
         run: |
