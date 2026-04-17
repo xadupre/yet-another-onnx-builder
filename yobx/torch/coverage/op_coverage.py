@@ -79,8 +79,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "cross",
         "cumulative_trapezoid",
         "deg2rad",
-        "diag",
-        "diag_embed",
         "diagflat",
         "diagonal",
         "diagonal_copy",
@@ -90,7 +88,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "exp2",
         "fliplr",
         "flipud",
-        "float_power",
         "fmax",
         "fmin",
         "fmod",
@@ -195,7 +192,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "trapezoid",
         "trapz",
         "triangular_solve",
-        "true_divide",
         "var",
         "var_mean",
         "vdot",
@@ -417,7 +413,7 @@ XFAIL_OPS_INT32: Dict[str, FrozenSet[str]] = {
         }
     ),
     "tracing": frozenset(),
-    "new-tracing": frozenset(),
+    "new-tracing": frozenset({"true_divide"}),
 }
 
 # Extra exclusions specific to torch.int64.
@@ -485,7 +481,12 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
     # short.int64: FX tracing produces call_method[target=short] with no
     # aten_meth_short converter in the tracing path.
     "tracing": frozenset({"short"}),  # FunctionNotFoundError: aten_meth_short
-    "new-tracing": frozenset({"short"}),  # FunctionNotFoundError: aten_meth_short
+    "new-tracing": frozenset(
+        {
+            "short",  # FunctionNotFoundError: aten_meth_short
+            "true_divide",  # true_divide disappears
+        }
+    ),
 }
 
 # Per-op absolute tolerance overrides for torch.float16.

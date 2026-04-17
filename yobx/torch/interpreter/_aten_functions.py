@@ -3053,6 +3053,159 @@ def aten_diff(
     return res
 
 
+def aten_diag(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    diagonal: int = 0,
+    name: str = "diag",
+) -> T:
+    """Constructs a diagonal matrix from a 1-D tensor or extracts the diagonal of a 2-D tensor."""
+    assert g.has_rank(x), f"diag: missing rank for {x!r}{g.get_debug_msg()}"
+    rank = g.get_rank(x)
+    assert rank in (1, 2), f"diag: expected rank 1 or 2, got {rank}{g.get_debug_msg()}"
+    assert g.has_type(x), f"diag: missing type for {x!r}{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    row_start = max(0, -diagonal)
+    col_start = max(0, diagonal)
+
+    if rank == 1:
+        # 1-D vector -> 2-D diagonal matrix via (range == range.T) + cast + mul
+        n = g.op.SqueezeAnyOpset(g.op.Shape(x, name=name), name=name)
+        abs_k = abs(diagonal)
+        if abs_k == 0:
+            size = n
+        else:
+            size = g.op.Add(n, np.array(abs_k, dtype=np.int64), name=name)
+        # arange [0, ..., size-1]; r is a column vector, c is a row vector ("range.T")
+        arange = g.op.Range(g.ZERO_NO_DIM, size, g.ONE_NO_DIM, name=name)
+        r = g.op.Reshape(arange, np.array([-1, 1], dtype=np.int64), name=name)
+        c = g.op.Reshape(arange, np.array([1, -1], dtype=np.int64), name=name)
+        # mask[i, j] is True where j - i == diagonal
+        mask = g.op.Equal(
+            g.op.Sub(c, r, name=name), np.array(diagonal, dtype=np.int64), name=name
+        )
+        mask_float = g.op.Cast(mask, to=itype, name=name)
+        # Pad x to length size (row_start zeros before, col_start zeros after)
+        x_col = g.op.Reshape(
+            g.op.Pad(x, np.array([row_start, col_start], dtype=np.int64), name=name),
+            np.array([-1, 1], dtype=np.int64),
+            name=name,
+        )
+        res = g.op.Mul(mask_float, x_col, name=name, outputs=outputs)
+        if not sts:
+            g.set_type(res, itype)
+            g.set_rank(res, 2)
+        return res
+    else:
+        # 2-D matrix -> 1-D diagonal vector
+        m = g.op.SqueezeAnyOpset(g.op.Shape(x, start=0, end=1, name=name), name=name)
+        n = g.op.SqueezeAnyOpset(g.op.Shape(x, start=1, end=2, name=name), name=name)
+        # length = max(0, min(m - row_start, n - col_start))
+        m_avail = g.op.Sub(m, np.array(row_start, dtype=np.int64), name=name)
+        n_avail = g.op.Sub(n, np.array(col_start, dtype=np.int64), name=name)
+        length_raw = g.op.Min(m_avail, n_avail, name=name)
+        length = g.op.Max(length_raw, g.ZERO_NO_DIM, name=name)
+        # Row indices [row_start, ..., row_start + length - 1]
+        row_end = g.op.Add(length, np.array(row_start, dtype=np.int64), name=name)
+        row_idx = g.op.Range(
+            np.array(row_start, dtype=np.int64), row_end, g.ONE_NO_DIM, name=name
+        )
+        # Col indices [col_start, ..., col_start + length - 1]
+        col_end = g.op.Add(length, np.array(col_start, dtype=np.int64), name=name)
+        col_idx = g.op.Range(
+            np.array(col_start, dtype=np.int64), col_end, g.ONE_NO_DIM, name=name
+        )
+        # Combine into [length, 2] index tensor
+        row_2d = g.op.Reshape(row_idx, np.array([-1, 1], dtype=np.int64), name=name)
+        col_2d = g.op.Reshape(col_idx, np.array([-1, 1], dtype=np.int64), name=name)
+        indices = g.op.Concat(row_2d, col_2d, axis=1, name=name)
+        # Gather diagonal elements
+        res = g.op.GatherND(x, indices, batch_dims=0, name=name, outputs=outputs)
+        if not sts:
+            g.set_type(res, itype)
+            g.set_rank(res, 1)
+        return res
+
+
+def aten_diag_embed(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    offset: int = 0,
+    dim1: int = -2,
+    dim2: int = -1,
+    name: str = "diag_embed",
+) -> T:
+    """Embeds the values of x as diagonals in a new 2-D subspace of the output tensor."""
+    assert g.has_rank(x), f"diag_embed: missing rank for {x!r}{g.get_debug_msg()}"
+    assert g.has_type(x), f"diag_embed: missing type for {x!r}{g.get_debug_msg()}"
+    rank = g.get_rank(x)  # input rank (>= 1)
+    itype = g.get_type(x)
+    out_rank = rank + 1  # output rank
+    row_start = max(0, -offset)
+    col_start = max(0, offset)
+
+    # Normalize dim1, dim2 relative to the output rank
+    dim1_norm = dim1 if dim1 >= 0 else dim1 + out_rank
+    dim2_norm = dim2 if dim2 >= 0 else dim2 + out_rank
+
+    # n = last dimension of x (length of the diagonal to embed)
+    n = g.op.SqueezeAnyOpset(g.op.Shape(x, start=rank - 1, end=rank, name=name), name=name)
+    abs_k = abs(offset)
+    if abs_k == 0:
+        size = n
+    else:
+        size = g.op.Add(n, np.array(abs_k, dtype=np.int64), name=name)
+
+    # Build [size, size] mask via range == range.T: mask[i, j] = (j - i == offset)
+    arange = g.op.Range(g.ZERO_NO_DIM, size, g.ONE_NO_DIM, name=name)
+    r = g.op.Reshape(arange, np.array([-1, 1], dtype=np.int64), name=name)
+    c = g.op.Reshape(arange, np.array([1, -1], dtype=np.int64), name=name)
+    mask = g.op.Equal(g.op.Sub(c, r, name=name), np.array(offset, dtype=np.int64), name=name)
+    mask_float = g.op.Cast(mask, to=itype, name=name)  # [size, size]
+
+    # Pad x along the last dimension: [row_start zeros] ++ x ++ [col_start zeros]
+    # ONNX Pad pads: [begin_0, ..., begin_{rank-1}, end_0, ..., end_{rank-1}]
+    pads = np.array(
+        [0] * (rank - 1) + [row_start] + [0] * (rank - 1) + [col_start], dtype=np.int64
+    )
+    padded = g.op.Pad(x, pads, name=name)  # (*batch, size)
+
+    # Add trailing dim for broadcast: (*batch, size, 1)
+    x_col = g.op.UnsqueezeAnyOpset(padded, g.MINUS_ONE, name=name)
+
+    # Multiply: (*batch, size, 1) * (size, size) -> (*batch, size, size)
+    # The 2-D diagonal plane is currently at the last two dims (out_rank-2, out_rank-1)
+    result = g.op.Mul(mask_float, x_col, name=name)
+
+    # If dim1/dim2 are not the last two dims, transpose to put them in the right positions
+    if dim1_norm != out_rank - 2 or dim2_norm != out_rank - 1:
+        # Build permutation: output position d comes from:
+        #   dim1_norm -> rank-1   (first plane dim in result, = out_rank-2)
+        #   dim2_norm -> out_rank-1 (second plane dim in result)
+        #   others    -> batch dims 0..rank-2 in order
+        batch_idx = 0
+        perm = [0] * out_rank
+        for d in range(out_rank):
+            if d == dim1_norm:
+                perm[d] = rank - 1
+            elif d == dim2_norm:
+                perm[d] = out_rank - 1
+            else:
+                perm[d] = batch_idx
+                batch_idx += 1
+        res = g.op.Transpose(result, perm=perm, name=name, outputs=outputs)
+    else:
+        res = g.op.Identity(result, name=name, outputs=outputs)
+    if not sts:
+        g.set_type(res, itype)
+        g.set_rank(res, out_rank)
+    return res
+
+
 def aten_div(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T, name="div"
 ) -> T:
@@ -10106,6 +10259,72 @@ def aten_pow_Tensor_Tensor(
     return res
 
 
+def aten_float_power_Tensor_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    exponent: T,
+    name: str = "float_power_Tensor_Tensor",
+) -> T:
+    "float_power"
+    x = g.op.Cast(x, to=TensorProto.DOUBLE, name=name)
+    exponent = g.op.Cast(exponent, to=TensorProto.DOUBLE, name=name)
+    res = g.op.Pow(x, exponent, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(outputs[0], TensorProto.DOUBLE)
+        if g.has_shape(x):
+            g.set_shape(outputs[0], g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(outputs[0], g.get_rank(x))
+    return res
+
+
+def aten_float_power_Tensor_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    exponent: T,
+    name: str = "float_power_Tensor_Scalar",
+) -> T:
+    "float_power"
+    x = g.op.Cast(x, to=TensorProto.DOUBLE, name=name)
+    exp_cst = np.array(exponent, dtype=np.float64)
+    res = g.op.Pow(x, exp_cst, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(outputs[0], TensorProto.DOUBLE)
+        if g.has_shape(x):
+            g.set_shape(outputs[0], g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(outputs[0], g.get_rank(x))
+    return res
+
+
+def aten_float_power_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    exponent: T,
+    name: str = "float_power_Scalar",
+) -> T:
+    "float_power"
+    assert isinstance(
+        exponent, str
+    ), f"Unexpected type for exponent {type(exponent)}{g.get_debug_msg()}"
+    base_cst = np.array(x, dtype=np.float64)
+    exponent = g.op.Cast(exponent, to=TensorProto.DOUBLE, name=name)
+    res = g.op.Pow(base_cst, exponent, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(outputs[0], TensorProto.DOUBLE)
+        if g.has_shape(exponent):
+            g.set_shape(outputs[0], g.get_shape(exponent))
+        elif g.has_rank(exponent):
+            g.set_rank(outputs[0], g.get_rank(exponent))
+    return res
+
+
 def aten_prelu(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -13639,6 +13858,30 @@ def aten_tril(
     if not sts:
         set_type_shape_unary_op(g, res, x)
     return res
+
+
+def aten_true_divide_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "true_divide_Tensor",
+) -> T:
+    """Performs true division (delegates to truediv)."""
+    return aten_truediv(g, sts, outputs, x, y, name=name)
+
+
+def aten_true_divide_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "true_divide_Scalar",
+) -> T:
+    """Performs true division (delegates to truediv)."""
+    return aten_truediv(g, sts, outputs, x, y, name=name)
 
 
 def aten_truediv(
