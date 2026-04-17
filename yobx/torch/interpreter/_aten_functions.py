@@ -10256,6 +10256,72 @@ def aten_pow_Tensor_Tensor(
     return res
 
 
+def aten_float_power_Tensor_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    exponent: T,
+    name: str = "float_power_Tensor_Tensor",
+) -> T:
+    "float_power"
+    x = g.op.Cast(x, to=TensorProto.DOUBLE, name=name)
+    exponent = g.op.Cast(exponent, to=TensorProto.DOUBLE, name=name)
+    res = g.op.Pow(x, exponent, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(outputs[0], TensorProto.DOUBLE)
+        if g.has_shape(x):
+            g.set_shape(outputs[0], g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(outputs[0], g.get_rank(x))
+    return res
+
+
+def aten_float_power_Tensor_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    exponent: T,
+    name: str = "float_power_Tensor_Scalar",
+) -> T:
+    "float_power"
+    x = g.op.Cast(x, to=TensorProto.DOUBLE, name=name)
+    exp_cst = np.array(exponent, dtype=np.float64)
+    res = g.op.Pow(x, exp_cst, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(outputs[0], TensorProto.DOUBLE)
+        if g.has_shape(x):
+            g.set_shape(outputs[0], g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(outputs[0], g.get_rank(x))
+    return res
+
+
+def aten_float_power_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    exponent: T,
+    name: str = "float_power_Scalar",
+) -> T:
+    "float_power"
+    assert isinstance(
+        exponent, str
+    ), f"Unexpected type for exponent {type(exponent)}{g.get_debug_msg()}"
+    base_cst = np.array(x, dtype=np.float64)
+    exponent = g.op.Cast(exponent, to=TensorProto.DOUBLE, name=name)
+    res = g.op.Pow(base_cst, exponent, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(outputs[0], TensorProto.DOUBLE)
+        if g.has_shape(exponent):
+            g.set_shape(outputs[0], g.get_shape(exponent))
+        elif g.has_rank(exponent):
+            g.set_rank(outputs[0], g.get_rank(exponent))
+    return res
+
+
 def aten_prelu(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
