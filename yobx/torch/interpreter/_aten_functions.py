@@ -10257,6 +10257,18 @@ def aten_pow_Tensor_Tensor(
     return res
 
 
+def aten_float_power(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    exponent: T,
+    name: str = "float_power",
+) -> T:
+    """Delegates float_power to the Tensor_Tensor implementation."""
+    return aten_float_power_Tensor_Tensor(g, sts, outputs, x, exponent, name=name)
+
+
 def aten_float_power_Tensor_Tensor(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
