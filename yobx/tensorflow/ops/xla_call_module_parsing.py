@@ -925,7 +925,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
                 layers_body.append(
                     {"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""}
                 )
-            continue
+                continue
 
         # ---- constant ----
         if oname == "stablehlo.constant":
