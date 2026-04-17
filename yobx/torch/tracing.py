@@ -9,6 +9,7 @@ import torch
 import torch.utils._pytree as pytree
 from torch.fx import Node
 from torch.fx.proxy import TracerBase
+from transformers.cache_utils import DynamicCache
 from ..helpers import flatten_object, string_type
 from .fake_tensor_helper import make_fake_with_dynamic_dimensions
 from .torch_helper import torch_deepcopy
@@ -1194,9 +1195,7 @@ class CustomTracer(torch.fx.Tracer):
         # (e.g. <class 'transformers.cache_utils.DynamicLayer'>) directly into the
         # generated graph source code, producing a SyntaxError when that code is
         # later compiled by _make_graph_module.
-        from transformers.cache_utils import DynamicCache as _DynCache
-
-        if isinstance(a, _DynCache):
+        if isinstance(a, DynamicCache):
             from .in_transformers.cache_helper import CacheKeyValue, make_dynamic_cache
 
             capi = CacheKeyValue(a)
