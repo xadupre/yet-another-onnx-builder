@@ -541,6 +541,7 @@ def parse_mlir(mlir_string: str) -> List[dict]:
     # text as before.
     arg_header_pattern = r"(%arg\d+)\s*:\s*(tensor<[^>]+>)"
 
+    assert isinstance(mlir_string, str), f"Unexpected type {type(mlir_string)} for mlir_string"
     public_func_match = re.search(r"func\.func\s+public\s+@\w+\s*\(", mlir_string)
     if public_func_match:
         paren_start = public_func_match.end() - 1  # position of '('

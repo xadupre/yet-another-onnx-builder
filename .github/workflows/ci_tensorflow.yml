@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   tensorflow_tests:
-    name: tensorflow (ubuntu-latest, py${{ matrix.python-version }}, tf-${{ matrix.tensorflow-version }})
+    name: tensorflow (ubuntu-latest, py${{ matrix.python-version }}, tf-${{ matrix.tensorflow-version }}, jax-${{ matrix.jax-version }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -22,7 +22,13 @@ jobs:
       fail-fast: false
       matrix:
         python-version: ["3.13"]
-        tensorflow-version: ["2.20"]
+        jax-version: ["0.9", "0.10"]
+        tensorflow-version: ["2.20", "2.21"]
+        exclude:
+          - jax-version: "0.9"
+            tensorflow-version: "2.21"
+          - jax-version: "0.10"
+            tensorflow-version: "2.20"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
@@ -30,14 +36,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install tensorflow==${{ matrix.tensorflow-version }}
-        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*"
+      - name: Install tensorflow==${{ matrix.tensorflow-version }} jax==${{ matrix.jax-version }}
+        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" "jax==${{ matrix.jax-version }}"
 
       - name: Install dependencies
         run: pip install -e ".[dev,tensorflow]"
 
-      - name: Install tensorflow==${{ matrix.tensorflow-version }} again
-        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" && pip freeze
+      - name: Install tensorflow==${{ matrix.tensorflow-version }} jax==${{ matrix.jax-version }} again
+        run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" "jax==${{ matrix.jax-version }}"
 
       - name: Run tensorflow tests with coverage
         run: |
