@@ -195,17 +195,18 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
     # ------------------------------------------------------------------
     # 3a. stablehlo.constant
     # ------------------------------------------------------------------
-    # Matches: %id = stablehlo.constant dense<VALUE> : tensor<...> loc(...)
+    # Matches: %id = stablehlo.constant dense<VALUE> : tensor<...> [loc(...)]
     # The dense value can be:
     #   * "0xHEXBYTES"        – raw binary
     #   * 0xFF800000           – single hex scalar
     #   * 0.000000e+00         – floating-point scalar
     #   * [[v1, v2], ...]      – nested list
+    # loc(...) is optional: present in JAX 0.9, absent in JAX 0.10+.
     const_pattern = (
         r"(%[\w]+)\s*=\s*stablehlo\.constant\s+"
         r'(dense<(?:"[^"]*"|[^>]*)>)'  # dense<...>
         r"\s*:\s*(tensor<[^>]+>)"  # : tensor<...>
-        r"[^\n]*loc\(([^)]*)\)"
+        r"(?:[^\n]*loc\(([^)]*)\))?"  # optional loc(...)
     )
     for m in re.finditer(const_pattern, scan_text):
         all_special_spans.update(range(m.start(), m.end()))
@@ -219,7 +220,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
                 "op": "constant",
                 "operands": [],
                 "shape": m.group(3),
-                "loc": m.group(4),
+                "loc": m.group(4) or "",
                 "dense_content": dense_content,
             }
         )
@@ -232,7 +233,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         r"(%\w+)\s*,\s*(%\w+)\s*,\s*"
         r"contracting_dims\s*=\s*\[([^\]]*)\]\s*x\s*\[([^\]]*)\]"
         r"[^:]*:[^-]*->\s*(tensor<[^>]+>)"
-        r"[^\n]*loc\(([^)]*)\)"
+        r"(?:[^\n]*loc\(([^)]*)\))?"
     )
     for m in re.finditer(dot_pattern, scan_text):
         all_special_spans.update(range(m.start(), m.end()))
@@ -247,7 +248,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
                 "op": "dot_general",
                 "operands": [lhs, rhs],
                 "shape": m.group(6),
-                "loc": m.group(7),
+                "loc": m.group(7) or "",
                 "lhs_contracting": lhs_dims,
                 "rhs_contracting": rhs_dims,
             }
@@ -260,7 +261,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         r"(%\w+)\s*=\s*stablehlo\.broadcast_in_dim\s+"
         r"(%\w+)\s*,\s*dims\s*=\s*\[([^\]]*)\]"
         r"\s*:\s*\([^)]+\)\s*->\s*(tensor<[^>]+>)"
-        r"[^\n]*loc\(([^)]*)\)"
+        r"(?:[^\n]*loc\(([^)]*)\))?"
     )
     for m in re.finditer(bcast_pattern, scan_text):
         all_special_spans.update(range(m.start(), m.end()))
@@ -273,7 +274,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
                 "op": "broadcast_in_dim",
                 "operands": [operand],
                 "shape": m.group(4),
-                "loc": m.group(5),
+                "loc": m.group(5) or "",
                 "dims": dims,
             }
         )
@@ -285,7 +286,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         r"(%\w+)\s*=\s*stablehlo\.dynamic_broadcast_in_dim\s+"
         r"(%\w+)\s*,\s*(%\w+)\s*,\s*dims\s*=\s*\[([^\]]*)\]"
         r"\s*:\s*\([^)]+\)\s*->\s*(tensor<[^>]+>)"
-        r"[^\n]*loc\(([^)]*)\)"
+        r"(?:[^\n]*loc\(([^)]*)\))?"
     )
     for m in re.finditer(dyn_bcast_pattern, scan_text):
         all_special_spans.update(range(m.start(), m.end()))
@@ -299,7 +300,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
                 "op": "dynamic_broadcast_in_dim",
                 "operands": [operand],
                 "shape": m.group(5),
-                "loc": m.group(6),
+                "loc": m.group(6) or "",
                 "dims": dims,
             }
         )
@@ -310,7 +311,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
     call_pattern = (
         r"(%\w+)\s*=\s*call\s+@(\w+)\s*\(([^)]*)\)"
         r"\s*:\s*\([^)]*\)\s*->\s*(tensor<[^>]+>)"
-        r"[^\n]*loc\(([^)]*)\)"
+        r"(?:[^\n]*loc\(([^)]*)\))?"
     )
     for m in re.finditer(call_pattern, scan_text):
         # Do NOT intercept @_wrapped_jax_export_main calls; they are handled
@@ -329,7 +330,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
                 "op": "call",
                 "operands": args,
                 "shape": m.group(4),
-                "loc": m.group(5),
+                "loc": m.group(5) or "",
                 "func": func_name,
             }
         )
@@ -344,7 +345,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         r"(%\w+)\s+init:\s+(%\w+)\s*\)\s*applies\s+stablehlo\.(\w+)\s+"
         r"across\s+dimensions\s*=\s*\[([^\]]*)\]"
         r"[^:]*:[^-]*->\s*(tensor<[^>]+>)"
-        r"[^\n]*loc\(([^)]*)\)"
+        r"(?:[^\n]*loc\(([^)]*)\))?"
     )
     for m in re.finditer(reduce_pattern, scan_text):
         all_special_spans.update(range(m.start(), m.end()))
@@ -359,7 +360,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
                 "op": onnx_op,
                 "operands": [operand],
                 "shape": m.group(6),
-                "loc": m.group(7),
+                "loc": m.group(7) or "",
                 "axes": axes,
             }
         )
@@ -379,16 +380,16 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         (
             r"(%\w+)\s*=\s*stablehlo\.reshape\s+(%\w+)"
             r"\s*:\s*\(tensor<[^>]*x?(?:i|ui)\d+>\)\s*->\s*tensor<[^>]*x?(?:i|ui)\d+>"
-            r"[^\n]*loc\(([^)]*)\)"
+            r"(?:[^\n]*loc\(([^)]*)\))?"
         ),
         # stablehlo.concatenate of integer tensors
         (
             r"(%\w+)\s*=\s*stablehlo\.concatenate\s+(%\w+)[^:]*"
             r":\s*\(tensor<[^>]*x?(?:i|ui)\d+>[^)]*\)\s*->\s*tensor<[^>]*x?(?:i|ui)\d+>"
-            r"[^\n]*loc\(([^)]*)\)"
+            r"(?:[^\n]*loc\(([^)]*)\))?"
         ),
         # stablehlo.get_dimension_size
-        (r"(%\w+)\s*=\s*stablehlo\.get_dimension_size\s+%\w+[^\n]*loc\(([^)]*)\)"),
+        (r"(%\w+)\s*=\s*stablehlo\.get_dimension_size\s+%\w+[^\n]*(?:loc\(([^)]*)\))?"),
     ]
     for pattern in skip_patterns:
         for m in re.finditer(pattern, scan_text):
@@ -396,8 +397,9 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
             res_id = arg_alias.get(m.group(1), m.group(1))
             layers.append({"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""})
 
-    # stablehlo.custom_call (no result; side-effect only)
-    custom_call_pat = r"stablehlo\.custom_call\s+@\w+[^\n]*loc\([^)]*\)"
+    # stablehlo.custom_call (no result; side-effect only).
+    # loc(...) is optional: absent in JAX 0.10+ MLIR output.
+    custom_call_pat = r"stablehlo\.custom_call\s+@\w+[^\n]*"
     for m in re.finditer(custom_call_pat, scan_text):
         all_special_spans.update(range(m.start(), m.end()))
 
@@ -410,7 +412,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
     convert_pattern = (
         r"(%\w+)\s*=\s*stablehlo\.convert\s+(%\w+)"
         r"\s*:\s*(?:\([^)]*\)\s*->)?\s*(tensor<[^>]+>)"
-        r"[^\n]*loc\(([^)]*)\)"
+        r"(?:[^\n]*loc\(([^)]*)\))?"
     )
     for m in re.finditer(convert_pattern, scan_text):
         all_special_spans.update(range(m.start(), m.end()))
@@ -423,7 +425,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
                 "op": "convert",
                 "operands": [operand],
                 "shape": tgt_type,
-                "loc": m.group(4),
+                "loc": m.group(4) or "",
             }
         )
 
@@ -432,7 +434,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
     # ------------------------------------------------------------------
     compare_pattern = (
         r"(%\w+)\s*=\s*stablehlo\.compare\s+(\w+)\s*,\s*(%\w+)\s*,\s*(%\w+)"
-        r"[^:]*:\s*(?:.*?->\s*)?(tensor<[^>]+>).*?loc\((.*?)\)"
+        r"[^:]*:\s*(?:.*?->\s*)?(tensor<[^>]+>)(?:[^\n]*loc\((.*?)\))?"
     )
     compare_spans: set = set()
     for match in re.finditer(compare_pattern, scan_text):
@@ -447,7 +449,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
                 "op": f"compare_{direction}",
                 "operands": [op1, op2],
                 "shape": shape,
-                "loc": location,
+                "loc": location or "",
             }
         )
 
@@ -456,7 +458,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
     # ------------------------------------------------------------------
     op_pattern = (
         r"(?:(%?\w+)\s*=\s*)?\"?([\w\.]+)\"?\s*(%[\w\s,%]+)?"
-        r"\s*:\s*(?:.*?->\s*)?(tensor<[^>]+>).*?loc\((.*?)\)"
+        r"\s*:\s*(?:.*?->\s*)?(tensor<[^>]+>)(?:[^\n]*loc\((.*?)\))?"
     )
     for match in re.finditer(op_pattern, scan_text):
         if match.start() in all_special_spans:
@@ -479,7 +481,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
                 "op": clean_op,
                 "operands": clean_operands,
                 "shape": shape,
-                "loc": location,
+                "loc": location or "",
             }
         )
         if op_name == "return":
