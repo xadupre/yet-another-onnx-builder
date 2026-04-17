@@ -57,7 +57,7 @@ the appropriate backend-specific converter:
 * a :class:`sklearn.base.BaseEstimator` → :func:`yobx.sklearn.to_onnx`
 * a :class:`tensorflow.Module` (including Keras models) → :func:`yobx.tensorflow.to_onnx`
 * raw ``.tflite`` bytes or a path ending in ``".tflite"`` → :func:`yobx.litert.to_onnx`
-* a SQL string, a Python callable, or a :class:`polars.LazyFrame` → :func:`yobx.sql.to_onnx`
+* a SQL string, a Python callable, or a :epkg:`polars.LazyFrame` → :func:`yobx.sql.to_onnx`
 
 All extra keyword arguments are forwarded verbatim to the selected converter,
 so the backend-specific parameters (``export_options``, ``function_options``,
@@ -92,7 +92,7 @@ operations on a DataFrame and compiles them to ONNX directly.
 +-----------------------------+------------------------------------+----------------------------------+
 | sql                         | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-converter`    |
 +-----------------------------+------------------------------------+----------------------------------+
-| :class:`polars.LazyFrame`   | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-polars`       |
+| :epkg:`polars.LazyFrame`    | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-polars`       |
 +-----------------------------+------------------------------------+----------------------------------+
 | :class:`pandas.DataFrame`   | :func:`yobx.sql.to_onnx`           | :ref:`l-design-sql-dataframe`    |
 +-----------------------------+------------------------------------+----------------------------------+
@@ -117,8 +117,44 @@ Its unique API:
 .. code-block:: python
 
     # the model is called 
+    from yobx import to_onnx
     expected = model(*args, **kwargs)
     onnx_model = to_onnx(model, args, kwargs, dynamic_shapes, **options)
+
+The function returns an :class:`~yobx.container.ExportArtifact` that
+wraps the exported ONNX proto together with an
+:class:`~yobx.container.ExportReport`. The ONNX model can be retrieved
+with `artifact.model_proto` and saved to disk via `artifact.save(path)`.
+
+`options` are different across the libraries producing the model even they
+share some of them. The common parameters accepted by all backends are:
+
+* ``target_opset`` — an integer or a dict mapping ONNX domain names to
+  their opset version (e.g. ``{"": 18, "com.microsoft": 1}``).  Adding
+  ``"com.microsoft"`` will trigger operator fusions specific to
+  :epkg:`onnxruntime` such as fused attention and layer normalization.
+* ``large_model`` — when ``True`` the weights are stored in a separate
+  ``.onnx_data`` file next to the model (ONNX external-data format).
+  This is required for models whose size exceeds the 2 GB protobuf limit.
+* ``external_threshold`` — size in bytes above which individual initializers
+  are stored externally when ``large_model=True`` (default: 1024).
+* ``input_names`` — an explicit list of names for the ONNX graph input
+  tensors.  When omitted, names are derived automatically.
+* ``dynamic_shapes`` — declares which tensor dimensions are symbolic
+  (variable-length).  The exact format depends on the backend: torch
+  follows :func:`torch.export.export` conventions while the other backends,
+  the default is different is different for every library but it is usually
+  empty for :epkg:`pytorch` or :epkg:`tensorflow` (so static shape),
+  first dimension is batch dimension for :epkg:`scikit-learn`.
+  use a tuple of ``{axis: dim_name}`` dicts.
+* ``verbose`` — verbosity level (integer, 0 = silent).
+* ``return_optimize_report`` — when ``True``, the returned artifact
+  has its ``report`` attribute populated with per-pattern optimization
+  statistics.
+
+Oother options are specific to every converter and control the way
+a model is captured or converted. It is possible to output
+the decision path for trees or ensembles in :epkg:`scikit-learn`.
 
 .. toctree::
    :maxdepth: 1

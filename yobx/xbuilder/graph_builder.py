@@ -2478,7 +2478,9 @@ class GraphBuilder(
                 key.append(d)
             elif isinstance(d, str):
                 assert self._debug_quiet or (
-                    self.has_shape(d) or (self.has_rank(d) and self.get_rank(d) == 0)
+                    self.has_shape(d)
+                    or (self.has_rank(d) and self.get_rank(d) == 0)
+                    or d in self.dynamic_objects
                 ), (
                     f"Missing shape for {d!r} in {shape!r}, has_rank={self.has_rank(d)}, "
                     f"has_type={self.has_type(d)}{self.get_debug_msg()}"
@@ -9706,6 +9708,14 @@ class GraphBuilder(
             for att in attributes:
                 mapatt[att.name] = att
         renamed = dict(zip(proto.input, inputs))
+        if len(inputs) < len(proto.input):
+            for missing_input in proto.input[len(inputs) :]:
+                if (
+                    missing_input in self.initializers_dict
+                    or self.is_constant(missing_input)
+                    or self.has_name(missing_input)
+                ):
+                    renamed[missing_input] = missing_input
         renamed.update(dict(zip(proto.output, outputs)))
         if self.verbose >= 5:
 

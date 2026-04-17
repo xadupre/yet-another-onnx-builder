@@ -1,6 +1,7 @@
 """
 Tests exporting torch ops from :mod:`torch.testing._internal.common_methods_invocations`
-to ONNX using :func:`yobx.torch.interpreter.to_onnx`.
+to ONNX using :func:`yobx.torch.interpreter.to_onnx` with
+``ExportOptions(tracing=TracingMode.NEW_TRACING)``.
 
 One test method is generated automatically for every (op, dtype) pair collected
 from ``op_db``, following the naming convention
@@ -19,6 +20,7 @@ from torch.testing._internal import common_methods_invocations
 from yobx.ext_test_case import ExtTestCase, has_onnxruntime, ignore_warnings, requires_torch
 from yobx.helpers import max_diff
 from yobx.reference import ExtendedReferenceEvaluator
+from yobx.torch import ExportOptions, TracingMode
 from yobx.torch.interpreter import to_onnx
 from yobx.torch.coverage.op_coverage import (
     NO_CONVERTER_OPS,
@@ -117,11 +119,31 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
         List of :class:`~torch.testing._internal.opinfo.core.OpInfo` objects.
     """
     _xfail_map: Dict[torch.dtype, FrozenSet[str]] = {
-        torch.float32: XFAIL_OPS["default"],
-        torch.float16: XFAIL_OPS["default"] | XFAIL_OPS_FLOAT16["default"],
-        torch.bfloat16: XFAIL_OPS["default"] | XFAIL_OPS_BFLOAT16["default"],
-        torch.int32: XFAIL_OPS["default"] | XFAIL_OPS_INT32["default"],
-        torch.int64: XFAIL_OPS["default"] | XFAIL_OPS_INT64["default"],
+        torch.float32: XFAIL_OPS["default"] | XFAIL_OPS["new-tracing"],
+        torch.float16: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_FLOAT16["default"]
+            | XFAIL_OPS["new-tracing"]
+            | XFAIL_OPS_FLOAT16["new-tracing"]
+        ),
+        torch.bfloat16: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_BFLOAT16["default"]
+            | XFAIL_OPS["new-tracing"]
+            | XFAIL_OPS_BFLOAT16["new-tracing"]
+        ),
+        torch.int32: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_INT32["default"]
+            | XFAIL_OPS["new-tracing"]
+            | XFAIL_OPS_INT32["new-tracing"]
+        ),
+        torch.int64: (
+            XFAIL_OPS["default"]
+            | XFAIL_OPS_INT64["default"]
+            | XFAIL_OPS["new-tracing"]
+            | XFAIL_OPS_INT64["new-tracing"]
+        ),
     }
     if dtype not in _xfail_map:
         raise ValueError(f"Unsupported dtype {dtype!r}. Supported dtypes: {list(_xfail_map)}")
@@ -224,7 +246,9 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
             expected if isinstance(expected, (tuple, list)) else (expected,)
         )
 
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(
+            model, inputs, export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
         numpy_inputs = [to_numpy(t) for t in inputs]
 
         ref = ExtendedReferenceEvaluator(onx.proto)
@@ -273,8 +297,8 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
     return _test
 
 
-class TestOnnxExportCommonMethods(ExtTestCase):
-    """Tests :func:`yobx.torch.interpreter.to_onnx` against ops from op_db.
+class TestOnnxExportCommonMethodsNewTracing(ExtTestCase):
+    """Tests :func:`yobx.torch.interpreter.to_onnx` with new-tracing against ops from op_db.
 
     One test method is generated automatically for every (op, dtype) pair in
     ``_OPS_FLOAT32``, ``_OPS_FLOAT16``, ``_OPS_BFLOAT16``, ``_OPS_INT32``,
@@ -303,7 +327,7 @@ class TestOnnxExportCommonMethods(ExtTestCase):
                 setattr(cls, method_name, _make_export_test(op, dtype))
 
 
-TestOnnxExportCommonMethods._add_test_methods()
+TestOnnxExportCommonMethodsNewTracing._add_test_methods()
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

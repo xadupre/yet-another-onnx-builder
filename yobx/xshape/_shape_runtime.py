@@ -261,6 +261,16 @@ class _ShapeRuntime:
                 node.doc_string += "#SV-Sq/2"
                 return False
             i = np.array(list(axes_attr.ints), dtype=np.int64)
+        elif len(node.input) == 1:
+            # No axes at all.
+            if self.has_shape(node.input[0]):
+                shape_x = self.get_shape(node.input[0])
+                if not all_int(shape_x):
+                    i = None
+                else:
+                    i = np.array([a for a, v in enumerate(shape_x) if v == 1], dtype=np.int64)
+            else:
+                i = None
         else:
             i = None
         y = self.value_as_shape(node.input[0])
@@ -276,11 +286,18 @@ class _ShapeRuntime:
             node.doc_string += "#SV-SqDim"
             self.set_value_shape(node.output[0], y[0])
             return True
+        elif isinstance(i, np.ndarray) and i.dtype == np.int64 and i.shape == (0,):
+            # nothing to squeeze -> identity
+            node.doc_string += "#SV-SqAll"
+            self.set_value_shape(node.output[0], y)
+            self.set_type(node.output[0], self.get_type(node.input[0]))
+            return True
         else:
             raise RuntimeError(
                 f"Not implemented when node Squeeze with inputs={node.input}, "
-                f"y={y!r}, i={i!r}{self.get_debug_msg()}"
+                f"y={y!r}, i={i!r}, node.name={node.name!r}{self.get_debug_msg()}"
             )
+
         assert ii == 0, f"A shape should only have one axis i={i}, y={y}{self.get_debug_msg()}"
         if isinstance(y, str):
             node.doc_string += "#SV-Sq1"

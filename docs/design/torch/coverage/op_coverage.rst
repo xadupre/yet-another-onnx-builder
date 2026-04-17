@@ -6,8 +6,11 @@ Op-db Coverage per Op and Type
 
 This page shows, for every op collected from
 :mod:`torch.testing._internal.common_methods_invocations` (``op_db``), which
-data types are covered by the op-db export tests in
-:mod:`unittests.torch.coverage.test_onnx_export_common_methods`.
+data types are covered by the op-db export tests in:
+
+* :mod:`unittests.torch.coverage.test_onnx_export_common_methods`
+* :mod:`unittests.torch.coverage.test_onnx_export_common_methods_tracing`
+* :mod:`unittests.torch.coverage.test_onnx_export_common_methods_new_tracing`
 
 Legend:
 
@@ -22,9 +25,32 @@ The exclusion sets (:data:`~yobx.torch.coverage.op_coverage.NO_CONVERTER_OPS`,
 defined in :mod:`yobx.torch.coverage.op_coverage` and are imported by the test module
 so that both sources always stay in sync.
 
+Default export path
++++++++++++++++++++
+
 .. runpython::
     :rst:
     :warningout: UserWarning
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
-    print(get_op_coverage_rst())
+    print(get_op_coverage_rst("default"))
+
+Torch tracing export path
++++++++++++++++++++++++++
+
+.. runpython::
+    :rst:
+    :warningout: UserWarning
+
+    from yobx.torch.coverage.op_coverage import get_op_coverage_rst
+    print(get_op_coverage_rst("tracing"))
+
+New-tracing export path
++++++++++++++++++++++++
+
+.. runpython::
+    :rst:
+    :warningout: UserWarning
+
+    from yobx.torch.coverage.op_coverage import get_op_coverage_rst
+    print(get_op_coverage_rst("new-tracing"))

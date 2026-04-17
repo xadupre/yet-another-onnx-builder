@@ -10,3 +10,4 @@ Additional statistics and metadata about the documentation build.
 
    index_stats
    ci_durations
+   comparison

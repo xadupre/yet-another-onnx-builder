@@ -318,7 +318,7 @@ class TestCustomTracer(ExtTestCase):
         add_node = graph.call_function(torch.ops.aten.add.Tensor, args=(x, y))
         graph.output(add_node)
 
-        result = CustomTracer._replace_inplace_aten_functions(graph)
+        result = CustomTracer.replace_inplace_aten_functions(graph)
         self.assertEqual(result, 0)
         # Target unchanged
         add_nodes = [n for n in graph.nodes if n.op == "call_function"]
@@ -334,7 +334,7 @@ class TestCustomTracer(ExtTestCase):
         add_node = graph.call_function(torch.ops.aten.add_.Tensor, args=(x, y))
         graph.output(add_node)
 
-        result = CustomTracer._replace_inplace_aten_functions(graph)
+        result = CustomTracer.replace_inplace_aten_functions(graph)
         self.assertEqual(result, 1)
         # Target must be the non-inplace variant now
         fn_nodes = [n for n in graph.nodes if n.op == "call_function"]
@@ -351,7 +351,7 @@ class TestCustomTracer(ExtTestCase):
         add_node = graph.call_function(torch.ops.aten.add_.Scalar, args=(x, 2))
         graph.output(add_node)
 
-        result = CustomTracer._replace_inplace_aten_functions(graph)
+        result = CustomTracer.replace_inplace_aten_functions(graph)
         self.assertEqual(result, 1)
         fn_nodes = [n for n in graph.nodes if n.op == "call_function"]
         self.assertEqual(fn_nodes[0].target, torch.ops.aten.add.Scalar)

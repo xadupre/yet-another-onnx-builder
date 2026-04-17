@@ -21,6 +21,17 @@ _ORIGINAL_TORCH_COND: Callable = torch.cond  # type: ignore[attr-defined]
 # restored after tracing.  ``torch._check`` may not exist on older versions.
 _ORIGINAL_TORCH_CHECK: Optional[Callable] = getattr(torch, "_check", None)
 
+# Capture the real ``torch.ops.higher_order.scan`` at import time so that it
+# can always be used as the canonical FX node target.  The op may not exist on
+# older PyTorch versions.
+_ORIGINAL_TORCH_SCAN: Optional[Callable] = getattr(
+    getattr(torch.ops, "higher_order", None), "scan", None
+)
+
+# Capture the real ``torch.full`` at import time so shape-only constructors
+# can be redirected during tracing when they receive TracingInt sizes.
+_ORIGINAL_TORCH_FULL: Callable = torch.full
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -78,6 +89,63 @@ def _check_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         yield
     finally:
         torch._check = _ORIGINAL_TORCH_CHECK  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _scan_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    A context manager that temporarily replaces ``torch.ops.higher_order.scan``
+    with a tracing-aware handler so that scan calls encountered during
+    :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.trace` are captured as
+    FX ``call_function`` nodes instead of being executed eagerly.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_scan` should be used as the replacement.
+    """
+    if _ORIGINAL_TORCH_SCAN is None:
+        yield
+        return
+
+    def _scan_handler(
+        f: Callable,
+        init_states: List,
+        scan_inputs: List,
+        additional_inputs: Optional[List] = None,
+        dim: int = 0,
+        reverse: bool = False,
+    ) -> Any:
+        return tracer._handle_scan(f, init_states, scan_inputs, additional_inputs, dim, reverse)
+
+    torch.ops.higher_order.scan = _scan_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.ops.higher_order.scan = _ORIGINAL_TORCH_SCAN  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    Temporarily replaces ``torch.full`` with a tracing-aware handler so calls
+    using symbolic ``TracingInt`` sizes are captured as FX nodes.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_full` should be used as the replacement.
+
+    Returns:
+        A context manager that yields control while ``torch.full``
+        is temporarily replaced, then restores the original implementation on
+        exit.
+    """
+
+    def _full_handler(size: Any, fill_value: Any, **kwargs: Any) -> Any:
+        return tracer._handle_full(size, fill_value, **kwargs)
+
+    torch.full = _full_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.full = _ORIGINAL_TORCH_FULL  # type: ignore[assignment]
 
 
 @contextlib.contextmanager
@@ -158,3 +226,25 @@ def _roll_dynamic_shape_ctx() -> Generator:
     finally:
         if _orig_decomp is not None:
             _decomp_table[_roll_op] = _orig_decomp
+
+
+@contextlib.contextmanager
+def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    Applies all tracing-time torch replacement context managers at once.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        using these temporary runtime patches.
+
+    Returns:
+        A context manager that enters all replacement contexts and restores all
+        original torch functions/decompositions on exit.
+    """
+    with (
+        _cond_replacement_ctx(tracer),
+        _check_replacement_ctx(tracer),
+        _full_replacement_ctx(tracer),
+        _roll_dynamic_shape_ctx(),
+        _scan_replacement_ctx(tracer),
+    ):
+        yield

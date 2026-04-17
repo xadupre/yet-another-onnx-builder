@@ -13,9 +13,12 @@ from .shape import TracingShape, TracingInt, TracingBool, register_condition, cl
 from .tensor import TracingTensor
 from ._patches import (
     _ORIGINAL_TORCH_COND,
+    _ORIGINAL_TORCH_FULL,
+    _ORIGINAL_TORCH_SCAN,
     _cond_replacement_ctx,
     _check_replacement_ctx,
-    _roll_dynamic_shape_ctx,
+    _scan_replacement_ctx,
+    _trace_replacement_ctx,
 )
 
 
@@ -185,6 +188,8 @@ class GraphTracer:
         Scalars (``int``, ``float``, ``str``) and empty collections are
         treated as non-tensor.  Lists and tuples are inspected recursively.
         Dicts are inspected by their values.
+        :class:`~yobx.torch.new_tracing.shape.TracingInt` instances are
+        treated as scalar integers (non-tensor).
 
         :param value: The value to inspect.  May be a scalar, tensor,
             list, tuple, or dict.
@@ -197,6 +202,10 @@ class GraphTracer:
             return True
         if isinstance(value, torch.Tensor):
             return False
+        # TracingInt represents a scalar integer (a shape dimension value);
+        # it is not a tensor.
+        if isinstance(value, TracingInt):
+            return True
         if isinstance(value, (list, tuple)):
             if not value:
                 return True
@@ -209,6 +218,52 @@ class GraphTracer:
         from ...helpers import string_type
 
         raise TypeError(f"Cannot determine if it is a constant argument {string_type(value)}")
+
+    def _tracing_int_to_fake(self, ti: TracingInt) -> Union[int, "torch.SymInt"]:
+        """
+        Convert a :class:`~yobx.torch.new_tracing.shape.TracingInt` to a
+        value suitable for use in :class:`~torch._subclasses.FakeTensor`
+        computations.
+
+        For static (integer-valued) :class:`TracingInt` instances the plain
+        ``int`` value is returned.  For symbolic instances the mapped
+        :class:`torch.SymInt` is returned if one exists; otherwise ``0`` is
+        used as a last-resort fallback.
+
+        :param ti: The :class:`TracingInt` to convert.
+        :returns: An ``int`` or :class:`torch.SymInt` suitable for fake
+            tensor arithmetic.
+        """
+        if ti.is_static:
+            return int(ti)
+        if ti.value in self._mapped_dimension:
+            return self._mapped_dimension[ti.value]
+        return 0  # Last-resort fallback for unknown symbolic dims.
+
+    def _tracing_int_to_const(self, ti: TracingInt) -> int:
+        """
+        Convert a :class:`~yobx.torch.new_tracing.shape.TracingInt` to a
+        constant integer for embedding in an FX graph node argument.
+
+        For static instances the integer value is returned directly.
+        Symbolic instances that have not been intercepted by a higher-level
+        override fall back to ``0``.
+
+        .. note::
+            This helper is a fallback for cases where a
+            :class:`~yobx.torch.new_tracing.shape.TracingInt` reaches
+            :meth:`dispatch` without being intercepted by a higher-level
+            override (e.g. :meth:`~TracingTensor.__truediv__`).  Callers
+            should prefer to intercept :class:`TracingInt`
+            divisors/multipliers *before* dispatching to produce correct
+            dynamic ONNX graphs.
+
+        :param ti: The :class:`TracingInt` to convert.
+        :returns: A concrete ``int`` constant.
+        """
+        if ti.is_static:
+            return int(ti)
+        return 0  # Last-resort fallback.
 
     def _node_for_external_tensor(self, t: torch.Tensor) -> torch.fx.Node:
         """
@@ -489,7 +544,12 @@ class GraphTracer:
         # We could recompute the dynamic shapes without FakeTensor
         # but this is the first approach
         fake_combined = [
-            (a if self.is_not_tensor(a) else self.make_fake(a)) for a in combined_args
+            (
+                self._tracing_int_to_fake(a)
+                if isinstance(a, TracingInt)
+                else (a if self.is_not_tensor(a) else self.make_fake(a))
+            )
+            for a in combined_args
         ]
         unflat = torch.utils._pytree.tree_unflatten(fake_combined, treespec)
         fake_args, fake_kwargs = unflat
@@ -511,12 +571,40 @@ class GraphTracer:
 
         # add a node in the graph
         node_combined = [
-            (a if self.is_not_tensor(a) else self._get_node(a)) for a in combined_args
+            (
+                self._tracing_int_to_const(a)
+                if isinstance(a, TracingInt)
+                else (a if self.is_not_tensor(a) else self._get_node(a))
+            )
+            for a in combined_args
         ]
         unflat_nodes = torch.utils._pytree.tree_unflatten(node_combined, treespec)
         node_args, node_kwargs = unflat_nodes
         # We need to add nodes.
         node = self.graph.call_function(func, args=node_args, kwargs=node_kwargs)
+
+        # For inplace operations (e.g. aten.add_.Tensor), the first tensor
+        # argument is modified in place.  Python's __iadd__ and friends return
+        # ``self``, so the caller keeps holding the *original* TracingTensor
+        # whose ``_node`` still points to the placeholder.  Redirecting
+        # that ``_node`` to the new graph node ensures that subsequent uses of
+        # the tensor — including the function's return value — see the result
+        # of the inplace op rather than the original input.
+        if (
+            args
+            and isinstance(args[0], TracingTensor)
+            and hasattr(func, "_schema")
+            and func._schema.is_mutable
+            and func._schema.arguments
+            and func._schema.arguments[0].alias_info is not None
+            and func._schema.arguments[0].alias_info.is_write
+        ):
+            args[0]._node = node
+            if self.verbose > 1:
+                print(
+                    f"[GraphTracer.dispatch] inplace op {func!r}: "
+                    f"redirected {args[0]!r} _node -> {node.name!r}"
+                )
 
         flat_fake_res, treespec_res = torch.utils._pytree.tree_flatten(fake_res)
         flat_res = [
@@ -840,9 +928,17 @@ class GraphTracer:
         self._sub_tracers[true_name] = sub_true
         self._sub_tracers[false_name] = sub_false
 
+        # --- create callable attribute nodes ---
+        true_fn_node = self.graph.get_attr(true_name)
+        true_fn_node.meta["stack_trace"] = "".join(traceback.format_stack())
+        true_fn_node.meta["callable"] = true_fn
+        false_fn_node = self.graph.get_attr(false_name)
+        false_fn_node.meta["stack_trace"] = "".join(traceback.format_stack())
+        false_fn_node.meta["callable"] = false_fn
+
         # --- emit the main cond node ---
         node = self.graph.call_function(
-            cond_target, args=(pred_node, true_fn, false_fn, operand_nodes), kwargs={}  # type: ignore
+            cond_target, args=(pred_node, true_fn_node, false_fn_node, operand_nodes), kwargs={}  # type: ignore
         )
         node.meta["stack_trace"] = "".join(traceback.format_stack())
 
@@ -875,6 +971,186 @@ class GraphTracer:
         raise NotImplementedError(
             f"torch.cond: unexpected output type from branch function: {type(true_out)}"
         )
+
+    # ------------------------------------------------------------------
+    # torch.ops.higher_order.scan support
+    # ------------------------------------------------------------------
+
+    def _handle_scan(
+        self,
+        f: Callable,
+        init_states: List[Any],
+        scan_inputs: List[Any],
+        additional_inputs: Optional[List[Any]] = None,
+        dim: int = 0,
+        reverse: bool = False,
+    ) -> Any:
+        """
+        Handles a ``torch.ops.higher_order.scan`` call intercepted during graph
+        tracing.
+
+        This method is invoked by :func:`_scan_replacement_ctx`'s handler
+        whenever user code calls ``torch.ops.higher_order.scan`` while a
+        :meth:`trace` is in progress.  It:
+
+        1. Registers *f* in :attr:`_callables` and emits a ``get_attr`` node.
+        2. Traces the scan body in a private sub-:class:`GraphTracer` to
+           determine output shapes and stores the result in :attr:`_sub_tracers`.
+        3. Emits a ``call_function`` node for ``torch.ops.higher_order.scan``
+           in the **main** graph.
+        4. Wraps the outputs in fresh :class:`TracingTensor` instances,
+           returning them as a flat tuple
+           ``(carry_0_final, ..., carry_n_final, scan_out_0, ..., scan_out_m)``,
+           mirroring what the real scan operator returns.
+
+        :param f: The scan body callable.  Receives
+            ``(*carry_states, *scan_elements, *additional_inputs)`` and returns
+            a list ``[new_carry_0, ..., new_carry_n, scan_out_0, ..., scan_out_m]``.
+        :param init_states: Initial carry states (list of
+            :class:`TracingTensor` instances or concrete tensors).
+        :param scan_inputs: Tensors to scan over (first dimension is the scan
+            dimension).
+        :param additional_inputs: Additional inputs forwarded to *f* unchanged
+            on every step.
+        :param dim: Scan dimension (must be 0 for current PyTorch ≥ 2.7).
+        :param reverse: Whether to scan in reverse order.
+        :return: A flat tuple of :class:`TracingTensor` instances
+            ``(carry_0_final, ..., scan_out_0_accum, ...)``.
+        """
+        additional_inputs = list(additional_inputs) if additional_inputs else []
+        n_carry = len(init_states)
+
+        # --- Register the scan body callable and create a get_attr node ---
+        fn_name = self._register_callable("scan", f)
+        get_attr_node = self.graph.get_attr(fn_name)
+        get_attr_node.meta["stack_trace"] = "".join(traceback.format_stack())
+        get_attr_node.meta["callable"] = f
+
+        # --- Trace the scan body to determine output shapes ---
+        sub = GraphTracer(verbose=self.verbose)
+        # Share symbolic dimension mappings so symbolic dim names are consistent.
+        sub._mapped_dimension = dict(self._mapped_dimension)
+        sub._sym_int_to_dynamic_dimension = dict(self._sym_int_to_dynamic_dimension)
+
+        sub_operands: List[Any] = []
+
+        # Carry (init state) inputs: same shape as init_states.
+        for i, s in enumerate(init_states):
+            if isinstance(s, TracingTensor):
+                ph = sub.graph.placeholder(f"carry_{i}")
+                tt = sub._make_tracing_tensor(s.shape, s.dtype, s.device, ph)
+                ph.meta["val"] = tt
+                sub_operands.append(tt)
+            else:
+                sub_operands.append(s)
+
+        # Scan-element inputs: first dimension (scan dim) stripped.
+        for i, s in enumerate(scan_inputs):
+            if isinstance(s, TracingTensor):
+                stripped_shape = (
+                    TracingShape(s.shape[1:]) if len(s.shape) > 1 else TracingShape(())
+                )
+                ph = sub.graph.placeholder(f"scan_elem_{i}")
+                tt = sub._make_tracing_tensor(stripped_shape, s.dtype, s.device, ph)
+                ph.meta["val"] = tt
+                sub_operands.append(tt)
+            else:
+                sub_operands.append(s)
+
+        # Additional inputs: passed unchanged (full shape).
+        for i, s in enumerate(additional_inputs):
+            if isinstance(s, TracingTensor):
+                ph = sub.graph.placeholder(f"additional_{i}")
+                tt = sub._make_tracing_tensor(s.shape, s.dtype, s.device, ph)
+                ph.meta["val"] = tt
+                sub_operands.append(tt)
+            else:
+                sub_operands.append(s)
+
+        with _scan_replacement_ctx(sub), _check_replacement_ctx(sub):
+            body_out = f(*sub_operands)
+
+        body_out_list: List[Any] = (
+            list(body_out) if isinstance(body_out, (list, tuple)) else [body_out]
+        )
+
+        def _body_to_node(x: Any) -> Any:
+            if isinstance(x, TracingTensor):
+                return sub._get_node(x)
+            return x
+
+        out_val = pytree.tree_map(_body_to_node, body_out)
+        sub.graph.output(out_val)
+        self._sub_tracers[fn_name] = sub
+
+        # --- Get FX nodes for all scan arguments ---
+        def _to_node(s: Any) -> Any:
+            if isinstance(s, TracingTensor):
+                return self._get_node(s)
+            return s
+
+        init_nodes = [_to_node(s) for s in init_states]
+        scan_input_nodes = [_to_node(s) for s in scan_inputs]
+        add_input_nodes = [_to_node(s) for s in additional_inputs]
+
+        # --- Emit the scan call_function node ---
+        scan_op = _ORIGINAL_TORCH_SCAN
+        node = self.graph.call_function(
+            scan_op,  # type: ignore
+            args=(get_attr_node, init_nodes, scan_input_nodes, add_input_nodes),
+            kwargs={},
+        )
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+
+        # --- Build output TracingTensors ---
+        # Outputs follow the flat layout:
+        #   (carry_0_final, ..., carry_n_final, scan_out_0_accum, ..., scan_out_m_accum)
+        # - carry_i_final.shape  = init_states[i].shape
+        # - scan_out_j.shape     = (scan_dim, *body_out_list[n_carry+j].shape)
+        #   where scan_dim = scan_inputs[k].shape[0] for any valid k.
+        results: List[Any] = []
+
+        # Carry outputs.
+        for i in range(n_carry):
+            s = init_states[i]
+            if isinstance(s, TracingTensor):
+                get_node = self.graph.call_function(operator.getitem, args=(node, i), kwargs={})
+                tt = self._make_tracing_tensor(s.shape, s.dtype, s.device, get_node)
+                get_node.meta["val"] = tt
+                results.append(tt)
+            else:
+                results.append(s)
+
+        # Scan-accumulation outputs.
+        n_body_scan_outs = len(body_out_list) - n_carry
+        # Determine the scan dimension size from the first scan input.
+        if (
+            scan_inputs
+            and isinstance(scan_inputs[0], TracingTensor)
+            and len(scan_inputs[0].shape) > 0
+        ):
+            scan_dim_val: Any = scan_inputs[0].shape[0]
+        else:
+            scan_dim_val = 0
+
+        for j in range(n_body_scan_outs):
+            body_scan_out = body_out_list[n_carry + j]
+            out_idx = n_carry + j
+            if isinstance(body_scan_out, TracingTensor):
+                accum_shape = TracingShape((scan_dim_val, *body_scan_out.shape.dims))
+                get_node = self.graph.call_function(
+                    operator.getitem, args=(node, out_idx), kwargs={}
+                )
+                tt = self._make_tracing_tensor(
+                    accum_shape, body_scan_out.dtype, body_scan_out.device, get_node
+                )
+                get_node.meta["val"] = tt
+                results.append(tt)
+            else:
+                results.append(None)
+
+        node.meta["val"] = tuple(results)
+        return tuple(results)
 
     def _handle_check(self, cond: Any, msg: Any = None) -> None:
         """
@@ -915,6 +1191,74 @@ class GraphTracer:
             # makes an otherwise-True condition evaluate to False.
             return
         # For any other type (including ints from shape ops), accept silently.
+
+    def _handle_full(self, size: Any, fill_value: Any, **kwargs: Any) -> Any:
+        """
+        Tracing-aware replacement for ``torch.full`` called via
+        :func:`_full_replacement_ctx`.
+
+        It intercepts constructor calls where *size* contains symbolic
+        :class:`TracingInt` values and emits a corresponding FX node without
+        requiring eager execution with concrete Python ``int`` dimensions.
+
+        :param size: Full size argument passed to ``torch.full``.
+        :param fill_value: Fill value passed to ``torch.full``.
+        :param kwargs: Additional keyword arguments for ``torch.full``.
+
+        Returns:
+            A :class:`TracingTensor` when symbolic dimensions are present,
+            otherwise the eager ``torch.full`` result.
+        """
+        if isinstance(size, torch.Size):
+            size = tuple(size)
+        if not isinstance(size, (tuple, list)):
+            return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
+        if not any(isinstance(dim, TracingInt) for dim in size):
+            return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
+
+        traced_size: List[Union[int, torch.SymInt]] = []
+        node_size: List[Any] = []
+        for dim in size:
+            if isinstance(dim, TracingInt):
+                if dim.is_static:
+                    traced_size.append(dim.value)  # type: ignore[arg-type]
+                    node_size.append(dim)
+                    continue
+                assert isinstance(
+                    dim.value, str
+                ), f"Expected string symbolic dimension value, got {type(dim.value)}"
+                dim_key = self._token_replace(dim.value)
+                assert isinstance(
+                    dim_key, str
+                ), f"Expected string type for symbolic dimension key, got {type(dim_key)}"
+                if dim_key in self._mapped_dimension:
+                    symd = self._mapped_dimension[dim_key]
+                else:
+                    symd = self._shape_env.create_unbacked_symint()
+                    self._mapped_dimension[dim_key] = symd
+                    symd_name = self._sym_int_to_str(symd)
+                    assert isinstance(symd_name, str), "type checking"
+                    self._sym_int_to_dynamic_dimension[symd_name] = dim_key
+                traced_size.append(symd)
+                node_size.append(TracingInt(dim_key))
+            else:
+                assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
+                traced_size.append(dim)
+                node_size.append(dim)
+
+        with self._fake_mode:
+            fake_res = _ORIGINAL_TORCH_FULL(tuple(traced_size), fill_value, **kwargs)
+
+        node = self.graph.call_function(
+            _ORIGINAL_TORCH_FULL, args=(tuple(node_size), fill_value), kwargs=kwargs
+        )
+        res = self._make_tracing_tensor(
+            self._sym_shape_to_str_shape(fake_res.shape), fake_res.dtype, fake_res.device, node
+        )
+        node.meta["val"] = res
+        node.meta["fake_val"] = fake_res
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return res
 
     # ------------------------------------------------------------------
     # Public tracing entry point
@@ -959,7 +1303,10 @@ class GraphTracer:
 
         new_arg, treespec_arg = torch.utils._pytree.tree_flatten(arg)
         if dynamic_shapes:
-            flat_ds, _ = torch.utils._pytree.tree_flatten(dynamic_shapes)
+            flat_ds, _ = torch.utils._pytree.tree_flatten(
+                dynamic_shapes,
+                is_leaf=lambda x: isinstance(x, dict) and all(isinstance(k, int) for k in x),
+            )
             assert len(flat_ds) == len(new_arg), (
                 f"Length mismatch between arg ({len(new_arg)}) and "
                 f"the dynamic_shapes ({len(flat_ds)}), name={name!r}"
@@ -1007,16 +1354,17 @@ class GraphTracer:
                 if self.is_not_tensor(a):
                     tracing_args.append(a)
                     continue
+                arg_name = sig_names[i] if i < len(sig_names) else f"vararg_{i - len(sig_names)}"
                 ds = (
                     (
                         dynamic_shapes[i]
                         if isinstance(dynamic_shapes, tuple)
-                        else dynamic_shapes[sig_names[i]]
+                        else dynamic_shapes.get(arg_name, None)
                     )
                     if dynamic_shapes
                     else None
                 )
-                x = self.make_tracing_arg(a, ds, name=sig_names[i] if sig_names else i)
+                x = self.make_tracing_arg(a, ds, name=arg_name)
                 tracing_args.append(x)
         if kwargs:
             for k, v in kwargs.items():
@@ -1117,11 +1465,18 @@ class GraphTracer:
         if self.verbose:
             print("[GraphTracer.trace] call...")
         clear_conditions()
-        with _cond_replacement_ctx(self), _check_replacement_ctx(self), _roll_dynamic_shape_ctx():
+        with _trace_replacement_ctx(self):
             out = func(*tracing_args, **tracing_kwargs)
 
         for submod, orig_fwd in _patched:
             submod.forward = orig_fwd
+
+        # Expose any registered callables (e.g. scan body functions) as
+        # attributes on the traced module so that the downstream interpreter's
+        # ``get_attr`` handler can retrieve them.
+        if isinstance(func, torch.nn.Module) and self._callables:
+            for k, v in self._callables.items():
+                setattr(func, k, v)
 
         def _to_output_node(x: Any) -> Any:
             if isinstance(x, TracingTensor):

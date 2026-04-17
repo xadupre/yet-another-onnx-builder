@@ -489,6 +489,41 @@ def aten_addmm(
     return res
 
 
+def aten_addr(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    vec1: T,
+    vec2: T,
+    beta: float = 1.0,
+    alpha: float = 1.0,
+    name: str = "addr",
+) -> T:
+    """Computes the outer product of vec1 and vec2 and adds it to the matrix x.
+
+    Implements ``out = beta * x + alpha * outer(vec1, vec2)``.
+    """
+    assert g.has_rank(vec1) and g.get_rank(vec1) == 1, f"rank(vec1) must be 1{g.get_debug_msg()}"
+    assert g.has_rank(vec2) and g.get_rank(vec2) == 1, f"rank(vec2) must be 1{g.get_debug_msg()}"
+    outer = g.op.Mul(
+        g.op.UnsqueezeAnyOpset(vec1, g.ONE, name=name),
+        g.op.UnsqueezeAnyOpset(vec2, g.ZERO, name=name),
+        name=name,
+    )
+    itype = g.get_type(x)
+    dtype = tensor_dtype_to_np_dtype(itype)
+    if alpha != 1.0:
+        outer = g.op.Mul(outer, np.array(alpha, dtype=dtype), name=name)
+    if beta != 1.0:
+        x = g.op.Mul(x, np.array(beta, dtype=dtype), name=name)
+    res = g.op.Add(x, outer, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, itype)
+        g.set_rank(res, 2)
+    return res
+
+
 def aten_iadd(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "iadd"
 ) -> T:
@@ -555,6 +590,13 @@ def aten_all_dim(
 def aten_alias(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "identity"
     return g.make_node("Identity", [x], outputs, name="alias")
+
+
+def aten_alias_copy(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
+) -> T:
+    "identity"
+    return g.make_node("Identity", [x], outputs, name="alias_copy")
 
 
 def aten_amax(
@@ -3115,6 +3157,14 @@ def aten_div_Tensor_mode(
     return g.op.Floor(g.op.Div(x, y, name=name), name=name, outputs=outputs)
 
 
+def aten_dot(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T) -> T:
+    """Computes the dot product of two 1-D tensors."""
+    res = g.op.MatMul(x, y, outputs=outputs, name="dot")
+    if not sts:
+        set_type_shape_matmul(g, res, x, y)
+    return res
+
+
 def aten_dropout(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -3774,6 +3824,29 @@ def aten_exp(
     return res
 
 
+def aten_exp2(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "exp2"
+) -> T:
+    """exp2 — Computes ``2 ** x``, casting integer inputs to float32 first."""
+    assert g.has_type(x), f"exp2: type of {x!r} must be known{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    if itype not in {
+        TensorProto.FLOAT,
+        TensorProto.DOUBLE,
+        TensorProto.FLOAT16,
+        TensorProto.BFLOAT16,
+    }:
+        # torch.exp2 returns float32 for integer inputs
+        x = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+        itype = TensorProto.FLOAT
+    dtype = tensor_dtype_to_np_dtype(itype)
+    ln2 = np.array(math.log(2), dtype=dtype)
+    res = g.op.Exp(g.op.Mul(x, ln2, name=name), name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, outputs[0], x)
+    return res
+
+
 def aten_expm1(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "expm1"
 ) -> T:
@@ -4140,6 +4213,90 @@ def aten_fft_ifft2(
     return aten__fft_r2c(
         g, sts, outputs, x, n=s, dim=dim, norm=norm, name=name, inverse=True, onesided=False
     )
+
+
+def aten_fft_fftshift(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    name: str = "fft_fftshift",
+) -> T:
+    """Shifts the zero-frequency component to the center of the spectrum.
+
+    Equivalent to rolling each specified dimension by ``n // 2`` where ``n``
+    is the size of that dimension.  Supports dynamic shapes.
+    """
+    assert g.has_rank(x), f"Missing rank for {x!r}{g.get_debug_msg()}"
+    rank = g.rank(x)
+
+    if dim is None:
+        dims = list(range(rank))
+    elif isinstance(dim, int):
+        dims = [dim]
+    else:
+        dims = list(dim)
+
+    result = x
+    for d in dims:
+        # n = size along dimension d (1-D int64 tensor of length 1)
+        n_tensor = g.op.Shape(result, start=d, end=d + 1, name=name)
+        # floor_half = n // 2, ceil_half = n - n // 2
+        floor_half = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
+        ceil_half = g.op.Sub(n_tensor, floor_half, name=name)
+        # fftshift: split at ceil(n/2): head=x[:ceil], tail=x[ceil:]; result=concat(tail, head)
+        split_sizes = g.op.Concat(ceil_half, floor_half, axis=0, name=name)
+        head, tail = g.op.Split(result, split_sizes, axis=d, outputs=2, name=name)
+        result = g.op.Concat(tail, head, axis=d, name=name)
+        g.set_type(result, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(result, g.get_shape(x))
+
+    return g.op.Identity(result, name=name, outputs=outputs)
+
+
+def aten_fft_ifftshift(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    name: str = "fft_ifftshift",
+) -> T:
+    """Computes the inverse of fftshift.
+
+    Equivalent to rolling each specified dimension by ``-(n // 2)`` (i.e.
+    rolling by ``+n // 2`` in the opposite direction), where ``n`` is the
+    size of that dimension.  Supports dynamic shapes.
+    """
+    assert g.has_rank(x), f"Missing rank for {x!r}{g.get_debug_msg()}"
+    rank = g.rank(x)
+
+    if dim is None:
+        dims = list(range(rank))
+    elif isinstance(dim, int):
+        dims = [dim]
+    else:
+        dims = list(dim)
+
+    result = x
+    for d in dims:
+        # n = size along dimension d (1-D int64 tensor of length 1)
+        n_tensor = g.op.Shape(result, start=d, end=d + 1, name=name)
+        # floor_half = n // 2, ceil_half = n - n // 2
+        floor_half = g.op.Div(n_tensor, np.array([2], dtype=np.int64), name=name)
+        ceil_half = g.op.Sub(n_tensor, floor_half, name=name)
+        # ifftshift: split at floor(n/2): head=x[:floor], tail=x[floor:];
+        # result=concat(tail, head)
+        split_sizes = g.op.Concat(floor_half, ceil_half, axis=0, name=name)
+        head, tail = g.op.Split(result, split_sizes, axis=d, outputs=2, name=name)
+        result = g.op.Concat(tail, head, axis=d, name=name)
+        g.set_type(result, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(result, g.get_shape(x))
+
+    return g.op.Identity(result, name=name, outputs=outputs)
 
 
 def aten_fill_Scalar(
@@ -5266,6 +5423,36 @@ def aten_hardtanh_backward(
     )
     if not sts:
         set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_heaviside(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    values: T,
+    name: str = "heaviside",
+) -> T:
+    """heaviside — Computes 0 where *x* < 0, *values* where *x* == 0, and 1 where *x* > 0."""
+    assert g.has_type(x), f"heaviside: type of {x!r} must be known{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    dtype = tensor_dtype_to_np_dtype(itype)
+    # Where x < 0 → 0; where x == 0 → values; where x > 0 → 1
+    assert g.has_rank(x), f"Missing rank for {x!r}{g.get_debug_msg()}"
+    assert g.has_rank(values), f"Missing rank for {values!r}{g.get_debug_msg()}"
+    if g.get_rank(x) == g.get_rank(values) == 0:
+        zero = np.array(0, dtype=dtype)
+        one = np.array(1, dtype=dtype)
+    else:
+        zero = np.array([0], dtype=dtype)
+        one = np.array([1], dtype=dtype)
+    x_eq_zero = g.op.Equal(x, zero, name=name)
+    x_lt_zero = g.op.Less(x, zero, name=name)
+    inner = g.op.Where(x_eq_zero, values, one, name=name)
+    res = g.op.Where(x_lt_zero, zero, inner, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_binary_op(g, res, x, values)
     return res
 
 
@@ -8195,7 +8382,7 @@ def aten_mean(
     res = g.op.ReduceMean(x, keepdims=0, name=name, outputs=outputs)
     if not sts:
         g.set_type(res, g.get_type(x) if dtype is None else itype)
-        g.get_shape(res, tuple())
+        g.set_shape(res, tuple())
     return res
 
 
@@ -8302,6 +8489,54 @@ def aten_min_other(
     res = g.op.Min(x, y, name=name, outputs=outputs)
     if not sts:
         set_type_shape_binary_op(g, res, x, y)
+    return res
+
+
+def aten_mH(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "mH"
+) -> T:
+    "Computes the conjugate transpose of the last two dimensions."
+    assert g.has_rank(x), f"{x!r} must have a rank{g.get_debug_msg()}"
+    assert g.has_type(x), f"missing type for {x!r}{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    assert itype not in {TensorProto.COMPLEX64, TensorProto.COMPLEX128}, (
+        f"aten_mH: complex tensors are not supported (type={itype}), "
+        f"only real tensors are supported for {x!r}{g.get_debug_msg()}"
+    )
+    rank = g.get_rank(x)
+    assert rank >= 2, f"aten_mH: rank must be >= 2, got {rank} for {x!r}{g.get_debug_msg()}"
+    perm = list(range(rank))
+    perm[-2], perm[-1] = perm[-1], perm[-2]
+    res = g.op.Transpose(x, perm=perm, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, itype)
+        if g.has_shape(x):
+            shape = list(g.get_shape(x))
+            shape[-2], shape[-1] = shape[-1], shape[-2]
+            g.set_shape(res, tuple(shape))
+        else:
+            g.set_rank(res, rank)
+    return res
+
+
+def aten_mT(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "mT"
+) -> T:
+    "Transposes the last two dimensions."
+    assert g.has_rank(x), f"{x!r} must have a rank{g.get_debug_msg()}"
+    rank = g.get_rank(x)
+    assert rank >= 2, f"aten_mT: rank must be >= 2, got {rank} for {x!r}{g.get_debug_msg()}"
+    perm = list(range(rank))
+    perm[-2], perm[-1] = perm[-1], perm[-2]
+    res = g.op.Transpose(x, perm=perm, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            shape = list(g.get_shape(x))
+            shape[-2], shape[-1] = shape[-1], shape[-2]
+            g.set_shape(res, tuple(shape))
+        else:
+            g.set_rank(res, rank)
     return res
 
 
@@ -11630,7 +11865,7 @@ def aten_slice_Tensor(
         if is_static_dimension(start) and is_static_dimension(end):
             shape = g.get_shape(x)
             new_shape = g._apply_slice_to_shape(
-                shape, slice(start, end, step), axes=[dim], expand_axes=[]
+                shape, [slice(start, end, step)], axes=[dim], expand_axes=[]
             )
             g.set_shape(res, new_shape)
         else:
@@ -12016,6 +12251,52 @@ def aten_sign(
     res = g.op.Sign(x, outputs=outputs, name=name)
     if not sts:
         set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_signbit(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "signbit",
+) -> T:
+    """Returns a boolean tensor indicating where the input has a negative sign bit.
+
+    For floating-point types this includes negative zero (``-0.0``), which has
+    its IEEE 754 sign bit set even though ``-0.0 < 0`` is ``False``.  The
+    implementation reinterprets the float bits as an unsigned integer with
+    ``BitCast`` (requires opset >= 21) and extracts the sign bit with
+    ``BitwiseAnd``.  For integer types a simple ``x < 0`` comparison suffices.
+
+    Returns:
+        A boolean tensor with the same shape as *x*; ``True`` where the sign
+        bit is set (i.e. the element is negative or negative zero).
+    """
+    assert g.has_type(x), f"Type missing for {x!r}{g.get_debug_msg()}"
+    itype = g.get_type(x)
+
+    # Float-type → (uint reinterpretation type, sign-bit mask)
+    _FLOAT_SIGN = {
+        TensorProto.FLOAT: (TensorProto.UINT32, np.uint32(0x80000000)),
+        TensorProto.DOUBLE: (TensorProto.UINT64, np.uint64(0x8000000000000000)),
+        TensorProto.FLOAT16: (TensorProto.UINT16, np.uint16(0x8000)),
+        TensorProto.BFLOAT16: (TensorProto.UINT16, np.uint16(0x8000)),
+    }
+
+    if itype in _FLOAT_SIGN and g.main_opset >= 26:
+        uint_itype, sign_mask = _FLOAT_SIGN[itype]
+        bits = g.op.BitCast(x, to=uint_itype, name=name)
+        masked = g.op.BitwiseAnd(bits, np.array(sign_mask), name=name)
+        res = g.op.Cast(masked, to=TensorProto.BOOL, outputs=outputs, name=name)
+    else:
+        # Integer types or opset < 26: sign bit is equivalent to x < 0.
+        np_dtype = tensor_dtype_to_np_dtype(itype)
+        zero = np.array(0, dtype=np_dtype)
+        res = g.op.Less(x, zero, outputs=outputs, name=name)
+
+    if not sts:
+        set_type_shape_unary_op(g, res, x, itype=TensorProto.BOOL)
     return res
 
 
@@ -12735,6 +13016,23 @@ def aten_std_mean_correction(
         set_type_shape_reduce_op(g, outputs[0], x, keepdim=1 if keepdim else 0)
         set_type_shape_reduce_op(g, outputs[1], x, keepdim=1 if keepdim else 0)
     return std, mean
+
+
+def aten_std_mean(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Union[int, List[int]]] = None,
+    *,
+    correction: Optional[float] = 1,
+    keepdim: bool = False,
+    name: str = "std_mean",
+) -> Tuple[T, T]:
+    """std_mean: delegates to :func:`aten_std_mean_correction` with the same defaults."""
+    return aten_std_mean_correction(
+        g, sts, outputs, x, dim=dim, correction=correction, keepdim=keepdim, name=name
+    )
 
 
 def aten_sub(
@@ -14386,28 +14684,41 @@ def aten_wrap_with_autocast(
     **kwargs,
 ) -> T:
     "identity, calling a local function"
-    # We don't need to check for the type, the module is converted as a function,
-    # hopefully this will go smoothly. Maybe here, we should check the local
-    # function is valid for the considered dtype.
-    # dtype is mentioned in the doc_string and should remain unless the graph
-    # is inlined.
-
-    # assert dtype is None, f"Not implemented with dtype={dtype}{g.get_debug_msg()}"
-    assert not enabled, f"Not implemented with dtype={enabled}{g.get_debug_msg()}"
-    assert (
-        not cache_enabled
-    ), f"Not implemented with cache_enabled={cache_enabled}{g.get_debug_msg()}"
+    # dtype is mentioned in the doc_string and should remain unless the graph is inlined.
     assert g.has_local_function(
         wrapped_func, domain=g.local_domain
     ), f"No local function {wrapped_func!r}, domain={g.local_domain!r}\n{g.pretty_text()}"
     assert all(
         isinstance(_, str) for _ in args
     ), f"Unexpected input types args={args}{g.get_debug_msg()}"
+
+    # When autocast is enabled with a floating-point target dtype, torch.export
+    # captures the body subgraph with the *original* input dtypes (e.g. float32).
+    # CustomTracer.fix_autocast_subgraph_dtypes (called from remove_inplace_nodes)
+    # promotes the body's placeholder meta["val"] to the autocast dtype so the
+    # function body is consistently typed.  The casts here additionally cover the
+    # call-site: the main graph still passes float32 tensors, so we must cast
+    # them to the autocast target dtype before calling the local function.
+    _FLOAT_DTYPES = frozenset(
+        {TensorProto.FLOAT, TensorProto.DOUBLE, TensorProto.FLOAT16, TensorProto.BFLOAT16}
+    )
+    cast_args = list(args)
+    if enabled and dtype is not None:
+        onnx_dtype = torch_dtype_to_onnx_dtype(dtype)
+        if onnx_dtype in _FLOAT_DTYPES:
+            for i, a in enumerate(cast_args):
+                if g.has_type(a):
+                    a_type = g.get_type(a)
+                    if a_type in _FLOAT_DTYPES and a_type != onnx_dtype:
+                        cast_args[i] = _cast_inputs(
+                            g, a, onnx_dtype, name="wrap_with_autocast_cast"
+                        )
+
     local_outputs = g.get_local_function_outputs(wrapped_func, domain=g.local_domain)
     if len(outputs) == len(local_outputs):
         return g.make_node(
             wrapped_func,
-            args,
+            cast_args,
             outputs,
             name="wrap_with_autocast",
             domain=g.local_domain,
@@ -14419,7 +14730,7 @@ def aten_wrap_with_autocast(
     )
     new_outputs = [f"{outputs[0]}#{i}" for i in range(len(local_outputs))]
     return g.make_node(
-        wrapped_func, args, new_outputs, name="wrap_with_autocast", domain=g.local_domain
+        wrapped_func, cast_args, new_outputs, name="wrap_with_autocast", domain=g.local_domain
     )
 
 

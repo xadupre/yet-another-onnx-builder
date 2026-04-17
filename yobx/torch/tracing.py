@@ -1908,6 +1908,166 @@ class CustomTracer(torch.fx.Tracer):
         return modified
 
     @classmethod
+    def fix_autocast_subgraph_dtypes(cls, graph: "torch.fx.Graph", verbose: int = 0) -> int:
+        """
+        Fixes the dtype inconsistency in body subgraphs used by ``wrap_with_autocast``.
+
+        :param graph: outer FX graph to scan; modified in-place if changes are made
+        :param verbose: verbosity level
+        :return: Returns the number of body subgraphs whose placeholder types were fixed.
+        """
+        _FLOAT_TORCH_DTYPES = frozenset(
+            {torch.float16, torch.float32, torch.float64, torch.bfloat16}
+        )
+
+        subgraphs = {}
+        for node in graph.nodes:
+            if node.op == "get_attr":
+                subgraphs[node.name] = node.target
+
+        fixed = 0
+        for node in graph.nodes:
+            if node.op != "call_function":
+                continue
+            if getattr(node.target, "__name__", "") != "wrap_with_autocast":
+                continue
+
+            # args = (device_type, dtype, enabled, cache_enabled, wrapped_fn, *inputs)
+            if len(node.args) < 5:
+                continue
+            dtype = node.args[1]  # torch.dtype or None
+            enabled = node.args[2]  # bool
+            wrapped_fn_node = node.args[4]  # get_attr node for body callable
+            if not enabled or dtype is None or dtype not in _FLOAT_TORCH_DTYPES:
+                continue
+
+            assert (
+                wrapped_fn_node.name in subgraphs
+            ), f"Unable to find subgraphs {node.name!r} in {set(subgraphs)}\n---\n{graph}"
+
+            body_module = getattr(graph.owning_module, wrapped_fn_node.target, None)
+            if body_module is None or not hasattr(body_module, "graph"):
+                continue
+
+            # Promote float tensor meta["val"] to the autocast target dtype.
+            # Collect nodes first to avoid modifying the graph while iterating.
+            modified_count = 0
+            all_sub_nodes = list(body_module.graph.nodes)
+            for ph_node in all_sub_nodes:
+                if "val" not in ph_node.meta or not isinstance(ph_node.meta["val"], torch.Tensor):
+                    continue
+                val = ph_node.meta["val"]
+                if not hasattr(val, "dtype") or val.dtype not in _FLOAT_TORCH_DTYPES:
+                    continue
+
+                # Build the promoted FakeTensor for the cast node output.
+                fake_mode = getattr(val, "fake_mode", None)
+                if fake_mode is not None:
+                    with fake_mode:
+                        promoted_val = val.to(dtype=dtype)
+                else:
+                    promoted_val = val.to(dtype=dtype)
+
+                # Insert an explicit _to_copy cast node right after the placeholder
+                # so that downstream ops see the promoted dtype.
+                with body_module.graph.inserting_after(ph_node):
+                    cast_node = body_module.graph.call_function(
+                        torch.ops.aten._to_copy.default, args=(ph_node,), kwargs={"dtype": dtype}
+                    )
+
+                # Move "val" and "tensor_meta" from the placeholder to the cast
+                # node so that the cast output carries the promoted dtype, and the
+                # placeholder is left without an explicit dtype annotation.
+                cast_node.meta["val"] = promoted_val
+                old_tensor_meta = ph_node.meta.get("tensor_meta", None)
+                if old_tensor_meta is not None:
+                    cast_node.meta["tensor_meta"] = old_tensor_meta._replace(dtype=dtype)
+                    del ph_node.meta["tensor_meta"]
+                ph_node.meta.pop("val", None)
+
+                # Redirect all downstream uses of the placeholder to the cast
+                # node (but keep the cast node's own reference to the placeholder).
+                def _not_cast(user, expected=cast_node):
+                    return user is not expected
+
+                ph_node.replace_all_uses_with(cast_node, delete_user_cb=_not_cast)
+
+                modified_count += 1
+                if verbose > 1:
+                    print(
+                        f"[CustomTracer.fix_autocast_subgraph_dtypes] "
+                        f"placeholder {ph_node.name!r}: {val.dtype} -> {dtype}"
+                    )
+
+            if modified_count:
+                fixed += 1
+                if verbose:
+                    print(
+                        f"[CustomTracer.fix_autocast_subgraph_dtypes] "
+                        f"fixed {modified_count} placeholder(s) in "
+                        f"{wrapped_fn_node.target!r} body"
+                    )
+
+            # Insert cast nodes after each getitem user of the wrap_with_autocast
+            # node in the outer graph, the same way we do for placeholders in the
+            # subgraph.  This ensures the outer graph's downstream ops see the
+            # promoted dtype and avoids "Type for name '...' already exists" errors
+            # when the subgraph output dtype (autocast dtype) differs from the
+            # getitem node's meta["val"] dtype (original dtype).
+            outer_cast_count = 0
+            for user in list(node.users):
+                if user.op != "call_function" or user.target is not operator.getitem:
+                    continue
+                if "val" not in user.meta or not isinstance(user.meta["val"], torch.Tensor):
+                    continue
+                user_val = user.meta["val"]
+                if not hasattr(user_val, "dtype") or user_val.dtype not in _FLOAT_TORCH_DTYPES:
+                    continue
+
+                # Build the promoted FakeTensor for the cast node output.
+                fake_mode = getattr(user_val, "fake_mode", None)
+                if fake_mode is not None:
+                    with fake_mode:
+                        promoted_val = user_val.to(dtype=dtype)
+                else:
+                    promoted_val = user_val.to(dtype=dtype)
+
+                # Insert a _to_copy cast right after the getitem node.
+                with graph.inserting_after(user):
+                    outer_cast_node = graph.call_function(
+                        torch.ops.aten._to_copy.default, args=(user,), kwargs={"dtype": dtype}
+                    )
+
+                # Move "val" and "tensor_meta" from the getitem to the cast node.
+                outer_cast_node.meta["val"] = promoted_val
+                old_tensor_meta = user.meta.get("tensor_meta", None)
+                if old_tensor_meta is not None:
+                    outer_cast_node.meta["tensor_meta"] = old_tensor_meta._replace(dtype=dtype)
+                    del user.meta["tensor_meta"]
+                user.meta.pop("val", None)
+
+                # Redirect all downstream uses of the getitem to the cast node.
+                def _not_outer_cast(u, expected=outer_cast_node):
+                    return u is not expected
+
+                user.replace_all_uses_with(outer_cast_node, delete_user_cb=_not_outer_cast)
+                outer_cast_count += 1
+                if verbose > 1:
+                    print(
+                        f"[CustomTracer.fix_autocast_subgraph_dtypes] "
+                        f"outer getitem {user.name!r}: {user_val.dtype} -> {dtype}"
+                    )
+
+            if outer_cast_count and verbose:
+                print(
+                    f"[CustomTracer.fix_autocast_subgraph_dtypes] "
+                    f"inserted {outer_cast_count} outer cast(s) after "
+                    f"{node.name!r} getitem outputs"
+                )
+
+        return fixed
+
+    @classmethod
     def graph_erase_node(cls, graph: torch.fx.Graph, node: torch.fx.Node):
         """
         Removes a node and all predecessors with are only consumed by this one.
@@ -2597,7 +2757,7 @@ class CustomTracer(torch.fx.Tracer):
         return n_inplace
 
     @classmethod
-    def _replace_inplace_call_methods(cls, graph: torch.fx.Graph, verbose: int = 0) -> int:
+    def replace_inplace_call_methods(cls, graph: torch.fx.Graph, verbose: int = 0) -> int:
         """
         Replaces ``call_method`` nodes with inplace targets (e.g. ``add_``, ``mul_``,
         ``sub_``, ``div_``) with their non-inplace ``call_function`` equivalents.
@@ -2646,20 +2806,20 @@ class CustomTracer(torch.fx.Tracer):
                     )
             if verbose > 1:
                 print(
-                    f"[CustomTracer._replace_inplace_call_methods] replaced "
+                    f"[CustomTracer.replace_inplace_call_methods] replaced "
                     f"call_method {old_target!r} -> aten at {node.name!r}"
                 )
         return n
 
     @classmethod
-    def _replace_inplace_aten_functions(cls, graph: torch.fx.Graph, verbose: int = 0) -> int:
+    def replace_inplace_aten_functions(cls, graph: torch.fx.Graph, verbose: int = 0) -> int:
         """
         Replaces ``call_function`` nodes whose target is an inplace ATen binary
         op (e.g. ``aten.add_.Tensor``, ``aten.mul_.Scalar``) with their
         non-inplace equivalents (e.g. ``aten.add.Tensor``,
         ``aten.mul.Scalar``).
 
-        This is the counterpart of :meth:`_replace_inplace_call_methods` for
+        This is the counterpart of :meth:`replace_inplace_call_methods` for
         graphs produced by :class:`~yobx.torch.new_tracing.GraphTracer` where
         inplace dispatch operations are already recorded as ``call_function``
         ATen nodes with the trailing ``_`` in the overload name.  Because
@@ -2691,7 +2851,7 @@ class CustomTracer(torch.fx.Tracer):
             n += 1
             if verbose > 1:
                 print(
-                    f"[CustomTracer._replace_inplace_aten_functions] replaced "
+                    f"[CustomTracer.replace_inplace_aten_functions] replaced "
                     f"aten inplace {old_target!r} -> non-inplace at {node.name!r}"
                 )
         return n
@@ -2738,9 +2898,9 @@ class CustomTracer(torch.fx.Tracer):
                     n_inplace_submobules += inpl
 
         # Convert call_function inplace ATen nodes (aten.add_.Tensor, etc.) to non-inplace.
-        cls._replace_inplace_aten_functions(graph, verbose=verbose)
+        cls.replace_inplace_aten_functions(graph, verbose=verbose)
         # Convert call_method inplace nodes (add_, mul_, etc.) to call_function equivalents.
-        cls._replace_inplace_call_methods(graph, verbose=verbose)
+        cls.replace_inplace_call_methods(graph, verbose=verbose)
 
         # Remove obvious unused nodes.
         rem = []

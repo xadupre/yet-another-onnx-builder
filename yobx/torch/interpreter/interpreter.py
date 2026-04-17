@@ -1793,6 +1793,25 @@ class DynamoInterpreter:
             return name
         if hasattr(i, "name"):
             return i.name
+        if isinstance(i, self.builder.TracingInt):
+            if isinstance(i.value, str) and i.value.startswith("_dyn_"):
+                dyn_names = sorted(
+                    n
+                    for n in self.builder.dynamic_objects
+                    if isinstance(n, str) and n.startswith("_dyn_")
+                )
+                dim_names = sorted(
+                    n
+                    for n in self.builder.dynamic_objects
+                    if isinstance(n, str) and n.startswith("DYN")
+                )
+                if len(dyn_names) == len(dim_names):
+                    mapped = dict(zip(dyn_names, dim_names)).get(i.value)
+                    if mapped is not None:
+                        return mapped
+            return i.value
+        if isinstance(i, self.torch.SymInt):
+            return self.builder._torch_sym_int_to_str(i)
         if isinstance(i, tuple):
             return tuple(self._process_arg(node, aten_name, t) for t in i)
         if isinstance(i, (float, int, tuple, complex)):
