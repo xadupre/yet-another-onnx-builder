@@ -90,7 +90,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "exp2",
         "fliplr",
         "flipud",
-        "float_power",
         "fmax",
         "fmin",
         "fmod",
