@@ -759,8 +759,8 @@ def parse_ir_module(mlir_module) -> List[dict]:
         if attr is None:
             return []
         s = str(attr)
-        # Newer jaxlib/MLIR (DenseI64ArrayAttr) prints as: array<i64: 1, 2, 3>
-        m = re.search(r"array<\w+:\s*([-\d][^>]*)>", s)
+        # Newer jaxlib/MLIR DenseI64ArrayAttr format: array<i64: 1, 2, 3>
+        m = re.search(r"array<\w+:\s*(-?\d+(?:\s*,\s*-?\d+)*)>", s)
         if m:
             return [int(x.strip()) for x in m.group(1).split(",") if x.strip()]
         # Older format: dense<[1, 2, 3]>
