@@ -546,6 +546,8 @@ def _run_exporter_impl(
     Core implementation of :func:`run_exporter`.
     Called with :func:`yobx.torch.flatten.register_flattening_functions` already
     active when the model class has ``_patch = "flattening"``.
+
+    :return: results dictionary with export/run metrics.
     """
     model = cls_model()
     inputs = cls_model._inputs

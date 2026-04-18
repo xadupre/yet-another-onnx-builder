@@ -1189,7 +1189,7 @@ try:
         """
 
         def forward(self, x, cache):
-            """Returns x plus the first key-cache tensor from cache."""
+            """Adds x element-wise to the first key-cache tensor from cache."""
             from ..in_transformers.cache_helper import CacheKeyValue
 
             capi = CacheKeyValue(cache)
