@@ -3267,6 +3267,7 @@ def aten_div_Tensor_mode(
 ) -> T:
     "div_Tensor_mode"
     if rounding_mode is None:
+        # if it is an integer, we should check is it consistent
         return aten_div(g, sts, outputs, x, y, name=name)
 
     assert g.has_type(x) or g.has_type(
@@ -10256,6 +10257,18 @@ def aten_pow_Tensor_Tensor(
     return res
 
 
+def aten_float_power(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    exponent: T,
+    name: str = "float_power",
+) -> T:
+    """Delegates float_power to the Tensor_Tensor implementation."""
+    return aten_float_power_Tensor_Tensor(g, sts, outputs, x, exponent, name=name)
+
+
 def aten_float_power_Tensor_Tensor(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -13857,6 +13870,18 @@ def aten_tril(
     return res
 
 
+def aten_true_divide(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "true_divide",
+) -> T:
+    """Delegates true division to the truediv implementation."""
+    return aten_truediv(g, sts, outputs, x, y, name=name)
+
+
 def aten_true_divide_Tensor(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -13865,7 +13890,7 @@ def aten_true_divide_Tensor(
     y: T,
     name: str = "true_divide_Tensor",
 ) -> T:
-    """Performs true division (delegates to truediv)."""
+    """Delegates true division (Tensor overload) to the truediv implementation."""
     return aten_truediv(g, sts, outputs, x, y, name=name)
 
 
@@ -13877,7 +13902,7 @@ def aten_true_divide_Scalar(
     y: T,
     name: str = "true_divide_Scalar",
 ) -> T:
-    """Performs true division (delegates to truediv)."""
+    """Delegates true division (Scalar overload) to the truediv implementation."""
     return aten_truediv(g, sts, outputs, x, y, name=name)
 
 

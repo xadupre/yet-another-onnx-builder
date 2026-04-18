@@ -142,7 +142,7 @@ class TestOnnxScriptBridge(ExtTestCase):
         gr.make_node("Add", ["X", bias], ["Y"])
         gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
         proto = gr.to_onnx()
-        check_model(proto)
+        check_model(proto.get_proto())
         self.assertEqual(len(proto.graph.initializer), 1)
         self.assertEqual(proto.graph.initializer[0].name, "bias")
 

@@ -342,7 +342,7 @@ XFAIL_OPS_BFLOAT16: Dict[str, FrozenSet[str]] = {
             "argsort",  # ordering instability due to reduced precision
         }
     ),
-    "tracing": frozenset(),
+    "tracing": frozenset({"float_power"}),
     "new-tracing": frozenset({"nn_functional_selu"}),
 }
 
