@@ -323,6 +323,8 @@ class common_RotaryEmbedding(torch.nn.Module):
 
         inv_freq_expanded = (
             inv_freq[None, :, None].float().expand(position_ids.shape[0], -1, 1).to(x.device)
+            if not isinstance(position_ids.shape[0], torch.fx.proxy.Proxy)
+            else inv_freq[None, :, None].float().to(x.device)
         )
         position_ids_expanded = position_ids[:, None, :].float()
 

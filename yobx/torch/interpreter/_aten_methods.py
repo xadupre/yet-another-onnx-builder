@@ -26,6 +26,7 @@ from ._aten_functions import (
     aten_max_dim,
     aten_min,
     aten_neg,
+    aten_new_ones,
     aten_permute,
     aten_relu,
     aten_repeat,
@@ -388,6 +389,32 @@ def aten_meth_neg(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[
     return aten_neg(g, sts, outputs, x, name=".neg")
 
 
+def aten_meth_new_ones(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    size: T,
+    dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    layout=None,
+    device=None,
+    pin_memory=None,
+) -> T:
+    "new_ones"
+    return aten_new_ones(
+        g,
+        sts,
+        outputs,
+        x,
+        size,
+        dtype=dtype,
+        layout=layout,
+        device=device,
+        pin_memory=pin_memory,
+        name=".new_ones",
+    )
+
+
 def aten_meth_permute(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, *dims: Sequence[int]
 ) -> T:
@@ -603,15 +630,44 @@ def aten_meth_to(
             continue
         if isinstance(a, bool):  # copy, non_blocking
             continue
+        if isinstance(a, str):
+            vs = g.get_constant(a, computed_value=True, exc=False)
+            if vs is not None and len(vs.shape) == 0:
+                if vs.dtype == np.int64:
+                    # This is a dtype.
+                    dtype = int(vs)
+                    continue
+                if vs.dtype == np.int32:
+                    # This is a device.
+                    device = int(vs)
+                    continue
         raise NotImplementedError(
-            f"Unexpected type for argument {type(a)}, iunput_name={input_name!r} "
+            f"Unexpected type for argument {type(a)}, input_name={input_name!r} "
             f"args={args}{g.get_debug_msg()}"
         )
     assert dtype is not None or device is not None, "dtype or device cannot be None for method to"
 
     if dtype is None:
         return g.op.Identity(input_name, outputs=outputs, name=name)
-    onnx_to = torch_dtype_to_onnx_dtype(dtype)
+    if isinstance(dtype, torch.fx.Node):
+        # tracing only
+        assert g.has_name(dtype.name), f"issue with {dtype.name!r}{g.get_debug_msg()}"
+        cst = g.get_constant(dtype.name, computed_value=True, exc=False)
+        assert (
+            cst is not None
+        ), f"A dtype {dtype.name!r} should be always be known{g.get_debug_msg()}"
+        assert (
+            cst.dtype == np.int64
+        ), f"Unexpected dtype {cst.dtype}{dtype.name}{g.get_debug_msg()}"
+        assert len(cst.shape) == 0, f"Unexpected shape {cst.shape}{dtype.name}{g.get_debug_msg()}"
+        onnx_to = int(cst)
+    elif isinstance(dtype, int):
+        onnx_to = dtype
+    else:
+        assert isinstance(
+            dtype, torch.dtype
+        ), f"Unexpected type {type(dtype)} for dtype{g.get_debug_msg()}"
+        onnx_to = torch_dtype_to_onnx_dtype(dtype)
 
     res = g.make_node("Cast", [input_name], outputs, to=onnx_to, name=name)
     if not sts:

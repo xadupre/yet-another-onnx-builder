@@ -629,12 +629,19 @@ class BasicShapeBuilder(
         """Returns the value of a result if it is a shape."""
         if name in self._known_value_shape:
             return self._known_value_shape[name]
-        if not self.has_type(name) or self.get_type(name) != onnx.TensorProto.INT64:
+        if not self.has_type(name) or self.get_type(name) not in (
+            onnx.TensorProto.INT64,
+            onnx.TensorProto.INT32,
+        ):
             return None
         if self.is_constant(name):
             # It is probably a shape because the user requested it as a shape.
             cst = self.get_constant(name, exc=False, computed_value=True)
-            if cst is not None and len(cst.shape) == 1 and cst.dtype == np.int64:
+            if (
+                cst is not None
+                and len(cst.shape) == 1
+                and (cst.dtype == np.int64 or cst.dtype == np.int32)
+            ):
                 value = tuple(map(int, cst))
                 self._known_value_shape[name] = value
                 return value

@@ -25,6 +25,7 @@ def apply_patches_for_model(
     patch_transformers: bool = False,
     verbose: int = 0,
     model: Optional[torch.nn.Module] = None,
+    tracing: bool = False,
 ) -> Generator[PatchDetails, None, None]:
     """
     The context manager apply patches, usually before exporting a model.
@@ -41,6 +42,11 @@ def apply_patches_for_model(
     :param verbose: prints out which patch is applies
     :param model: modifies the list of patches for a particular model,
         it is recommended to fill it the used rope is not the default one
+    :param tracing: when ``True``, also includes patches required for FX
+        symbolic tracing (e.g. for mask-creation utilities and
+        ``sdpa_attention_forward``).  These patches must not be applied during
+        ordinary eager-mode inference because they alter control-flow in a way
+        that is only correct for the symbolic-tracing code path.
 
     The following shows how to use the output of this function to display
     information about the patches applied to the model.
@@ -63,7 +69,7 @@ def apply_patches_for_model(
     if patch_transformers:
         from .in_transformers.patches import get_patches_for
 
-        patches.extend(get_patches_for(model))
+        patches.extend(get_patches_for(model, tracing=tracing))
     for patch in patches:
         if verbose:
             print(f"[register_patch_functions] apply {patch}")
