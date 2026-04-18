@@ -1080,3 +1080,364 @@ def parse_ir_module(mlir_module) -> List[dict]:
         f"Module: {mlir_module}"
     )
     return [*input_layers, *layers_body]
+
+
+def _parse_ir_private_function(mlir_module, func_name: str):
+    """Parses parameter info and body layers for a named private function.
+
+    Uses MLIR Python bindings to walk the function directly, without converting
+    the module to a text string.  Returns the same data structures that the
+    text-based helpers :func:`_get_function_param_info` and
+    :func:`_parse_body` produce together.
+
+    Must be called while an active MLIR context is open.
+
+    :param mlir_module: an ``ir.Module`` obtained from
+        ``jax.extend.mlir.deserialize_portable_artifact``.
+    :param func_name: name of the private function to parse (without ``@``).
+
+    Returns:
+        A tuple ``(param_info, layers)`` where *param_info* is a list of
+        ``(param_id, is_shape_only)`` pairs and *layers* is a list of layer
+        dicts in the same format as :func:`parse_mlir`.  Returns
+        ``([], None)`` when the function is not found.
+    """
+    from jaxlib.mlir import ir  # available when jaxlib >= 0.4 (JAX 0.10+)
+
+    # ------------------------------------------------------------------
+    # Locate the named function in the module body.
+    # ------------------------------------------------------------------
+    target_func = None
+    for op in mlir_module.body.operations:
+        try:
+            sym = op.attributes["sym_name"]
+        except (KeyError, IndexError):
+            continue
+        if ir.StringAttr(sym).value == func_name:
+            target_func = op
+            break
+
+    if target_func is None:
+        return [], None
+
+    entry = target_func.regions[0].blocks[0]
+
+    # ------------------------------------------------------------------
+    # Build param_info: [(param_id, is_shape_only), ...]
+    # ------------------------------------------------------------------
+    param_info: List[Tuple] = []
+    for i, arg in enumerate(entry.arguments):
+        param_id = f"%arg{i}"
+        t = str(arg.type)
+        if t.startswith("tensor<"):
+            shape, dtype = _parse_tensor_type(t)
+            if shape is None:
+                param_info.append((param_id, False))
+            else:
+                is_shape_only = (
+                    dtype in (np.int32, np.int64, np.uint32, np.uint64) and len(shape) <= 1
+                )
+                param_info.append((param_id, is_shape_only))
+        else:
+            # Non-tensor arg (e.g. index type) – treat as shape-only.
+            param_info.append((param_id, True))
+
+    # ------------------------------------------------------------------
+    # Assign SSA names to all values in the function body.
+    # ------------------------------------------------------------------
+    val_names: dict = {}
+    _counter = [0]
+
+    def get_name(val) -> str:
+        """Returns the SSA name previously assigned to *val*, or assigns a fresh one."""
+        if val in val_names:
+            return val_names[val]
+        try:
+            name = val.get_name()
+        except (AttributeError, RuntimeError):
+            name = ""
+        if not name:
+            name = f"%f{_counter[0]}"
+            _counter[0] += 1
+        val_names[val] = name
+        return name
+
+    def ttype(val) -> str:
+        """Returns the tensor type string for *val*, or ``""`` if not a tensor."""
+        t = str(val.type)
+        return t if t.startswith("tensor<") else ""
+
+    def _try_attr(op, name):
+        """Returns the named attribute from *op*, or ``None`` if absent."""
+        try:
+            return op.attributes[name]
+        except (KeyError, IndexError):
+            return None
+
+    def _callee(op) -> str:
+        """Returns the callee function name from a ``func.call`` / ``call`` op."""
+        attr = _try_attr(op, "callee")
+        if attr is None:
+            return ""
+        s = str(attr)
+        m = re.search(r'@"?([^"@\s>]+)"?', s)
+        return m.group(1) if m else s.strip().lstrip("@").strip('"')
+
+    def _dense_content(op) -> str:
+        """Extracts the content of a ``stablehlo.constant`` value attribute."""
+        attr = _try_attr(op, "value")
+        if attr is None:
+            return ""
+        s = str(attr)
+        colon = s.find(" : tensor")
+        if colon != -1:
+            s = s[:colon]
+        if s.startswith("dense<") and s.endswith(">"):
+            return s[len("dense<") : -1]
+        return s
+
+    def _int_list(op, name) -> list:
+        """Extracts a list of ints from a dense integer attribute by name."""
+        attr = _try_attr(op, name)
+        if attr is None:
+            return []
+        s = str(attr)
+        m = re.search(r"array<\w+:\s*(-?\d+(?:\s*,\s*-?\d+)*)>", s)
+        if m:
+            return [int(x.strip()) for x in m.group(1).split(",") if x.strip()]
+        m = re.search(r"dense<\[([^\]]*)\]>", s)
+        if m:
+            return [int(x.strip()) for x in m.group(1).split(",") if x.strip()]
+        m = re.search(r"dense<(-?\d+)>", s)
+        return [int(m.group(1))] if m else []
+
+    def _compare_dir(op) -> str:
+        """Extracts the comparison direction from a ``stablehlo.compare`` op."""
+        attr = _try_attr(op, "comparison_direction")
+        if attr is None:
+            return ""
+        s = str(attr)
+        m = re.search(r"comparison_direction\s+(\w+)", s)
+        if m:
+            return m.group(1)
+        tok = s.strip().rstrip(">").rsplit(None, 1)
+        return tok[-1] if tok else ""
+
+    def _dot_contracting(op):
+        """Returns ``(lhs_dims, rhs_dims)`` for a ``stablehlo.dot_general`` op."""
+        attr = _try_attr(op, "dot_dimension_numbers")
+        if attr is None:
+            return [], []
+        s = str(attr)
+        lhs_m = re.search(r"lhs_contracting_dimensions\s*=\s*\[([^\]]*)\]", s)
+        rhs_m = re.search(r"rhs_contracting_dimensions\s*=\s*\[([^\]]*)\]", s)
+        lhs = [int(x.strip()) for x in lhs_m.group(1).split(",") if x.strip()] if lhs_m else []
+        rhs = [int(x.strip()) for x in rhs_m.group(1).split(",") if x.strip()] if rhs_m else []
+        return lhs, rhs
+
+    # Assign names to function arguments.
+    for i, arg in enumerate(entry.arguments):
+        val_names[arg] = f"%arg{i}"
+
+    # Pre-name all op results.
+    for op in entry.operations:
+        for r in op.results:
+            if r not in val_names:
+                val_names[r] = f"%f{_counter[0]}"
+                _counter[0] += 1
+
+    # ------------------------------------------------------------------
+    # Build input layers from function arguments.
+    # ------------------------------------------------------------------
+    input_layers: list = []
+    for i, arg in enumerate(entry.arguments):
+        param_id = f"%arg{i}"
+        t = str(arg.type)
+        if t.startswith("tensor<"):
+            shape, dtype = _parse_tensor_type(t)
+            if shape is None or not (
+                dtype in (np.int32, np.int64, np.uint32, np.uint64) and len(shape) <= 1
+            ):
+                input_layers.append(
+                    {
+                        "id": param_id,
+                        "op": "Input",
+                        "operands": tuple(),
+                        "shape": t,
+                        "loc": "header",
+                    }
+                )
+
+    # ------------------------------------------------------------------
+    # Parse function body ops into layer dicts (mirrors parse_ir_module).
+    # ------------------------------------------------------------------
+    layers_body: list = []
+
+    for op in entry.operations:
+        oname = op.name
+        op_res = list(op.results)
+        res_id = get_name(op_res[0]) if op_res else "?"
+        operands = [get_name(v) for v in op.operands]
+        rtype = ttype(op_res[0]) if op_res else ""
+
+        if oname == "stablehlo.custom_call":
+            continue
+
+        if oname == "stablehlo.get_dimension_size":
+            layers_body.append(
+                {"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""}
+            )
+            continue
+
+        if oname in ("stablehlo.reshape", "stablehlo.concatenate"):
+            if rtype and "f" not in rtype:
+                layers_body.append(
+                    {"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""}
+                )
+                continue
+
+        if oname in ("func.return", "return"):
+            layers_body.append(
+                {"id": res_id, "op": "return", "operands": operands, "shape": "", "loc": ""}
+            )
+            break
+
+        if res_id == "?":
+            continue
+
+        if oname == "stablehlo.constant":
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": "constant",
+                    "operands": [],
+                    "shape": rtype,
+                    "loc": "",
+                    "dense_content": _dense_content(op),
+                }
+            )
+            continue
+
+        if oname == "stablehlo.dot_general":
+            lhs_dims, rhs_dims = _dot_contracting(op)
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": "dot_general",
+                    "operands": operands[:2],
+                    "shape": rtype,
+                    "loc": "",
+                    "lhs_contracting": lhs_dims,
+                    "rhs_contracting": rhs_dims,
+                }
+            )
+            continue
+
+        if oname == "stablehlo.broadcast_in_dim":
+            dims = _int_list(op, "broadcast_dimensions")
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": "broadcast_in_dim",
+                    "operands": operands[:1],
+                    "shape": rtype,
+                    "loc": "",
+                    "dims": dims,
+                }
+            )
+            continue
+
+        if oname == "stablehlo.dynamic_broadcast_in_dim":
+            dims = _int_list(op, "broadcast_dimensions")
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": "dynamic_broadcast_in_dim",
+                    "operands": operands[:1],
+                    "shape": rtype,
+                    "loc": "",
+                    "dims": dims,
+                }
+            )
+            continue
+
+        if oname == "stablehlo.compare":
+            direction = _compare_dir(op)
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": f"compare_{direction}",
+                    "operands": operands[:2],
+                    "shape": rtype,
+                    "loc": "",
+                }
+            )
+            continue
+
+        if oname == "stablehlo.convert":
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": "convert",
+                    "operands": operands[:1],
+                    "shape": rtype,
+                    "loc": "",
+                }
+            )
+            continue
+
+        if oname == "stablehlo.reduce":
+            axes = _int_list(op, "dimensions")
+            reduce_kind = "maximum"
+            if op.regions:
+                for block in op.regions[0].blocks:
+                    for inner_op in block.operations:
+                        if inner_op.name.startswith("stablehlo.") and inner_op.name not in (
+                            "stablehlo.return",
+                        ):
+                            reduce_kind = inner_op.name[len("stablehlo.") :]
+                            break
+                    break
+            onnx_op = _REDUCE_OP_MAP.get(reduce_kind, f"reduce_{reduce_kind}")
+            layers_body.append(
+                {
+                    "id": res_id,
+                    "op": onnx_op,
+                    "operands": operands[:1],
+                    "shape": rtype,
+                    "loc": "",
+                    "axes": axes,
+                }
+            )
+            continue
+
+        if oname in ("func.call", "call"):
+            callee = _callee(op)
+            if callee:
+                layers_body.append(
+                    {
+                        "id": res_id,
+                        "op": "call",
+                        "operands": operands,
+                        "shape": rtype,
+                        "loc": "",
+                        "func": callee,
+                    }
+                )
+            continue
+
+        if oname.startswith("stablehlo."):
+            clean_op = oname[len("stablehlo.") :]
+            if operands:
+                layers_body.append(
+                    {
+                        "id": res_id,
+                        "op": clean_op,
+                        "operands": operands,
+                        "shape": rtype,
+                        "loc": "",
+                    }
+                )
+            continue
+
+    return param_info, [*input_layers, *layers_body]
