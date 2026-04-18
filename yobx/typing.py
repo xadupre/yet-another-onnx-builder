@@ -526,7 +526,7 @@ class GraphBuilderTorchProtocol(GraphBuilderExtendedProtocol, Protocol):
 
     This protocol extends :class:`GraphBuilderExtendedProtocol` with the
     additional methods and attributes used by
-    :class:`~yobx.torch.interpreter.DynamoInterpreter` (the *torch exporter*)
+    :class:`~yobx.torch.interpreter.FxGraphInterpreter` (the *torch exporter*)
     when translating a ``torch.fx`` graph into ONNX.
 
     The extra surface covers:

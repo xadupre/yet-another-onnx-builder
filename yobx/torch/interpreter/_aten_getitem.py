@@ -1,7 +1,7 @@
 """
 Standalone implementations of the ``getitem`` operator and its slice/index
 helpers.  These functions mirror the methods that used to live on
-:class:`~yobx.torch.interpreter.interpreter.DynamoInterpreter` but accept
+:class:`~yobx.torch.interpreter.interpreter.FxGraphInterpreter` but accept
 a :class:`~yobx.xbuilder.GraphBuilder` as their first argument so they can
 be used independently of the interpreter.
 """
