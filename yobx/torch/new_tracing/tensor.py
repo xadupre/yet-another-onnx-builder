@@ -84,6 +84,38 @@ class TracingTensor(torch.Tensor):
         """Returns the shape as a TracingShape."""
         return self._tracing_shape
 
+    def numel(self) -> int:  # type: ignore[override]
+        """Computes the total number of elements from :attr:`_tracing_shape`.
+
+        Symbolic (string-valued) :class:`TracingInt` dimensions are treated as
+        ``1`` so that the result is always a positive integer when no concrete
+        dimension is zero.  This ensures that guards of the form
+        ``if x.numel() == 0:`` evaluate to ``False`` during tracing (taking the
+        non-empty branch) rather than always evaluating to ``True`` as they
+        would if the underlying wrapper tensor's stored size of ``0`` were used.
+
+        A concrete dimension of ``0`` still causes the method to return ``0``
+        so that genuinely empty tensors are identified correctly.
+
+        Returns:
+            int: The product of all concrete dimension values (using ``1`` as a
+            placeholder for purely symbolic dimensions).
+        """
+        result = 1
+        for d in self._tracing_shape.dims:
+            if isinstance(d, TracingInt):
+                if isinstance(d.value, int):
+                    if d.value == 0:
+                        return 0
+                    result *= d.value
+                # else: symbolic – treat as 1 (non-zero placeholder)
+            else:
+                d_int = int(d)
+                if d_int == 0:
+                    return 0
+                result *= d_int
+        return result
+
     def __repr__(self) -> str:  # type: ignore
         node_name = self._node.name if self._node is not None else "<unregistered>"
         return (
