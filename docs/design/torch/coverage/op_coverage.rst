@@ -54,3 +54,17 @@ New-tracing export path
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
     print(get_op_coverage_rst("new-tracing"))
+
+Float32 comparison across export paths
++++++++++++++++++++++++++++++++++++++++
+
+This section compares, for every op that supports ``float32``, whether it
+passes, is a known failure (xfail), or has no converter for the three export
+paths side by side.
+
+.. runpython::
+    :rst:
+    :warningout: UserWarning
+
+    from yobx.torch.coverage.op_coverage import get_op_coverage_float32_comparison_rst
+    print(get_op_coverage_float32_comparison_rst())

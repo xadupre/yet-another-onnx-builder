@@ -515,6 +515,83 @@ ATOL_OPS_BFLOAT16: Dict[str, float] = {
 }
 
 
+def get_op_coverage_float32_comparison_rst() -> str:
+    """Returns an RST table comparing float32 op support across all export paths.
+
+    Queries ``torch.testing._internal.common_methods_invocations.op_db`` and
+    builds a single grid showing, for every op that supports ``float32``, the
+    export status for three paths side by side:
+
+    * ``✔`` - converter exists and the test passes for ``float32``.
+    * ``⚠ xfail`` - converter exists but the test is a known failure.
+    * ``✘ no converter`` - no ONNX converter has been implemented for this op.
+
+    Returns:
+        RST source string with one ``list-table`` directive, ready to be
+        printed inside a ``.. runpython::`` block with ``:rst:`` enabled.
+    """
+    import warnings
+
+    import torch
+    from torch.testing._internal import common_methods_invocations
+
+    # Xfail sets for float32 for each export path.
+    float32_xfails = {
+        "default": XFAIL_OPS["default"],
+        "tracing": XFAIL_OPS["default"] | XFAIL_OPS["tracing"],
+        "new-tracing": XFAIL_OPS["default"] | XFAIL_OPS["new-tracing"],
+    }
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ops = [
+            op
+            for op in common_methods_invocations.op_db
+            if not op.variant_test_name
+            and op.name not in NON_DETERMINISTIC_OPS
+            and torch.float32 in op.dtypes
+        ]
+    ops.sort(key=lambda o: o.name)
+
+    paths = ["default", "tracing", "new-tracing"]
+    path_labels = {"default": "Default", "tracing": "Tracing", "new-tracing": "New-tracing"}
+    header = ["Op"] + [path_labels[p] for p in paths]
+
+    rows = []
+    for op in ops:
+        key = op.name.replace(".", "_")
+        row = [f"``{op.name}``"]
+        for path in paths:
+            if key in NO_CONVERTER_OPS:
+                row.append(_NO_CONVERTER)
+            elif key in float32_xfails[path]:
+                row.append(_XFAIL)
+            else:
+                row.append(_SUPPORTED)
+        rows.append(row)
+
+    n_cols = len(header)
+    widths = " ".join(["20"] + ["16"] * (n_cols - 1))
+    title = "Float32 op support: default vs tracing vs new-tracing"
+    lines = [
+        f".. rubric:: {title}",
+        "",
+        ".. list-table::",
+        "    :header-rows: 1",
+        f"    :widths: {widths}",
+        "",
+    ]
+    lines.append("    * - " + header[0])
+    for h in header[1:]:
+        lines.append("      - " + h)
+    for row in rows:
+        lines.append("    * - " + row[0])
+        for cell in row[1:]:
+            lines.append("      - " + cell)
+    lines.append("")
+    return "\n".join(lines)
+
+
 def get_op_coverage_rst(tracing_method: str) -> str:
     """Returns an RST table showing op-db coverage for one export path.
 
