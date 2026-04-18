@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from onnx import TensorProto
-
+from ...typing import GraphBuilderTorchProtocol
 from ...container.model_container import _get_type
 from ...helpers import string_type
 from ...xshape._shape_helper import all_int
@@ -19,10 +19,7 @@ from ._aten_functions import _aten_tensor_int1
 
 
 def _getitem_verify_new_shape(
-    g: "GraphBuilderTorchProtocol",  # noqa: F821
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    shape,
+    g: GraphBuilderTorchProtocol, sts: Optional[Dict[str, Any]], outputs: List[str], shape
 ) -> None:
     """Registers previously-unseen dynamic dimension tokens found in *shape*.
 
@@ -39,6 +36,13 @@ def _getitem_verify_new_shape(
     :param shape: the shape tuple (may contain :class:`torch.SymInt` or
         :class:`~yobx.torch.new_tracing.shape.TracingInt` entries)
     """
+    assert hasattr(g, "torch"), "torch module is added as an attribute to avoid import"
+    assert hasattr(g, "TracingInt"), "TracingInt class is added as an attribute to avoid import"
+    assert hasattr(g, "_torch_sym_int_to_str"), "expecting _torch_sym_int_to_str specific method"
+    assert hasattr(g, "dynamic_objects"), "expecting dynamic_objects specific method"
+    assert hasattr(
+        g, "dynamic_dimensions_source"
+    ), "expecting dynamic_dimensions_source specific attribute"
     output_name = outputs[0]
     for axis, dim in enumerate(shape):
         if isinstance(dim, (g.torch.SymInt, g.TracingInt)):
@@ -64,7 +68,7 @@ def _getitem_verify_new_shape(
 
 
 def _getitem_slice(
-    g: "GraphBuilderTorchProtocol",  # noqa: F821
+    g: GraphBuilderTorchProtocol,
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
     input_name: str,
@@ -88,10 +92,14 @@ def _getitem_slice(
     :param name: base name for generated ONNX nodes
     :returns: the name of the result tensor
     """
+    assert hasattr(g, "torch"), "torch module is added as an attribute to avoid import"
+    assert hasattr(g, "_apply_slice_to_shape"), "expecting method _apply_slice_to_shape"
     output_name = outputs[0]
     assert isinstance(axes, list), f"Unexpected type {type(axes)} for axes"
     assert all_int(axes), f"Expected only integer axis but got {axes}"
-    assert len(axes) == len(index_slice), f"Length mismatch {len(axes)} != {len(index_slice)}"
+    assert len(axes) == len(
+        index_slice  # type: ignore
+    ), f"Length mismatch {len(axes)} != {len(index_slice)}"  # type: ignore
 
     # axes
     aaxes = np.array(axes, dtype=np.int64)
@@ -109,7 +117,7 @@ def _getitem_slice(
     end_name = None
     concat = False
     squeeze_axes: List[int] = []
-    for axis_, aslice in zip(axes, index_slice):
+    for axis_, aslice in zip(axes, index_slice):  # type: ignore
         axis = axis_
         if isinstance(aslice, int):
             # integer
@@ -235,7 +243,7 @@ def _getitem_slice(
         else:
             conc_starts = g.op.Identity(istarts[0], name=f"{name}SE")
 
-    inputs = [
+    inputs: List[str] = [  # type: ignore
         input_name,
         conc_starts,
         conc_ends,
@@ -291,7 +299,7 @@ def _getitem_slice(
                 f"{g.get_debug_msg()}"
             )
             g.set_shape(output_name, new_shape)
-        elif squeeze_axes and g.has_rank(inputs[0]):
+        elif squeeze_axes and g.has_rank(inputs[0]):  # type: ignore
             # expand_axes is empty here (handled by the first branch above)
             g.set_rank(output_name, g.get_rank(inputs[0]) - len(squeeze_axes))
         elif expand_axes:
@@ -300,10 +308,10 @@ def _getitem_slice(
 
 
 def getitem(  # noqa: F821
-    g: "GraphBuilderTorchProtocol",  # noqa: F821
+    g: GraphBuilderTorchProtocol,
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
-    node: "torch.fx.Node",  # noqa: F821
+    node: "torch.fx.Node",  # type: ignore # noqa: F821
 ):
     """Converts a ``getitem`` (``something[...]``) node to ONNX.
 
@@ -317,6 +325,7 @@ def getitem(  # noqa: F821
     :param node: the :class:`torch.fx.Node` representing the subscript operation
     :returns: name of the result tensor (or ONNX node)
     """
+    assert hasattr(g, "torch"), "torch module is added as an attribute to avoid import"
     args = node.args
     assert len(args) == 2
     node_output, index = args
@@ -372,14 +381,14 @@ def getitem(  # noqa: F821
                 dtype = info["dtype"]
                 if isinstance(dtype, tuple):
                     dtype = dtype[index]
-                g.set_type(res, dtype)
+                g.set_type(res, dtype)  # type: ignore
                 if info["shapes"] is not None:
-                    g.set_shape(res, info["shapes"][min(index, len(info["shapes"]) - 1)])
+                    g.set_shape(res, info["shapes"][min(index, len(info["shapes"]) - 1)])  # type: ignore
                 elif info["ranks"] is not None:
                     if isinstance(info["ranks"], int):
-                        g.set_rank(res, info["ranks"])
+                        g.set_rank(res, info["ranks"])  # type: ignore
                     else:
-                        g.set_rank(res, info["ranks"][min(index, len(info["ranks"]) - 1)])
+                        g.set_rank(res, info["ranks"][min(index, len(info["ranks"]) - 1)])  # type: ignore
             return res
         else:
             # A tensor.
@@ -408,19 +417,20 @@ def getitem(  # noqa: F821
             sts,
             outputs,
             node_output.name,
-            [index],
+            [index],  # type: ignore
             axes=[0],
             expand_axes=[],
             name="_getitem_slice1",
         )
 
+    assert hasattr(g, "torch"), "torch module is added as an attribute to avoid import"
     if isinstance(index, g.torch.fx.immutable_collections.immutable_list):
         # something like x[[0, 2]]
         if all_int(index):
             # something like x[[0, 1]]
             axes = [0]
             return _aten_tensor_int1(
-                g,
+                g,  # type: ignore
                 sts,
                 outputs,
                 node_output.name,
@@ -431,13 +441,14 @@ def getitem(  # noqa: F821
             )
 
     if isinstance(index, tuple):
+        assert hasattr(g, "torch"), "torch module is added as an attribute to avoid import"
         if all(isinstance(x, (slice, g.torch.fx.Node)) for x in index):
             return _getitem_slice(
                 g,
                 sts,
                 outputs,
                 node_output.name,
-                list(index),
+                list(index),  # type: ignore
                 axes=list(range(len(index))),
                 expand_axes=[],
                 name="_getitem_slicen",
@@ -476,7 +487,7 @@ def getitem(  # noqa: F821
                     sts,
                     outputs,
                     node_output.name,
-                    slices,
+                    slices,  # type: ignore
                     axes=axes,
                     expand_axes=expand_axes,
                     name="_getitem_slice2",
