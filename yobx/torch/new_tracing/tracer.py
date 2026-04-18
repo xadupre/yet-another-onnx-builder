@@ -1282,8 +1282,8 @@ class GraphTracer:
         :param kwargs: Additional keyword arguments for ``torch.zeros``.
 
         Returns:
-            A :class:`TracingTensor` when symbolic dimensions are present,
-            otherwise the eager ``torch.zeros`` result.
+            Returns a :class:`TracingTensor` when symbolic dimensions are present,
+            otherwise returns the eager ``torch.zeros`` result.
         """
         if isinstance(size, torch.Size):
             size = tuple(size)
@@ -1349,8 +1349,8 @@ class GraphTracer:
         :param kwargs: Additional keyword arguments for ``torch.ones``.
 
         Returns:
-            A :class:`TracingTensor` when symbolic dimensions are present,
-            otherwise the eager ``torch.ones`` result.
+            Returns a :class:`TracingTensor` when symbolic dimensions are present,
+            otherwise returns the eager ``torch.ones`` result.
         """
         if isinstance(size, torch.Size):
             size = tuple(size)

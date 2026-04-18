@@ -163,7 +163,7 @@ def _zeros_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         whose :meth:`_handle_zeros` should be used as the replacement.
 
     Returns:
-        A context manager that yields control while ``torch.zeros``
+        Returns a context manager that yields control while ``torch.zeros``
         is temporarily replaced, then restores the original implementation on
         exit.
     """
@@ -188,7 +188,7 @@ def _ones_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
         whose :meth:`_handle_ones` should be used as the replacement.
 
     Returns:
-        A context manager that yields control while ``torch.ones``
+        Returns a context manager that yields control while ``torch.ones``
         is temporarily replaced, then restores the original implementation on
         exit.
     """
