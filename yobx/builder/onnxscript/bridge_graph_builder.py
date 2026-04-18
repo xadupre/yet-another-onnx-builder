@@ -249,7 +249,9 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
             # name is not supported by onnxscript.GraphBuilder.
             kwargs.pop("name")
 
-        output = self._inner.call_op(op_type, new_args, kwargs)
+        # outputs= and domain= are proper call_op parameters; do not embed them in kwargs.
+        outputs_spec: Union[int, List[str]] = list(outputs) if outputs is not None else 1
+        output = self._inner.call_op(op_type, new_args, kwargs, domain=domain, outputs=outputs_spec)
         if isinstance(output, ir.Value):
             if outputs:
                 assert len(outputs) == 1
@@ -567,15 +569,11 @@ class OnnxScriptGraphBuilder(GraphBuilderExtendedProtocol):
                 extra_kwargs[attr.name] = ir_attr.value  # type: ignore
 
         all_kwargs = {**extra_kwargs, **kwargs}
-        if output_names is not None:
-            all_kwargs["_outputs"] = output_names
-        else:
-            all_kwargs["_outputs"] = output_count
+        # outputs= and domain= are proper call_op parameters (new onnxscript API);
+        # do not embed them in the attributes dict to avoid spurious ONNX attributes.
+        outputs_spec: Union[int, List[str]] = output_names if output_names is not None else output_count
 
-        if domain:
-            all_kwargs["_domain"] = domain
-
-        result = self._inner.call_op(op_type, ir_inputs, all_kwargs)  # type: ignore
+        result = self._inner.call_op(op_type, ir_inputs, all_kwargs, domain=domain, outputs=outputs_spec)  # type: ignore
 
         if isinstance(result, ir.Value):
             result_list: List[ir.Value] = [result]
