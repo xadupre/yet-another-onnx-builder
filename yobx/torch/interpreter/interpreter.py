@@ -1295,7 +1295,7 @@ class DynamoInterpreter:
         name: str = "_getitem_slice",
     ):
         return _aten_getitem_slice(
-            self.builder, node, input_name, index_slice, sts, axes, expand_axes, name
+            self.builder, sts, [node.name], input_name, index_slice, axes, expand_axes, name
         )
 
     def _getitem_int1(
@@ -1329,10 +1329,12 @@ class DynamoInterpreter:
         """
         if self.builder.verbose > 1:
             print(f"[DynamoInterpreter-{self._hash()}.getitem]")
-        return _aten_getitem(self.builder, node)
+        can_set = self._can_set_shape_and_type(node)
+        output_names = self._get_output_names(node)
+        return _aten_getitem(self.builder, can_set, output_names, node)
 
     def _verify_new_shape(self, shape, node):
-        _getitem_verify_new_shape(self.builder, shape, node)
+        _getitem_verify_new_shape(self.builder, None, [node.name], shape)
 
     def _process_arg(self, node, aten_name, i):
         if i is None:

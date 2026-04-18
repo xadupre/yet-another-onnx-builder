@@ -18,7 +18,12 @@ from ...xexpressions.rename_expressions import parse_expression_tokens
 from ._aten_functions import _aten_tensor_int1
 
 
-def _getitem_verify_new_shape(g: "GraphBuilderTorchProtocol", shape, node) -> None:  # noqa: F821
+def _getitem_verify_new_shape(
+    g: "GraphBuilderTorchProtocol",  # noqa: F821
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    shape,
+) -> None:
     """Registers previously-unseen dynamic dimension tokens found in *shape*.
 
     Walks over every dimension of *shape* and, for each symbolic integer that
@@ -27,11 +32,14 @@ def _getitem_verify_new_shape(g: "GraphBuilderTorchProtocol", shape, node) -> No
     name in ``g.dynamic_dimensions_source``.
 
     :param g: the graph builder
+    :param sts: known shapes and types (unused; present for signature consistency
+        with other aten functions)
+    :param outputs: list of output tensor names; ``outputs[0]`` is used for
+        source bookkeeping
     :param shape: the shape tuple (may contain :class:`torch.SymInt` or
         :class:`~yobx.torch.new_tracing.shape.TracingInt` entries)
-    :param node: the originating :class:`torch.fx.Node` (used for error messages
-        and source bookkeeping)
     """
+    output_name = outputs[0]
     for axis, dim in enumerate(shape):
         if isinstance(dim, (g.torch.SymInt, g.TracingInt)):
             if isinstance(dim, g.TracingInt):
@@ -44,12 +52,11 @@ def _getitem_verify_new_shape(g: "GraphBuilderTorchProtocol", shape, node) -> No
                 t = tokens.pop()
                 if t not in g.dynamic_objects:
                     g.add_dynamic_object(t, t)
-                    input_name = node.name
-                    assert isinstance(input_name, str), (
+                    assert isinstance(output_name, str), (
                         f"Unexpected type for dim={dim!r}, axis={axis}, shape={shape}, "
-                        f"node.name={node.name!r}, t={t!r}"
+                        f"outputs[0]={output_name!r}, t={t!r}"
                     )
-                    source = dict(axis=axis, input_name=input_name)
+                    source = dict(axis=axis, input_name=output_name)
                     if t in g.dynamic_dimensions_source:
                         g.dynamic_dimensions_source[t].append(source)
                     else:
@@ -58,10 +65,10 @@ def _getitem_verify_new_shape(g: "GraphBuilderTorchProtocol", shape, node) -> No
 
 def _getitem_slice(
     g: "GraphBuilderTorchProtocol",  # noqa: F821
-    node: "torch.fx.Node",  # noqa: F821
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
     input_name: str,
     index_slice: slice,
-    sts: Optional[Dict[str, Any]],
     axes: List[int],
     expand_axes: List[int],
     name: str = "_getitem_slice",
@@ -70,24 +77,25 @@ def _getitem_slice(
     subscript expression of the form ``tensor[a:b, c:d, ...]``.
 
     :param g: the graph builder
-    :param node: the originating :class:`torch.fx.Node`
+    :param sts: known shapes and types; when ``None`` the function sets type and
+        shape on the output itself
+    :param outputs: list of output tensor names; ``outputs[0]`` is the result
     :param input_name: name of the ONNX tensor to slice
     :param index_slice: list of :class:`slice` / :class:`int` /
         :class:`torch.fx.Node` objects, one per axis in *axes*
-    :param sts: optional shape/type state dict (``None`` when shape information
-        is not yet available)
     :param axes: axes to slice (one entry per element of *index_slice*)
     :param expand_axes: axes to unsqueeze after slicing
     :param name: base name for generated ONNX nodes
     :returns: the name of the result tensor
     """
+    output_name = outputs[0]
     assert isinstance(axes, list), f"Unexpected type {type(axes)} for axes"
     assert all_int(axes), f"Expected only integer axis but got {axes}"
     assert len(axes) == len(index_slice), f"Length mismatch {len(axes)} != {len(index_slice)}"
 
     # axes
     aaxes = np.array(axes, dtype=np.int64)
-    axes_name = g.unique_name(f"{node.name}_axis")
+    axes_name = g.unique_name(f"{output_name}_axis")
     g.make_initializer(axes_name, aaxes, source="_getitem_slice.axis.1")
 
     shape_value = None
@@ -116,7 +124,7 @@ def _getitem_slice(
         if isinstance(aslice, g.torch.fx.Node):
             # Dynamic integer index: treat as i:i+1 slice and squeeze the axis afterwards.
             starts.append(aslice)
-            slice_end_name = g.unique_name(f"{node.name}_slice_end_{axis_}")
+            slice_end_name = g.unique_name(f"{output_name}_slice_end_{axis_}")
             g.make_node(
                 "Add",
                 [
@@ -140,14 +148,14 @@ def _getitem_slice(
         if aslice.stop is None:
             if shape_value is None or not isinstance(shape_value[axis], int):
                 if shape_name is None:
-                    shape_name = g.unique_name(f"{node.name}_shape")
+                    shape_name = g.unique_name(f"{output_name}_shape")
                     g.make_node("Shape", [input_name], [shape_name], name=f"{name}A")
 
                 aaxis = np.array([axis], dtype=np.int64)
-                axis_name = g.unique_name(f"{node.name}_axis_{axis}")
+                axis_name = g.unique_name(f"{output_name}_axis_{axis}")
                 g.make_initializer(axis_name, aaxis, source="_getitem_slice.axis.2")
 
-                end_name = g.unique_name(f"{node.name}_end")
+                end_name = g.unique_name(f"{output_name}_end")
                 g.make_node(
                     "GatherElements",
                     [shape_name, axis_name],
@@ -201,7 +209,7 @@ def _getitem_slice(
     )
     if all_int(starts):
         conc_starts = g.make_initializer(
-            g.unique_name(f"{node.name}_start"),
+            g.unique_name(f"{output_name}_start"),
             np.array(starts, dtype=np.int64),
             source="_getitem_slice.2",
         )
@@ -233,7 +241,7 @@ def _getitem_slice(
         conc_ends,
         axes_name,
         g.make_initializer(
-            g.unique_name(f"{node.name}_step"),
+            g.unique_name(f"{output_name}_step"),
             np.array(steps, dtype=np.int64),
             source="_getitem_slice.3",
         ),
@@ -247,57 +255,65 @@ def _getitem_slice(
         res = g.op.SqueezeAnyOpset(
             unsqueezed,
             np.array(squeeze_axes, dtype=np.int64),
-            outputs=[node.name],
+            outputs=[output_name],
             name=f"{name}H",
         )
     elif expand_axes:
         sliced = g.make_node("Slice", inputs, name=f"{name}F")
         res = g.op.UnsqueezeAnyOpset(
-            sliced, np.array(expand_axes, dtype=np.int64), outputs=[node.name], name=f"{name}F"
+            sliced, np.array(expand_axes, dtype=np.int64), outputs=[output_name], name=f"{name}F"
         )
     elif squeeze_axes:
-        slice_name = g.unique_name(f"{node.name}_sliced")
+        slice_name = g.unique_name(f"{output_name}_sliced")
         g.make_node("Slice", inputs, [slice_name], name=f"{name}G_sq")
         res = g.op.SqueezeAnyOpset(
             slice_name,
             np.array(squeeze_axes, dtype=np.int64),
-            outputs=[node.name],
+            outputs=[output_name],
             name=f"{name}H_sq",
         )
     else:
-        res = g.make_node("Slice", inputs, [node.name], name=f"{name}G")
+        res = g.make_node("Slice", inputs, [output_name], name=f"{name}G")
     if not sts:
         dtype = g.get_type(inputs[0])
-        g.set_type(node.name, dtype)
+        g.set_type(output_name, dtype)
         if not concat and g.has_shape(inputs[0]):
             shape = g.get_shape(inputs[0])
             new_shape = g._apply_slice_to_shape(
                 shape, index_slice, axes=axes, expand_axes=expand_axes
             )
-            assert not g.has_shape(node.name) or new_shape == g.get_shape(node.name), (
-                f"Shape for node {node.name!r} is already set to "
-                f"{g.get_shape(node.name)} with type "
-                f"{g.get_type(node.name)} (expecting {dtype}) "
+            assert not g.has_shape(output_name) or new_shape == g.get_shape(output_name), (
+                f"Shape for node {output_name!r} is already set to "
+                f"{g.get_shape(output_name)} with type "
+                f"{g.get_type(output_name)} (expecting {dtype}) "
                 f"new_shape={new_shape}, shape={shape}, index_slice={index_slice}, "
                 f"axes={axes}, expand_axes={expand_axes}"
                 f"{g.get_debug_msg()}"
             )
-            g.set_shape(node.name, new_shape)
+            g.set_shape(output_name, new_shape)
         elif squeeze_axes and g.has_rank(inputs[0]):
             # expand_axes is empty here (handled by the first branch above)
-            g.set_rank(node.name, g.get_rank(inputs[0]) - len(squeeze_axes))
+            g.set_rank(output_name, g.get_rank(inputs[0]) - len(squeeze_axes))
         elif expand_axes:
-            g.set_rank(node.name, g.get_rank(inputs[0]) + len(expand_axes))
+            g.set_rank(output_name, g.get_rank(inputs[0]) + len(expand_axes))
     return res
 
 
-def getitem(g: "GraphBuilderTorchProtocol", node: "torch.fx.Node"):  # noqa: F821  # noqa: F821
+def getitem(  # noqa: F821
+    g: "GraphBuilderTorchProtocol",  # noqa: F821
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    node: "torch.fx.Node",  # noqa: F821
+):
     """Converts a ``getitem`` (``something[...]``) node to ONNX.
 
     The index may be another variable (a :class:`torch.fx.Node`), an integer,
     a :class:`slice`, a :class:`tuple`, or a list.
 
     :param g: the graph builder
+    :param sts: known shapes and types; when ``None`` the function sets type and
+        shape on the output itself
+    :param outputs: list of output tensor names; ``outputs[0]`` is the result
     :param node: the :class:`torch.fx.Node` representing the subscript operation
     :returns: name of the result tensor (or ONNX node)
     """
@@ -306,7 +322,6 @@ def getitem(g: "GraphBuilderTorchProtocol", node: "torch.fx.Node"):  # noqa: F82
     node_output, index = args
     result_name = node_output.name
     val = node.meta.get("val", None)
-    sts = None
     if val is not None:
         if isinstance(val, g.torch.Tensor):
             shape = val.shape
@@ -314,20 +329,18 @@ def getitem(g: "GraphBuilderTorchProtocol", node: "torch.fx.Node"):  # noqa: F82
             # the graph could be new if a function produces results
             # depending on the result values
             t_shape = tuple(shape)
-            _getitem_verify_new_shape(g, shape, node)
+            _getitem_verify_new_shape(g, sts, outputs, shape)
             # Let's set the shape if not null shape
             if len(t_shape) > 1 and not any(i == 0 for i in t_shape if isinstance(i, int)):
-                g.set_shape(node.name, t_shape, allow_zero=all_int(t_shape) and t_shape == (0,))
+                g.set_shape(outputs[0], t_shape, allow_zero=all_int(t_shape) and t_shape == (0,))
             else:
-                g.set_rank(node.name, len(t_shape))
-            g.set_type(node.name, dtype)
-            g.set_device(node.name, val.get_device())
-            sts = {"dtype": val.dtype}
+                g.set_rank(outputs[0], len(t_shape))
+            g.set_type(outputs[0], dtype)
+            g.set_device(outputs[0], val.get_device())
         elif isinstance(val, g.torch.SymInt):
-            g.set_shape(node.name, tuple())
-            g.set_type(node.name, TensorProto.INT64)
-            g.set_device(node.name, -1)
-            sts = {"dtype": g.torch.int64}
+            g.set_shape(outputs[0], tuple())
+            g.set_type(outputs[0], TensorProto.INT64)
+            g.set_device(outputs[0], -1)
         else:
             raise TypeError(
                 f"Unexpected type {type(val)} in node {node!r}"
@@ -336,23 +349,23 @@ def getitem(g: "GraphBuilderTorchProtocol", node: "torch.fx.Node"):  # noqa: F82
 
     if hasattr(index, "name"):
         # A dynamic index (torch.fx.Node)
-        res = g.make_node("Gather", [result_name, index.name], [node.name], name="getitemA")
+        res = g.make_node("Gather", [result_name, index.name], [outputs[0]], name="getitemA")
         if not sts:
-            g.set_type(node.name, g.get_type(result_name))
-            g.set_rank(node.name, g.get_rank(result_name) + g.get_rank(index.name) - 1)
+            g.set_type(outputs[0], g.get_type(result_name))
+            g.set_rank(outputs[0], g.get_rank(result_name) + g.get_rank(index.name) - 1)
         return res
 
     if isinstance(index, int):
         name_index = f"{result_name}#{index}"
         if g.has_name(name_index):
             # The user wants to get a tensor from a tuple of tensors.
-            return g.make_node("Identity", [name_index], [node.name], name="getitemB_tuple")
+            return g.make_node("Identity", [name_index], [outputs[0]], name="getitemB_tuple")
         # The user means to access the first element of a tensor or a sequence.
         if g.is_sequence(result_name):
             # A sequence
             tpos = g.make_initializer("", np.array(index, dtype=np.int64), source="getitem.1")
             res = g.make_node(
-                "SequenceAt", [result_name, tpos], [node.name], name="getitemB_tuple"
+                "SequenceAt", [result_name, tpos], [outputs[0]], name="getitemB_tuple"
             )
             if not sts:
                 info = g.get_sequence(result_name)
@@ -376,26 +389,26 @@ def getitem(g: "GraphBuilderTorchProtocol", node: "torch.fx.Node"):  # noqa: F82
                 ),
                 np.array([0], dtype=np.int64),
                 name="getitemB_index",
-                outputs=[node.name],
+                outputs=[outputs[0]],
             )
             if not sts:
                 if g.has_type(result_name):
-                    g.set_type(node.name, g.get_type(result_name))
+                    g.set_type(outputs[0], g.get_type(result_name))
                 if g.has_device(result_name):
-                    g.set_device(node.name, g.get_device(result_name))
+                    g.set_device(outputs[0], g.get_device(result_name))
                 if g.has_shape(result_name):
-                    g.set_shape(node.name, g.get_shape(result_name)[1:])
+                    g.set_shape(outputs[0], g.get_shape(result_name)[1:])
                 elif g.has_rank(result_name):
-                    g.set_rank(node.name, g.get_rank(result_name) - 1)
+                    g.set_rank(outputs[0], g.get_rank(result_name) - 1)
             return res
 
     if isinstance(index, slice):
         return _getitem_slice(
             g,
-            node,
+            sts,
+            outputs,
             node_output.name,
             [index],
-            sts=sts,
             axes=[0],
             expand_axes=[],
             name="_getitem_slice1",
@@ -409,7 +422,7 @@ def getitem(g: "GraphBuilderTorchProtocol", node: "torch.fx.Node"):  # noqa: F82
             return _aten_tensor_int1(
                 g,
                 sts,
-                [node.name],
+                outputs,
                 node_output.name,
                 index,
                 axes=axes,
@@ -421,10 +434,10 @@ def getitem(g: "GraphBuilderTorchProtocol", node: "torch.fx.Node"):  # noqa: F82
         if all(isinstance(x, (slice, g.torch.fx.Node)) for x in index):
             return _getitem_slice(
                 g,
-                node,
+                sts,
+                outputs,
                 node_output.name,
                 list(index),
-                sts=sts,
                 axes=list(range(len(index))),
                 expand_axes=[],
                 name="_getitem_slicen",
@@ -460,10 +473,10 @@ def getitem(g: "GraphBuilderTorchProtocol", node: "torch.fx.Node"):  # noqa: F82
             if true_slice:
                 return _getitem_slice(
                     g,
-                    node,
+                    sts,
+                    outputs,
                     node_output.name,
                     slices,
-                    sts=sts,
                     axes=axes,
                     expand_axes=expand_axes,
                     name="_getitem_slice2",
@@ -473,7 +486,7 @@ def getitem(g: "GraphBuilderTorchProtocol", node: "torch.fx.Node"):  # noqa: F82
                 str(node.args[0]),
                 np.array(expand_axes, dtype=np.int64),
                 name="getitem_unsqueeze",
-                outputs=[node.name],
+                outputs=[outputs[0]],
             )
             return res
 
