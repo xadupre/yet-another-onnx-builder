@@ -683,20 +683,20 @@ def parse_ir_module(mlir_module) -> List[dict]:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    val_names: dict = {}  # id(ir.Value) -> SSA name str
+    val_names: dict = {}  # ir.Value -> SSA name str
     _counter = [0]
 
     def get_name(val) -> str:
         """Returns the SSA name previously assigned to *val*, or ``"?"``."""
-        if id(val) in val_names:
-            return val_names[id(val)]
+        if val in val_names:
+            return val_names[val]
         name = val.get_name()
         assign(val, name)
         return name
 
     def assign(val, name: str) -> str:
         """Assigns *name* to *val* in the value-name map and returns *name*."""
-        val_names[id(val)] = name
+        val_names[val] = name
         return name
 
     def fresh() -> str:
@@ -841,7 +841,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
     # ------------------------------------------------------------------
     for op in main_entry.operations:
         for r in op.results:
-            if id(r) not in val_names:
+            if r not in val_names:
                 assign(r, fresh())
 
     # ------------------------------------------------------------------
@@ -873,7 +873,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
     # before we build layer dicts, so back-references are always resolved).
     for op in scan_entry.operations:
         for r in op.results:
-            if id(r) not in val_names:
+            if r not in val_names:
                 assign(r, fresh())
 
     # ------------------------------------------------------------------
