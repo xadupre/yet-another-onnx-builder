@@ -1111,8 +1111,6 @@ class ExportWithNewConstantTo(torch.nn.Module):
 
 
 class LayerNorm(torch.nn.Module):
-    """Wraps :class:`torch.nn.LayerNorm` to export it as an ONNX model."""
-
     def __init__(self):
         super().__init__()
         self.layer_norm = torch.nn.LayerNorm(4)
@@ -1122,6 +1120,49 @@ class LayerNorm(torch.nn.Module):
 
     _inputs = [(torch.rand(3, 4),), (torch.rand(5, 4),)]
     _dynamic = {"x": {0: DIM("batch")}}
+
+
+class ShapeBased(torch.nn.Module):
+    def forward(self, x):
+        shape = x.shape
+        new_shape = (shape[0], shape[1] + 1)
+        return torch.zeros(new_shape, dtype=torch.float32)
+
+    _inputs = [(torch.rand(3, 4),), (torch.rand(5, 4),)]
+    _dynamic = {"x": {0: DIM("batch"), 1: DIM("seq")}}
+
+
+class ShapeAndTypeBased(torch.nn.Module):
+    def forward(self, x):
+        shape = x.shape
+        new_shape = (shape[0], shape[1] + 1)
+        dtype = x.dtype
+        if dtype == torch.float64 or dtype == torch.float16:
+            dtype = torch.float32
+        return torch.zeros(new_shape, dtype=dtype)
+
+    _inputs = [
+        (torch.rand((3, 4), dtype=torch.float32),),
+        (torch.rand((5, 4), dtype=torch.float16),),
+    ]
+    _dynamic = {"x": {0: DIM("batch"), 1: DIM("seq")}}
+
+
+class ShapeAndTypeAndDeviceBased(torch.nn.Module):
+    def forward(self, x):
+        shape = x.shape
+        new_shape = (shape[0], shape[1] + 1)
+        dtype = x.dtype
+        if dtype == torch.float64 or dtype == torch.float16:
+            dtype = torch.float32
+        device = x.device
+        return torch.zeros(new_shape, dtype=dtype, device=device)
+
+    _inputs = [
+        (torch.rand((3, 4), dtype=torch.float32),),
+        (torch.rand((5, 4), dtype=torch.float16),),
+    ]
+    _dynamic = {"x": {0: DIM("batch"), 1: DIM("seq")}}
 
 
 _bsize, _nheads, _slen, _dim = 2, 1, 30, 96
