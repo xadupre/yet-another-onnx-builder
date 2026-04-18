@@ -21,6 +21,11 @@ from ._exceptions import FunctionNotFoundError
 from .aten_functions import find_function
 from .aten_functions_transformers import find_function as find_transformers_function
 from .aten_methods import find_method
+from ._aten_getitem import (
+    _getitem_verify_new_shape,
+    _getitem_slice as _aten_getitem_slice,
+    getitem as _aten_getitem,
+)
 
 
 class DynamoInterpreter:
@@ -1289,9 +1294,7 @@ class DynamoInterpreter:
         expand_axes: List[int],
         name: str = "_getitem_slice",
     ):
-        from ._aten_getitem import _getitem_slice as _slice_impl
-
-        return _slice_impl(
+        return _aten_getitem_slice(
             self.builder, node, input_name, index_slice, sts, axes, expand_axes, name
         )
 
@@ -1326,13 +1329,9 @@ class DynamoInterpreter:
         """
         if self.builder.verbose > 1:
             print(f"[DynamoInterpreter-{self._hash()}.getitem]")
-        from ._aten_getitem import getitem as _getitem_impl
-
-        return _getitem_impl(self.builder, node)
+        return _aten_getitem(self.builder, node)
 
     def _verify_new_shape(self, shape, node):
-        from ._aten_getitem import _getitem_verify_new_shape
-
         _getitem_verify_new_shape(self.builder, shape, node)
 
     def _process_arg(self, node, aten_name, i):
