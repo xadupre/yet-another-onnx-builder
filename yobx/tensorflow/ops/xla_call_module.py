@@ -18,6 +18,7 @@ from .xla_call_module_parsing import (  # noqa: F401
     _parse_body,
     _parse_dense_value,
     _parse_tensor_type,
+    parse_ir_module,
     parse_mlir,
 )
 
@@ -187,7 +188,7 @@ def _process_call_layer(
     compute_layers = [la for la in func_layers if la["op"] not in ("Input", "return")]
     return_layers = [la for la in func_layers if la["op"] == "return"]
     compute_layers.sort(key=lambda la: _get_layer_pos(la, func_body))
-    func_layers = input_layers + compute_layers + return_layers
+    func_layers = [*input_layers, *compute_layers, *return_layers]
 
     # Process function body layers (stops at return layer).
     _process_layers(func_layers, inline_results, g, decoded_module)
@@ -317,15 +318,19 @@ def _process_layers(
         fct = get_jax_cvt(decoded_module, g, op_type)
         args_list = []
         for a in layer["operands"]:
-            if a not in local_results:
-                break
+            assert a in local_results, (
+                f"Missing argument {a!r} in layer {layer} (local_results="
+                f"{sorted(local_results)})\n---\n{decoded_module}"
+            )
             args_list.append(local_results[a])
-        else:
-            res = fct(*args_list, name="XlaCallModule")
-            if isinstance(res, str):
-                res = (res,)
-            if res:
-                local_results[layer["id"]] = res[0]
+        res = fct(*args_list, name="XlaCallModule")
+        if isinstance(res, str):
+            res = (res,)
+        if res:
+            assert (
+                layer["id"] not in local_results
+            ), f"Existing id={layer['id']}\n---\n{decoded_module}"
+            local_results[layer["id"]] = res[0]
 
 
 @register_tf_op_converter("XlaCallModule")
@@ -342,9 +347,25 @@ def convert_exp(
     """
     import jax.extend.mlir
 
+    # make_ir_context is not exposed in the public jax.extend.mlir namespace;
+    # it lives in jax._src.interpreters.mlir and registers all required dialects
+    # (StableHLO, MHLO, CHLO, …) that deserialize_portable_artifact depends on.
+    from jax._src.interpreters.mlir import make_ir_context
+
     hlo_module = op.get_attr("module")
-    decoded_module = jax.extend.mlir.deserialize_portable_artifact(hlo_module)
-    layers = parse_mlir(decoded_module)
+    with make_ir_context():
+        decoded_module = jax.extend.mlir.deserialize_portable_artifact(hlo_module)
+        if isinstance(decoded_module, str):
+            # JAX 0.9: string MLIR – use the text-based parser.
+            layers = parse_mlir(decoded_module)
+        else:
+            # JAX 0.10+: ir.Module object – use Python bindings directly,
+            # skipping the text conversion and regex-based parse step.
+            layers = parse_ir_module(decoded_module)
+            # Convert to string now (context still active) for downstream
+            # call-inlining helpers that still operate on MLIR text.
+            decoded_module = str(decoded_module)
+
     results: Dict[str, str] = {}
 
     for layer in layers:
@@ -355,6 +376,10 @@ def convert_exp(
 
         if layer["op"] == "return":
             if len(layer["operands"]) == 1:
+                assert layer["operands"][0] in results, (
+                    f"Issue with {layer=}, unable to find {layer['operands'][0]}, "
+                    f"results={sorted(results)}\n---\n{decoded_module}"
+                )
                 return g.op.Identity(
                     results[layer["operands"][0]], outputs=outputs, name="XlaCallModule"
                 )
