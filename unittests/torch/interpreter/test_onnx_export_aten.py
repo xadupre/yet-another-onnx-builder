@@ -3079,6 +3079,51 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertIn("Split", [n.op_type for n in onx.graph.node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
 
+    def test_aten_tensor_split_sections(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.tensor_split(x, 3, dim=0)
+
+        model = Model()
+        x = torch.arange(12, dtype=torch.float32).reshape((6, 2))
+        expected = model(x)
+        onx = to_onnx(model, (x,))
+        self.dump_onnx("test_aten_tensor_split_sections.onnx", onx)
+        self.assertIn("Split", [n.op_type for n in onx.graph.node])
+        self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
+
+    def test_aten_tensor_split_sections_unequal(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.tensor_split(x, 3, dim=0)
+
+        model = Model()
+        x = torch.arange(21, dtype=torch.float32).reshape((7, 3))
+        expected = model(x)
+        onx = to_onnx(model, (x,))
+        self.dump_onnx("test_aten_tensor_split_sections_unequal.onnx", onx)
+        self.assertIn("Split", [n.op_type for n in onx.graph.node])
+        self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
+
+    def test_aten_tensor_split_indices(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.tensor_split(x, [1, 4], dim=0)
+
+        model = Model()
+        x = torch.arange(18, dtype=torch.float32).reshape((6, 3))
+        expected = model(x)
+        onx = to_onnx(model, (x,))
+        self.dump_onnx("test_aten_tensor_split_indices.onnx", onx)
+        self.assertIn("Split", [n.op_type for n in onx.graph.node])
+        self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
+
     @skipif_ci_windows("does not work on windows")
     def test_aten_bucketize_right(self):
         import torch

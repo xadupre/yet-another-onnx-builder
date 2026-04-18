@@ -12952,8 +12952,8 @@ def aten_split_with_sizes(
         f"{g.get_debug_msg()}"
     )
     assert isinstance(dim, int), f"dim={dim} is not an integer{g.get_debug_msg()}"
-    assert all(d > 0 for d in split_sizes), (
-        f"split_with_sizes only implemented when all sizes are positive "
+    assert all(d >= 0 for d in split_sizes), (
+        f"split_with_sizes only implemented when all sizes are non-negative "
         f"but split_sizes={split_sizes}{g.get_debug_msg()}"
     )
     assert len(outputs) in (1, len(split_sizes)), (
@@ -13001,10 +13001,94 @@ def aten_split_with_sizes(
         for i, o in enumerate(res):
             g.set_type(o, t)
             if new_shapes:
-                g.get_shape(o, new_shape[i])
+                g.set_shape(o, new_shapes[i], allow_zero=True)
             else:
-                g.get_rank(o, new_ranks[i])
+                g.set_rank(o, new_ranks[i])
     return res
+
+
+def aten_tensor_split(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    indices_or_sections: Union[int, List[int]],
+    dim: int = 0,
+    name: str = "tensor_split",
+) -> Tuple[T, ...]:
+    """Dispatches tensor_split to the sections or indices variant."""
+    if isinstance(indices_or_sections, int):
+        return aten_tensor_split_sections(g, sts, outputs, x, indices_or_sections, dim, name=name)
+    return aten_tensor_split_indices(g, sts, outputs, x, indices_or_sections, dim, name=name)
+
+
+def aten_tensor_split_sections(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    sections: int,
+    dim: int = 0,
+    name: str = "tensor_split_sections",
+) -> Tuple[T, ...]:
+    """Splits x into *sections* chunks along *dim*.
+
+    Unlike :func:`torch.split`, the chunk sizes may differ by at most one
+    element so that exactly *sections* chunks are produced.
+    """
+    assert isinstance(
+        sections, int
+    ), f"sections must be a Python int, got {type(sections)}{g.get_debug_msg()}"
+    assert g.has_shape(
+        x
+    ), f"aten_tensor_split_sections requires known shape for {x!r}{g.get_debug_msg()}"
+    shape = g.get_shape(x)
+    size = shape[dim]
+    assert isinstance(size, int), (
+        f"aten_tensor_split_sections requires a static size along dim={dim}, "
+        f"got shape={shape}{g.get_debug_msg()}"
+    )
+    if sections == 0:
+        return ()
+    q, r = divmod(size, sections)
+    split_sizes = [q + 1] * r + [q] * (sections - r)
+    return aten_split_with_sizes(g, sts, outputs, x, split_sizes, dim, name=name)
+
+
+def aten_tensor_split_indices(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    indices: List[int],
+    dim: int = 0,
+    name: str = "tensor_split_indices",
+) -> Tuple[T, ...]:
+    """Splits x at the given index positions along *dim*.
+
+    Unlike split sizes, *indices* are absolute positions in the tensor, not
+    lengths.  Out-of-range indices are clamped to ``[0, size]``.
+    """
+    assert isinstance(
+        indices, (list, tuple)
+    ), f"indices must be a list or tuple, got {type(indices)}{g.get_debug_msg()}"
+    assert g.has_shape(
+        x
+    ), f"aten_tensor_split_indices requires known shape for {x!r}{g.get_debug_msg()}"
+    shape = g.get_shape(x)
+    size = shape[dim]
+    assert isinstance(size, int), (
+        f"aten_tensor_split_indices requires a static size along dim={dim}, "
+        f"got shape={shape}{g.get_debug_msg()}"
+    )
+    prev = 0
+    split_sizes: List[int] = []
+    for idx in indices:
+        clamped = max(0, min(int(idx), size))
+        split_sizes.append(clamped - prev)
+        prev = clamped
+    split_sizes.append(size - prev)
+    return aten_split_with_sizes(g, sts, outputs, x, split_sizes, dim, name=name)
 
 
 def aten_square(
