@@ -318,15 +318,19 @@ def _process_layers(
         fct = get_jax_cvt(decoded_module, g, op_type)
         args_list = []
         for a in layer["operands"]:
-            if a not in local_results:
-                break
+            assert a in local_results, (
+                f"Missing argument {a!r} in layer {layer} (local_results="
+                f"{sorted(local_results)})\n---\n{decoded_module}"
+            )
             args_list.append(local_results[a])
-        else:
-            res = fct(*args_list, name="XlaCallModule")
-            if isinstance(res, str):
-                res = (res,)
-            if res:
-                local_results[layer["id"]] = res[0]
+        res = fct(*args_list, name="XlaCallModule")
+        if isinstance(res, str):
+            res = (res,)
+        if res:
+            assert (
+                layer["id"] not in local_results
+            ), f"Existing id={layer['id']}\n---\n{decoded_module}"
+            local_results[layer["id"]] = res[0]
 
 
 @register_tf_op_converter("XlaCallModule")
@@ -361,6 +365,7 @@ def convert_exp(
             # Convert to string now (context still active) for downstream
             # call-inlining helpers that still operate on MLIR text.
             decoded_module = str(decoded_module)
+
     results: Dict[str, str] = {}
 
     for layer in layers:
@@ -372,8 +377,8 @@ def convert_exp(
         if layer["op"] == "return":
             if len(layer["operands"]) == 1:
                 assert layer["operands"][0] in results, (
-                    f"Issue with {layer=}, unable to find {layer['operands'][0]}"
-                    f"\n---\n{decoded_module}"
+                    f"Issue with {layer=}, unable to find {layer['operands'][0]}, "
+                    f"results={sorted(results)}\n---\n{decoded_module}"
                 )
                 return g.op.Identity(
                     results[layer["operands"][0]], outputs=outputs, name="XlaCallModule"
