@@ -335,6 +335,17 @@ class TestModelEvalCases(ExtTestCase):
             cases="BuildInIsInstance", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_shape_and_type_based_tracing(self):
+        evaluation(cases="ShapeAndTypeBased", exporters="yobx-tracing", quiet=False, dynamic=True)
+
+    def test_run_exporter_shape_and_type_and_device_based_tracing(self):
+        evaluation(
+            cases="ShapeAndTypeAndDeviceBased",
+            exporters="yobx-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     @requires_transformers("5.0")
     def test_run_exporter_tiny_llm_export_nostrict(self):
         evaluation(cases="TinyLLM", exporters="export-nostrict", quiet=False, dynamic=True)

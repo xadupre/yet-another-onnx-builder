@@ -32,6 +32,11 @@ _ORIGINAL_TORCH_SCAN: Optional[Callable] = getattr(
 # can be redirected during tracing when they receive TracingInt sizes.
 _ORIGINAL_TORCH_FULL: Callable = torch.full
 
+# Capture the real ``torch.zeros`` and ``torch.ones`` at import time so they
+# can be redirected during tracing when they receive TracingInt sizes.
+_ORIGINAL_TORCH_ZEROS: Callable = torch.zeros
+_ORIGINAL_TORCH_ONES: Callable = torch.ones
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -149,6 +154,56 @@ def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
 
 
 @contextlib.contextmanager
+def _zeros_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    Temporarily replaces ``torch.zeros`` with a tracing-aware handler so calls
+    using symbolic ``TracingInt`` sizes are captured as FX nodes.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_zeros` should be used as the replacement.
+
+    Returns:
+        A context manager that yields control while ``torch.zeros``
+        is temporarily replaced, then restores the original implementation on
+        exit.
+    """
+
+    def _zeros_handler(size: Any, **kwargs: Any) -> Any:
+        return tracer._handle_zeros(size, **kwargs)
+
+    torch.zeros = _zeros_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.zeros = _ORIGINAL_TORCH_ZEROS  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _ones_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    Temporarily replaces ``torch.ones`` with a tracing-aware handler so calls
+    using symbolic ``TracingInt`` sizes are captured as FX nodes.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_ones` should be used as the replacement.
+
+    Returns:
+        A context manager that yields control while ``torch.ones``
+        is temporarily replaced, then restores the original implementation on
+        exit.
+    """
+
+    def _ones_handler(size: Any, **kwargs: Any) -> Any:
+        return tracer._handle_ones(size, **kwargs)
+
+    torch.ones = _ones_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.ones = _ORIGINAL_TORCH_ONES  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
 def _roll_dynamic_shape_ctx() -> Generator:
     """
     Temporarily replaces the ``aten.roll.default`` decomposition with a
@@ -244,6 +299,8 @@ def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         _cond_replacement_ctx(tracer),
         _check_replacement_ctx(tracer),
         _full_replacement_ctx(tracer),
+        _zeros_replacement_ctx(tracer),
+        _ones_replacement_ctx(tracer),
         _roll_dynamic_shape_ctx(),
         _scan_replacement_ctx(tracer),
     ):

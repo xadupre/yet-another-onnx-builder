@@ -1142,7 +1142,7 @@ class ShapeAndTypeBased(torch.nn.Module):
         return torch.zeros(new_shape, dtype=dtype)
 
     _inputs = [
-        (torch.rand((3, 4), dtype=torch.float32),),
+        (torch.rand((3, 4), dtype=torch.float16),),
         (torch.rand((5, 4), dtype=torch.float16),),
     ]
     _dynamic = {"x": {0: DIM("batch"), 1: DIM("seq")}}
@@ -1159,7 +1159,7 @@ class ShapeAndTypeAndDeviceBased(torch.nn.Module):
         return torch.zeros(new_shape, dtype=dtype, device=device)
 
     _inputs = [
-        (torch.rand((3, 4), dtype=torch.float32),),
+        (torch.rand((3, 4), dtype=torch.float16),),
         (torch.rand((5, 4), dtype=torch.float16),),
     ]
     _dynamic = {"x": {0: DIM("batch"), 1: DIM("seq")}}
