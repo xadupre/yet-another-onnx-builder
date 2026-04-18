@@ -1167,6 +1167,75 @@ class ShapeAndTypeAndDeviceBased(torch.nn.Module):
 
 _bsize, _nheads, _slen, _dim = 2, 1, 30, 96
 
+try:
+    from ..in_transformers.cache_helper import make_dynamic_cache as _make_dc
+
+    _bsize_dc, _nheads_dc, _slen_dc, _dim_dc = 2, 4, 3, 7
+
+    class DynamicCacheInput(torch.nn.Module):
+        """
+        Eval case where a :class:`transformers.cache_utils.DynamicCache` is passed
+        directly as an input argument instead of being assembled inside ``forward``.
+
+        The model accepts two positional arguments:
+
+        * ``x``     – ``(batch, nheads, seq, dim)``  float32
+        * ``cache`` – :class:`transformers.cache_utils.DynamicCache` with two layers,
+          each ``(batch, nheads, past_seq, dim)``
+
+        It returns ``x`` added element-wise to the first key-cache tensor of the cache.
+        Requires :mod:`transformers` and
+        :func:`yobx.torch.flatten.register_flattening_functions` to export.
+        """
+
+        def forward(self, x, cache):
+            """Returns x plus the first key-cache tensor from cache."""
+            from ..in_transformers.cache_helper import CacheKeyValue
+
+            capi = CacheKeyValue(cache)
+            return x + capi.key_cache[0]
+
+        _inputs = [
+            (
+                torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                _make_dc(
+                    [
+                        (
+                            torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                            torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                        ),
+                        (
+                            torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                            torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                        ),
+                    ]
+                ),
+            ),
+            (
+                torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                _make_dc(
+                    [
+                        (
+                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                        ),
+                        (
+                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                        ),
+                    ]
+                ),
+            ),
+        ]
+        _dynamic = {
+            "x": {0: DYN, 2: DYN},
+            "cache": [{0: DYN, 2: DYN}, {0: DYN, 2: DYN}, {0: DYN, 2: DYN}, {0: DYN, 2: DYN}],
+        }
+        _patch = "flattening"
+
+except ImportError:
+    pass
+
 
 class TinyLLM(torch.nn.Module):
     """

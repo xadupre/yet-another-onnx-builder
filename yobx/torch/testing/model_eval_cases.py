@@ -168,7 +168,10 @@ def _clone(x):
         return [_clone(_) for _ in x]
     if isinstance(x, tuple):
         return tuple(_clone(_) for _ in x)
-    raise TypeError(f"Unable to clone type {type(x)}, x={x} into numpy")
+    # Fall back to torch_deepcopy for custom types such as DynamicCache.
+    from ..torch_helper import torch_deepcopy
+
+    return torch_deepcopy(x)
 
 
 def _wrap_torch_export(*args, backed_size_oblivious=False, **kwargs):
@@ -525,6 +528,25 @@ def run_exporter(
     """
     assert hasattr(cls_model, "_inputs"), f"Attribute '_inputs' is missing from class {cls_model}"
 
+    requires_flattening = getattr(cls_model, "_patch", None) == "flattening"
+    if requires_flattening:
+        from ..flatten import register_flattening_functions
+
+        with register_flattening_functions(patch_transformers=True):
+            return _run_exporter_impl(
+                exporter, cls_model, dynamic=dynamic, quiet=quiet, verbose=verbose
+            )
+    return _run_exporter_impl(exporter, cls_model, dynamic=dynamic, quiet=quiet, verbose=verbose)
+
+
+def _run_exporter_impl(
+    exporter: str, cls_model: type, dynamic: bool = False, quiet: bool = False, verbose: int = 0
+) -> Dict[str, Any]:
+    """
+    Core implementation of :func:`run_exporter`.
+    Called with :func:`yobx.torch.flatten.register_flattening_functions` already
+    active when the model class has ``_patch = "flattening"``.
+    """
     model = cls_model()
     inputs = cls_model._inputs
     valid = getattr(cls_model, "_valid", None)
