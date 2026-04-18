@@ -311,7 +311,7 @@ def getitem(g: "GraphBuilderTorchProtocol", node: "torch.fx.Node"):  # noqa: F82
         if isinstance(val, g.torch.Tensor):
             shape = val.shape
             dtype = _get_type(val.dtype)
-            # the graph could be new if a function produces a results
+            # the graph could be new if a function produces results
             # depending on the result values
             t_shape = tuple(shape)
             _getitem_verify_new_shape(g, shape, node)
