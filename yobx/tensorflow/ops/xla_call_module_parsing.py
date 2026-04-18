@@ -759,10 +759,16 @@ def parse_ir_module(mlir_module) -> List[dict]:
         if attr is None:
             return []
         s = str(attr)
+        # Newer jaxlib/MLIR (DenseI64ArrayAttr) prints as: array<i64: 1, 2, 3>
+        m = re.search(r"array<\w+:\s*([-\d][^>]*)>", s)
+        if m:
+            return [int(x.strip()) for x in m.group(1).split(",") if x.strip()]
+        # Older format: dense<[1, 2, 3]>
         m = re.search(r"dense<\[([^\]]*)\]>", s)
         if m:
             return [int(x.strip()) for x in m.group(1).split(",") if x.strip()]
-        m = re.search(r"dense<(\d+)>", s)
+        # Scalar dense format: dense<1>
+        m = re.search(r"dense<(-?\d+)>", s)
         return [int(m.group(1))] if m else []
 
     def _compare_dir(op) -> str:
