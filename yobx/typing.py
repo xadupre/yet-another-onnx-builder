@@ -272,7 +272,9 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
-    def make_initializer(self, name: str, value: Any, give_unique_name: bool = True) -> str:
+    def make_initializer(
+        self, name: str, value: Any, give_unique_name: bool = True, source: Optional[str] = None
+    ) -> str:
         """Adds a constant initializer and returns its name.
 
         :param name: initializer name; may be empty to auto-generate a unique name
@@ -280,6 +282,7 @@ class GraphBuilderProtocol(Protocol):
             :class:`onnx.TensorProto`, ``int``, or ``float``)
         :param give_unique_name: changes the name if it is already taken, otherwise,
             the user should expect an exception to raised
+        :param source: used to track where this initializer was added
         :return: the final registered name
         """
         ...
