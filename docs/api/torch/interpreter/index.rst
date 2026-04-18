@@ -11,6 +11,7 @@ yobx.torch.interpreter
 
     _aten_functions
     _aten_functions_attention
+    _aten_getitem
     _aten_functions_transformers
     _aten_methods
     _doc_
