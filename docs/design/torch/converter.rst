@@ -28,7 +28,7 @@ different design priorities.
      - :func:`yobx.torch.interpreter.to_onnx`
      - :func:`torch.onnx.export` (dynamo backend)
    * - **ATen → ONNX translation**
-     - Custom :class:`~yobx.torch.interpreter.interpreter.DynamoInterpreter`
+     - Custom :class:`~yobx.torch.interpreter.interpreter.FxGraphInterpreter`
        that walks the FX graph node-by-node and emits ONNX ops directly into a
        :class:`~yobx.xbuilder.GraphBuilder`
      - Uses `onnxscript <https://microsoft.github.io/onnxscript/>`_ as the
@@ -93,7 +93,7 @@ multi-stage pipeline:
 1. **Export** — trace the module into a portable graph representation using
    :func:`torch.export.export` (or one of its alternatives).
 2. **Interpret** — walk every node of the FX graph and translate it into a
-   sequence of ONNX operations via :class:`~yobx.torch.interpreter.interpreter.DynamoInterpreter`.
+   sequence of ONNX operations via :class:`~yobx.torch.interpreter.interpreter.FxGraphInterpreter`.
 3. **Optimise** — run the ONNX graph through the optimiser shipped in
    :class:`~yobx.xbuilder.GraphBuilder` to fold constants, remove redundant
    casts, and simplify shapes.
@@ -111,9 +111,9 @@ Pipeline overview
           │
           │  _make_builder_interpreter()
           ▼
-    GraphBuilder  +  DynamoInterpreter
+    GraphBuilder  +  FxGraphInterpreter
           │
-          │  DynamoInterpreter.run()  ── node-by-node dispatch
+          │  FxGraphInterpreter.run()  ── node-by-node dispatch
           │        ├── placeholder   →  graph input
           │        ├── get_attr      →  initializer
           │        ├── call_function →  aten_* converter
@@ -225,10 +225,10 @@ mapped to the same symbolic integer.  The
 underlying :class:`~torch._subclasses.fake_tensor.FakeTensorMode` and the
 mapping between concrete dimension values and their symbolic counterparts.
 
-DynamoInterpreter
+FxGraphInterpreter
 -----------------
 
-:class:`~yobx.torch.interpreter.interpreter.DynamoInterpreter` is the heart
+:class:`~yobx.torch.interpreter.interpreter.FxGraphInterpreter` is the heart
 of the converter.  It walks the :class:`torch.fx.Graph` node by node and
 translates each node into one or more ONNX operators appended to the
 :class:`~yobx.xbuilder.GraphBuilder`.
@@ -255,7 +255,7 @@ Node kinds and their handlers
        (``_aten_methods.py``).
    * - ``call_module``
      - Recursively converts a submodule using a nested
-       :class:`DynamoInterpreter` instance.
+       :class:`FxGraphInterpreter` instance.
    * - ``output``
      - Registers graph outputs, applying any output masks produced by the
        export stage.

@@ -28,7 +28,7 @@ from ._aten_getitem import (
 )
 
 
-class DynamoInterpreter:
+class FxGraphInterpreter:
     """
     Interprets a torch graph into an ONNX graph.
     Dispatches every node to the appropriate converting function.
@@ -118,7 +118,7 @@ class DynamoInterpreter:
 
     def register_named_modules(
         self,
-        parent_interpreter: Optional["DynamoInterpreter"],
+        parent_interpreter: Optional["FxGraphInterpreter"],
         preserved_modules: Optional[Set[Union[type["torch.nn.Module"], str]]],  # noqa: F821
         named_modules: Dict[str, "torch.nn.Module"],  # noqa: F821
     ):
@@ -129,11 +129,11 @@ class DynamoInterpreter:
         :func:`torch.export.unflatten.unflatten`.
         """
         assert parent_interpreter is None or isinstance(
-            parent_interpreter, DynamoInterpreter
+            parent_interpreter, FxGraphInterpreter
         ), f"Unexpected type {type(parent_interpreter)} for the interpreter"
         if self.builder.verbose > 4 and preserved_modules:
             print(
-                f"[DynamoInterpreter-{self._hash()}.register] "
+                f"[FxGraphInterpreter-{self._hash()}.register] "
                 f"{sorted(c.__name__ for c in preserved_modules)}"
             )
         self.named_modules = named_modules
@@ -219,7 +219,7 @@ class DynamoInterpreter:
             a1 = "E" if hasattr(node, "meta") and "example_value" in node.meta else "-"
             a2 = "A" if hasattr(node, "meta") and "val" in node.meta else "-"
             print(
-                f"[DynamoInterpreter-{self._hash()}.run_node][{symbol}{a1}{a2}] "
+                f"[FxGraphInterpreter-{self._hash()}.run_node][{symbol}{a1}{a2}] "
                 f"{node.op}:{node.name}:{exa}:{val}"
             )
 
@@ -364,7 +364,7 @@ class DynamoInterpreter:
     def get_attr(self, node: "torch.fx.Node"):  # noqa: F821
         """Retrieves an attribute."""
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.get_attr][{node.name}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.get_attr][{node.name}]")
         try:
             init = getattr(node.graph.owning_module, node.target)
         except AttributeError as e:
@@ -779,7 +779,7 @@ class DynamoInterpreter:
             shape,
             default_initializer=default_initializer,
             device=device,
-            marker="DynamoInterpreter._make_tensor_input",
+            marker="FxGraphInterpreter._make_tensor_input",
         )
 
     def _make_list_input(
@@ -812,7 +812,7 @@ class DynamoInterpreter:
         elem_type = _get_type(example_value[0].dtype)
         self.current_input_ += 1
         return self.builder.make_tensor_sequence_input(
-            name, elem_type, shape[0], marker="DynamoInterpreter._make_list_input"
+            name, elem_type, shape[0], marker="FxGraphInterpreter._make_list_input"
         )
 
     def placeholder(self, node: "torch.fx.Node"):  # noqa: F821
@@ -821,7 +821,7 @@ class DynamoInterpreter:
         between the input names he wants and the name it has in the graph module.
         """
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.placeholder][{node.name}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.placeholder][{node.name}]")
 
         if isinstance(node, VirtualTensor):
             return self._make_tensor_input(
@@ -833,14 +833,14 @@ class DynamoInterpreter:
 
         if self.builder.verbose > 2:
             print(
-                f"[DynamoInterpreter-{self._hash()}.placeholder]"
+                f"[FxGraphInterpreter-{self._hash()}.placeholder]"
                 f"[{node.name}] val={string_type(val, with_shape=True)}"
             )
         if val is None:
             example_value = node.meta.get("example_value", None)
             if self.builder.verbose > 2:
                 print(
-                    f"[DynamoInterpreter-{self._hash()}.placeholder]"
+                    f"[FxGraphInterpreter-{self._hash()}.placeholder]"
                     f"[{node.name}] example_value={string_type(val, with_shape=True)}"
                 )
             # index_input may be wrong because torch.export.export may flatten the inputs.
@@ -979,7 +979,7 @@ class DynamoInterpreter:
 
             if self.builder.verbose > 2:
                 print(
-                    f"[DynamoInterpreter-{self._hash()}.placeholder]"
+                    f"[FxGraphInterpreter-{self._hash()}.placeholder]"
                     f"[{node.name}] value={string_type(value, with_shape=True)} into initializer"
                 )
 
@@ -1056,7 +1056,7 @@ class DynamoInterpreter:
         """Adds an output to the graph."""
         output_name = node.name
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.output][{output_name}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.output][{output_name}]")
         declared = node.args
         assert len(declared) == 1, (
             f"declared must have one element: {declared}, output_name={output_name}"
@@ -1328,7 +1328,7 @@ class DynamoInterpreter:
         a tuple, a list.
         """
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.getitem]")
+            print(f"[FxGraphInterpreter-{self._hash()}.getitem]")
         can_set = self._can_set_shape_and_type(node)
         output_names = self._get_output_names(node)
         return _aten_getitem(self.builder, can_set, output_names, node)
@@ -1438,7 +1438,7 @@ class DynamoInterpreter:
             )
         if self.builder.verbose > 1:
             name = fct.__class__.__name__ if isinstance(fct, GraphBuilder) else fct.__name__
-            print(f"[DynamoInterpreter-{self._hash()}.call_function][{name}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.call_function][{name}]")
 
         args = [self._process_arg(node, aten_name, a) for a in fx_args]
         output_names = self._get_output_names(node)
@@ -1619,7 +1619,7 @@ class DynamoInterpreter:
         """Called for a method."""
         method_name = node.target
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.call_method][{method_name}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.call_method][{method_name}]")
         assert isinstance(node.args, tuple), f"Unexpected type {type(node.args)} for node.args."
 
         fct = None
@@ -1687,7 +1687,7 @@ class DynamoInterpreter:
 
         if self.builder.verbose > 1 or self._debug_aten_as_function:
             print(
-                f"[DynamoInterpreter.add_aten_as_function] {name_fct}"
+                f"[FxGraphInterpreter.add_aten_as_function] {name_fct}"
                 f"({', '.join(input_names)}) -> {', '.join(output_names)}"
             )
 
@@ -2386,13 +2386,13 @@ class DynamoInterpreter:
         ), f"Not implemented for type {type(sub_module)}.\n{raise_msg()}"
 
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.call_module] class [{type(sub_module)}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.call_module] class [{type(sub_module)}]")
             print(
-                f"[DynamoInterpreter-{self._hash()}.call_module] with "
+                f"[FxGraphInterpreter-{self._hash()}.call_module] with "
                 f"node.args={string_type(node.args)}]"
             )
             print(
-                f"[DynamoInterpreter-{self._hash()}.call_module] with "
+                f"[FxGraphInterpreter-{self._hash()}.call_module] with "
                 f"kwargs={string_type(node.kwargs)}]"
             )
 

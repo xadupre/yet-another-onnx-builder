@@ -113,8 +113,8 @@ def _retrieve(
     exc: bool = True,
 ) -> "torch.Tensor":  # noqa: F821
     """
-    Sent to the :class:`DynamoInterpreter
-    <yobx.torch.interpreter.interpreter.DynamoInterpreter>`.
+    Sent to the :class:`FxGraphInterpreter
+    <yobx.torch.interpreter.interpreter.FxGraphInterpreter>`.
     It retrieves the weights.
 
     :param name: name to retrieve
@@ -492,7 +492,7 @@ def _make_builder_interpreter(
 ) -> Tuple[
     Union["torch.export.ExportedProgram", "torch.fx.GraphModule"],  # noqa: F821
     GraphBuilder,
-    "DynamoInterpreter",  # noqa: F821
+    "FxGraphInterpreter",  # noqa: F821
     Optional[List[bool]],
 ]:
     """
@@ -748,13 +748,13 @@ def _make_builder_interpreter(
             name, value, weights, buffers, constants, mapping, builder, debug, exc=exc
         )
 
-    from .interpreter import DynamoInterpreter
+    from .interpreter import FxGraphInterpreter
 
     if not submodule_naming:
         submodule_naming = SubModuleNaming(mod)
     if not parameter_naming:
         parameter_naming = ParameterNaming(mod, exported_program=exported_program)
-    interpreter = DynamoInterpreter(
+    interpreter = FxGraphInterpreter(
         builder,
         retrieve,
         dispatcher=dispatcher,
