@@ -1117,6 +1117,17 @@ def aten_argsort(
     return res
 
 
+def aten_argwhere(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "argwhere",
+) -> T:
+    """Returns the indices where the input is non-zero, equivalent to ``nonzero(x, as_tuple=False)``."""
+    return aten_nonzero(g, sts, outputs, x, name=name, as_tuple=False)
+
+
 def aten_atleast_1d(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
