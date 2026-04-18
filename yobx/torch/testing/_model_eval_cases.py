@@ -1182,9 +1182,9 @@ class DynamicCacheInput(torch.nn.Module):
     * ``cache`` – :class:`transformers.cache_utils.DynamicCache` with two layers,
       each ``(batch, nheads, past_seq, dim)``
 
-    For every tensor in the cache (``key_cache`` and ``value_cache`` across all
-    layers), reduces over the sequence dimension (dim 2) and concatenates the
-    result to ``x`` along the same dimension.  Returns a tensor of shape
+    For every tensor in the cache (keys and values across all layers), reduces
+    over the sequence dimension (dim 2) and concatenates the result to ``x``
+    along the same dimension.  Returns a tensor of shape
     ``(batch, nheads, seq + n_cache_tensors, dim)``.
     Requires :mod:`transformers` and
     :func:`yobx.torch.flatten.register_flattening_functions` to export.
@@ -1193,7 +1193,11 @@ class DynamicCacheInput(torch.nn.Module):
     def forward(self, x, cache):
         """Reduces each cache tensor over dim 2 and concatenates to x along dim 2."""
         parts = [x]
-        for t in cache.key_cache + cache.value_cache:
+        if hasattr(cache, "layers"):
+            tensors = [t for layer in cache.layers for t in (layer.keys, layer.values)]
+        else:
+            tensors = cache.key_cache + cache.value_cache
+        for t in tensors:
             parts.append(t.mean(dim=2, keepdim=True))
         return torch.cat(parts, dim=2)
 
