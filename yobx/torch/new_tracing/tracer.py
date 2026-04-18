@@ -14,6 +14,8 @@ from .tensor import TracingTensor
 from ._patches import (
     _ORIGINAL_TORCH_COND,
     _ORIGINAL_TORCH_FULL,
+    _ORIGINAL_TORCH_ZEROS,
+    _ORIGINAL_TORCH_ONES,
     _ORIGINAL_TORCH_SCAN,
     _cond_replacement_ctx,
     _check_replacement_ctx,
@@ -215,6 +217,8 @@ class GraphTracer:
                 return True
             return all(self.is_not_tensor(v) for v in value.values())
         if isinstance(value, torch.dtype):
+            return True
+        if isinstance(value, torch.device):
             return True
 
         from ...helpers import string_type
@@ -1256,6 +1260,140 @@ class GraphTracer:
 
         node = self.graph.call_function(
             _ORIGINAL_TORCH_FULL, args=(tuple(node_size), fill_value), kwargs=kwargs
+        )
+        res = self._make_tracing_tensor(
+            self._sym_shape_to_str_shape(fake_res.shape), fake_res.dtype, fake_res.device, node
+        )
+        node.meta["val"] = res
+        node.meta["fake_val"] = fake_res
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return res
+
+    def _handle_zeros(self, size: Any, **kwargs: Any) -> Any:
+        """
+        Tracing-aware replacement for ``torch.zeros`` called via
+        :func:`_zeros_replacement_ctx`.
+
+        Intercepts constructor calls where *size* contains symbolic
+        :class:`TracingInt` values and emits a corresponding FX node without
+        requiring eager execution with concrete Python ``int`` dimensions.
+
+        :param size: Size argument passed to ``torch.zeros``.
+        :param kwargs: Additional keyword arguments for ``torch.zeros``.
+
+        Returns:
+            Returns a :class:`TracingTensor` when symbolic dimensions are present,
+            otherwise returns the eager ``torch.zeros`` result.
+        """
+        if isinstance(size, torch.Size):
+            size = tuple(size)
+        if not isinstance(size, (tuple, list)):
+            return _ORIGINAL_TORCH_ZEROS(size, **kwargs)
+        if not any(isinstance(dim, TracingInt) for dim in size):
+            return _ORIGINAL_TORCH_ZEROS(size, **kwargs)
+
+        traced_size: List[Union[int, torch.SymInt]] = []
+        node_size: List[Any] = []
+        for dim in size:
+            if isinstance(dim, TracingInt):
+                if dim.is_static:
+                    traced_size.append(dim.value)  # type: ignore[arg-type]
+                    node_size.append(dim)
+                    continue
+                assert isinstance(
+                    dim.value, str
+                ), f"Expected string symbolic dimension value, got {type(dim.value)}"
+                dim_key = self._token_replace(dim.value)
+                assert isinstance(
+                    dim_key, str
+                ), f"Expected string type for symbolic dimension key, got {type(dim_key)}"
+                if dim_key in self._mapped_dimension:
+                    symd = self._mapped_dimension[dim_key]
+                else:
+                    symd = self._shape_env.create_unbacked_symint()
+                    self._mapped_dimension[dim_key] = symd
+                    symd_name = self._sym_int_to_str(symd)
+                    assert isinstance(symd_name, str), "type checking"
+                    self._sym_int_to_dynamic_dimension[symd_name] = dim_key
+                traced_size.append(symd)
+                node_size.append(TracingInt(dim_key))
+            else:
+                assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
+                traced_size.append(dim)
+                node_size.append(dim)
+
+        with self._fake_mode:
+            fake_res = _ORIGINAL_TORCH_ZEROS(tuple(traced_size), **kwargs)
+
+        node = self.graph.call_function(
+            _ORIGINAL_TORCH_ZEROS, args=(tuple(node_size),), kwargs=kwargs
+        )
+        res = self._make_tracing_tensor(
+            self._sym_shape_to_str_shape(fake_res.shape), fake_res.dtype, fake_res.device, node
+        )
+        node.meta["val"] = res
+        node.meta["fake_val"] = fake_res
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return res
+
+    def _handle_ones(self, size: Any, **kwargs: Any) -> Any:
+        """
+        Tracing-aware replacement for ``torch.ones`` called via
+        :func:`_ones_replacement_ctx`.
+
+        Intercepts constructor calls where *size* contains symbolic
+        :class:`TracingInt` values and emits a corresponding FX node without
+        requiring eager execution with concrete Python ``int`` dimensions.
+
+        :param size: Size argument passed to ``torch.ones``.
+        :param kwargs: Additional keyword arguments for ``torch.ones``.
+
+        Returns:
+            Returns a :class:`TracingTensor` when symbolic dimensions are present,
+            otherwise returns the eager ``torch.ones`` result.
+        """
+        if isinstance(size, torch.Size):
+            size = tuple(size)
+        if not isinstance(size, (tuple, list)):
+            return _ORIGINAL_TORCH_ONES(size, **kwargs)
+        if not any(isinstance(dim, TracingInt) for dim in size):
+            return _ORIGINAL_TORCH_ONES(size, **kwargs)
+
+        traced_size: List[Union[int, torch.SymInt]] = []
+        node_size: List[Any] = []
+        for dim in size:
+            if isinstance(dim, TracingInt):
+                if dim.is_static:
+                    traced_size.append(dim.value)  # type: ignore[arg-type]
+                    node_size.append(dim)
+                    continue
+                assert isinstance(
+                    dim.value, str
+                ), f"Expected string symbolic dimension value, got {type(dim.value)}"
+                dim_key = self._token_replace(dim.value)
+                assert isinstance(
+                    dim_key, str
+                ), f"Expected string type for symbolic dimension key, got {type(dim_key)}"
+                if dim_key in self._mapped_dimension:
+                    symd = self._mapped_dimension[dim_key]
+                else:
+                    symd = self._shape_env.create_unbacked_symint()
+                    self._mapped_dimension[dim_key] = symd
+                    symd_name = self._sym_int_to_str(symd)
+                    assert isinstance(symd_name, str), "type checking"
+                    self._sym_int_to_dynamic_dimension[symd_name] = dim_key
+                traced_size.append(symd)
+                node_size.append(TracingInt(dim_key))
+            else:
+                assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
+                traced_size.append(dim)
+                node_size.append(dim)
+
+        with self._fake_mode:
+            fake_res = _ORIGINAL_TORCH_ONES(tuple(traced_size), **kwargs)
+
+        node = self.graph.call_function(
+            _ORIGINAL_TORCH_ONES, args=(tuple(node_size),), kwargs=kwargs
         )
         res = self._make_tracing_tensor(
             self._sym_shape_to_str_shape(fake_res.shape), fake_res.dtype, fake_res.device, node
