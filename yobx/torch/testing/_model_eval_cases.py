@@ -234,7 +234,7 @@ class InplaceSetItemEllipsis_1(torch.nn.Module):
         self.params = torch.zeros((1, 8192, 4), dtype=torch.float32)
 
     def forward(self, index, update):
-        copy = self.params.clone()
+        copy = update.new_zeros(self.params.shape)
         copy[..., index] = update
         return copy
 

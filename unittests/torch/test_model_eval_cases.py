@@ -238,6 +238,14 @@ class TestModelEvalCases(ExtTestCase):
             cases="InplaceSetItemEllipsis_1", exporters="yobx-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_inplace_setitem_ellipsis_1_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemEllipsis_1",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_inplace_setitem_ellipsis_2_tracing(self):
         evaluation(
             cases="InplaceSetItemEllipsis_2", exporters="yobx-tracing", quiet=False, dynamic=True

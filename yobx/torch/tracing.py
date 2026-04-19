@@ -235,6 +235,11 @@ class CustomProxy(torch.fx.proxy.Proxy):
         indices, values = args
         if isinstance(indices, CustomProxy):
             indices = indices.node
+        elif isinstance(indices, tuple):
+            # create_node expects torch.fx.Node objects in args, not Proxy
+            # objects. Unwrap any CustomProxy elements within the tuple so that
+            # FX dependency tracking works correctly.
+            indices = tuple(i.node if isinstance(i, CustomProxy) else i for i in indices)
         node = self.tracer.create_node(
             "call_function",
             operator.setitem,
