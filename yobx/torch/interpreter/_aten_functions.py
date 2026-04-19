@@ -1117,6 +1117,20 @@ def aten_argsort(
     return res
 
 
+def aten_argwhere(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "argwhere",
+) -> T:
+    """
+    Returns the indices where the input is non-zero,
+    equivalent to ``nonzero(x, as_tuple=False)``.
+    """
+    return aten_nonzero(g, sts, outputs, x, name=name, as_tuple=False)
+
+
 def aten_atleast_1d(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -11459,6 +11473,105 @@ def aten_roll(
             g.set_shape(result, g.get_shape(x))
 
     return g.op.Identity(result, name=name, outputs=outputs)
+
+
+def aten_rot90(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    k: int = 1,
+    dims: Optional[List[int]] = None,
+    name: str = "rot90",
+) -> T:
+    """Rotates a tensor by 90 degrees in the plane defined by dims."""
+    if dims is None:
+        dims = [0, 1]
+    k = k % 4
+    if k == 0:
+        res = g.op.Identity(x, outputs=outputs, name=name)
+        if not sts:
+            set_type_shape_unary_op(g, res, x)
+        return res
+
+    dim0, dim1 = dims[0], dims[1]
+    rank = g.rank(x)
+    # Normalize negative dimension indices.
+    if dim0 < 0:
+        dim0 = dim0 + rank
+    if dim1 < 0:
+        dim1 = dim1 + rank
+
+    cst_neg1 = np.array([-1], dtype=np.int64)
+    cst_int64_min = np.array([_INT64_MIN], dtype=np.int64)
+
+    if k == 2:
+        # flip along dim0 then flip along dim1
+        flipped0 = g.op.Slice(
+            x, cst_neg1, cst_int64_min, np.array([dim0], dtype=np.int64), cst_neg1, name=name
+        )
+        g.set_type(flipped0, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(flipped0, g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(flipped0, rank)
+        res = g.op.Slice(
+            flipped0,
+            cst_neg1,
+            cst_int64_min,
+            np.array([dim1], dtype=np.int64),
+            cst_neg1,
+            outputs=outputs,
+            name=name,
+        )
+        if not sts:
+            set_type_shape_unary_op(g, res, x)
+        return res
+
+    if k == 1:
+        # flip along dim1, then transpose dim0 <-> dim1
+        flipped = g.op.Slice(
+            x, cst_neg1, cst_int64_min, np.array([dim1], dtype=np.int64), cst_neg1, name=name
+        )
+        g.set_type(flipped, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(flipped, g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(flipped, rank)
+        perm = list(range(rank))
+        perm[dim0], perm[dim1] = perm[dim1], perm[dim0]
+        res = g.op.Transpose(flipped, perm=perm, outputs=outputs, name=name)
+    else:
+        # k == 3: transpose dim0 <-> dim1, then flip along dim1
+        perm = list(range(rank))
+        perm[dim0], perm[dim1] = perm[dim1], perm[dim0]
+        transposed = g.op.Transpose(x, perm=perm, name=name)
+        g.set_type(transposed, g.get_type(x))
+        if g.has_shape(x):
+            shape = list(g.get_shape(x))
+            shape[dim0], shape[dim1] = shape[dim1], shape[dim0]
+            g.set_shape(transposed, tuple(shape))
+        elif g.has_rank(x):
+            g.set_rank(transposed, rank)
+        res = g.op.Slice(
+            transposed,
+            cst_neg1,
+            cst_int64_min,
+            np.array([dim1], dtype=np.int64),
+            cst_neg1,
+            outputs=outputs,
+            name=name,
+        )
+
+    if not sts:
+        g.set_type(outputs[0], g.get_type(x))
+        if g.has_shape(x):
+            shape = list(g.get_shape(x))
+            shape[dim0], shape[dim1] = shape[dim1], shape[dim0]
+            g.set_shape(outputs[0], tuple(shape))
+        elif g.has_rank(x):
+            g.set_rank(outputs[0], rank)
+    return res
 
 
 def aten_round(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
