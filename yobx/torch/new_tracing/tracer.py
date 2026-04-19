@@ -187,19 +187,21 @@ class GraphTracer:
         """
         Return ``True`` if *value* contains no :class:`torch.Tensor` leaves.
 
-        Scalars (``int``, ``float``, ``str``) and empty collections are
-        treated as non-tensor.  Lists and tuples are inspected recursively.
+        Scalars (``int``, ``float``, ``str``), ``None``, and empty collections
+        are treated as non-tensor.  Lists and tuples are inspected recursively.
         Dicts are inspected by their values.
         :class:`~yobx.torch.new_tracing.shape.TracingInt` instances are
         treated as scalar integers (non-tensor).
 
         :param value: The value to inspect.  May be a scalar, tensor,
-            list, tuple, or dict.
+            list, tuple, dict, or ``None``.
         :return: ``True`` when *value* has no tensor leaves; ``False`` when
             any leaf is a :class:`torch.Tensor` (including
             :class:`TracingTensor`).
         :raises TypeError: If *value* has a type that cannot be classified.
         """
+        if value is None:
+            return True
         if isinstance(value, (int, float, str)):
             return True
         if isinstance(value, torch.Tensor):
