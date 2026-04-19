@@ -144,7 +144,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "resize_as_",
         "resolve_conj",
         "resolve_neg",
-        "rot90",
         "rsub",
         "sgn",
         "sinc",
