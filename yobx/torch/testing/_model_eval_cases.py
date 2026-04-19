@@ -1182,24 +1182,29 @@ class DynamicCacheInput(torch.nn.Module):
     * ``cache`` – :class:`transformers.cache_utils.DynamicCache` with two layers,
       each ``(batch, nheads, past_seq, dim)``
 
-    For every tensor in the cache (keys and values across all layers), reduces
-    over the sequence dimension (dim 2) and concatenates the result to ``x``
-    along the same dimension.  Returns a tensor of shape
-    ``(batch, nheads, seq + n_cache_tensors, dim)``.
+    For every layer in the cache, reduces the key and value tensors over the
+    sequence dimension (dim 2) and assembles a new
+    :class:`transformers.cache_utils.DynamicCache` from those reduced tensors.
+    Returns ``(x, new_cache)`` where ``new_cache`` is the reduced cache.
     Requires :mod:`transformers` and
     :func:`yobx.torch.flatten.register_flattening_functions` to export.
     """
 
     def forward(self, x, cache):
-        """Reduces each cache tensor over dim 2 and concatenates to x along dim 2."""
-        parts = [x]
+        """Reduces each cache layer over dim 2 and returns (x, new_cache)."""
         if hasattr(cache, "layers"):
-            tensors = [t for layer in cache.layers for t in (layer.keys, layer.values)]
+            pairs = [
+                (layer.keys.mean(dim=2, keepdim=True), layer.values.mean(dim=2, keepdim=True))
+                for layer in cache.layers
+            ]
         else:
-            tensors = cache.key_cache + cache.value_cache
-        for t in tensors:
-            parts.append(t.mean(dim=2, keepdim=True))
-        return torch.cat(parts, dim=2)
+            keys = cache.key_cache
+            values = cache.value_cache
+            pairs = [
+                (k.mean(dim=2, keepdim=True), v.mean(dim=2, keepdim=True))
+                for k, v in zip(keys, values)
+            ]
+        return x, make_dynamic_cache(pairs)
 
     _inputs = [
         (
