@@ -5,6 +5,7 @@ from yobx.torch.testing.model_eval_cases import discover, evaluation
 
 class TestModelEvalCases(ExtTestCase):
     @requires_torch("2.7", "scan")
+    @requires_transformers("4.55")
     @ignore_warnings(FutureWarning)
     def test_discover(self):
         res = discover()
