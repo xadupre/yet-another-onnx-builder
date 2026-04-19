@@ -70,7 +70,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "addcdiv",
         "addr",
         "alias_copy",
-        "argwhere",
         "bernoulli",
         "block_diag",
         "conj_physical",
