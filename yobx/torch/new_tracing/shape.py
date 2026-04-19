@@ -126,6 +126,13 @@ class TracingInt:
 
     :param value: Either a concrete :class:`int` (concrete dimension) or a
         :class:`str` (symbolic/dynamic dimension name such as ``"batch"``).
+    :param concrete_value: Optional concrete integer value associated with a
+        symbolic dimension.  When *value* is a ``str`` (symbolic), this carries
+        the actual integer size that was observed in the concrete input tensor
+        at trace time.  It is used by :meth:`numel` (and similar helpers) so
+        that expressions such as ``if x.numel() == 0:`` can be evaluated
+        correctly at trace time without converting the symbolic dimension to a
+        :class:`TracingBool`.
 
     Examples::
 
@@ -139,11 +146,29 @@ class TracingInt:
         print(str(s))       # batch
         print(s + 2)        # TracingInt('(batch+2)')
         print(s == 4)       # TracingBool('(batch==4)')
+
+        # Symbolic with known concrete value (from trace-time input)
+        t = TracingInt("batch", concrete_value=5)
+        print(t.concrete_value)  # 5
     """
 
-    def __init__(self, value: Union[int, str]):
+    def __init__(self, value: Union[int, str], concrete_value: Optional[int] = None):
         assert isinstance(value, (int, str)), f"Unexpected type {type(value)} for value"
         self.value = value
+        # concrete_value is only meaningful for symbolic (str-valued) dims.
+        self._concrete_value: Optional[int] = concrete_value if isinstance(value, str) else None
+
+    @property
+    def concrete_value(self) -> Optional[int]:
+        """Returns the concrete integer value for a symbolic dimension, or ``None``.
+
+        For static (integer-valued) :class:`TracingInt` instances this always
+        returns ``None``; the concrete value is :attr:`value` itself.  For
+        symbolic instances the concrete value is the integer size observed in
+        the actual input tensor at the start of tracing, propagated via
+        :meth:`~TracingShape.from_existing_shape`.
+        """
+        return self._concrete_value
 
     @property
     def is_static(self):
@@ -451,5 +476,5 @@ class TracingShape:
             return TracingShape(tuple(int(i) for i in shape))
         new_shape = [int(i) for i in shape]
         for d, dim_spec in dynamic_shapes.items():
-            new_shape[d] = TracingInt(_dim_spec_to_name(dim_spec))  # type: ignore
+            new_shape[d] = TracingInt(_dim_spec_to_name(dim_spec), concrete_value=int(shape[d]))  # type: ignore
         return TracingShape(tuple(new_shape))  # type: ignore

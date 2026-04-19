@@ -87,19 +87,23 @@ class TracingTensor(torch.Tensor):
     def numel(self) -> int:  # type: ignore[override]
         """Computes the total number of elements from :attr:`_tracing_shape`.
 
-        Symbolic (string-valued) :class:`TracingInt` dimensions are treated as
-        ``1`` so that the result is always a positive integer when no concrete
-        dimension is zero.  This ensures that guards of the form
-        ``if x.numel() == 0:`` evaluate to ``False`` during tracing (taking the
-        non-empty branch) rather than always evaluating to ``True`` as they
-        would if the underlying wrapper tensor's stored size of ``0`` were used.
+        Concrete integer dimensions contribute their actual value.  Symbolic
+        (string-valued) :class:`TracingInt` dimensions use their
+        :attr:`~TracingInt.concrete_value` when one was recorded at trace time
+        (via :meth:`~TracingShape.from_existing_shape`), falling back to ``1``
+        only when no concrete value is available.
 
-        A concrete dimension of ``0`` still causes the method to return ``0``
-        so that genuinely empty tensors are identified correctly.
+        This ensures that guards such as ``if x.numel() == 0:`` evaluate
+        correctly at trace time rather than always returning ``True`` due to
+        the underlying wrapper tensor storing ``0`` for every symbolic
+        dimension.  Any dimension with a concrete value of ``0`` (including
+        symbolic dims whose trace-time size was ``0``) causes an immediate
+        return of ``0``.
 
         Returns:
-            int: The product of all concrete dimension values (using ``1`` as a
-            placeholder for purely symbolic dimensions).
+            int: The product of all dimension values, using concrete values for
+            symbolic dimensions where available (and ``1`` as a last-resort
+            fallback for symbolic dims with no recorded concrete value).
         """
         result = 1
         for d in self._tracing_shape.dims:
@@ -108,7 +112,15 @@ class TracingTensor(torch.Tensor):
                     if d.value == 0:
                         return 0
                     result *= d.value
-                # else: symbolic – treat as 1 (non-zero placeholder)
+                else:
+                    # Symbolic dim: use concrete_value when available.
+                    cv = d.concrete_value
+                    if cv is not None:
+                        if cv == 0:
+                            return 0
+                        result *= cv
+                    # If no concrete_value recorded, treat as 1 (non-zero
+                    # placeholder) — the tracer has no evidence the dim is zero.
             else:
                 d_int = int(d)
                 if d_int == 0:
