@@ -84,14 +84,15 @@ class TracingTensor(torch.Tensor):
         """Returns the shape as a TracingShape."""
         return self._tracing_shape
 
-    def numel(self) -> int:  # type: ignore[override]
+    def numel(self) -> Union[int, TracingInt]:  # type: ignore[override]
         """Computes the total number of elements from :attr:`_tracing_shape`.
 
         Concrete integer dimensions contribute their actual value.  Symbolic
         (string-valued) :class:`TracingInt` dimensions use their
         :attr:`~TracingInt.concrete_value` when one was recorded at trace time
-        (via :meth:`~TracingShape.from_existing_shape`), falling back to ``1``
-        only when no concrete value is available.
+        (via :meth:`~TracingShape.from_existing_shape`); when no concrete value
+        is available the symbolic name itself is folded into the product,
+        yielding a :class:`TracingInt` return value.
 
         This ensures that guards such as ``if x.numel() == 0:`` evaluate
         correctly at trace time rather than always returning ``True`` due to
@@ -101,31 +102,36 @@ class TracingTensor(torch.Tensor):
         return of ``0``.
 
         Returns:
-            int: The product of all dimension values, using concrete values for
-            symbolic dimensions where available (and ``1`` as a last-resort
-            fallback for symbolic dims with no recorded concrete value).
+            Union[int, TracingInt]: The product of all dimension values.  A
+            plain ``int`` is returned when every dimension is either a concrete
+            integer or a symbolic dim with a recorded :attr:`~TracingInt.concrete_value`.
+            A :class:`TracingInt` is returned when at least one symbolic dim
+            has no recorded concrete value, so that callers such as
+            ``if x.numel() == 0:`` can propagate the symbolic comparison
+            correctly via :class:`~yobx.torch.new_tracing.shape.TracingBool`.
         """
-        result = 1
+        result: Union[int, TracingInt] = 1
         for d in self._tracing_shape.dims:
             if isinstance(d, TracingInt):
                 if isinstance(d.value, int):
                     if d.value == 0:
                         return 0
-                    result *= d.value
+                    result = result * d.value
                 else:
-                    # Symbolic dim: use concrete_value when available.
+                    # Symbolic dim: prefer concrete_value; fall back to symbolic product.
                     cv = d.concrete_value
                     if cv is not None:
                         if cv == 0:
                             return 0
-                        result *= cv
-                    # If no concrete_value recorded, treat as 1 (non-zero
-                    # placeholder) — the tracer has no evidence the dim is zero.
+                        result = result * cv
+                    else:
+                        # No concrete value recorded — keep the dimension symbolic.
+                        result = d * result
             else:
                 d_int = int(d)
                 if d_int == 0:
                     return 0
-                result *= d_int
+                result = result * d_int
         return result
 
     def __repr__(self) -> str:  # type: ignore
