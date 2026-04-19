@@ -11470,7 +11470,7 @@ def aten_rot90(
     dims: Optional[List[int]] = None,
     name: str = "rot90",
 ) -> T:
-    """rot90 - rotates a tensor by 90 degrees in the plane defined by dims."""
+    """Rotates a tensor by 90 degrees in the plane defined by dims."""
     if dims is None:
         dims = [0, 1]
     k = k % 4
@@ -11482,7 +11482,7 @@ def aten_rot90(
 
     dim0, dim1 = dims[0], dims[1]
     rank = g.rank(x)
-    # Normalise negative dimension indices.
+    # Normalize negative dimension indices.
     if dim0 < 0:
         dim0 = dim0 + rank
     if dim1 < 0:
