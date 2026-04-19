@@ -110,12 +110,6 @@ class GraphTracer:
         self._placeholder_count: int = 0
         self.verbose = verbose
         #
-        # Maps symbolic dimension names (e.g. "_dyn_0") to the concrete integer
-        # value observed in the actual input tensor at trace time.  Populated by
-        # :meth:`make_tracing_arg` when the caller provides ``dynamic_shapes``.
-        # Used by :meth:`~TracingTensor.numel` to compute the element count
-        # without storing concrete values in :class:`TracingInt` itself.
-        self._dim_concrete_values: Dict[str, int] = {}
         self._shape_env = ShapeEnv()
         self._fake_mode = FakeTensorMode(shape_env=self._shape_env)
         self._mapped_dimension: Dict[str, torch.SymInt] = {}
@@ -1442,15 +1436,12 @@ class GraphTracer:
         if isinstance(name, int):
             name = f"arg_{name}"
         if isinstance(arg, torch.Tensor):
-            ts = TracingShape.from_existing_shape(arg.shape, dynamic_shapes)
-            # Record the concrete integer size for every symbolic dimension so
-            # that TracingTensor.numel() can compute the correct element count
-            # without needing to store concrete values in TracingInt itself.
-            if dynamic_shapes:
-                for d, dim in enumerate(ts.dims):
-                    if isinstance(dim, TracingInt) and isinstance(dim.value, str):
-                        self._dim_concrete_values[dim.value] = int(arg.shape[d])
-            tt = self.placeholder(name, ts, arg.dtype, device=arg.device)
+            tt = self.placeholder(
+                name,
+                TracingShape.from_existing_shape(arg.shape, dynamic_shapes),
+                arg.dtype,
+                device=arg.device,
+            )
             return tt
 
         new_arg, treespec_arg = torch.utils._pytree.tree_flatten(arg)
@@ -1466,14 +1457,12 @@ class GraphTracer:
         else:
             flat_ds = [None for _ in new_arg]
         names = self.make_names(len(new_arg), name, arg, treespec_arg)
-        flat_args = []
-        for nom, a, ds in zip(names, new_arg, flat_ds):
-            ts = TracingShape.from_existing_shape(a.shape, ds)
-            if ds:
-                for d, dim in enumerate(ts.dims):
-                    if isinstance(dim, TracingInt) and isinstance(dim.value, str):
-                        self._dim_concrete_values[dim.value] = int(a.shape[d])
-            flat_args.append(self.placeholder(nom, ts, a.dtype, device=a.device))
+        flat_args = [
+            self.placeholder(
+                nom, TracingShape.from_existing_shape(a.shape, ds), a.dtype, device=a.device
+            )
+            for nom, a, ds in zip(names, new_arg, flat_ds)
+        ]
         return torch.utils._pytree.tree_unflatten(flat_args, treespec_arg)
 
     def make_tracing_args(

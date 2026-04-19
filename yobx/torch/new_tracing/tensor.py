@@ -87,34 +87,25 @@ class TracingTensor(torch.Tensor):
     def numel(self) -> Union[int, TracingInt]:  # type: ignore[override]
         """Computes the total number of elements from :attr:`_tracing_shape`.
 
-        Concrete integer dimensions contribute their actual value.  Symbolic
-        (string-valued) :class:`TracingInt` dimensions use the trace-time
-        concrete value recorded in
-        :attr:`~yobx.torch.new_tracing.tracer.GraphTracer._dim_concrete_values`
-        when the tensor was created via
-        :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.make_tracing_arg`;
-        when no tracer or no concrete value is available the symbolic dim is
-        folded into a symbolic :class:`TracingInt` product.
+        Concrete integer dimensions contribute their actual value directly.
+        Symbolic (string-valued) :class:`TracingInt` dimensions are folded
+        into the product as symbolic terms, yielding a :class:`TracingInt`
+        return value.
 
-        This ensures that guards such as ``if x.numel() == 0:`` evaluate
-        correctly at trace time rather than always returning ``True`` due to
-        the underlying wrapper tensor storing ``0`` for every symbolic
-        dimension.  Any dimension with a concrete value of ``0`` (including
-        symbolic dims whose trace-time size was ``0``) causes an immediate
-        return of ``0``.
+        This ensures that guards of the form ``if x.numel() == 0:`` can be
+        resolved at trace time via the :class:`TracingBool` mechanism: models
+        should use ``torch._check(x.numel() != 0)`` to register the non-empty
+        constraint (as with :class:`~yobx.torch.testing._model_eval_cases.ControlFlowShapeCheck`),
+        after which :meth:`~yobx.torch.new_tracing.shape.TracingBool.__bool__`
+        resolves the equality to ``False`` via its negation lookup.
+
+        A concrete dimension of ``0`` still causes an immediate return of ``0``
+        so that genuinely empty static shapes are identified correctly.
 
         Returns:
-            Union[int, TracingInt]: The product of all dimension values.  A
-            plain ``int`` is returned when every dimension is either a concrete
-            integer or a symbolic dim with a known concrete value in the tracer.
-            A :class:`TracingInt` is returned when at least one symbolic dim
-            has no recorded concrete value, so that callers such as
-            ``if x.numel() == 0:`` can propagate the symbolic comparison
-            correctly via :class:`~yobx.torch.new_tracing.shape.TracingBool`.
+            Union[int, TracingInt]: Plain ``int`` when every dimension is
+            concrete; :class:`TracingInt` when any dimension is symbolic.
         """
-        dim_concrete = (
-            getattr(self._tracer, "_dim_concrete_values", {}) if self._tracer is not None else {}
-        )
         result: Union[int, TracingInt] = 1
         for d in self._tracing_shape.dims:
             if isinstance(d, TracingInt):
@@ -123,16 +114,8 @@ class TracingTensor(torch.Tensor):
                         return 0
                     result = result * d.value
                 else:
-                    # Symbolic dim: look up the concrete value recorded by the
-                    # tracer when this tensor was created from a concrete input.
-                    cv = dim_concrete.get(d.value)
-                    if cv is not None:
-                        if cv == 0:
-                            return 0
-                        result = result * cv
-                    else:
-                        # No concrete value available; keep the dim symbolic.
-                        result = d * result
+                    # Purely symbolic dim — fold into the product symbolically.
+                    result = d * result
             else:
                 d_int = int(d)
                 if d_int == 0:
