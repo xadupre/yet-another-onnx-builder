@@ -1348,17 +1348,27 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
             st = steps[idx] if steps is not None and idx < len(steps) else 1
             if isinstance(e, int) and e >= 922337203685477580:
                 e = input_shape[a]
+            # Sentinel for "go to the beginning" with negative step (e.g. from flip).
+            if isinstance(e, int) and e < -922337203685477580:
+                if isinstance(st, int) and st < 0 and isinstance(s, int):
+                    d = input_shape[a] if isinstance(input_shape[a], int) else None
+                    s_n = s + d if s < 0 and d is not None else s
+                    if isinstance(s_n, int):
+                        # Number of elements: ceil((s_n + 1) / (-st))
+                        output_shape[a] = (s_n + 1 + (-st) - 1) // (-st)
+                        continue
+                # Fallback: unable to compute size for this axis.
+                output_shape[a] = self.unique_dimension_name("NEWDIM_slice")
+                continue
             if isinstance(s, int) and isinstance(e, int):
                 if e >= s >= 0:
-                    assert not isinstance(st, int) or st > 0 or (e - s) % (-s) == 0, (
-                        f"Negative steps are not handled start={s}, end={e}, step={st}"
-                        f"{self.get_debug_msg()}"
-                    )
-                    output_shape[a] = (
-                        (e - s) // st
-                        if isinstance(st, int)
-                        else simplify_expression(f"{e-s}//({st})")
-                    )
+                    if isinstance(st, int) and st > 0:
+                        output_shape[a] = (e - s + st - 1) // st
+                    elif isinstance(st, int) and st < 0:
+                        # Negative step going from s down to e (exclusive).
+                        output_shape[a] = max(0, (s - e - 1) // (-st) + 1)
+                    else:
+                        output_shape[a] = simplify_expression(f"({e-s})//({st})")
                     continue
                 if isinstance(input_shape[a], int):
                     d = input_shape[a]
@@ -1366,15 +1376,13 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
                         s += d
                     if e < 0:
                         e += d
-                    assert not isinstance(st, int) or st > 0 or (e - s) % (-s) == 0, (
-                        f"Negative steps are not handled start={s}, end={e}, step={st}"
-                        f"{self.get_debug_msg()}"
-                    )
-                    output_shape[a] = (
-                        (e - s) // st
-                        if isinstance(st, int)
-                        else simplify_expression(f"({e-s})//({st})")
-                    )
+                    if isinstance(st, int) and st > 0:
+                        output_shape[a] = max(0, (e - s + st - 1) // st)
+                    elif isinstance(st, int) and st < 0:
+                        # Negative step going from s down to e (exclusive).
+                        output_shape[a] = max(0, (s - e - 1) // (-st) + 1)
+                    else:
+                        output_shape[a] = simplify_expression(f"({e-s})//({st})")
                     continue
             d = input_shape[a]
             if isinstance(s, int) and s < 0:
