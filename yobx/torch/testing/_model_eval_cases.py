@@ -1192,18 +1192,10 @@ class DynamicCacheInput(torch.nn.Module):
 
     def forward(self, x, cache):
         """Reduces each cache layer over dim 2 and returns (x, new_cache)."""
-        if hasattr(cache, "layers"):
-            pairs = [
-                (layer.keys.mean(dim=2, keepdim=True), layer.values.mean(dim=2, keepdim=True))
-                for layer in cache.layers
-            ]
-        else:
-            keys = cache.key_cache
-            values = cache.value_cache
-            pairs = [
-                (k.mean(dim=2, keepdim=True), v.mean(dim=2, keepdim=True))
-                for k, v in zip(keys, values)
-            ]
+        pairs = [
+            (layer.keys.mean(dim=2, keepdim=True), layer.values.mean(dim=2, keepdim=True))
+            for layer in cache.layers
+        ]
         return x, make_dynamic_cache(pairs)
 
     _inputs = [
