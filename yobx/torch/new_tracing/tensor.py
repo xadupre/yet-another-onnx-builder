@@ -88,11 +88,13 @@ class TracingTensor(torch.Tensor):
         """Computes the total number of elements from :attr:`_tracing_shape`.
 
         Concrete integer dimensions contribute their actual value.  Symbolic
-        (string-valued) :class:`TracingInt` dimensions use their
-        :attr:`~TracingInt.concrete_value` when one was recorded at trace time
-        (via :meth:`~TracingShape.from_existing_shape`); when no concrete value
-        is available the symbolic name itself is folded into the product,
-        yielding a :class:`TracingInt` return value.
+        (string-valued) :class:`TracingInt` dimensions use the trace-time
+        concrete value recorded in
+        :attr:`~yobx.torch.new_tracing.tracer.GraphTracer._dim_concrete_values`
+        when the tensor was created via
+        :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.make_tracing_arg`;
+        when no tracer or no concrete value is available the symbolic dim is
+        folded into a symbolic :class:`TracingInt` product.
 
         This ensures that guards such as ``if x.numel() == 0:`` evaluate
         correctly at trace time rather than always returning ``True`` due to
@@ -104,12 +106,15 @@ class TracingTensor(torch.Tensor):
         Returns:
             Union[int, TracingInt]: The product of all dimension values.  A
             plain ``int`` is returned when every dimension is either a concrete
-            integer or a symbolic dim with a recorded :attr:`~TracingInt.concrete_value`.
+            integer or a symbolic dim with a known concrete value in the tracer.
             A :class:`TracingInt` is returned when at least one symbolic dim
             has no recorded concrete value, so that callers such as
             ``if x.numel() == 0:`` can propagate the symbolic comparison
             correctly via :class:`~yobx.torch.new_tracing.shape.TracingBool`.
         """
+        dim_concrete = (
+            getattr(self._tracer, "_dim_concrete_values", {}) if self._tracer is not None else {}
+        )
         result: Union[int, TracingInt] = 1
         for d in self._tracing_shape.dims:
             if isinstance(d, TracingInt):
@@ -118,14 +123,15 @@ class TracingTensor(torch.Tensor):
                         return 0
                     result = result * d.value
                 else:
-                    # Symbolic dim: prefer concrete_value; fall back to symbolic product.
-                    cv = d.concrete_value
+                    # Symbolic dim: look up the concrete value recorded by the
+                    # tracer when this tensor was created from a concrete input.
+                    cv = dim_concrete.get(d.value)
                     if cv is not None:
                         if cv == 0:
                             return 0
                         result = result * cv
                     else:
-                        # No concrete value recorded — keep the dimension symbolic.
+                        # No concrete value available; keep the dim symbolic.
                         result = d * result
             else:
                 d_int = int(d)
