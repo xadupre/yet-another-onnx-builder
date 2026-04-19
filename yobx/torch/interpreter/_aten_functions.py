@@ -6603,6 +6603,12 @@ def aten_index_put(
         ind0, ind1, ind2 = indices
         if (
             (
+                ind0 is None
+                or (
+                    g.has_rank(ind0)
+                    and g.get_rank(ind0) == 1
+                    and g.get_type(ind0) in {TensorProto.INT64, TensorProto.INT32}
+                )
             )
             and (
                 ind1 is None

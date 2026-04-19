@@ -26,6 +26,7 @@ from ._aten_functions import (
     aten_max_dim,
     aten_min,
     aten_neg,
+    aten_new_zeros,
     aten_permute,
     aten_relu,
     aten_repeat,
@@ -354,6 +355,33 @@ def aten_meth_numel(
         g.set_type(res, TensorProto.INT64)
         g.set_shape(res, tuple())
     return res
+
+
+def aten_meth_new_zeros(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    size,
+    dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    layout=None,
+    device: Optional["torch.device"] = None,  # noqa: F821
+    pin_memory=None,
+    name: str = "meth_new_zeros",
+) -> T:
+    "new_zeros as method call"
+    return aten_new_zeros(
+        g,
+        sts,
+        outputs,
+        x,
+        size,
+        dtype=dtype,
+        layout=layout,
+        device=device,
+        pin_memory=pin_memory,
+        name=name,
+    )
 
 
 def aten_meth_pow(
