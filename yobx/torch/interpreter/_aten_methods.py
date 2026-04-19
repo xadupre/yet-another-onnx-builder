@@ -369,7 +369,7 @@ def aten_meth_new_zeros(
     pin_memory=None,
     name: str = "meth_new_zeros",
 ) -> T:
-    "new_zeros as method call"
+    "Delegates to aten_new_zeros for the tensor.new_zeros(...) method call."
     return aten_new_zeros(
         g,
         sts,
