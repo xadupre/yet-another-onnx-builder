@@ -2463,11 +2463,20 @@ class GraphBuilder(
     def _compute_expression_as_1d_tensor(self, expr: str, prefix: str = "_dexpr") -> str:
         """Builds a rank-1 INT64 ONNX tensor that holds the value of *expr*.
 
-        For a simple identifier ``"dy"`` returns the corresponding dimension as
-        a 1-element INT64 tensor (inserting ``Shape`` / ``Gather`` /
-        ``Unsqueeze`` nodes as needed).  For a compound expression such as
-        ``"dy+1"`` recursively builds the corresponding ONNX arithmetic
-        (``Add``, ``Sub``, ``Mul``, ``Div``, ``Neg``).
+        This method is needed when the new tracing path records shape arithmetic
+        like ``x.shape[1] + 1`` as a symbolic string ``"dy+1"`` inside FX node
+        arguments.  When the ONNX interpreter later calls
+        :meth:`make_shape_from_results`, such compound strings are not registered
+        as plain dynamic objects (only base names like ``"dy"`` are), so they
+        cannot be looked up directly.  This method bridges that gap by parsing the
+        expression string and emitting the corresponding ONNX arithmetic nodes
+        (``Add``, ``Sub``, ``Mul``, ``Div``, ``Neg``) whose base operands are
+        fetched from the graph via ``Shape`` / ``Gather`` / ``Unsqueeze`` as
+        needed.
+
+        For a simple identifier ``"dy"`` it returns the corresponding dimension as
+        a 1-element INT64 tensor.  For a compound expression such as ``"dy+1"``
+        it recursively builds the ONNX subgraph that computes the value.
 
         :param expr: A Python expression string (e.g. ``"dy+1"`` or ``"dx*2"``).
         :param prefix: Name prefix for generated ONNX nodes.
@@ -2633,9 +2642,9 @@ class GraphBuilder(
                 elif not self.has_name(value) and not value.isidentifier():
                     # Compound expression such as "dy+1": compute it as an
                     # ONNX arithmetic result (rank-1 INT64 tensor).
-                    import re as _re
+                    import re
 
-                    safe = _re.sub(r"[^a-zA-Z0-9_]", "_", value)
+                    safe = re.sub(r"[^a-zA-Z0-9_]", "_", value)
                     name = self._compute_expression_as_1d_tensor(value, prefix=f"_mkshape_{safe}")
                     shape_shape = None
                     conc.append(name)
