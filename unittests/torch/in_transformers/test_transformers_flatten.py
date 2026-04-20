@@ -162,11 +162,41 @@ class TestTransformersFlatten(ExtTestCase):
         )
         flat, context = flatten_dynamic_cache(cache)
         self.assertEqual(4, len(flat))
+        # The context must not encode the sliding_window value so that the
+        # tree spec remains stable across inputs with different sequence lengths.
+        self.assertEqual(["key_D_0", "value_D_0", "key_W_1", "value_W_1"], context)
         rebuilt = unflatten_dynamic_cache(flat, context)
         self.assertIsInstance(rebuilt, transformers.cache_utils.DynamicCache)
         from yobx.helpers import max_diff
 
         self.assertEqual(0, max_diff(cache, rebuilt)["abs"])
+
+    @requires_transformers("4.57")
+    def test_flatten_dynamic_cache_mixed_layers_stable_context(self):
+        """Verifies that the tree-spec context is the same for different sliding_window sizes.
+
+        This is required for ``torch.export`` to accept inputs with varying sequence
+        lengths without raising a tree-spec mismatch error.
+        """
+        cache3 = make_dynamic_cache(
+            [(torch.rand((2, 4, 3, 7)), torch.rand((2, 4, 3, 7))) for _ in range(2)],
+            cls_layers=[
+                transformers.cache_utils.DynamicLayer,
+                transformers.cache_utils.DynamicSlidingWindowLayer,
+            ],
+            cls_kwargs=[{}, {"sliding_window": 3}],
+        )
+        cache5 = make_dynamic_cache(
+            [(torch.rand((2, 4, 5, 7)), torch.rand((2, 4, 5, 7))) for _ in range(2)],
+            cls_layers=[
+                transformers.cache_utils.DynamicLayer,
+                transformers.cache_utils.DynamicSlidingWindowLayer,
+            ],
+            cls_kwargs=[{}, {"sliding_window": 5}],
+        )
+        _, ctx3 = flatten_dynamic_cache(cache3)
+        _, ctx5 = flatten_dynamic_cache(cache5)
+        self.assertEqual(ctx3, ctx5, "context must be the same regardless of sliding_window size")
 
     def test_register_class_flattening_with_f_check(self):
         """Test register_class_flattening verifies the registration using f_check."""

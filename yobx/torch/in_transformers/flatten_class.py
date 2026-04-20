@@ -31,22 +31,27 @@ SHORTEN_LAYER_NAMES = {
     "X": "StaticSlidingWindowLayer",
 }
 
+# The sliding_window size is intentionally omitted from KWARGS_LAYER_NAMES context keys.
+# Encoding it would make the pytree tree spec data-dependent (it often equals
+# tensor.shape[2] which varies with inputs), causing ``torch.export`` to raise a
+# tree-spec mismatch when evaluated on inputs of different sequence lengths.
+# When unflattening, the sliding_window is inferred from the tensor shape via
+# ``KWARGS_LAYER`` defaults in cache_helper.py.
 KWARGS_LAYER_NAMES = {
     "DynamicLayer": lambda layer: "",
-    "DynamicSlidingWindowLayer": lambda layer: str(
-        getattr(layer, "sliding_window", getattr(layer, "max_cache_len", 0))
-    ),
+    "DynamicSlidingWindowLayer": lambda layer: "",
     "StaticLayer": lambda layer: "",
-    "StaticSlidingWindowLayer": lambda layer: str(
-        getattr(layer, "sliding_window", getattr(layer, "max_cache_len", 0))
-    ),
+    "StaticSlidingWindowLayer": lambda layer: "",
 }
 
+# Accept both old-style context keys that carry the sliding_window value
+# (e.g. ``W3`` → sliding_window=3) for backward compatibility, and new-style
+# keys without a numeric suffix (``W`` → infer sliding_window from tensor shape).
 PARSE_LAYER_NAMES = {
     "DynamicLayer": lambda skw: {},
-    "DynamicSlidingWindowLayer": lambda skw: dict(sliding_window=int(skw[1:])),
+    "DynamicSlidingWindowLayer": lambda skw: dict(sliding_window=int(skw[1:])) if skw[1:] else {},
     "StaticLayer": lambda skw: {},
-    "StaticSlidingWindowLayer": lambda skw: dict(sliding_window=int(skw[1:])),
+    "StaticSlidingWindowLayer": lambda skw: dict(sliding_window=int(skw[1:])) if skw[1:] else {},
 }
 
 
