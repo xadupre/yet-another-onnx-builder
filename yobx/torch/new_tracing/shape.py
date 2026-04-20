@@ -74,6 +74,30 @@ _COMPARISON_OPS: Dict[str, Callable[[int, int], bool]] = {
 }
 
 
+def _negate_condition(cond: str) -> Optional[str]:
+    """Returns the logical negation of a simple equality/inequality condition.
+
+    Only handles the ``==`` ↔ ``!=`` relationship (sufficient for the common
+    ``if x.numel() == 0:`` / ``torch._check(x.numel() != 0)`` pairing).
+    Returns ``None`` for all other patterns.  Handles both the ``"(E==0)"``
+    and ``"E==0"`` forms since :func:`simplify_expression` strips outer parens.
+
+    :param cond: A condition string such as ``"E==0"`` or ``"E!=0"``.
+
+    Returns:
+        The negated string, or ``None`` if negation cannot be determined.
+    """
+    if "!=" in cond:
+        return cond.replace("!=", "==", 1)
+    if "==" in cond:
+        # Guard against matching the `=` inside `<=` or `>=`
+        idx = cond.index("==")
+        if idx > 0 and cond[idx - 1] in "<>":
+            return None
+        return cond.replace("==", "!=", 1)
+    return None
+
+
 class TracingBool:
     """
     Represents a boolean comparison that may involve symbolic :class:`TracingInt`
@@ -89,6 +113,8 @@ class TracingBool:
     ``True`` when the condition has been registered via
     :func:`register_condition` (typically by the :func:`torch._check`
     interception in :class:`~yobx.torch.new_tracing.tracer.GraphTracer`).
+    The logical negation of a registered condition resolves to ``False``
+    (e.g. if ``(E!=0)`` is known-true, then ``(E==0)`` resolves to ``False``).
     """
 
     def __init__(self, value: Union[bool, str]):
@@ -105,6 +131,12 @@ class TracingBool:
             return self.value
         if self.value in _known_true_conditions:
             return True
+        # If the logical negation of this condition is known to be True,
+        # this condition must be False.  This handles the common pattern
+        # ``torch._check(x.numel() != 0)`` followed by ``if x.numel() == 0:``.
+        neg = _negate_condition(self.value)
+        if neg is not None and neg in _known_true_conditions:
+            return False
         raise ValueError(
             f"TracingBool({self.value!r}) cannot be converted to a Python bool; "
             "the result depends on a symbolic/dynamic dimension. "
@@ -290,6 +322,9 @@ class TracingInt:
 
         Returns a concrete :class:`bool` when both operands are concrete, and
         a :class:`TracingBool` with a symbolic expression string otherwise.
+        Symbolic expressions are normalised via :func:`simplify_expression` so
+        that the produced strings are consistent with those from :meth:`__eq__`,
+        enabling the negation lookup in :meth:`TracingBool.__bool__`.
 
         :param op: Comparison operator string: ``">"``, ``">="``, ``"<"``, ``"<="``, or ``"!="``.
         :param other: The right-hand-side operand.
@@ -298,11 +333,17 @@ class TracingInt:
         if isinstance(other, TracingInt):
             if isinstance(self.value, int) and isinstance(other.value, int):
                 return bool(_COMPARISON_OPS[op](self.value, other.value))
-            return TracingBool(f"({self._sym()}{op}{other._sym()})")
+            expr = simplify_expression(f"({self._sym()}{op}{other._sym()})")
+            if isinstance(expr, str):
+                return TracingBool(expr)
+            return TracingBool(bool(expr))
         if isinstance(other, int):
             if isinstance(self.value, int):
                 return bool(_COMPARISON_OPS[op](self.value, other))
-            return TracingBool(f"({self._sym()}{op}{other})")
+            expr = simplify_expression(f"({self._sym()}{op}{other})")
+            if isinstance(expr, str):
+                return TracingBool(expr)
+            return TracingBool(bool(expr))
         return NotImplemented
 
     def __gt__(self, other: Union[int, "TracingInt"]) -> Union[bool, "TracingBool"]:

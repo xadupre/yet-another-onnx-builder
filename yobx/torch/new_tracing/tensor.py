@@ -84,6 +84,45 @@ class TracingTensor(torch.Tensor):
         """Returns the shape as a TracingShape."""
         return self._tracing_shape
 
+    def numel(self) -> Union[int, TracingInt]:  # type: ignore[override]
+        """Computes the total number of elements from :attr:`_tracing_shape`.
+
+        Concrete integer dimensions contribute their actual value directly.
+        Symbolic (string-valued) :class:`TracingInt` dimensions are folded
+        into the product as symbolic terms, yielding a :class:`TracingInt`
+        return value.
+
+        This ensures that guards of the form ``if x.numel() == 0:`` can be
+        resolved at trace time via the :class:`TracingBool` mechanism: models
+        should use ``torch._check(x.numel() != 0)`` to register the non-empty
+        constraint (as with :class:`~yobx.torch.testing._model_eval_cases.ControlFlowShapeCheck`),
+        after which :meth:`~yobx.torch.new_tracing.shape.TracingBool.__bool__`
+        resolves the equality to ``False`` via its negation lookup.
+
+        A concrete dimension of ``0`` still causes an immediate return of ``0``
+        so that genuinely empty static shapes are identified correctly.
+
+        Returns:
+            Union[int, TracingInt]: Plain ``int`` when every dimension is
+            concrete; :class:`TracingInt` when any dimension is symbolic.
+        """
+        result: Union[int, TracingInt] = 1
+        for d in self._tracing_shape.dims:
+            if isinstance(d, TracingInt):
+                if isinstance(d.value, int):
+                    if d.value == 0:
+                        return 0
+                    result = result * d.value
+                else:
+                    # Purely symbolic dim — fold into the product symbolically.
+                    result = d * result
+            else:
+                d_int = int(d)
+                if d_int == 0:
+                    return 0
+                result = result * d_int
+        return result
+
     def __repr__(self) -> str:  # type: ignore
         node_name = self._node.name if self._node is not None else "<unregistered>"
         return (
