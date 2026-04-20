@@ -9,7 +9,7 @@
 - One-liner docstrings must end with a period
 
 ### Imports
-- Avoid alias when importing as much as possible
+- Avoid using aliases when importing as much as possible
 
 ### Private members
 - Do not make everything private.
