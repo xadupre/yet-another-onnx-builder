@@ -12956,6 +12956,24 @@ def aten_softplus(
     return res
 
 
+def aten_softsign(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "softsign",
+) -> T:
+    """Computes softsign: x / (1 + |x|)."""
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    one = np.array([1], dtype=dtype)
+    abs_x = g.op.Abs(x, name=name)
+    denom = g.op.Add(one, abs_x, name=name)
+    res = g.op.Div(x, denom, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
 def aten_split(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -13716,6 +13734,21 @@ def aten_tanh(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str]
     res = g.make_node("Tanh", [x], outputs, name="tanh")
     if not sts:
         set_type_shape_unary_op(g, outputs[0], x)
+    return res
+
+
+def aten_tanhshrink(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "tanhshrink",
+) -> T:
+    """Computes tanhshrink: x - tanh(x)."""
+    tanh_x = g.op.Tanh(x, name=name)
+    res = g.op.Sub(x, tanh_x, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
     return res
 
 

@@ -14,25 +14,45 @@ from ._aten_functions import (
     torch_dtype_to_onnx_dtype,
     # aten_add__Tensor,
     aten_abs,
+    aten_add,
+    aten_aminmax,
+    aten_argsort,
+    aten_bitwise_and,
+    aten_bitwise_or,
     aten_clamp_max,
     aten_clamp_min,
     aten_cos,
+    aten_div,
+    aten_erfinv,
     aten_exp,
     aten_expand,
     aten_eq,
     aten_flatten,
     aten_log,
+    aten_logical_and,
+    aten_logical_or,
+    aten_logical_xor,
+    aten_matmul,
     aten_max,
     aten_max_dim,
+    aten_mH,
     aten_min,
+    aten_mT,
+    aten_mul,
     aten_neg,
     aten_new_zeros,
     aten_permute,
+    aten_pow,
     aten_relu,
+    aten_remainder,
     aten_repeat,
+    aten_reshape_as,
     aten_sigmoid,
     aten_sin,
     aten_sqrt,
+    aten_std_correction,
+    aten_std_mean_correction,
+    aten_sub,
     aten_t,
     aten_tanh,
 )
@@ -50,6 +70,20 @@ def aten_meth_bool(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List
     import torch
 
     return aten_meth_to(g, sts, outputs, x, dtype=torch.bool)
+
+
+def aten_meth_byte(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "Casts to uint8."
+    import torch
+
+    return aten_meth_to(g, sts, outputs, x, dtype=torch.uint8)
+
+
+def aten_meth_char(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "Casts to int8."
+    import torch
+
+    return aten_meth_to(g, sts, outputs, x, dtype=torch.int8)
 
 
 def aten_meth_clamp_max(
@@ -143,6 +177,45 @@ def aten_meth_float(
     import torch
 
     return aten_meth_to(g, sts, outputs, x, dtype=torch.float32)
+
+
+def aten_meth_double(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
+) -> T:
+    "Casts to float64."
+    import torch
+
+    return aten_meth_to(g, sts, outputs, x, dtype=torch.float64)
+
+
+def aten_meth_half(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "Casts to float16."
+    import torch
+
+    return aten_meth_to(g, sts, outputs, x, dtype=torch.float16)
+
+
+def aten_meth_int(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "Casts to int32."
+    import torch
+
+    return aten_meth_to(g, sts, outputs, x, dtype=torch.int32)
+
+
+def aten_meth_long(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "Casts to int64."
+    import torch
+
+    return aten_meth_to(g, sts, outputs, x, dtype=torch.int64)
+
+
+def aten_meth_short(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
+) -> T:
+    "Casts to int16."
+    import torch
+
+    return aten_meth_to(g, sts, outputs, x, dtype=torch.int16)
 
 
 def aten_meth_flatten(
@@ -731,3 +804,218 @@ def aten_meth_view(
         set_type_shape_reshape(g, res, input_name, new_shape_name)
         assert g.get_rank(res) == len(args), f"error in set_type_shape_reshape args={args!r}"
     return res
+
+
+def aten_meth_T(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "Reverses all dimensions (tensor.T property)."
+    assert g.has_rank(x), f"{x!r} must have a rank{g.get_debug_msg()}"
+    rank = g.get_rank(x)
+    if rank < 2:
+        res = g.op.Identity(x, outputs=outputs, name=".T")
+        if not sts:
+            g.set_type(res, g.get_type(x))
+            if g.has_shape(x):
+                g.set_shape(res, g.get_shape(x))
+            else:
+                g.set_rank(res, rank)
+        return res
+    perm = list(reversed(range(rank)))
+    res = g.op.Transpose(x, perm=perm, outputs=outputs, name=".T")
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(res, tuple(reversed(g.get_shape(x))))
+        else:
+            g.set_rank(res, rank)
+    return res
+
+
+def aten_meth_mH(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "Computes conjugate transpose of the last two dimensions (tensor.mH property)."
+    return aten_mH(g, sts, outputs, x, name=".mH")
+
+
+def aten_meth_mT(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "Transposes the last two dimensions (tensor.mT property)."
+    return aten_mT(g, sts, outputs, x, name=".mT")
+
+
+def aten_meth_aminmax(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[int] = None,
+    keepdim: bool = False,
+) -> T:
+    "Computes both minimum and maximum values."
+    return aten_aminmax(g, sts, outputs, x, dim=dim, keepdim=keepdim, name=".aminmax")
+
+
+def aten_meth_argsort(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: int = -1,
+    descending: bool = False,
+    stable: bool = False,
+) -> T:
+    "Returns the indices that would sort the tensor."
+    return aten_argsort(
+        g, sts, outputs, x, dim=dim, descending=descending, stable=stable, name=".argsort"
+    )
+
+
+def aten_meth_std(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Any] = None,
+    correction: Optional[float] = 1,
+    keepdim: bool = False,
+) -> T:
+    "Computes the standard deviation."
+    return aten_std_correction(
+        g, sts, outputs, x, dim=dim, correction=correction, keepdim=keepdim, name=".std"
+    )
+
+
+def aten_meth_std_mean(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Optional[Any] = None,
+    correction: Optional[float] = 1,
+    keepdim: bool = False,
+) -> T:
+    "Computes the standard deviation and mean."
+    return aten_std_mean_correction(
+        g, sts, outputs, x, dim=dim, correction=correction, keepdim=keepdim, name=".std_mean"
+    )
+
+
+def aten_meth_bitwise_and(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes bitwise AND."
+    return aten_bitwise_and(g, sts, outputs, x, y, name=".bitwise_and")
+
+
+def aten_meth_bitwise_or(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes bitwise OR."
+    return aten_bitwise_or(g, sts, outputs, x, y, name=".bitwise_or")
+
+
+def aten_meth_logical_and(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes logical AND."
+    return aten_logical_and(g, sts, outputs, x, y, name=".logical_and")
+
+
+def aten_meth_logical_or(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes logical OR."
+    return aten_logical_or(g, sts, outputs, x, y, name=".logical_or")
+
+
+def aten_meth_logical_xor(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes logical XOR."
+    return aten_logical_xor(g, sts, outputs, x, y, name=".logical_xor")
+
+
+def aten_meth_erfinv(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T
+) -> T:
+    "Computes the inverse error function."
+    return aten_erfinv(g, sts, outputs, x, name=".erfinv")
+
+
+def aten_meth_conj(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
+    "Computes conjugate (identity for real tensors)."
+    res = g.op.Identity(x, outputs=outputs, name=".conj")
+    if not sts:
+        g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            g.set_shape(res, g.get_shape(x))
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x))
+    return res
+
+
+def aten_meth_reshape_as(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, other: T
+) -> T:
+    "Reshapes tensor to match another tensor's shape."
+    return aten_reshape_as(g, sts, outputs, x, other, name=".reshape_as")
+
+
+def aten_meth___radd__(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes reversed addition: y + x."
+    return aten_add(g, sts, outputs, y, x, name="__radd__")
+
+
+def aten_meth___rsub__(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes reversed subtraction: y - x."
+    return aten_sub(g, sts, outputs, y, x, name="__rsub__")
+
+
+def aten_meth___rmul__(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes reversed multiplication: y * x."
+    return aten_mul(g, sts, outputs, y, x, name="__rmul__")
+
+
+def aten_meth___rdiv__(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes reversed division: y / x."
+    return aten_div(g, sts, outputs, y, x, name="__rdiv__")
+
+
+def aten_meth___rpow__(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes reversed exponentiation: y ** x."
+    return aten_pow(g, sts, outputs, y, x, name="__rpow__")
+
+
+def aten_meth___rmatmul__(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes reversed matrix multiplication: y @ x."
+    return aten_matmul(g, sts, outputs, y, x, name="__rmatmul__")
+
+
+def aten_meth___rand__(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes reversed bitwise AND: y & x."
+    return aten_bitwise_and(g, sts, outputs, y, x, name="__rand__")
+
+
+def aten_meth___ror__(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes reversed bitwise OR: y | x."
+    return aten_bitwise_or(g, sts, outputs, y, x, name="__ror__")
+
+
+def aten_meth___rmod__(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes reversed remainder: y % x."
+    return aten_remainder(g, sts, outputs, y, x, name="__rmod__")

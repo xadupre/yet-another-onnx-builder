@@ -157,6 +157,12 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 f"The rank of a tensor is always known. "
                 f"k={k!r} - {self=} - {self.node=} - {self.node.meta=}"
             )
+        if k in ("T", "mT", "mH"):
+            # These are tensor properties that transpose dimensions.
+            # Convert them to call_method nodes so the interpreter can
+            # dispatch them to aten_meth_T, aten_meth_mT, aten_meth_mH.
+            node = self.tracer.create_node("call_method", k, args=(self.node,), kwargs={})
+            return self.tracer.proxy(node)
         return CustomAttribute(self, k)
 
     @classmethod
