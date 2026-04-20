@@ -13147,19 +13147,36 @@ def aten_tensor_split(
     if isinstance(indices_or_sections, str):
         # Tracing path: the argument is a graph variable name referring to a
         # constant tensor.  Retrieve its value to determine the split kind.
-        assert g.is_constant(
-            indices_or_sections
-        ), f"aten_tensor_split: {indices_or_sections!r} is not a constant{g.get_debug_msg()}"
-        cst = g.get_constant(indices_or_sections, computed_value=True)
-        if hasattr(cst, "ndim") and cst.ndim == 0:
-            return aten_tensor_split_sections(g, sts, outputs, x, int(cst), dim, name=name)
-        # 1-D tensor of split indices.
-        indices = [int(v) for v in cst.flatten()]
-        return aten_tensor_split_indices(g, sts, outputs, x, indices, dim, name=name)
+        if g.is_constant(indices_or_sections):
+            cst = g.get_constant(indices_or_sections, computed_value=True)
+            if hasattr(cst, "ndim") and cst.ndim == 0:
+                return aten_tensor_split_sections(g, sts, outputs, x, int(cst), dim, name=name)
+            # 1-D tensor of split indices.
+            indices = [int(v) for v in cst.flatten()]
+            return aten_tensor_split_indices(g, sts, outputs, x, indices, dim, name=name)
+        if g.has_shape(indices_or_sections):
+            shape = g.get_shape(indices_or_sections)
+            # check it is static, then use Split
+            # otherwise use Split Sequence
+
+            print(shape)
+        
     raise AssertionError(
         f"aten_tensor_split: unsupported type for indices_or_sections: "
         f"{type(indices_or_sections)}{g.get_debug_msg()}"
     )
+
+def aten_tensor_split_tensor_indices_or_sections(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    indices_or_sections: T,
+    dim: int = 0,
+    name: str = "aten_tensor_split_tensor_indices_or_sections",
+) -> Tuple[T, ...]:
+    "aten_tensor_split_tensor_indices_or_sections"
+    return aten_tensor_split(g, sts, outputs, x, indices_or_sections, dim=dim, name=name)
 
 
 def aten_tensor_split_sections(
