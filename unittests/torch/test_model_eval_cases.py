@@ -393,6 +393,24 @@ class TestModelEvalCases(ExtTestCase):
             cases="DynamicCacheInput", exporters="export-nostrict", quiet=False, dynamic=False
         )
 
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_mixed_layers_export_nostrict(self):
+        evaluation(
+            cases="DynamicCacheInputMixedLayers",
+            exporters="export-nostrict",
+            quiet=False,
+            dynamic=True,
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_mixed_layers_export_nostrict_static(self):
+        evaluation(
+            cases="DynamicCacheInputMixedLayers",
+            exporters="export-nostrict",
+            quiet=False,
+            dynamic=False,
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
