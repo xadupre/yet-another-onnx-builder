@@ -360,6 +360,19 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    def test_run_exporter_create_from_shape_new_tracing(self):
+        evaluation(
+            cases="CreateFromShape", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_create_from_shape_through_function_new_tracing(self):
+        evaluation(
+            cases="CreateFromShapeThroughFunction",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     @requires_transformers("5.0")
     def test_run_exporter_tiny_llm_export_nostrict(self):
         evaluation(cases="TinyLLM", exporters="export-nostrict", quiet=False, dynamic=True)
@@ -378,6 +391,24 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_dynamic_cache_input_export_nostrict_static(self):
         evaluation(
             cases="DynamicCacheInput", exporters="export-nostrict", quiet=False, dynamic=False
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_mixed_layers_export_nostrict(self):
+        evaluation(
+            cases="DynamicCacheInputMixedLayers",
+            exporters="export-nostrict",
+            quiet=False,
+            dynamic=True,
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_mixed_layers_export_nostrict_static(self):
+        evaluation(
+            cases="DynamicCacheInputMixedLayers",
+            exporters="export-nostrict",
+            quiet=False,
+            dynamic=False,
         )
 
 

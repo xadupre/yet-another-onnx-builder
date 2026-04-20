@@ -147,26 +147,108 @@ class TestTransformersFlatten(ExtTestCase):
         self.assertIsInstance(rebuilt, BaseModelOutput)
         self.assertEqualArray(t, rebuilt.last_hidden_state)
 
+    def _make_mixed_layer_cache(self, bsize=2, nheads=4, slen=3, dim=7):
+        """Creates a DynamicCache with mixed DynamicLayer + DynamicSlidingWindowLayer layers."""
+        from transformers.cache_utils import DynamicLayer, DynamicSlidingWindowLayer
+
+        return make_dynamic_cache(
+            [
+                (torch.rand((bsize, nheads, slen, dim)), torch.rand((bsize, nheads, slen, dim))),
+                (torch.rand((bsize, nheads, slen, dim)), torch.rand((bsize, nheads, slen, dim))),
+            ],
+            cls_layers=[DynamicLayer, DynamicSlidingWindowLayer],
+            cls_kwargs=[{}, {"sliding_window": slen}],
+        )
+
     @requires_transformers("4.57")
     def test_flatten_dynamic_cache_mixed_layers(self):
-        cache = make_dynamic_cache(
-            [
-                (torch.rand((2, 4, 3, 7)), torch.rand((2, 4, 3, 7))),
-                (torch.rand((2, 4, 3, 7)), torch.rand((2, 4, 3, 7))),
-            ],
+        cache = self._make_mixed_layer_cache()
+        flat, context = flatten_dynamic_cache(cache)
+        self.assertEqual(4, len(flat))
+        # The context must not encode the sliding_window value so that the
+        # tree spec remains stable across inputs with different sequence lengths.
+        self.assertEqual(["key_D_0", "value_D_0", "key_W_1", "value_W_1"], context)
+        rebuilt = unflatten_dynamic_cache(flat, context)
+        self.assertIsInstance(rebuilt, transformers.cache_utils.DynamicCache)
+        from yobx.helpers import max_diff
+
+        self.assertEqual(0, max_diff(cache, rebuilt)["abs"])
+
+    @requires_transformers("4.57")
+    def test_flatten_dynamic_cache_mixed_layers_context_keys(self):
+        """Flattening a mixed-layer cache encodes layer types in the context keys."""
+        cache = self._make_mixed_layer_cache(slen=3)
+        flat, context = flatten_dynamic_cache(cache)
+        self.assertEqual(4, len(flat))
+        # sliding_window is intentionally not encoded in context keys (data-independent spec)
+        self.assertEqual(["key_D_0", "value_D_0", "key_W_1", "value_W_1"], context)
+
+    @requires_transformers("4.57")
+    def test_unflatten_dynamic_cache_mixed_layers_preserves_types(self):
+        """Unflatten restores the correct layer types for a mixed-layer cache."""
+        from transformers.cache_utils import DynamicLayer, DynamicSlidingWindowLayer
+
+        cache = self._make_mixed_layer_cache()
+        flat, context = flatten_dynamic_cache(cache)
+        rebuilt = unflatten_dynamic_cache(flat, context)
+        self.assertIsInstance(rebuilt, transformers.cache_utils.DynamicCache)
+        self.assertIsInstance(rebuilt.layers[0], DynamicLayer)
+        self.assertIsInstance(rebuilt.layers[1], DynamicSlidingWindowLayer)
+        from yobx.helpers import max_diff
+
+        self.assertEqual(0, max_diff(cache, rebuilt)["abs"])
+
+    @requires_transformers("4.57")
+    def test_flatten_with_keys_dynamic_cache_mixed_layers(self):
+        """flatten_with_keys encodes layer types in context for mixed-layer caches."""
+        cache = self._make_mixed_layer_cache(slen=3)
+        kv_pairs, context = flatten_with_keys_dynamic_cache(cache)
+        self.assertEqual(4, len(kv_pairs))
+        # sliding_window is intentionally not encoded in context keys (data-independent spec)
+        self.assertEqual(["key_D_0", "value_D_0", "key_W_1", "value_W_1"], context)
+        for _key_entry, val in kv_pairs:
+            self.assertIsInstance(val, torch.Tensor)
+
+    @requires_transformers("4.57")
+    def test_roundtrip_dynamic_cache_mixed_layers(self):
+        """pytree tree_flatten/tree_unflatten roundtrip preserves mixed layer types."""
+        from transformers.cache_utils import DynamicLayer, DynamicSlidingWindowLayer
+
+        cache = self._make_mixed_layer_cache()
+        flat, spec = torch.utils._pytree.tree_flatten(cache)
+        cache2 = torch.utils._pytree.tree_unflatten(flat, spec)
+        self.assertIsInstance(cache2, transformers.cache_utils.DynamicCache)
+        self.assertIsInstance(cache2.layers[0], DynamicLayer)
+        self.assertIsInstance(cache2.layers[1], DynamicSlidingWindowLayer)
+        from yobx.helpers import max_diff
+
+        self.assertEqual(0, max_diff(cache, cache2)["abs"])
+
+    def test_flatten_dynamic_cache_mixed_layers_stable_context(self):
+        """Verifies that the tree-spec context is the same for different sliding_window sizes.
+
+        This is required for ``torch.export`` to accept inputs with varying sequence
+        lengths without raising a tree-spec mismatch error.
+        """
+        cache3 = make_dynamic_cache(
+            [(torch.rand((2, 4, 3, 7)), torch.rand((2, 4, 3, 7))) for _ in range(2)],
             cls_layers=[
                 transformers.cache_utils.DynamicLayer,
                 transformers.cache_utils.DynamicSlidingWindowLayer,
             ],
             cls_kwargs=[{}, {"sliding_window": 3}],
         )
-        flat, context = flatten_dynamic_cache(cache)
-        self.assertEqual(4, len(flat))
-        rebuilt = unflatten_dynamic_cache(flat, context)
-        self.assertIsInstance(rebuilt, transformers.cache_utils.DynamicCache)
-        from yobx.helpers import max_diff
-
-        self.assertEqual(0, max_diff(cache, rebuilt)["abs"])
+        cache5 = make_dynamic_cache(
+            [(torch.rand((2, 4, 5, 7)), torch.rand((2, 4, 5, 7))) for _ in range(2)],
+            cls_layers=[
+                transformers.cache_utils.DynamicLayer,
+                transformers.cache_utils.DynamicSlidingWindowLayer,
+            ],
+            cls_kwargs=[{}, {"sliding_window": 5}],
+        )
+        _, ctx3 = flatten_dynamic_cache(cache3)
+        _, ctx5 = flatten_dynamic_cache(cache5)
+        self.assertEqual(ctx3, ctx5, "context must be the same regardless of sliding_window size")
 
     def test_register_class_flattening_with_f_check(self):
         """Test register_class_flattening verifies the registration using f_check."""
