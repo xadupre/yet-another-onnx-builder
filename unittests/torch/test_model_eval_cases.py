@@ -5,6 +5,7 @@ from yobx.torch.testing.model_eval_cases import discover, evaluation
 
 class TestModelEvalCases(ExtTestCase):
     @requires_torch("2.7", "scan")
+    @requires_transformers("4.55")
     @ignore_warnings(FutureWarning)
     def test_discover(self):
         res = discover()
@@ -238,6 +239,14 @@ class TestModelEvalCases(ExtTestCase):
             cases="InplaceSetItemEllipsis_1", exporters="yobx-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_inplace_setitem_ellipsis_1_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemEllipsis_1",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_inplace_setitem_ellipsis_2_tracing(self):
         evaluation(
             cases="InplaceSetItemEllipsis_2", exporters="yobx-tracing", quiet=False, dynamic=True
@@ -265,6 +274,11 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_controlflow_numel_zero_2_tracing(self):
         evaluation(
             cases="ControlFlowNumelZero2", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_numel_zero_2_new_tracing(self):
+        evaluation(
+            cases="ControlFlowNumelZero2", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
     def test_run_exporter_controlflow_numel_zero_export_1_tracing(self):
@@ -353,6 +367,18 @@ class TestModelEvalCases(ExtTestCase):
     @requires_transformers("5.0")
     def test_run_exporter_tiny_llm_yobx(self):
         evaluation(cases="TinyLLM", exporters="yobx", quiet=False, dynamic=True)
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_export_nostrict(self):
+        evaluation(
+            cases="DynamicCacheInput", exporters="export-nostrict", quiet=False, dynamic=True
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_export_nostrict_static(self):
+        evaluation(
+            cases="DynamicCacheInput", exporters="export-nostrict", quiet=False, dynamic=False
+        )
 
 
 if __name__ == "__main__":

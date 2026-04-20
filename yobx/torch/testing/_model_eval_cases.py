@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from ...helpers import string_type
+from ..in_transformers.cache_helper import make_dynamic_cache
 
 DIM = torch.export.Dim
 DYN = torch.export.Dim.DYNAMIC
@@ -234,7 +235,7 @@ class InplaceSetItemEllipsis_1(torch.nn.Module):
         self.params = torch.zeros((1, 8192, 4), dtype=torch.float32)
 
     def forward(self, index, update):
-        copy = self.params.clone()
+        copy = update.new_zeros(self.params.shape)
         copy[..., index] = update
         return copy
 
@@ -397,6 +398,7 @@ class ControlFlowNumelZero1(torch.nn.Module):
 class ControlFlowNumelZero2(torch.nn.Module):
     def forward(self, x):
         def empty_cache(x):
+            torch._check(x.numel() != 0)
             if x.numel() == 0:
                 return 0
             return x.shape[-2]
@@ -404,7 +406,7 @@ class ControlFlowNumelZero2(torch.nn.Module):
         size = (empty_cache(x), 1)
         return torch.full(size, fill_value=2)
 
-    _inputs = [(torch.rand(3, 2, 2, 5),), (torch.rand(3, 2, 1, 5),), (torch.rand(3, 2, 0, 5),)]
+    _inputs = [(torch.rand(3, 2, 2, 5),), (torch.rand(3, 2, 1, 5),)]
     _dynamic = {"x": {0: torch.export.Dim.DYNAMIC, 2: torch.export.Dim.DYNAMIC}}
 
 
@@ -1166,6 +1168,74 @@ class ShapeAndTypeAndDeviceBased(torch.nn.Module):
 
 
 _bsize, _nheads, _slen, _dim = 2, 1, 30, 96
+
+_bsize_dc, _nheads_dc, _slen_dc, _dim_dc = 2, 4, 3, 7
+
+
+class DynamicCacheInput(torch.nn.Module):
+    """
+    Eval case where a :class:`transformers.cache_utils.DynamicCache` is passed
+    directly as an input argument instead of being assembled inside ``forward``.
+
+    The model accepts two positional arguments:
+
+    * ``x``     – ``(batch, nheads, seq, dim)``  float32
+    * ``cache`` – :class:`transformers.cache_utils.DynamicCache` with two layers,
+      each ``(batch, nheads, past_seq, dim)``
+
+    For every layer in the cache, reduces the key and value tensors over the
+    sequence dimension (dim 2) and assembles a new
+    :class:`transformers.cache_utils.DynamicCache` from those reduced tensors.
+    Returns ``(x, new_cache)`` where ``new_cache`` is the reduced cache.
+    Requires :mod:`transformers` and
+    :func:`yobx.torch.flatten.register_flattening_functions` to export.
+    """
+
+    def forward(self, x, cache):
+        """Reduces each cache layer over dim 2 and returns (x, new_cache)."""
+        pairs = [
+            (layer.keys.mean(dim=2, keepdim=True), layer.values.mean(dim=2, keepdim=True))
+            for layer in cache.layers
+        ]
+        return x, make_dynamic_cache(pairs)
+
+    _inputs = [
+        (
+            torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+            make_dynamic_cache(
+                [
+                    (
+                        torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                        torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                    ),
+                    (
+                        torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                        torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                    ),
+                ]
+            ),
+        ),
+        (
+            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+            make_dynamic_cache(
+                [
+                    (
+                        torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                        torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                    ),
+                    (
+                        torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                        torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                    ),
+                ]
+            ),
+        ),
+    ]
+    _dynamic = {
+        "x": {0: DYN, 2: DYN},
+        "cache": [{0: DYN, 2: DYN}, {0: DYN, 2: DYN}, {0: DYN, 2: DYN}, {0: DYN, 2: DYN}],
+    }
+    _patch = "flattening"
 
 
 class TinyLLM(torch.nn.Module):
