@@ -15,4 +15,6 @@
 - Do not make everything private.
 
 ### Exception
-- Do not use try/except when something may fail. Use a proper test to avoid this situation.
+- Do not use `try/except` for normal control flow.
+- Prefer precondition checks when feasible, but use `try/except` for genuinely exceptional conditions and around external I/O boundaries where failures can still occur.
+- Catch specific exceptions rather than using broad exception handlers, and add tests that cover expected failure paths.
