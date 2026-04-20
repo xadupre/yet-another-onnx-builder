@@ -2475,9 +2475,9 @@ class GraphBuilder(
         Returns:
             The name of a rank-1 INT64 ONNX result that holds the value.
         """
-        import ast as _ast
+        import ast
 
-        tree = _ast.parse(expr, mode="eval")
+        tree = ast.parse(expr, mode="eval")
         return self._eval_dim_expr_node_as_1d(tree.body, expr, prefix)
 
     def _eval_dim_expr_node_as_1d(self, node: Any, expr: str, prefix: str) -> str:
@@ -2491,16 +2491,16 @@ class GraphBuilder(
         Returns:
             The name of a rank-1 INT64 ONNX result.
         """
-        import ast as _ast
+        import ast
 
-        if isinstance(node, _ast.Constant) and isinstance(node.value, int):
+        if isinstance(node, ast.Constant) and isinstance(node.value, int):
             return self.make_initializer(
                 "",
                 np.array([node.value], dtype=np.int64),
                 source="GraphBuilder._eval_dim_expr_node_as_1d.const",
             )
 
-        if isinstance(node, _ast.Name):
+        if isinstance(node, ast.Name):
             dim_name = node.id
             # Retrieve the dimension as an ONNX result (creates Shape+Gather if needed).
             if dim_name in self.dynamic_objects_rev:
@@ -2524,16 +2524,16 @@ class GraphBuilder(
                 return unsq
             return result
 
-        if isinstance(node, _ast.BinOp):
+        if isinstance(node, ast.BinOp):
             left = self._eval_dim_expr_node_as_1d(node.left, expr, prefix)
             right = self._eval_dim_expr_node_as_1d(node.right, expr, prefix)
-            if isinstance(node.op, _ast.Add):
+            if isinstance(node.op, ast.Add):
                 r = self.make_node("Add", [left, right], 1, name=f"{prefix}_add")
-            elif isinstance(node.op, _ast.Sub):
+            elif isinstance(node.op, ast.Sub):
                 r = self.make_node("Sub", [left, right], 1, name=f"{prefix}_sub")
-            elif isinstance(node.op, _ast.Mult):
+            elif isinstance(node.op, ast.Mult):
                 r = self.make_node("Mul", [left, right], 1, name=f"{prefix}_mul")
-            elif isinstance(node.op, _ast.FloorDiv):
+            elif isinstance(node.op, ast.FloorDiv):
                 r = self.make_node("Div", [left, right], 1, name=f"{prefix}_div")
             else:
                 raise ValueError(
@@ -2543,7 +2543,7 @@ class GraphBuilder(
             assert isinstance(r, str), f"Unexpected type {type(r)} for ONNX node result"
             return r
 
-        if isinstance(node, _ast.UnaryOp) and isinstance(node.op, _ast.USub):
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
             operand = self._eval_dim_expr_node_as_1d(node.operand, expr, prefix)
             r = self.make_node("Neg", [operand], 1, name=f"{prefix}_neg")
             assert isinstance(r, str), f"Unexpected type {type(r)} for ONNX node result"
