@@ -13131,14 +13131,35 @@ def aten_tensor_split(
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
     x: T,
-    indices_or_sections: Union[int, List[int]],
+    indices_or_sections: Union[int, List[int], T],
     dim: int = 0,
     name: str = "tensor_split",
 ) -> Tuple[T, ...]:
-    """Dispatches tensor_split to the sections or indices variant."""
+    """Dispatches tensor_split to the sections or indices variant.
+
+    Handles the tracing path where *indices_or_sections* may be a graph
+    variable name (str) referring to a constant integer tensor.
+    """
     if isinstance(indices_or_sections, int):
         return aten_tensor_split_sections(g, sts, outputs, x, indices_or_sections, dim, name=name)
-    return aten_tensor_split_indices(g, sts, outputs, x, indices_or_sections, dim, name=name)
+    if isinstance(indices_or_sections, (list, tuple)):
+        return aten_tensor_split_indices(g, sts, outputs, x, indices_or_sections, dim, name=name)
+    if isinstance(indices_or_sections, str):
+        # Tracing path: the argument is a graph variable name referring to a
+        # constant tensor.  Retrieve its value to determine the split kind.
+        assert g.is_constant(
+            indices_or_sections
+        ), f"aten_tensor_split: {indices_or_sections!r} is not a constant{g.get_debug_msg()}"
+        cst = g.get_constant(indices_or_sections, computed_value=True)
+        if hasattr(cst, "ndim") and cst.ndim == 0:
+            return aten_tensor_split_sections(g, sts, outputs, x, int(cst), dim, name=name)
+        # 1-D tensor of split indices.
+        indices = [int(v) for v in cst.flatten()]
+        return aten_tensor_split_indices(g, sts, outputs, x, indices, dim, name=name)
+    raise AssertionError(
+        f"aten_tensor_split: unsupported type for indices_or_sections: "
+        f"{type(indices_or_sections)}{g.get_debug_msg()}"
+    )
 
 
 def aten_tensor_split_sections(
@@ -13172,6 +13193,22 @@ def aten_tensor_split_sections(
     q, r = divmod(size, sections)
     split_sizes = [q + 1] * r + [q] * (sections - r)
     return aten_split_with_sizes(g, sts, outputs, x, split_sizes, dim, name=name)
+
+
+def aten_tensor_split_Tensor_sections(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    sections: int,
+    dim: int = 0,
+    name: str = "tensor_split_Tensor_sections",
+) -> Tuple[T, ...]:
+    """Handles the ``aten::tensor_split.Tensor_sections`` overload.
+
+    Delegates to :func:`aten_tensor_split_sections`.
+    """
+    return aten_tensor_split_sections(g, sts, outputs, x, sections, dim, name=name)
 
 
 def aten_tensor_split_indices(
