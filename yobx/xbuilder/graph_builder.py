@@ -2466,12 +2466,14 @@ class GraphBuilder(
         For a simple identifier ``"dy"`` returns the corresponding dimension as
         a 1-element INT64 tensor (inserting ``Shape`` / ``Gather`` /
         ``Unsqueeze`` nodes as needed).  For a compound expression such as
-        ``"dy+1"`` it recursively builds the corresponding ONNX arithmetic
+        ``"dy+1"`` recursively builds the corresponding ONNX arithmetic
         (``Add``, ``Sub``, ``Mul``, ``Div``, ``Neg``).
 
         :param expr: A Python expression string (e.g. ``"dy+1"`` or ``"dx*2"``).
         :param prefix: Name prefix for generated ONNX nodes.
-        :return: The name of a rank-1 INT64 ONNX result that holds the value.
+
+        Returns:
+            The name of a rank-1 INT64 ONNX result that holds the value.
         """
         import ast as _ast
 
@@ -2485,7 +2487,9 @@ class GraphBuilder(
             ``UnaryOp``).
         :param expr: The original expression string (for error messages only).
         :param prefix: Name prefix for generated ONNX nodes.
-        :return: The name of a rank-1 INT64 ONNX result.
+
+        Returns:
+            The name of a rank-1 INT64 ONNX result.
         """
         import ast as _ast
 
