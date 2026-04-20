@@ -1238,6 +1238,90 @@ class DynamicCacheInput(torch.nn.Module):
     _patch = "flattening"
 
 
+try:
+    import transformers as _transformers_mdc
+
+    _DynamicLayer_mdc = _transformers_mdc.cache_utils.DynamicLayer
+    _DynamicSlidingWindowLayer_mdc = _transformers_mdc.cache_utils.DynamicSlidingWindowLayer
+
+    class DynamicCacheInputMixedLayers(torch.nn.Module):
+        """
+        Eval case where a :class:`transformers.cache_utils.DynamicCache` with
+        **mixed layer types** is passed directly as an input argument.
+
+        The model accepts two positional arguments:
+
+        * ``x``     – ``(batch, nheads, seq, dim)``  float32
+        * ``cache`` – :class:`transformers.cache_utils.DynamicCache` with two
+          layers of different types: a
+          :class:`~transformers.cache_utils.DynamicLayer` (layer 0) and a
+          :class:`~transformers.cache_utils.DynamicSlidingWindowLayer`
+          (layer 1).
+
+        For every layer in the cache, reduces the key and value tensors over the
+        sequence dimension (dim 2) and assembles a new
+        :class:`transformers.cache_utils.DynamicCache` from those reduced
+        tensors, **preserving the original layer types**.
+        Returns ``(x, new_cache)`` where ``new_cache`` is the reduced cache.
+        Requires :mod:`transformers` >= 4.57 and
+        :func:`yobx.torch.flatten.register_flattening_functions` to export.
+        """
+
+        def forward(self, x, cache):
+            """Reduces each cache layer over dim 2 and returns (x, new_cache)."""
+            cls_layers = [type(layer) for layer in cache.layers]
+            pairs = [
+                (layer.keys.mean(dim=2, keepdim=True), layer.values.mean(dim=2, keepdim=True))
+                for layer in cache.layers
+            ]
+            return x, make_dynamic_cache(pairs, cls_layers=cls_layers)
+
+        _inputs = [
+            (
+                torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                make_dynamic_cache(
+                    [
+                        (
+                            torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                            torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                        ),
+                        (
+                            torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                            torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
+                        ),
+                    ],
+                    cls_layers=[_DynamicLayer_mdc, _DynamicSlidingWindowLayer_mdc],
+                    cls_kwargs=[{}, {"sliding_window": _slen_dc}],
+                ),
+            ),
+            (
+                torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                make_dynamic_cache(
+                    [
+                        (
+                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                        ),
+                        (
+                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                        ),
+                    ],
+                    cls_layers=[_DynamicLayer_mdc, _DynamicSlidingWindowLayer_mdc],
+                    cls_kwargs=[{}, {"sliding_window": _slen_dc + 2}],
+                ),
+            ),
+        ]
+        _dynamic = {
+            "x": {0: DYN, 2: DYN},
+            "cache": [{0: DYN, 2: DYN}, {0: DYN, 2: DYN}, {0: DYN, 2: DYN}, {0: DYN, 2: DYN}],
+        }
+        _patch = "flattening"
+
+except (ImportError, AttributeError):
+    pass
+
+
 class TinyLLM(torch.nn.Module):
     """
     Wraps ``arnir0/Tiny-LLM`` as a minimal eval case.
