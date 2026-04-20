@@ -13189,6 +13189,22 @@ def aten_tensor_split_sections(
     return aten_split_with_sizes(g, sts, outputs, x, split_sizes, dim, name=name)
 
 
+def aten_tensor_split_Tensor_sections(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    sections: int,
+    dim: int = 0,
+    name: str = "tensor_split_Tensor_sections",
+) -> Tuple[T, ...]:
+    """Handles the ``aten::tensor_split.Tensor_sections`` overload.
+
+    Delegates to :func:`aten_tensor_split_sections`.
+    """
+    return aten_tensor_split_sections(g, sts, outputs, x, sections, dim, name=name)
+
+
 def aten_tensor_split_indices(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
