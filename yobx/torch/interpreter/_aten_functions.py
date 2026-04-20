@@ -13154,28 +13154,78 @@ def aten_tensor_split(
             # 1-D tensor of split indices.
             indices = [int(v) for v in cst.flatten()]
             return aten_tensor_split_indices(g, sts, outputs, x, indices, dim, name=name)
-        if g.has_shape(indices_or_sections):
-            shape = g.get_shape(indices_or_sections)
-            # check it is static, then use Split
-            # otherwise use Split Sequence
-
-            print(shape)
-        
+        # Non-constant 1-D tensor of split indices.
+        assert g.has_shape(indices_or_sections), (
+            f"aten_tensor_split: shape of {indices_or_sections!r} is unknown; "
+            f"cannot determine the number of outputs{g.get_debug_msg()}"
+        )
+        shape = g.get_shape(indices_or_sections)
+        assert isinstance(shape[0], int), (
+            f"aten_tensor_split: dynamic number of split indices is not supported; "
+            f"shape of indices_or_sections={shape}{g.get_debug_msg()}"
+        )
+        n = shape[0]
+        n_outputs = n + 1
+        # Compute total size of x along dim as a 1-D int64 tensor.
+        if dim >= 0:
+            total_size_1d = g.op.Shape(x, start=dim, end=dim + 1, name=name)
+        else:
+            total_size_1d = g.op.Shape(x, start=dim, name=name)
+        # Clamp indices to [0, total_size] element-wise.
+        zero_1d = g.make_initializer("", np.array([0], dtype=np.int64))
+        clamped = g.op.Min(indices_or_sections, total_size_1d, name=name)
+        clamped = g.op.Max(clamped, zero_1d, name=name)
+        # Build boundaries: [0] ++ clamped ++ [total_size].
+        boundaries = g.op.Concat(zero_1d, clamped, total_size_1d, axis=0, name=name)
+        # split_sizes = boundaries[1:n_outputs+1] - boundaries[0:n_outputs].
+        rhs = g.op.Slice(
+            boundaries,
+            np.array([1], dtype=np.int64),
+            np.array([n_outputs + 1], dtype=np.int64),
+            name=name,
+        )
+        lhs = g.op.Slice(
+            boundaries,
+            np.array([0], dtype=np.int64),
+            np.array([n_outputs], dtype=np.int64),
+            name=name,
+        )
+        split_sizes = g.op.Sub(rhs, lhs, name=name)
+        if len(outputs) == 1:
+            o = outputs[0]
+            output_names = [f"{o}#{i}" for i in range(n_outputs)]
+        else:
+            output_names = list(outputs)
+        res = g.make_node("Split", [x, split_sizes], output_names, axis=dim, name=name)
+        if not sts:
+            if g.has_type(x):
+                dt = g.get_type(x)
+                for o in res:
+                    g.set_type(o, dt)
+            if g.has_rank(x):
+                r = g.get_rank(x)
+                for o in res:
+                    g.set_rank(o, r)
+        return res
     raise AssertionError(
         f"aten_tensor_split: unsupported type for indices_or_sections: "
         f"{type(indices_or_sections)}{g.get_debug_msg()}"
     )
 
-def aten_tensor_split_tensor_indices_or_sections(
+
+def aten_tensor_split_Tensor_indices_or_sections(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
     x: T,
     indices_or_sections: T,
     dim: int = 0,
-    name: str = "aten_tensor_split_tensor_indices_or_sections",
+    name: str = "tensor_split_Tensor_indices_or_sections",
 ) -> Tuple[T, ...]:
-    "aten_tensor_split_tensor_indices_or_sections"
+    """Handles the ``aten::tensor_split.Tensor_indices_or_sections`` overload.
+
+    Delegates to :func:`aten_tensor_split`.
+    """
     return aten_tensor_split(g, sts, outputs, x, indices_or_sections, dim=dim, name=name)
 
 
