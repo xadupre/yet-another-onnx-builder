@@ -1240,8 +1240,7 @@ class DynamicCacheInput(torch.nn.Module):
 
 
 if hasattr(transformers.cache_utils, "DynamicSlidingWindowLayer"):
-    _DynamicLayer = transformers.cache_utils.DynamicLayer
-    _DynamicSlidingWindowLayer = transformers.cache_utils.DynamicSlidingWindowLayer
+    from transformers.cache_utils import DynamicLayer, DynamicSlidingWindowLayer
 
     class DynamicCacheInputMixedLayers(torch.nn.Module):
         """
@@ -1289,7 +1288,7 @@ if hasattr(transformers.cache_utils, "DynamicSlidingWindowLayer"):
                             torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
                         ),
                     ],
-                    cls_layers=[_DynamicLayer, _DynamicSlidingWindowLayer],
+                    cls_layers=[DynamicLayer, DynamicSlidingWindowLayer],
                     cls_kwargs=[{}, {"sliding_window": _slen_dc}],
                 ),
             ),
@@ -1306,7 +1305,7 @@ if hasattr(transformers.cache_utils, "DynamicSlidingWindowLayer"):
                             torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
                         ),
                     ],
-                    cls_layers=[_DynamicLayer, _DynamicSlidingWindowLayer],
+                    cls_layers=[DynamicLayer, DynamicSlidingWindowLayer],
                     cls_kwargs=[{}, {"sliding_window": _slen_dc + 2}],
                 ),
             ),
