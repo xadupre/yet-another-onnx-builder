@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import transformers
 from ...helpers import string_type
 from ..in_transformers.cache_helper import make_dynamic_cache
 
@@ -1238,11 +1239,9 @@ class DynamicCacheInput(torch.nn.Module):
     _patch = "flattening"
 
 
-try:
-    import transformers as _transformers_mdc
-
-    _DynamicLayer_mdc = _transformers_mdc.cache_utils.DynamicLayer
-    _DynamicSlidingWindowLayer_mdc = _transformers_mdc.cache_utils.DynamicSlidingWindowLayer
+if hasattr(transformers.cache_utils, "DynamicSlidingWindowLayer"):
+    _DynamicLayer = transformers.cache_utils.DynamicLayer
+    _DynamicSlidingWindowLayer = transformers.cache_utils.DynamicSlidingWindowLayer
 
     class DynamicCacheInputMixedLayers(torch.nn.Module):
         """
@@ -1290,7 +1289,7 @@ try:
                             torch.rand((_bsize_dc, _nheads_dc, _slen_dc, _dim_dc)),
                         ),
                     ],
-                    cls_layers=[_DynamicLayer_mdc, _DynamicSlidingWindowLayer_mdc],
+                    cls_layers=[_DynamicLayer, _DynamicSlidingWindowLayer],
                     cls_kwargs=[{}, {"sliding_window": _slen_dc}],
                 ),
             ),
@@ -1307,7 +1306,7 @@ try:
                             torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
                         ),
                     ],
-                    cls_layers=[_DynamicLayer_mdc, _DynamicSlidingWindowLayer_mdc],
+                    cls_layers=[_DynamicLayer, _DynamicSlidingWindowLayer],
                     cls_kwargs=[{}, {"sliding_window": _slen_dc + 2}],
                 ),
             ),
@@ -1317,9 +1316,6 @@ try:
             "cache": [{0: DYN, 2: DYN}, {0: DYN, 2: DYN}, {0: DYN, 2: DYN}, {0: DYN, 2: DYN}],
         }
         _patch = "flattening"
-
-except (ImportError, AttributeError):
-    pass
 
 
 class TinyLLM(torch.nn.Module):
