@@ -1347,18 +1347,18 @@ if hasattr(transformers.cache_utils, "DynamicSlidingWindowLayer"):
                             torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
                         ),
                         (
-                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
-                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc + 2, _dim_dc)),
+                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc, _dim_dc)),
+                            torch.rand((_bsize_dc + 1, _nheads_dc, _slen_dc, _dim_dc)),
                         ),
                     ],
                     cls_layers=[DynamicLayer, DynamicSlidingWindowLayer],
-                    cls_kwargs=[{}, {"sliding_window": _slen_dc + 2}],
+                    cls_kwargs=[{}, {"sliding_window": _slen_dc}],
                 ),
             ),
         ]
         _dynamic = {
             "x": {0: DYN, 2: DYN},
-            "cache": [{0: DYN, 2: DYN}, {0: DYN, 2: DYN}, {0: DYN, 2: DYN}, {0: DYN, 2: DYN}],
+            "cache": [{0: DYN, 2: DYN}, {0: DYN, 2: DYN}, {0: DYN}, {0: DYN}],
         }
         _patch = "flattening"
 

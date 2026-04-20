@@ -180,8 +180,8 @@ class TestTransformersFlatten(ExtTestCase):
         cache = self._make_mixed_layer_cache(slen=3)
         flat, context = flatten_dynamic_cache(cache)
         self.assertEqual(4, len(flat))
-        # DynamicLayer -> letter "D", DynamicSlidingWindowLayer(sliding_window=3) -> "W3"
-        self.assertEqual(["key_D_0", "value_D_0", "key_W3_1", "value_W3_1"], context)
+        # sliding_window is intentionally not encoded in context keys (data-independent spec)
+        self.assertEqual(["key_D_0", "value_D_0", "key_W_1", "value_W_1"], context)
 
     @requires_transformers("4.57")
     def test_unflatten_dynamic_cache_mixed_layers_preserves_types(self):
@@ -204,7 +204,8 @@ class TestTransformersFlatten(ExtTestCase):
         cache = self._make_mixed_layer_cache(slen=3)
         kv_pairs, context = flatten_with_keys_dynamic_cache(cache)
         self.assertEqual(4, len(kv_pairs))
-        self.assertEqual(["key_D_0", "value_D_0", "key_W3_1", "value_W3_1"], context)
+        # sliding_window is intentionally not encoded in context keys (data-independent spec)
+        self.assertEqual(["key_D_0", "value_D_0", "key_W_1", "value_W_1"], context)
         for _key_entry, val in kv_pairs:
             self.assertIsInstance(val, torch.Tensor)
 
