@@ -2460,6 +2460,109 @@ class GraphBuilder(
         self.make_node("Gather", [shape_name, axis_name], [name], name="_get_dimension_as_result")
         return name
 
+    def _compute_expression_as_1d_tensor(self, expr: str, prefix: str = "_dexpr") -> str:
+        """Builds a rank-1 INT64 ONNX tensor that holds the value of *expr*.
+
+        This method is needed when the new tracing path records shape arithmetic
+        like ``x.shape[1] + 1`` as a symbolic string ``"dy+1"`` inside FX node
+        arguments.  When the ONNX interpreter later calls
+        :meth:`make_shape_from_results`, such compound strings are not registered
+        as plain dynamic objects (only base names like ``"dy"`` are), so they
+        cannot be looked up directly.  This method bridges that gap by parsing the
+        expression string and emitting the corresponding ONNX arithmetic nodes
+        (``Add``, ``Sub``, ``Mul``, ``Div``, ``Neg``) whose base operands are
+        fetched from the graph via ``Shape`` / ``Gather`` / ``Unsqueeze`` as
+        needed.
+
+        For a simple identifier ``"dy"`` it returns the corresponding dimension as
+        a 1-element INT64 tensor.  For a compound expression such as ``"dy+1"``
+        it recursively builds the ONNX subgraph that computes the value.
+
+        :param expr: A Python expression string (e.g. ``"dy+1"`` or ``"dx*2"``).
+        :param prefix: Name prefix for generated ONNX nodes.
+
+        Returns:
+            The name of a rank-1 INT64 ONNX result that holds the value.
+        """
+        import ast
+
+        tree = ast.parse(expr, mode="eval")
+        return self._eval_dim_expr_node_as_1d(tree.body, expr, prefix)
+
+    def _eval_dim_expr_node_as_1d(self, node: Any, expr: str, prefix: str) -> str:
+        """Converts one AST node of a dimension expression to an ONNX 1-D tensor.
+
+        :param node: An ``ast`` node (``Constant``, ``Name``, ``BinOp``, or
+            ``UnaryOp``).
+        :param expr: The original expression string (for error messages only).
+        :param prefix: Name prefix for generated ONNX nodes.
+
+        Returns:
+            The name of a rank-1 INT64 ONNX result.
+        """
+        import ast
+
+        if isinstance(node, ast.Constant) and isinstance(node.value, int):
+            return self.make_initializer(
+                "",
+                np.array([node.value], dtype=np.int64),
+                source="GraphBuilder._eval_dim_expr_node_as_1d.const",
+            )
+
+        if isinstance(node, ast.Name):
+            dim_name = node.id
+            # Retrieve the dimension as an ONNX result (creates Shape+Gather if needed).
+            if dim_name in self.dynamic_objects_rev:
+                input_dim = self.dynamic_objects_rev[dim_name][0][0]
+                result = self.get_dimension_as_result(input_dim)
+            elif self.has_name(dim_name):
+                result = dim_name
+            else:
+                raise ValueError(
+                    f"Unknown dimension {dim_name!r} in expression {expr!r}"
+                    f"{self.get_debug_msg()}"
+                )
+            # Ensure rank-1 output (Gather produces a scalar when indices are a vector).
+            if self.has_rank(result) and self.get_rank(result) == 0:
+                unsq = self.op.UnsqueezeAnyOpset(
+                    result, self.ZERO, name=f"{prefix}_unsq_{dim_name}"
+                )
+                if self.has_type(result):
+                    self.set_type(unsq, self.get_type(result))  # type: ignore[arg-type]
+                self.set_shape(unsq, (1,))
+                return unsq
+            return result
+
+        if isinstance(node, ast.BinOp):
+            left = self._eval_dim_expr_node_as_1d(node.left, expr, prefix)
+            right = self._eval_dim_expr_node_as_1d(node.right, expr, prefix)
+            if isinstance(node.op, ast.Add):
+                r = self.make_node("Add", [left, right], 1, name=f"{prefix}_add")
+            elif isinstance(node.op, ast.Sub):
+                r = self.make_node("Sub", [left, right], 1, name=f"{prefix}_sub")
+            elif isinstance(node.op, ast.Mult):
+                r = self.make_node("Mul", [left, right], 1, name=f"{prefix}_mul")
+            elif isinstance(node.op, ast.FloorDiv):
+                r = self.make_node("Div", [left, right], 1, name=f"{prefix}_div")
+            else:
+                raise ValueError(
+                    f"Unsupported binary operator {type(node.op).__name__!r} "
+                    f"in expression {expr!r}{self.get_debug_msg()}"
+                )
+            assert isinstance(r, str), f"Unexpected type {type(r)} for ONNX node result"
+            return r
+
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.USub):
+            operand = self._eval_dim_expr_node_as_1d(node.operand, expr, prefix)
+            r = self.make_node("Neg", [operand], 1, name=f"{prefix}_neg")
+            assert isinstance(r, str), f"Unexpected type {type(r)} for ONNX node result"
+            return r
+
+        raise ValueError(
+            f"Unsupported AST node type {type(node).__name__!r} "
+            f"in expression {expr!r}{self.get_debug_msg()}"
+        )
+
     def make_shape_from_results(self, shape: DYNAMIC_SHAPE, name="") -> str:
         """Creates a shape coming from intermediate results."""
         assert isinstance(
@@ -2477,6 +2580,15 @@ class GraphBuilder(
             if isinstance(d, int):
                 key.append(d)
             elif isinstance(d, str):
+                if not (
+                    self.has_shape(d)
+                    or (self.has_rank(d) and self.get_rank(d) == 0)
+                    or d in self.dynamic_objects
+                ):
+                    # Try registering as a compound expression (e.g. "dy+1").
+                    tokens = parse_expression_tokens(d)
+                    if tokens and all(t in self.dynamic_objects or t.isdigit() for t in tokens):
+                        self.register_dynamic_objects_from_dim(d)
                 assert self._debug_quiet or (
                     self.has_shape(d)
                     or (self.has_rank(d) and self.get_rank(d) == 0)
@@ -2527,6 +2639,16 @@ class GraphBuilder(
                         f"{self.get_debug_msg()}"
                     )
                     name = self.get_dimension_as_result(name)
+                elif not self.has_name(value) and not value.isidentifier():
+                    # Compound expression such as "dy+1": compute it as an
+                    # ONNX arithmetic result (rank-1 INT64 tensor).
+                    import re
+
+                    safe = re.sub(r"[^a-zA-Z0-9_]", "_", value)
+                    name = self._compute_expression_as_1d_tensor(value, prefix=f"_mkshape_{safe}")
+                    shape_shape = None
+                    conc.append(name)
+                    continue
                 else:
                     name = value
 
