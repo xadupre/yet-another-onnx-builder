@@ -29,9 +29,6 @@ from ._aten_functions import (
     aten_eq,
     aten_flatten,
     aten_log,
-    aten_logical_and,
-    aten_logical_or,
-    aten_logical_xor,
     aten_matmul,
     aten_max,
     aten_max_dim,
@@ -911,25 +908,47 @@ def aten_meth_bitwise_or(
     return aten_bitwise_or(g, sts, outputs, x, y, name=".bitwise_or")
 
 
+def _to_bool(g: GraphBuilder, x: T, name: str) -> T:
+    """Casts tensor to BOOL if it is not already BOOL."""
+    if g.has_type(x) and g.get_type(x) == TensorProto.BOOL:
+        return x
+    return g.op.Cast(x, to=TensorProto.BOOL, name=name)
+
+
 def aten_meth_logical_and(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
 ) -> T:
     "Computes logical AND."
-    return aten_logical_and(g, sts, outputs, x, y, name=".logical_and")
+    bool_x = _to_bool(g, x, ".logical_and")
+    bool_y = _to_bool(g, y, ".logical_and")
+    res = g.op.And(bool_x, bool_y, outputs=outputs, name=".logical_and")
+    if not sts:
+        set_type_shape_binary_op(g, outputs[0], bool_x, bool_y, itype=TensorProto.BOOL)
+    return res
 
 
 def aten_meth_logical_or(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
 ) -> T:
     "Computes logical OR."
-    return aten_logical_or(g, sts, outputs, x, y, name=".logical_or")
+    bool_x = _to_bool(g, x, ".logical_or")
+    bool_y = _to_bool(g, y, ".logical_or")
+    res = g.op.Or(bool_x, bool_y, outputs=outputs, name=".logical_or")
+    if not sts:
+        set_type_shape_binary_op(g, outputs[0], bool_x, bool_y, itype=TensorProto.BOOL)
+    return res
 
 
 def aten_meth_logical_xor(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
 ) -> T:
     "Computes logical XOR."
-    return aten_logical_xor(g, sts, outputs, x, y, name=".logical_xor")
+    bool_x = _to_bool(g, x, ".logical_xor")
+    bool_y = _to_bool(g, y, ".logical_xor")
+    res = g.op.Xor(bool_x, bool_y, outputs=outputs, name=".logical_xor")
+    if not sts:
+        set_type_shape_binary_op(g, outputs[0], bool_x, bool_y, itype=TensorProto.BOOL)
+    return res
 
 
 def aten_meth_erfinv(
