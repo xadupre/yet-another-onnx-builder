@@ -441,6 +441,21 @@ class ControlFlowNumelZero4(torch.nn.Module):
     _dynamic = {"x": {0: torch.export.Dim.DYNAMIC, 2: torch.export.Dim.DYNAMIC}}
 
 
+class ControlFlowNumelZero5(torch.nn.Module):
+    def forward(self, x):
+        def empty_cache(x):
+            torch._check(x.numel() != 0)
+            if x.shape[0] != 0 and x.shape[2] != 0:
+                return 0
+            return x.shape[-2]
+
+        size = (empty_cache(x), 1)
+        return torch.full(size, fill_value=2)
+
+    _inputs = [(torch.rand(3, 2, 2, 5),), (torch.rand(3, 2, 1, 5),)]
+    _dynamic = {"x": {0: torch.export.Dim.DYNAMIC, 2: torch.export.Dim.DYNAMIC}}
+
+
 class ControlFlowRanksType(torch.nn.Module):
     def forward(self, x=None):
         if (
