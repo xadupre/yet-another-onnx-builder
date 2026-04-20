@@ -13148,7 +13148,7 @@ def aten_tensor_split(
         if hasattr(cst, "ndim") and cst.ndim == 0:
             return aten_tensor_split_sections(g, sts, outputs, x, int(cst), dim, name=name)
         # 1-D tensor of split indices.
-        indices = [int(v) for v in cst.flat]
+        indices = [int(v) for v in cst.flatten()]
         return aten_tensor_split_indices(g, sts, outputs, x, indices, dim, name=name)
     raise AssertionError(
         f"aten_tensor_split: unsupported type for indices_or_sections: "
