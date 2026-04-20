@@ -8071,24 +8071,39 @@ def aten_lt(
 
 
 def aten_lt_Scalar(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "lt_Scalar",
 ) -> T:
     "less"
-    return aten_lt(g, sts, outputs, x, y, name="lt_Scalar")
+    return aten_lt(g, sts, outputs, x, y, name=name)
 
 
 def aten_lt_Tensor(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "lt_Tensor",
 ) -> T:
     "less"
-    return aten_lt(g, sts, outputs, x, y, name="lt_Tensor")
+    return aten_lt(g, sts, outputs, x, y, name=name)
 
 
 def aten_matmul(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "matmul",
 ) -> T:
     "matmul"
-    res = g.op.MatMul(x, y, outputs=outputs)
+    res = g.op.MatMul(x, y, outputs=outputs, name=name)
     if not sts:
         set_type_shape_binary_op(g, outputs[0], x, y)
     return res
