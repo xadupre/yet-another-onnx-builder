@@ -237,41 +237,23 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
     # beyond those already listed under ``"default"``.
     "tracing": frozenset(
         {
-            "T",  # no attr
-            "__radd__",  # not implemented
-            "__rand__",  # not implemented
-            "__rdiv__",  # not implemented
-            "__rmatmul__",  # not implemented
-            "__rmod__",  # not implemented
-            "__rmul__",  # not implemented
-            "__ror__",  # not implemented
-            "__rpow__",  # not implemented
-            "__rsub__",  # not implemented
-            "__rxor__",  # not implemented
-            "aminmax",  # list index out of range
-            "argsort",
+            "__radd__",  # later
+            "__rand__",  # later
+            "__rdiv__",  # later
+            "__rmul__",  # later
+            "__ror__",  # later
+            "__rsub__",  # later
+            "__rxor__",  # no bitwise_xor converter
             "bitwise_and",
             "bitwise_or",
-            "byte",
-            "char",
+            "bitwise_xor",
             "conj",
-            "double",
-            "erfinv",
-            "flatten",
-            "half",
-            "int",
             "logical_and",
             "logical_or",
             "logical_xor",
-            "long",
-            "mH",
-            "mT",
-            "nn_functional_bilinear",
-            "nn_functional_hardsigmoid",
-            "nn_functional_softsign",
-            "nn_functional_tanhshrink",
-            "reshape_as",
-            "short",
+            "flatten",  # tracing-specific failure
+            "nn_functional_bilinear",  # tracing-specific failure
+            "nn_functional_hardsigmoid",  # tracing-specific failure
             "std",
             "std_mean",
         }
@@ -476,12 +458,11 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
             "xlogy",  # ONNX Log only supports float dtypes
         }
     ),
-    # short.int64: FX tracing produces call_method[target=short] with no
-    # aten_meth_short converter in the tracing path.
-    "tracing": frozenset({"short"}),  # FunctionNotFoundError: aten_meth_short
+    # short.int64: aten_meth_short is now implemented; no extra failures for this dtype.
+    "tracing": frozenset(),
     "new-tracing": frozenset(
         {
-            "short",  # FunctionNotFoundError: aten_meth_short
+            "short",  # FunctionNotFoundError: aten_meth_short (new-tracing path)
             "true_divide",  # true_divide disappears
         }
     ),

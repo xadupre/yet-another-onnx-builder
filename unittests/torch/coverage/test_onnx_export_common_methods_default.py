@@ -273,7 +273,7 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
     return _test
 
 
-class TestOnnxExportCommonMethods(ExtTestCase):
+class TestOnnxExportCommonMethodsDefault(ExtTestCase):
     """Tests :func:`yobx.torch.interpreter.to_onnx` against ops from op_db.
 
     One test method is generated automatically for every (op, dtype) pair in
@@ -303,7 +303,7 @@ class TestOnnxExportCommonMethods(ExtTestCase):
                 setattr(cls, method_name, _make_export_test(op, dtype))
 
 
-TestOnnxExportCommonMethods._add_test_methods()
+TestOnnxExportCommonMethodsDefault._add_test_methods()
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
