@@ -13172,11 +13172,10 @@ def aten_tensor_split(
         else:
             total_size_1d = g.op.Shape(x, start=dim, name=name)
         # Clamp indices to [0, total_size] element-wise.
-        zero_1d = g.make_initializer("", np.array([0], dtype=np.int64))
         clamped = g.op.Min(indices_or_sections, total_size_1d, name=name)
-        clamped = g.op.Max(clamped, zero_1d, name=name)
+        clamped = g.op.Max(clamped, g.ZERO, name=name)
         # Build boundaries: [0] ++ clamped ++ [total_size].
-        boundaries = g.op.Concat(zero_1d, clamped, total_size_1d, axis=0, name=name)
+        boundaries = g.op.Concat(g.ZERO, clamped, total_size_1d, axis=0, name=name)
         # split_sizes = boundaries[1:n_outputs+1] - boundaries[0:n_outputs].
         rhs = g.op.Slice(
             boundaries,
@@ -13213,7 +13212,7 @@ def aten_tensor_split(
     )
 
 
-def aten_tensor_split_Tensor_indices_or_sections(
+def aten_tensor_split_tensor_indices_or_sections(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
