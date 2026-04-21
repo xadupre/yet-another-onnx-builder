@@ -4502,6 +4502,10 @@ class GraphBuilder(
 
         if not shape_set or (node.output and not self.has_shape(node.output[0])):
             # second try
+            assert node.output, (
+                f"No need to set shape if there is no output: {self.pretty_node(node)}"
+                f"{self.get_debug_msg()}"
+            )
             self._make_node_set_type_shape(node)
 
         node.doc_string += ".\n" + self._info_shape_type(node.output) + "\n"

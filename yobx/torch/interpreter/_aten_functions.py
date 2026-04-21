@@ -638,8 +638,10 @@ def aten_aminmax(
     dim: Optional[int] = None,
     keepdim: bool = False,
     name: str = "aminmax",
-) -> T:
+) -> Tuple[T, T]:
     "Returns both minimum and maximum reductions along the specified dimension."
+    if len(outputs) == 1:
+        outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
     if dim is None:
         res_min = g.op.ReduceMinAnyOpset(
             x, keepdims=1 if keepdim else 0, outputs=outputs[:1], name=name
@@ -1113,7 +1115,7 @@ def aten_argsort(
     _value, indices = g.op.TopK(x, n_elems, axis=dim, largest=int(descending), name=name)
     res = g.op.Identity(indices, name=name, outputs=outputs)
     if not sts:
-        set_type_shape_unary_op(g, res, x, dtype=TensorProto.INT64)
+        set_type_shape_unary_op(g, res, x, itype=TensorProto.INT64)
     return res
 
 
@@ -8071,24 +8073,39 @@ def aten_lt(
 
 
 def aten_lt_Scalar(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "lt_Scalar",
 ) -> T:
     "less"
-    return aten_lt(g, sts, outputs, x, y, name="lt_Scalar")
+    return aten_lt(g, sts, outputs, x, y, name=name)
 
 
 def aten_lt_Tensor(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "lt_Tensor",
 ) -> T:
     "less"
-    return aten_lt(g, sts, outputs, x, y, name="lt_Tensor")
+    return aten_lt(g, sts, outputs, x, y, name=name)
 
 
 def aten_matmul(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "matmul",
 ) -> T:
     "matmul"
-    res = g.op.MatMul(x, y, outputs=outputs)
+    res = g.op.MatMul(x, y, outputs=outputs, name=name)
     if not sts:
         set_type_shape_binary_op(g, outputs[0], x, y)
     return res
@@ -12956,6 +12973,28 @@ def aten_softplus(
     return res
 
 
+def aten_softsign(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "softsign",
+) -> T:
+    """Computes softsign: x / (1 + |x|)."""
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    one = (
+        np.array(1, dtype=dtype)
+        if g.get_rank(x) == 0
+        else np.array([1], dtype=dtype)
+    )
+    abs_x = g.op.Abs(x, name=name)
+    denom = g.op.Add(one, abs_x, name=name)
+    res = g.op.Div(x, denom, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
 def aten_split(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -13903,6 +13942,21 @@ def aten_tanh(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str]
     res = g.make_node("Tanh", [x], outputs, name="tanh")
     if not sts:
         set_type_shape_unary_op(g, outputs[0], x)
+    return res
+
+
+def aten_tanhshrink(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "tanhshrink",
+) -> T:
+    """Computes tanhshrink: x - tanh(x)."""
+    tanh_x = g.op.Tanh(x, name=name)
+    res = g.op.Sub(x, tanh_x, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
     return res
 
 
