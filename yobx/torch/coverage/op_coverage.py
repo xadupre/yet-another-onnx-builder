@@ -237,6 +237,12 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
     # beyond those already listed under ``"default"``.
     "tracing": frozenset(
         {
+            "__radd__",  # later
+            "__rand__",  # later
+            "__rdiv__",  # later
+            "__rmul__",  # later
+            "__ror__",  # later
+            "__rsub__",  # later
             "__rxor__",  # no bitwise_xor converter
             "flatten",  # tracing-specific failure
             "nn_functional_bilinear",  # tracing-specific failure

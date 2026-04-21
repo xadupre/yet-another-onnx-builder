@@ -638,8 +638,10 @@ def aten_aminmax(
     dim: Optional[int] = None,
     keepdim: bool = False,
     name: str = "aminmax",
-) -> T:
+) -> Tuple[T, T]:
     "Returns both minimum and maximum reductions along the specified dimension."
+    if len(outputs) == 1:
+        outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
     if dim is None:
         res_min = g.op.ReduceMinAnyOpset(
             x, keepdims=1 if keepdim else 0, outputs=outputs[:1], name=name
@@ -1113,7 +1115,7 @@ def aten_argsort(
     _value, indices = g.op.TopK(x, n_elems, axis=dim, largest=int(descending), name=name)
     res = g.op.Identity(indices, name=name, outputs=outputs)
     if not sts:
-        set_type_shape_unary_op(g, res, x, dtype=TensorProto.INT64)
+        set_type_shape_unary_op(g, res, x, itype=TensorProto.INT64)
     return res
 
 
