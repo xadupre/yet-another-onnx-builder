@@ -5034,7 +5034,11 @@ def aten_geqrf(
         col = g.op.Squeeze(col_2d, np.array([1], dtype=np.int64), name=name)  # (m-k,)
 
         # ------------------------------------------------------------------
-        # 2. L2 norm of the column
+        # 2. Full column norm (used for u0 and v_rest denominator).
+        #    Note: norm = ||col|| differs from xnorm = ||col[1:]|| (sub-vector
+        #    norm computed below); they are NOT the same and serve different
+        #    purposes — norm feeds the Householder vector computation while
+        #    xnorm drives the LAPACK dlarfg identity-reflector check.
         # ------------------------------------------------------------------
         norm = g.op.ReduceL2(
             col, np.array([0], dtype=np.int64), keepdims=0, name=name
@@ -5133,7 +5137,8 @@ def aten_geqrf(
                 name=name,
             )  # (1,)
 
-        # Handle zero-norm column (alpha == 0): identity reflector (tau = 0)
+        # Handle all-zero column (norm == 0 iff every element of col is zero):
+        # identity reflector (tau = 0)
         tau_k = g.op.Where(
             norm_is_zero, np.array([0.0], dtype=dtype), tau_k_raw, name=name
         )  # (1,)
