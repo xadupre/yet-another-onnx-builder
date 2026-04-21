@@ -12,6 +12,7 @@ from .xla_call_module_helper import (  # noqa: F401
     _extract_balanced_parens,
     _extract_function_body,
 )
+from .xla_call_module_layer import XlaLayer  # noqa: F401
 from .xla_call_module_parsing import (  # noqa: F401
     _get_function_param_ids,
     _get_function_param_info,
@@ -25,7 +26,7 @@ from .xla_call_module_parsing import (  # noqa: F401
 
 
 def _process_constant_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
     decoded_module: Optional[str] = None,
@@ -35,7 +36,8 @@ def _process_constant_layer(
     Updates *local_results* in-place, mapping the layer's result id to the
     generated initializer name.
 
-    :param layer: layer dict with keys ``id``, ``shape``, and ``dense_content``.
+    :param layer: :class:`XlaLayer` with fields ``id``, ``shape``, and
+        ``dense_content``.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
     :param decoded_module: unused; present for a uniform handler signature.
@@ -70,7 +72,7 @@ def _process_constant_layer(
 
 
 def _process_broadcast_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: Optional[GraphBuilderExtendedProtocol] = None,
     decoded_module: Optional[str] = None,
@@ -80,7 +82,7 @@ def _process_broadcast_layer(
     ONNX arithmetic ops support implicit broadcasting, so we simply pass the
     operand tensor through unchanged.
 
-    :param layer: layer dict with keys ``id`` and ``operands``.
+    :param layer: :class:`XlaLayer` with fields ``id`` and ``operands``.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: unused; present for a uniform handler signature.
     :param decoded_module: unused; present for a uniform handler signature.
@@ -91,14 +93,15 @@ def _process_broadcast_layer(
 
 
 def _process_dot_general_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
     decoded_module: Optional[str] = None,
 ) -> None:
     """Emit a MatMul ONNX op for a ``dot_general`` StableHLO layer.
 
-    :param layer: layer dict with keys ``id`` and ``operands`` (lhs, rhs).
+    :param layer: :class:`XlaLayer` with fields ``id`` and ``operands``
+        (lhs, rhs).
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
     :param decoded_module: unused; present for a uniform handler signature.
@@ -111,14 +114,15 @@ def _process_dot_general_layer(
 
 
 def _process_reduce_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
     decoded_module: Optional[str] = None,
 ) -> None:
     """Emit a ReduceMax or ReduceSum ONNX op for a ``reduce_*`` StableHLO layer.
 
-    :param layer: layer dict with keys ``id``, ``op``, ``operands``, and ``axes``.
+    :param layer: :class:`XlaLayer` with fields ``id``, ``op``, ``operands``,
+        and ``axes``.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
     :param decoded_module: unused; present for a uniform handler signature.
@@ -136,7 +140,7 @@ def _process_reduce_layer(
 
 
 def _process_call_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
     decoded_module: Union[str, Any],
@@ -147,7 +151,8 @@ def _process_call_layer(
     arguments to the function's parameter IDs (skipping shape-only args), and
     processes the function body recursively via :func:`_process_layers`.
 
-    :param layer: layer dict with keys ``id``, ``operands``, and ``func``.
+    :param layer: :class:`XlaLayer` with fields ``id``, ``operands``, and
+        ``func``.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
     :param decoded_module: either raw MLIR text (``str``) or an ``ir.Module``
@@ -214,7 +219,7 @@ def _process_call_layer(
 
 
 def _process_convert_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
     decoded_module: Optional[str] = None,
@@ -224,8 +229,8 @@ def _process_convert_layer(
     When the source and target types are identical this is a no-op
     (pass-through).
 
-    :param layer: layer dict with keys ``id``, ``operands``, and ``shape``
-        (the target tensor-type string, e.g. ``"tensor<f32>"``).
+    :param layer: :class:`XlaLayer` with fields ``id``, ``operands``, and
+        ``shape`` (the target tensor-type string, e.g. ``"tensor<f32>"``).
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
     :param decoded_module: unused; present for a uniform handler signature.
@@ -286,7 +291,7 @@ _STRUCTURAL_OPS = {
 
 
 def _process_layers(
-    layer_list: List[dict],
+    layer_list: List[XlaLayer],
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
     decoded_module: Union[str, Any],
@@ -300,7 +305,8 @@ def _process_layers(
     dispatched directly to their handler functions.  All other ops are
     handled via :func:`~yobx.tensorflow.ops.jax_ops.get_jax_cvt`.
 
-    :param layer_list: list of layer dicts produced by :func:`parse_mlir`.
+    :param layer_list: list of :class:`XlaLayer` objects produced by
+        :func:`parse_mlir` or :func:`parse_ir_module`.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
     :param decoded_module: either raw MLIR text or an ``ir.Module`` object

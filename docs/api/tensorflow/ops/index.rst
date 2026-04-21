@@ -24,4 +24,5 @@ yobx.tensorflow.ops
     unary_ops
     xla_call_module
     xla_call_module_helper
+    xla_call_module_layer
     xla_call_module_parsing
