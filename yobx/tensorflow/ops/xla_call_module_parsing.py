@@ -17,6 +17,7 @@ from .xla_call_module_helper import (
     _extract_balanced_parens,
     _extract_function_body,  # noqa: F401 – re-exported for callers
 )
+from .xla_call_module_layer import XlaLayer  # noqa: F401 – re-exported for callers
 
 # ---------------------------------------------------------------------------
 # Tensor-type and dense-value helpers
@@ -177,7 +178,7 @@ def _get_function_param_info(mlir_string: str, func_name: str) -> List[Tuple]:
 
 
 def _parse_body(scan_text: str, arg_alias: dict) -> list:
-    """Parse a single StableHLO function body into a list of layer dicts.
+    """Parse a single StableHLO function body into a list of :class:`XlaLayer` objects.
 
     This is the shared parsing kernel used by both :func:`parse_mlir` (for the
     main / wrapped function body) and by the ``call``-inlining code in
@@ -186,8 +187,8 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
     :param scan_text: the text between ``{`` and ``}`` of the function body.
     :param arg_alias: mapping from local ``%argN`` ids to caller-scope ids
         (used when parsing the ``@_wrapped_jax_export_main`` body).
-    :returns: list of layer dicts (unsorted; caller is responsible for sorting
-        if needed).
+    :returns: list of :class:`XlaLayer` objects (unsorted; caller is
+        responsible for sorting if needed).
     """
     layers: list = []
     all_special_spans: set = set()
@@ -215,14 +216,14 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         # Strip the dense< prefix and > suffix.
         dense_content = dense_attr[len("dense<") : -1]
         layers.append(
-            {
-                "id": res_id,
-                "op": "constant",
-                "operands": [],
-                "shape": m.group(3),
-                "loc": m.group(4) or "",
-                "dense_content": dense_content,
-            }
+            XlaLayer(
+                id=res_id,
+                op="constant",
+                operands=[],
+                shape=m.group(3),
+                loc=m.group(4) or "",
+                dense_content=dense_content,
+            )
         )
 
     # ------------------------------------------------------------------
@@ -243,15 +244,15 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         lhs_dims = [int(d.strip()) for d in m.group(4).split(",") if d.strip()]
         rhs_dims = [int(d.strip()) for d in m.group(5).split(",") if d.strip()]
         layers.append(
-            {
-                "id": res_id,
-                "op": "dot_general",
-                "operands": [lhs, rhs],
-                "shape": m.group(6),
-                "loc": m.group(7) or "",
-                "lhs_contracting": lhs_dims,
-                "rhs_contracting": rhs_dims,
-            }
+            XlaLayer(
+                id=res_id,
+                op="dot_general",
+                operands=[lhs, rhs],
+                shape=m.group(6),
+                loc=m.group(7) or "",
+                lhs_contracting=lhs_dims,
+                rhs_contracting=rhs_dims,
+            )
         )
 
     # ------------------------------------------------------------------
@@ -269,14 +270,14 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         operand = arg_alias.get(m.group(2), m.group(2))
         dims = [int(d.strip()) for d in m.group(3).split(",") if d.strip()]
         layers.append(
-            {
-                "id": res_id,
-                "op": "broadcast_in_dim",
-                "operands": [operand],
-                "shape": m.group(4),
-                "loc": m.group(5) or "",
-                "dims": dims,
-            }
+            XlaLayer(
+                id=res_id,
+                op="broadcast_in_dim",
+                operands=[operand],
+                shape=m.group(4),
+                loc=m.group(5) or "",
+                dims=dims,
+            )
         )
 
     # ------------------------------------------------------------------
@@ -295,14 +296,14 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         operand = arg_alias.get(m.group(2), m.group(2))
         dims = [int(d.strip()) for d in m.group(4).split(",") if d.strip()]
         layers.append(
-            {
-                "id": res_id,
-                "op": "dynamic_broadcast_in_dim",
-                "operands": [operand],
-                "shape": m.group(5),
-                "loc": m.group(6) or "",
-                "dims": dims,
-            }
+            XlaLayer(
+                id=res_id,
+                op="dynamic_broadcast_in_dim",
+                operands=[operand],
+                shape=m.group(5),
+                loc=m.group(6) or "",
+                dims=dims,
+            )
         )
 
     # ------------------------------------------------------------------
@@ -325,14 +326,14 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         raw_args = [a.strip() for a in m.group(3).split(",") if a.strip()]
         args = [arg_alias.get(a, a) for a in raw_args]
         layers.append(
-            {
-                "id": res_id,
-                "op": "call",
-                "operands": args,
-                "shape": m.group(4),
-                "loc": m.group(5) or "",
-                "func": func_name,
-            }
+            XlaLayer(
+                id=res_id,
+                op="call",
+                operands=args,
+                shape=m.group(4),
+                loc=m.group(5) or "",
+                func=func_name,
+            )
         )
 
     # ------------------------------------------------------------------
@@ -355,14 +356,14 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         axes = [int(d.strip()) for d in m.group(5).split(",") if d.strip()]
         onnx_op = _REDUCE_OP_MAP.get(reduce_op, f"reduce_{reduce_op}")
         layers.append(
-            {
-                "id": res_id,
-                "op": onnx_op,
-                "operands": [operand],
-                "shape": m.group(6),
-                "loc": m.group(7) or "",
-                "axes": axes,
-            }
+            XlaLayer(
+                id=res_id,
+                op=onnx_op,
+                operands=[operand],
+                shape=m.group(6),
+                loc=m.group(7) or "",
+                axes=axes,
+            )
         )
 
     # ------------------------------------------------------------------
@@ -395,7 +396,7 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         for m in re.finditer(pattern, scan_text):
             all_special_spans.update(range(m.start(), m.end()))
             res_id = arg_alias.get(m.group(1), m.group(1))
-            layers.append({"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""})
+            layers.append(XlaLayer(id=res_id, op="skip", operands=[], shape="", loc=""))
 
     # stablehlo.custom_call (no result; side-effect only).
     # loc(...) is optional: absent in JAX 0.10+ MLIR output.
@@ -420,13 +421,9 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         operand = arg_alias.get(m.group(2), m.group(2))
         tgt_type = m.group(3)
         layers.append(
-            {
-                "id": res_id,
-                "op": "convert",
-                "operands": [operand],
-                "shape": tgt_type,
-                "loc": m.group(4) or "",
-            }
+            XlaLayer(
+                id=res_id, op="convert", operands=[operand], shape=tgt_type, loc=m.group(4) or ""
+            )
         )
 
     # ------------------------------------------------------------------
@@ -444,13 +441,13 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
         op1 = arg_alias.get(op1, op1)
         op2 = arg_alias.get(op2, op2)
         layers.append(
-            {
-                "id": res_id,
-                "op": f"compare_{direction}",
-                "operands": [op1, op2],
-                "shape": shape,
-                "loc": location or "",
-            }
+            XlaLayer(
+                id=res_id,
+                op=f"compare_{direction}",
+                operands=[op1, op2],
+                shape=shape,
+                loc=location or "",
+            )
         )
 
     # ------------------------------------------------------------------
@@ -476,13 +473,13 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
             continue
 
         layers.append(
-            {
-                "id": res_id or "?",
-                "op": clean_op,
-                "operands": clean_operands,
-                "shape": shape,
-                "loc": location or "",
-            }
+            XlaLayer(
+                id=res_id or "?",
+                op=clean_op,
+                operands=clean_operands,
+                shape=shape,
+                loc=location or "",
+            )
         )
         if op_name == "return":
             break
@@ -490,8 +487,8 @@ def _parse_body(scan_text: str, arg_alias: dict) -> list:
     return layers
 
 
-def _get_layer_pos(layer: dict, scan_text: str) -> int:
-    """Return the character offset of this layer's result id in *scan_text*.
+def _get_layer_pos(layer: XlaLayer, scan_text: str) -> int:
+    """Returns the character offset of this layer's result id in *scan_text*.
 
     Used as the sort key to restore execution order after all patterns have
     been collected.  Returns ``len(scan_text)`` (i.e., sorts last) when the
@@ -505,11 +502,11 @@ def _get_layer_pos(layer: dict, scan_text: str) -> int:
     return len(scan_text)
 
 
-def parse_mlir(mlir_string: str) -> List[dict]:
-    """Parse a StableHLO MLIR module text into a list of layer dicts.
+def parse_mlir(mlir_string: str) -> List[XlaLayer]:
+    """Parse a StableHLO MLIR module text into a list of :class:`XlaLayer` objects.
 
-    Each dict has at minimum the keys ``id``, ``op``, ``operands``, ``shape``,
-    and ``loc``.  Recognised ``op`` values include:
+    Each :class:`XlaLayer` has at minimum the fields *id*, *op*, *operands*,
+    *shape*, and *loc*.  Recognised ``op`` values include:
 
     * ``"Input"`` – a function argument (tensor input).
     * ``"return"`` – function return.
@@ -557,7 +554,7 @@ def parse_mlir(mlir_string: str) -> List[dict]:
             continue
         seen_arg_ids.add(arg_id)
         results.append(
-            {"id": arg_id, "op": "Input", "operands": tuple(), "shape": shape, "loc": "header"}
+            XlaLayer(id=arg_id, op="Input", operands=tuple(), shape=shape, loc="header")
         )
 
     # 2. Determine which text region to scan for computation ops.
@@ -661,12 +658,12 @@ def parse_mlir(mlir_string: str) -> List[dict]:
     return [*input_layers, *compute_layers, *return_layers]
 
 
-def parse_ir_module(mlir_module) -> List[dict]:
+def parse_ir_module(mlir_module) -> List[XlaLayer]:
     """Parses an MLIR ``ir.Module`` using Python bindings (JAX 0.10+).
 
     Walks MLIR operations directly without converting the module to a text
     string, so ``loc(...)`` annotations are not required.  Returns the same
-    list of layer dicts as :func:`parse_mlir`.
+    list of :class:`XlaLayer` objects as :func:`parse_mlir`.
 
     Must be called while an active MLIR context is open (e.g., inside a
     ``with make_ir_context():`` block).
@@ -675,7 +672,8 @@ def parse_ir_module(mlir_module) -> List[dict]:
         ``jax.extend.mlir.deserialize_portable_artifact``.
 
     Returns:
-        List of layer dicts in the same format as :func:`parse_mlir`.
+        List of :class:`XlaLayer` objects in the same format as
+        :func:`parse_mlir`.
     """
     from jaxlib.mlir import ir  # available when jaxlib >= 0.4 (JAX 0.10+)
 
@@ -839,7 +837,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
         if t.startswith("tensor<") and aname not in seen_arg_names:
             seen_arg_names.add(aname)
             input_layers.append(
-                {"id": aname, "op": "Input", "operands": tuple(), "shape": t, "loc": "header"}
+                XlaLayer(id=aname, op="Input", operands=tuple(), shape=t, loc="header")
             )
 
     # ------------------------------------------------------------------
@@ -906,7 +904,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
         if oname in ("func.return", "return"):
             # cannot return '?' here
             layers_body.append(
-                {"id": res_id, "op": "return", "operands": operands, "shape": "", "loc": ""}
+                XlaLayer(id=res_id, op="return", operands=operands, shape="", loc="")
             )
             break
 
@@ -917,30 +915,25 @@ def parse_ir_module(mlir_module) -> List[dict]:
 
         # ---- skip: shape-query ops ----
         if oname == "stablehlo.get_dimension_size":
-            layers_body.append(
-                {"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""}
-            )
+            layers_body.append(XlaLayer(id=res_id, op="skip", operands=[], shape="", loc=""))
             continue
 
         # ---- skip: integer-tensor reshapes / concatenates (shape only) ----
         if oname in ("stablehlo.reshape", "stablehlo.concatenate"):
             if rtype and "f" not in rtype:  # integer element type → shape-only
-                layers_body.append(
-                    {"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""}
-                )
+                layers_body.append(XlaLayer(id=res_id, op="skip", operands=[], shape="", loc=""))
                 continue
 
         # ---- constant ----
         if oname == "stablehlo.constant":
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": "constant",
-                    "operands": [],
-                    "shape": rtype,
-                    "loc": "",
-                    "dense_content": _dense_content(op),
-                }
+                XlaLayer(
+                    id=res_id,
+                    op="constant",
+                    operands=[],
+                    shape=rtype,
+                    dense_content=_dense_content(op),
+                )
             )
             continue
 
@@ -948,15 +941,14 @@ def parse_ir_module(mlir_module) -> List[dict]:
         if oname == "stablehlo.dot_general":
             lhs_dims, rhs_dims = _dot_contracting(op)
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": "dot_general",
-                    "operands": operands[:2],
-                    "shape": rtype,
-                    "loc": "",
-                    "lhs_contracting": lhs_dims,
-                    "rhs_contracting": rhs_dims,
-                }
+                XlaLayer(
+                    id=res_id,
+                    op="dot_general",
+                    operands=operands[:2],
+                    shape=rtype,
+                    lhs_contracting=lhs_dims,
+                    rhs_contracting=rhs_dims,
+                )
             )
             continue
 
@@ -964,14 +956,13 @@ def parse_ir_module(mlir_module) -> List[dict]:
         if oname == "stablehlo.broadcast_in_dim":
             dims = _int_list(op, "broadcast_dimensions")
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": "broadcast_in_dim",
-                    "operands": operands[:1],
-                    "shape": rtype,
-                    "loc": "",
-                    "dims": dims,
-                }
+                XlaLayer(
+                    id=res_id,
+                    op="broadcast_in_dim",
+                    operands=operands[:1],
+                    shape=rtype,
+                    dims=dims,
+                )
             )
             continue
 
@@ -979,14 +970,13 @@ def parse_ir_module(mlir_module) -> List[dict]:
         if oname == "stablehlo.dynamic_broadcast_in_dim":
             dims = _int_list(op, "broadcast_dimensions")
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": "dynamic_broadcast_in_dim",
-                    "operands": operands[:1],  # tensor operand only; shape tensor is elided
-                    "shape": rtype,
-                    "loc": "",
-                    "dims": dims,
-                }
+                XlaLayer(
+                    id=res_id,
+                    op="dynamic_broadcast_in_dim",
+                    operands=operands[:1],  # tensor operand only; shape tensor is elided
+                    shape=rtype,
+                    dims=dims,
+                )
             )
             continue
 
@@ -994,26 +984,14 @@ def parse_ir_module(mlir_module) -> List[dict]:
         if oname == "stablehlo.compare":
             direction = _compare_dir(op)
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": f"compare_{direction}",
-                    "operands": operands[:2],
-                    "shape": rtype,
-                    "loc": "",
-                }
+                XlaLayer(id=res_id, op=f"compare_{direction}", operands=operands[:2], shape=rtype)
             )
             continue
 
         # ---- convert ----
         if oname == "stablehlo.convert":
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": "convert",
-                    "operands": operands[:1],
-                    "shape": rtype,
-                    "loc": "",
-                }
+                XlaLayer(id=res_id, op="convert", operands=operands[:1], shape=rtype)
             )
             continue
 
@@ -1032,14 +1010,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
                     break
             onnx_op = _REDUCE_OP_MAP.get(reduce_kind, f"reduce_{reduce_kind}")
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": onnx_op,
-                    "operands": operands[:1],
-                    "shape": rtype,
-                    "loc": "",
-                    "axes": axes,
-                }
+                XlaLayer(id=res_id, op=onnx_op, operands=operands[:1], shape=rtype, axes=axes)
             )
             continue
 
@@ -1048,14 +1019,7 @@ def parse_ir_module(mlir_module) -> List[dict]:
             callee = _callee(op)
             if callee:
                 layers_body.append(
-                    {
-                        "id": res_id,
-                        "op": "call",
-                        "operands": operands,
-                        "shape": rtype,
-                        "loc": "",
-                        "func": callee,
-                    }
+                    XlaLayer(id=res_id, op="call", operands=operands, shape=rtype, func=callee)
                 )
             continue
 
@@ -1064,17 +1028,11 @@ def parse_ir_module(mlir_module) -> List[dict]:
             clean_op = oname[len("stablehlo.") :]
             if operands:
                 layers_body.append(
-                    {
-                        "id": res_id,
-                        "op": clean_op,
-                        "operands": operands,
-                        "shape": rtype,
-                        "loc": "",
-                    }
+                    XlaLayer(id=res_id, op=clean_op, operands=operands, shape=rtype)
                 )
             continue
 
-    assert any(la["op"] == "return" for la in layers_body), (
+    assert any(la.op == "return" for la in layers_body), (
         f"parse_ir_module: no return op found. "
         f"{len(input_layers)} inputs, {len(layers_body)} body layers.\n"
         f"Module: {mlir_module}"
@@ -1098,9 +1056,9 @@ def _parse_ir_private_function(mlir_module, func_name: str):
 
     Returns:
         A tuple ``(param_info, layers)`` where *param_info* is a list of
-        ``(param_id, is_shape_only)`` pairs and *layers* is a list of layer
-        dicts in the same format as :func:`parse_mlir`.  Returns
-        ``([], None)`` when the function is not found.
+        ``(param_id, is_shape_only)`` pairs and *layers* is a list of
+        :class:`XlaLayer` objects in the same format as :func:`parse_mlir`.
+        Returns ``([], None)`` when the function is not found.
     """
     from jaxlib.mlir import ir  # available when jaxlib >= 0.4 (JAX 0.10+)
 
@@ -1259,17 +1217,11 @@ def _parse_ir_private_function(mlir_module, func_name: str):
                 dtype in (np.int32, np.int64, np.uint32, np.uint64) and len(shape) <= 1
             ):
                 input_layers.append(
-                    {
-                        "id": param_id,
-                        "op": "Input",
-                        "operands": tuple(),
-                        "shape": t,
-                        "loc": "header",
-                    }
+                    XlaLayer(id=param_id, op="Input", operands=tuple(), shape=t, loc="header")
                 )
 
     # ------------------------------------------------------------------
-    # Parse function body ops into layer dicts (mirrors parse_ir_module).
+    # Parse function body ops into XlaLayer objects (mirrors parse_ir_module).
     # ------------------------------------------------------------------
     layers_body: list = []
 
@@ -1284,21 +1236,17 @@ def _parse_ir_private_function(mlir_module, func_name: str):
             continue
 
         if oname == "stablehlo.get_dimension_size":
-            layers_body.append(
-                {"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""}
-            )
+            layers_body.append(XlaLayer(id=res_id, op="skip", operands=[], shape="", loc=""))
             continue
 
         if oname in ("stablehlo.reshape", "stablehlo.concatenate"):
             if rtype and "f" not in rtype:
-                layers_body.append(
-                    {"id": res_id, "op": "skip", "operands": [], "shape": "", "loc": ""}
-                )
+                layers_body.append(XlaLayer(id=res_id, op="skip", operands=[], shape="", loc=""))
                 continue
 
         if oname in ("func.return", "return"):
             layers_body.append(
-                {"id": res_id, "op": "return", "operands": operands, "shape": "", "loc": ""}
+                XlaLayer(id=res_id, op="return", operands=operands, shape="", loc="")
             )
             break
 
@@ -1307,82 +1255,66 @@ def _parse_ir_private_function(mlir_module, func_name: str):
 
         if oname == "stablehlo.constant":
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": "constant",
-                    "operands": [],
-                    "shape": rtype,
-                    "loc": "",
-                    "dense_content": _dense_content(op),
-                }
+                XlaLayer(
+                    id=res_id,
+                    op="constant",
+                    operands=[],
+                    shape=rtype,
+                    dense_content=_dense_content(op),
+                )
             )
             continue
 
         if oname == "stablehlo.dot_general":
             lhs_dims, rhs_dims = _dot_contracting(op)
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": "dot_general",
-                    "operands": operands[:2],
-                    "shape": rtype,
-                    "loc": "",
-                    "lhs_contracting": lhs_dims,
-                    "rhs_contracting": rhs_dims,
-                }
+                XlaLayer(
+                    id=res_id,
+                    op="dot_general",
+                    operands=operands[:2],
+                    shape=rtype,
+                    lhs_contracting=lhs_dims,
+                    rhs_contracting=rhs_dims,
+                )
             )
             continue
 
         if oname == "stablehlo.broadcast_in_dim":
             dims = _int_list(op, "broadcast_dimensions")
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": "broadcast_in_dim",
-                    "operands": operands[:1],
-                    "shape": rtype,
-                    "loc": "",
-                    "dims": dims,
-                }
+                XlaLayer(
+                    id=res_id,
+                    op="broadcast_in_dim",
+                    operands=operands[:1],
+                    shape=rtype,
+                    dims=dims,
+                )
             )
             continue
 
         if oname == "stablehlo.dynamic_broadcast_in_dim":
             dims = _int_list(op, "broadcast_dimensions")
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": "dynamic_broadcast_in_dim",
-                    "operands": operands[:1],
-                    "shape": rtype,
-                    "loc": "",
-                    "dims": dims,
-                }
+                XlaLayer(
+                    id=res_id,
+                    op="dynamic_broadcast_in_dim",
+                    operands=operands[:1],
+                    shape=rtype,
+                    dims=dims,
+                )
             )
             continue
 
         if oname == "stablehlo.compare":
             direction = _compare_dir(op)
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": f"compare_{direction}",
-                    "operands": operands[:2],
-                    "shape": rtype,
-                    "loc": "",
-                }
+                XlaLayer(id=res_id, op=f"compare_{direction}", operands=operands[:2], shape=rtype)
             )
             continue
 
         if oname == "stablehlo.convert":
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": "convert",
-                    "operands": operands[:1],
-                    "shape": rtype,
-                    "loc": "",
-                }
+                XlaLayer(id=res_id, op="convert", operands=operands[:1], shape=rtype)
             )
             continue
 
@@ -1400,14 +1332,7 @@ def _parse_ir_private_function(mlir_module, func_name: str):
                     break
             onnx_op = _REDUCE_OP_MAP.get(reduce_kind, f"reduce_{reduce_kind}")
             layers_body.append(
-                {
-                    "id": res_id,
-                    "op": onnx_op,
-                    "operands": operands[:1],
-                    "shape": rtype,
-                    "loc": "",
-                    "axes": axes,
-                }
+                XlaLayer(id=res_id, op=onnx_op, operands=operands[:1], shape=rtype, axes=axes)
             )
             continue
 
@@ -1415,14 +1340,7 @@ def _parse_ir_private_function(mlir_module, func_name: str):
             callee = _callee(op)
             if callee:
                 layers_body.append(
-                    {
-                        "id": res_id,
-                        "op": "call",
-                        "operands": operands,
-                        "shape": rtype,
-                        "loc": "",
-                        "func": callee,
-                    }
+                    XlaLayer(id=res_id, op="call", operands=operands, shape=rtype, func=callee)
                 )
             continue
 
@@ -1430,13 +1348,7 @@ def _parse_ir_private_function(mlir_module, func_name: str):
             clean_op = oname[len("stablehlo.") :]
             if operands:
                 layers_body.append(
-                    {
-                        "id": res_id,
-                        "op": clean_op,
-                        "operands": operands,
-                        "shape": rtype,
-                        "loc": "",
-                    }
+                    XlaLayer(id=res_id, op=clean_op, operands=operands, shape=rtype)
                 )
             continue
 

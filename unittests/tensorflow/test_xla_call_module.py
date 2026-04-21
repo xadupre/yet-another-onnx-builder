@@ -2,7 +2,8 @@
 Unit tests for :mod:`yobx.tensorflow.ops.xla_call_module`.
 
 Tests cover:
-* :func:`parse_mlir` – MLIR text → list of layer dicts.
+* :class:`XlaLayer` – layer class replacing plain dicts.
+* :func:`parse_mlir` – MLIR text → list of :class:`XlaLayer` objects.
 * :data:`_MAPPING_JAX_ONNX` – every entry is a valid ONNX op-type string.
 * :func:`get_jax_cvt` – returns a callable for every supported op; raises for
   unknown ops.
@@ -65,6 +66,140 @@ func.func @main(%arg0: tensor<3x4xf32>, %arg1: tensor<3x4xf32>) -> tensor<3x4xi1
   return %0 : tensor<3x4xi1> loc(#loc1)
 }
 """
+
+
+class TestXlaLayer(ExtTestCase):
+    """Tests for :class:`~yobx.tensorflow.ops.xla_call_module_layer.XlaLayer`."""
+
+    def _import(self):
+        from yobx.tensorflow.ops.xla_call_module_layer import XlaLayer
+
+        return XlaLayer
+
+    def test_core_fields_attribute_access(self):
+        """Core fields are accessible as attributes."""
+        XlaLayer = self._import()
+        layer = XlaLayer(
+            id="%0", op="sine", operands=["%arg0"], shape="tensor<3x4xf32>", loc="#loc0"
+        )
+        self.assertEqual(layer.id, "%0")
+        self.assertEqual(layer.op, "sine")
+        self.assertEqual(layer.operands, ["%arg0"])
+        self.assertEqual(layer.shape, "tensor<3x4xf32>")
+        self.assertEqual(layer.loc, "#loc0")
+
+    def test_dict_style_getitem(self):
+        """Dict-style ``layer["key"]`` access works for all core fields."""
+        XlaLayer = self._import()
+        layer = XlaLayer(id="%1", op="add", operands=["%a", "%b"], shape="tensor<f32>")
+        self.assertEqual(layer["id"], "%1")
+        self.assertEqual(layer["op"], "add")
+        self.assertEqual(layer["operands"], ["%a", "%b"])
+        self.assertEqual(layer["shape"], "tensor<f32>")
+
+    def test_dict_style_setitem(self):
+        """Dict-style ``layer["key"] = value`` assignment works."""
+        XlaLayer = self._import()
+        layer = XlaLayer(id="%0", op="sine", operands=["%arg0"])
+        layer["shape"] = "tensor<5xf32>"
+        self.assertEqual(layer.shape, "tensor<5xf32>")
+
+    def test_get_with_default(self):
+        """``layer.get(key, default)`` returns the value or the default."""
+        XlaLayer = self._import()
+        layer = XlaLayer(id="%0", op="constant", operands=[], dense_content="1.0")
+        self.assertEqual(layer.get("dense_content", ""), "1.0")
+        self.assertEqual(layer.get("axes", []), [])
+        self.assertEqual(layer.get("func", ""), "")
+        self.assertIsNone(layer.get("nonexistent_key"))
+        self.assertEqual(layer.get("nonexistent_key", "default"), "default")
+
+    def test_getitem_missing_key_raises(self):
+        """``layer["missing"]`` raises :exc:`KeyError`."""
+        XlaLayer = self._import()
+        layer = XlaLayer(id="%0", op="sine", operands=[])
+        with self.assertRaises(KeyError):
+            _ = layer["nonexistent_field"]
+
+    def test_optional_fields_default_to_empty(self):
+        """Optional fields default to empty lists or empty strings."""
+        XlaLayer = self._import()
+        layer = XlaLayer(id="%0", op="sine", operands=["%arg0"])
+        self.assertEqual(layer.dense_content, "")
+        self.assertEqual(layer.dims, [])
+        self.assertEqual(layer.axes, [])
+        self.assertEqual(layer.func, "")
+        self.assertEqual(layer.lhs_contracting, [])
+        self.assertEqual(layer.rhs_contracting, [])
+
+    def test_constant_layer(self):
+        """``constant`` layer stores ``dense_content``."""
+        XlaLayer = self._import()
+        layer = XlaLayer(
+            id="%c", op="constant", operands=[], shape="tensor<3xf32>", dense_content="1.0"
+        )
+        self.assertEqual(layer["op"], "constant")
+        self.assertEqual(layer["dense_content"], "1.0")
+        self.assertEqual(layer.get("dense_content", ""), "1.0")
+
+    def test_reduce_layer_axes(self):
+        """``reduce_*`` layers store ``axes``."""
+        XlaLayer = self._import()
+        layer = XlaLayer(id="%r", op="reduce_max", operands=["%x"], axes=[0, 1])
+        self.assertEqual(layer.axes, [0, 1])
+        self.assertEqual(layer["axes"], [0, 1])
+        self.assertEqual(layer.get("axes", []), [0, 1])
+
+    def test_dot_general_contracting_dims(self):
+        """``dot_general`` layers store ``lhs_contracting`` / ``rhs_contracting``."""
+        XlaLayer = self._import()
+        layer = XlaLayer(
+            id="%mm",
+            op="dot_general",
+            operands=["%a", "%b"],
+            lhs_contracting=[1],
+            rhs_contracting=[0],
+        )
+        self.assertEqual(layer.lhs_contracting, [1])
+        self.assertEqual(layer.rhs_contracting, [0])
+
+    def test_call_layer_func(self):
+        """``call`` layers store the callee ``func`` name."""
+        XlaLayer = self._import()
+        layer = XlaLayer(id="%out", op="call", operands=["%arg0"], func="relu")
+        self.assertEqual(layer.func, "relu")
+        self.assertEqual(layer["func"], "relu")
+
+    def test_repr_contains_op_and_id(self):
+        """``repr`` includes at least the op and id."""
+        XlaLayer = self._import()
+        layer = XlaLayer(id="%0", op="tanh", operands=["%arg0"])
+        r = repr(layer)
+        self.assertIn("tanh", r)
+        self.assertIn("%0", r)
+
+    def test_parse_mlir_returns_xla_layers(self):
+        """``parse_mlir`` returns a list of :class:`XlaLayer` objects."""
+        from yobx.tensorflow.ops.xla_call_module_layer import XlaLayer
+        from yobx.tensorflow.ops.xla_call_module import parse_mlir
+
+        layers = parse_mlir(_MLIR_SIN)
+        for layer in layers:
+            self.assertIsInstance(layer, XlaLayer)
+
+    def test_parse_mlir_xla_layer_field_access(self):
+        """Layers returned by ``parse_mlir`` support both attribute and dict access."""
+        from yobx.tensorflow.ops.xla_call_module import parse_mlir
+
+        layers = parse_mlir(_MLIR_TWO_OPS)
+        compute = [la for la in layers if la.op not in ("Input", "return")]
+        self.assertEqual(len(compute), 2)
+        # Attribute access
+        self.assertEqual(compute[0].op, "abs")
+        self.assertEqual(compute[1].op, "negate")
+        # Dict-style access
+        self.assertEqual(compute[0]["op"], "abs")
+        self.assertEqual(compute[1]["op"], "negate")
 
 
 class TestParseMlir(ExtTestCase):
