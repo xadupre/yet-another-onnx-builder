@@ -1,6 +1,5 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Union
 import itertools
-import traceback
 from ...xexpressions import simplify_expression
 import torch
 
@@ -409,16 +408,18 @@ class TracingInt:
         scalar-comparison op (e.g. ``aten.gt.Scalar``) that produces a 0-dim
         ``bool`` tensor.
 
-        This method avoids importing :class:`~yobx.torch.new_tracing.tensor.TracingTensor`
-        at module level to prevent a circular import.  Instead it obtains the
-        ``TracingTensor`` class at runtime from the ``meta["val"]`` of
-        :attr:`_node`.
+        A local import of :class:`~yobx.torch.new_tracing.tensor.TracingTensor`
+        is used to avoid a circular import at module level (``tensor.py``
+        imports from ``shape.py``).  This is safe because both modules are
+        fully initialised by the time any tracing operation calls this method.
 
         :param op: One of ``">"``, ``">="``, ``"<"``, ``"<="``, ``"!="``.
         :param other: The right-hand scalar integer value.
         :return: The newly created FX :class:`~torch.fx.Node`, or ``None`` if
             the required ATen op is unavailable.
         """
+        import traceback
+
         if not TracingInt._ATEN_SCALAR_CMP_OPS:
             TracingInt._ATEN_SCALAR_CMP_OPS = {
                 ">": torch.ops.aten.gt.Scalar,
@@ -432,19 +433,16 @@ class TracingInt:
             return None
         cmp_node = self._tracer.graph.call_function(aten_op, args=(self._node, other), kwargs={})
         # Set meta["val"] to a 0-dim bool TracingTensor so that the
-        # interpreter can determine the output type.  We obtain the
-        # TracingTensor class from the source node's meta to avoid a
-        # circular import between shape.py and tensor.py.
-        source_tt = self._node.meta.get("val")
-        if source_tt is not None:
-            TT = type(source_tt)
-            device = self._device or "cpu"
-            cmp_tt = TT.__new__(TT, TracingShape(()), dtype=torch.bool, device=device)
-            TT.__init__(
-                cmp_tt, TracingShape(()), dtype=torch.bool, device=device, tracer=self._tracer
-            )
-            cmp_tt._node = cmp_node
-            cmp_node.meta["val"] = cmp_tt
+        # interpreter can determine the output type.  Use a local import to
+        # avoid a circular dependency between shape.py and tensor.py.
+        from .tensor import TracingTensor
+
+        device = self._device or "cpu"
+        cmp_tt = TracingTensor(
+            TracingShape(()), dtype=torch.bool, device=device, tracer=self._tracer
+        )
+        cmp_tt._node = cmp_node
+        cmp_node.meta["val"] = cmp_tt
         cmp_node.meta["stack_trace"] = "".join(traceback.format_stack())
         return cmp_node
 

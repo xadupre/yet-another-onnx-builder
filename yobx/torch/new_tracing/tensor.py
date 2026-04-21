@@ -1,5 +1,4 @@
 from typing import Any, Dict, List, Optional, Tuple, Union
-import traceback
 import torch
 import torch.fx
 import torch.utils._pytree as _pytree
@@ -156,6 +155,8 @@ class TracingTensor(torch.Tensor):
             or ``None`` when no tracer is active or the tensor has no
             dimensions.
         """
+        import traceback
+
         tracer = self._tracer
         if tracer is None or self._node is None:
             return None
