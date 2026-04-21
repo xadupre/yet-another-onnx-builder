@@ -4596,6 +4596,20 @@ def aten_flip(
     return res
 
 
+def aten_fliplr(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "fliplr"
+) -> T:
+    """fliplr"""
+    return aten_flip(g, sts, outputs, x, [1], name=name)
+
+
+def aten_flipud(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "flipud"
+) -> T:
+    """flipud"""
+    return aten_flip(g, sts, outputs, x, [0], name=name)
+
+
 def aten_floor(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     """floor"""
     res = g.op.Floor(x, name="floor", outputs=outputs)
