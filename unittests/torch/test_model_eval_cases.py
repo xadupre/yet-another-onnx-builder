@@ -349,6 +349,9 @@ class TestModelEvalCases(ExtTestCase):
             cases="BuildInIsInstance", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_shape_based_new_tracing(self):
+        evaluation(cases="ShapeBased", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
     def test_run_exporter_shape_and_type_based_tracing(self):
         evaluation(cases="ShapeAndTypeBased", exporters="yobx-tracing", quiet=False, dynamic=True)
 
