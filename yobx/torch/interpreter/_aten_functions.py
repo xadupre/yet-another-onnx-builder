@@ -4986,6 +4986,192 @@ def aten_ge_Tensor(
     return aten_ge(g, sts, outputs, x, y, name="ge_Tensor")
 
 
+def aten_geqrf(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "geqrf"
+) -> Tuple[T, T]:
+    """Computes the LAPACK-style packed QR factorisation via Householder reflectors.
+
+    Returns ``(a, tau)`` where *a* (shape ``(m, n)``) holds the upper-triangular
+    *R* factor in its upper triangle and the normalised Householder vectors in
+    its strictly lower triangle, and *tau* (shape ``(min(m, n),)``) holds the
+    corresponding scalar factors.
+
+    The input must have a statically-known 2-D shape because the Householder
+    loop is unrolled at graph-construction time.
+    """
+    assert g.has_shape(x), (
+        f"aten_geqrf requires a statically known shape; "
+        f"use a concrete input shape{g.get_debug_msg()}"
+    )
+    shape = g.get_shape(x)
+    assert len(shape) == 2 and all(isinstance(d, int) for d in shape), (
+        f"aten_geqrf requires a 2-D matrix with static integer dimensions, "
+        f"got shape={shape}{g.get_debug_msg()}"
+    )
+    m, n = shape
+    itype = g.get_type(x)
+    dtype = tensor_dtype_to_np_dtype(itype)
+    K = min(m, n)
+
+    if len(outputs) == 1:
+        outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
+
+    # A is updated through a chain of Add operations; tau is accumulated similarly.
+    A: T = x
+    tau: T = np.zeros(K, dtype=dtype)
+
+    for k in range(K):
+        # ------------------------------------------------------------------
+        # 1. Extract the k-th column from row k downward: col = A[k:, k]
+        # ------------------------------------------------------------------
+        col_2d = g.op.Slice(
+            A,
+            np.array([k, k], dtype=np.int64),
+            np.array([m, k + 1], dtype=np.int64),
+            np.array([0, 1], dtype=np.int64),
+            name=name,
+        )  # (m-k, 1)
+        col = g.op.Squeeze(col_2d, np.array([1], dtype=np.int64), name=name)  # (m-k,)
+
+        # ------------------------------------------------------------------
+        # 2. L2 norm of the column
+        # ------------------------------------------------------------------
+        norm = g.op.ReduceL2(
+            col, np.array([0], dtype=np.int64), keepdims=0, name=name
+        )  # scalar ()
+        norm_1d = g.op.Unsqueeze(norm, np.array([0], dtype=np.int64), name=name)  # (1,)
+        norm_is_zero = g.op.Equal(norm_1d, np.array([0.0], dtype=dtype), name=name)  # (1,) bool
+
+        # ------------------------------------------------------------------
+        # 3. col[0] = alpha; sign(alpha) defaulting to +1 when alpha == 0
+        # ------------------------------------------------------------------
+        alpha = g.op.Slice(
+            col,
+            np.array([0], dtype=np.int64),
+            np.array([1], dtype=np.int64),
+            np.array([0], dtype=np.int64),
+            name=name,
+        )  # (1,)
+        sign_alpha = g.op.Sign(alpha, name=name)  # (1,)
+        sign_alpha = g.op.Where(
+            g.op.Equal(sign_alpha, np.array([0.0], dtype=dtype), name=name),
+            np.array([1.0], dtype=dtype),
+            sign_alpha,
+            name=name,
+        )  # (1,)
+
+        # u0 = alpha + sign(alpha) * norm  (numerically stable; u0 != 0 when norm != 0)
+        u0 = g.op.Add(alpha, g.op.Mul(sign_alpha, norm_1d, name=name), name=name)  # (1,)
+
+        # ------------------------------------------------------------------
+        # 4. Build normalised Householder vector v = [1, col[1:] / u0]
+        #    and compute tau_k = 2 / (v^T v) = 2 / (1 + ||col[1:]/u0||^2)
+        # ------------------------------------------------------------------
+        if m - k > 1:
+            col_rest = g.op.Slice(
+                col,
+                np.array([1], dtype=np.int64),
+                np.array([m - k], dtype=np.int64),
+                np.array([0], dtype=np.int64),
+                name=name,
+            )  # (m-k-1,)
+            v_rest_raw = g.op.Div(col_rest, u0, name=name)  # (m-k-1,); NaN when u0==0
+            # Guard: replace NaN (u0==0 iff norm==0) with zeros
+            v_rest: T = g.op.Where(
+                norm_is_zero, np.zeros(m - k - 1, dtype=dtype), v_rest_raw, name=name
+            )  # (m-k-1,)
+            v: T = g.op.Concat(np.array([1.0], dtype=dtype), v_rest, axis=0, name=name)  # (m-k,)
+            # tau_k = 2 / (1 + ||v_rest||^2)
+            v_rest_sq_sum_sc = g.op.ReduceSum(
+                g.op.Mul(v_rest, v_rest, name=name),
+                np.array([0], dtype=np.int64),
+                keepdims=0,
+                name=name,
+            )  # scalar
+            v_rest_sq_sum_1d = g.op.Unsqueeze(
+                v_rest_sq_sum_sc, np.array([0], dtype=np.int64), name=name
+            )  # (1,)
+            tau_k_raw: T = g.op.Div(
+                np.array([2.0], dtype=dtype),
+                g.op.Add(np.array([1.0], dtype=dtype), v_rest_sq_sum_1d, name=name),
+                name=name,
+            )  # (1,)
+        else:
+            # m - k == 1: v = [1], v^T v = 1, tau = 2
+            v = np.array([1.0], dtype=dtype)  # (1,)
+            tau_k_raw = np.array([2.0], dtype=dtype)  # (1,)
+
+        # Handle zero-norm column: use identity reflector (tau = 0)
+        tau_k = g.op.Where(
+            norm_is_zero, np.array([0.0], dtype=dtype), tau_k_raw, name=name
+        )  # (1,)
+
+        # ------------------------------------------------------------------
+        # 5. Apply Householder reflection to A[k:, k:]
+        #    A_sub_new = A_sub - tau_k * v_col @ (v_row @ A_sub)
+        # ------------------------------------------------------------------
+        A_sub = g.op.Slice(
+            A,
+            np.array([k, k], dtype=np.int64),
+            np.array([m, n], dtype=np.int64),
+            np.array([0, 1], dtype=np.int64),
+            name=name,
+        )  # (m-k, n-k)
+        v_col = g.op.Unsqueeze(v, np.array([1], dtype=np.int64), name=name)  # (m-k, 1)
+        v_row = g.op.Unsqueeze(v, np.array([0], dtype=np.int64), name=name)  # (1, m-k)
+        # proj = v^T @ A_sub -> (1, m-k) @ (m-k, n-k) = (1, n-k)
+        proj = g.op.MatMul(v_row, A_sub, name=name)  # (1, n-k)
+        # tau_k_2d for broadcasting: (1,) -> (1, 1)
+        tau_k_2d = g.op.Unsqueeze(tau_k, np.array([0], dtype=np.int64), name=name)  # (1, 1)
+        scaled_proj = g.op.Mul(tau_k_2d, proj, name=name)  # (1, n-k)
+        # outer = v_col @ scaled_proj -> (m-k, 1) @ (1, n-k) = (m-k, n-k)
+        outer = g.op.MatMul(v_col, scaled_proj, name=name)  # (m-k, n-k)
+        A_sub_new = g.op.Sub(A_sub, outer, name=name)  # (m-k, n-k)
+
+        # ------------------------------------------------------------------
+        # 6. Scatter A_sub_new back into A at position [k:, k:]
+        #    diff = A_sub_new - A_sub; A = A + Pad(diff, [k, k, 0, 0])
+        #    ONNX Pad pads format (rank-2): [row_begin, col_begin, row_end, col_end]
+        # ------------------------------------------------------------------
+        diff = g.op.Sub(A_sub_new, A_sub, name=name)  # (m-k, n-k)
+        pad_diff = np.array([k, k, 0, 0], dtype=np.int64)
+        padded_diff = g.op.Pad(diff, pad_diff, name=name)  # (m, n)
+        A = g.op.Add(A, padded_diff, name=name)  # (m, n)
+
+        # ------------------------------------------------------------------
+        # 7. Overwrite A[k+1:, k] with v_rest (LAPACK Householder storage)
+        #    The reflection already zeroed A[k+1:, k]; add v_rest there.
+        # ------------------------------------------------------------------
+        if m - k > 1:
+            v_rest_col = g.op.Unsqueeze(
+                v_rest, np.array([1], dtype=np.int64), name=name
+            )  # (m-k-1, 1)
+            # Pad to (m, n): pads = [row_begin=k+1, col_begin=k, row_end=0, col_end=n-k-1]
+            pad_house = np.array([k + 1, k, 0, n - k - 1], dtype=np.int64)
+            v_rest_full = g.op.Pad(v_rest_col, pad_house, name=name)  # (m, n)
+            A = g.op.Add(A, v_rest_full, name=name)  # (m, n)
+
+        # ------------------------------------------------------------------
+        # 8. Accumulate tau[k] = tau_k
+        #    pad_tau = [k zeros before, K-k-1 zeros after]
+        # ------------------------------------------------------------------
+        pad_tau = np.array([k, K - k - 1], dtype=np.int64)
+        tau_update = g.op.Pad(tau_k, pad_tau, name=name)  # (K,)
+        tau = g.op.Add(tau, tau_update, name=name)  # (K,)
+
+    # Write outputs
+    a_out = g.op.Identity(A, outputs=outputs[:1], name=name)
+    tau_out = g.op.Identity(tau, outputs=outputs[1:], name=name)
+
+    if not sts:
+        g.set_type(a_out, itype)
+        g.set_shape(a_out, (m, n))
+        g.set_type(tau_out, itype)
+        g.set_shape(tau_out, (K,))
+
+    return a_out, tau_out
+
+
 def aten_gelu(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
