@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 from onnx import TensorProto
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
@@ -844,7 +844,7 @@ def aten_meth_aminmax(
     x: T,
     dim: Optional[int] = None,
     keepdim: bool = False,
-) -> T:
+) -> Tuple[T, T]:
     "Computes both minimum and maximum values."
     return aten_aminmax(g, sts, outputs, x, dim=dim, keepdim=keepdim, name=".aminmax")
 
