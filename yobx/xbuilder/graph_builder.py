@@ -2639,9 +2639,13 @@ class GraphBuilder(
                         f"{self.get_debug_msg()}"
                     )
                     name = self.get_dimension_as_result(name)
-                elif not self.has_name(value) and not value.isidentifier():
-                    # Compound expression such as "dy+1": compute it as an
-                    # ONNX arithmetic result (rank-1 INT64 tensor).
+                elif not self.has_name(value) and (
+                    not value.isidentifier() or value in self.dynamic_dimensions_source
+                ):
+                    # Compound expression such as "dy+1", or a simple symbolic
+                    # dimension from new tracing (e.g. "dx") whose source
+                    # tensor/axis is known: compute an ONNX arithmetic result
+                    # (rank-1 INT64 tensor) via Shape+Gather nodes emitted on demand.
                     import re
 
                     safe = re.sub(r"[^a-zA-Z0-9_]", "_", value)
@@ -3901,6 +3905,22 @@ class GraphBuilder(
                     self.add_dynamic_object(sb, sb)
                 continue
 
+            if (
+                self._has_torch
+                and isinstance(a, self.TracingInt)
+                and not a.is_static
+                and isinstance(b, str)
+            ):
+                # For new tracing, the shape element is a symbolic TracingInt.
+                # Register the dimension source so that get_dimension_as_result
+                # can emit Shape+Gather nodes on demand when building shapes.
+                if b not in self.dynamic_dimensions_source:
+                    self.dynamic_dimensions_source[b] = []
+                source = {"input_name": name, "axis": _idim}
+                if source not in self.dynamic_dimensions_source[b]:
+                    self.dynamic_dimensions_source[b].append(source)
+                if b not in self.dynamic_objects_rev:
+                    self.add_dynamic_objects_rev(b, (b, _idim))
             self._dynamic_to_str(b, register_if_not_exist=True)
             self._dynamic_to_str(a, register_if_not_exist=True)
 
