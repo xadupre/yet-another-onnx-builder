@@ -39,6 +39,7 @@ TBOOL = TensorProto.BOOL
 TFLOAT = TensorProto.FLOAT
 TINT64 = TensorProto.INT64
 TFLOAT16 = TensorProto.FLOAT16
+TINT32 = TensorProto.INT32
 TINT64 = TensorProto.INT64
 _mkv_ = oh.make_tensor_value_info
 
@@ -3601,8 +3602,8 @@ class TestGraphPatternOptimization(ExtTestCase):
             oh.make_graph(
                 [oh.make_node("Max", ["X", "zero"], ["Y"])],
                 "dummy",
-                [_mkv_("X", TINT64, [3, 3])],
-                [_mkv_("Y", TINT64, [3, 3])],
+                [_mkv_("X", TINT32, [3, 3])],
+                [_mkv_("Y", TINT32, [3, 3])],
                 [onh.from_array(np.array([0], dtype=np.int64), name="zero")],
             ),
             opset_imports=[oh.make_opsetid("", 18)],

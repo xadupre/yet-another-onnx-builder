@@ -37,6 +37,14 @@ _ORIGINAL_TORCH_FULL: Callable = torch.full
 _ORIGINAL_TORCH_ZEROS: Callable = torch.zeros
 _ORIGINAL_TORCH_ONES: Callable = torch.ones
 
+# Capture the real ``torch.tensor_split`` at import time so that calls with
+# a :class:`~yobx.torch.new_tracing.tensor.TracingTensor` as
+# ``indices_or_sections`` can be intercepted: the native C++ kernel tries to
+# read concrete values from the indices tensor before dispatching, which fails
+# for :class:`~yobx.torch.new_tracing.tensor.TracingTensor` instances that
+# carry no backing storage.
+_ORIGINAL_TORCH_TENSOR_SPLIT: Callable = torch.tensor_split
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -204,6 +212,38 @@ def _ones_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
 
 
 @contextlib.contextmanager
+def _tensor_split_replacement_ctx(
+    tracer: "GraphTracer",  # type: ignore[name-defined]  # noqa: F821
+) -> Generator:
+    """
+    Temporarily replaces ``torch.tensor_split`` with a tracing-aware handler.
+
+    The native C++ kernel for ``aten::tensor_split`` attempts to read the
+    *concrete* values from the ``indices_or_sections`` tensor in order to
+    decide (a) the number of output chunks and (b) their sizes along *dim*.
+    This fails for :class:`~yobx.torch.new_tracing.tensor.TracingTensor`
+    instances because they carry no backing storage.
+
+    The replacement intercepts the call and delegates to
+    :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_tensor_split`
+    which performs shape inference via concrete surrogate tensors and emits
+    the appropriate FX ``call_function`` node.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_tensor_split` should be used as the replacement.
+    """
+
+    def _tensor_split_handler(input: Any, indices_or_sections: Any, dim: int = 0) -> Any:
+        return tracer._handle_tensor_split(input, indices_or_sections, dim)
+
+    torch.tensor_split = _tensor_split_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.tensor_split = _ORIGINAL_TORCH_TENSOR_SPLIT  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
 def _roll_dynamic_shape_ctx() -> Generator:
     """
     Temporarily replaces the ``aten.roll.default`` decomposition with a
@@ -303,5 +343,6 @@ def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         _ones_replacement_ctx(tracer),
         _roll_dynamic_shape_ctx(),
         _scan_replacement_ctx(tracer),
+        _tensor_split_replacement_ctx(tracer),
     ):
         yield

@@ -17,6 +17,7 @@ from ._patches import (
     _ORIGINAL_TORCH_ZEROS,
     _ORIGINAL_TORCH_ONES,
     _ORIGINAL_TORCH_SCAN,
+    _ORIGINAL_TORCH_TENSOR_SPLIT,
     _cond_replacement_ctx,
     _check_replacement_ctx,
     _scan_replacement_ctx,
@@ -1404,6 +1405,124 @@ class GraphTracer:
         node.meta["fake_val"] = fake_res
         node.meta["stack_trace"] = "".join(traceback.format_stack())
         return res
+
+    def _handle_tensor_split(self, input: Any, indices_or_sections: Any, dim: int = 0) -> Any:
+        """
+        Tracing-aware replacement for ``torch.tensor_split`` called via
+        :func:`_tensor_split_replacement_ctx`.
+
+        The native C++ kernel for ``aten::tensor_split`` reads the *values*
+        from ``indices_or_sections`` (via ``.item()`` or ``.tolist()``) before
+        dispatching, which fails for
+        :class:`~yobx.torch.new_tracing.tensor.TracingTensor` instances that
+        carry no backing storage.
+
+        When ``indices_or_sections`` is a :class:`TracingTensor` with a
+        statically-known 1-D shape ``(n,)``, this method:
+
+        1. Builds concrete surrogate tensors (no symbolic/tracing tensors) and
+           calls the original ``torch.tensor_split`` to infer the output shapes.
+        2. Emits a ``call_function`` FX node for
+           ``aten.tensor_split.Tensor_indices_or_sections``.
+        3. Emits one ``operator.getitem`` FX node per output chunk.
+        4. Returns a tuple of ``n + 1`` :class:`TracingTensor` instances.
+
+        When ``indices_or_sections`` is a plain ``int`` or ``list`` (or a
+        concrete :class:`torch.Tensor`), the call is forwarded to the standard
+        :meth:`dispatch` path which handles those cases correctly.
+
+        :param input: The tensor to split.  Must be a
+            :class:`TracingTensor`.
+        :param indices_or_sections: An ``int``, a sequence of ``int``, a
+            concrete :class:`torch.Tensor`, or a
+            :class:`TracingTensor` of shape ``(n,)``.
+        :param dim: The dimension along which to split.
+
+        Returns:
+            A tuple of :class:`TracingTensor` instances, one per output chunk.
+        """
+        # ------------------------------------------------------------------ #
+        # Case 1: indices_or_sections is NOT a TracingTensor.                 #
+        # Route through the standard dispatch path which handles int/list and #
+        # concrete tensor arguments correctly.                                 #
+        # ------------------------------------------------------------------ #
+        if not isinstance(indices_or_sections, TracingTensor):
+            if isinstance(indices_or_sections, int):
+                return self.dispatch(
+                    torch.ops.aten.tensor_split.sections, (input, indices_or_sections, dim), {}
+                )
+            if isinstance(indices_or_sections, (list, tuple)):
+                return self.dispatch(
+                    torch.ops.aten.tensor_split.indices, (input, indices_or_sections, dim), {}
+                )
+            if isinstance(indices_or_sections, torch.Tensor):
+                if indices_or_sections.dim() == 0:
+                    return self.dispatch(
+                        torch.ops.aten.tensor_split.sections,
+                        (input, int(indices_or_sections.item()), dim),
+                        {},
+                    )
+                return self.dispatch(
+                    torch.ops.aten.tensor_split.indices,
+                    (input, indices_or_sections.tolist(), dim),
+                    {},
+                )
+            # Fall back to original for anything else (should not normally occur).
+            return _ORIGINAL_TORCH_TENSOR_SPLIT(input, indices_or_sections, dim)
+
+        # ------------------------------------------------------------------ #
+        # Case 2: indices_or_sections IS a TracingTensor.                     #
+        # The C++ kernel would try to read the tensor values here; intercept. #
+        # ------------------------------------------------------------------ #
+        indices_shape = indices_or_sections.shape
+        assert indices_or_sections.dim() == 1, (
+            f"TracingTensor indices_or_sections must be 1-D, got shape {indices_shape}"
+        )
+
+        n_indices_dim = indices_shape[0]
+        assert isinstance(n_indices_dim, int), (
+            f"Dynamic number of split indices is not supported "
+            f"in new-tracing mode; shape[0]={n_indices_dim!r}"
+        )
+        n_indices = n_indices_dim
+        n_outputs = n_indices + 1
+
+        # Build a concrete surrogate for ``input`` for shape inference.
+        concrete_x_shape = tuple(d if isinstance(d, int) else 1 for d in input.shape)
+        concrete_x = torch.zeros(concrete_x_shape, dtype=input.dtype)
+
+        # Build concrete surrogate indices (equidistant within the split dim).
+        concrete_dim_size = concrete_x_shape[dim]
+        step = max(1, concrete_dim_size // n_outputs)
+        concrete_indices = torch.tensor(
+            [min(concrete_dim_size, step * (i + 1)) for i in range(n_indices)], dtype=torch.int64
+        )
+
+        # Shape inference using real (non-tracing, non-fake) tensors.
+        concrete_results = _ORIGINAL_TORCH_TENSOR_SPLIT(concrete_x, concrete_indices, dim)
+
+        # Emit FX node for the split op.
+        func = torch.ops.aten.tensor_split.Tensor_indices_or_sections
+        x_node = self._get_node(input)
+        indices_node = self._get_node(indices_or_sections)
+        node = self.graph.call_function(func, args=(x_node, indices_node, dim), kwargs={})
+
+        # Emit one getitem node per output chunk and wrap in TracingTensor.
+        results = []
+        for i, concrete_out in enumerate(concrete_results):
+            get_node = self.graph.call_function(operator.getitem, args=(node, i), kwargs={})
+            tt = self._make_tracing_tensor(
+                TracingShape(tuple(concrete_out.shape)),
+                concrete_out.dtype,
+                concrete_out.device,
+                get_node,
+            )
+            get_node.meta["val"] = tt
+            results.append(tt)
+
+        node.meta["val"] = tuple(results)
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return tuple(results)
 
     # ------------------------------------------------------------------
     # Public tracing entry point

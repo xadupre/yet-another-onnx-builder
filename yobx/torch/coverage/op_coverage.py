@@ -184,7 +184,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "special_zeta",
         "squeeze_copy",
         "t_copy",
-        "tensor_split",
         "to_sparse",
         "trace",
         "trapezoid",
@@ -280,6 +279,7 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "short",
             "std",
             "std_mean",
+            "tensor_split",
         }
     ),
 }
