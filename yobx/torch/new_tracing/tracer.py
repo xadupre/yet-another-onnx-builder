@@ -1475,9 +1475,9 @@ class GraphTracer:
         # The C++ kernel would try to read the tensor values here; intercept. #
         # ------------------------------------------------------------------ #
         indices_shape = indices_or_sections.shape
-        assert indices_or_sections.dim() == 1, (
-            f"TracingTensor indices_or_sections must be 1-D, got shape {indices_shape}"
-        )
+        assert (
+            indices_or_sections.dim() == 1
+        ), f"TracingTensor indices_or_sections must be 1-D, got shape {indices_shape}"
 
         n_indices_dim = indices_shape[0]
         assert isinstance(n_indices_dim, int), (
