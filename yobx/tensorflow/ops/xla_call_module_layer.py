@@ -8,7 +8,7 @@ syntax as well as the legacy ``layer["key"]`` dict-style syntax.
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import List, Optional, Sequence, Union
 
 
 class XlaLayer:
@@ -54,7 +54,7 @@ class XlaLayer:
         self,
         id: str,
         op: str,
-        operands,
+        operands: Union[List[str], Sequence[str]],
         shape: str = "",
         loc: str = "",
         *,
@@ -67,7 +67,7 @@ class XlaLayer:
     ) -> None:
         self.id: str = id
         self.op: str = op
-        self.operands = operands
+        self.operands: Union[List[str], Sequence[str]] = operands
         self.shape: str = shape
         self.loc: str = loc
         self.dense_content: str = dense_content
@@ -86,6 +86,7 @@ class XlaLayer:
         try:
             return getattr(self, key)
         except AttributeError:
+            # Intentionally converts AttributeError to KeyError to match dict semantics.
             raise KeyError(key) from None
 
     def __setitem__(self, key: str, value) -> None:
@@ -93,6 +94,7 @@ class XlaLayer:
         try:
             setattr(self, key, value)
         except AttributeError:
+            # Intentionally converts AttributeError to KeyError to match dict semantics.
             raise KeyError(key) from None
 
     def get(self, key: str, default=None):
