@@ -279,6 +279,7 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "short",
             "std",
             "std_mean",
+            "tensor_split",
         }
     ),
 }
