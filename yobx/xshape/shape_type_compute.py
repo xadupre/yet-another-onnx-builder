@@ -2365,11 +2365,7 @@ def set_shape_type_op_any(self: ShapeBuilder, node: NodeProto, exc: bool = False
         )
         return r
     if node.op_type in self._op_type_element_wise_types:
-        from ..helpers.onnx_helper import element_wise_op_cmp_types
-
-        r = set_type_shape_binary_op(
-            self, node.output[0], *node.input, cmp_op=node.op_type in element_wise_op_cmp_types()
-        )
+        r = set_type_shape_binary_op(self, node.output[0], *node.input)
         assert r is not None or not self._debug_shape_missing, (
             f"No function to compute shape for node {node.op_type!r}"
             f"\ninput shapes are "
