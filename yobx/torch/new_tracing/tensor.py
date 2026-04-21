@@ -1,4 +1,5 @@
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
+import traceback
 import torch
 import torch.fx
 import torch.utils._pytree as _pytree
@@ -102,6 +103,12 @@ class TracingTensor(torch.Tensor):
         A concrete dimension of ``0`` still causes an immediate return of ``0``
         so that genuinely empty static shapes are identified correctly.
 
+        When a tracer is active and the result is symbolic, FX nodes are
+        emitted for the numel computation and stored on the returned
+        :class:`TracingInt` (see :meth:`_emit_numel_node`).  Subsequent
+        comparisons such as ``numel() > 0`` then also emit comparison FX
+        nodes, allowing the result to serve as a ``torch.cond`` predicate.
+
         Returns:
             Union[int, TracingInt]: Plain ``int`` when every dimension is
             concrete; :class:`TracingInt` when any dimension is symbolic.
@@ -121,7 +128,68 @@ class TracingTensor(torch.Tensor):
                 if d_int == 0:
                     return 0
                 result = result * d_int
+        # When the result is symbolic and a tracer is active, emit FX nodes
+        # so that comparisons such as ``numel() > 0`` can produce a proper
+        # bool tensor node (required for use as a ``torch.cond`` predicate).
+        if isinstance(result, TracingInt) and self._tracer is not None and self._node is not None:
+            numel_node = self._emit_numel_node()
+            if numel_node is not None:
+                result._node = numel_node
+                result._tracer = self._tracer
+                result._device = self.device
         return result
+
+    def _emit_numel_node(self) -> Optional[torch.fx.Node]:
+        """Emits FX nodes that compute ``numel()`` as a scalar ``int64`` tensor.
+
+        For each dimension of this tensor an ``aten.sym_size.int`` node is
+        emitted.  All per-dimension nodes are then multiplied together via
+        ``aten.mul.Tensor`` dispatch calls.  The final node represents the
+        total element count as a 0-dim ``int64`` :class:`TracingTensor`.
+
+        This follows the same pattern as :meth:`_div_by_tracing_int`: shape
+        dimensions are materialised as proper FX nodes so that the resulting
+        integer value participates correctly in the runtime computation graph.
+
+        Returns:
+            The FX :class:`~torch.fx.Node` whose output is the numel scalar,
+            or ``None`` when no tracer is active or the tensor has no
+            dimensions.
+        """
+        tracer = self._tracer
+        if tracer is None or self._node is None:
+            return None
+
+        dims: List[Any] = list(self._tracing_shape.dims)
+        if not dims:
+            return None
+
+        device = self.device
+
+        def make_sym_size_node(dim_idx: int) -> torch.fx.Node:
+            """Emits ``aten.sym_size.int(self, dim_idx)`` and wraps it."""
+            node = tracer.graph.call_function(
+                torch.ops.aten.sym_size.int, args=(self._node, dim_idx), kwargs={}
+            )
+            # Create a 0-dim int64 TracingTensor for FX node metadata.
+            tt = TracingTensor(TracingShape(()), dtype=torch.int64, device=device, tracer=tracer)
+            tt._node = node
+            node.meta["val"] = tt
+            node.meta["stack_trace"] = "".join(traceback.format_stack())
+            return node
+
+        result_node = make_sym_size_node(0)
+        result_tt: "TracingTensor" = result_node.meta["val"]
+
+        for i in range(1, len(dims)):
+            dim_node = make_sym_size_node(i)
+            dim_tt: "TracingTensor" = dim_node.meta["val"]
+            # aten.mul.Tensor dispatches through __torch_dispatch__ → dispatch(),
+            # creating a proper FX node and returning a new TracingTensor.
+            result_tt = torch.ops.aten.mul.Tensor(result_tt, dim_tt)  # type: ignore
+            result_node = result_tt._node  # type: ignore
+
+        return result_node
 
     def __repr__(self) -> str:  # type: ignore
         node_name = self._node.name if self._node is not None else "<unregistered>"
