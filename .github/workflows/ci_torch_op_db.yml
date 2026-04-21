@@ -34,16 +34,18 @@ jobs:
 
       - name: Run op_db export tests default
         run: |
-          pytest --cov=yobx --cov-report=xml --durations=10 unittests/torch/coverage/test_onnx_export_common_methods_default.py
+          pytest --cov=yobx --durations=10 unittests/torch/coverage/test_onnx_export_common_methods_default.py
 
       - name: Run op_db export tests tracing
         run: |
-          pytest --cov=yobx --cov-report=xml --durations=10 unittests/torch/coverage/test_onnx_export_common_methods_tracing.py
+          pytest --cov=yobx --cov-append --durations=10 unittests/torch/coverage/test_onnx_export_common_methods_tracing.py
 
       - name: Run op_db export tests new tracing
         run: |
-          pytest --cov=yobx --cov-report=xml --durations=10 unittests/torch/coverage/test_onnx_export_common_methods_new_tracing.py
+          pytest --cov=yobx --cov-append --durations=10 unittests/torch/coverage/test_onnx_export_common_methods_new_tracing.py
 
+      - name: Generate combined coverage XML
+        run: coverage xml
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
         with:
