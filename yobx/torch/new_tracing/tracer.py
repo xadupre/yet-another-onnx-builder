@@ -1439,7 +1439,7 @@ class GraphTracer:
         :param dim: The dimension along which to split.
 
         Returns:
-            A tuple of :class:`TracingTensor` chunks.
+            A tuple of :class:`TracingTensor` instances, one per output chunk.
         """
         # ------------------------------------------------------------------ #
         # Case 1: indices_or_sections is NOT a TracingTensor.                 #
@@ -1476,13 +1476,12 @@ class GraphTracer:
         # ------------------------------------------------------------------ #
         indices_shape = indices_or_sections.shape
         assert indices_or_sections.dim() == 1, (
-            f"_handle_tensor_split: TracingTensor indices_or_sections must be 1-D, "
-            f"got shape {indices_shape}"
+            f"TracingTensor indices_or_sections must be 1-D, got shape {indices_shape}"
         )
 
         n_indices_dim = indices_shape[0]
         assert isinstance(n_indices_dim, int), (
-            f"_handle_tensor_split: dynamic number of split indices is not supported "
+            f"Dynamic number of split indices is not supported "
             f"in new-tracing mode; shape[0]={n_indices_dim!r}"
         )
         n_indices = n_indices_dim
