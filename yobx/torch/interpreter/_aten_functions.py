@@ -4989,7 +4989,7 @@ def aten_ge_Tensor(
 def aten_geqrf(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "geqrf"
 ) -> Tuple[T, T]:
-    """Computes the LAPACK-style packed QR factorisation via Householder reflectors.
+    """Computes the LAPACK-style packed QR factorization via Householder reflectors.
 
     Returns ``(a, tau)`` where *a* (shape ``(m, n)``) holds the upper-triangular
     *R* factor in its upper triangle and the normalised Householder vectors in
