@@ -226,7 +226,7 @@ underlying :class:`~torch._subclasses.fake_tensor.FakeTensorMode` and the
 mapping between concrete dimension values and their symbolic counterparts.
 
 FxGraphInterpreter
------------------
+------------------
 
 :class:`~yobx.torch.interpreter.interpreter.FxGraphInterpreter` is the heart
 of the converter.  It walks the :class:`torch.fx.Graph` node by node and

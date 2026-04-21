@@ -12980,7 +12980,7 @@ def aten_softsign(
     x: T,
     name: str = "softsign",
 ) -> T:
-    """Computes softsign: x / (1 + |x|)."""
+    """softsign: ``x / (1 + |x|)``."""
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     one = np.array(1, dtype=dtype) if g.get_rank(x) == 0 else np.array([1], dtype=dtype)
     abs_x = g.op.Abs(x, name=name)
