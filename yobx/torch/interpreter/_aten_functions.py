@@ -4596,6 +4596,34 @@ def aten_flip(
     return res
 
 
+def aten_fliplr(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "fliplr"
+) -> T:
+    """Flips the input tensor left-to-right (along dimension 1)."""
+    cst_neg1 = np.array([-1], dtype=np.int64)
+    cst_min = np.array([_INT64_MIN], dtype=np.int64)
+    res = g.op.Slice(
+        x, cst_neg1, cst_min, np.array([1], dtype=np.int64), cst_neg1, outputs=outputs, name=name
+    )
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_flipud(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "flipud"
+) -> T:
+    """Flips the input tensor up-to-down (along dimension 0)."""
+    cst_neg1 = np.array([-1], dtype=np.int64)
+    cst_min = np.array([_INT64_MIN], dtype=np.int64)
+    res = g.op.Slice(
+        x, cst_neg1, cst_min, np.array([0], dtype=np.int64), cst_neg1, outputs=outputs, name=name
+    )
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
 def aten_floor(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     """floor"""
     res = g.op.Floor(x, name="floor", outputs=outputs)
