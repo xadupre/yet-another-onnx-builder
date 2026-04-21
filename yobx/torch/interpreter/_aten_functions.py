@@ -5011,21 +5011,21 @@ def aten_geqrf(
     m, n = shape
     itype = g.get_type(x)
     dtype = tensor_dtype_to_np_dtype(itype)
-    K = min(m, n)
+    num_reflectors = min(m, n)
 
     if len(outputs) == 1:
         outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
 
-    # A is updated through a chain of Add operations; tau is accumulated similarly.
-    A: T = x
-    tau: T = np.zeros(K, dtype=dtype)
+    # a_mat is updated through a chain of Add operations; tau is accumulated similarly.
+    a_mat: T = x
+    tau: T = np.zeros(num_reflectors, dtype=dtype)
 
-    for k in range(K):
+    for k in range(num_reflectors):
         # ------------------------------------------------------------------
-        # 1. Extract the k-th column from row k downward: col = A[k:, k]
+        # 1. Extract the k-th column from row k downward: col = a_mat[k:, k]
         # ------------------------------------------------------------------
         col_2d = g.op.Slice(
-            A,
+            a_mat,
             np.array([k, k], dtype=np.int64),
             np.array([m, k + 1], dtype=np.int64),
             np.array([0, 1], dtype=np.int64),
@@ -5107,11 +5107,11 @@ def aten_geqrf(
         )  # (1,)
 
         # ------------------------------------------------------------------
-        # 5. Apply Householder reflection to A[k:, k:]
-        #    A_sub_new = A_sub - tau_k * v_col @ (v_row @ A_sub)
+        # 5. Apply Householder reflection to a_mat[k:, k:]
+        #    a_sub_new = a_sub - tau_k * v_col @ (v_row @ a_sub)
         # ------------------------------------------------------------------
-        A_sub = g.op.Slice(
-            A,
+        a_sub = g.op.Slice(
+            a_mat,
             np.array([k, k], dtype=np.int64),
             np.array([m, n], dtype=np.int64),
             np.array([0, 1], dtype=np.int64),
@@ -5119,28 +5119,28 @@ def aten_geqrf(
         )  # (m-k, n-k)
         v_col = g.op.Unsqueeze(v, np.array([1], dtype=np.int64), name=name)  # (m-k, 1)
         v_row = g.op.Unsqueeze(v, np.array([0], dtype=np.int64), name=name)  # (1, m-k)
-        # proj = v^T @ A_sub -> (1, m-k) @ (m-k, n-k) = (1, n-k)
-        proj = g.op.MatMul(v_row, A_sub, name=name)  # (1, n-k)
+        # proj = v^T @ a_sub -> (1, m-k) @ (m-k, n-k) = (1, n-k)
+        proj = g.op.MatMul(v_row, a_sub, name=name)  # (1, n-k)
         # tau_k_2d for broadcasting: (1,) -> (1, 1)
         tau_k_2d = g.op.Unsqueeze(tau_k, np.array([0], dtype=np.int64), name=name)  # (1, 1)
         scaled_proj = g.op.Mul(tau_k_2d, proj, name=name)  # (1, n-k)
         # outer = v_col @ scaled_proj -> (m-k, 1) @ (1, n-k) = (m-k, n-k)
         outer = g.op.MatMul(v_col, scaled_proj, name=name)  # (m-k, n-k)
-        A_sub_new = g.op.Sub(A_sub, outer, name=name)  # (m-k, n-k)
+        a_sub_new = g.op.Sub(a_sub, outer, name=name)  # (m-k, n-k)
 
         # ------------------------------------------------------------------
-        # 6. Scatter A_sub_new back into A at position [k:, k:]
-        #    diff = A_sub_new - A_sub; A = A + Pad(diff, [k, k, 0, 0])
+        # 6. Scatter a_sub_new back into a_mat at position [k:, k:]
+        #    diff = a_sub_new - a_sub; a_mat = a_mat + Pad(diff, [k, k, 0, 0])
         #    ONNX Pad pads format (rank-2): [row_begin, col_begin, row_end, col_end]
         # ------------------------------------------------------------------
-        diff = g.op.Sub(A_sub_new, A_sub, name=name)  # (m-k, n-k)
+        diff = g.op.Sub(a_sub_new, a_sub, name=name)  # (m-k, n-k)
         pad_diff = np.array([k, k, 0, 0], dtype=np.int64)
         padded_diff = g.op.Pad(diff, pad_diff, name=name)  # (m, n)
-        A = g.op.Add(A, padded_diff, name=name)  # (m, n)
+        a_mat = g.op.Add(a_mat, padded_diff, name=name)  # (m, n)
 
         # ------------------------------------------------------------------
-        # 7. Overwrite A[k+1:, k] with v_rest (LAPACK Householder storage)
-        #    The reflection already zeroed A[k+1:, k]; add v_rest there.
+        # 7. Overwrite a_mat[k+1:, k] with v_rest (LAPACK Householder storage)
+        #    The reflection already zeroed a_mat[k+1:, k]; add v_rest there.
         # ------------------------------------------------------------------
         if m - k > 1:
             v_rest_col = g.op.Unsqueeze(
@@ -5149,25 +5149,25 @@ def aten_geqrf(
             # Pad to (m, n): pads = [row_begin=k+1, col_begin=k, row_end=0, col_end=n-k-1]
             pad_house = np.array([k + 1, k, 0, n - k - 1], dtype=np.int64)
             v_rest_full = g.op.Pad(v_rest_col, pad_house, name=name)  # (m, n)
-            A = g.op.Add(A, v_rest_full, name=name)  # (m, n)
+            a_mat = g.op.Add(a_mat, v_rest_full, name=name)  # (m, n)
 
         # ------------------------------------------------------------------
         # 8. Accumulate tau[k] = tau_k
-        #    pad_tau = [k zeros before, K-k-1 zeros after]
+        #    pad_tau = [k zeros before, num_reflectors-k-1 zeros after]
         # ------------------------------------------------------------------
-        pad_tau = np.array([k, K - k - 1], dtype=np.int64)
-        tau_update = g.op.Pad(tau_k, pad_tau, name=name)  # (K,)
-        tau = g.op.Add(tau, tau_update, name=name)  # (K,)
+        pad_tau = np.array([k, num_reflectors - k - 1], dtype=np.int64)
+        tau_update = g.op.Pad(tau_k, pad_tau, name=name)  # (num_reflectors,)
+        tau = g.op.Add(tau, tau_update, name=name)  # (num_reflectors,)
 
     # Write outputs
-    a_out = g.op.Identity(A, outputs=outputs[:1], name=name)
+    a_out = g.op.Identity(a_mat, outputs=outputs[:1], name=name)
     tau_out = g.op.Identity(tau, outputs=outputs[1:], name=name)
 
     if not sts:
         g.set_type(a_out, itype)
         g.set_shape(a_out, (m, n))
         g.set_type(tau_out, itype)
-        g.set_shape(tau_out, (K,))
+        g.set_shape(tau_out, (num_reflectors,))
 
     return a_out, tau_out
 
