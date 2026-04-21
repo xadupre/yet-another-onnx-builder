@@ -97,6 +97,10 @@ class XlaLayer:
             # Intentionally converts AttributeError to KeyError to match dict semantics.
             raise KeyError(key) from None
 
+    def __contains__(self, key: str) -> bool:
+        """Returns ``True`` when *key* is a known field name with a truthy value."""
+        return key in self.__slots__ and bool(getattr(self, key, None))
+
     def get(self, key: str, default=None):
         """Returns the attribute named *key*, or *default* when not present."""
         return getattr(self, key, default)
