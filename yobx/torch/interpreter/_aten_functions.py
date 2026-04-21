@@ -4599,14 +4599,14 @@ def aten_flip(
 def aten_fliplr(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "fliplr"
 ) -> T:
-    """fliplr"""
+    """Flips the input tensor left-to-right (along dimension 1)."""
     return aten_flip(g, sts, outputs, x, [1], name=name)
 
 
 def aten_flipud(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "flipud"
 ) -> T:
-    """flipud"""
+    """Flips the input tensor up-to-down (along dimension 0)."""
     return aten_flip(g, sts, outputs, x, [0], name=name)
 
 
