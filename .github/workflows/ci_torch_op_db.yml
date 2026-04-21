@@ -32,9 +32,17 @@ jobs:
       - name: pip freeze
         run: pip freeze
 
-      - name: Run op_db export tests
+      - name: Run op_db export tests default
         run: |
-          pytest --cov=yobx --cov-report=xml --durations=10 unittests/torch/coverage
+          pytest --cov=yobx --cov-report=xml --durations=10 unittests/torch/coverage/test_onnx_export_common_methods_default.py
+
+      - name: Run op_db export tests tracing
+        run: |
+          pytest --cov=yobx --cov-report=xml --durations=10 unittests/torch/coverage/test_onnx_export_common_methods_tracing.py
+
+      - name: Run op_db export tests new tracing
+        run: |
+          pytest --cov=yobx --cov-report=xml --durations=10 unittests/torch/coverage/test_onnx_export_common_methods_new_tracing.py
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

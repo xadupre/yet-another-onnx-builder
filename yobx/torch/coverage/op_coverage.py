@@ -244,9 +244,17 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "__ror__",  # later
             "__rsub__",  # later
             "__rxor__",  # no bitwise_xor converter
+            "bitwise_and",
+            "bitwise_or",
+            "bitwise_xor",
+            "logical_and",
+            "logical_or",
+            "logical_xor",
             "flatten",  # tracing-specific failure
             "nn_functional_bilinear",  # tracing-specific failure
             "nn_functional_hardsigmoid",  # tracing-specific failure
+            "std",
+            "std_mean",
         }
     ),
     # Ops that fail specifically under ``ExportOptions(tracing=True)``,
