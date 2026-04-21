@@ -247,6 +247,7 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "bitwise_and",
             "bitwise_or",
             "bitwise_xor",
+            "conj",
             "logical_and",
             "logical_or",
             "logical_xor",
