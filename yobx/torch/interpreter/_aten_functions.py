@@ -5043,7 +5043,8 @@ def aten_geqrf(
         norm_is_zero = g.op.Equal(norm_1d, np.array([0.0], dtype=dtype), name=name)  # (1,) bool
 
         # ------------------------------------------------------------------
-        # 3. col[0] = alpha; sign(alpha) defaulting to +1 when alpha == 0
+        # 3. col[0] = alpha; sign(alpha) defaulting to +1 when alpha == 0.
+        #    Pre-compute alpha_geq_0 for the LAPACK dlarfg early-return guard.
         # ------------------------------------------------------------------
         alpha = g.op.Slice(
             col,
@@ -5052,6 +5053,11 @@ def aten_geqrf(
             np.array([0], dtype=np.int64),
             name=name,
         )  # (1,)
+        # LAPACK dlarfg early-return: tau = 0 when xnorm == 0 AND alpha >= 0,
+        # so that R's diagonal stays non-negative without an unnecessary reflector.
+        alpha_geq_0 = g.op.GreaterOrEqual(
+            alpha, np.array([0.0], dtype=dtype), name=name
+        )  # (1,) bool
         sign_alpha = g.op.Sign(alpha, name=name)  # (1,)
         sign_alpha = g.op.Where(
             g.op.Equal(sign_alpha, np.array([0.0], dtype=dtype), name=name),
@@ -5064,8 +5070,11 @@ def aten_geqrf(
         u0 = g.op.Add(alpha, g.op.Mul(sign_alpha, norm_1d, name=name), name=name)  # (1,)
 
         # ------------------------------------------------------------------
-        # 4. Build normalised Householder vector v = [1, col[1:] / u0]
-        #    and compute tau_k = 2 / (v^T v) = 2 / (1 + ||col[1:]/u0||^2)
+        # 4. Build normalized Householder vector v = [1, col[1:] / u0]
+        #    and compute tau_k following the LAPACK dlarfg convention:
+        #      tau = 0  when xnorm == 0 AND alpha >= 0  (identity reflector)
+        #      tau = 2/(v^T v)  otherwise
+        #    where xnorm = ||col[1:]|| (sub-vector norm, as in LAPACK dlarfg).
         # ------------------------------------------------------------------
         if m - k > 1:
             col_rest = g.op.Slice(
@@ -5075,6 +5084,14 @@ def aten_geqrf(
                 np.array([0], dtype=np.int64),
                 name=name,
             )  # (m-k-1,)
+            # xnorm = ||col_rest|| — used for LAPACK early-return check
+            xnorm_sc = g.op.ReduceL2(
+                col_rest, np.array([0], dtype=np.int64), keepdims=0, name=name
+            )  # scalar
+            xnorm_1d = g.op.Unsqueeze(xnorm_sc, np.array([0], dtype=np.int64), name=name)  # (1,)
+            xnorm_is_zero = g.op.Equal(
+                xnorm_1d, np.array([0.0], dtype=dtype), name=name
+            )  # (1,) bool
             v_rest_raw = g.op.Div(col_rest, u0, name=name)  # (m-k-1,); NaN when u0==0
             # Guard: replace NaN (u0==0 iff norm==0) with zeros
             v_rest: T = g.op.Where(
@@ -5091,17 +5108,32 @@ def aten_geqrf(
             v_rest_sq_sum_1d = g.op.Unsqueeze(
                 v_rest_sq_sum_sc, np.array([0], dtype=np.int64), name=name
             )  # (1,)
-            tau_k_raw: T = g.op.Div(
+            tau_k_computed: T = g.op.Div(
                 np.array([2.0], dtype=dtype),
                 g.op.Add(np.array([1.0], dtype=dtype), v_rest_sq_sum_1d, name=name),
                 name=name,
             )  # (1,)
+            # LAPACK early-return: tau = 0 when xnorm == 0 AND alpha >= 0
+            lapack_identity = g.op.And(xnorm_is_zero, alpha_geq_0, name=name)  # (1,) bool
+            tau_k_raw: T = g.op.Where(
+                lapack_identity, np.array([0.0], dtype=dtype), tau_k_computed, name=name
+            )  # (1,)
         else:
-            # m - k == 1: v = [1], v^T v = 1, tau = 2
+            # m - k == 1: sub-vector is empty, so xnorm = 0 always.
+            # LAPACK dlarfg: tau = 0 if alpha >= 0 (identity, nothing to zero),
+            # tau = 2 if alpha < 0 (flip sign to keep R diagonal non-negative).
             v = np.array([1.0], dtype=dtype)  # (1,)
-            tau_k_raw = np.array([2.0], dtype=dtype)  # (1,)
+            alpha_is_negative = g.op.Less(
+                alpha, np.array([0.0], dtype=dtype), name=name
+            )  # (1,) bool
+            tau_k_raw = g.op.Where(
+                alpha_is_negative,
+                np.array([2.0], dtype=dtype),
+                np.array([0.0], dtype=dtype),
+                name=name,
+            )  # (1,)
 
-        # Handle zero-norm column: use identity reflector (tau = 0)
+        # Handle zero-norm column (alpha == 0): identity reflector (tau = 0)
         tau_k = g.op.Where(
             norm_is_zero, np.array([0.0], dtype=dtype), tau_k_raw, name=name
         )  # (1,)
