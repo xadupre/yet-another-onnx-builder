@@ -985,6 +985,89 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         self.assertIn("true", branch_taken, "The true branch should have been taken")
         clear_conditions()
 
+    def test_trace_cond_numel_predicate(self):
+        """torch.cond with a numel()>0 predicate emits proper FX nodes.
+
+        Replicates the ControlFlowCondNonZero model: the predicate is
+        ``image_features.numel() > 0``.  During tracing this must produce
+        ``aten.sym_size.int`` + ``aten.mul.Tensor`` + ``aten.gt.Scalar``
+        nodes rather than a raw Python :class:`~yobx.torch.new_tracing.shape.TracingBool`,
+        so the ONNX ``If`` node receives a proper boolean tensor input.
+        """
+
+        class CondNonZeroModel(torch.nn.Module):
+            def forward(self, input_ids, image_features, vocab_size):
+                def then_branch(input_ids, image_features, vocab_size):
+                    input_shape = input_ids.size()
+                    input_ids = input_ids.view(-1, input_shape[-1])
+                    condition = (input_ids < 0) & (input_ids > -int(1e9))
+                    positions = torch.nonzero(condition, as_tuple=True)
+                    input_ids = input_ids.clamp_min(0).clamp_max(vocab_size)
+                    return (input_ids, positions[0], positions[1])
+
+                def else_branch(input_ids, image_features, vocab_size):
+                    r = torch.where(torch.zeros((1, 1), dtype=torch.bool))
+                    return (input_ids, r[0], r[1])
+
+                a, b, c = torch.cond(
+                    image_features.numel() > 0,
+                    then_branch,
+                    else_branch,
+                    [input_ids, image_features, vocab_size],
+                )
+                return a, b, c
+
+        model = CondNonZeroModel()
+        inputs = (
+            (torch.arange(24) - 8).reshape((2, -1)).to(torch.int64),
+            torch.arange(32).reshape((2, -1)).to(torch.float32),
+            1025,
+        )
+        DIM = torch.export.Dim
+        dynamic_shapes = ({0: DIM("batch")}, {0: DIM("batch"), 1: DIM("seq_length")}, None)
+        tracer = GraphTracer()
+        graph = tracer.trace(model, inputs, dynamic_shapes=dynamic_shapes)
+        graph.lint()
+
+        # The predicate chain: sym_size.int × 2  →  mul.Tensor  →  gt.Scalar
+        sym_size_nodes = [
+            n
+            for n in graph.nodes
+            if n.op == "call_function"
+            and n.target is torch.ops.aten.sym_size.int  # type: ignore[attr-defined]
+        ]
+        self.assertGreaterEqual(len(sym_size_nodes), 2, "Expected sym_size.int nodes for numel()")
+
+        mul_nodes = [
+            n
+            for n in graph.nodes
+            if n.op == "call_function" and n.target is torch.ops.aten.mul.Tensor
+        ]
+        self.assertGreaterEqual(len(mul_nodes), 1, "Expected mul.Tensor node for numel product")
+
+        gt_nodes = [
+            n
+            for n in graph.nodes
+            if n.op == "call_function" and n.target is torch.ops.aten.gt.Scalar
+        ]
+        self.assertEqual(len(gt_nodes), 1, "Expected exactly one gt.Scalar node for numel() > 0")
+
+        # The cond node must receive the gt.Scalar node as its predicate arg.
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
+        self.assertEqual(len(cond_nodes), 1, "Expected exactly one torch.cond node")
+        pred_arg = cond_nodes[0].args[0]
+        self.assertIs(
+            pred_arg,
+            gt_nodes[0],
+            "torch.cond predicate must be the gt.Scalar FX node, not a Python TracingBool",
+        )
+
+        # Sub-graphs must also be valid.
+        for _name, sub in tracer._sub_tracers.items():
+            sub.graph.lint()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
