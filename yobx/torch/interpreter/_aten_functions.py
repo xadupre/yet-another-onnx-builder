@@ -2444,13 +2444,14 @@ def aten_cond(
     # Ensure every element of *inputs* is an ONNX variable name string.
     # When a torch.cond operand is a plain Python scalar (e.g. vocab_size=1025),
     # the interpreter leaves it as a Python int/float in the list.  We need to
-    # materialise it as an ONNX initializer so the branch local function can
+    # materialize it as an ONNX initializer so the branch local function can
     # receive it as a typed input.
     import numpy as np
 
     tensor_inputs = []
     for inp in inputs:
         if isinstance(inp, str):
+            # Already an ONNX variable name.
             tensor_inputs.append(inp)
         elif isinstance(inp, int):
             cst_name = g.unique_name("cst_scalar_int")
@@ -2463,6 +2464,8 @@ def aten_cond(
             )
             tensor_inputs.append(cst_name)
         else:
+            # Fallback for any other type (should not normally occur since
+            # _process_arg resolves FX Nodes to their string names first).
             tensor_inputs.append(inp)
 
     res = g.make_node(

@@ -1647,6 +1647,9 @@ class GraphBuilder(
         if not self._has_torch:
             raise AssertionError(f"Unable to convert {value!r} into string")
         if isinstance(value, self.TracingInt):
+            # TracingInt objects from new-tracing placeholders carry the symbolic
+            # dimension name (e.g. "batch") as their .value attribute, which is
+            # exactly the string needed by the ONNX dynamic-dimension machinery.
             return value.value
 
         from torch.fx.experimental.sym_node import SymNode
