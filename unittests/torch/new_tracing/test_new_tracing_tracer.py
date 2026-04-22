@@ -1065,7 +1065,7 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         )
 
         # Sub-graphs must also be valid.
-        for _name, sub in tracer._sub_tracers.items():
+        for _, sub in tracer._sub_tracers.items():
             sub.graph.lint()
 
 
