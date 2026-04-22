@@ -3901,6 +3901,22 @@ class GraphBuilder(
                     self.add_dynamic_object(sb, sb)
                 continue
 
+            if (
+                self._has_torch
+                and isinstance(a, self.TracingInt)
+                and not a.is_static
+                and isinstance(b, str)
+            ):
+                # For new tracing, the shape element is a symbolic TracingInt.
+                # Register the dimension source so that get_dimension_as_result
+                # can emit Shape+Gather nodes on demand when building shapes.
+                if b not in self.dynamic_dimensions_source:
+                    self.dynamic_dimensions_source[b] = []
+                source = {"input_name": name, "axis": _idim}
+                if source not in self.dynamic_dimensions_source[b]:
+                    self.dynamic_dimensions_source[b].append(source)
+                if b not in self.dynamic_objects_rev:
+                    self.add_dynamic_objects_rev(b, (b, _idim))
             self._dynamic_to_str(b, register_if_not_exist=True)
             self._dynamic_to_str(a, register_if_not_exist=True)
 
