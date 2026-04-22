@@ -2639,13 +2639,9 @@ class GraphBuilder(
                         f"{self.get_debug_msg()}"
                     )
                     name = self.get_dimension_as_result(name)
-                elif not self.has_name(value) and (
-                    not value.isidentifier() or value in self.dynamic_dimensions_source
-                ):
-                    # Compound expression such as "dy+1", or a simple symbolic
-                    # dimension from new tracing (e.g. "dx") whose source
-                    # tensor/axis is known: compute an ONNX arithmetic result
-                    # (rank-1 INT64 tensor) via Shape+Gather nodes emitted on demand.
+                elif not self.has_name(value) and not value.isidentifier():
+                    # Compound expression such as "dy+1": compute it as an
+                    # ONNX arithmetic result (rank-1 INT64 tensor).
                     import re
 
                     safe = re.sub(r"[^a-zA-Z0-9_]", "_", value)
