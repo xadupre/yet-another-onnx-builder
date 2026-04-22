@@ -1068,6 +1068,58 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         for _, sub in tracer._sub_tracers.items():
             sub.graph.lint()
 
+        # ------------------------------------------------------------------
+        # Convert to ONNX with new-tracing and verify the result is valid
+        # and produces numerically correct outputs when run with OnnxRuntime.
+        # ------------------------------------------------------------------
+        import onnx
+        from yobx.torch import ExportOptions
+        from yobx.torch.export_options import TracingMode
+        from yobx.torch.interpreter import to_onnx
+
+        artifact = to_onnx(
+            model,
+            inputs,
+            dynamic_shapes=dynamic_shapes,
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
+        )
+        onx = artifact.proto
+        self.assertIsInstance(onx, onnx.ModelProto, "to_onnx must return a valid ModelProto")
+        # The ONNX model has 2 tensor inputs (vocab_size is embedded as a constant).
+        self.assertEqual(
+            len(onx.graph.input), 2, f"Expected 2 ONNX graph inputs, got {len(onx.graph.input)}"
+        )
+        self.assertEqual(len(onx.graph.output), 3, "Expected 3 ONNX graph outputs")
+
+        # Verify numerical correctness with OnnxRuntime.
+        try:
+            import onnxruntime
+        except ImportError:
+            return
+
+        import numpy as np
+
+        expected_a, expected_b, expected_c = model(*inputs)
+        sess = onnxruntime.InferenceSession(
+            onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        inp_names = [i.name for i in sess.get_inputs()]
+        tensor_inputs = [inp for inp in inputs if isinstance(inp, torch.Tensor)]
+        feeds = {name: t.numpy() for name, t in zip(inp_names, tensor_inputs)}
+        got_a, got_b, got_c = sess.run(None, feeds)
+        self.assertTrue(
+            np.array_equal(expected_a.numpy(), got_a),
+            "ONNX output 0 (input_ids) must match eager",
+        )
+        self.assertTrue(
+            np.array_equal(expected_b.numpy(), got_b),
+            "ONNX output 1 (positions[0]) must match eager",
+        )
+        self.assertTrue(
+            np.array_equal(expected_c.numpy(), got_c),
+            "ONNX output 2 (positions[1]) must match eager",
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1646,6 +1646,8 @@ class GraphBuilder(
             return f"{value.node}"
         if not self._has_torch:
             raise AssertionError(f"Unable to convert {value!r} into string")
+        if isinstance(value, self.TracingInt):
+            return value.value
 
         from torch.fx.experimental.sym_node import SymNode
 

@@ -2441,6 +2441,30 @@ def aten_cond(
         # We change the outputs to match the number of outputs in both branches.
         outputs = [f"{outputs[0]}#{i}" for i in range(len(then_f.output))]
 
+    # Ensure every element of *inputs* is an ONNX variable name string.
+    # When a torch.cond operand is a plain Python scalar (e.g. vocab_size=1025),
+    # the interpreter leaves it as a Python int/float in the list.  We need to
+    # materialise it as an ONNX initializer so the branch local function can
+    # receive it as a typed input.
+    import numpy as np
+
+    tensor_inputs = []
+    for inp in inputs:
+        if isinstance(inp, str):
+            tensor_inputs.append(inp)
+        elif isinstance(inp, int):
+            cst_name = g.unique_name("cst_scalar_int")
+            g.make_initializer(cst_name, np.array(inp, dtype=np.int64), source="aten_cond_scalar")
+            tensor_inputs.append(cst_name)
+        elif isinstance(inp, float):
+            cst_name = g.unique_name("cst_scalar_float")
+            g.make_initializer(
+                cst_name, np.array(inp, dtype=np.float32), source="aten_cond_scalar"
+            )
+            tensor_inputs.append(cst_name)
+        else:
+            tensor_inputs.append(inp)
+
     res = g.make_node(
         "If",
         [cond],
@@ -2450,7 +2474,7 @@ def aten_cond(
             [
                 make_node(
                     true_graph,
-                    inputs,
+                    tensor_inputs,
                     outputs,
                     domain=g.local_domain,
                     name=g.unique_node_name(f"{name}_then"),
@@ -2464,7 +2488,7 @@ def aten_cond(
             [
                 make_node(
                     false_graph,
-                    inputs,
+                    tensor_inputs,
                     outputs,
                     domain=g.local_domain,
                     name=g.unique_node_name(f"{name}_else"),
