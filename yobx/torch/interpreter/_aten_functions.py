@@ -5048,7 +5048,6 @@ def aten_geqrf(
 
         # ------------------------------------------------------------------
         # 3. col[0] = alpha; sign(alpha) defaulting to +1 when alpha == 0.
-        #    Pre-compute alpha_geq_0 for the LAPACK dlarfg early-return guard.
         # ------------------------------------------------------------------
         alpha = g.op.Slice(
             col,
@@ -5057,11 +5056,6 @@ def aten_geqrf(
             np.array([0], dtype=np.int64),
             name=name,
         )  # (1,)
-        # LAPACK dlarfg early-return: tau = 0 when xnorm == 0 AND alpha >= 0,
-        # so that R's diagonal stays non-negative without an unnecessary reflector.
-        alpha_geq_0 = g.op.GreaterOrEqual(
-            alpha, np.array([0.0], dtype=dtype), name=name
-        )  # (1,) bool
         sign_alpha = g.op.Sign(alpha, name=name)  # (1,)
         sign_alpha = g.op.Where(
             g.op.Equal(sign_alpha, np.array([0.0], dtype=dtype), name=name),
@@ -5076,9 +5070,11 @@ def aten_geqrf(
         # ------------------------------------------------------------------
         # 4. Build normalized Householder vector v = [1, col[1:] / u0]
         #    and compute tau_k following the LAPACK dlarfg convention:
-        #      tau = 0  when xnorm == 0 AND alpha >= 0  (identity reflector)
-        #      tau = 2/(v^T v)  otherwise
+        #      tau = 0  when xnorm == 0  (LAPACK dlarfg early-return, H = I)
+        #      tau = 2/(v^T v)  when xnorm != 0
         #    where xnorm = ||col[1:]|| (sub-vector norm, as in LAPACK dlarfg).
+        #    Note: LAPACK checks only xnorm, not sign(alpha).  The sign of
+        #    alpha does NOT affect the early-return; tau=0 even when alpha<0.
         # ------------------------------------------------------------------
         if m - k > 1:
             col_rest = g.op.Slice(
@@ -5088,7 +5084,7 @@ def aten_geqrf(
                 np.array([0], dtype=np.int64),
                 name=name,
             )  # (m-k-1,)
-            # xnorm = ||col_rest|| — used for LAPACK early-return check
+            # xnorm = ||col_rest|| — the LAPACK dlarfg early-return test
             xnorm_sc = g.op.ReduceL2(
                 col_rest, np.array([0], dtype=np.int64), keepdims=0, name=name
             )  # scalar
@@ -5117,25 +5113,16 @@ def aten_geqrf(
                 g.op.Add(np.array([1.0], dtype=dtype), v_rest_sq_sum_1d, name=name),
                 name=name,
             )  # (1,)
-            # LAPACK early-return: tau = 0 when xnorm == 0 AND alpha >= 0
-            lapack_identity = g.op.And(xnorm_is_zero, alpha_geq_0, name=name)  # (1,) bool
+            # LAPACK early-return: tau = 0 when xnorm == 0 (H = I), regardless
+            # of the sign of alpha
             tau_k_raw: T = g.op.Where(
-                lapack_identity, np.array([0.0], dtype=dtype), tau_k_computed, name=name
+                xnorm_is_zero, np.array([0.0], dtype=dtype), tau_k_computed, name=name
             )  # (1,)
         else:
             # m - k == 1: sub-vector is empty, so xnorm = 0 always.
-            # LAPACK dlarfg: tau = 0 if alpha >= 0 (identity, nothing to zero),
-            # tau = 2 if alpha < 0 (flip sign to keep R diagonal non-negative).
+            # LAPACK dlarfg: tau = 0 (H = I); alpha is left unchanged.
             v = np.array([1.0], dtype=dtype)  # (1,)
-            alpha_is_negative = g.op.Less(
-                alpha, np.array([0.0], dtype=dtype), name=name
-            )  # (1,) bool
-            tau_k_raw = g.op.Where(
-                alpha_is_negative,
-                np.array([2.0], dtype=dtype),
-                np.array([0.0], dtype=dtype),
-                name=name,
-            )  # (1,)
+            tau_k_raw: T = np.array([0.0], dtype=dtype)  # (1,)
 
         # Handle all-zero column (norm == 0 iff every element of col is zero):
         # identity reflector (tau = 0)
