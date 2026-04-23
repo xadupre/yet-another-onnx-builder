@@ -115,10 +115,21 @@ class TracingBool:
     interception in :class:`~yobx.torch.new_tracing.tracer.GraphTracer`).
     The logical negation of a registered condition resolves to ``False``
     (e.g. if ``(E!=0)`` is known-true, then ``(E==0)`` resolves to ``False``).
+
+    When this instance is produced by a comparison on a
+    :class:`TracingInt` that carries an FX node (e.g. ``numel() > 0``
+    during graph tracing), the corresponding FX comparison node is stored
+    in :attr:`_node`.  :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_cond`
+    uses this to pass a proper bool tensor node as the ``torch.cond`` predicate
+    instead of the raw :class:`TracingBool` object.
     """
 
     def __init__(self, value: Union[bool, str]):
         self.value = value
+        # Optional FX node that produces this boolean value as a 0-dim bool
+        # tensor.  Set by :meth:`TracingInt._cmp` when the left-hand operand
+        # carries an FX node (see :attr:`TracingInt._node`).
+        self._node: Any = None
 
     def __repr__(self) -> str:
         return f"TracingBool({self.value!r})"
@@ -171,11 +182,30 @@ class TracingInt:
         print(str(s))       # batch
         print(s + 2)        # TracingInt('(batch+2)')
         print(s == 4)       # TracingBool('(batch==4)')
+
+    When a :class:`TracingInt` is produced from :meth:`TracingTensor.numel`
+    during graph tracing, three extra attributes are set so that subsequent
+    comparisons (e.g. ``numel > 0``) can emit proper FX nodes:
+
+    * :attr:`_node` — the FX :class:`~torch.fx.Node` that produces this
+      integer value as a scalar ``int64`` tensor.
+    * :attr:`_tracer` — the :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+      that owns the FX graph.
+    * :attr:`_device` — the device string (e.g. ``"cpu"``) of the source
+      tensor, used when creating wrapper :class:`TracingTensor` objects for
+      FX node metadata.
     """
 
     def __init__(self, value: Union[int, str]):
         assert isinstance(value, (int, str)), f"Unexpected type {type(value)} for value"
         self.value = value
+        # Optional FX node that produces this integer as a scalar int64 tensor.
+        # Set by TracingTensor.numel() when a tracer is active.
+        self._node: Any = None
+        # Tracer that owns the FX graph referenced by _node.
+        self._tracer: Any = None
+        # Device of the source tensor (used when creating FX node metadata).
+        self._device: Any = None
 
     @property
     def is_static(self):
@@ -317,6 +347,10 @@ class TracingInt:
     # GraphTracer-based tracing.
     # ------------------------------------------------------------------
 
+    # Maps comparison operator strings to the corresponding aten scalar
+    # comparison ops.  Used in _cmp to emit FX nodes when self._node is set.
+    _ATEN_SCALAR_CMP_OPS: Dict[str, Any] = {}
+
     def _cmp(self, op: str, other: Union[int, "TracingInt"]) -> Union[bool, "TracingBool"]:
         """Applies comparison *op* to *self* and *other*.
 
@@ -325,6 +359,14 @@ class TracingInt:
         Symbolic expressions are normalised via :func:`simplify_expression` so
         that the produced strings are consistent with those from :meth:`__eq__`,
         enabling the negation lookup in :meth:`TracingBool.__bool__`.
+
+        When :attr:`_node` and :attr:`_tracer` are set (i.e. this integer was
+        produced by :meth:`~yobx.torch.new_tracing.tensor.TracingTensor.numel`
+        during graph tracing), a corresponding FX comparison node is emitted
+        and stored on the returned :class:`TracingBool` as :attr:`TracingBool._node`.
+        :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_cond` then
+        uses this node as the ``torch.cond`` predicate rather than the raw
+        :class:`TracingBool`.
 
         :param op: Comparison operator string: ``">"``, ``">="``, ``"<"``, ``"<="``, or ``"!="``.
         :param other: The right-hand-side operand.
@@ -341,10 +383,68 @@ class TracingInt:
             if isinstance(self.value, int):
                 return bool(_COMPARISON_OPS[op](self.value, other))
             expr = simplify_expression(f"({self._sym()}{op}{other})")
+            result: Union[bool, TracingBool]
             if isinstance(expr, str):
-                return TracingBool(expr)
-            return TracingBool(bool(expr))
+                result = TracingBool(expr)
+            else:
+                result = TracingBool(bool(expr))
+            # If self carries an FX node (e.g. produced by numel()), emit a
+            # comparison FX node and store it on the TracingBool so that
+            # _handle_cond can use it as the torch.cond predicate.
+            if (
+                isinstance(result, TracingBool)
+                and self._node is not None
+                and self._tracer is not None
+            ):
+                result._node = self._emit_cmp_node(op, other)
+            return result
         return NotImplemented
+
+    def _emit_cmp_node(self, op: str, other: int) -> Any:
+        """Emits an FX comparison node for ``self <op> other``.
+
+        Uses the FX node stored in :attr:`_node` (which produces the integer
+        value of *self* as a scalar ``int64`` tensor) and emits an ATen
+        scalar-comparison op (e.g. ``aten.gt.Scalar``) that produces a 0-dim
+        ``bool`` tensor.
+
+        A local import of :class:`~yobx.torch.new_tracing.tensor.TracingTensor`
+        is used to avoid a circular import at module level (``tensor.py``
+        imports from ``shape.py``).  This is safe because both modules are
+        fully initialised by the time any tracing operation calls this method.
+
+        :param op: One of ``">"``, ``">="``, ``"<"``, ``"<="``, ``"!="``.
+        :param other: The right-hand scalar integer value.
+        :return: The newly created FX :class:`~torch.fx.Node`, or ``None`` if
+            the required ATen op is unavailable.
+        """
+        import traceback
+
+        if not TracingInt._ATEN_SCALAR_CMP_OPS:
+            TracingInt._ATEN_SCALAR_CMP_OPS = {
+                ">": torch.ops.aten.gt.Scalar,
+                ">=": torch.ops.aten.ge.Scalar,
+                "<": torch.ops.aten.lt.Scalar,
+                "<=": torch.ops.aten.le.Scalar,
+                "!=": torch.ops.aten.ne.Scalar,
+            }
+        aten_op = TracingInt._ATEN_SCALAR_CMP_OPS.get(op)
+        if aten_op is None:
+            return None
+        cmp_node = self._tracer.graph.call_function(aten_op, args=(self._node, other), kwargs={})
+        # Set meta["val"] to a 0-dim bool TracingTensor so that the
+        # interpreter can determine the output type.  Use a local import to
+        # avoid a circular dependency between shape.py and tensor.py.
+        from .tensor import TracingTensor
+
+        device = self._device or "cpu"
+        cmp_tt = TracingTensor(
+            TracingShape(()), dtype=torch.bool, device=device, tracer=self._tracer
+        )
+        cmp_tt._node = cmp_node
+        cmp_node.meta["val"] = cmp_tt
+        cmp_node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return cmp_node
 
     def __gt__(self, other: Union[int, "TracingInt"]) -> Union[bool, "TracingBool"]:
         """Returns ``True`` / ``False`` or :class:`TracingBool` for ``self > other``."""

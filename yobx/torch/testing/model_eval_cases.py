@@ -154,6 +154,14 @@ def _make_feeds(names, args):
     if len(names) > len(args):
         flats = _flatten_inputs(args)
         return {k: _to_numpy(v) for k, v in zip(names, flats)}
+    # len(names) < len(args): some inputs were embedded as ONNX constants
+    # (e.g. plain Python scalars passed as torch.cond operands).  Filter to
+    # tensor-only inputs so the counts align.
+    import torch
+
+    tensor_args = tuple(a for a in args if isinstance(a, torch.Tensor))
+    if len(names) == len(tensor_args):
+        return {k: _to_numpy(v) for k, v in zip(names, tensor_args)}
     from ...helpers import string_type
 
     raise RuntimeError(f"Unable to handle names={names!r} and args={string_type(args, limit=20)}")
@@ -613,6 +621,15 @@ def _run_exporter_impl(
 
         names = [i.name for i in onx.graph.input]
         flats = _flatten_inputs(inputs[0]) if len(names) > len(inputs[0]) else inputs[0]
+
+        # When scalar inputs (int/float) are embedded as ONNX constants during
+        # new-tracing export (e.g. a plain Python integer passed as a torch.cond
+        # operand), the ONNX graph will have fewer named inputs than the original
+        # model inputs.  Filter out non-tensor scalars so the counts align.
+        import torch
+
+        if len(names) < len(flats if isinstance(flats, (list, tuple)) else [flats]):
+            flats = tuple(f for f in flats if isinstance(f, torch.Tensor))
 
         assert quiet or len(names) == len(flats), (
             f"Input mismatch, inputs[0]={string_type(inputs[0])} "
