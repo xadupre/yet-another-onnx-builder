@@ -1366,7 +1366,34 @@ class FxGraphInterpreter:
                         return mapped
             return i.value
         if isinstance(i, self.torch.SymInt):
-            return self.builder._torch_sym_int_to_str(i)
+            dim_expr = self.builder._torch_sym_int_to_str(i)
+            if isinstance(dim_expr, int):
+                return dim_expr
+            # If the expression string is already a registered ONNX node, return it
+            # directly.  Otherwise, look up the ONNX node created for this symbolic
+            # dimension via dynamic_objects_rev (e.g. "s0" -> "sym_size_int_0").
+            if (
+                not self.builder.has_name(dim_expr)
+                and dim_expr in self.builder.dynamic_objects_rev
+            ):
+                candidates = self.builder.dynamic_objects_rev[dim_expr]
+                if candidates:
+                    node_name = candidates[0][0]
+                    if self.builder.has_name(node_name):
+                        return node_name
+            return dim_expr
+        if isinstance(i, self.torch.SymBool):
+            # SymBool values arise from torch._check / _assert_scalar deferred
+            # assertions.  They are not representable as ONNX nodes; convert to a
+            # constant bool initializer so that downstream Identity / no-op nodes
+            # can still be emitted without error.
+            try:
+                bool_val = bool(i)
+            except Exception:
+                bool_val = True
+            return self.builder.make_initializer(
+                "", np.array(bool_val, dtype=np.bool_), source="_process_arg.SymBool"
+            )
         if isinstance(i, tuple):
             return tuple(self._process_arg(node, aten_name, t) for t in i)
         if isinstance(i, (float, int, tuple, complex)):

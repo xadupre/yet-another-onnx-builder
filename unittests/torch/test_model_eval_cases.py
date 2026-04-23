@@ -309,6 +309,9 @@ class TestModelEvalCases(ExtTestCase):
             cases="ControlFlowShapeCheck", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_controlflow_shape_check_default(self):
+        evaluation(cases="ControlFlowShapeCheck", exporters="yobx", quiet=False, dynamic=True)
+
     def test_run_exporter_controlflow_cond_nonzero_new_tracing(self):
         evaluation(
             cases="ControlFlowCondNonZero",
