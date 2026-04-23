@@ -891,6 +891,58 @@ class TestNewTracingTracer(ExtTestCase):
         ]
         self.assertEqual(len(leaf_nodes), 1)
 
+    def test_trace_inplace_setitem_ellipsis_1(self):
+        """Traces copy[..., index] = update via new_zeros and verifies graph structure."""
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.params = torch.zeros((1, 8192, 4), dtype=torch.float32)
+
+            def forward(self, index, update):
+                copy = update.new_zeros(self.params.shape)
+                copy[..., index] = update
+                return copy
+
+        model = Model()
+        index = torch.tensor([0, 3, 2, 1], dtype=torch.int64)
+        update = (torch.arange(4 * 8192) + 10).reshape((-1, 4)).to(torch.float32)
+
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            model,
+            args=(index, update),
+            dynamic_shapes={"index": {0: "batch"}, "update": {0: "batch"}},
+        )
+        graph.lint()
+
+        # There must be an operator.setitem node in the graph.
+        setitem_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is operator.setitem
+        ]
+        self.assertEqual(len(setitem_nodes), 1, "Expected exactly one operator.setitem node")
+
+        # The setitem indices must be a tuple (Ellipsis, <FX node for index>).
+        si_node = setitem_nodes[0]
+        si_indices = si_node.args[1]
+        self.assertIsInstance(si_indices, tuple, "setitem indices must be a tuple")
+        self.assertEqual(len(si_indices), 2, "setitem indices tuple must have 2 elements")
+        self.assertIs(si_indices[0], Ellipsis, "First index must be Ellipsis")
+        self.assertIsInstance(
+            si_indices[1],
+            torch.fx.Node,
+            "Second index must be an FX Node (unwrapped TracingTensor)",
+        )
+
+        # The output must reference the setitem node, not the original new_zeros node.
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        result_node = output_node.args[0]
+        self.assertIs(
+            result_node,
+            si_node,
+            "Output must reference the setitem node, not the original new_zeros",
+        )
+
 
 class TestGraphTracerTorchCheck(ExtTestCase):
     """Tests for torch._check interception in GraphTracer."""
