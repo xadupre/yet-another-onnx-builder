@@ -247,6 +247,27 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    def test_run_exporter_inplace_setitem_square_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemSquare", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_inplace_setitem_square_add_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemSquareAdd",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
+    def test_run_exporter_inplace_setitem_square_add2_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemSquareAdd2",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_inplace_setitem_ellipsis_2_tracing(self):
         evaluation(
             cases="InplaceSetItemEllipsis_2", exporters="yobx-tracing", quiet=False, dynamic=True
