@@ -4699,7 +4699,7 @@ def aten_floor_divide(
 def aten_frac(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "frac"
 ) -> T:
-    """frac — Computes the fractional part of each element: ``frac(x) = x - trunc(x)``."""
+    """Computes the fractional part of each element: ``frac(x) = x - trunc(x)``."""
     trunc_x = g.op.Mul(
         g.op.Floor(g.op.Abs(x, name=name), name=name), g.op.Sign(x, name=name), name=name
     )
@@ -4716,7 +4716,7 @@ def aten_frexp_Tensor(
     x: T,
     name: str = "frexp_Tensor",
 ) -> Tuple[T, T]:
-    """frexp — Decomposes ``x`` into mantissa and exponent so that
+    """Decomposes ``x`` into mantissa and exponent so that
     ``x = mantissa * 2 ** exponent`` with ``0.5 <= |mantissa| < 1``.
 
     Returns:
