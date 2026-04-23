@@ -13,8 +13,82 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect_tensorflow_scope:
+    name: Detect tensorflow-only PR
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      count: ${{ steps.detect.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect whether all changes are in the tensorflow source tree
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "Changed files:"
+          echo "$changed"
+
+          # Count files outside yobx/tensorflow/ and unittests/tensorflow/.
+          out_of_scope=$(echo "$changed" \
+            | grep -v '^yobx/tensorflow/' \
+            | grep -v '^unittests/tensorflow/' \
+            | grep -c '\S' || true)
+
+          if [ "$out_of_scope" -gt 0 ]; then
+            echo "Changes outside tensorflow scope detected."
+            echo "count=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "All changes are in the tensorflow scope."
+            echo "count=1" >> "$GITHUB_OUTPUT"
+          fi
+
+  tensorflow_targeted_tests:
+    name: tensorflow targeted (py3.13, tf-2.21, jax-0.10)
+    needs: detect_tensorflow_scope
+    if: needs.detect_tensorflow_scope.outputs.count == '1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install tensorflow==2.21 jax==0.10
+        run: pip install "tensorflow==2.21.*" "jax==0.10.*"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,tensorflow]"
+
+      - name: Install tensorflow==2.21 jax==0.10 again
+        run: pip install "tensorflow==2.21.*" "jax==0.10.*"
+
+      - name: pip freeze
+        run: pip freeze
+
+      - name: Run targeted tensorflow tests
+        run: pytest --durations=10 unittests/tensorflow
+
   tensorflow_tests:
     name: tensorflow (ubuntu-latest, py${{ matrix.python-version }}, tf-${{ matrix.tensorflow-version }}, jax-${{ matrix.jax-version }})
+    needs: tensorflow_targeted_tests
+    # Run when targeted tests succeeded or were skipped (not a PR / out-of-scope PR).
+    # Do NOT run when targeted tests failed.
+    if: >-
+      always() && (
+        needs.tensorflow_targeted_tests.result == 'success' ||
+        needs.tensorflow_targeted_tests.result == 'skipped'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read

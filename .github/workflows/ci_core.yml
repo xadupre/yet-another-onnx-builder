@@ -11,8 +11,115 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect_builder_subfolder:
+    name: Detect unique builder subfolder
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      subfolder: ${{ steps.detect.outputs.subfolder }}
+      count: ${{ steps.detect.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect unique yobx/builder subfolder
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "Changed files:"
+          echo "$changed"
+
+          # If any changed file is outside yobx/builder/ and unittests/builder/, no unique subfolder.
+          non_builder=$(echo "$changed" \
+            | grep -v '^yobx/builder/' \
+            | grep -v '^unittests/builder/' \
+            | grep -c '\S' || true)
+          if [ "$non_builder" -gt 0 ]; then
+            echo "subfolder=" >> "$GITHUB_OUTPUT"
+            echo "count=0"    >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Reject files sitting directly in yobx/builder/ or unittests/builder/ (no subdirectory).
+          root_files=$(echo "$changed" \
+            | grep -E '^(yobx/builder|unittests/builder)/[^/]+$' \
+            | grep -c '\S' || true)
+          if [ "$root_files" -gt 0 ]; then
+            echo "subfolder=" >> "$GITHUB_OUTPUT"
+            echo "count=0"    >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Extract second-level subdirectory under yobx/builder/.
+          yobx_subs=$(echo "$changed" \
+            | grep '^yobx/builder/' \
+            | awk -F'/' '{if (NF >= 4) print $3}' \
+            | sort -u)
+
+          # Extract second-level subdirectory under unittests/builder/.
+          test_subs=$(echo "$changed" \
+            | grep '^unittests/builder/' \
+            | awk -F'/' '{if (NF >= 4) print $3}' \
+            | sort -u)
+
+          # Combine and count unique subfolders.
+          all_subs=$(printf '%s\n%s\n' "$yobx_subs" "$test_subs" \
+            | grep -v '^$' | sort -u)
+          count=$(echo "$all_subs" | grep -c '\S' || true)
+          subfolder=$(echo "$all_subs" | head -1)
+
+          # Verify the test directory exists.
+          if [ "$count" -eq 1 ] && [ ! -d "unittests/builder/${subfolder}" ]; then
+            echo "No test directory for subfolder '${subfolder}', skipping targeted tests."
+            echo "subfolder=" >> "$GITHUB_OUTPUT"
+            echo "count=0"    >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "Impacted builder subfolders: $all_subs (count=$count)"
+          echo "subfolder=$subfolder" >> "$GITHUB_OUTPUT"
+          echo "count=$count"         >> "$GITHUB_OUTPUT"
+
+  core_targeted_tests:
+    name: core targeted (${{ needs.detect_builder_subfolder.outputs.subfolder }})
+    needs: detect_builder_subfolder
+    if: needs.detect_builder_subfolder.outputs.count == '1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install package
+        run: pip install -e .[dev,spox,onnxscript]
+
+      - name: pip freeze
+        run: pip freeze
+
+      - name: Run targeted builder tests
+        run: |
+          pytest --durations=10 unittests/builder/${{ needs.detect_builder_subfolder.outputs.subfolder }}
+
   no_torch_tests:
     name: core (${{ matrix.os }}, py${{ matrix.python-version }})
+    needs: core_targeted_tests
+    # Run when targeted tests succeeded or were skipped (no unique subfolder / not a PR).
+    # Do NOT run when targeted tests failed – that already signals a broken subfolder.
+    if: >-
+      always() && (
+        needs.core_targeted_tests.result == 'success' ||
+        needs.core_targeted_tests.result == 'skipped'
+      )
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
