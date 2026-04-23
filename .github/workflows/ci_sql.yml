@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   detect_sql_scope:
+    if: github.event_name == 'pull_request'
     uses: ./.github/workflows/common_detect_module_scope.yml
     permissions:
       contents: read

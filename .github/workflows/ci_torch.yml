@@ -12,6 +12,7 @@ concurrency:
 
 jobs:
   detect_torch_subfolder:
+    if: github.event_name == 'pull_request'
     uses: ./.github/workflows/common_detect_torch_subfolder.yml
     permissions:
       contents: read
