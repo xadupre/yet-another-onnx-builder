@@ -87,8 +87,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "fmax",
         "fmin",
         "fmod",
-        "frac",
-        "frexp",
         "hash_tensor",
         "hypot",
         "i0",
@@ -309,6 +307,7 @@ XFAIL_OPS_BFLOAT16: Dict[str, FrozenSet[str]] = {
             "bmm",  # matmul numerical error exceeds bfloat16 tolerance
             "erfinv",  # bfloat16 precision insufficient for erfinv computation
             "expm1",  # reduced-precision exponential error
+            "frexp",  # reduced-precision exponential error
             "log10",  # bfloat16 precision loss in Log
             "log1p",  # bfloat16 precision loss in Log
             "log2",  # bfloat16 precision loss in Log
