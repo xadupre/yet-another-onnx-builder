@@ -109,6 +109,55 @@ class TestOnnxExportControlFlow(ExtTestCase):
                         self.assertEqualArray(e, g, atol=1e-5)
 
     @ignore_warnings((UserWarning, FutureWarning))
+    def test_scan_2_new_tracing(self):
+        import torch
+        from yobx.torch.export_options import TracingMode
+
+        def add(carry1: torch.Tensor, carry2: torch.Tensor, y1: torch.Tensor, y2: torch.Tensor):
+            next_carry1 = carry1 + y1
+            next_carry2 = carry2 * y2
+            return [next_carry1, next_carry2, next_carry1, next_carry2]
+
+        class ScanModel(torch.nn.Module):
+            def forward(self, x):
+                init1 = torch.zeros_like(x[0])
+                init2 = torch.ones_like(x[0])
+                carry1, carry2, out1, out2 = torch.ops.higher_order.scan(
+                    add, [init1, init2], [x, x * 2], additional_inputs=[]
+                )
+                return carry1, carry2, out1, out2
+
+        x = torch.tensor([[1, 2, 3, -1], [4, 5, 6, -1], [7, 8, 9, -1]], dtype=torch.float32)
+        model = ScanModel()
+        expected = model(x)
+        self.assertEqualArray(expected[0], x.sum(axis=0))
+
+        batch = torch.export.Dim("batch")
+        for optimize in [False, True]:
+            with self.subTest(optimize=optimize):
+                onx = to_onnx(
+                    model,
+                    (x,),
+                    optimize=optimize,
+                    dynamic_shapes={"x": {0: batch}},
+                    export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
+                )
+                names = [(f.domain, f.name) for f in onx.functions]
+                self.assertEqual(len(names), len(set(names)))
+
+                import onnxruntime
+
+                sess = onnxruntime.InferenceSession(
+                    onx.SerializeToString(), providers=["CPUExecutionProvider"]
+                )
+                for _x in (-x, x):
+                    expected = model(_x)
+                    feeds = {"x": _x.detach().numpy()}
+                    got = sess.run(None, feeds)
+                    for e, g in zip(expected, got):
+                        self.assertEqualArray(e, g, atol=1e-5)
+
+    @ignore_warnings((UserWarning, FutureWarning))
     def test_scan_cdist_carry(self):
         import torch
 

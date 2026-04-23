@@ -660,6 +660,58 @@ class TestNewTracingTracer(ExtTestCase):
         not hasattr(getattr(torch.ops, "higher_order", None), "scan"),
         "torch.ops.higher_order.scan not available",
     )
+    def test_trace_scan_two_carries_two_scan_inputs(self):
+        """GraphTracer correctly traces a scan with 2 carry states and 2 scan inputs."""
+
+        class ScanModel(torch.nn.Module):
+            def forward(self, x):
+                def add(carry1, carry2, y1, y2):
+                    next_carry1 = carry1 + y1
+                    next_carry2 = carry2 * y2
+                    return [next_carry1, next_carry2, next_carry1, next_carry2]
+
+                init1 = torch.zeros_like(x[0])
+                init2 = torch.ones_like(x[0])
+                carry1, carry2, out1, out2 = torch.ops.higher_order.scan(
+                    add, [init1, init2], [x, x * 2], additional_inputs=[]
+                )
+                return carry1, carry2, out1, out2
+
+        model = ScanModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(3, 4),))
+        graph.lint()
+
+        scan_op = torch.ops.higher_order.scan
+        scan_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is scan_op]
+        self.assertEqual(len(scan_nodes), 1, f"Expected 1 scan node, got: {scan_nodes}")
+
+        # Exactly 4 getitem nodes (2 carry + 2 scan-accumulation outputs).
+        getitem_nodes = [
+            n
+            for n in graph.nodes
+            if n.op == "call_function" and n.target is operator.getitem
+            and n.args[0] is scan_nodes[0]
+        ]
+        self.assertEqual(
+            len(getitem_nodes), 4, f"Expected 4 getitem nodes, got: {getitem_nodes}"
+        )
+
+        # meta["val"] carries shape info for all 4 outputs.
+        val = scan_nodes[0].meta.get("val", None)
+        self.assertIsNotNone(val, "scan node must have meta['val'] set")
+        self.assertEqual(len(val), 4, f"Expected 4 outputs in meta['val'], got {len(val)}")
+
+        # The scan body sub-tracer is registered.
+        self.assertTrue(
+            any("scan" in k for k in tracer._sub_tracers),
+            f"No scan sub-tracer found in {list(tracer._sub_tracers)}",
+        )
+
+    @unittest.skipIf(
+        not hasattr(getattr(torch.ops, "higher_order", None), "scan"),
+        "torch.ops.higher_order.scan not available",
+    )
     def test_trace_scan_cdist(self):
         """ControlFlowScanCDist-like model is correctly traced."""
 
