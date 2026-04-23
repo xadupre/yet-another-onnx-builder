@@ -8016,6 +8016,110 @@ def aten_lift_fresh_copy(
 #     return res
 
 
+def aten_linalg_cross(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    dim: int = -1,
+    name: str = "linalg_cross",
+) -> T:
+    """Computes the cross product of two 3-element vectors along *dim*."""
+    assert g.has_rank(x), f"linalg_cross: rank of {x!r} must be known{g.get_debug_msg()}"
+    rank = g.get_rank(x)
+    dim = dim if dim >= 0 else dim + rank
+
+    def _slice(t: T, i: int) -> T:
+        starts = np.array([i], dtype=np.int64)
+        ends = np.array([i + 1], dtype=np.int64)
+        axes = np.array([dim], dtype=np.int64)
+        return g.op.Slice(t, starts, ends, axes, name=name)
+
+    x0, x1, x2 = _slice(x, 0), _slice(x, 1), _slice(x, 2)
+    y0, y1, y2 = _slice(y, 0), _slice(y, 1), _slice(y, 2)
+
+    r0 = g.op.Sub(g.op.Mul(x1, y2, name=name), g.op.Mul(x2, y1, name=name), name=name)
+    r1 = g.op.Sub(g.op.Mul(x2, y0, name=name), g.op.Mul(x0, y2, name=name), name=name)
+    r2 = g.op.Sub(g.op.Mul(x0, y1, name=name), g.op.Mul(x1, y0, name=name), name=name)
+
+    res = g.op.Concat(r0, r1, r2, axis=dim, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_linalg_det(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "linalg_det",
+) -> T:
+    """Computes the determinant of a square matrix or batch of square matrices."""
+    res = g.op.Det(x, outputs=outputs, name=name)
+    if not sts:
+        if g.has_type(x):
+            g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            shape = g.get_shape(x)
+            g.set_shape(res, shape[:-2])
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x) - 2)
+    return res
+
+
+def aten_linalg_slogdet(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "linalg_slogdet",
+) -> Tuple[T, T]:
+    """Computes the sign and the natural log of the absolute value of the determinant."""
+    if len(outputs) == 1:
+        outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
+    assert (
+        len(outputs) == 2
+    ), f"linalg_slogdet expects 2 outputs, got {len(outputs)}{g.get_debug_msg()}"
+    det = g.op.Det(x, name=name)
+    sign = g.op.Sign(det, name=name, outputs=outputs[:1])
+    logabsdet = g.op.Log(g.op.Abs(det, name=name), name=name, outputs=outputs[1:])
+    if not sts:
+        if g.has_type(x):
+            g.set_type(sign, g.get_type(x))
+            g.set_type(logabsdet, g.get_type(x))
+        if g.has_shape(x):
+            shape = g.get_shape(x)
+            g.set_shape(sign, shape[:-2])
+            g.set_shape(logabsdet, shape[:-2])
+        elif g.has_rank(x):
+            g.set_rank(sign, g.get_rank(x) - 2)
+            g.set_rank(logabsdet, g.get_rank(x) - 2)
+    return sign, logabsdet
+
+
+def aten_linalg_vecdot(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    dim: int = -1,
+    name: str = "linalg_vecdot",
+) -> T:
+    """Computes the dot product of two batches of vectors along *dim*."""
+    assert g.has_rank(x), f"linalg_vecdot: rank of {x!r} must be known{g.get_debug_msg()}"
+    rank = g.get_rank(x)
+    dim = dim if dim >= 0 else dim + rank
+    axes = np.array([dim], dtype=np.int64)
+    product = g.op.Mul(x, y, name=name)
+    res = g.op.ReduceSumAnyOpset(product, axes, keepdims=0, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_reduce_op(g, res, x, keepdim=0, axes=(dim,))
+    return res
+
+
 def aten_linalg_vector_norm(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
