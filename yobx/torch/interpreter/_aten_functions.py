@@ -4736,6 +4736,13 @@ def aten_frac(
     return res
 
 
+def aten_frexp(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "frexp"
+) -> Tuple[T, T]:
+    """Delegates ``torch.frexp`` to :func:`aten_frexp_Tensor`."""
+    return aten_frexp_Tensor(g, sts, outputs, x, name=name)
+
+
 def aten_frexp_Tensor(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
