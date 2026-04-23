@@ -4757,6 +4757,8 @@ def aten_frexp_Tensor(
         A tuple ``(mantissa, exponent)`` where *mantissa* has the same dtype as
         *x* and *exponent* is an ``INT32`` tensor with the same shape.
     """
+    if len(outputs) == 1:
+        outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
     assert len(outputs) == 2, f"frexp expects 2 outputs, got {len(outputs)}{g.get_debug_msg()}"
     assert g.has_type(x), f"frexp: type of {x!r} must be known{g.get_debug_msg()}"
     itype = g.get_type(x)
