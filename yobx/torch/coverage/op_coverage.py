@@ -88,8 +88,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "fmax",
         "fmin",
         "fmod",
-        "frac",
-        "frexp",
         "hash_tensor",
         "hypot",
         "i0",

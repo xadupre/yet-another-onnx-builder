@@ -4696,6 +4696,72 @@ def aten_floor_divide(
     return res
 
 
+def aten_frac(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "frac"
+) -> T:
+    """frac — Computes the fractional part of each element: ``frac(x) = x - trunc(x)``."""
+    trunc_x = g.op.Mul(
+        g.op.Floor(g.op.Abs(x, name=name), name=name), g.op.Sign(x, name=name), name=name
+    )
+    res = g.op.Sub(x, trunc_x, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_frexp_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "frexp_Tensor",
+) -> Tuple[T, T]:
+    """frexp — Decomposes ``x`` into mantissa and exponent so that
+    ``x = mantissa * 2 ** exponent`` with ``0.5 <= |mantissa| < 1``.
+
+    Returns:
+        A tuple ``(mantissa, exponent)`` where *mantissa* has the same dtype as
+        *x* and *exponent* is an ``INT32`` tensor with the same shape.
+    """
+    assert len(outputs) == 2, f"frexp expects 2 outputs, got {len(outputs)}{g.get_debug_msg()}"
+    assert g.has_type(x), f"frexp: type of {x!r} must be known{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    dtype = tensor_dtype_to_np_dtype(itype)
+
+    abs_x = g.op.Abs(x, name=name)
+    is_zero = g.op.Equal(abs_x, np.array(0, dtype=dtype), name=name)
+
+    # Replace 0 with 1 to avoid log(0) = -inf when computing the exponent.
+    safe_abs = g.op.Where(is_zero, np.array(1, dtype=dtype), abs_x, name=name)
+
+    # exponent = floor(log2(|x|)) + 1  (gives 0.5 <= |mantissa| < 1)
+    log2_abs = g.op.Div(
+        g.op.Log(safe_abs, name=name), np.array(math.log(2), dtype=dtype), name=name
+    )
+    exp_float = g.op.Add(g.op.Floor(log2_abs, name=name), np.array(1, dtype=dtype), name=name)
+
+    # Cast exponent to INT32, forcing zero wherever the input was zero.
+    exp_int_raw = g.op.Cast(exp_float, to=TensorProto.INT32, name=name)
+    exp_int = g.op.Where(
+        is_zero, np.array(0, dtype=np.int32), exp_int_raw, name=name, outputs=outputs[1:]
+    )
+
+    # mantissa = x / 2^exponent = x * 2^(-exponent)
+    mantissa = g.op.Mul(
+        x,
+        g.op.Pow(np.array(2, dtype=dtype), g.op.Neg(exp_float, name=name), name=name),
+        name=name,
+        outputs=outputs[:1],
+    )
+
+    if not sts:
+        set_type_shape_unary_op(g, mantissa, x)
+        g.set_type(exp_int, TensorProto.INT32)
+        if g.has_rank(x):
+            g.set_rank(exp_int, g.get_rank(x))
+    return mantissa, exp_int
+
+
 def aten_full(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
