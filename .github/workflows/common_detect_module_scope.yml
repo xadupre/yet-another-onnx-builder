@@ -1,0 +1,66 @@
+name: Detect module-only scope (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      module:
+        description: "Module name (e.g. tensorflow, sql, litert)"
+        required: true
+        type: string
+      base_sha:
+        description: "Base commit SHA (github.event.pull_request.base.sha)"
+        required: false
+        type: string
+        default: ""
+      head_sha:
+        description: "Head commit SHA (github.event.pull_request.head.sha)"
+        required: false
+        type: string
+        default: ""
+    outputs:
+      count:
+        description: "1 if all changes are within the module scope, 0 otherwise"
+        value: ${{ jobs.detect.outputs.count }}
+
+jobs:
+  detect:
+    name: Detect ${{ inputs.module }}-only PR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      count: ${{ steps.detect.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect whether all changes are in the ${{ inputs.module }} source tree
+        id: detect
+        env:
+          BASE_SHA: ${{ inputs.base_sha }}
+          HEAD_SHA: ${{ inputs.head_sha }}
+          MODULE: ${{ inputs.module }}
+        run: |
+          if [ -z "$BASE_SHA" ] || [ -z "$HEAD_SHA" ]; then
+            echo "count=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "Changed files:"
+          echo "$changed"
+
+          # Count files outside yobx/$MODULE/ and unittests/$MODULE/.
+          out_of_scope=$(echo "$changed" \
+            | grep -v "^yobx/${MODULE}/" \
+            | grep -v "^unittests/${MODULE}/" \
+            | grep -c '\S' || true)
+
+          if [ "$out_of_scope" -gt 0 ]; then
+            echo "Changes outside ${MODULE} scope detected."
+            echo "count=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "All changes are in the ${MODULE} scope."
+            echo "count=1" >> "$GITHUB_OUTPUT"
+          fi

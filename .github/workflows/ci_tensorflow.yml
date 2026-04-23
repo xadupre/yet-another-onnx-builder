@@ -14,41 +14,14 @@ concurrency:
 
 jobs:
   detect_tensorflow_scope:
-    name: Detect tensorflow-only PR
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/common_detect_module_scope.yml
     permissions:
       contents: read
-    outputs:
-      count: ${{ steps.detect.outputs.count }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect whether all changes are in the tensorflow source tree
-        id: detect
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
-          echo "Changed files:"
-          echo "$changed"
-
-          # Count files outside yobx/tensorflow/ and unittests/tensorflow/.
-          out_of_scope=$(echo "$changed" \
-            | grep -v '^yobx/tensorflow/' \
-            | grep -v '^unittests/tensorflow/' \
-            | grep -c '\S' || true)
-
-          if [ "$out_of_scope" -gt 0 ]; then
-            echo "Changes outside tensorflow scope detected."
-            echo "count=0" >> "$GITHUB_OUTPUT"
-          else
-            echo "All changes are in the tensorflow scope."
-            echo "count=1" >> "$GITHUB_OUTPUT"
-          fi
+    with:
+      module: tensorflow
+      base_sha: ${{ github.event.pull_request.base.sha }}
+      head_sha: ${{ github.event.pull_request.head.sha }}
 
   tensorflow_targeted_tests:
     name: tensorflow targeted (py3.13, tf-2.21, jax-0.10)
