@@ -175,6 +175,11 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
                 # Skip ops with non-trivial keyword arguments whose semantics
                 # may not be fully supported by the ONNX exporter.
                 continue
+            if any(isinstance(t, torch.Tensor) and 0 in t.shape for t in (s.input, *s.args)):
+                # Skip ops whose first sample contains a tensor with a zero-sized
+                # dimension.  The ONNX graph builder rejects such inputs by default
+                # (set_shape raises when allow_zero=False and a dimension is 0).
+                continue
             testable.append(op)
     return testable
 

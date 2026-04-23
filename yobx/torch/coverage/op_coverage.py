@@ -98,7 +98,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "ldexp",
         "lgamma",
         "linalg_cond",
-        "linalg_cross",
         "linalg_diagonal",
         "linalg_householder_product",
         "linalg_inv",
@@ -107,7 +106,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "linalg_solve",
         "linalg_solve_ex",
         "linalg_svdvals",
-        "linalg_vecdot",
         "lu_solve",
         "lu_unpack",
         "masked_select",
@@ -207,9 +205,6 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "jiterator_binary",
             "jiterator_binary_return_by_ref",
             "jiterator_unary",
-            "linalg_det",
-            "linalg_slogdet",
-            "logdet",
             "logical_not",
             "nn_functional_cross_entropy",
             "nn_functional_l1_loss",
@@ -475,6 +470,7 @@ ATOL_OPS_FLOAT32: Dict[str, float] = {
 # a larger tolerance than the global _ATOL_FLOAT16 = 1e-2.
 ATOL_OPS_FLOAT16: Dict[str, float] = {
     "addr": 0.02,
+    "linalg.cross": 5e-2,  # float16: cross product accumulates rounding error
     "std": 1e-1,  # variance accumulates float16 rounding; sqrt amplifies
     "std_mean": 3e-1,  # same compound error as std
 }
