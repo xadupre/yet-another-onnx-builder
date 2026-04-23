@@ -13,8 +13,76 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect_sql_scope:
+    name: Detect sql-only PR
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      count: ${{ steps.detect.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect whether all changes are in the sql source tree
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "Changed files:"
+          echo "$changed"
+
+          # Count files outside yobx/sql/ and unittests/sql/.
+          out_of_scope=$(echo "$changed" \
+            | grep -v '^yobx/sql/' \
+            | grep -v '^unittests/sql/' \
+            | grep -c '\S' || true)
+
+          if [ "$out_of_scope" -gt 0 ]; then
+            echo "Changes outside sql scope detected."
+            echo "count=0" >> "$GITHUB_OUTPUT"
+          else
+            echo "All changes are in the sql scope."
+            echo "count=1" >> "$GITHUB_OUTPUT"
+          fi
+
+  sql_targeted_tests:
+    name: sql targeted
+    needs: detect_sql_scope
+    if: needs.detect_sql_scope.outputs.count == '1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,polars,sql]"
+
+      - name: pip freeze
+        run: pip freeze
+
+      - name: Run targeted sql tests
+        run: pytest --durations=10 unittests/sql
+
   sql_tests:
     name: sql (ubuntu-latest, py3.12)
+    needs: sql_targeted_tests
+    # Run when targeted tests succeeded or were skipped (not a PR / out-of-scope PR).
+    # Do NOT run when targeted tests failed.
+    if: >-
+      always() && (
+        needs.sql_targeted_tests.result == 'success' ||
+        needs.sql_targeted_tests.result == 'skipped'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
