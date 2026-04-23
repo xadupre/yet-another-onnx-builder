@@ -1,3 +1,5 @@
+import operator
+import traceback
 from typing import Any, Dict, List, Optional, Tuple, Union
 import torch
 import torch.fx
@@ -363,3 +365,59 @@ class TracingTensor(torch.Tensor):
         if isinstance(other, TracingInt) and not other.is_static:
             return self._div_by_tracing_int(other)
         return super().__truediv__(other)
+
+    def __setitem__(self, indices: Any, values: Any) -> None:
+        """
+        Captures inplace index-assignment as an ``operator.setitem`` FX node.
+
+        When Python evaluates ``x[...] = val`` on a :class:`TracingTensor`,
+        this override intercepts the assignment before it reaches the C++
+        dispatcher.  It emits a single ``call_function`` node with target
+        ``operator.setitem`` and updates ``self._node`` to point to that node
+        so that all subsequent uses of this tensor in the graph flow through
+        the setitem result.
+
+        This mirrors the behaviour of
+        :meth:`~yobx.torch.tracing.CustomProxy.__setitem__` in the old
+        symbolic-tracing path, allowing
+        :func:`~yobx.torch.tracing.CustomTracer.remove_inplace` and the
+        ONNX interpreter's ``aten_setitem`` handler to process the node in
+        the same way as the old tracing.
+
+        :param indices: Index expression (slice, tuple of slices,
+            integer, boolean mask, or :class:`TracingTensor`).
+        :param values: Value(s) to assign.  May be a scalar, a
+            :class:`torch.Tensor`, or a :class:`TracingTensor`.
+        """
+        tracer = self._tracer
+        assert tracer is not None, "__setitem__ requires an active tracer"
+
+        def _unwrap(idx: Any) -> Any:
+            """Returns the FX node for a TracingTensor index or the index itself."""
+            if isinstance(idx, TracingTensor):
+                return idx._node
+            if isinstance(idx, tuple):
+                return tuple(_unwrap(i) for i in idx)
+            return idx
+
+        processed_indices = _unwrap(indices)
+        values_arg = values._node if isinstance(values, TracingTensor) else values
+
+        node = tracer.graph.call_function(
+            operator.setitem, args=(self._node, processed_indices, values_arg), kwargs={}
+        )
+        # Store a TracingTensor as node metadata so the FX interpreter can
+        # infer the output dtype/shape (same as the modified tensor).
+        shape, dtype, device = self._tracing_shape, self.dtype, self.device
+        meta_tt = TracingTensor.__new__(TracingTensor, shape, dtype=dtype, device=device)
+        meta_tt._tracing_shape = shape
+        meta_tt._tracer = tracer
+        meta_tt._node = node
+        node.meta["val"] = meta_tt
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        # Redirect self._node so that all subsequent operations on this tensor
+        # in the same forward() call flow through the setitem node rather than
+        # the original placeholder.  This ensures eliminate_dead_code() does
+        # not discard the node and that downstream ops receive the updated
+        # tensor value.
+        self._node = node
