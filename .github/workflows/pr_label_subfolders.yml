@@ -1,0 +1,128 @@
+name: PR – report impacted subfolders
+
+on:
+  pull_request:
+    branches: ["main"]
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  label_subfolders:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect impacted yobx/ subfolders
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # List files changed between the PR base and head.
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          echo "Changed files:"
+          echo "$changed"
+
+          # Extract unique first-level sub-directories under yobx/.
+          # Files directly in yobx/ (no sub-directory) are reported as "yobx".
+          subfolders=$(echo "$changed" \
+            | grep '^yobx/' \
+            | awk -F'/' '{if (NF >= 3) print $1"/"$2; else print $1}' \
+            | sort -u)
+
+          echo "Impacted subfolders:"
+          echo "$subfolders"
+
+          # Count unique subfolders.
+          count=$(echo "$subfolders" | grep -c '\S' || true)
+
+          # Export as comma-separated list (single line).
+          csv=$(echo "$subfolders" | tr '\n' ',' | sed 's/,$//')
+          echo "subfolders=$csv" >> "$GITHUB_OUTPUT"
+          echo "count=$count"    >> "$GITHUB_OUTPUT"
+
+      - name: Post PR comment with impacted subfolders
+        if: steps.detect.outputs.count != '0'
+        uses: actions/github-script@v7
+        env:
+          SUBFOLDERS: ${{ steps.detect.outputs.subfolders }}
+        with:
+          script: |
+            const subfolders = process.env.SUBFOLDERS;
+            const list = subfolders.split(',').filter(Boolean);
+
+            const body = [
+              '## Impacted sub-packages',
+              '',
+              'The following `yobx/` sub-packages are affected by this PR:',
+              '',
+              ...list.map(s => `- \`${s}\``),
+            ].join('\n');
+
+            // Find an existing bot comment so we update rather than spam.
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const marker = '## Impacted sub-packages';
+            const existing = comments.find(
+              c => c.user.type === 'Bot' && c.body.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body,
+              });
+            }
+
+      - name: Update PR title when exactly one subfolder is impacted
+        if: steps.detect.outputs.count == '1'
+        uses: actions/github-script@v7
+        env:
+          SUBFOLDER: ${{ steps.detect.outputs.subfolders }}
+        with:
+          script: |
+            const subfolder = process.env.SUBFOLDER;
+            const prefix = `[${subfolder}] `;
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.issue.number,
+            });
+
+            const currentTitle = pr.title;
+
+            // Add the prefix only if it isn't already present.
+            if (!currentTitle.startsWith(prefix)) {
+              // Remove any existing single-subfolder prefix of the same form.
+              const cleaned = currentTitle.replace(/^\[yobx\/[^\]]+\]\s*/, '');
+              const newTitle = `${prefix}${cleaned}`;
+
+              await github.rest.pulls.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: context.issue.number,
+                title: newTitle,
+              });
+            }
