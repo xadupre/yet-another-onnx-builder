@@ -14,41 +14,13 @@ concurrency:
 
 jobs:
   detect_litert_scope:
-    name: Detect litert-only PR
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    uses: ./.github/workflows/common_detect_module_scope.yml
     permissions:
       contents: read
-    outputs:
-      count: ${{ steps.detect.outputs.count }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Detect whether all changes are in the litert source tree
-        id: detect
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-        run: |
-          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
-          echo "Changed files:"
-          echo "$changed"
-
-          # Count files outside yobx/litert/ and unittests/litert/.
-          out_of_scope=$(echo "$changed" \
-            | grep -v '^yobx/litert/' \
-            | grep -v '^unittests/litert/' \
-            | grep -c '\S' || true)
-
-          if [ "$out_of_scope" -gt 0 ]; then
-            echo "Changes outside litert scope detected."
-            echo "count=0" >> "$GITHUB_OUTPUT"
-          else
-            echo "All changes are in the litert scope."
-            echo "count=1" >> "$GITHUB_OUTPUT"
-          fi
+    with:
+      module: litert
+      base_sha: ${{ github.event.pull_request.base.sha }}
+      head_sha: ${{ github.event.pull_request.head.sha }}
 
   litert_targeted_tests:
     name: litert targeted
