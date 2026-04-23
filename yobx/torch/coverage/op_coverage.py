@@ -74,7 +74,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "block_diag",
         "conj_physical",
         "copysign",
-        "count_nonzero",
         "cross",
         "cumulative_trapezoid",
         "deg2rad",
