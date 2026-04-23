@@ -2874,14 +2874,16 @@ def aten_count_nonzero(
         adim = np.array([dim] if isinstance(dim, int) else dim, dtype=np.int64)
         result = g.op.ReduceSumAnyOpset(int_x, adim, keepdims=0, outputs=outputs, name=name)
     if not sts:
+        # count_nonzero always returns INT64 regardless of the input dtype.
+        # Pass int_x (already INT64) so set_type_shape_reduce_op propagates the
+        # correct type and avoids a conflict with the input's original dtype.
         set_type_shape_reduce_op(
             g,
             outputs[0],
-            x,
+            int_x,
             keepdim=0,
             axes=None if dim is None else ((dim,) if isinstance(dim, int) else tuple(dim)),
         )
-        g.set_type(outputs[0], TensorProto.INT64)
     return result
 
 
