@@ -393,7 +393,7 @@ class TracingTensor(torch.Tensor):
         assert tracer is not None, "__setitem__ requires an active tracer"
 
         def _unwrap(idx: Any) -> Any:
-            """Unwraps TracingTensor indices to their FX nodes."""
+            """Returns the FX node for a TracingTensor index or the index itself."""
             if isinstance(idx, TracingTensor):
                 return idx._node
             if isinstance(idx, tuple):
@@ -408,10 +408,10 @@ class TracingTensor(torch.Tensor):
         )
         # Store a TracingTensor as node metadata so the FX interpreter can
         # infer the output dtype/shape (same as the modified tensor).
-        meta_tt = TracingTensor.__new__(
-            TracingTensor, self._tracing_shape, dtype=self.dtype, device=self.device
-        )
-        meta_tt.__init__(self._tracing_shape, dtype=self.dtype, device=self.device, tracer=tracer)
+        shape, dtype, device = self._tracing_shape, self.dtype, self.device
+        meta_tt = TracingTensor.__new__(TracingTensor, shape, dtype=dtype, device=device)
+        meta_tt._tracing_shape = shape
+        meta_tt._tracer = tracer
         meta_tt._node = node
         node.meta["val"] = meta_tt
         node.meta["stack_trace"] = "".join(traceback.format_stack())
