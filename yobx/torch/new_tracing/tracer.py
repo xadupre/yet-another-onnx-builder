@@ -20,6 +20,9 @@ from ._patches import (
     _ORIGINAL_TORCH_TENSOR_SPLIT,
     _cond_replacement_ctx,
     _check_replacement_ctx,
+    _full_replacement_ctx,
+    _zeros_replacement_ctx,
+    _ones_replacement_ctx,
     _scan_replacement_ctx,
     _trace_replacement_ctx,
 )
@@ -875,7 +878,13 @@ class GraphTracer:
             else:
                 sub_operands.append(op)
 
-        with _cond_replacement_ctx(sub), _check_replacement_ctx(sub):
+        with (
+            _cond_replacement_ctx(sub),
+            _check_replacement_ctx(sub),
+            _full_replacement_ctx(sub),
+            _zeros_replacement_ctx(sub),
+            _ones_replacement_ctx(sub),
+        ):
             out = fn(*sub_operands)
 
         def _to_node(x: Any) -> Any:
@@ -923,7 +932,16 @@ class GraphTracer:
         # the shim function instead.
         cond_target = _ORIGINAL_TORCH_COND
         # --- node for the predicate ---
-        pred_node: Any = self._get_node(pred) if isinstance(pred, TracingTensor) else pred
+        if isinstance(pred, TracingTensor):
+            pred_node: Any = self._get_node(pred)
+        elif isinstance(pred, TracingBool) and pred._node is not None:
+            # Predicate is a symbolic boolean that also carries an FX node
+            # (e.g. produced by ``tensor.numel() > 0`` during tracing).
+            # Use the FX node directly so the ONNX If node receives a proper
+            # bool tensor instead of a raw TracingBool.
+            pred_node = pred._node
+        else:
+            pred_node = pred
 
         # --- nodes for each operand ---
         operand_nodes: List[Any] = [
@@ -1441,6 +1459,15 @@ class GraphTracer:
         Returns:
             A tuple of :class:`TracingTensor` instances, one per output chunk.
         """
+        # ------------------------------------------------------------------ #
+        # Guard: if the input tensor is NOT a TracingTensor (e.g. it is a   #
+        # FakeTensor produced inside FakeTensorMode during dispatch()'s       #
+        # fake evaluation of another op), fall back to the original           #
+        # implementation immediately.  The patch is only meant for user-level #
+        # calls where the input is a genuine TracingTensor.                   #
+        # ------------------------------------------------------------------ #
+        if not isinstance(input, TracingTensor):
+            return _ORIGINAL_TORCH_TENSOR_SPLIT(input, indices_or_sections, dim)
         # ------------------------------------------------------------------ #
         # Case 1: indices_or_sections is NOT a TracingTensor.                 #
         # Route through the standard dispatch path which handles int/list and #
