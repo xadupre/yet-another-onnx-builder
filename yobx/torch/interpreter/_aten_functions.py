@@ -9271,6 +9271,25 @@ def aten_fmin(
     return res
 
 
+def aten_fmod(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "fmod",
+) -> T:
+    """Implements fmod for both scalar and tensor second arguments."""
+    if isinstance(y, str):
+        return aten_fmod_Tensor(g, sts, outputs, x, y, name=name)
+    assert g.has_type(x), f"Missing type for {x!r}{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    res = g.op.Mod(x, np.array([y], dtype=dtype), fmod=1, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
 def aten_fmod_Scalar(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
