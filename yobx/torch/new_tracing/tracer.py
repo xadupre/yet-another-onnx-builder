@@ -11,6 +11,7 @@ from torch.fx.experimental.sym_node import SymNode
 from ...xexpressions import rename_expression
 from .shape import TracingShape, TracingInt, TracingBool, register_condition, clear_conditions
 from .tensor import TracingTensor
+from ..interpreter._torch_helper import create_symint as _create_symint
 from ._patches import (
     _ORIGINAL_TORCH_COND,
     _ORIGINAL_TORCH_FULL,
@@ -427,6 +428,15 @@ class GraphTracer:
         seen dimension names are reused so that the same symbol appears
         wherever the same dynamic dimension is referenced.
 
+        When a :class:`TracingInt` dimension carries a
+        :attr:`~yobx.torch.new_tracing.shape.TracingInt.concrete_value`, a
+        *backed* :class:`~torch.SymInt` is created via
+        :func:`~yobx.torch.interpreter._torch_helper.create_symint` using that
+        value.  This allows shape-dependent operations such as
+        ``aten.select.int`` to pass their bounds checks (e.g. ``0 < s0=3``)
+        during fake-mode shape inference, even though the tracer stores
+        symbolic dimensions as size ``0`` in the underlying wrapper tensor.
+
         For a plain :class:`torch.Tensor`, a fake tensor with the same shape,
         dtype, and device is created directly.
 
@@ -445,7 +455,13 @@ class GraphTracer:
                     if d.value in self._mapped_dimension:
                         symd = self._mapped_dimension[d.value]
                     else:
-                        symd = self._shape_env.create_unbacked_symint()
+                        if d.concrete_value is not None:
+                            # Use a backed SymInt with the trace-time concrete
+                            # value so that bounds checks like ``0 < s0=3``
+                            # pass during shape inference (e.g. aten.select.int).
+                            symd = _create_symint(d.concrete_value, self._shape_env)
+                        else:
+                            symd = self._shape_env.create_unbacked_symint()
                         self._mapped_dimension[d.value] = symd  # type: ignore
                         symd_name = self._sym_int_to_str(symd)
                         assert isinstance(symd_name, str), "type checking"

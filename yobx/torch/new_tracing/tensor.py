@@ -52,7 +52,23 @@ class TracingTensor(torch.Tensor):
                 )
                 for d in size
             )
-            sizes = tuple((i if isinstance(i, int) else 0) for i in sizes)
+            # For symbolic dimensions (stored as TracingInt), use the concrete
+            # trace-time value if known, otherwise fall back to 1.  Using a
+            # non-zero stored size prevents C++-level bounds checks from
+            # raising IndexError before __torch_dispatch__ can intercept (e.g.
+            # ``x[0]`` on a tensor with a dynamic batch dimension).
+            sizes = tuple(
+                (
+                    i
+                    if isinstance(i, int)
+                    else (
+                        i.concrete_value
+                        if isinstance(i, TracingInt) and i.concrete_value is not None
+                        else 1
+                    )
+                )
+                for i in sizes
+            )
         else:
             assert isinstance(size, tuple), f"Unexpected type {type(size)} for size"
             assert not size or all(
