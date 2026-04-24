@@ -9197,13 +9197,13 @@ def aten_mod(
     return res
 
 
-def aten_fmax_default(
+def aten_fmax(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
     x: T,
     y: T,
-    name: str = "fmax_default",
+    name: str = "fmax",
 ) -> T:
     """Implements fmax.default."""
     assert g.has_type(x), f"Missing type for {x!r}{g.get_debug_msg()}"
@@ -9234,13 +9234,13 @@ def aten_fmax_default(
     return res
 
 
-def aten_fmin_default(
+def aten_fmin(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
     outputs: List[str],
     x: T,
     y: T,
-    name: str = "fmin_default",
+    name: str = "fmin",
 ) -> T:
     """Implements fmin.default."""
     assert g.has_type(x), f"Missing type for {x!r}{g.get_debug_msg()}"
