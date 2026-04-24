@@ -367,6 +367,15 @@ class TestModelEvalCases(ExtTestCase):
             cases="ControlFlowScanCDist2", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_yobx_scan_2_carried_new_tracing(self):
+        evaluation(
+            cases="ControlFlowScan2Carried",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_layer_norm_tracing(self):
         evaluation(cases="LayerNorm", exporters="yobx-tracing", quiet=False, dynamic=True)
 

@@ -459,6 +459,42 @@ class GraphTracer:
         with self._fake_mode:
             return torch.empty(a.shape, dtype=a.dtype, device=a.device)
 
+    def _handle_select_int(self, x: TracingTensor, dim: int, index: int) -> TracingTensor:
+        """
+        Handle ``aten.select.int(x, dim, index)`` without calling
+        :meth:`dispatch` or :class:`~torch._subclasses.fake_tensor.FakeTensorMode`.
+
+        When *x* has a symbolic (dynamic) dimension at *dim*, the fake-mode
+        meta kernel for ``aten.select.int`` would try to prove the bounds check
+        ``-size <= index < size`` for an unbacked :class:`~torch.SymInt`.  That
+        guard cannot be statically discharged, raising
+        :exc:`torch.fx.experimental.symbolic_shapes.GuardOnDataDependentSymNode`.
+
+        This method bypasses the issue entirely by computing the output shape
+        directly from :attr:`~TracingTensor._tracing_shape` (dropping dimension
+        *dim*) and emitting the ``aten.select.int`` FX node directly.
+
+        It is called from :meth:`~yobx.torch.new_tracing.tensor.TracingTensor.__getitem__`
+        whenever a :class:`TracingTensor` is indexed with a single integer.
+
+        :param x: The input :class:`TracingTensor`.
+        :param dim: The dimension to select along.  Negative values are
+            normalised internally to their equivalent non-negative index.
+        :param index: The integer index to select.
+        :returns: A :class:`TracingTensor` with the selected dimension dropped.
+        """
+        ndim = len(x.shape)
+        if dim < 0:
+            dim = dim + ndim
+        out_shape = TracingShape(tuple(d for i, d in enumerate(x.shape.dims) if i != dim))
+        node = self.graph.call_function(
+            torch.ops.aten.select.int, args=(self._get_node(x), dim, index), kwargs={}
+        )
+        result = self._make_tracing_tensor(out_shape, x.dtype, x.device, node)
+        node.meta["val"] = result
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return result
+
     def _sym_shape_to_str_shape(
         self, sym_shape: Tuple[Union[int, torch.SymInt], ...]
     ) -> TracingShape:
