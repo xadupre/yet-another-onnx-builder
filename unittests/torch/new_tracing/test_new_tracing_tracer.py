@@ -670,8 +670,8 @@ class TestNewTracingTracer(ExtTestCase):
                     next_carry2 = carry2 * y2
                     return [next_carry1, next_carry2, next_carry1, next_carry2]
 
-                init1 = torch.zeros_like(x[0])
-                init2 = torch.ones_like(x[0])
+                init1 = x.new_zeros(x.shape[1:])
+                init2 = x.new_zeros(x.shape[1:]) + 1
                 carry1, carry2, out1, out2 = torch.ops.higher_order.scan(
                     add, [init1, init2], [x, x * 2], additional_inputs=[]
                 )
