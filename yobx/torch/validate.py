@@ -40,6 +40,9 @@ class ValidateSummary:
         error_observer: Error message if input capture failed.
         export: ``"OK"`` or ``"FAILED"`` depending on whether the ONNX export succeeded.
         error_export: Error message if the ONNX export failed.
+        n_nodes: Total number of nodes in the exported ONNX graph.
+        top_op_types: Compact summary of the most frequent op types, e.g.
+            ``"MatMul:10,Add:7,Mul:5"``.
         discrepancies_ok: Number of input sets where ONNX Runtime results matched PyTorch.
         discrepancies_total: Total number of input sets checked for discrepancies.
         discrepancies: ``"OK"`` or ``"FAILED"`` for the overall discrepancy check.
@@ -58,6 +61,8 @@ class ValidateSummary:
     error_observer: Optional[str] = None
     export: Optional[str] = None
     error_export: Optional[str] = None
+    n_nodes: Optional[int] = None
+    top_op_types: Optional[str] = None
     discrepancies_ok: Optional[int] = None
     discrepancies_total: Optional[int] = None
     discrepancies: Optional[str] = None
@@ -77,6 +82,8 @@ class ValidateSummary:
         error_observer: Optional[str] = None,
         export: Optional[str] = None,
         error_export: Optional[str] = None,
+        n_nodes: Optional[int] = None,
+        top_op_types: Optional[str] = None,
         discrepancies_ok: Optional[int] = None,
         discrepancies_total: Optional[int] = None,
         discrepancies: Optional[str] = None,
@@ -94,6 +101,8 @@ class ValidateSummary:
         self.error_observer = error_observer
         self.export = export
         self.error_export = error_export
+        self.n_nodes = n_nodes
+        self.top_op_types = top_op_types
         self.discrepancies_ok = discrepancies_ok
         self.discrepancies_total = discrepancies_total
         self.discrepancies = discrepancies
@@ -158,6 +167,8 @@ class ValidateData:
     """Inferred dynamic shapes passed to the exporter."""
     filename: Optional[str] = None
     """Path to the exported ``.onnx`` file."""
+    artifact: Optional[Any] = None
+    """:class:`~yobx.container.ExportArtifact` returned by the yobx exporter, or ``None``."""
     discrepancies: Optional[List[Dict[str, Any]]] = None
     """Per-input-set discrepancy records from :meth:`InputObserver.check_discrepancies`."""
 
@@ -468,7 +479,7 @@ def _export(
                 else contextlib.nullcontext()
             ),
         ):
-            _to_onnx(
+            artifact = _to_onnx(
                 model,
                 (),
                 kwargs=kwargs,
@@ -479,6 +490,7 @@ def _export(
                 verbose=max(0, verbose - 1),
                 **export_kwargs,
             )
+        collected_data.artifact = artifact
         summary.export = "OK"
     except Exception as exc:
         summary.export = "FAILED"
@@ -486,6 +498,20 @@ def _export(
         if not quiet:
             raise
         return False
+
+    # Compute node statistics from the exported ONNX file for the standard output.
+    if os.path.exists(filename):
+        try:
+            import onnx
+            from collections import Counter
+
+            onx = onnx.load(filename, load_external_data=False)
+            counts: Counter = Counter(n.op_type for n in onx.graph.node)
+            summary.n_nodes = sum(counts.values())
+            top = counts.most_common(5)
+            summary.top_op_types = ",".join(f"{op}:{cnt}" for op, cnt in top)
+        except Exception:
+            pass
 
     if verbose:
         print(f"[validate_model] export succeeded -> {filename!r}")
@@ -729,5 +755,18 @@ def validate_model(
         _check_discrepancies(
             observer, collected_data.filename, verbose, quiet, summary, collected_data
         )
+
+    # --------------------------------- update xlsx report with discrepancies (yobx exporter only)
+    from ..container import ExportArtifact
+
+    if isinstance(collected_data.artifact, ExportArtifact) and collected_data.filename:
+        artifact = collected_data.artifact
+        if artifact.report is None:
+            from ..container import ExportReport
+
+            artifact.report = ExportReport()
+        if collected_data.discrepancies is not None:
+            artifact.report.discrepancies = collected_data.discrepancies
+        artifact.save_report(collected_data.filename)
 
     return summary, collected_data

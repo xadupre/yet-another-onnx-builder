@@ -27,6 +27,11 @@ class ExportReport:
     :attr:`node_stats` and can be populated by calling
     :meth:`compute_node_stats`.
 
+    Per-input-set discrepancy records from
+    :meth:`~yobx.torch.InputObserver.check_discrepancies` can be stored in
+    :attr:`discrepancies`.  When present, :meth:`to_excel` writes a
+    ``"discrepancies"`` sheet to the workbook.
+
     Example::
 
         report = ExportReport()
@@ -41,6 +46,7 @@ class ExportReport:
         build_stats: Optional[BuildStats] = None,
         node_stats: Optional[List[Dict[str, Any]]] = None,
         symbolic_flops: Optional[List[Dict[str, Any]]] = None,
+        discrepancies: Optional[List[Dict[str, Any]]] = None,
     ):
         self.stats: List[Dict[str, Any]] = stats if stats is not None else []
         self.extra: Dict[str, Any] = extra if extra is not None else {}
@@ -48,6 +54,9 @@ class ExportReport:
         self.node_stats: List[Dict[str, Any]] = node_stats if node_stats is not None else []
         self.symbolic_flops: List[Dict[str, Any]] = (
             symbolic_flops if symbolic_flops is not None else []
+        )
+        self.discrepancies: List[Dict[str, Any]] = (
+            discrepancies if discrepancies is not None else []
         )
 
     def update(self, data: Any):
@@ -72,6 +81,8 @@ class ExportReport:
                 self.node_stats.extend(data.node_stats)
             if data.symbolic_flops:
                 self.symbolic_flops.extend(data.symbolic_flops)
+            if data.discrepancies:
+                self.discrepancies.extend(data.discrepancies)
         else:
             raise TypeError(f"Unexpected type {type(data)} for data.")
         return self
@@ -87,6 +98,7 @@ class ExportReport:
             "build_stats": self.build_stats,
             "node_stats": self.node_stats,
             "symbolic_flops": self.symbolic_flops,
+            "discrepancies": self.discrepancies,
         }
 
     def to_string(self) -> str:
@@ -167,12 +179,19 @@ class ExportReport:
             lines.append("-- symbolic_flops --")
             lines.append(df_sf.to_string(index=False))
 
+        if self.discrepancies:
+            import pandas
+
+            df_disc = pandas.DataFrame(self.discrepancies)
+            lines.append("-- discrepancies --")
+            lines.append(df_disc.to_string(index=False))
+
         return "\n".join(lines)
 
     def to_excel(self, path: str) -> None:
         """Write the report contents to an Excel workbook at *path*.
 
-        The workbook contains up to six sheets:
+        The workbook contains up to seven sheets:
 
         ``stats``
             Every row from :attr:`stats` as a raw :class:`~pandas.DataFrame`.
@@ -197,6 +216,12 @@ class ExportReport:
             Each row has ``op_type``, ``node_name``, and ``symbolic_flops``
             columns.  Only written when :attr:`symbolic_flops` is non-empty.
             Populated by :meth:`compute_symbolic_flops`.
+        ``discrepancies``
+            Per-input-set discrepancy records from
+            :meth:`~yobx.torch.InputObserver.check_discrepancies`.  Each row
+            corresponds to one forward call and contains at least the columns
+            ``index``, ``SUCCESS``, ``abs``, and ``rel``.  Only written when
+            :attr:`discrepancies` is non-empty.
 
         :param path: destination file path (e.g. ``"report.xlsx"``).
 
@@ -251,6 +276,10 @@ class ExportReport:
             if self.symbolic_flops:
                 df_sf = pandas.DataFrame(self.symbolic_flops)
                 df_sf.to_excel(writer, sheet_name="symbolic_flops", index=False)
+
+            if self.discrepancies:
+                df_disc = pandas.DataFrame(self.discrepancies)
+                df_disc.to_excel(writer, sheet_name="discrepancies", index=False)
 
     def compute_node_stats(self, model: "onnx.ModelProto", verbose: int = 0) -> "ExportReport":
         """Compute per-op-type node counts and estimated FLOPs from *model*.
@@ -371,7 +400,8 @@ class ExportReport:
             f"extra={sorted(self.extra)}, "
             f"has_build_stats={self.build_stats is not None}, "
             f"n_node_stats={len(self.node_stats)}, "
-            f"n_symbolic_flops={len(self.symbolic_flops)})"
+            f"n_symbolic_flops={len(self.symbolic_flops)}, "
+            f"n_discrepancies={len(self.discrepancies)})"
         )
 
 

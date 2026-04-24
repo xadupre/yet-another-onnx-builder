@@ -378,8 +378,88 @@ class TestExportReport(ExtTestCase):
             self.assertIn("MatMul", op_types)
             self.assertIn("Add", op_types)
 
+    def test_discrepancies_empty_by_default(self):
+        r = ExportReport()
+        self.assertEqual(r.discrepancies, [])
 
-class TestExportArtifact(ExtTestCase):
+    def test_discrepancies_stored(self):
+        rows = [
+            {"index": 0, "SUCCESS": True, "abs": 0.0, "rel": 0.0},
+            {"index": 1, "SUCCESS": False, "abs": 1e-3, "rel": 1e-2},
+        ]
+        r = ExportReport(discrepancies=rows)
+        self.assertEqual(len(r.discrepancies), 2)
+        self.assertTrue(r.discrepancies[0]["SUCCESS"])
+        self.assertFalse(r.discrepancies[1]["SUCCESS"])
+
+    def test_to_dict_includes_discrepancies(self):
+        rows = [{"index": 0, "SUCCESS": True, "abs": 0.0, "rel": 0.0}]
+        r = ExportReport(discrepancies=rows)
+        d = r.to_dict()
+        self.assertIn("discrepancies", d)
+        self.assertEqual(len(d["discrepancies"]), 1)
+
+    def test_repr_includes_n_discrepancies(self):
+        rows = [{"index": 0, "SUCCESS": True}]
+        r = ExportReport(discrepancies=rows)
+        text = repr(r)
+        self.assertIn("n_discrepancies=1", text)
+
+    @skipif_ci_windows("issue with excel")
+    def test_to_excel_with_discrepancies(self):
+        try:
+            import openpyxl  # noqa: F401
+        except ImportError:
+            return
+        import pandas
+
+        rows = [
+            {"index": 0, "SUCCESS": True, "abs": 0.0, "rel": 0.0},
+            {"index": 1, "SUCCESS": False, "abs": 1e-3, "rel": 1e-2},
+        ]
+        r = ExportReport(discrepancies=rows)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "report_disc.xlsx")
+            r.to_excel(path)
+            self.assertTrue(os.path.exists(path))
+            sheets = pandas.ExcelFile(path).sheet_names
+            self.assertIn("discrepancies", sheets)
+            df_disc = pandas.read_excel(path, sheet_name="discrepancies")
+            self.assertIn("index", df_disc.columns)
+            self.assertIn("SUCCESS", df_disc.columns)
+            self.assertEqual(len(df_disc), 2)
+
+    @skipif_ci_windows("issue with excel")
+    def test_to_excel_no_discrepancies_sheet_when_empty(self):
+        """The 'discrepancies' sheet must not appear when discrepancies is empty."""
+        try:
+            import openpyxl  # noqa: F401
+        except ImportError:
+            return
+        import pandas
+
+        r = ExportReport(extra={"k": "v"})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "report_nodisc.xlsx")
+            r.to_excel(path)
+            self.assertTrue(os.path.exists(path))
+            sheets = pandas.ExcelFile(path).sheet_names
+            self.assertNotIn("discrepancies", sheets)
+
+    def test_to_string_with_discrepancies(self):
+        rows = [{"index": 0, "SUCCESS": True, "abs": 0.0}]
+        r = ExportReport(discrepancies=rows)
+        text = r.to_string()
+        self.assertIn("discrepancies", text)
+
+    def test_update_merges_discrepancies(self):
+        rows1 = [{"index": 0, "SUCCESS": True}]
+        rows2 = [{"index": 1, "SUCCESS": False}]
+        r1 = ExportReport(discrepancies=rows1)
+        r2 = ExportReport(discrepancies=rows2)
+        r1.update(r2)
+        self.assertEqual(len(r1.discrepancies), 2)
+
     def _artifact(self):
         model = _make_simple_model()
         report = ExportReport(
