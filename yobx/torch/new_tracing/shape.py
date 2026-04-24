@@ -194,6 +194,14 @@ class TracingInt:
     * :attr:`_device` — the device string (e.g. ``"cpu"``) of the source
       tensor, used when creating wrapper :class:`TracingTensor` objects for
       FX node metadata.
+
+    When a :class:`TracingInt` comes from a placeholder tensor's shape (set by
+    :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.placeholder`), two
+    additional attributes allow lazy emission of ``aten.sym_size.int`` nodes:
+
+    * :attr:`_source_node` — the FX placeholder :class:`~torch.fx.Node` of
+      the tensor this dimension belongs to.
+    * :attr:`_source_dim` — the integer dimension index within that tensor.
     """
 
     def __init__(self, value: Union[int, str]):
@@ -206,6 +214,11 @@ class TracingInt:
         self._tracer: Any = None
         # Device of the source tensor (used when creating FX node metadata).
         self._device: Any = None
+        # FX node of the placeholder tensor this dimension belongs to.
+        # Set by GraphTracer.placeholder() for input tensor shape dims.
+        self._source_node: Any = None
+        # Dimension index within the source tensor's shape.
+        self._source_dim: Optional[int] = None
 
     @property
     def is_static(self):

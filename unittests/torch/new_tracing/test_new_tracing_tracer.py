@@ -690,12 +690,11 @@ class TestNewTracingTracer(ExtTestCase):
         getitem_nodes = [
             n
             for n in graph.nodes
-            if n.op == "call_function" and n.target is operator.getitem
+            if n.op == "call_function"
+            and n.target is operator.getitem
             and n.args[0] is scan_nodes[0]
         ]
-        self.assertEqual(
-            len(getitem_nodes), 4, f"Expected 4 getitem nodes, got: {getitem_nodes}"
-        )
+        self.assertEqual(len(getitem_nodes), 4, f"Expected 4 getitem nodes, got: {getitem_nodes}")
 
         # meta["val"] carries shape info for all 4 outputs.
         val = scan_nodes[0].meta.get("val", None)
@@ -1223,6 +1222,75 @@ class TestGraphTracerTorchCheck(ExtTestCase):
             np.array_equal(expected_c.numpy(), got_c),
             "ONNX output 2 (positions[1]) must match eager",
         )
+
+    def test_trace_shape_as_index(self):
+        """Tracing a model that uses y.shape[1] as a slice endpoint.
+
+        Replicates the SignatureShapeAsIndex pattern:
+        ``return t[:, :y.shape[1]]`` where dimension 1 of *y* is dynamic.
+        The tracer must emit ``aten.sym_size.int(y, 1)`` and use that node as
+        the ``end`` argument of ``aten.slice.Tensor`` rather than falling back
+        to the constant ``0``.
+        """
+
+        class ShapeAsIndexModel(torch.nn.Module):
+            def forward(self, x, y):
+                return x[:, : y.shape[1]]
+
+        model = ShapeAsIndexModel()
+        x = torch.randn(4, 5)
+        y = torch.randn(4, 3)
+        DIM = torch.export.Dim
+        dynamic_shapes = {"x": {0: DIM("batch")}, "y": {0: DIM("batch"), 1: DIM("length")}}
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (x, y), dynamic_shapes=dynamic_shapes)
+        graph.lint()
+
+        # There must be an aten.sym_size.int node for dimension 1 of y.
+        sym_size_nodes = [
+            n
+            for n in graph.nodes
+            if n.op == "call_function"
+            and n.target is torch.ops.aten.sym_size.int  # type: ignore[attr-defined]
+        ]
+        self.assertGreaterEqual(
+            len(sym_size_nodes), 1, "Expected at least one aten.sym_size.int node"
+        )
+
+        # There must be an aten.slice.Tensor node.
+        slice_nodes = [
+            n
+            for n in graph.nodes
+            if n.op == "call_function" and n.target is torch.ops.aten.slice.Tensor
+        ]
+        self.assertGreaterEqual(
+            len(slice_nodes), 1, "Expected at least one aten.slice.Tensor node"
+        )
+
+        # The sym_size.int node must feed into the slice.Tensor node as an arg.
+        sym_size_node = sym_size_nodes[0]
+        slice_with_sym = [n for n in slice_nodes if sym_size_node in n.args]
+        self.assertGreaterEqual(
+            len(slice_with_sym),
+            1,
+            "aten.slice.Tensor must receive the aten.sym_size.int node as an argument",
+        )
+
+        # The output shape's dimension 1 must be symbolic.
+        from yobx.torch.new_tracing.shape import TracingInt
+
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        result_val = output_node.args[0]
+        if isinstance(result_val, torch.fx.Node):
+            result_shape = result_val.meta.get("val")
+            if result_shape is not None and hasattr(result_shape, "_tracing_shape"):
+                dim1 = result_shape._tracing_shape.dims[1]
+                self.assertIsInstance(
+                    dim1, TracingInt, "Output dimension 1 must be a TracingInt (symbolic)"
+                )
+                self.assertFalse(
+                    dim1.is_static, "Output dimension 1 must be symbolic, not static"
+                )
 
 
 if __name__ == "__main__":
