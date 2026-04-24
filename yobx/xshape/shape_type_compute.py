@@ -2655,7 +2655,7 @@ def set_type_shape_multi_head_attention(self: ShapeBuilder, node: NodeProto):
             self.set_rank(o, 4)
 
 
-def _set_type_shape_bias_split_gelu(g: "ShapeBuilder", node: "NodeProto"):  # noqa: F821
+def set_type_shape_bias_split_gelu(g: "ShapeBuilder", node: "NodeProto"):  # noqa: F821
     """Sets the shape and type for ``com.microsoft.BiasSplitGelu``.
 
     The operator computes ``Y = left * Gelu(right)`` after adding a bias and
@@ -2686,7 +2686,7 @@ _set_shape_type_op_any_custom = {
     "AddSharedInput": set_type_shape_shared_input,
     "BiasGelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "BiasSoftmax": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
-    "BiasSplitGelu": lambda g, node: _set_type_shape_bias_split_gelu(g, node),
+    "BiasSplitGelu": lambda g, node: set_type_shape_bias_split_gelu(g, node),
     "ComplexModule": set_type_shape_complex_module,
     "FastGelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "FusedMatMul": set_type_shape_fused_matmul,
