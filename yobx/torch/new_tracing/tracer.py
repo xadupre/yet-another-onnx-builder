@@ -414,6 +414,24 @@ class GraphTracer:
         assert isinstance(shape, TracingShape), f"Unexpected type {type(shape)} for this operator"
         tt = self._make_tracing_tensor(shape, dtype, device, node)
         node.meta["val"] = tt
+        # Annotate symbolic dims with source info so they can be lazily
+        # materialised as aten.sym_size.int FX nodes when used as slice
+        # endpoints (e.g. t[:, :y.shape[1]]).  Also eagerly populate
+        # _mapped_dimension so _tracing_int_to_fake works even if the
+        # placeholder tensor is never directly passed to a dispatched op.
+        device_str = str(device)
+        for i, d in enumerate(tt._tracing_shape.dims):
+            if isinstance(d, TracingInt) and not d.is_static:
+                d._source_node = node
+                d._source_dim = i
+                d._tracer = self
+                d._device = device_str
+                if d.value not in self._mapped_dimension:
+                    symd = self._shape_env.create_unbacked_symint()
+                    self._mapped_dimension[d.value] = symd  # type: ignore
+                    symd_name = self._sym_int_to_str(symd)
+                    if isinstance(symd_name, str):
+                        self._sym_int_to_dynamic_dimension[symd_name] = d.value  # type: ignore
         return tt
 
     def make_fake(self, a: Union[TracingTensor, torch.Tensor]) -> "FakeTensor":  # type: ignore # noqa: F821
@@ -493,6 +511,214 @@ class GraphTracer:
         result = self._make_tracing_tensor(out_shape, x.dtype, x.device, node)
         node.meta["val"] = result
         node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return result
+
+    def _emit_sym_size_node(self, ti: TracingInt) -> torch.fx.Node:
+        """
+        Emit (or return a cached) ``aten.sym_size.int`` FX node for *ti*.
+
+        If *ti* already has a ``_node`` cached, that is returned immediately.
+        Otherwise a new ``aten.sym_size.int(source_node, source_dim)`` node is
+        created in the graph, wrapped in a 0-dim ``int64``
+        :class:`~yobx.torch.new_tracing.tensor.TracingTensor` for metadata, and
+        the result is cached on ``ti._node`` before being returned.
+
+        :param ti: A symbolic :class:`TracingInt` whose ``_source_node`` and
+            ``_source_dim`` are set (populated by :meth:`placeholder`).
+        :returns: The FX :class:`~torch.fx.Node` that computes the dimension
+            value as a scalar ``int64`` tensor.
+        :raises AssertionError: If *ti* has no source node / dim information.
+        """
+        if ti._node is not None:
+            return ti._node
+        assert ti._source_node is not None and ti._source_dim is not None, (
+            f"TracingInt({ti.value!r}) has no _source_node/_source_dim; "
+            "cannot emit aten.sym_size.int node.  Ensure the TracingInt was "
+            "created by GraphTracer.placeholder()."
+        )
+        sym_node = self.graph.call_function(
+            torch.ops.aten.sym_size.int, args=(ti._source_node, ti._source_dim), kwargs={}
+        )
+        device = ti._device or "cpu"
+        tt_meta = TracingTensor(TracingShape(()), dtype=torch.int64, device=device, tracer=self)
+        tt_meta._node = sym_node
+        sym_node.meta["val"] = tt_meta
+        sym_node.meta["stack_trace"] = "".join(traceback.format_stack())
+        ti._node = sym_node
+        return sym_node
+
+    def _tracing_int_to_slice_arg(self, x: Any) -> Any:
+        """
+        Convert a slice start/stop/step value to an FX graph argument.
+
+        * ``None`` is returned as-is.
+        * Plain ``int`` values are returned as-is.
+        * Static :class:`TracingInt` values are returned as their ``int``
+          equivalent.
+        * Symbolic :class:`TracingInt` values trigger emission of an
+          ``aten.sym_size.int`` FX node (via :meth:`_emit_sym_size_node`) and
+          that node is returned.
+
+        :param x: A slice member value.
+        :returns: ``None``, ``int``, or a :class:`~torch.fx.Node`.
+        """
+        if x is None:
+            return None
+        if isinstance(x, int):
+            return x
+        if isinstance(x, TracingInt):
+            if x.is_static:
+                return int(x)
+            return self._emit_sym_size_node(x)
+        return x
+
+    def _compute_slice_output_dim(self, input_dim: Any, start: Any, stop: Any) -> Any:
+        """
+        Compute the output dimension size for ``input[start:stop]`` (step=1).
+
+        The computation is kept symbolic when *stop* is a symbolic
+        :class:`TracingInt` and avoids calling ``FakeTensorMode``, which would
+        raise :exc:`~torch.fx.experimental.symbolic_shapes.GuardOnDataDependentSymNode`
+        for unbacked symbols.
+
+        The returned value is either a plain ``int`` (fully static slice) or a
+        :class:`TracingInt` (when *stop* or *input_dim* is symbolic).
+
+        :param input_dim: The current size of the dimension being sliced
+            (:class:`TracingInt` or ``int``).
+        :param start: The slice start (``None``, ``int``, or
+            :class:`TracingInt`).
+        :param stop: The slice stop (``None``, ``int``, or
+            :class:`TracingInt`).
+        :returns: Output dimension size.
+        """
+        if isinstance(stop, TracingInt) and not stop.is_static:
+            # Symbolic stop — assume stop <= input_dim (caller's responsibility).
+            start_is_zero = (
+                start is None
+                or (isinstance(start, int) and start == 0)
+                or (isinstance(start, TracingInt) and start.is_static and int(start) == 0)
+            )
+            if start_is_zero:
+                return stop
+            # Non-zero start: output size = stop - start
+            if isinstance(start, int):
+                return TracingInt(f"({stop.value}-{start})")
+            # Both symbolic — return stop as a conservative upper bound.
+            return stop
+        if stop is None:
+            # Full slice: output matches input dimension unchanged.
+            return input_dim
+        # Fully static stop value.
+        stop_v: int = int(stop) if isinstance(stop, TracingInt) else stop
+        start_v: int = 0
+        if start is not None and start != 0:
+            start_v = int(start) if isinstance(start, TracingInt) else start
+        if isinstance(input_dim, int):
+            return max(0, min(input_dim, stop_v) - start_v)
+        # Dynamic input_dim with static stop — output size is min(input_dim, stop_v) - start_v.
+        # Return the static slice length as a plain int; the ONNX Slice op computes
+        # the correct clamped size at runtime.
+        return stop_v - start_v
+
+    def _handle_symbolic_getitem(self, tensor: TracingTensor, index: Any) -> TracingTensor:
+        """
+        Handle ``tensor[index]`` when *index* contains symbolic
+        :class:`~yobx.torch.new_tracing.shape.TracingInt` values inside
+        :class:`slice` objects.
+
+        This method is called from
+        :meth:`~yobx.torch.new_tracing.tensor.TracingTensor.__getitem__`
+        instead of ``super().__getitem__`` to avoid the C++ dispatcher
+        calling ``__index__()`` on symbolic :class:`TracingInt` values,
+        which would raise :exc:`ValueError`.
+
+        Each symbolic :class:`TracingInt` in a slice start/stop is replaced by
+        an ``aten.sym_size.int`` FX node emitted via
+        :meth:`_emit_sym_size_node`.  Output shapes are computed directly
+        from :attr:`~TracingTensor._tracing_shape` without
+        :class:`~torch._subclasses.fake_tensor.FakeTensorMode`.
+
+        :param tensor: The input :class:`TracingTensor`.
+        :param index: The index expression (single slice or tuple of slices /
+            :data:`Ellipsis`).
+        :returns: A :class:`TracingTensor` representing the sliced result.
+        """
+        if not isinstance(index, tuple):
+            index = (index,)
+
+        ndim = len(tensor._tracing_shape)
+        result: TracingTensor = tensor
+
+        # Determine how many non-Ellipsis elements there are so we can
+        # figure out the actual dimension each index element covers.
+        n_ellipsis = sum(1 for k in index if k is Ellipsis)
+        n_non_ellipsis = len(index) - n_ellipsis
+        # Number of dims each Ellipsis absorbs.
+        ellipsis_dims = ndim - n_non_ellipsis if n_ellipsis else 0
+
+        actual_dim = 0
+        for key in index:
+            if key is Ellipsis:
+                actual_dim += ellipsis_dims
+                continue
+            if isinstance(key, int):
+                # Integer indexing selects a single element and removes the dim.
+                out_shape = TracingShape(
+                    tuple(d for i, d in enumerate(result._tracing_shape.dims) if i != actual_dim)
+                )
+                sel_node = self.graph.call_function(
+                    torch.ops.aten.select.int, args=(result._node, actual_dim, key), kwargs={}
+                )
+                result = self._make_tracing_tensor(
+                    out_shape, tensor.dtype, tensor.device, sel_node
+                )
+                sel_node.meta["val"] = result
+                sel_node.meta["stack_trace"] = "".join(traceback.format_stack())
+                # actual_dim stays the same: the next key operates on what is
+                # now dimension actual_dim after the removed axis.
+                continue
+            if not isinstance(key, slice):
+                # Other index types (tensor indices, etc.) are not handled here.
+                raise NotImplementedError(
+                    f"_handle_symbolic_getitem does not support index type "
+                    f"{type(key)!r} within a tuple that also contains symbolic "
+                    "TracingInt slice endpoints."
+                )
+
+            start = key.start
+            stop = key.stop
+            step = key.step
+
+            # Identity slice — no node needed.
+            if stop is None and (start is None or start == 0) and (step is None or step == 1):
+                actual_dim += 1
+                continue
+
+            start_arg = self._tracing_int_to_slice_arg(start)
+            stop_arg = self._tracing_int_to_slice_arg(stop)
+            step_val: int = (
+                1 if step is None else (int(step) if isinstance(step, TracingInt) else step)
+            )
+
+            input_dim = result._tracing_shape.dims[actual_dim]
+            output_dim = self._compute_slice_output_dim(input_dim, start, stop)
+
+            new_dims = list(result._tracing_shape.dims)
+            new_dims[actual_dim] = output_dim
+            new_shape = TracingShape(tuple(new_dims))
+
+            slice_node = self.graph.call_function(
+                torch.ops.aten.slice.Tensor,
+                args=(result._node, actual_dim, start_arg, stop_arg, step_val),
+                kwargs={},
+            )
+            result = self._make_tracing_tensor(new_shape, tensor.dtype, tensor.device, slice_node)
+            slice_node.meta["val"] = result
+            slice_node.meta["stack_trace"] = "".join(traceback.format_stack())
+
+            actual_dim += 1
+
         return result
 
     def _sym_shape_to_str_shape(

@@ -428,30 +428,57 @@ class TracingTensor(torch.Tensor):
         # tensor value.
         self._node = node
 
+    @staticmethod
+    def _index_has_symbolic_tracing_int(index: Any) -> bool:
+        """
+        Return ``True`` if *index* contains a symbolic
+        :class:`~yobx.torch.new_tracing.shape.TracingInt` inside a
+        :class:`slice` start or stop.
+
+        A symbolic :class:`TracingInt` has a non-integer (string) value.
+        Plain integer :class:`TracingInt` instances behave like ``int`` and
+        do not require special handling.
+
+        :param index: Any index expression (int, slice, tuple, Ellipsis, …).
+        :returns: ``True`` when the index contains at least one symbolic
+            :class:`TracingInt` in a slice member.
+        """
+        if isinstance(index, slice):
+            for part in (index.start, index.stop, index.step):
+                if isinstance(part, TracingInt) and not part.is_static:
+                    return True
+            return False
+        if isinstance(index, tuple):
+            return any(TracingTensor._index_has_symbolic_tracing_int(i) for i in index)
+        return False
+
     def __getitem__(self, index: Any) -> Any:
         """
-        Intercepts single-integer indexing (``x[i]``) on a
-        :class:`TracingTensor` to bypass the C++ bounds check that fires
-        before ``__torch_dispatch__`` when symbolic dimensions are stored as
-        size ``1`` internally.
+        Intercepts indexing on a :class:`TracingTensor` for two special cases:
 
-        For a single integer index ``i``, this is equivalent to
-        ``aten.select.int(self, 0, i)`` — i.e. it selects element *i* along
-        the first (index-0) dimension of ``self``.  The output shape is
-        ``self._tracing_shape`` with that leading dimension removed.  The
-        shape is computed directly from :attr:`_tracing_shape` so no
-        FakeTensorMode bounds check is triggered.
+        1. **Single-integer index** (e.g. ``x[0]``): delegates to
+           :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_select_int`
+           to bypass the C++ bounds check that fires before
+           ``__torch_dispatch__`` when symbolic dimensions are stored as
+           size ``1`` internally.
 
-        For all other index types (slices, tuples, tensors, …) the default
-        ``torch.Tensor.__getitem__`` path is used.  Those cases either do not
-        perform bounds checks (slice, tensor indexing) or operate on concrete
-        dimensions where the stored size is correct.
+        2. **Slice with symbolic** :class:`~yobx.torch.new_tracing.shape.TracingInt`
+           **endpoint** (e.g. ``x[:, :y.shape[1]]``): delegates to
+           :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_symbolic_getitem`
+           to prevent the C++ dispatcher from calling ``__index__()`` on the
+           symbolic :class:`TracingInt`, which would raise :exc:`ValueError`.
+
+        For all other index types the default ``torch.Tensor.__getitem__``
+        path is used.
 
         :param index: Index expression.
-        :returns: A :class:`TracingTensor` for integer indexing, or the
-            result of the default dispatch for other index types.
+        :returns: A :class:`TracingTensor` or the result of the default
+            dispatch for other index types.
         """
         tracer = self._tracer
-        if tracer is not None and isinstance(index, int):
-            return tracer._handle_select_int(self, 0, index)
+        if tracer is not None:
+            if isinstance(index, int):
+                return tracer._handle_select_int(self, 0, index)
+            if self._index_has_symbolic_tracing_int(index):
+                return tracer._handle_symbolic_getitem(self, index)
         return super().__getitem__(index)  # type: ignore
