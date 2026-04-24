@@ -169,12 +169,6 @@ class TracingInt:
 
     :param value: Either a concrete :class:`int` (concrete dimension) or a
         :class:`str` (symbolic/dynamic dimension name such as ``"batch"``).
-    :param concrete_value: Optional trace-time concrete size of this symbolic
-        dimension (e.g. ``3`` when the model was called with a batch of 3).
-        When provided, :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.make_fake`
-        uses a *backed* :class:`~torch.SymInt` with this value so that
-        shape-dependent operations like ``aten.select.int`` can pass bounds
-        checks at trace time.
 
     Examples::
 
@@ -202,16 +196,9 @@ class TracingInt:
       FX node metadata.
     """
 
-    def __init__(self, value: Union[int, str], concrete_value: Optional[int] = None):
+    def __init__(self, value: Union[int, str]):
         assert isinstance(value, (int, str)), f"Unexpected type {type(value)} for value"
-        assert concrete_value is None or isinstance(
-            concrete_value, int
-        ), f"Unexpected type {type(concrete_value)} for concrete_value"
         self.value = value
-        # Optional trace-time concrete size for this symbolic dimension.
-        # Used by GraphTracer.make_fake() to build a backed SymInt so that
-        # bounds checks like ``index < size`` pass during shape inference.
-        self.concrete_value: Optional[int] = concrete_value
         # Optional FX node that produces this integer as a scalar int64 tensor.
         # Set by TracingTensor.numel() when a tracer is active.
         self._node: Any = None
@@ -605,7 +592,5 @@ class TracingShape:
             return TracingShape(tuple(int(i) for i in shape))
         new_shape = [int(i) for i in shape]
         for d, dim_spec in dynamic_shapes.items():
-            new_shape[d] = TracingInt(  # type: ignore
-                _dim_spec_to_name(dim_spec), concrete_value=int(shape[d])
-            )
+            new_shape[d] = TracingInt(_dim_spec_to_name(dim_spec))  # type: ignore
         return TracingShape(tuple(new_shape))  # type: ignore

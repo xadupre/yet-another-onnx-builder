@@ -52,23 +52,13 @@ class TracingTensor(torch.Tensor):
                 )
                 for d in size
             )
-            # For symbolic dimensions (stored as TracingInt), use the concrete
-            # trace-time value if known, otherwise fall back to 1.  Using a
-            # non-zero stored size prevents C++-level bounds checks from
-            # raising IndexError before __torch_dispatch__ can intercept (e.g.
-            # ``x[0]`` on a tensor with a dynamic batch dimension).
-            sizes = tuple(
-                (
-                    i
-                    if isinstance(i, int)
-                    else (
-                        i.concrete_value
-                        if isinstance(i, TracingInt) and i.concrete_value is not None
-                        else 1
-                    )
-                )
-                for i in sizes
-            )
+            # For symbolic dimensions (still TracingInt objects after the pass
+            # above), use 1 as the stored concrete size.  A stored size of 1
+            # prevents C++-level bounds checks from raising IndexError for
+            # common index-0 access patterns (e.g. ``x[0]``) before
+            # ``__torch_dispatch__`` can intercept.  The actual symbolic size
+            # is tracked separately in ``_tracing_shape``.
+            sizes = tuple((i if isinstance(i, int) else 1) for i in sizes)
         else:
             assert isinstance(size, tuple), f"Unexpected type {type(size)} for size"
             assert not size or all(
@@ -437,3 +427,31 @@ class TracingTensor(torch.Tensor):
         # not discard the node and that downstream ops receive the updated
         # tensor value.
         self._node = node
+
+    def __getitem__(self, index: Any) -> Any:
+        """
+        Intercepts single-integer indexing (``x[i]``) on a
+        :class:`TracingTensor` to bypass the C++ bounds check that fires
+        before ``__torch_dispatch__`` when symbolic dimensions are stored as
+        size ``1`` internally.
+
+        For a single integer index ``i``, this is equivalent to
+        ``aten.select.int(self, 0, i)`` — i.e. it selects element *i* along
+        the first (index-0) dimension of ``self``.  The output shape is
+        ``self._tracing_shape`` with that leading dimension removed.  The
+        shape is computed directly from :attr:`_tracing_shape` so no
+        FakeTensorMode bounds check is triggered.
+
+        For all other index types (slices, tuples, tensors, …) the default
+        ``torch.Tensor.__getitem__`` path is used.  Those cases either do not
+        perform bounds checks (slice, tensor indexing) or operate on concrete
+        dimensions where the stored size is correct.
+
+        :param index: Index expression.
+        :returns: A :class:`TracingTensor` for integer indexing, or the
+            result of the default dispatch for other index types.
+        """
+        tracer = self._tracer
+        if tracer is not None and isinstance(index, int):
+            return tracer._handle_select_int(self, 0, index)
+        return super().__getitem__(index)  # type: ignore

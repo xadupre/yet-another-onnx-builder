@@ -11,7 +11,6 @@ from torch.fx.experimental.sym_node import SymNode
 from ...xexpressions import rename_expression
 from .shape import TracingShape, TracingInt, TracingBool, register_condition, clear_conditions
 from .tensor import TracingTensor
-from ..interpreter._torch_helper import create_symint as _create_symint
 from ._patches import (
     _ORIGINAL_TORCH_COND,
     _ORIGINAL_TORCH_FULL,
@@ -428,15 +427,6 @@ class GraphTracer:
         seen dimension names are reused so that the same symbol appears
         wherever the same dynamic dimension is referenced.
 
-        When a :class:`TracingInt` dimension carries a
-        :attr:`~yobx.torch.new_tracing.shape.TracingInt.concrete_value`, a
-        *backed* :class:`~torch.SymInt` is created via
-        :func:`~yobx.torch.interpreter._torch_helper.create_symint` using that
-        value.  This allows shape-dependent operations such as
-        ``aten.select.int`` to pass their bounds checks (e.g. ``0 < s0=3``)
-        during fake-mode shape inference, even though the tracer stores
-        symbolic dimensions as size ``0`` in the underlying wrapper tensor.
-
         For a plain :class:`torch.Tensor`, a fake tensor with the same shape,
         dtype, and device is created directly.
 
@@ -455,13 +445,7 @@ class GraphTracer:
                     if d.value in self._mapped_dimension:
                         symd = self._mapped_dimension[d.value]
                     else:
-                        if d.concrete_value is not None:
-                            # Use a backed SymInt with the trace-time concrete
-                            # value so that bounds checks like ``0 < s0=3``
-                            # pass during shape inference (e.g. aten.select.int).
-                            symd = _create_symint(d.concrete_value, self._shape_env)
-                        else:
-                            symd = self._shape_env.create_unbacked_symint()
+                        symd = self._shape_env.create_unbacked_symint()
                         self._mapped_dimension[d.value] = symd  # type: ignore
                         symd_name = self._sym_int_to_str(symd)
                         assert isinstance(symd_name, str), "type checking"
@@ -474,6 +458,42 @@ class GraphTracer:
                 return torch.empty(tuple(new_shape), dtype=a.dtype, device=a.device)
         with self._fake_mode:
             return torch.empty(a.shape, dtype=a.dtype, device=a.device)
+
+    def _handle_select_int(self, x: TracingTensor, dim: int, index: int) -> TracingTensor:
+        """
+        Handle ``aten.select.int(x, dim, index)`` without calling
+        :meth:`dispatch` or :class:`~torch._subclasses.fake_tensor.FakeTensorMode`.
+
+        When *x* has a symbolic (dynamic) dimension at *dim*, the fake-mode
+        meta kernel for ``aten.select.int`` would try to prove the bounds check
+        ``-size <= index < size`` for an unbacked :class:`~torch.SymInt`.  That
+        guard cannot be statically discharged, raising
+        :exc:`torch.fx.experimental.symbolic_shapes.GuardOnDataDependentSymNode`.
+
+        This method bypasses the issue entirely by computing the output shape
+        directly from :attr:`~TracingTensor._tracing_shape` (dropping dimension
+        *dim*) and emitting the ``aten.select.int`` FX node directly.
+
+        It is called from :meth:`~yobx.torch.new_tracing.tensor.TracingTensor.__getitem__`
+        whenever a :class:`TracingTensor` is indexed with a single integer.
+
+        :param x: The input :class:`TracingTensor`.
+        :param dim: The dimension to select along.  Negative values are
+            normalised internally to their equivalent non-negative index.
+        :param index: The integer index to select.
+        :returns: A :class:`TracingTensor` with the selected dimension dropped.
+        """
+        ndim = len(x.shape)
+        if dim < 0:
+            dim = dim + ndim
+        out_shape = TracingShape(tuple(d for i, d in enumerate(x.shape.dims) if i != dim))
+        node = self.graph.call_function(
+            torch.ops.aten.select.int, args=(self._get_node(x), dim, index), kwargs={}
+        )
+        result = self._make_tracing_tensor(out_shape, x.dtype, x.device, node)
+        node.meta["val"] = result
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return result
 
     def _sym_shape_to_str_shape(
         self, sym_shape: Tuple[Union[int, torch.SymInt], ...]
