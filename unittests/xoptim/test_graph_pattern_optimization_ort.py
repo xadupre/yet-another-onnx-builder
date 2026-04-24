@@ -761,6 +761,109 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         node = opt_onx.graph.node[0]
         self.assertEqual(node.op_type, "BiasGelu")
 
+    def test_bias_split_gelu(self):
+        # Shape: X is (2, 4, 8), bias is (8).
+        # After Add, Split along last dim produces two halves of size 4.
+        # t1 (left) is multiplied by Gelu(t2) (right).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Add", ["X", "B"], ["xb"]),
+                    oh.make_node("Split", ["xb"], ["xb1", "xb2"], axis=-1, num_outputs=2),
+                    oh.make_node("Div", ["xb2", "sq2"], ["xb2d"]),
+                    oh.make_node("Erf", ["xb2d"], ["xb2e"]),
+                    oh.make_node("Add", ["xb2e", "one"], ["xb2e1"]),
+                    oh.make_node("Mul", ["xb2", "xb2e1"], ["xb2g"]),
+                    oh.make_node("Mul", ["xb2g", "half"], ["xb2gelu"]),
+                    oh.make_node("Mul", ["xb1", "xb2gelu"], ["Y"]),
+                ],
+                "dummy",
+                [oh.make_tensor_value_info("X", TFLOAT, [2, 4, 8])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [2, 4, 4])],
+                [
+                    onh.from_array(
+                        np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, -0.4, -0.1], dtype=np.float32),
+                        name="B",
+                    ),
+                    onh.from_array(np.array([1.4140625], dtype=np.float32), name="sq2"),
+                    onh.from_array(np.array([1], dtype=np.float32), name="one"),
+                    onh.from_array(np.array([0.5], dtype=np.float32), name="half"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        check_model(model)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["BiasSplitGelu"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["BiasSplitGelu"], [n.op_type for n in opt_onx.graph.node])
+        self.assertEqual(1, len(opt_onx.graph.initializer))
+        node = opt_onx.graph.node[0]
+        self.assertEqual(node.op_type, "BiasSplitGelu")
+        self.assertEqual(node.domain, "com.microsoft")
+
+    @requires_cuda()
+    def test_bias_split_gelu_cuda(self):
+        from onnxruntime import InferenceSession
+
+        # Shape: X is (2, 4, 8), bias is (8).
+        # After Add, Split along last dim produces two halves of size 4.
+        # t1 (left) is multiplied by Gelu(t2) (right).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Add", ["X", "B"], ["xb"]),
+                    oh.make_node("Split", ["xb"], ["xb1", "xb2"], axis=-1, num_outputs=2),
+                    oh.make_node("Div", ["xb2", "sq2"], ["xb2d"]),
+                    oh.make_node("Erf", ["xb2d"], ["xb2e"]),
+                    oh.make_node("Add", ["xb2e", "one"], ["xb2e1"]),
+                    oh.make_node("Mul", ["xb2", "xb2e1"], ["xb2g"]),
+                    oh.make_node("Mul", ["xb2g", "half"], ["xb2gelu"]),
+                    oh.make_node("Mul", ["xb1", "xb2gelu"], ["Y"]),
+                ],
+                "dummy",
+                [oh.make_tensor_value_info("X", TFLOAT, [2, 4, 8])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [2, 4, 4])],
+                [
+                    onh.from_array(
+                        np.array([0.1, 0.2, 0.3, 0.4, 0.5, 0.6, -0.4, -0.1], dtype=np.float32),
+                        name="B",
+                    ),
+                    onh.from_array(np.array([1.4140625], dtype=np.float32), name="sq2"),
+                    onh.from_array(np.array([1], dtype=np.float32), name="one"),
+                    onh.from_array(np.array([0.5], dtype=np.float32), name="half"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        check_model(model)
+        feeds = {"X": self._range(2, 4, 8)}
+        ref = InferenceSession(model.SerializeToString(), providers=["CUDAExecutionProvider"])
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["BiasSplitGelu"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["BiasSplitGelu"], [n.op_type for n in opt_onx.graph.node])
+        self.assertEqual(1, len(opt_onx.graph.initializer))
+
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CUDAExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-4)
+        node = opt_onx.graph.node[0]
+        self.assertEqual(node.op_type, "BiasSplitGelu")
+
     def test_gelu_erf(self):
         from onnxruntime import InferenceSession
 

@@ -18,6 +18,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
     """
     from .activation import (
         BiasGeluPattern,
+        BiasSplitGeluPattern,
         BiasSoftmaxPattern,
         FastGeluPattern,
         GeluOrtPattern,
@@ -60,6 +61,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         Attention3DPattern(verbose=verbose),
         BiasGeluPattern(verbose=verbose),
         BiasSoftmaxPattern(verbose=verbose),
+        BiasSplitGeluPattern(verbose=verbose),
         ContribRotaryEmbeddingPattern(verbose=verbose),
         ContribRotaryEmbedding3DPattern(verbose=verbose),
         GeluOrtPattern(verbose=verbose),

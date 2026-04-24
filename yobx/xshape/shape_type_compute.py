@@ -2655,12 +2655,38 @@ def set_type_shape_multi_head_attention(self: ShapeBuilder, node: NodeProto):
             self.set_rank(o, 4)
 
 
+def set_type_shape_bias_split_gelu(g: "ShapeBuilder", node: "NodeProto"):  # noqa: F821
+    """Sets the shape and type for ``com.microsoft.BiasSplitGelu``.
+
+    The operator computes ``Y = left * Gelu(right)`` after adding a bias and
+    splitting the last dimension into two equal halves, so the output shape
+    equals the input shape with the last dimension halved.
+    """
+    out = node.output[0]
+    inp = node.input[0]
+    if g.has_device(inp):
+        g.set_device(out, g.get_device(inp))
+    if g.has_type(inp):
+        g.set_type(out, g.get_type(inp))
+    if g.has_shape(inp):
+        shape = g.get_shape(inp)
+        last = shape[-1]
+        if isinstance(last, int):
+            new_last = last // 2
+        else:
+            new_last = f"({last})//2"
+        g.set_shape(out, (*shape[:-1], new_last))
+    elif g.has_rank(inp):
+        g.set_rank(out, g.get_rank(inp))
+
+
 _set_shape_type_op_any_custom = {
     "AddAdd": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
     "AddMul": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
     "AddSharedInput": set_type_shape_shared_input,
     "BiasGelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "BiasSoftmax": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
+    "BiasSplitGelu": lambda g, node: set_type_shape_bias_split_gelu(g, node),
     "ComplexModule": set_type_shape_complex_module,
     "FastGelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "FusedMatMul": set_type_shape_fused_matmul,
