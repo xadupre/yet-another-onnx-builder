@@ -9,6 +9,7 @@ inferred dynamic shapes are then used for the ONNX export.
 """
 
 import contextlib
+from collections import Counter
 from dataclasses import dataclass, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
 import os
@@ -503,10 +504,9 @@ def _export(
     if os.path.exists(filename):
         try:
             import onnx
-            from collections import Counter
 
             onx = onnx.load(filename, load_external_data=False)
-            counts: Counter = Counter(n.op_type for n in onx.graph.node)
+            counts = Counter(n.op_type for n in onx.graph.node)
             summary.n_nodes = sum(counts.values())
             top = counts.most_common(5)
             summary.top_op_types = ",".join(f"{op}:{cnt}" for op, cnt in top)
