@@ -9197,6 +9197,99 @@ def aten_mod(
     return res
 
 
+def aten_fmax(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "fmax",
+) -> T:
+    """Implements fmax.default."""
+    assert g.has_type(x), f"Missing type for {x!r}{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    if itype in {
+        TensorProto.FLOAT,
+        TensorProto.DOUBLE,
+        TensorProto.FLOAT16,
+        TensorProto.BFLOAT16,
+    }:
+        # For floating-point types fmax ignores NaN: if one input is NaN return the other.
+        if g.main_opset >= 20 or itype in {TensorProto.FLOAT, TensorProto.DOUBLE}:
+            nan_x = g.op.IsNaN(x, name=name)
+            nan_y = g.op.IsNaN(y, name=name)
+        else:
+            fx = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+            fy = g.op.Cast(y, to=TensorProto.FLOAT, name=name)
+            nan_x = g.op.IsNaN(fx, name=name)
+            nan_y = g.op.IsNaN(fy, name=name)
+        max_xy = g.op.Max(x, y, name=name)
+        inner = g.op.Where(nan_y, x, max_xy, name=name)
+        res = g.op.Where(nan_x, y, inner, name=name, outputs=outputs)
+    else:
+        # For integer types NaN does not exist; use element-wise Max.
+        res = g.op.Max(x, y, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_binary_op(g, res, x, y)
+    return res
+
+
+def aten_fmin(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "fmin",
+) -> T:
+    """Implements fmin.default."""
+    assert g.has_type(x), f"Missing type for {x!r}{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    if itype in {
+        TensorProto.FLOAT,
+        TensorProto.DOUBLE,
+        TensorProto.FLOAT16,
+        TensorProto.BFLOAT16,
+    }:
+        # For floating-point types fmin ignores NaN: if one input is NaN return the other.
+        if g.main_opset >= 20 or itype in {TensorProto.FLOAT, TensorProto.DOUBLE}:
+            nan_x = g.op.IsNaN(x, name=name)
+            nan_y = g.op.IsNaN(y, name=name)
+        else:
+            fx = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+            fy = g.op.Cast(y, to=TensorProto.FLOAT, name=name)
+            nan_x = g.op.IsNaN(fx, name=name)
+            nan_y = g.op.IsNaN(fy, name=name)
+        min_xy = g.op.Min(x, y, name=name)
+        inner = g.op.Where(nan_y, x, min_xy, name=name)
+        res = g.op.Where(nan_x, y, inner, name=name, outputs=outputs)
+    else:
+        # For integer types NaN does not exist; use element-wise Min.
+        res = g.op.Min(x, y, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_binary_op(g, res, x, y)
+    return res
+
+
+def aten_fmod(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "fmod",
+) -> T:
+    """Implements fmod for both scalar and tensor second arguments."""
+    if isinstance(y, str):
+        return aten_fmod_Tensor(g, sts, outputs, x, y, name=name)
+    assert g.has_type(x), f"Missing type for {x!r}{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    res = g.op.Mod(x, np.array([y], dtype=dtype), fmod=1, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
 def aten_fmod_Scalar(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -9211,6 +9304,21 @@ def aten_fmod_Scalar(
     res = g.op.Mod(x, np.array([scalar], dtype=dtype), fmod=1)
     if not sts:
         set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_fmod_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "fmod_Tensor",
+) -> T:
+    """Implements fmod.Tensor."""
+    res = g.op.Mod(x, y, fmod=1, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_binary_op(g, res, x, y)
     return res
 
 
