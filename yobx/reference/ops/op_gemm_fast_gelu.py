@@ -4,6 +4,11 @@ from .op_fast_gelu import _fast_gelu_core
 
 
 class GemmFastGelu(OpRun):
+    """Implements the ``com.microsoft.GemmFastGelu`` operator.
+
+    Computes ``FastGelu(A @ B + bias)`` where bias is optional.
+    """
+
     op_domain = "com.microsoft"
 
     def _run(self, A, B, bias=None):
