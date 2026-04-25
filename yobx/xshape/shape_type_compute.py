@@ -2694,6 +2694,7 @@ _set_shape_type_op_any_custom = {
     "FusedMatMul": set_type_shape_fused_matmul,
     "FusedConv": _set_shape_type_op_any_conv_max_pool,
     "Gelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
+    "GemmFastGelu": lambda g, node: set_type_shape_matmul(g, node.output[0], *node.input[:2]),
     "MaskedScatterNDOfShape": set_type_shape_scatter_nd_of_shape,
     "MulAdd": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
     "MulMul": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
@@ -2875,6 +2876,41 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             self.set_shape(node.output[0], (1, num_heads, q_dim, k_dim))
         else:
             self.set_rank(node.output[0], 4)
+        return None
+
+    # CausalConvWithState: stateful causal depthwise convolution.
+    # Inputs: input (N, C, L), weight (C, 1, K), bias (C, optional),
+    #         past_state (N, C, K-1, optional).
+    # Outputs: output (same shape as input), present_state (N, C, K-1, optional).
+    if node.op_type == "CausalConvWithState" and node.domain == "com.microsoft":
+        dtype = self.get_type(node.input[0]) if self.has_type(node.input[0]) else None
+        if dtype is not None:
+            self.set_type(node.output[0], dtype)
+            if len(node.output) > 1 and node.output[1]:
+                self.set_type(node.output[1], dtype)
+        if self.has_device(node.input[0]):
+            dev = self.get_device(node.input[0])
+            self.set_device(node.output[0], dev)
+            if len(node.output) > 1 and node.output[1]:
+                self.set_device(node.output[1], dev)
+        if self.has_shape(node.input[0]):
+            input_shape = self.get_shape(node.input[0])
+            # Output has the same shape as the input.
+            self.set_shape(node.output[0], input_shape)
+            if len(node.output) > 1 and node.output[1]:
+                # present_state shape: (N, C, K-1) where K is the kernel size.
+                if len(node.input) > 1 and self.has_shape(node.input[1]):
+                    weight_shape = self.get_shape(node.input[1])
+                    kernel_size = weight_shape[2]
+                    state_len = kernel_size - 1 if isinstance(kernel_size, int) else kernel_size
+                    self.set_shape(node.output[1], (input_shape[0], input_shape[1], state_len))
+                else:
+                    self.set_rank(node.output[1], len(input_shape))
+        elif self.has_rank(node.input[0]):
+            rk = self.get_rank(node.input[0])
+            self.set_rank(node.output[0], rk)
+            if len(node.output) > 1 and node.output[1]:
+                self.set_rank(node.output[1], rk)
         return None
 
     assert node.domain not in {

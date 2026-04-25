@@ -11,3 +11,5 @@ yobx.reference.ops
 
     op__overwrite_gather
     op_complex
+    op_fast_gelu
+    op_gemm_fast_gelu
