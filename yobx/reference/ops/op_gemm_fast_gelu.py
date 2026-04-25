@@ -1,6 +1,6 @@
 import numpy as np
 from onnx.reference.op_run import OpRun
-from .op_fast_gelu import _fast_gelu_core
+from .op_fast_gelu import FastGelu
 
 
 class GemmFastGelu(OpRun):
@@ -15,4 +15,4 @@ class GemmFastGelu(OpRun):
         y = np.matmul(A, B)
         if bias is not None:
             y = y + bias
-        return (_fast_gelu_core(y).astype(A.dtype),)
+        return (FastGelu._fast_gelu_core(y).astype(A.dtype),)
