@@ -2927,6 +2927,144 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         self.assertEqual(0, len(ms_attention))
         self.assertIn("LocalAttention_to1", [n.op_type for n in opt_onx.graph.node])
 
+    def _build_relative_position_bias_model(self):
+        """Builds a T5-style (bidirectional) relative position bias ONNX model."""
+        import math
+
+        num_heads = 8
+        num_buckets_total = 32
+        max_distance = 128
+        half_num_buckets = num_buckets_total // 2  # 16
+        max_exact = half_num_buckets // 2  # 8
+        log_max = math.log(max_distance / max_exact)  # log(16) ≈ 2.77
+        scale = float(half_num_buckets - max_exact)  # 8.0
+        clamp_val = half_num_buckets - 1  # 15
+
+        bias_table = (
+            np.arange(num_buckets_total * num_heads)
+            .reshape(num_buckets_total, num_heads)
+            .astype(np.float32)
+        )
+
+        nodes = [
+            # Range(0, seq_len, 1) -> [seq_len]
+            oh.make_node("Range", ["zero", "seq_len", "one"], ["range"]),
+            # Unsqueeze(range, [0]) -> [1, seq_len]
+            oh.make_node("Unsqueeze", ["range", "axis0"], ["unsqueeze_q"]),
+            # Unsqueeze(range, [1]) -> [seq_len, 1]
+            oh.make_node("Unsqueeze", ["range", "axis1"], ["unsqueeze_k"]),
+            # Sub -> [seq_len, seq_len]
+            oh.make_node("Sub", ["unsqueeze_q", "unsqueeze_k"], ["rel_pos"]),
+            # Abs
+            oh.make_node("Abs", ["rel_pos"], ["abs_pos"]),
+            # Cast to int64 (for Where true branch and Less)
+            oh.make_node("Cast", ["abs_pos"], ["abs_pos_int"], to=TINT64),
+            # Cast to float (for log computation)
+            oh.make_node("Cast", ["abs_pos"], ["abs_pos_float"], to=TFLOAT),
+            # Less -> condition for Where
+            oh.make_node("Less", ["abs_pos_int", "max_exact_int"], ["is_small"]),
+            # Div(pos_float, max_exact_float)
+            oh.make_node("Div", ["abs_pos_float", "max_exact_float"], ["div_pos"]),
+            # Log
+            oh.make_node("Log", ["div_pos"], ["log_div"]),
+            # Div(log, log_max)
+            oh.make_node("Div", ["log_div", "log_max_cst"], ["div_log"]),
+            # Mul(div_log, scale)
+            oh.make_node("Mul", ["div_log", "scale_cst"], ["mul_result"]),
+            # Cast to int64
+            oh.make_node("Cast", ["mul_result"], ["bucket_int"], to=TINT64),
+            # Add(bucket, max_exact_int)
+            oh.make_node("Add", ["bucket_int", "max_exact_int"], ["add_result"]),
+            # Shape(add_result)
+            oh.make_node("Shape", ["add_result"], ["add_shape"]),
+            # ConstantOfShape(shape, clamp_val)
+            oh.make_node(
+                "ConstantOfShape",
+                ["add_shape"],
+                ["clamp_cst"],
+                value=onh.from_array(np.array([clamp_val], dtype=np.int64)),
+            ),
+            # Min(add_result, clamp_cst)
+            oh.make_node("Min", ["add_result", "clamp_cst"], ["bucket_clamped"]),
+            # Where(is_small, abs_pos_int, bucket_clamped)
+            oh.make_node(
+                "Where", ["is_small", "abs_pos_int", "bucket_clamped"], ["final_bucket"]
+            ),
+            # Gather(bias_table, final_bucket)
+            oh.make_node("Gather", ["bias_table", "final_bucket"], ["gathered"], axis=0),
+            # Transpose([2, 0, 1]) -> [num_heads, seq_len, seq_len]
+            oh.make_node("Transpose", ["gathered"], ["transposed"], perm=[2, 0, 1]),
+            # Unsqueeze([0]) -> [1, num_heads, seq_len, seq_len]
+            oh.make_node("Unsqueeze", ["transposed", "batch_axis"], ["rpb_output"]),
+        ]
+
+        inits = [
+            onh.from_array(np.array(0, dtype=np.int64), name="zero"),
+            onh.from_array(np.array(1, dtype=np.int64), name="one"),
+            onh.from_array(np.array([0], dtype=np.int64), name="axis0"),
+            onh.from_array(np.array([1], dtype=np.int64), name="axis1"),
+            onh.from_array(np.array([0], dtype=np.int64), name="batch_axis"),
+            onh.from_array(np.array(max_exact, dtype=np.int64), name="max_exact_int"),
+            onh.from_array(np.array(float(max_exact), dtype=np.float32), name="max_exact_float"),
+            onh.from_array(np.array(log_max, dtype=np.float32), name="log_max_cst"),
+            onh.from_array(np.array(scale, dtype=np.float32), name="scale_cst"),
+            onh.from_array(bias_table, name="bias_table"),
+        ]
+
+        model = oh.make_model(
+            oh.make_graph(
+                nodes,
+                "rpb_test",
+                [oh.make_tensor_value_info("seq_len", TINT64, [])],
+                [oh.make_tensor_value_info("rpb_output", TFLOAT, [1, num_heads, None, None])],
+                inits,
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        check_model(model)
+        return model
+
+    def test_relative_position_bias(self):
+        """Tests that RelativePositionBiasPattern fuses the T5 encoder subgraph."""
+        model = self._build_relative_position_bias_model()
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["RelativePositionBias"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("RelativePositionBias", op_types)
+        self.assertNotIn("Gather", op_types)
+        self.assertNotIn("Where", op_types)
+
+        rpb_nodes = [n for n in opt_onx.graph.node if n.op_type == "RelativePositionBias"]
+        self.assertEqual(1, len(rpb_nodes))
+        rpb_node = rpb_nodes[0]
+        self.assertEqual("com.microsoft", rpb_node.domain)
+
+        attr_map = {a.name: a for a in rpb_node.attribute}
+        self.assertIn("max_distance", attr_map)
+        self.assertEqual(128, attr_map["max_distance"].i)
+        self.assertIn("is_bidirectional", attr_map)
+        self.assertEqual(1, attr_map["is_bidirectional"].i)
+
+        # Bias table should now be transposed: [num_heads, num_buckets]
+        init_names = {init.name for init in opt_onx.graph.initializer}
+        self.assertIn(rpb_node.input[0], init_names)
+
+    def test_relative_position_bias_in_pattern_list(self):
+        """Tests that RelativePositionBiasPattern is in the default ORT pattern list."""
+        from yobx.xoptim.patterns_ort import get_onnxruntime_patterns
+
+        patterns = get_onnxruntime_patterns()
+        names = [p.__class__.__name__ for p in patterns]
+        self.assertIn("RelativePositionBiasPattern", names)
+
 
 class TestMissingKernelPatterns(ExtTestCase):
     """Tests for MissingReduceMaxPattern and MissingTopKPattern."""
