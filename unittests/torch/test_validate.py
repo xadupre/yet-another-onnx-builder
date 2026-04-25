@@ -1,5 +1,5 @@
 import unittest
-from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
+from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers, skipif_ci_windows
 
 
 class TestValidateSummaryFields(ExtTestCase):
@@ -318,6 +318,7 @@ class TestValidateModel(ExtTestCase):
         if data.discrepancies:
             self.assertEqual(len(data.artifact.report.discrepancies), len(data.discrepancies))
 
+    @skipif_ci_windows("xlsx file locked by another process on Windows")
     def test_validate_model_artifact_xlsx_has_discrepancies_sheet(self):
         """The xlsx saved alongside the ONNX contains a 'discrepancies' sheet."""
         try:
