@@ -344,6 +344,15 @@ def getitem(  # noqa: F821
                 g.set_shape(outputs[0], t_shape, allow_zero=all_int(t_shape) and t_shape == (0,))
             else:
                 g.set_rank(outputs[0], len(t_shape))
+            # When accessing a named tuple element, the ONNX converter may
+            # have chosen a different dtype for that element (e.g., float32 for
+            # the rstd output of _fused_rms_norm for numerical stability). Use the
+            # already-established ONNX type to stay consistent with the Identity
+            # node that will propagate the source type to this output.
+            if isinstance(index, int):
+                _name_index = f"{result_name}#{index}"
+                if g.has_type(_name_index):
+                    dtype = g.get_type(_name_index)
             g.set_type(outputs[0], dtype)
             g.set_device(outputs[0], val.get_device())
         elif isinstance(val, g.torch.SymInt):

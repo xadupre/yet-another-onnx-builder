@@ -215,7 +215,7 @@ class _InferenceRuntime:
             elif self.has_rank(node.input[0]):
                 self.set_rank(node.output[0], self.get_rank(node.input[0]))
             if self.has_type(node.input[0]):
-                self.set_type(node.output[0], self.get_type(node.input[0]), exc=False)
+                self.set_type(node.output[0], self.get_type(node.input[0]))
             if self.has_device(node.input[0]) and not self.has_device(node.output[0]):
                 # Identity node are tricky. The onnx conversion usually ignores this.
                 # .to(device) becomes an identity node, therefore, a device could already be
