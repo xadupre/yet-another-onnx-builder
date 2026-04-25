@@ -1617,9 +1617,7 @@ class GraphEinsumSubOp:
         for inp, le in zip(inputs, lengths):
             if isinstance(inp, tuple):
                 name, (typ, shape) = inp
-                assert le == len(
-                    shape
-                ), "Irreconcialable shapes for input %r: " "%r != len(%r)." % (  # noqa: ISC001
+                assert le == len(shape), "Irreconcilable shapes for input %r: %r != len(%r)." % (
                     name,
                     le,
                     typ.shape,

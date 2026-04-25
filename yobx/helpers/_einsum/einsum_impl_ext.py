@@ -70,8 +70,6 @@ def _numpy_extended_dot_equation(
 
     :param m1: number of dimensions of the first matrix
     :param m2: number of dimensions of the second matrix
-    :param axes: summation axes
-    :param axes: summation axes
     :param left: left axes
     :param right: right axes
     :return: equation
@@ -285,7 +283,7 @@ def numpy_extended_dot(
     return output.reshape(tuple(new_shape))
 
 
-def numpy_extended_dot_ouput_shape(
+def numpy_extended_dot_output_shape(
     m1: numpy.ndarray,
     m2: numpy.ndarray,
     axes: Tuple[int, ...],
@@ -488,7 +486,7 @@ def numpy_extended_dot_python(
     def dispb(c):
         return "".join("o" if b else "." for b in c)
 
-    new_shape = numpy_extended_dot_ouput_shape(m1, m2, axes, left, right)
+    new_shape = numpy_extended_dot_output_shape(m1, m2, axes, left, right)
     m1_dim = len(m1.shape)
 
     # output result
@@ -672,7 +670,7 @@ def numpy_extended_dot_matrix(
         if verbose:
             print(f"[GENERICDOT] transposeL={perm!r}, {red1.shape!r} -> {trm1.shape!r}")
             print(f"[GENERICDOT] transposeR={perm!r}, {red2.shape!r} -> {trm2.shape!r}")
-        final_shape = numpy_extended_dot_ouput_shape(m1, m2, axes, left, right)
+        final_shape = numpy_extended_dot_output_shape(m1, m2, axes, left, right)
         perm_left = [i for i in range(len(perm)) if perm[i] in left]
         perm_right = [i for i in range(len(perm)) if perm[i] in right]
         perm_common_axes = [i for i in range(len(perm)) if perm[i] in common_axes]

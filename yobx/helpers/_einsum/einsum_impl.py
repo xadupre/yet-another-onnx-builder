@@ -208,7 +208,7 @@ def apply_einsum_sequence(
 
 def is_transpose_identity(perm: Tuple[int, ...]) -> bool:
     """
-    Tells if the permutation *perm* does nothing (itentity).
+    Tells if the permutation *perm* does nothing (identity).
 
     :param perm: permutation
     :return: boolean
