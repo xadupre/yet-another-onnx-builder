@@ -13,13 +13,6 @@ model_statistics
 
 .. autofunction:: yobx.helpers.model_statistics
 
-_Statistics
-+++++++++++
-
-.. autoclass:: yobx.helpers.stats_helper._Statistics
-    :members:
-    :no-undoc-members:
-
 NodeStatistics
 ++++++++++++++
 

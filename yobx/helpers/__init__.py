@@ -11,7 +11,6 @@ from .helper import (
 from .stats_helper import (
     ModelStatistics,
     model_statistics,
-    _Statistics,
     NodeStatistics,
     TreeStatistics,
     HistTreeStatistics,
