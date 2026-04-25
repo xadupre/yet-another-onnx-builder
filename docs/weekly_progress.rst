@@ -4,475 +4,276 @@
 Weekly Progress Since the Start
 =================================
 
-This page summarises the development activity of
-`yet-another-onnx-builder <https://github.com/xadupre/yet-another-onnx-builder>`_
-on a week-by-week basis since the repository was created.
-Commit counts, lines added, and lines deleted are fetched from the
-GitHub REST API and displayed as bar charts.
-
-.. note::
-
-   This page queries the public GitHub REST API.  No authentication token is
-   required for a public repository, but anonymous requests are subject to
-   rate-limiting (60 requests/hour per IP).  When the API cannot be reached
-   (offline build, rate-limit exceeded, …) the charts will be empty and a
-   warning is printed to the console.  Retrieved statistics are cached for two
-   weeks in the user cache directory.
-
-.. runpython::
-    :rst:
-
-    import datetime
-    print(
-        f"*Page generated on "
-        f"{datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}.*"
-    )
-
-Commits per Week
-================
-
-.. plot::
-    :include-source: false
-
-    """Fetch weekly commit counts from the GitHub stats API and plot them."""
-
-    import datetime
-    import json
-    import os
-    import time
-    import urllib.request
-
-    import matplotlib
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-
-    _OWNER = "xadupre"
-    _REPO = "yet-another-onnx-builder"
-    _API_BASE = f"https://api.github.com/repos/{_OWNER}/{_REPO}"
-    _HEADERS = {
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-    _USER_CACHE_DIR = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
-    _CACHE_DIR = os.path.join(
-        _USER_CACHE_DIR, "yet-another-onnx-builder", "weekly_progress"
-    )
-    _CACHE_MAX_AGE_DAYS = 14
-
-
-    def _cache_is_recent(path):
-        """Checks whether a cache file is newer than the cache max age.
-
-        Returns:
-            bool: True when the cache entry is recent enough to be used.
-        """
-        if not os.path.exists(path):
-            return False
-        try:
-            age = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromtimestamp(
-                os.path.getmtime(path), tz=datetime.timezone.utc
-            )
-            return age <= datetime.timedelta(days=_CACHE_MAX_AGE_DAYS)
-        except OSError:
-            return False
-
-
-    def _gh_get_stats(endpoint):
-        """Fetches a GitHub stats endpoint, retrying once after 202 responses.
-
-        Returns:
-            list | None: Parsed JSON list on success, None on failure.
-        """
-        url = f"{_API_BASE}/stats/{endpoint}"
-        req = urllib.request.Request(url, headers=_HEADERS)
-        for attempt in range(3):
-            try:
-                with urllib.request.urlopen(req, timeout=20) as resp:
-                    if resp.status == 200:
-                        return json.loads(resp.read().decode())
-            except (urllib.error.URLError, urllib.error.HTTPError):
-                pass
-            # GitHub may return 202 (computing) — wait and retry
-            time.sleep(2)
-        return None
-
-
-    def _load_or_fetch(cache_name, endpoint):
-        """Returns stats from cache if fresh, otherwise fetches from GitHub API.
-
-        Returns:
-            list | None: Stats list, or None when unavailable.
-        """
-        os.makedirs(_CACHE_DIR, exist_ok=True)
-        cache_path = os.path.join(_CACHE_DIR, cache_name)
-        if _cache_is_recent(cache_path):
-            with open(cache_path, "r", encoding="utf-8") as fh:
-                return json.load(fh)
-        data = _gh_get_stats(endpoint)
-        if data:
-            with open(cache_path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh)
-        return data
-
-
-    # ── Commit activity: list of {week (unix ts), days, total} ──────────────────
-    commit_data = _load_or_fetch("commit_activity.json", "commit_activity")
-
-    if not commit_data:
-        fig, ax = plt.subplots(figsize=(8, 2))
-        ax.text(
-            0.5,
-            0.5,
-            "No data available (GitHub API not reachable or still computing).",
-            ha="center",
-            va="center",
-            transform=ax.transAxes,
-            fontsize=11,
-        )
-        ax.axis("off")
-        plt.tight_layout()
-    else:
-        weeks = []
-        counts = []
-        for entry in commit_data:
-            ts = entry.get("week", 0)
-            total = entry.get("total", 0)
-            if total == 0:
-                continue
-            weeks.append(datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc))
-            counts.append(total)
-
-        if not weeks:
-            fig, ax = plt.subplots(figsize=(8, 2))
-            ax.text(
-                0.5,
-                0.5,
-                "No commit data found for the past 52 weeks.",
-                ha="center",
-                va="center",
-                transform=ax.transAxes,
-                fontsize=11,
-            )
-            ax.axis("off")
-            plt.tight_layout()
-        else:
-            fig, ax = plt.subplots(figsize=(12, 4))
-            bar_width = datetime.timedelta(days=5)
-            colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-            ax.bar(weeks, counts, width=bar_width, color=colors[0], alpha=0.8, label="commits / week")
-            ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d\n%Y"))
-            ax.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.MO, interval=2))
-            ax.tick_params(axis="x", labelsize=8)
-            ax.set_ylabel("Commits", fontsize=10)
-            ax.set_title("Commits per Week", fontsize=13)
-            ax.grid(True, axis="y", linestyle="--", alpha=0.4)
-            ax.legend(fontsize=9)
-            fig.autofmt_xdate()
-            plt.tight_layout()
-
-Lines of Code Added and Deleted per Week
-=========================================
-
-.. plot::
-    :include-source: false
-
-    """Fetch weekly code-frequency stats from the GitHub stats API and plot them."""
-
-    import datetime
-    import json
-    import os
-    import time
-    import urllib.request
-
-    import matplotlib
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-
-    _OWNER = "xadupre"
-    _REPO = "yet-another-onnx-builder"
-    _API_BASE = f"https://api.github.com/repos/{_OWNER}/{_REPO}"
-    _HEADERS = {
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-    _USER_CACHE_DIR = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
-    _CACHE_DIR = os.path.join(
-        _USER_CACHE_DIR, "yet-another-onnx-builder", "weekly_progress"
-    )
-    _CACHE_MAX_AGE_DAYS = 14
-
-
-    def _cache_is_recent(path):
-        """Checks whether a cache file is newer than the cache max age.
-
-        Returns:
-            bool: True when the cache entry is recent enough to be used.
-        """
-        if not os.path.exists(path):
-            return False
-        try:
-            age = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromtimestamp(
-                os.path.getmtime(path), tz=datetime.timezone.utc
-            )
-            return age <= datetime.timedelta(days=_CACHE_MAX_AGE_DAYS)
-        except OSError:
-            return False
-
-
-    def _gh_get_stats(endpoint):
-        """Fetches a GitHub stats endpoint, retrying once after 202 responses.
-
-        Returns:
-            list | None: Parsed JSON list on success, None on failure.
-        """
-        url = f"{_API_BASE}/stats/{endpoint}"
-        req = urllib.request.Request(url, headers=_HEADERS)
-        for attempt in range(3):
-            try:
-                with urllib.request.urlopen(req, timeout=20) as resp:
-                    if resp.status == 200:
-                        return json.loads(resp.read().decode())
-            except (urllib.error.URLError, urllib.error.HTTPError):
-                pass
-            time.sleep(2)
-        return None
-
-
-    def _load_or_fetch(cache_name, endpoint):
-        """Returns stats from cache if fresh, otherwise fetches from GitHub API.
-
-        Returns:
-            list | None: Stats list, or None when unavailable.
-        """
-        os.makedirs(_CACHE_DIR, exist_ok=True)
-        cache_path = os.path.join(_CACHE_DIR, cache_name)
-        if _cache_is_recent(cache_path):
-            with open(cache_path, "r", encoding="utf-8") as fh:
-                return json.load(fh)
-        data = _gh_get_stats(endpoint)
-        if data:
-            with open(cache_path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh)
-        return data
-
-
-    # ── Code frequency: list of [unix_ts, additions, deletions] ─────────────────
-    freq_data = _load_or_fetch("code_frequency.json", "code_frequency")
-
-    if not freq_data:
-        fig, ax = plt.subplots(figsize=(8, 2))
-        ax.text(
-            0.5,
-            0.5,
-            "No data available (GitHub API not reachable or still computing).",
-            ha="center",
-            va="center",
-            transform=ax.transAxes,
-            fontsize=11,
-        )
-        ax.axis("off")
-        plt.tight_layout()
-    else:
-        weeks = []
-        additions = []
-        deletions = []
-        for entry in freq_data:
-            ts, adds, dels = entry[0], entry[1], entry[2]
-            if adds == 0 and dels == 0:
-                continue
-            weeks.append(datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc))
-            additions.append(adds)
-            deletions.append(abs(dels))
-
-        if not weeks:
-            fig, ax = plt.subplots(figsize=(8, 2))
-            ax.text(
-                0.5,
-                0.5,
-                "No code-frequency data found.",
-                ha="center",
-                va="center",
-                transform=ax.transAxes,
-                fontsize=11,
-            )
-            ax.axis("off")
-            plt.tight_layout()
-        else:
-            fig, ax = plt.subplots(figsize=(12, 4))
-            colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-
-            ax.bar(
-                weeks,
-                additions,
-                width=datetime.timedelta(days=3),
-                color=colors[0],
-                alpha=0.8,
-                label="Lines added",
-            )
-            ax.bar(
-                weeks,
-                [-d for d in deletions],
-                width=datetime.timedelta(days=3),
-                color=colors[3],
-                alpha=0.8,
-                label="Lines deleted",
-            )
-
-            ax.axhline(0, color="black", linewidth=0.8)
-            ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d\n%Y"))
-            ax.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.MO, interval=2))
-            ax.tick_params(axis="x", labelsize=8)
-            ax.set_ylabel("Lines", fontsize=10)
-            ax.set_title("Lines of Code Added / Deleted per Week", fontsize=13)
-            ax.grid(True, axis="y", linestyle="--", alpha=0.4)
-            ax.legend(fontsize=9)
-            fig.autofmt_xdate()
-            plt.tight_layout()
-
-Cumulative Commit Count
-=======================
-
-.. plot::
-    :include-source: false
-
-    """Plot the cumulative commit count over time."""
-
-    import datetime
-    import json
-    import os
-    import time
-    import urllib.request
-
-    import matplotlib
-    import matplotlib.pyplot as plt
-    import matplotlib.dates as mdates
-    import numpy as np
-
-    _OWNER = "xadupre"
-    _REPO = "yet-another-onnx-builder"
-    _API_BASE = f"https://api.github.com/repos/{_OWNER}/{_REPO}"
-    _HEADERS = {
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28",
-    }
-    _USER_CACHE_DIR = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
-    _CACHE_DIR = os.path.join(
-        _USER_CACHE_DIR, "yet-another-onnx-builder", "weekly_progress"
-    )
-    _CACHE_MAX_AGE_DAYS = 14
-
-
-    def _cache_is_recent(path):
-        """Checks whether a cache file is newer than the cache max age.
-
-        Returns:
-            bool: True when the cache entry is recent enough to be used.
-        """
-        if not os.path.exists(path):
-            return False
-        try:
-            age = datetime.datetime.now(datetime.timezone.utc) - datetime.datetime.fromtimestamp(
-                os.path.getmtime(path), tz=datetime.timezone.utc
-            )
-            return age <= datetime.timedelta(days=_CACHE_MAX_AGE_DAYS)
-        except OSError:
-            return False
-
-
-    def _gh_get_stats(endpoint):
-        """Fetches a GitHub stats endpoint, retrying once after 202 responses.
-
-        Returns:
-            list | None: Parsed JSON list on success, None on failure.
-        """
-        url = f"{_API_BASE}/stats/{endpoint}"
-        req = urllib.request.Request(url, headers=_HEADERS)
-        for attempt in range(3):
-            try:
-                with urllib.request.urlopen(req, timeout=20) as resp:
-                    if resp.status == 200:
-                        return json.loads(resp.read().decode())
-            except (urllib.error.URLError, urllib.error.HTTPError):
-                pass
-            time.sleep(2)
-        return None
-
-
-    def _load_or_fetch(cache_name, endpoint):
-        """Returns stats from cache if fresh, otherwise fetches from GitHub API.
-
-        Returns:
-            list | None: Stats list, or None when unavailable.
-        """
-        os.makedirs(_CACHE_DIR, exist_ok=True)
-        cache_path = os.path.join(_CACHE_DIR, cache_name)
-        if _cache_is_recent(cache_path):
-            with open(cache_path, "r", encoding="utf-8") as fh:
-                return json.load(fh)
-        data = _gh_get_stats(endpoint)
-        if data:
-            with open(cache_path, "w", encoding="utf-8") as fh:
-                json.dump(data, fh)
-        return data
-
-
-    commit_data = _load_or_fetch("commit_activity.json", "commit_activity")
-
-    if not commit_data:
-        fig, ax = plt.subplots(figsize=(8, 2))
-        ax.text(
-            0.5,
-            0.5,
-            "No data available (GitHub API not reachable or still computing).",
-            ha="center",
-            va="center",
-            transform=ax.transAxes,
-            fontsize=11,
-        )
-        ax.axis("off")
-        plt.tight_layout()
-    else:
-        all_weeks = []
-        all_counts = []
-        for entry in commit_data:
-            ts = entry.get("week", 0)
-            total = entry.get("total", 0)
-            all_weeks.append(datetime.datetime.fromtimestamp(ts, tz=datetime.timezone.utc))
-            all_counts.append(total)
-
-        cumulative = list(np.cumsum(all_counts))
-
-        # Keep only up to current date
-        now = datetime.datetime.now(datetime.timezone.utc)
-        pairs = [(w, c) for w, c in zip(all_weeks, cumulative) if w <= now]
-
-        if not pairs or pairs[-1][1] == 0:
-            fig, ax = plt.subplots(figsize=(8, 2))
-            ax.text(
-                0.5,
-                0.5,
-                "No commit data found.",
-                ha="center",
-                va="center",
-                transform=ax.transAxes,
-                fontsize=11,
-            )
-            ax.axis("off")
-            plt.tight_layout()
-        else:
-            weeks = [p[0] for p in pairs]
-            cumulative = [p[1] for p in pairs]
-            colors = plt.rcParams["axes.prop_cycle"].by_key()["color"]
-
-            fig, ax = plt.subplots(figsize=(12, 4))
-            ax.fill_between(weeks, cumulative, color=colors[1], alpha=0.3)
-            ax.plot(weeks, cumulative, "-", color=colors[1], linewidth=1.8, label="total commits")
-            ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d\n%Y"))
-            ax.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.MO, interval=2))
-            ax.tick_params(axis="x", labelsize=8)
-            ax.set_ylabel("Cumulative commits", fontsize=10)
-            ax.set_title("Cumulative Commit Count", fontsize=13)
-            ax.grid(True, linestyle="--", alpha=0.4)
-            ax.legend(fontsize=9)
-            fig.autofmt_xdate()
-            plt.tight_layout()
+This page summarises the major achievements in **yet-another-onnx-builder** (``yobx``)
+week by week since the project was created on February 25, 2026.
+
+.. contents::
+   :local:
+   :depth: 1
+
+----
+
+Week 1 — Feb 25 – Mar 1 (~199 commits)
+=======================================
+
+The project was bootstrapped from scratch.
+The first day alone saw 41 commits establishing the repository layout, CI pipelines
+(GitHub Actions for core, sklearn, torch, tensorflow, docs, style, spelling),
+Codecov integration, black/ruff enforcement, and a README with badges.
+
+The central focus was the ``yobx.xshape`` shape-inference engine.
+Operators received dedicated implementations: ``TopK``, ``Resize``, ``Pad``,
+``Gather``, ``Einsum``, ``NonZero``, ``GridSample``, ``LogSoftmax``,
+``Softmax``, ``LpNormalization``, ``InstanceNormalization``, window functions
+(``BlackmanWindow``, ``HannWindow``, ``HammingWindow``), and
+``Squeeze``/``Unsqueeze`` with both attribute-based and tensor-based axes.
+Every new path was immediately covered by unit tests.
+
+Before the week ended, several higher-level building blocks were already in place:
+the ``MiniOnnxBuilder`` fluent graph-builder, the ``ExtendedReferenceEvaluator``
+(combining the ONNX reference implementation with OnnxRuntime),
+the ``yobx.translate`` module that converts an ONNX model back to Python source
+code, the ``LightGraphBuilder``, and the ``ExtendedModelContainer`` container
+that wraps a model proto together with per-run statistics.
+The ``xoptim`` graph-optimisation framework — with its pattern-matching engine —
+was seeded by the end of this week.
+
+----
+
+Week 2 — Mar 2 – Mar 8 (~170 commits)
+======================================
+
+The week opened with a major refactor of the ``GraphBuilder`` class:
+``FunctionOptions``, ``InferShapesOptions``, ``WrapDim``, ``WrapSym``, and
+``InitializerInfo`` were extracted into dedicated modules.
+An exhaustive unit-test suite was written for every public method of
+``GraphBuilder`` (constants, shapes, types, sequences, dimension helpers,
+subgraph inlining, …).
+
+The first substantial **scikit-learn → ONNX** converter landed (``yobx.sklearn``),
+initially covering ``DecisionTreeClassifier``/``Regressor`` and later extended to
+``RandomForestClassifier``/``Regressor``, ``HistGradientBoosting*``,
+``PCA``, ``KMeans``, and the full family of linear models.
+A dedicated sklearn CI job was added with two scikit-learn versions (1.4 and 1.8).
+
+Two alternative ``GraphBuilder`` back-ends were contributed:
+``OnnxScriptGraphBuilder`` (bridging to the *onnxscript* IR) and
+``SpoxGraphBuilder`` (bridging to *spox*), both implementing the new typed
+``GraphBuilderExtendedProtocol``.
+
+A proof-of-concept **TensorFlow/Keras → ONNX** converter appeared as well,
+together with a first sphinx-gallery example.
+The Sphinx theme was switched from *furo* to *piccolo_theme* and documentation
+cross-references were switched from viewcode to GitHub source links.
+
+----
+
+Week 3 — Mar 9 – Mar 15 (~148 commits)
+=======================================
+
+The sklearn converter library reached near-complete coverage of the
+scikit-learn API in a single sprint:
+``SVM`` (SVC, SVR, LinearSVC, LinearSVR, NuSVC, NuSVR),
+``NaiveBayes`` (Gaussian, Bernoulli, Multinomial, Complement, Categorical),
+``VotingClassifier``/``Regressor``,
+``StackingClassifier``/``Regressor``,
+``ExtraTreesClassifier``/``Regressor``,
+``BaggingClassifier``/``Regressor``,
+``AdaBoostClassifier``/``Regressor``,
+``GaussianProcessClassifier``/``Regressor``,
+``QuantileTransformer``, ``PowerTransformer``, ``KBinsDiscretizer``,
+``OneHotEncoder``, ``RobustScaler``, ``SplineTransformer``,
+``GaussianMixture``, ``MultiOutputClassifier``/``Regressor``,
+``FeatureUnion``, ``PLSRegression``, ``GradientBoostingClassifier``/``Regressor``,
+``TruncatedSVD``, ``MaxAbsScaler``, ``KNNImputer``, ``IsotonicRegression``,
+and many more.
+**XGBoost** and **LightGBM** converters were also added.
+
+On the torch side the aten-function interpreter matured, covering pool ops,
+``addmm``, logical operators, ``argmin``/``argmax``, and trigonometric ops.
+``LlamaAttention`` received a direct ONNX converter.
+
+The ``validate_model`` function (and ``python -m yobx validate`` CLI command)
+was introduced to give a structured report on the quality of an exported model.
+
+The **SQL-to-ONNX converter** (``yobx.sql``) made its initial appearance,
+translating SQL ``SELECT`` statements into ONNX graphs.
+
+----
+
+Week 4 — Mar 16 – Mar 22 (~116 commits)
+========================================
+
+The ``ExportArtifact`` / ``ExportReport`` pair became the unified return type of
+every ``to_onnx`` function, replacing the raw ``ModelProto``.
+The report can be serialised to a string or saved as a multi-sheet Excel workbook.
+
+All ``to_onnx`` functions grew ``filename`` and ``verbose`` parameters to
+save the model and report to disk automatically.
+
+The ``yobx.sql`` converter expanded significantly: ``GROUP BY`` with true
+per-group aggregation, subqueries in ``FROM``, multi-column ``JOIN`` keys,
+and support for custom Python functions via numpy tracing.
+A dedicated SQL gallery was added.
+
+``lazyframe_to_onnx`` was implemented, letting a **Polars LazyFrame** execution
+plan be compiled directly to ONNX.
+``jax_to_concrete_function`` bridged the JAX → TF ``ConcreteFunction`` → ONNX
+pipeline and enabled more JAX gallery examples.
+
+``yobx.litert`` appeared as a pure-Python **LiteRT/TFLite → ONNX** converter.
+
+The ``DataFrameTransformer`` (a traceable sklearn transformer with built-in ONNX
+export) and ``xtracing`` (numpy-tracing-based ONNX export for
+``FunctionTransformer``) rounded off the new data-manipulation backends.
+
+The Sphinx theme was upgraded a final time to ``pydata_sphinx_theme``.
+
+----
+
+Week 5 — Mar 23 – Mar 29 (~113 commits)
+========================================
+
+The top-level ``yobx.to_onnx`` dispatcher was implemented, giving users a single
+entry point that automatically routes to the right backend by inspecting the
+input type at runtime.
+
+``pivot_table`` export via the DataFrame tracer was contributed, together with
+binary arithmetic operators between traced DataFrames and multi-DataFrame inputs.
+The ``TracedDataFrame`` column dictionary was migrated to ``Dict[ColumnRef, TracedSeries]``
+for stronger typing.
+
+Cost analysis infrastructure landed: the ``ModelStatistics`` class,
+the ``cost_inference`` module (per-operator FLOPs formulas), a ``stats`` CLI
+sub-command, a FLOPs sheet in the Excel report, and a gallery example computing
+the symbolic FLOPs of an attention block before and after optimisation.
+
+**imbalanced-learn** converters were added
+(``BalancedBaggingClassifier``, ``BalancedRandomForestClassifier``, ``RUSBoostClassifier``,
+``EasyEnsembleClassifier``).
+``category_encoders`` converters grew
+(``OrdinalEncoder``, ``BinaryEncoder``, ``PolynomialEncoder``, ``TargetEncoder``).
+**scikit-survival** converters appeared (``IPCRidge``, ``RandomSurvivalForest``).
+
+``while_loop`` support was added to the torch ONNX converter, along with numerous
+inplace-op fixes for the tracing exporter (``InplaceAdd``, ``InplaceSetItemMask``,
+``InplaceSetItemSquare``).
+
+A CI job for the litert and sql sub-packages was created.
+
+----
+
+Week 6 — Mar 30 – Apr 5 (~42 commits)
+======================================
+
+A lighter week in terms of commits but important for depth.
+The brand-new **dispatch-level tracer** (``yobx/torch/new_tracing``) was seeded —
+a ``__torch_dispatch__``-based approach building an FX graph at the ATen-operator
+level, giving finer-grained control over dynamic shapes than the existing
+``CustomTracer``.
+``node.meta["stack_trace"]`` was populated during tracing to aid debugging.
+
+On the existing tracing path, several hard edge-cases were fixed:
+``ControlFlowCondNestedModule``, ``ControlFlowScanCDist2``,
+``AtenAsStrided`` with dynamic shapes, ``ExportWithDimension0``.
+
+JAX progress: ``sigmoid`` test enabled, dynamic-batch export,
+``export_to_onnx_dynamic_shapes`` test.
+LiteRT improved: all subgraphs are now merged into one ONNX model.
+SQL: multiple DataFrames as direct outputs, ``copy()`` on ``TracedDataFrame``.
+
+The ``TracingMode`` enum replaced the bare ``tracing: bool`` flag in
+``ExportOptions``, making the API forward-compatible.
+
+----
+
+Week 7 — Apr 6 – Apr 12 (~67 commits)
+======================================
+
+A milestone week for the new-tracing path.
+``CustomProxyShape``, ``CustomProxyBool``, and ``CustomProxyInt`` replaced
+the ad-hoc ``_SafeShape`` / ``_SymGuardProxy`` helpers, giving first-class
+proxy objects that participate in the FX graph without triggering
+``GuardOnDataDependentSymNode`` errors.
+``torch._check`` assertions are now registered as known conditions so that
+symbolic shape guards inside the model body are resolved correctly.
+
+The ``ConvertingLibrary`` enum (choosing between yobx, onnxscript, and spox
+back-ends) and ``TracingMode.NEW_TRACING`` were exposed through ``ExportOptions``.
+
+A comprehensive op-db–driven test suite was introduced, running
+``common_methods_invocations`` against all supported dtype × operator combinations
+(float32, float16, int32, int64, bfloat16) and publishing a per-operator
+coverage page in the docs.
+
+The ``return_optimize_report`` parameter was added to all ``to_onnx`` functions.
+CI now shows a durations page plotting how long each CI workflow takes over time,
+with per-workflow charts and a rolling average.
+
+``ControlFlowCond`` with ``torch.cond`` was made codegen-safe by using callable
+``get_attr`` nodes in the new-tracing path.
+
+----
+
+Week 8 — Apr 13 – Apr 19 (~27 commits)
+========================================
+
+A focused, quality-oriented week.
+**TensorFlow CI** was repaired for JAX 0.10+: MLIR Python bindings are now parsed
+correctly, ``ir.Module`` return types are handled, and the MLIR context is always
+active during ``call_inlining``.
+
+Over **30 new aten-function ONNX converters** were shipped:
+``amin``, ``aminmax``, ``angle``, ``atan2``, ``std``/``std_mean``,
+``bilinear``, ``xlogy``, ``logit``, ``nanmean``/``nansum``,
+``log10``, ``log1p``, ``log2``, ``logaddexp``/``logaddexp2``,
+``erfc``/``erfinv``, ``atleast_1d``/``2d``/``3d``,
+``isclose``, ``isfinite``, ``isneginf``/``isposinf``,
+``clamp_min_Tensor``/``clamp_max_Tensor``,
+``count_nonzero``, ``mse_loss``, ``logical_xor``, ``ravel``, ``cartesian_prod``,
+``aten_alias_copy``, ``addr``, ``dot``, ``exp2``,
+and FFT-shift operators (``fft.fftshift``, ``fft.ifftshift``).
+
+``DynamoInterpreter`` was renamed to ``FxGraphInterpreter`` to better reflect its
+role.  A float32 cross-path comparison section was added to the op-coverage page.
+
+The CI duration cache was restructured to use per-workflow CSV files for more
+granular persistence.
+``torch.autocast(enabled=True)`` was supported in ONNX export.
+
+----
+
+Week 9 — Apr 20 – Apr 25 (~36 commits, ongoing)
+=================================================
+
+The new-tracing path closed out a long backlog of failing evaluation cases:
+``DynamicCacheInput``, ``ControlFlowNumelZero2``, ``ControlFlowShapeCheck``,
+``ControlFlowScan2Carried``, ``SignatureShapeAsIndex``,
+``InplaceSetItemEllipsis_1``/``2``, ``InplaceSetItemSquare``,
+``CreateFromShape``, and ``ControlFlowCondNonZero`` are all now passing.
+
+The ``XlaLayer`` class replaced bare dicts for StableHLO layer representation
+in the XlaCallModule converter, making attribute access safer.
+``TracingInt`` was integrated into ``GraphBuilder`` to handle symbolic integer
+dimensions coming from the new-tracing path.
+
+Two new fusion patterns landed for ``com.microsoft`` contrib ops:
+**BiasSplitGelu** and **RelativePositionBias**.
+
+Additional aten converters were contributed:
+``tensor_split``, ``fliplr``/``flipud``, ``geqrf``,
+``frac``, ``frexp``,
+``linalg.det``, ``linalg.slogdet``, ``linalg.cross``, ``linalg.vecdot``,
+``fmax``, ``fmin``, ``fmod``,
+``mT``/``mH`` (matrix transpose/conjugate-transpose),
+``heaviside``, ``signbit``, ``diag``/``diag_embed``,
+``float_power``, ``true_divide``.
+
+The CI was reorganised: targeted subfolder tests now run first on pull requests
+and block the full suite on failure, and a reusable workflow detects which
+``yobx/`` subfolder a PR touches.
+A new workflow posts a comment listing impacted subfolders.
+
+``validate_model`` was enriched with per-node-type statistics and a discrepancy
+sheet in the Excel output.
+Documentation now tracks and displays the five slowest Sphinx pages to build.
