@@ -12411,6 +12411,9 @@ def aten_setitem(
 
     if g.has_rank(x) and g.get_rank(x) == 1 and g.has_rank(values) and g.get_rank(values) == 1:
         # Uses concat, it might be applicable to other cases. To be improved.
+        # Normalize a bare slice to a one-element list so len() works uniformly.
+        if isinstance(indices, slice):
+            indices = [indices]
         assert len(indices) == 1 and isinstance(indices[0], slice), (
             f"Unexpected type for indices {type(indices)}, value is {indices}"
             f"{g.get_debug_msg()}"
@@ -12444,7 +12447,7 @@ def aten_setitem(
                 f"{g.get_debug_msg()}"
             )
             stop = g.op.UnsqueezeAnyOpset(index.stop, g.ZERO, name=name)
-        if index.start == 0:
+        if index.start in (0, None):
             res = g.op.Concat(
                 values,
                 g.op.Slice(x, stop, g.op.Shape(x, name=name), g.ZERO, name=name),
