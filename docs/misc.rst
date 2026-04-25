@@ -10,4 +10,5 @@ Additional statistics and metadata about the documentation build.
 
    index_stats
    ci_durations
+   doc_build_durations
    comparison
