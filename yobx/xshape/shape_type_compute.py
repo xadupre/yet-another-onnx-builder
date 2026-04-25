@@ -2855,6 +2855,26 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             self.set_rank(node.output[0], 2)
         return None
 
+    # RelativePositionBias: T5-style relative attention bias.
+    # Inputs: bias_table (num_heads, num_buckets), query_length (), key_length ()
+    # Output: (1, num_heads, query_length, key_length)
+    if node.op_type == "RelativePositionBias" and node.domain == "com.microsoft":
+        if self.has_type(node.input[0]):
+            self.set_type(node.output[0], self.get_type(node.input[0]))
+        if self.has_device(node.input[0]):
+            self.set_device(node.output[0], self.get_device(node.input[0]))
+        if self.has_shape(node.input[0]):
+            bias_shape = self.get_shape(node.input[0])
+            num_heads = bias_shape[0]
+            q_val = self.value_as_shape(node.input[1])
+            k_val = self.value_as_shape(node.input[2])
+            q_dim = q_val[0] if q_val is not None and len(q_val) == 1 else node.input[1]
+            k_dim = k_val[0] if k_val is not None and len(k_val) == 1 else node.input[2]
+            self.set_shape(node.output[0], (1, num_heads, q_dim, k_dim))
+        else:
+            self.set_rank(node.output[0], 4)
+        return None
+
     assert node.domain not in {
         "ai.onnx.ml",
         "intermediate",
