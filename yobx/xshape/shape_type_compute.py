@@ -2688,6 +2688,8 @@ _set_shape_type_op_any_custom = {
     "BiasSoftmax": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "BiasSplitGelu": lambda g, node: set_type_shape_bias_split_gelu(g, node),
     "ComplexModule": set_type_shape_complex_module,
+    "ComplexMul": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
+    "ComplexMulConj": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
     "FastGelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "FusedMatMul": set_type_shape_fused_matmul,
     "FusedConv": _set_shape_type_op_any_conv_max_pool,

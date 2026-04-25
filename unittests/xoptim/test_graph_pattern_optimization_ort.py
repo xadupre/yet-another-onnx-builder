@@ -3185,5 +3185,183 @@ class TestMissingKernelPatterns(ExtTestCase):
         self.assertNotIn("Cast", op_types)
 
 
+class TestComplexMulPatterns(ExtTestCase):
+    """Tests for ComplexMulPattern and ComplexMulConjPattern."""
+
+    def _make_complex_mul_model(self, shape, conj: bool = False):
+        """Builds a model that computes complex multiplication of A and B.
+
+        When ``conj`` is ``True``, the imaginary combination uses Sub instead
+        of Add (corresponding to ``ComplexMulConj``).
+        """
+        TFLOAT_ = TensorProto.FLOAT
+        cst0 = onh.from_array(np.array(0, dtype=np.int64), name="cst0")
+        cst1 = onh.from_array(np.array(1, dtype=np.int64), name="cst1")
+        neg1 = onh.from_array(np.array([-1], dtype=np.int64), name="neg1")
+
+        #   A_r = Gather(A, 0, axis=-1)
+        #   A_i = Gather(A, 1, axis=-1)
+        #   B_r = Gather(B, 0, axis=-1)
+        #   B_i = Gather(B, 1, axis=-1)
+        #   t_rr = A_r * B_r
+        #   t_ii = A_i * B_i
+        #   t_ri = A_r * B_i
+        #   t_ir = A_i * B_r
+        #   C_r = Sub(t_rr, t_ii)
+        #   C_i = Add(t_ri, t_ir)  -- or Sub(t_ir, t_ri) for conj
+        #   C = Concat([Unsqueeze(C_r, -1), Unsqueeze(C_i, -1)], axis=-1)
+
+        if not conj:
+            real_op = oh.make_node("Sub", ["t_rr", "t_ii"], ["c_r"])
+            imag_op = oh.make_node("Add", ["t_ri", "t_ir"], ["c_i"])
+        else:
+            real_op = oh.make_node("Add", ["t_rr", "t_ii"], ["c_r"])
+            imag_op = oh.make_node("Sub", ["t_ir", "t_ri"], ["c_i"])
+
+        nodes = [
+            oh.make_node("Gather", ["A", "cst0"], ["a_r"], axis=-1),
+            oh.make_node("Gather", ["A", "cst1"], ["a_i"], axis=-1),
+            oh.make_node("Gather", ["B", "cst0"], ["b_r"], axis=-1),
+            oh.make_node("Gather", ["B", "cst1"], ["b_i"], axis=-1),
+            oh.make_node("Mul", ["a_r", "b_r"], ["t_rr"]),
+            oh.make_node("Mul", ["a_i", "b_i"], ["t_ii"]),
+            oh.make_node("Mul", ["a_r", "b_i"], ["t_ri"]),
+            oh.make_node("Mul", ["a_i", "b_r"], ["t_ir"]),
+            real_op,
+            imag_op,
+            oh.make_node("Unsqueeze", ["c_r", "neg1"], ["c_r_u"]),
+            oh.make_node("Unsqueeze", ["c_i", "neg1"], ["c_i_u"]),
+            oh.make_node("Concat", ["c_r_u", "c_i_u"], ["C"], axis=-1),
+        ]
+        model = oh.make_model(
+            oh.make_graph(
+                nodes,
+                "complex_mul",
+                [
+                    oh.make_tensor_value_info("A", TFLOAT_, shape),
+                    oh.make_tensor_value_info("B", TFLOAT_, shape),
+                ],
+                [oh.make_tensor_value_info("C", TFLOAT_, shape)],
+                [cst0, cst1, neg1],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        check_model(model)
+        return model
+
+    def test_complex_mul_pattern_match(self):
+        """ComplexMulPattern fuses the decomposed complex multiplication."""
+        shape = [2, 4, 2]
+        model = self._make_complex_mul_model(shape, conj=False)
+
+        rng = np.random.default_rng(0)
+        feeds = {
+            "A": rng.standard_normal(shape).astype(np.float32),
+            "B": rng.standard_normal(shape).astype(np.float32),
+        }
+
+        ref1 = ExtendedReferenceEvaluator(model)
+        expected = ref1.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ComplexMul"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("ComplexMul", op_types)
+        fused = opt_onx.graph.node[0]
+        self.assertEqual(fused.op_type, "ComplexMul")
+        self.assertEqual(fused.domain, "com.microsoft")
+
+        ref2 = ExtendedReferenceEvaluator(opt_onx)
+        got = ref2.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+
+    def test_complex_mul_conj_pattern_match(self):
+        """ComplexMulConjPattern fuses the decomposed complex multiplication with conjugate."""
+        shape = [2, 4, 2]
+        model = self._make_complex_mul_model(shape, conj=True)
+
+        rng = np.random.default_rng(1)
+        feeds = {
+            "A": rng.standard_normal(shape).astype(np.float32),
+            "B": rng.standard_normal(shape).astype(np.float32),
+        }
+
+        ref1 = ExtendedReferenceEvaluator(model)
+        expected = ref1.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ComplexMulConj"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("ComplexMulConj", op_types)
+        fused = opt_onx.graph.node[0]
+        self.assertEqual(fused.op_type, "ComplexMulConj")
+        self.assertEqual(fused.domain, "com.microsoft")
+
+        ref2 = ExtendedReferenceEvaluator(opt_onx)
+        got = ref2.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+
+    def test_complex_mul_pattern_no_match_shared_mul(self):
+        """ComplexMulPattern must not fire when a Mul output is consumed elsewhere."""
+        shape = [2, 4, 2]
+        # Build model where t_rr is also used as an extra output.
+        cst0 = onh.from_array(np.array(0, dtype=np.int64), name="cst0")
+        cst1 = onh.from_array(np.array(1, dtype=np.int64), name="cst1")
+        neg1 = onh.from_array(np.array([-1], dtype=np.int64), name="neg1")
+        TFLOAT_ = TensorProto.FLOAT
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Gather", ["A", "cst0"], ["a_r"], axis=-1),
+                    oh.make_node("Gather", ["A", "cst1"], ["a_i"], axis=-1),
+                    oh.make_node("Gather", ["B", "cst0"], ["b_r"], axis=-1),
+                    oh.make_node("Gather", ["B", "cst1"], ["b_i"], axis=-1),
+                    oh.make_node("Mul", ["a_r", "b_r"], ["t_rr"]),
+                    oh.make_node("Mul", ["a_i", "b_i"], ["t_ii"]),
+                    oh.make_node("Mul", ["a_r", "b_i"], ["t_ri"]),
+                    oh.make_node("Mul", ["a_i", "b_r"], ["t_ir"]),
+                    oh.make_node("Sub", ["t_rr", "t_ii"], ["c_r"]),
+                    oh.make_node("Add", ["t_ri", "t_ir"], ["c_i"]),
+                    oh.make_node("Unsqueeze", ["c_r", "neg1"], ["c_r_u"]),
+                    oh.make_node("Unsqueeze", ["c_i", "neg1"], ["c_i_u"]),
+                    oh.make_node("Concat", ["c_r_u", "c_i_u"], ["C"], axis=-1),
+                    # t_rr is used again here, making the pattern unsafe to remove.
+                    oh.make_node("Relu", ["t_rr"], ["extra"]),
+                ],
+                "complex_mul_shared",
+                [
+                    oh.make_tensor_value_info("A", TFLOAT_, shape),
+                    oh.make_tensor_value_info("B", TFLOAT_, shape),
+                ],
+                [
+                    oh.make_tensor_value_info("C", TFLOAT_, shape),
+                    oh.make_tensor_value_info("extra", TFLOAT_, shape[:-1]),
+                ],
+                [cst0, cst1, neg1],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        check_model(model)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ComplexMul"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        # The pattern should NOT have been applied.
+        self.assertNotIn("ComplexMul", op_types)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

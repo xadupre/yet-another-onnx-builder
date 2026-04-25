@@ -25,7 +25,7 @@ from .ops.op__overwrite_gather import Gather
 from .ops.op__overwrite_scatter_elements import ScatterElements
 from .ops.op_attention import Attention
 from .ops.op_bias_softmax import BiasSoftmax
-from .ops.op_complex import ComplexModule, ToComplex
+from .ops.op_complex import ComplexModule, ComplexMul, ComplexMulConj, ToComplex
 from .ops.op_fused_matmul import FusedMatMul
 from .ops.op_memcpy_host import MemcpyFromHost, MemcpyToHost
 from .ops.op_qlinear_average_pool import QLinearAveragePool
@@ -160,6 +160,8 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         Attention,
         BiasSoftmax,
         ComplexModule,
+        ComplexMul,
+        ComplexMulConj,
         FusedMatMul,
         MemcpyFromHost,
         MemcpyToHost,
