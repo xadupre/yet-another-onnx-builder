@@ -6325,21 +6325,21 @@ class GraphBuilder(
             # prefix in the expanded constraint graph.  If so, reuse prefix
             # instead of creating a redundant alias like "batch_3".
             # Short-circuit: k == prefix means they are trivially the same.
-            _visited = set()
-            _queue = list(expanded_constraints.get(k, set()))
-            _already_linked = prefix == k
-            while _queue and not _already_linked:
-                _node = _queue.pop()
-                if _node in _visited:
+            visited = set()
+            queue = list(expanded_constraints.get(k, set()))
+            already_linked = prefix == k
+            while queue and not already_linked:
+                node = queue.pop()
+                if node in visited:
                     continue
-                _visited.add(_node)
-                if _node == prefix:
-                    _already_linked = True
+                visited.add(node)
+                if node == prefix:
+                    already_linked = True
                     break
-                _queue.extend(
-                    _n for _n in expanded_constraints.get(_node, set()) if _n not in _visited
+                queue.extend(
+                    n2 for n2 in expanded_constraints.get(node, set()) if n2 not in visited
                 )
-            if _already_linked:
+            if already_linked:
                 original.add(prefix)
                 continue
             n = f"{prefix}_{1}"
