@@ -12,3 +12,4 @@ Additional statistics and metadata about the documentation build.
    ci_durations
    doc_build_durations
    comparison
+   weekly_progress
