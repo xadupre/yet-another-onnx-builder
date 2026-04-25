@@ -502,16 +502,13 @@ def _export(
 
     # Compute node statistics from the exported ONNX file for the standard output.
     if os.path.exists(filename):
-        try:
-            import onnx
+        import onnx
 
-            onx = onnx.load(filename, load_external_data=False)
-            counts = Counter(n.op_type for n in onx.graph.node)
-            summary.n_nodes = sum(counts.values())
-            top = counts.most_common(5)
-            summary.top_op_types = ",".join(f"{op}:{cnt}" for op, cnt in top)
-        except Exception:
-            pass
+        onx = onnx.load(filename, load_external_data=False)
+        counts = Counter(n.op_type for n in onx.graph.node)
+        summary.n_nodes = sum(counts.values())
+        top = counts.most_common(5)
+        summary.top_op_types = ",".join(f"{op}:{cnt}" for op, cnt in top)
 
     if verbose:
         print(f"[validate_model] export succeeded -> {filename!r}")
