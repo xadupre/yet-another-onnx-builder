@@ -1,8 +1,57 @@
+import json
 import os
 import shutil
 import sys
+import time
 from sphinx_runpython.github_link import make_linkcode_resolve
 import yobx
+
+# ---------------------------------------------------------------------------
+# Per-page build duration tracking (writes top-5 to a JSON file so that the
+# doc_build_durations.rst page can display it in the generated documentation).
+# ---------------------------------------------------------------------------
+
+_PAGE_TIMINGS_START: dict[str, float] = {}
+_PAGE_DURATIONS: dict[str, float] = {}
+_DOC_BUILD_DURATIONS_JSON = os.path.join(
+    os.path.dirname(__file__), "_static", "doc_build_durations.json"
+)
+os.environ["YOBX_DOC_BUILD_DURATIONS_JSON"] = _DOC_BUILD_DURATIONS_JSON
+
+
+def _on_source_read(app, docname, source):
+    """Records the start time when a source file begins to be read."""
+    _PAGE_TIMINGS_START[docname] = time.monotonic()
+
+
+def _on_doctree_read(app, doctree):
+    """Records the elapsed time after a doctree has been parsed."""
+    docname = app.env.docname
+    start = _PAGE_TIMINGS_START.pop(docname, None)
+    if start is not None:
+        _PAGE_DURATIONS[docname] = time.monotonic() - start
+
+
+def _on_build_finished(app, exception):
+    """Writes the 5 slowest pages (by build duration) to a JSON file."""
+    if exception or not _PAGE_DURATIONS:
+        return
+    top5 = sorted(_PAGE_DURATIONS.items(), key=lambda kv: kv[1], reverse=True)[:5]
+    os.makedirs(os.path.dirname(_DOC_BUILD_DURATIONS_JSON), exist_ok=True)
+    with open(_DOC_BUILD_DURATIONS_JSON, "w", encoding="utf-8") as fh:
+        json.dump(
+            [{"docname": name, "duration_s": round(dur, 3)} for name, dur in top5],
+            fh,
+            indent=2,
+        )
+
+
+def setup(app):
+    """Connects duration-tracking hooks to Sphinx events."""
+    app.connect("source-read", _on_source_read)
+    app.connect("doctree-read", _on_doctree_read)
+    app.connect("build-finished", _on_build_finished)
+
 
 project = "yet-another-onnx-builder"
 author = "yet-another-onnx-builder contributors"
@@ -63,6 +112,7 @@ document.addEventListener("DOMContentLoaded", function () {
 exclude_patterns = ["_build"]
 if int(os.environ.get("UNITTEST_GOING", "0")):
     exclude_patterns.append("ci_durations.rst")
+    exclude_patterns.append("design/torch/case_coverage.rst")
 html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]

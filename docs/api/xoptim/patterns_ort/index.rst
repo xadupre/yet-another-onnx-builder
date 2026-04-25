@@ -10,6 +10,7 @@ yobx.xoptim.patterns_ort
     fused_matmul
     llm_optim
     missing_kernels
+    relative_position_bias
     simplified_layer_normalization
 
 get_onnxruntime_patterns

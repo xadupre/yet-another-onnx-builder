@@ -3358,6 +3358,33 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
+    def test_aten_fused_rms_none_float16_rstd_output(self):
+        # Regression test for a type conflict in _aten_getitem when accessing
+        # a named tuple element whose ONNX type (float32, for numerical
+        # stability in the rstd computation) differs from the FX metadata
+        # dtype (float16, following the float16 input).  Previously, getitem
+        # pre-registered outputs[0] as float16 from FX metadata, then the
+        # Identity node propagation tried to set it to float32 (the
+        # established ONNX type of the source), raising:
+        #   AssertionError: Type for name 'rsqrt' already exists and it is
+        #   different, known is 1 != 10 (new)
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                _out, rstd = torch.ops.aten._fused_rms_norm(x, [4], None, None)
+                return rstd
+
+        inputs = (torch.rand((3, 4), dtype=torch.float16),)
+        DYN = torch.export.Dim.DYNAMIC
+        dynamic = ({0: DYN},)
+
+        model = Model()
+        expected = model(*torch_deepcopy(inputs))
+        # to_onnx raises AssertionError without the _aten_getitem fix
+        onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
+
     def test_identity_model(self):
         import torch
 

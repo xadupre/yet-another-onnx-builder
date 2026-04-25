@@ -234,6 +234,9 @@ time-series charts — one chart per CI workflow.
         return result
 
 
+    _PLOT_CUTOFF = datetime.datetime(2025, 3, 30)
+    _AVG_WINDOW = 10
+
     data = _collect_data()
 
     if not data:
@@ -250,20 +253,21 @@ time-series charts — one chart per CI workflow.
 
         for idx, (wf_name, points) in enumerate(sorted(data.items())):
             fig, ax = plt.subplots(figsize=(10, 4))
-            dates = [p[0] for p in points]
-            durations = [p[1] for p in points]
+            filtered = [(d, v) for d, v in points if d >= _PLOT_CUTOFF]
+            dates = [p[0] for p in filtered]
+            durations = [p[1] for p in filtered]
 
             color = colors[idx % len(colors)]
-            ax.plot(dates, durations, "o-", color=color, linewidth=1.2, markersize=4,
-                    label=wf_name)
+            ax.plot(dates, durations, "-", color=color, linewidth=1.2, label=wf_name)
 
-            # Rolling average (window = 5)
-            if len(durations) >= 5:
-                kernel = np.ones(5) / 5
+            # Rolling average (window = 10)
+            if len(durations) >= _AVG_WINDOW:
+                kernel = np.ones(_AVG_WINDOW) / _AVG_WINDOW
                 avg = np.convolve(durations, kernel, mode="valid")
-                avg_dates = dates[2: 2 + len(avg)]
-                ax.plot(avg_dates, avg, "--", color=color, linewidth=1.5, alpha=0.7,
-                        label="5-run avg")
+                offset = (_AVG_WINDOW - 1) // 2
+                avg_dates = dates[offset: offset + len(avg)]
+                ax.plot(avg_dates, avg, "--", color="orange", linewidth=1.5, alpha=0.9,
+                        label=f"{_AVG_WINDOW}-run avg")
 
             ax.xaxis.set_major_formatter(mdates.DateFormatter("%b %d"))
             ax.xaxis.set_major_locator(mdates.WeekdayLocator(byweekday=mdates.MO))
@@ -271,7 +275,7 @@ time-series charts — one chart per CI workflow.
             ax.set_title(wf_name, fontsize=12)
             ax.set_ylabel("Duration (min)", fontsize=10)
             ax.grid(True, linestyle="--", alpha=0.4)
-            if len(durations) >= 5:
+            if len(durations) >= _AVG_WINDOW:
                 ax.legend(fontsize=9)
             fig.autofmt_xdate()
             plt.tight_layout()
