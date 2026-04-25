@@ -545,51 +545,53 @@ def _check_discrepancies(
     """Run ONNX Runtime on every captured input set and compare against PyTorch outputs."""
     if verbose:
         print("[validate_model] checking discrepancies ...")
-    try:
-        atol = 1e-4
+    atol = 1e-4
+    if quiet:
+        try:
+            disc_data = observer.check_discrepancies(filename, atol=atol)
+        except Exception as exc:
+            summary.discrepancies = "FAILED"
+            summary.error_discrepancies = str(exc)
+            return
+    else:
         disc_data = observer.check_discrepancies(filename, atol=atol)
-        collected_data.discrepancies = disc_data
-        n_ok = sum(1 for row in disc_data if row.get("SUCCESS", False))
-        n_total = len(disc_data)
-        summary.discrepancies_ok = n_ok
-        summary.discrepancies_total = n_total
-        summary.discrepancies = "OK" if n_ok == n_total else "FAILED"
-        summary.discrepancies_atol = atol
-        # Aggregate per-element stats across all examples that ran without error.
-        numeric_rows = [row for row in disc_data if "abs" in row]
-        if numeric_rows:
-            summary.discrepancies_max_abs = max(row["abs"] for row in numeric_rows)
-            total_n = sum(row.get("n", 0) for row in numeric_rows)
-            if total_n > 0:
-                total_001 = sum(row.get(">0.01", 0) for row in numeric_rows)
-                total_01 = sum(row.get(">0.1", 0) for row in numeric_rows)
-                summary.discrepancies_ratio_001 = total_001 / total_n
-                summary.discrepancies_ratio_01 = total_01 / total_n
-        if verbose:
-            print(f"[validate_model] discrepancies: {n_ok}/{n_total} OK")
-        if verbose >= 2:
-            for row in disc_data:
-                idx = row.get("index", "?")
-                ok = row.get("SUCCESS", False)
-                status = "OK" if ok else "FAILED"
-                if "error" in row:
-                    print(f"  [{idx}] {status}  error={row['error']}")
-                else:
-                    abs_diff = row.get("abs", float("nan"))
-                    rel_diff = row.get("rel", float("nan"))
-                    print(f"  [{idx}] {status}  abs={abs_diff:.3g}  rel={rel_diff:.3g}")
-                    if verbose >= 3:
-                        if "inputs" in row:
-                            print(f"       inputs:       {row['inputs']}")
-                        if "outputs_torch" in row:
-                            print(f"       outputs_torch: {row['outputs_torch']}")
-                        if "outputs_ort" in row:
-                            print(f"       outputs_ort:  {row['outputs_ort']}")
-    except Exception as exc:
-        summary.discrepancies = "FAILED"
-        summary.error_discrepancies = str(exc)
-        if not quiet:
-            raise
+    collected_data.discrepancies = disc_data
+    n_ok = sum(1 for row in disc_data if row.get("SUCCESS", False))
+    n_total = len(disc_data)
+    summary.discrepancies_ok = n_ok
+    summary.discrepancies_total = n_total
+    summary.discrepancies = "OK" if n_ok == n_total else "FAILED"
+    summary.discrepancies_atol = atol
+    # Aggregate per-element stats across all examples that ran without error.
+    numeric_rows = [row for row in disc_data if "abs" in row]
+    if numeric_rows:
+        summary.discrepancies_max_abs = max(row["abs"] for row in numeric_rows)
+        total_n = sum(row.get("n", 0) for row in numeric_rows)
+        if total_n > 0:
+            total_001 = sum(row.get(">0.01", 0) for row in numeric_rows)
+            total_01 = sum(row.get(">0.1", 0) for row in numeric_rows)
+            summary.discrepancies_ratio_001 = total_001 / total_n
+            summary.discrepancies_ratio_01 = total_01 / total_n
+    if verbose:
+        print(f"[validate_model] discrepancies: {n_ok}/{n_total} OK")
+    if verbose >= 2:
+        for row in disc_data:
+            idx = row.get("index", "?")
+            ok = row.get("SUCCESS", False)
+            status = "OK" if ok else "FAILED"
+            if "error" in row:
+                print(f"  [{idx}] {status}  error={row['error']}")
+            else:
+                abs_diff = row.get("abs", float("nan"))
+                rel_diff = row.get("rel", float("nan"))
+                print(f"  [{idx}] {status}  abs={abs_diff:.3g}  rel={rel_diff:.3g}")
+                if verbose >= 3:
+                    if "inputs" in row:
+                        print(f"       inputs:       {row['inputs']}")
+                    if "outputs_torch" in row:
+                        print(f"       outputs_torch: {row['outputs_torch']}")
+                    if "outputs_ort" in row:
+                        print(f"       outputs_ort:  {row['outputs_ort']}")
 
 
 def validate_model(
