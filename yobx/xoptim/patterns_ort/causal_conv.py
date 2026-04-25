@@ -9,9 +9,9 @@ class CausalConvWithStatePattern(PatternOptimization):
     Fuses ``Concat + Conv (+ Slice)`` into ``com.microsoft.CausalConvWithState``.
 
     The operator performs a stateful causal depthwise 1-D convolution and
-    replaces the three-step streaming pattern that concatenates a past-state
-    buffer with the current input, runs a depthwise Conv, and optionally slices
-    the last ``K-1`` frames back out as the next state.
+    replaces the streaming pattern that concatenates a past-state buffer with
+    the current input, runs a depthwise Conv, and optionally slices the last
+    ``K-1`` frames back out as the next state.
 
     Model with nodes to be fused:
 
