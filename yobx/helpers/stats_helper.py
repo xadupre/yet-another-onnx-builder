@@ -641,14 +641,14 @@ def enumerate_stats_nodes(
     :return: yields tuples ``(path, parent, statistics)`` for every matched node
     """
     if stats_fcts is None:
-        stats_fcts = {
+        stats_fcts = {  # type: ignore
             ("ai.onnx.ml", "TreeEnsembleRegressor"): stats_tree_ensemble,
             ("ai.onnx.ml", "TreeEnsembleClassifier"): stats_tree_ensemble,
         }
     for name, parent, node in enumerate_nodes(onx, recursive=recursive):
         if isinstance(node, NodeProto):
-            if (node.domain, node.op_type) in stats_fcts:
-                stat = stats_fcts[node.domain, node.op_type](parent, node)
+            if (node.domain, node.op_type) in stats_fcts:  # type: ignore
+                stat = stats_fcts[node.domain, node.op_type](parent, node)  # type: ignore
                 yield name, parent, stat
 
 
