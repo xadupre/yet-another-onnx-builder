@@ -25,6 +25,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         GeluErfPattern,
         QuickGeluPattern,
     )
+    from .causal_conv import CausalConvWithStatePattern
     from .fused_conv import FusedConvPattern
     from .fused_matmul import (
         FusedMatMulDivPattern,
@@ -63,6 +64,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         BiasGeluPattern(verbose=verbose),
         BiasSoftmaxPattern(verbose=verbose),
         BiasSplitGeluPattern(verbose=verbose),
+        CausalConvWithStatePattern(verbose=verbose),
         ContribRotaryEmbeddingPattern(verbose=verbose),
         ContribRotaryEmbedding3DPattern(verbose=verbose),
         GeluOrtPattern(verbose=verbose),

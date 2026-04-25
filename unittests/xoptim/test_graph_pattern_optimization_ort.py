@@ -3185,5 +3185,216 @@ class TestMissingKernelPatterns(ExtTestCase):
         self.assertNotIn("Cast", op_types)
 
 
+class TestCausalConvWithStatePattern(ExtTestCase):
+    """Tests for CausalConvWithStatePattern."""
+
+    def _range(self, *shape, bias: Optional[float] = None):
+        n = np.prod(shape)
+        x = np.arange(n).astype(np.float32) / n
+        if bias:
+            x = x + bias
+        return x.reshape(tuple(shape)).astype(np.float32)
+
+    def _make_causal_conv_model(
+        self,
+        batch: int = 1,
+        channels: int = 4,
+        seq_len: int = 8,
+        kernel_size: int = 3,
+        with_bias: bool = True,
+        with_slice: bool = True,
+    ) -> "ModelProto":
+        """Builds a Concat + Conv (+ Slice) graph for testing."""
+        state_len = kernel_size - 1
+        concat_output_len = state_len + seq_len
+
+        nodes = [
+            oh.make_node("Concat", ["past_state", "input"], ["concat_out"], axis=2),
+            oh.make_node(
+                "Conv",
+                ["concat_out", "weight"] + (["bias"] if with_bias else []),
+                ["output"],
+                group=channels,
+                pads=[0, 0],
+            ),
+        ]
+        if with_slice:
+            nodes.append(
+                oh.make_node(
+                    "Slice",
+                    ["concat_out", "slice_starts", "slice_ends", "slice_axes"],
+                    ["present_state"],
+                )
+            )
+
+        inputs = [
+            oh.make_tensor_value_info("input", TFLOAT, [batch, channels, seq_len]),
+            oh.make_tensor_value_info("past_state", TFLOAT, [batch, channels, state_len]),
+        ]
+        graph_outputs = [oh.make_tensor_value_info("output", TFLOAT, [batch, channels, seq_len])]
+        if with_slice:
+            graph_outputs.append(
+                oh.make_tensor_value_info("present_state", TFLOAT, [batch, channels, state_len])
+            )
+
+        initializers = [
+            onh.from_array(
+                np.random.randn(channels, 1, kernel_size).astype(np.float32), name="weight"
+            )
+        ]
+        if with_bias:
+            initializers.append(onh.from_array(np.zeros(channels, dtype=np.float32), name="bias"))
+        if with_slice:
+            initializers += [
+                onh.from_array(np.array([seq_len], dtype=np.int64), name="slice_starts"),
+                onh.from_array(np.array([concat_output_len], dtype=np.int64), name="slice_ends"),
+                onh.from_array(np.array([2], dtype=np.int64), name="slice_axes"),
+            ]
+
+        return oh.make_model(
+            oh.make_graph(nodes, "causal_conv", inputs, graph_outputs, initializers),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+
+    def test_causal_conv_with_state_pattern_in_list(self):
+        """CausalConvWithStatePattern must appear in the default ORT pattern list."""
+        from yobx.xoptim.patterns_ort import get_onnxruntime_patterns
+
+        patterns = get_onnxruntime_patterns()
+        names = [p.__class__.__name__ for p in patterns]
+        self.assertIn("CausalConvWithStatePattern", names)
+
+    def test_causal_conv_with_state_basic(self):
+        """Concat + depthwise Conv + Slice fuses to CausalConvWithState."""
+        model = self._make_causal_conv_model(with_slice=True)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["CausalConvWithState"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("CausalConvWithState", op_types)
+        self.assertNotIn("Concat", op_types)
+        self.assertNotIn("Slice", op_types)
+        # The fused node must live in the com.microsoft domain.
+        fused_nodes = [n for n in opt_onx.graph.node if n.op_type == "CausalConvWithState"]
+        self.assertEqual(1, len(fused_nodes))
+        self.assertEqual("com.microsoft", fused_nodes[0].domain)
+        # Two outputs: convolution result + present_state.
+        self.assertEqual(2, len(fused_nodes[0].output))
+
+    def test_causal_conv_with_state_no_slice(self):
+        """Concat + depthwise Conv (no Slice) also fuses to CausalConvWithState."""
+        model = self._make_causal_conv_model(with_slice=False)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["CausalConvWithState"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("CausalConvWithState", op_types)
+        self.assertNotIn("Concat", op_types)
+        fused_nodes = [n for n in opt_onx.graph.node if n.op_type == "CausalConvWithState"]
+        self.assertEqual(1, len(fused_nodes))
+        self.assertEqual("com.microsoft", fused_nodes[0].domain)
+        # Single output: only the convolution result.
+        self.assertEqual(1, len(fused_nodes[0].output))
+
+    def test_causal_conv_with_state_no_bias(self):
+        """Fusion also works when the Conv has no bias."""
+        model = self._make_causal_conv_model(with_bias=False, with_slice=True)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["CausalConvWithState"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("CausalConvWithState", op_types)
+        self.assertNotIn("Concat", op_types)
+
+    def test_causal_conv_no_match_not_depthwise(self):
+        """Pattern must NOT fire when groups < channels (not depthwise)."""
+        # groups=1, channels=4 → not a depthwise convolution
+        batch, channels, seq_len, kernel_size = 1, 4, 8, 3
+        state_len = kernel_size - 1
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["past_state", "input"], ["concat_out"], axis=2),
+                    oh.make_node(
+                        "Conv", ["concat_out", "weight"], ["output"], group=1, pads=[0, 0]
+                    ),
+                ],
+                "no_depthwise",
+                [
+                    oh.make_tensor_value_info("input", TFLOAT, [batch, channels, seq_len]),
+                    oh.make_tensor_value_info("past_state", TFLOAT, [batch, channels, state_len]),
+                ],
+                [oh.make_tensor_value_info("output", TFLOAT, [batch, channels, seq_len])],
+                [
+                    onh.from_array(
+                        np.random.randn(channels, channels, kernel_size).astype(np.float32),
+                        name="weight",
+                    )
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["CausalConvWithState"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertNotIn("CausalConvWithState", op_types)
+
+    def test_causal_conv_no_match_with_padding(self):
+        """Pattern must NOT fire when the Conv has non-zero pads."""
+        batch, channels, seq_len, kernel_size = 1, 4, 8, 3
+        state_len = kernel_size - 1
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["past_state", "input"], ["concat_out"], axis=2),
+                    oh.make_node(
+                        "Conv",
+                        ["concat_out", "weight"],
+                        ["output"],
+                        group=channels,
+                        pads=[1, 1],  # non-zero padding
+                    ),
+                ],
+                "padded_conv",
+                [
+                    oh.make_tensor_value_info("input", TFLOAT, [batch, channels, seq_len]),
+                    oh.make_tensor_value_info("past_state", TFLOAT, [batch, channels, state_len]),
+                ],
+                [oh.make_tensor_value_info("output", TFLOAT, [batch, channels, seq_len])],
+                [
+                    onh.from_array(
+                        np.random.randn(channels, 1, kernel_size).astype(np.float32),
+                        name="weight",
+                    )
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["CausalConvWithState"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertNotIn("CausalConvWithState", op_types)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
