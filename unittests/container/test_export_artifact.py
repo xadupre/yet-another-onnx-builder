@@ -70,7 +70,7 @@ class TestExportReport(ExtTestCase):
         self.assertIn("extra", d)
         self.assertEqual(d["extra"]["k"], "v")
 
-    def test_repr(self):
+    def test_repr0(self):
         r = ExportReport(stats=[{"x": 1}, {"x": 2}], extra={"k": "v"})
         text = repr(r)
         self.assertIn("ExportReport", text)

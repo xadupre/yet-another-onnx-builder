@@ -1,5 +1,10 @@
 import unittest
-from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers, skipif_ci_windows
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_torch,
+    requires_transformers,
+    skipif_ci_windows,
+)
 
 
 class TestValidateSummaryFields(ExtTestCase):
