@@ -6324,7 +6324,8 @@ class GraphBuilder(
             # Check whether k is already transitively constrained equal to
             # prefix in the expanded constraint graph.  If so, reuse prefix
             # instead of creating a redundant alias like "batch_3".
-            _visited: set = set()
+            # Short-circuit: k == prefix means they are trivially the same.
+            _visited = set()
             _queue = list(expanded_constraints.get(k, set()))
             _already_linked = prefix == k
             while _queue and not _already_linked:
