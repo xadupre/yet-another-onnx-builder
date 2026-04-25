@@ -40,6 +40,32 @@ class TestValidateSummaryFields(ExtTestCase):
         d = dict(s.items())
         self.assertEqual(d["top_op_types"], "MatMul:5,Add:3")
 
+    def test_discrepancy_stats_fields_exist(self):
+        """ValidateSummary exposes discrepancies_max_abs, atol, ratio_001, and ratio_01 fields."""
+        from dataclasses import fields
+        from yobx.torch.validate import ValidateSummary
+
+        names = {f.name for f in fields(ValidateSummary)}
+        self.assertIn("discrepancies_max_abs", names)
+        self.assertIn("discrepancies_atol", names)
+        self.assertIn("discrepancies_ratio_001", names)
+        self.assertIn("discrepancies_ratio_01", names)
+
+    def test_summary_items_includes_discrepancy_stats(self):
+        """ValidateSummary.items() yields the new discrepancy stat fields when set."""
+        from yobx.torch.validate import ValidateSummary
+
+        s = ValidateSummary(model_id="m", prompt="p")
+        s.discrepancies_max_abs = 0.005
+        s.discrepancies_atol = 1e-4
+        s.discrepancies_ratio_001 = 0.02
+        s.discrepancies_ratio_01 = 0.0
+        d = dict(s.items())
+        self.assertAlmostEqual(d["discrepancies_max_abs"], 0.005)
+        self.assertAlmostEqual(d["discrepancies_atol"], 1e-4)
+        self.assertAlmostEqual(d["discrepancies_ratio_001"], 0.02)
+        self.assertAlmostEqual(d["discrepancies_ratio_01"], 0.0)
+
 
 @requires_torch("2.0")
 @requires_transformers("5.0")

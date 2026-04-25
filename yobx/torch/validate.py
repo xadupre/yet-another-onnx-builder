@@ -47,6 +47,12 @@ class ValidateSummary:
         discrepancies_ok: Number of input sets where ONNX Runtime results matched PyTorch.
         discrepancies_total: Total number of input sets checked for discrepancies.
         discrepancies: ``"OK"`` or ``"FAILED"`` for the overall discrepancy check.
+        discrepancies_max_abs: Maximum absolute discrepancy across all input sets.
+        discrepancies_atol: Absolute tolerance threshold used to determine success.
+        discrepancies_ratio_001: Fraction of output elements with absolute difference > 0.01,
+            aggregated across all input sets.
+        discrepancies_ratio_01: Fraction of output elements with absolute difference > 0.1,
+            aggregated across all input sets.
         error_discrepancies: Error message if the discrepancy check raised an exception.
     """
 
@@ -67,6 +73,10 @@ class ValidateSummary:
     discrepancies_ok: Optional[int] = None
     discrepancies_total: Optional[int] = None
     discrepancies: Optional[str] = None
+    discrepancies_max_abs: Optional[float] = None
+    discrepancies_atol: Optional[float] = None
+    discrepancies_ratio_001: Optional[float] = None
+    discrepancies_ratio_01: Optional[float] = None
     error_discrepancies: Optional[str] = None
 
     def __init__(
@@ -88,6 +98,10 @@ class ValidateSummary:
         discrepancies_ok: Optional[int] = None,
         discrepancies_total: Optional[int] = None,
         discrepancies: Optional[str] = None,
+        discrepancies_max_abs: Optional[float] = None,
+        discrepancies_atol: Optional[float] = None,
+        discrepancies_ratio_001: Optional[float] = None,
+        discrepancies_ratio_01: Optional[float] = None,
         error_discrepancies: Optional[str] = None,
     ):
         self.model_id = model_id
@@ -107,6 +121,10 @@ class ValidateSummary:
         self.discrepancies_ok = discrepancies_ok
         self.discrepancies_total = discrepancies_total
         self.discrepancies = discrepancies
+        self.discrepancies_max_abs = discrepancies_max_abs
+        self.discrepancies_atol = discrepancies_atol
+        self.discrepancies_ratio_001 = discrepancies_ratio_001
+        self.discrepancies_ratio_01 = discrepancies_ratio_01
         self.error_discrepancies = error_discrepancies
 
     def items(self):
@@ -528,13 +546,25 @@ def _check_discrepancies(
     if verbose:
         print("[validate_model] checking discrepancies ...")
     try:
-        disc_data = observer.check_discrepancies(filename)
+        atol = 1e-4
+        disc_data = observer.check_discrepancies(filename, atol=atol)
         collected_data.discrepancies = disc_data
         n_ok = sum(1 for row in disc_data if row.get("SUCCESS", False))
         n_total = len(disc_data)
         summary.discrepancies_ok = n_ok
         summary.discrepancies_total = n_total
         summary.discrepancies = "OK" if n_ok == n_total else "FAILED"
+        summary.discrepancies_atol = atol
+        # Aggregate per-element stats across all examples that ran without error.
+        numeric_rows = [row for row in disc_data if "abs" in row]
+        if numeric_rows:
+            summary.discrepancies_max_abs = max(row["abs"] for row in numeric_rows)
+            total_n = sum(row.get("n", 0) for row in numeric_rows)
+            if total_n > 0:
+                total_001 = sum(row.get(">0.01", 0) for row in numeric_rows)
+                total_01 = sum(row.get(">0.1", 0) for row in numeric_rows)
+                summary.discrepancies_ratio_001 = total_001 / total_n
+                summary.discrepancies_ratio_01 = total_01 / total_n
         if verbose:
             print(f"[validate_model] discrepancies: {n_ok}/{n_total} OK")
         if verbose >= 2:
