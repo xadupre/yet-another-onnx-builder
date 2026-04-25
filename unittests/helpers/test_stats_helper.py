@@ -305,20 +305,20 @@ class TestTreeStatistics(ExtTestCase):
         node = _make_tree_ensemble_node(1)
         atts = extract_attributes(node)
         self.assertIn("nodes_nodeids", atts)
-        _, val = atts["nodes_nodeids"]
+        val = atts["nodes_nodeids"]
         np.testing.assert_array_equal(val, [0, 1, 2])
 
     def test_extract_attributes_floats(self):
         node = _make_tree_ensemble_node(1)
         atts = extract_attributes(node)
-        _, val = atts["nodes_values"]
+        val = atts["nodes_values"]
         self.assertIsInstance(val, np.ndarray)
         self.assertEqual(val.dtype, np.float32)
 
     def test_extract_attributes_strings(self):
         node = _make_tree_ensemble_node(1)
         atts = extract_attributes(node)
-        _, val = atts["nodes_modes"]
+        val = atts["nodes_modes"]
         self.assertIn("BRANCH_LEQ", list(val))
         self.assertIn("LEAF", list(val))
 

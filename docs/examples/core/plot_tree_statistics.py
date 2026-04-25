@@ -130,11 +130,36 @@ for k, v in sorted(row.items()):
     print(f"  {k}: {v}")
 
 # %%
-# 7. Visualize the ONNX graph
-# ----------------------------
+# 7. Visualize tree statistics with matplotlib
+# ---------------------------------------------
 #
-# Finally, we render the ONNX graph so you can inspect nodes and tensor shapes.
+# Plot per-tree node/leaf counts and per-feature split counts side by side.
 
-from yobx.doc import plot_dot  # noqa: E402
+import matplotlib.pyplot as plt  # noqa: E402
 
-plot_dot(model)
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+
+# --- left panel: nodes and leaves per tree ---
+tree_ids = [tr.tree_id for tr in stats["trees"]]
+n_nodes = [tr["n_nodes"] for tr in stats["trees"]]
+n_leaves = [tr["n_leaves"] for tr in stats["trees"]]
+x = range(len(tree_ids))
+ax1.bar([i - 0.2 for i in x], n_nodes, width=0.4, label="n_nodes")
+ax1.bar([i + 0.2 for i in x], n_leaves, width=0.4, label="n_leaves")
+ax1.set_xticks(list(x))
+ax1.set_xticklabels([f"tree {t}" for t in tree_ids])
+ax1.set_ylabel("count")
+ax1.set_title("Nodes and leaves per tree")
+ax1.legend()
+
+# --- right panel: number of split thresholds per feature ---
+feat_ids = [f.featureid for f in stats["features"]]
+n_splits = [f["n_distinct"] for f in stats["features"]]
+ax2.bar(feat_ids, n_splits)
+ax2.set_xlabel("feature id")
+ax2.set_ylabel("distinct thresholds")
+ax2.set_title("Distinct split thresholds per feature")
+ax2.set_xticks(feat_ids)
+
+fig.tight_layout()
+plt.show()

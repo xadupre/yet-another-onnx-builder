@@ -251,47 +251,45 @@ def model_statistics(
 # ---------------------------------------------------------------------------
 
 
-def extract_attributes(node: NodeProto) -> Dict[str, Tuple[AttributeProto, Any]]:
+def extract_attributes(node: NodeProto) -> Dict[str, Any]:
     """
-    Extracts all attributes of a node into a plain Python dictionary.
+    Extracts all attributes of a node into a plain Python/NumPy dictionary.
+
+    Delegates to
+    :func:`~yobx.helpers.onnx_helper.attr_proto_to_python` for scalar and
+    tensor attribute types.  List-typed attributes (``INTS``, ``FLOATS``,
+    ``STRINGS``) are returned as NumPy arrays so that callers can use
+    boolean-mask indexing directly.  ``GRAPH`` and ref-attribute entries are
+    stored as ``None``.
 
     :param node: node to inspect
-    :return: dictionary mapping attribute name to ``(AttributeProto, value)``
-        where *value* is a Python/NumPy scalar or array, or ``None`` for graph
-        and ref-attribute entries.
+    :return: dictionary mapping attribute name to a Python/NumPy value,
+        or ``None`` for graph and ref-attribute entries.
     """
-    atts: Dict[str, Tuple[AttributeProto, Any]] = {}
+    from .onnx_helper import attr_proto_to_python
+
+    atts: Dict[str, Any] = {}
     for att in node.attribute:
         if hasattr(att, "ref_attr_name") and att.ref_attr_name:
-            atts[att.name] = (att, None)
+            atts[att.name] = None
             continue
-        if att.type == AttributeProto.INT:
-            atts[att.name] = (att, att.i)
-            continue
-        if att.type == AttributeProto.FLOAT:
-            atts[att.name] = (att, att.f)
-            continue
-        if att.type == AttributeProto.INTS:
-            atts[att.name] = (att, np.array(att.ints))
-            continue
-        if att.type == AttributeProto.FLOATS:
-            atts[att.name] = (att, np.array(att.floats, dtype=np.float32))
-            continue
-        if att.type == AttributeProto.GRAPH and hasattr(att, "g") and att.g is not None:
-            atts[att.name] = (att, None)
-            continue
-        if att.type == AttributeProto.TENSOR:
-            atts[att.name] = (att, onh.to_array(att.t))
+        if att.type == AttributeProto.GRAPH:
+            atts[att.name] = None
             continue
         if att.type == AttributeProto.TENSORS:
-            atts[att.name] = (att, [onh.to_array(t) for t in att.tensors])
+            atts[att.name] = [onh.to_array(t) for t in att.tensors]
             continue
-        if att.type == AttributeProto.STRING:
-            atts[att.name] = (att, att.s.decode("utf-8"))
+        # List attributes are converted to NumPy arrays for mask operations.
+        if att.type == AttributeProto.INTS:
+            atts[att.name] = np.array(att.ints)
+            continue
+        if att.type == AttributeProto.FLOATS:
+            atts[att.name] = np.array(att.floats, dtype=np.float32)
             continue
         if att.type == AttributeProto.STRINGS:
-            atts[att.name] = (att, np.array([s.decode("utf-8") for s in att.strings]))
+            atts[att.name] = np.array([s.decode("utf-8") for s in att.strings])
             continue
+        atts[att.name] = attr_proto_to_python(att)
     return atts
 
 
@@ -570,7 +568,7 @@ def stats_tree_ensemble(
     :raises KeyError: if required tree-structure attributes are missing from *node*
     """
     stats = NodeStatistics(parent, node)
-    atts = {k: v[1] for k, v in extract_attributes(node).items()}
+    atts = extract_attributes(node)
     unique = set(atts["nodes_treeids"])
     stats.add("kind", "Regressor" if "n_targets" in atts else "Classifier")
     stats.add("n_trees", len(unique))
