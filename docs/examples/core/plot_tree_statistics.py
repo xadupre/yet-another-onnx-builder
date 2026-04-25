@@ -43,17 +43,19 @@ print(
 )
 
 # %%
-# 2. Convert to ONNX with skl2onnx
-# ---------------------------------
+# 2. Convert to ONNX with yobx.sklearn.to_onnx
+# ---------------------------------------------
 #
-# :func:`skl2onnx.convert_sklearn` produces a ``TreeEnsembleClassifier`` node
+# :func:`yobx.sklearn.to_onnx` converts the estimator and returns an
+# :class:`~yobx.container.ExportArtifact`.  The ``.proto`` attribute gives
+# the :class:`~onnx.ModelProto` containing a ``TreeEnsembleClassifier`` node
 # in the ``ai.onnx.ml`` domain — the operator supported by
 # :func:`~yobx.helpers.stats_tree_ensemble`.
 
-from skl2onnx import convert_sklearn  # noqa: E402
-from skl2onnx.common.data_types import FloatTensorType  # noqa: E402
+from yobx.sklearn import to_onnx  # noqa: E402
 
-model = convert_sklearn(clf, "random_forest", [("X", FloatTensorType([None, X_train.shape[1]]))])
+artifact = to_onnx(clf, (X_train,), target_opset={"": 20, "ai.onnx.ml": 3})
+model = artifact.proto
 
 print("Graph nodes:", [(n.op_type, n.domain) for n in model.graph.node])
 

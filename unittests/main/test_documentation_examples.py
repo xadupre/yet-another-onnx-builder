@@ -153,12 +153,6 @@ class TestDocumentationExamples(ExtTestCase):
             if not reason and not has_sklearn() and name in {"plot_tree_statistics.py"}:
                 reason = "scikit-learn not installed"
 
-            if not reason and name in {"plot_tree_statistics.py"}:
-                try:
-                    import skl2onnx  # noqa: F401
-                except ImportError:
-                    reason = "skl2onnx not installed"
-
             if not reason and not has_sklearn("1.8") and name in {"plot_sklearn_pls_float32.py"}:
                 reason = "expected discrepancies with scikit-learn<1.8"
 
