@@ -10,5 +10,6 @@ Additional statistics and metadata about the documentation build.
 
    index_stats
    ci_durations
+   commits_per_week
    doc_build_durations
    comparison
