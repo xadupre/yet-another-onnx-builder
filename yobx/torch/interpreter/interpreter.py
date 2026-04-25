@@ -1969,6 +1969,7 @@ class FxGraphInterpreter:
                         "aten::_native_batch_norm_legit_no_training",
                         "aten::_scaled_dot_product_efficient_attention",
                         "aten::_scaled_dot_product_flash_attention",
+                        "aten::_fused_rms_norm",
                     }:
                         # It seems the type is not very consistent
                         # and the output might not be used.
