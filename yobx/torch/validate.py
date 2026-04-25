@@ -9,6 +9,7 @@ inferred dynamic shapes are then used for the ONNX export.
 """
 
 import contextlib
+from collections import Counter
 from dataclasses import dataclass, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
 import os
@@ -40,9 +41,18 @@ class ValidateSummary:
         error_observer: Error message if input capture failed.
         export: ``"OK"`` or ``"FAILED"`` depending on whether the ONNX export succeeded.
         error_export: Error message if the ONNX export failed.
+        n_nodes: Total number of nodes in the exported ONNX graph.
+        top_op_types: Compact summary of the most frequent op types, e.g.
+            ``"MatMul:10,Add:7,Mul:5"``.
         discrepancies_ok: Number of input sets where ONNX Runtime results matched PyTorch.
         discrepancies_total: Total number of input sets checked for discrepancies.
         discrepancies: ``"OK"`` or ``"FAILED"`` for the overall discrepancy check.
+        discrepancies_max_abs: Maximum absolute discrepancy across all input sets.
+        discrepancies_atol: Absolute tolerance threshold used to determine success.
+        discrepancies_ratio_001: Fraction of output elements with absolute difference > 0.01,
+            aggregated across all input sets.
+        discrepancies_ratio_01: Fraction of output elements with absolute difference > 0.1,
+            aggregated across all input sets.
         error_discrepancies: Error message if the discrepancy check raised an exception.
     """
 
@@ -58,9 +68,15 @@ class ValidateSummary:
     error_observer: Optional[str] = None
     export: Optional[str] = None
     error_export: Optional[str] = None
+    n_nodes: Optional[int] = None
+    top_op_types: Optional[str] = None
     discrepancies_ok: Optional[int] = None
     discrepancies_total: Optional[int] = None
     discrepancies: Optional[str] = None
+    discrepancies_max_abs: Optional[float] = None
+    discrepancies_atol: Optional[float] = None
+    discrepancies_ratio_001: Optional[float] = None
+    discrepancies_ratio_01: Optional[float] = None
     error_discrepancies: Optional[str] = None
 
     def __init__(
@@ -77,9 +93,15 @@ class ValidateSummary:
         error_observer: Optional[str] = None,
         export: Optional[str] = None,
         error_export: Optional[str] = None,
+        n_nodes: Optional[int] = None,
+        top_op_types: Optional[str] = None,
         discrepancies_ok: Optional[int] = None,
         discrepancies_total: Optional[int] = None,
         discrepancies: Optional[str] = None,
+        discrepancies_max_abs: Optional[float] = None,
+        discrepancies_atol: Optional[float] = None,
+        discrepancies_ratio_001: Optional[float] = None,
+        discrepancies_ratio_01: Optional[float] = None,
         error_discrepancies: Optional[str] = None,
     ):
         self.model_id = model_id
@@ -94,9 +116,15 @@ class ValidateSummary:
         self.error_observer = error_observer
         self.export = export
         self.error_export = error_export
+        self.n_nodes = n_nodes
+        self.top_op_types = top_op_types
         self.discrepancies_ok = discrepancies_ok
         self.discrepancies_total = discrepancies_total
         self.discrepancies = discrepancies
+        self.discrepancies_max_abs = discrepancies_max_abs
+        self.discrepancies_atol = discrepancies_atol
+        self.discrepancies_ratio_001 = discrepancies_ratio_001
+        self.discrepancies_ratio_01 = discrepancies_ratio_01
         self.error_discrepancies = error_discrepancies
 
     def items(self):
@@ -158,6 +186,8 @@ class ValidateData:
     """Inferred dynamic shapes passed to the exporter."""
     filename: Optional[str] = None
     """Path to the exported ``.onnx`` file."""
+    artifact: Optional[Any] = None
+    """:class:`~yobx.container.ExportArtifact` returned by the yobx exporter, or ``None``."""
     discrepancies: Optional[List[Dict[str, Any]]] = None
     """Per-input-set discrepancy records from :meth:`InputObserver.check_discrepancies`."""
 
@@ -468,7 +498,7 @@ def _export(
                 else contextlib.nullcontext()
             ),
         ):
-            _to_onnx(
+            artifact = _to_onnx(
                 model,
                 (),
                 kwargs=kwargs,
@@ -479,6 +509,7 @@ def _export(
                 verbose=max(0, verbose - 1),
                 **export_kwargs,
             )
+        collected_data.artifact = artifact
         summary.export = "OK"
     except Exception as exc:
         summary.export = "FAILED"
@@ -486,6 +517,16 @@ def _export(
         if not quiet:
             raise
         return False
+
+    # Compute node statistics from the exported ONNX file for the standard output.
+    if os.path.exists(filename):
+        import onnx
+
+        onx = onnx.load(filename, load_external_data=False)
+        counts = Counter(n.op_type for n in onx.graph.node)
+        summary.n_nodes = sum(counts.values())
+        top = counts.most_common(5)
+        summary.top_op_types = ",".join(f"{op}:{cnt}" for op, cnt in top)
 
     if verbose:
         print(f"[validate_model] export succeeded -> {filename!r}")
@@ -504,39 +545,53 @@ def _check_discrepancies(
     """Run ONNX Runtime on every captured input set and compare against PyTorch outputs."""
     if verbose:
         print("[validate_model] checking discrepancies ...")
-    try:
-        disc_data = observer.check_discrepancies(filename)
-        collected_data.discrepancies = disc_data
-        n_ok = sum(1 for row in disc_data if row.get("SUCCESS", False))
-        n_total = len(disc_data)
-        summary.discrepancies_ok = n_ok
-        summary.discrepancies_total = n_total
-        summary.discrepancies = "OK" if n_ok == n_total else "FAILED"
-        if verbose:
-            print(f"[validate_model] discrepancies: {n_ok}/{n_total} OK")
-        if verbose >= 2:
-            for row in disc_data:
-                idx = row.get("index", "?")
-                ok = row.get("SUCCESS", False)
-                status = "OK" if ok else "FAILED"
-                if "error" in row:
-                    print(f"  [{idx}] {status}  error={row['error']}")
-                else:
-                    abs_diff = row.get("abs", float("nan"))
-                    rel_diff = row.get("rel", float("nan"))
-                    print(f"  [{idx}] {status}  abs={abs_diff:.3g}  rel={rel_diff:.3g}")
-                    if verbose >= 3:
-                        if "inputs" in row:
-                            print(f"       inputs:       {row['inputs']}")
-                        if "outputs_torch" in row:
-                            print(f"       outputs_torch: {row['outputs_torch']}")
-                        if "outputs_ort" in row:
-                            print(f"       outputs_ort:  {row['outputs_ort']}")
-    except Exception as exc:
-        summary.discrepancies = "FAILED"
-        summary.error_discrepancies = str(exc)
-        if not quiet:
-            raise
+    atol = 1e-4
+    if quiet:
+        try:
+            disc_data = observer.check_discrepancies(filename, atol=atol)
+        except Exception as exc:
+            summary.discrepancies = "FAILED"
+            summary.error_discrepancies = str(exc)
+            return
+    else:
+        disc_data = observer.check_discrepancies(filename, atol=atol)
+    collected_data.discrepancies = disc_data
+    n_ok = sum(1 for row in disc_data if row.get("SUCCESS", False))
+    n_total = len(disc_data)
+    summary.discrepancies_ok = n_ok
+    summary.discrepancies_total = n_total
+    summary.discrepancies = "OK" if n_ok == n_total else "FAILED"
+    summary.discrepancies_atol = atol
+    # Aggregate per-element stats across all examples that ran without error.
+    numeric_rows = [row for row in disc_data if "abs" in row]
+    if numeric_rows:
+        summary.discrepancies_max_abs = max(row["abs"] for row in numeric_rows)
+        total_n = sum(row.get("n", 0) for row in numeric_rows)
+        if total_n > 0:
+            total_001 = sum(row.get(">0.01", 0) for row in numeric_rows)
+            total_01 = sum(row.get(">0.1", 0) for row in numeric_rows)
+            summary.discrepancies_ratio_001 = total_001 / total_n
+            summary.discrepancies_ratio_01 = total_01 / total_n
+    if verbose:
+        print(f"[validate_model] discrepancies: {n_ok}/{n_total} OK")
+    if verbose >= 2:
+        for row in disc_data:
+            idx = row.get("index", "?")
+            ok = row.get("SUCCESS", False)
+            status = "OK" if ok else "FAILED"
+            if "error" in row:
+                print(f"  [{idx}] {status}  error={row['error']}")
+            else:
+                abs_diff = row.get("abs", float("nan"))
+                rel_diff = row.get("rel", float("nan"))
+                print(f"  [{idx}] {status}  abs={abs_diff:.3g}  rel={rel_diff:.3g}")
+                if verbose >= 3:
+                    if "inputs" in row:
+                        print(f"       inputs:       {row['inputs']}")
+                    if "outputs_torch" in row:
+                        print(f"       outputs_torch: {row['outputs_torch']}")
+                    if "outputs_ort" in row:
+                        print(f"       outputs_ort:  {row['outputs_ort']}")
 
 
 def validate_model(
@@ -729,5 +784,18 @@ def validate_model(
         _check_discrepancies(
             observer, collected_data.filename, verbose, quiet, summary, collected_data
         )
+
+    # --------------------------------- update xlsx report with discrepancies (yobx exporter only)
+    from ..container import ExportArtifact
+
+    if isinstance(collected_data.artifact, ExportArtifact) and collected_data.filename:
+        artifact = collected_data.artifact
+        if artifact.report is None:
+            from ..container import ExportReport
+
+            artifact.report = ExportReport()
+        if collected_data.discrepancies is not None:
+            artifact.report.discrepancies = collected_data.discrepancies
+        artifact.save_report(collected_data.filename)
 
     return summary, collected_data
