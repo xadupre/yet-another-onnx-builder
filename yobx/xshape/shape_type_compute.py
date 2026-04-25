@@ -2690,6 +2690,7 @@ _set_shape_type_op_any_custom = {
     "ComplexModule": set_type_shape_complex_module,
     "FastGelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "FusedMatMul": set_type_shape_fused_matmul,
+    "FusedMatMulActivation": set_type_shape_fused_matmul,
     "FusedConv": _set_shape_type_op_any_conv_max_pool,
     "Gelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "GemmFastGelu": lambda g, node: set_type_shape_matmul(g, node.output[0], *node.input[:2]),

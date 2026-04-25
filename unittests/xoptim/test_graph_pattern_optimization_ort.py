@@ -3531,6 +3531,165 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         op_types = [n.op_type for n in opt_onx.graph.node]
         self.assertNotIn("CausalConvWithState", op_types)
 
+    def test_fused_matmul_activation_relu(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "FusedMatMul", ["X", "Y"], ["mm"], domain="com.microsoft"
+                    ),
+                    oh.make_node("Relu", ["mm"], ["Z"]),
+                ],
+                "dummy",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [2, 2, 32, 64]),
+                    oh.make_tensor_value_info("Y", TFLOAT, [2, 2, 64, 16]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, [2, 2, 32, 16])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        feeds = {"X": self._range(2, 2, 32, 64), "Y": self._range(2, 2, 64, 16)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["FusedMatMulActivation"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(
+            ["FusedMatMulActivation"], [n.op_type for n in opt_onx.graph.node]
+        )
+        node = opt_onx.graph.node[0]
+        self.assertEqual(node.domain, "com.microsoft")
+        act_attr = {a.name: a for a in node.attribute}
+        self.assertEqual(act_attr["activation"].s.decode(), "Relu")
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0])
+
+    def test_fused_matmul_activation_from_matmul(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("MatMul", ["X", "Y"], ["mm"]),
+                    oh.make_node("Tanh", ["mm"], ["Z"]),
+                ],
+                "dummy",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [4, 8]),
+                    oh.make_tensor_value_info("Y", TFLOAT, [8, 16]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, [4, 16])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        feeds = {"X": self._range(4, 8), "Y": self._range(8, 16)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["FusedMatMulActivation"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(
+            ["FusedMatMulActivation"], [n.op_type for n in opt_onx.graph.node]
+        )
+        node = opt_onx.graph.node[0]
+        self.assertEqual(node.domain, "com.microsoft")
+        act_attr = {a.name: a for a in node.attribute}
+        self.assertEqual(act_attr["activation"].s.decode(), "Tanh")
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-6)
+
+    def test_fused_matmul_activation_leaky_relu(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "FusedMatMul", ["X", "Y"], ["mm"], domain="com.microsoft"
+                    ),
+                    oh.make_node("LeakyRelu", ["mm"], ["Z"], alpha=0.1),
+                ],
+                "dummy",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [4, 8]),
+                    oh.make_tensor_value_info("Y", TFLOAT, [8, 16]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, [4, 16])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        feeds = {"X": self._range(4, 8, bias=-0.5), "Y": self._range(8, 16)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["FusedMatMulActivation"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(
+            ["FusedMatMulActivation"], [n.op_type for n in opt_onx.graph.node]
+        )
+        node = opt_onx.graph.node[0]
+        self.assertEqual(node.domain, "com.microsoft")
+        act_attr = {a.name: a for a in node.attribute}
+        self.assertEqual(act_attr["activation"].s.decode(), "LeakyRelu")
+        self.assertAlmostEqual(act_attr["activation_alpha"].f, 0.1, atol=1e-5)
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-6)
+
+    def test_fused_matmul_activation_no_fusion_when_used_twice(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "FusedMatMul", ["X", "Y"], ["mm"], domain="com.microsoft"
+                    ),
+                    oh.make_node("Relu", ["mm"], ["r"]),
+                    oh.make_node("Add", ["mm", "r"], ["Z"]),
+                ],
+                "dummy",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [4, 8]),
+                    oh.make_tensor_value_info("Y", TFLOAT, [8, 16]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, [4, 16])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["FusedMatMulActivation"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # The matmul output is used twice so fusion should NOT happen.
+        self.assertNotIn("FusedMatMulActivation", [n.op_type for n in opt_onx.graph.node])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
