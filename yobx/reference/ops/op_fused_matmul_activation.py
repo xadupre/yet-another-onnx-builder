@@ -3,10 +3,10 @@ from onnx.reference.op_run import OpRun
 
 
 class FusedMatMulActivation(OpRun):
-    """Implements the ``com.microsoft.FusedMatMulActivation`` operator.
+    """Represents the ``com.microsoft.FusedMatMulActivation`` operator.
 
-    Computes ``activation(alpha * A @ B)`` where ``activation`` is one of the
-    supported element-wise activation functions.
+    Applies an element-wise activation function to the result of a scaled
+    matrix multiplication ``alpha * A @ B``.
 
     Supported values for ``activation``:
 
@@ -35,6 +35,24 @@ class FusedMatMulActivation(OpRun):
         transBatchA: int = 0,
         transBatchB: int = 0,
     ):
+        """Runs the operator and returns the activation-gated matrix product.
+
+        :param A: first input matrix
+        :param B: second input matrix
+        :param activation: name of the activation function to apply
+        :param activation_alpha: first scalar parameter for the activation
+            (used by ``"LeakyRelu"`` and ``"HardSigmoid"``)
+        :param activation_beta: second scalar parameter for the activation
+            (used by ``"HardSigmoid"``)
+        :param activation_gamma: unused; reserved for future activations
+        :param activation_axis: unused; reserved for future activations
+        :param alpha: scalar multiplier applied before the activation
+        :param transA: whether to transpose the last two dimensions of A
+        :param transB: whether to transpose the last two dimensions of B
+        :param transBatchA: reserved; must be 0
+        :param transBatchB: reserved; must be 0
+        :returns: tuple containing the single output tensor
+        """
         assert transBatchA == 0, f"Not implemented for transBatchA==1 and {A.shape}x{B.shape}"
         assert transBatchB == 0, f"Not implemented for transBatchB==1 and {A.shape}x{B.shape}"
         if transA:
