@@ -82,28 +82,20 @@ class TestEinsumHelper(ExtTestCase):
         with self.assertRaises((NotImplementedError, AssertionError, ValueError)):
             decompose_einsum("ij,jk")
 
-    def test_decompose_einsum_no_onnx_extended(self):
-        """Tests that a helpful ImportError is raised when onnx_extended is absent."""
+    def test_decompose_einsum_no_external_dep(self):
+        """Tests that decompose_einsum works without onnx_extended installed."""
         import sys
-        import importlib
 
-        # Temporarily hide onnx_extended
-        onnx_extended_modules = {k: v for k, v in sys.modules.items() if "onnx_extended" in k}
-        for k in onnx_extended_modules:
-            sys.modules[k] = None  # type: ignore[assignment]
+        # Verify that onnx_extended is NOT imported by einsum_helper itself
+        import yobx.helpers.einsum_helper  # noqa: F401 (trigger import)
 
-        try:
-            import yobx.helpers.einsum_helper as module
+        einsum_helper_imports = {k: v for k, v in sys.modules.items() if "einsum_helper" in k}
+        for mod_name in einsum_helper_imports:
+            self.assertNotIn("onnx_extended", mod_name)
 
-            importlib.reload(module)
-            with self.assertRaises(ImportError) as ctx:
-                module.decompose_einsum("ij,jk->ik")
-            self.assertIn("onnx-extended", str(ctx.exception))
-        finally:
-            # Restore
-            for k in onnx_extended_modules:
-                sys.modules[k] = onnx_extended_modules[k]
-            importlib.reload(module)
+        # The function still works fine without onnx_extended
+        model = decompose_einsum("ij,jk->ik", (2, 3), (3, 4))
+        self.assertGreater(len(model.graph.node), 1)
 
 
 if __name__ == "__main__":

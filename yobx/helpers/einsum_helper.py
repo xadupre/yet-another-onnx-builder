@@ -8,15 +8,17 @@ for any input shapes.  The resulting sub-graph is embedded in a
 stand-alone :class:`onnx.ModelProto` so it can be inspected, optimised,
 or stitched into a larger graph.
 
-The heavy lifting is delegated to the
-:mod:`onnx_extended.tools.einsum` package
-(see `onnx-extended on GitHub
-<https://github.com/sdpython/onnx-extended/tree/main/onnx_extended/tools/einsum>`_).
+The decomposition algorithm is implemented in the private
+:mod:`yobx.helpers._einsum` sub-package, which is a self-contained port
+of the einsum decomposition logic from
+https://github.com/sdpython/onnx-extended/tree/main/onnx_extended/tools/einsum
+(MIT licence).
 """
 
 from typing import List, Optional, Tuple, Union
 import numpy as np
 import onnx
+from ._einsum import decompose_einsum_equation as _decompose_einsum_equation
 
 
 def decompose_einsum(
@@ -37,10 +39,6 @@ def decompose_einsum(
     equivalent for any input shapes.  The result is returned as a
     stand-alone :class:`onnx.ModelProto`.
 
-    Requires the :mod:`onnx_extended` package::
-
-        pip install onnx-extended
-
     :param equation: einsum equation string (e.g. ``"ij,jk->ik"``).
         The equation must contain an explicit output (``->``).
     :param input_shapes: optional shapes for each input operand, used as
@@ -53,11 +51,8 @@ def decompose_einsum(
         ``numpy.float32``, ``numpy.float64``, ``numpy.int32``, and
         ``numpy.int64``.
     :param opset: ONNX opset version for the produced model; defaults to
-        the version bundled with the installed :mod:`onnx` package (capped
-        at 18 by :mod:`onnx_extended`).
-    :param strategy: decomposition strategy passed to
-        :func:`decompose_einsum_equation
-        <onnx_extended.tools.einsum.einsum_impl.decompose_einsum_equation>`.
+        the current ONNX opset version (capped at 18).
+    :param strategy: decomposition strategy.
         Use ``"numpy"`` (default) for a fully element-wise decomposition that
         avoids any remaining ``Einsum`` call, or ``"simple"`` for a simpler
         decomposition that may retain a 2-operand ``Einsum`` internally.
@@ -99,18 +94,10 @@ def decompose_einsum(
         ops = [n.op_type for n in model.graph.node]
         print("ONNX node types:", ops)
     """
-    try:
-        from onnx_extended.tools.einsum import decompose_einsum_equation
-    except ImportError as exc:
-        raise ImportError(
-            "Package 'onnx-extended' is required for decompose_einsum. "
-            "Install it with: pip install onnx-extended"
-        ) from exc
-
     n_inputs = len(equation.split("->")[0].split(","))
     input_names = [f"X{i}" for i in range(n_inputs)]
 
-    graph = decompose_einsum_equation(
+    graph = _decompose_einsum_equation(
         equation, *input_shapes, strategy=strategy, clean=clean, verbose=verbose
     )
 
