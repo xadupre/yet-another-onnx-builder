@@ -40,9 +40,7 @@ def _on_build_finished(app, exception):
     os.makedirs(os.path.dirname(_DOC_BUILD_DURATIONS_JSON), exist_ok=True)
     with open(_DOC_BUILD_DURATIONS_JSON, "w", encoding="utf-8") as fh:
         json.dump(
-            [{"docname": name, "duration_s": round(dur, 3)} for name, dur in top5],
-            fh,
-            indent=2,
+            [{"docname": name, "duration_s": round(dur, 3)} for name, dur in top5], fh, indent=2
         )
 
 
