@@ -7,7 +7,7 @@ and helpers for computing per-tree statistics on ``TreeEnsemble*`` operators
 
 import pprint
 from collections import Counter
-from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Tuple, Union
+from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Set, Tuple, Union
 import numpy as np
 import onnx
 import onnx.numpy_helper as onh
@@ -531,16 +531,147 @@ def enumerate_nodes(
                             yield (f"{n}/{att.name}", *c), parent, inner
 
 
+#: Mapping from ``ai.onnx.ml`` opset-5 ``TreeEnsemble`` node-mode integer codes
+#: to their string names.  The codes are stored as ``UINT8`` in the
+#: ``nodes_modes`` tensor attribute.
+_V5_MODE_NAMES: Dict[int, str] = {
+    0: "BRANCH_LEQ",
+    1: "BRANCH_LT",
+    2: "BRANCH_GTE",
+    3: "BRANCH_GT",
+    4: "BRANCH_EQ",
+    5: "BRANCH_NEQ",
+}
+
+
+def _v5_collect_tree_nodes(
+    root: int,
+    nodes_truenodeids: np.ndarray,
+    nodes_trueleafs: np.ndarray,
+    nodes_falsenodeids: np.ndarray,
+    nodes_falseleafs: np.ndarray,
+) -> Tuple[List[int], int]:
+    """Traverses a v5 ``TreeEnsemble`` tree and returns its internal-node indices and leaf count.
+
+    Uses an iterative depth-first search starting from *root* in the global
+    ``nodes_*`` arrays.
+
+    :param root: index of the tree root in the ``nodes_*`` arrays
+    :param nodes_truenodeids: true-branch child indices (internal or leaf)
+    :param nodes_trueleafs: 1 if the true-branch child is a leaf, 0 if internal
+    :param nodes_falsenodeids: false-branch child indices (internal or leaf)
+    :param nodes_falseleafs: 1 if the false-branch child is a leaf, 0 if internal
+    :return: ``(internal_indices, leaf_count)`` where *internal_indices* is a
+        list of indices into the ``nodes_*`` arrays for all internal nodes
+        reachable from *root*, and *leaf_count* is the number of leaf nodes.
+    """
+    internal_indices: List[int] = []
+    visited: Set[int] = set()
+    leaf_count = 0
+    stack = [root]
+    while stack:
+        nid = stack.pop()
+        if nid in visited:
+            continue
+        visited.add(nid)
+        internal_indices.append(nid)
+        if nodes_trueleafs[nid] == 0:
+            stack.append(int(nodes_truenodeids[nid]))
+        else:
+            leaf_count += 1
+        if nodes_falseleafs[nid] == 0:
+            stack.append(int(nodes_falsenodeids[nid]))
+        else:
+            leaf_count += 1
+    return internal_indices, leaf_count
+
+
+def _stats_tree_ensemble_v5(
+    stats: "NodeStatistics", atts: Dict[str, Any], node: NodeProto
+) -> None:
+    """Populates *stats* with statistics extracted from a v5 ``TreeEnsemble`` node.
+
+    The v5 ``TreeEnsemble`` operator (``ai.onnx.ml`` opset 5) separates internal
+    nodes from leaf nodes and uses ``tree_roots`` to identify each tree's root
+    instead of the flat ``nodes_treeids`` array used by the legacy operators.
+
+    :param stats: :class:`NodeStatistics` instance to populate
+    :param atts: attribute dictionary produced by :func:`extract_attributes`
+    :param node: the ``TreeEnsemble`` node proto (used only for constructing
+        child statistics objects)
+    """
+    tree_roots: np.ndarray = atts["tree_roots"]
+    n_trees = len(tree_roots)
+    n_targets = int(atts["n_targets"])
+
+    nodes_featureids: np.ndarray = atts["nodes_featureids"]
+    nodes_splits: np.ndarray = atts["nodes_splits"]
+    nodes_modes_raw: np.ndarray = atts["nodes_modes"]
+    nodes_truenodeids: np.ndarray = atts["nodes_truenodeids"]
+    nodes_trueleafs: np.ndarray = atts["nodes_trueleafs"]
+    nodes_falsenodeids: np.ndarray = atts["nodes_falsenodeids"]
+    nodes_falseleafs: np.ndarray = atts["nodes_falseleafs"]
+
+    mode_names = np.vectorize(lambda c: _V5_MODE_NAMES.get(int(c), f"UNKNOWN_{c}"))(
+        nodes_modes_raw
+    )
+
+    stats.add("kind", "TreeEnsemble")
+    stats.add("n_trees", n_trees)
+    stats.add("n_outputs", n_targets)
+    if len(nodes_featureids) > 0:
+        stats.add("max_featureid", int(max(nodes_featureids)))
+        stats.add("n_features", len(set(nodes_featureids.tolist())))
+    else:
+        stats.add("max_featureid", 0)
+        stats.add("n_features", 0)
+    stats.add("n_rules", len(set(mode_names.tolist())))
+    stats.add("rules", set(mode_names.tolist()))
+    stats.add("hist_rules", Counter(mode_names.tolist()))
+
+    features = []
+    for fid in sorted(set(nodes_featureids.tolist())):
+        indices = nodes_featureids == fid
+        features.append(HistTreeStatistics(node, fid, nodes_splits[indices]))
+    stats.add("features", features)
+
+    tree_stats = []
+    for tree_idx, root in enumerate(tree_roots.tolist()):
+        tr = TreeStatistics(node, tree_idx)
+        internal_indices, leaf_count = _v5_collect_tree_nodes(
+            int(root), nodes_truenodeids, nodes_trueleafs, nodes_falsenodeids, nodes_falseleafs
+        )
+        n_internal = len(internal_indices)
+        tr.add("n_nodes", n_internal + leaf_count)
+        tr.add("n_leaves", leaf_count)
+        if n_internal > 0:
+            tree_fids = nodes_featureids[internal_indices]
+            tree_modes = mode_names[internal_indices]
+            tr.add("max_featureid", int(max(tree_fids)))
+            tr.add("n_features", len(set(tree_fids.tolist())))
+            tr.add("n_rules", len(set(tree_modes.tolist())))
+            tr.add("rules", set(tree_modes.tolist()))
+            tr.add("hist_rules", Counter(tree_modes.tolist()))
+        else:
+            tr.add("max_featureid", 0)
+            tr.add("n_features", 0)
+            tr.add("n_rules", 0)
+            tr.add("rules", set())
+            tr.add("hist_rules", Counter())
+        tree_stats.append(tr)
+    stats.add("trees", tree_stats)
+
+
 def stats_tree_ensemble(
     parent: Union[GraphProto, FunctionProto], node: NodeProto
 ) -> NodeStatistics:
     """
-    Computes statistics on every tree of a ``TreeEnsembleClassifier`` or
-    ``TreeEnsembleRegressor`` node.
+    Computes statistics on every tree of a ``TreeEnsembleClassifier``,
+    ``TreeEnsembleRegressor``, or ``TreeEnsemble`` (``ai.onnx.ml`` opset 5) node.
 
     The returned :class:`NodeStatistics` instance contains the following entries:
 
-    - ``"kind"`` – ``"Classifier"`` or ``"Regressor"``
+    - ``"kind"`` – ``"Classifier"``, ``"Regressor"``, or ``"TreeEnsemble"``
     - ``"n_trees"`` – total number of trees
     - ``"n_outputs"`` – number of outputs / classes
     - ``"max_featureid"`` – maximum feature index used across all nodes
@@ -561,14 +692,26 @@ def stats_tree_ensemble(
     - ``"rules"`` – :class:`set` of mode strings
     - ``"hist_rules"`` – :class:`collections.Counter` of mode frequencies
 
+    For ``TreeEnsembleClassifier`` / ``TreeEnsembleRegressor`` (``ai.onnx.ml``
+    opset ≤ 4) the legacy flat ``nodes_treeids`` / ``nodes_values`` / string
+    ``nodes_modes`` attributes are used.  For the unified ``TreeEnsemble``
+    operator (``ai.onnx.ml`` opset ≥ 5) the ``tree_roots`` / ``nodes_splits``
+    / ``nodes_modes`` (UINT8 tensor) attributes are used instead.
+
     :param parent: the :class:`~onnx.GraphProto` or :class:`~onnx.FunctionProto`
         that contains *node*
-    :param node: a ``TreeEnsembleClassifier`` or ``TreeEnsembleRegressor`` node
+    :param node: a ``TreeEnsembleClassifier``, ``TreeEnsembleRegressor``, or
+        ``TreeEnsemble`` node
     :return: :class:`NodeStatistics` populated with the statistics listed above
     :raises KeyError: if required tree-structure attributes are missing from *node*
     """
     stats = NodeStatistics(parent, node)
     atts = extract_attributes(node)
+
+    if node.op_type == "TreeEnsemble":
+        _stats_tree_ensemble_v5(stats, atts, node)
+        return stats
+
     unique = set(atts["nodes_treeids"])
     stats.add("kind", "Regressor" if "n_targets" in atts else "Classifier")
     stats.add("n_trees", len(unique))
@@ -644,6 +787,7 @@ def enumerate_stats_nodes(
         stats_fcts = {  # type: ignore
             ("ai.onnx.ml", "TreeEnsembleRegressor"): stats_tree_ensemble,
             ("ai.onnx.ml", "TreeEnsembleClassifier"): stats_tree_ensemble,
+            ("ai.onnx.ml", "TreeEnsemble"): stats_tree_ensemble,
         }
     for name, parent, node in enumerate_nodes(onx, recursive=recursive):
         if isinstance(node, NodeProto):

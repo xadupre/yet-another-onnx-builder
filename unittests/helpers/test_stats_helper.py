@@ -418,5 +418,136 @@ class TestTreeStatistics(ExtTestCase):
         self.assertEqual(dv["n_nodes"], 3)
 
 
+def _make_tree_ensemble_v5_node(n_trees: int = 2) -> onnx.NodeProto:
+    """Builds a small ``TreeEnsemble`` (ai.onnx.ml opset 5) node with *n_trees* trees.
+
+    Each tree has one internal split node (on alternating features 0 / 1) and
+    two leaf nodes (one per branch).  The v5 encoding stores internal and leaf
+    nodes in separate flat arrays.
+    """
+    # One internal node per tree.
+    nodes_featureids = [tid % 2 for tid in range(n_trees)]
+    nodes_splits_vals = [0.5] * n_trees
+    nodes_modes_vals = [0] * n_trees  # 0 = BRANCH_LEQ
+    # True branch → leaf index (tree_idx * 2 + 0), False → leaf index (tree_idx * 2 + 1)
+    nodes_truenodeids = [tid * 2 for tid in range(n_trees)]
+    nodes_trueleafs = [1] * n_trees
+    nodes_falsenodeids = [tid * 2 + 1 for tid in range(n_trees)]
+    nodes_falseleafs = [1] * n_trees
+
+    # Leaf arrays: 2 leaves per tree, all targeting output 0.
+    leaf_targetids = [0] * (n_trees * 2)
+    leaf_weights_vals = [0.0, 1.0] * n_trees
+
+    nodes_splits_tensor = onh.from_array(
+        np.array(nodes_splits_vals, dtype=np.float32), name="nodes_splits"
+    )
+    nodes_modes_tensor = onh.from_array(
+        np.array(nodes_modes_vals, dtype=np.uint8), name="nodes_modes"
+    )
+    leaf_weights_tensor = onh.from_array(
+        np.array(leaf_weights_vals, dtype=np.float32), name="leaf_weights"
+    )
+
+    return oh.make_node(
+        "TreeEnsemble",
+        inputs=["X"],
+        outputs=["Y"],
+        domain="ai.onnx.ml",
+        tree_roots=list(range(n_trees)),
+        n_targets=1,
+        nodes_featureids=nodes_featureids,
+        nodes_splits=nodes_splits_tensor,
+        nodes_modes=nodes_modes_tensor,
+        nodes_truenodeids=nodes_truenodeids,
+        nodes_trueleafs=nodes_trueleafs,
+        nodes_falsenodeids=nodes_falsenodeids,
+        nodes_falseleafs=nodes_falseleafs,
+        leaf_targetids=leaf_targetids,
+        leaf_weights=leaf_weights_tensor,
+        aggregate_function=1,
+        post_transform=0,
+    )
+
+
+def _make_tree_model_v5(n_trees: int = 2) -> onnx.ModelProto:
+    """Wraps ``_make_tree_ensemble_v5_node`` in a minimal ONNX model."""
+    node = _make_tree_ensemble_v5_node(n_trees)
+    X_vi = oh.make_tensor_value_info("X", TFLOAT, [None, 2])
+    Y_vi = oh.make_tensor_value_info("Y", TFLOAT, [None, 1])
+    graph = oh.make_graph([node], "tree_v5_test", [X_vi], [Y_vi])
+    return oh.make_model(
+        graph,
+        opset_imports=[oh.make_opsetid("", 20), oh.make_opsetid("ai.onnx.ml", 5)],
+        ir_version=10,
+    )
+
+
+class TestTreeStatisticsV5(ExtTestCase):
+    def test_stats_tree_ensemble_v5_basic(self):
+        node = _make_tree_ensemble_v5_node(2)
+        model = _make_tree_model_v5(2)
+        stats = stats_tree_ensemble(model.graph, node)
+        self.assertIsInstance(stats, NodeStatistics)
+        self.assertEqual(stats["kind"], "TreeEnsemble")
+        self.assertEqual(stats["n_trees"], 2)
+
+    def test_stats_tree_ensemble_v5_n_outputs(self):
+        node = _make_tree_ensemble_v5_node(1)
+        model = _make_tree_model_v5(1)
+        stats = stats_tree_ensemble(model.graph, node)
+        self.assertEqual(stats["n_outputs"], 1)
+
+    def test_stats_tree_ensemble_v5_features(self):
+        node = _make_tree_ensemble_v5_node(2)
+        model = _make_tree_model_v5(2)
+        stats = stats_tree_ensemble(model.graph, node)
+        # Tree 0 uses feature 0, tree 1 uses feature 1 → 2 distinct features
+        self.assertEqual(stats["n_features"], 2)
+        features = stats["features"]
+        self.assertEqual(len(features), 2)
+        for f in features:
+            self.assertIsInstance(f, HistTreeStatistics)
+
+    def test_stats_tree_ensemble_v5_rules(self):
+        node = _make_tree_ensemble_v5_node(1)
+        model = _make_tree_model_v5(1)
+        stats = stats_tree_ensemble(model.graph, node)
+        # v5 stores only internal nodes; all are BRANCH_LEQ (code 0)
+        self.assertEqual(stats["rules"], {"BRANCH_LEQ"})
+        self.assertEqual(stats["n_rules"], 1)
+
+    def test_stats_tree_ensemble_v5_trees(self):
+        node = _make_tree_ensemble_v5_node(3)
+        model = _make_tree_model_v5(3)
+        stats = stats_tree_ensemble(model.graph, node)
+        trees = stats["trees"]
+        self.assertEqual(len(trees), 3)
+        for tr in trees:
+            self.assertIsInstance(tr, TreeStatistics)
+            # 1 internal node + 2 leaf nodes
+            self.assertEqual(tr["n_nodes"], 3)
+            self.assertEqual(tr["n_leaves"], 2)
+
+    def test_stats_tree_ensemble_v5_dict_values(self):
+        node = _make_tree_ensemble_v5_node(2)
+        model = _make_tree_model_v5(2)
+        stats = stats_tree_ensemble(model.graph, node)
+        dv = stats.dict_values
+        self.assertIn("n_trees", dv)
+        self.assertEqual(dv["n_trees"], 2)
+        self.assertIn("kind", dv)
+        self.assertEqual(dv["kind"], "TreeEnsemble")
+
+    def test_enumerate_stats_nodes_v5(self):
+        model = _make_tree_model_v5(2)
+        results = list(enumerate_stats_nodes(model))
+        self.assertEqual(len(results), 1)
+        _path, _parent, node_stats = results[0]
+        self.assertIsInstance(node_stats, NodeStatistics)
+        self.assertEqual(node_stats["n_trees"], 2)
+        self.assertEqual(node_stats["kind"], "TreeEnsemble")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
