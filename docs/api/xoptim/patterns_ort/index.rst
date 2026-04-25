@@ -7,6 +7,7 @@ yobx.xoptim.patterns_ort
 
     activation
     causal_conv
+    complex_mul
     fused_conv
     fused_matmul
     llm_optim
