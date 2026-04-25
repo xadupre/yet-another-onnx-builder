@@ -407,46 +407,46 @@ class ComplexMulPattern(_ComplexMulPatternBase):
             if nexts != expected_mul_outs:
                 return self.none(node, inspect.currentframe().f_lineno)
 
-        all_nodes = [
-            g_a0,
-            g_a1,
-            g_b0,
-            g_b1,
-            mul_rr,
-            mul_ii,
-            mul_ri,
-            mul_ir,
-            real_node,
-            imag_node,
-            unsq_r,
-            unsq_i,
-            node,
-        ]
+        return MatchResult(
+            self,
+            [
+                g_a0,
+                g_a1,
+                g_b0,
+                g_b1,
+                mul_rr,
+                mul_ii,
+                mul_ri,
+                mul_ir,
+                real_node,
+                imag_node,
+                unsq_r,
+                unsq_i,
+                node,
+            ],
+            self.apply,
+            insert_at=node,
+        )
 
-        # Deduplicate when A == B (same Gather nodes appear for A and B slots).
-        seen = []
-        for n in all_nodes:
-            if n not in seen:
-                seen.append(n)
-
-        return MatchResult(self, seen, self.apply, insert_at=node)
-
-    def apply(self, g: "GraphBuilder", *nodes: NodeProto) -> List[NodeProto]:  # noqa: F821
-        # The concat node is always last in the deduplicated list.
-        concat_node = nodes[-1]
-        # Identify Gather nodes (op_type == "Gather") to extract A and B.
-        gather_nodes = [n for n in nodes if n.op_type == "Gather"]
-        # g_a0 is the first Gather (Gather(A, 0)); its source is A.
-        A = gather_nodes[0].input[0]
-        # g_b0 is Gather(B, 0); find the Gather with source != A (or same if A==B).
-        B = None
-        for gn in gather_nodes:
-            if gn.input[0] != A:
-                B = gn.input[0]
-                break
-        if B is None:
-            B = A  # A == B case
-
+    def apply(
+        self,
+        g: "GraphBuilder",  # noqa: F821
+        g_a0: NodeProto,
+        g_a1: NodeProto,
+        g_b0: NodeProto,
+        g_b1: NodeProto,
+        mul_rr: NodeProto,
+        mul_ii: NodeProto,
+        mul_ri: NodeProto,
+        mul_ir: NodeProto,
+        real_node: NodeProto,
+        imag_node: NodeProto,
+        unsq_r: NodeProto,
+        unsq_i: NodeProto,
+        concat_node: NodeProto,
+    ) -> List[NodeProto]:
+        A = g_a0.input[0]
+        B = g_b0.input[0]
         return [
             g.make_node(
                 "ComplexMul",
@@ -628,41 +628,46 @@ class ComplexMulConjPattern(_ComplexMulPatternBase):
             if nexts != expected_mul_outs:
                 return self.none(node, inspect.currentframe().f_lineno)
 
-        all_nodes = [
-            g_a0,
-            g_a1,
-            g_b0,
-            g_b1,
-            mul_rr,
-            mul_ii,
-            mul_ri,
-            mul_ir,
-            real_node,
-            imag_node,
-            unsq_r,
-            unsq_i,
-            node,
-        ]
+        return MatchResult(
+            self,
+            [
+                g_a0,
+                g_a1,
+                g_b0,
+                g_b1,
+                mul_rr,
+                mul_ii,
+                mul_ri,
+                mul_ir,
+                real_node,
+                imag_node,
+                unsq_r,
+                unsq_i,
+                node,
+            ],
+            self.apply,
+            insert_at=node,
+        )
 
-        seen = []
-        for n in all_nodes:
-            if n not in seen:
-                seen.append(n)
-
-        return MatchResult(self, seen, self.apply, insert_at=node)
-
-    def apply(self, g: "GraphBuilder", *nodes: NodeProto) -> List[NodeProto]:  # noqa: F821
-        concat_node = nodes[-1]
-        gather_nodes = [n for n in nodes if n.op_type == "Gather"]
-        A = gather_nodes[0].input[0]
-        B = None
-        for gn in gather_nodes:
-            if gn.input[0] != A:
-                B = gn.input[0]
-                break
-        if B is None:
-            B = A
-
+    def apply(
+        self,
+        g: "GraphBuilder",  # noqa: F821
+        g_a0: NodeProto,
+        g_a1: NodeProto,
+        g_b0: NodeProto,
+        g_b1: NodeProto,
+        mul_rr: NodeProto,
+        mul_ii: NodeProto,
+        mul_ri: NodeProto,
+        mul_ir: NodeProto,
+        real_node: NodeProto,
+        imag_node: NodeProto,
+        unsq_r: NodeProto,
+        unsq_i: NodeProto,
+        concat_node: NodeProto,
+    ) -> List[NodeProto]:
+        A = g_a0.input[0]
+        B = g_b0.input[0]
         return [
             g.make_node(
                 "ComplexMulConj",
