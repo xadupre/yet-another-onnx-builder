@@ -349,9 +349,9 @@ def _while_loop_replacement_ctx(
     :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
         whose :meth:`_handle_while_loop` should be used as the replacement.
 
-    Returns:
-        A context manager that yields control while the while_loop callable is
-        temporarily replaced, then restores all original callables on exit.
+    Yields:
+        Control while the while_loop callable is temporarily replaced, then
+        restores all original callables on exit.
     """
     if _ORIGINAL_TORCH_WHILE_LOOP is None and _ORIGINAL_TORCH_WHILE_LOOP_OP is None:
         yield

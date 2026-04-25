@@ -1499,7 +1499,7 @@ class GraphTracer:
         :param carried_inputs: The initial loop-variable tensors.
         :param additional_inputs: Extra read-only tensors forwarded to both
             *cond_fn* and *body_fn* unchanged.
-        :return: A tuple of :class:`TracingTensor` instances corresponding to
+        :returns: A tuple of :class:`TracingTensor` instances corresponding to
             the final loop-variable values.
         """
         additional_inputs = list(additional_inputs) if additional_inputs else []
