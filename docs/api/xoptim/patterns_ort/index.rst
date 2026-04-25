@@ -6,6 +6,7 @@ yobx.xoptim.patterns_ort
     :caption: modules
 
     activation
+    complex_mul
     fused_conv
     fused_matmul
     llm_optim

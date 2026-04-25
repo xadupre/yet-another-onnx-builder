@@ -10,3 +10,4 @@ yobx.reference.ops
     :caption: modules
 
     op__overwrite_gather
+    op_complex
