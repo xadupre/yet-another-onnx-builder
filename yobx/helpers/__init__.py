@@ -8,4 +8,16 @@ from .helper import (
     string_sig,
     string_signature,
 )
-from .stats_helper import ModelStatistics, model_statistics
+from .stats_helper import (
+    ModelStatistics,
+    model_statistics,
+    _Statistics,
+    NodeStatistics,
+    TreeStatistics,
+    HistTreeStatistics,
+    HistStatistics,
+    extract_attributes,
+    stats_tree_ensemble,
+    enumerate_nodes,
+    enumerate_stats_nodes,
+)
