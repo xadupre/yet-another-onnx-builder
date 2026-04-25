@@ -1131,6 +1131,15 @@ class GraphTracer:
         # reused in branch graphs.
         sub._mapped_dimension = dict(self._mapped_dimension)
         sub._sym_int_to_dynamic_dimension = dict(self._sym_int_to_dynamic_dimension)
+        # Share the parent's ShapeEnv and FakeTensorMode so that unbacked SymInts
+        # stored in _mapped_dimension (which were created by the parent's ShapeEnv)
+        # remain valid when sub.make_fake() uses them inside sub._fake_mode.  Without
+        # this sharing, checks like is_contiguous for multi-dimensional tensors with
+        # dynamic shapes raise "vr must not be None for symbol uN" because the SymInt
+        # belongs to the parent's ShapeEnv while the FakeTensorMode runs under the
+        # sub-tracer's independent ShapeEnv.
+        sub._shape_env = self._shape_env
+        sub._fake_mode = self._fake_mode
 
         sub_operands: List[Any] = []
         for i, op in enumerate(operands):
@@ -1326,6 +1335,10 @@ class GraphTracer:
         # Share symbolic dimension mappings so symbolic dim names are consistent.
         sub._mapped_dimension = dict(self._mapped_dimension)
         sub._sym_int_to_dynamic_dimension = dict(self._sym_int_to_dynamic_dimension)
+        # Share the parent's ShapeEnv and FakeTensorMode (same rationale as
+        # _trace_branch) so that parent SymInts remain valid inside sub._fake_mode.
+        sub._shape_env = self._shape_env
+        sub._fake_mode = self._fake_mode
 
         sub_operands: List[Any] = []
 

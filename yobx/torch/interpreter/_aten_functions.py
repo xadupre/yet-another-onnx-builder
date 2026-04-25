@@ -11278,6 +11278,10 @@ def aten_while_loop(
         value_info_proto.name = vname
         return value_info_proto
 
+    def mkv_typed(vname, elem_type, shape=None):
+        """Creates a typed ValueInfoProto for use as Loop body subgraph I/O."""
+        return make_tensor_value_info(vname, elem_type, shape)
+
     body_loc = g.get_local_function(body_graph, g.local_domain)
     n_vars = len(loop_vars)
     assert len(body_loc.output) == n_vars, (
@@ -11327,7 +11331,11 @@ def aten_while_loop(
     body = make_graph(
         [body_call_node, cond_call_node],
         f"{name}_body",
-        [mkv(iter_name), mkv(cond_in_name), *[mkv(v) for v in loop_var_names_in]],
+        [
+            mkv_typed(iter_name, TensorProto.INT64, []),
+            mkv_typed(cond_in_name, TensorProto.BOOL, []),
+            *[mkv(v) for v in loop_var_names_in],
+        ],
         [mkv(cond_out_name), *[mkv(v) for v in loop_var_names_out]],
     )
 
