@@ -1033,6 +1033,142 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         got = opt_ref.run(None, feeds)
         self.assertEqualArray(expected[0], got[0])
 
+    def test_gemm_fast_gelu_with_bias(self):
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("MatMul", ["A", "B"], ["ab"]),
+                    oh.make_node("Add", ["ab", "bias"], ["ab_bias"]),
+                    oh.make_node("FastGelu", ["ab_bias"], ["Y"], domain="com.microsoft"),
+                ],
+                "dummy",
+                [
+                    oh.make_tensor_value_info("A", TFLOAT, [2, 4]),
+                    oh.make_tensor_value_info("B", TFLOAT, [4, 8]),
+                ],
+                [oh.make_tensor_value_info("Y", TFLOAT, [2, 8])],
+                [
+                    onh.from_array(
+                        np.array([0.1, 0.2, -0.1, 0.3, -0.2, 0.4, 0.0, -0.3], dtype=np.float32),
+                        name="bias",
+                    )
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        check_model(model)
+        feeds = {"A": self._range(2, 4), "B": self._range(4, 8)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["GemmFastGelu"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["GemmFastGelu"], [n.op_type for n in opt_onx.graph.node])
+        self.assertEqual(1, len(opt_onx.graph.initializer))
+        node = opt_onx.graph.node[0]
+        self.assertEqual(node.op_type, "GemmFastGelu")
+        self.assertEqual(node.domain, "com.microsoft")
+        self.assertEqual(3, len(node.input))
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+
+    def test_gemm_fast_gelu_no_bias(self):
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("MatMul", ["A", "B"], ["ab"]),
+                    oh.make_node("FastGelu", ["ab"], ["Y"], domain="com.microsoft"),
+                ],
+                "dummy",
+                [
+                    oh.make_tensor_value_info("A", TFLOAT, [2, 4]),
+                    oh.make_tensor_value_info("B", TFLOAT, [4, 8]),
+                ],
+                [oh.make_tensor_value_info("Y", TFLOAT, [2, 8])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        check_model(model)
+        feeds = {"A": self._range(2, 4), "B": self._range(4, 8)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["GemmFastGelu"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["GemmFastGelu"], [n.op_type for n in opt_onx.graph.node])
+        self.assertEqual(0, len(opt_onx.graph.initializer))
+        node = opt_onx.graph.node[0]
+        self.assertEqual(node.op_type, "GemmFastGelu")
+        self.assertEqual(node.domain, "com.microsoft")
+        self.assertEqual(2, len(node.input))
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+
+    def test_gemm_fast_gelu_fast_gelu_with_bias_input(self):
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("MatMul", ["A", "B"], ["ab"]),
+                    oh.make_node("FastGelu", ["ab", "bias"], ["Y"], domain="com.microsoft"),
+                ],
+                "dummy",
+                [
+                    oh.make_tensor_value_info("A", TFLOAT, [2, 4]),
+                    oh.make_tensor_value_info("B", TFLOAT, [4, 8]),
+                ],
+                [oh.make_tensor_value_info("Y", TFLOAT, [2, 8])],
+                [
+                    onh.from_array(
+                        np.array([0.1, 0.2, -0.1, 0.3, -0.2, 0.4, 0.0, -0.3], dtype=np.float32),
+                        name="bias",
+                    )
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        check_model(model)
+        feeds = {"A": self._range(2, 4), "B": self._range(4, 8)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["GemmFastGelu"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["GemmFastGelu"], [n.op_type for n in opt_onx.graph.node])
+        self.assertEqual(1, len(opt_onx.graph.initializer))
+        node = opt_onx.graph.node[0]
+        self.assertEqual(node.op_type, "GemmFastGelu")
+        self.assertEqual(node.domain, "com.microsoft")
+        self.assertEqual(3, len(node.input))
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+
     def test_skip_layer_normalization_1d(self):
         from onnxruntime import InferenceSession
 

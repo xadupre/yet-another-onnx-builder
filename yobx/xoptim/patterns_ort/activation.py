@@ -793,3 +793,172 @@ class QuickGeluPattern(PatternOptimization):
                 name=f"{self.__class__.__name__}--{sigmoid.name}",
             )
         ]
+
+
+class GemmFastGeluPattern(PatternOptimization):
+    """
+    Replaces ``MatMul + Add(bias) + FastGelu`` or ``MatMul + FastGelu``
+    by ``GemmFastGelu(A, B, [bias])``.
+
+    Three cases are handled:
+
+    * Case 1 — ``MatMul(A, B) → Add(AB, bias) → FastGelu(AB+bias)``
+    * Case 2 — ``MatMul(A, B) → FastGelu(AB, bias)``  (FastGelu with two inputs)
+    * Case 3 — ``MatMul(A, B) → FastGelu(AB)``  (no bias)
+
+    Model with nodes to be fused (Case 1):
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_A(["A FLOAT(2, 4)"])
+            I_B(["B FLOAT(4, 8)"])
+            I_bias(["bias FLOAT(8)"])
+
+            MatMul_0[["MatMul(., .)"]]
+            Add_1[["Add(., .)"]]
+            FastGelu_2[["com.microsoft.FastGelu(.)"]]
+
+            I_A -->|"FLOAT(2, 4)"| MatMul_0
+            I_B -->|"FLOAT(4, 8)"| MatMul_0
+            MatMul_0 -->|"FLOAT(2, 8)"| Add_1
+            I_bias -->|"FLOAT(8)"| Add_1
+            Add_1 -->|"FLOAT(2, 8)"| FastGelu_2
+
+            O_Y(["Y FLOAT(2, 8)"])
+            FastGelu_2 --> O_Y
+
+            class I_A,I_B,I_bias,O_Y ioNode
+            class MatMul_0,Add_1,FastGelu_2 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_A(["A FLOAT(2, 4)"])
+            I_B(["B FLOAT(4, 8)"])
+            I_bias(["bias FLOAT(8)"])
+
+            GemmFastGelu_0[["com.microsoft.GemmFastGelu(., ., .)"]]
+
+            I_A -->|"FLOAT(2, 4)"| GemmFastGelu_0
+            I_B -->|"FLOAT(4, 8)"| GemmFastGelu_0
+            I_bias -->|"FLOAT(8)"| GemmFastGelu_0
+
+            O_Y(["Y FLOAT(2, 8)"])
+            GemmFastGelu_0 --> O_Y
+
+            class I_A,I_B,I_bias,O_Y ioNode
+            class GemmFastGelu_0 opNode
+    """
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if node.op_type != "FastGelu" or node.domain != "com.microsoft":
+            return self.none()
+
+        # Case 2: FastGelu(AB, bias) — two inputs, second is a 1-D constant bias.
+        if len(node.input) == 2:
+            bias_input = node.input[1]
+            if not g.is_constant(bias_input):
+                return self.none(node, inspect.currentframe().f_lineno)
+            if g.is_used_more_than_once(node.input[0]):
+                return self.none(node, inspect.currentframe().f_lineno)
+            mm = g.node_before(node.input[0])
+            if mm is None or mm.op_type != "MatMul" or mm.domain != "":
+                return self.none(node, inspect.currentframe().f_lineno)
+            if g.is_used_more_than_once(mm.output[0]):
+                return self.none(node, inspect.currentframe().f_lineno)
+            return MatchResult(self, [mm, node], self.apply, insert_at=node)
+
+        if len(node.input) != 1:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        if g.is_used_more_than_once(node.input[0]):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        before = g.node_before(node.input[0])
+        if before is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        if before.op_type == "Add" and before.domain == "":
+            # Case 1: MatMul → Add(bias) → FastGelu
+            if g.is_used_more_than_once(before.output[0]):
+                return self.none(node, inspect.currentframe().f_lineno)
+
+            # Identify which Add input comes from MatMul and which is the bias.
+            mm_input_idx = None
+            for i, inp in enumerate(before.input):
+                n = g.node_before(inp)
+                if n is not None and n.op_type == "MatMul" and n.domain == "":
+                    mm_input_idx = i
+                    break
+
+            if mm_input_idx is None:
+                return self.none(node, inspect.currentframe().f_lineno)
+
+            bias_input = before.input[1 - mm_input_idx]
+            if not g.is_constant(bias_input):
+                return self.none(node, inspect.currentframe().f_lineno)
+
+            mm = g.node_before(before.input[mm_input_idx])
+            if g.is_used_more_than_once(mm.output[0]):
+                return self.none(node, inspect.currentframe().f_lineno)
+
+            return MatchResult(self, [mm, before, node], self.apply, insert_at=node)
+
+        if before.op_type == "MatMul" and before.domain == "":
+            # Case 3: MatMul → FastGelu (no bias)
+            if g.is_used_more_than_once(before.output[0]):
+                return self.none(node, inspect.currentframe().f_lineno)
+            return MatchResult(self, [before, node], self.apply, insert_at=node)
+
+        return self.none(node, inspect.currentframe().f_lineno)
+
+    def apply(self, g: "GraphBuilder", *nodes: NodeProto) -> List[NodeProto]:  # noqa: F821
+        if len(nodes) == 3:
+            # Case 1: mm, add, fast_gelu
+            mm, add, fast_gelu = nodes
+            mm_input_idx = 0 if add.input[0] == mm.output[0] else 1
+            bias_input = add.input[1 - mm_input_idx]
+            inputs = [mm.input[0], mm.input[1], bias_input]
+            return [
+                g.make_node(
+                    "GemmFastGelu",
+                    inputs,
+                    fast_gelu.output,
+                    domain="com.microsoft",
+                    doc_string=fast_gelu.doc_string,
+                    name=f"{self.__class__.__name__}--{fast_gelu.name}",
+                )
+            ]
+        # Case 2 or Case 3: mm, fast_gelu
+        mm, fast_gelu = nodes
+        inputs = list(mm.input[:2]) + list(fast_gelu.input[1:])
+        return [
+            g.make_node(
+                "GemmFastGelu",
+                inputs,
+                fast_gelu.output,
+                domain="com.microsoft",
+                doc_string=fast_gelu.doc_string,
+                name=f"{self.__class__.__name__}--{fast_gelu.name}",
+            )
+        ]
