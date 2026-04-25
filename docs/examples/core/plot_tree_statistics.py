@@ -22,75 +22,57 @@ scikit-learn ``RandomForestClassifier`` or similar estimators.
 """
 
 # %%
-# 1. Build a small TreeEnsembleClassifier ONNX node
-# --------------------------------------------------
+# 1. Train a scikit-learn RandomForestClassifier on dummy data
+# -------------------------------------------------------------
 #
-# We manually construct a two-tree ensemble with two input features and two
-# output classes.  Each tree has a root split node and two leaf nodes.
-#
-# **Tree 0** splits on feature 0 at threshold 0.5.
-# **Tree 1** splits on feature 1 at threshold -0.3.
+# We generate a small binary-classification dataset with four features and
+# train a five-tree random forest with depth ≤ 4.
 
-import onnx
-import onnx.helper as oh
+import numpy as np
+from sklearn.ensemble import RandomForestClassifier
 
-TFLOAT = onnx.TensorProto.FLOAT
-TINT64 = onnx.TensorProto.INT64
+rng = np.random.default_rng(0)
+X_train = rng.standard_normal((200, 4)).astype(np.float32)
+y_train = (X_train[:, 0] + X_train[:, 2] > 0).astype(int)
 
-# fmt: off
-tree_node = oh.make_node(
-    "TreeEnsembleClassifier",
-    inputs=["X"],
-    outputs=["label", "probabilities"],
-    domain="ai.onnx.ml",
-    # --- structural attributes (per node in all trees) ---
-    nodes_nodeids=[0, 1, 2,   0, 1, 2],
-    nodes_treeids=[0, 0, 0,   1, 1, 1],
-    nodes_featureids=[0, 0, 0,   1, 1, 1],
-    nodes_modes=["BRANCH_LEQ", "LEAF", "LEAF",
-                 "BRANCH_LEQ", "LEAF", "LEAF"],
-    nodes_values=[0.5, 0.0, 0.0,   -0.3, 0.0, 0.0],
-    nodes_truenodeids=[1, 0, 0,   1, 0, 0],
-    nodes_falsenodeids=[2, 0, 0,   2, 0, 0],
-    nodes_hitrates=[1.0, 1.0, 1.0,   1.0, 1.0, 1.0],
-    nodes_missing_value_tracks_true=[0, 0, 0,   0, 0, 0],
-    # --- class-weight attributes ---
-    class_ids=[0, 1,   0, 1],
-    class_nodeids=[1, 2,   1, 2],
-    class_treeids=[0, 0,   1, 1],
-    class_weights=[1.0, 1.0,   1.0, 1.0],
-    classlabels_int64s=[0, 1],
-    post_transform="NONE",
+clf = RandomForestClassifier(n_estimators=5, max_depth=4, random_state=0)
+clf.fit(X_train, y_train)
+print(
+    f"Trained RandomForestClassifier: {clf.n_estimators} trees, "
+    f"{clf.n_features_in_} features, classes={list(clf.classes_)}"
 )
-# fmt: on
-
-# Wrap the node in a minimal ONNX model so we can run it and pass it to
-# enumerate_stats_nodes.
-X_vi = oh.make_tensor_value_info("X", TFLOAT, [None, 2])
-label_vi = oh.make_tensor_value_info("label", TINT64, [None])
-proba_vi = oh.make_tensor_value_info("probabilities", TFLOAT, [None, 2])
-
-graph = oh.make_graph([tree_node], "trees", [X_vi], [label_vi, proba_vi])
-model = oh.make_model(
-    graph,
-    opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("ai.onnx.ml", 3)],
-    ir_version=10,
-)
-
-print("Number of nodes in graph:", len(model.graph.node))
 
 # %%
-# 2. Compute statistics for a single node
-# ----------------------------------------
+# 2. Convert to ONNX with skl2onnx
+# ---------------------------------
 #
-# :func:`~yobx.helpers.stats_tree_ensemble` analyses the tree structure
-# directly from the node's ONNX attributes and returns a
-# :class:`~yobx.helpers.NodeStatistics` object.
+# :func:`skl2onnx.convert_sklearn` produces a ``TreeEnsembleClassifier`` node
+# in the ``ai.onnx.ml`` domain — the operator supported by
+# :func:`~yobx.helpers.stats_tree_ensemble`.
 
-from yobx.helpers import stats_tree_ensemble  # noqa: E402
+from skl2onnx import convert_sklearn  # noqa: E402
+from skl2onnx.common.data_types import FloatTensorType  # noqa: E402
 
-stats = stats_tree_ensemble(model.graph, tree_node)
+model = convert_sklearn(clf, "random_forest", [("X", FloatTensorType([None, X_train.shape[1]]))])
 
+print("Graph nodes:", [(n.op_type, n.domain) for n in model.graph.node])
+
+# %%
+# 3. Compute statistics for the tree-ensemble node
+# -------------------------------------------------
+#
+# :func:`~yobx.helpers.enumerate_stats_nodes` walks the model graph and
+# returns a :class:`~yobx.helpers.NodeStatistics` for every
+# ``TreeEnsembleClassifier`` / ``TreeEnsembleRegressor`` it encounters.
+
+from yobx.helpers import enumerate_stats_nodes  # noqa: E402
+
+# Collect results from the full model walk
+all_stats = list(enumerate_stats_nodes(model))
+print(f"\nNumber of tree-ensemble nodes found: {len(all_stats)}")
+
+# For the single classifier node, inspect the statistics directly
+_path, _parent, stats = all_stats[0]
 print("kind      :", stats["kind"])
 print("n_trees   :", stats["n_trees"])
 print("n_outputs :", stats["n_outputs"])
@@ -100,7 +82,7 @@ print("rules     :", stats["rules"])
 print("hist_rules:", stats["hist_rules"])
 
 # %%
-# 3. Per-tree breakdown
+# 4. Per-tree breakdown
 # ---------------------
 #
 # The ``"trees"`` key holds a :class:`~yobx.helpers.TreeStatistics` object
@@ -117,12 +99,12 @@ for tr in stats["trees"]:
     )
 
 # %%
-# 4. Per-feature threshold distribution
+# 5. Per-feature threshold distribution
 # ---------------------------------------
 #
 # For each input feature that appears as a split condition,
 # :class:`~yobx.helpers.HistTreeStatistics` stores the distribution of
-# threshold values across all trees.
+# threshold values used across all trees.
 
 print(f"\nPer-feature threshold statistics ({len(stats['features'])} features):")
 for feat in stats["features"]:
@@ -136,7 +118,7 @@ for feat in stats["features"]:
     )
 
 # %%
-# 5. Flat dictionary for DataFrame integration
+# 6. Flat dictionary for DataFrame integration
 # ---------------------------------------------
 #
 # :meth:`~yobx.helpers.NodeStatistics.dict_values` flattens all scalar
@@ -148,30 +130,10 @@ for k, v in sorted(row.items()):
     print(f"  {k}: {v}")
 
 # %%
-# 6. Walk a full model with enumerate_stats_nodes
-# ------------------------------------------------
-#
-# :func:`~yobx.helpers.enumerate_stats_nodes` yields statistics for every
-# ``TreeEnsembleClassifier`` / ``TreeEnsembleRegressor`` node it encounters
-# while walking the model graph.
-
-from yobx.helpers import enumerate_stats_nodes  # noqa: E402
-
-rows = []
-for path, _parent, node_stats in enumerate_stats_nodes(model):
-    row = node_stats.dict_values
-    row["path"] = "/".join(path)
-    rows.append(row)
-
-print(f"\nNodes with tree-ensemble statistics: {len(rows)}")
-for r in rows:
-    print(f"  path={r['path']}  n_trees={r['n_trees']}  kind={r['kind']}")
-
-# %%
 # 7. Visualize the ONNX graph
 # ----------------------------
 #
-# Finally, we render the graph so you can inspect nodes and tensor shapes.
+# Finally, we render the ONNX graph so you can inspect nodes and tensor shapes.
 
 from yobx.doc import plot_dot  # noqa: E402
 
