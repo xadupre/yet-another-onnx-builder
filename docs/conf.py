@@ -63,6 +63,7 @@ document.addEventListener("DOMContentLoaded", function () {
 exclude_patterns = ["_build"]
 if int(os.environ.get("UNITTEST_GOING", "0")):
     exclude_patterns.append("ci_durations.rst")
+    exclude_patterns.append("design/torch/case_coverage.rst")
 html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
