@@ -404,12 +404,14 @@ class FxGraphInterpreter:
             else:
                 trace_init = init
 
-            # When the callable is used in a torch.cond or scan call (tracing
-            # exporter path), try to pass input type/shape info so the local
-            # function's outputs are typed.
+            # When the callable is used in a torch.cond, scan, or while_loop
+            # call (tracing exporter path), try to pass input type/shape info
+            # so the local function's outputs are typed.
             sub_args = self._get_cond_input_args_for_callable(node)
             if sub_args is None:
                 sub_args = self._get_scan_input_args_for_callable(node)
+            if sub_args is None:
+                sub_args = self._get_while_loop_input_args_for_callable(node)
 
             builder, _args, _kwargs, output_names = self._interpret_sub_module(
                 trace_init, sub_args, None, source_node=node, local_domain=f"{root}.{n}"
@@ -682,6 +684,71 @@ class FxGraphInterpreter:
 
             for inp_node in add_input_nodes:
                 vt = _node_to_virtual(inp_node, strip_first_dim=False)
+                if vt is None:
+                    sub_args = None
+                    break
+                sub_args.append(vt)
+            if sub_args is not None:
+                return sub_args
+        return None
+
+    def _get_while_loop_input_args_for_callable(
+        self, node: "torch.fx.Node"  # noqa: F821
+    ) -> Optional[List[VirtualTensor]]:
+        """
+        When a callable (get_attr node) is used in a
+        :func:`torch._higher_order_ops.while_loop` call (new-tracing exporter
+        path), build the argument type/shape information for the cond/body
+        function and return it as a list of :class:`VirtualTensor` objects.
+
+        Both *cond_fn* and *body_fn* receive
+        ``(*carried_inputs, *additional_inputs)`` at their full shapes.
+
+        Returns *None* if the info cannot be determined.
+        """
+        for user_node in node.users:
+            if not (
+                user_node.op == "call_function"
+                and hasattr(user_node.target, "__name__")
+                and user_node.target.__name__ == "while_loop"
+                and len(user_node.args) >= 3
+            ):
+                continue
+            # user_node.args = (cond_fn_node, body_fn_node, [carried_nodes], [additional_nodes])
+            carried_nodes = user_node.args[2]
+            additional_nodes = user_node.args[3] if len(user_node.args) > 3 else []
+            sub_args: Optional[List[VirtualTensor]] = []
+
+            def _node_to_virtual(inp_node):
+                if isinstance(inp_node, self.torch.Tensor):
+                    full_shape = tuple(inp_node.shape)
+                    onnx_dtype = torch_dtype_to_onnx_dtype(inp_node.dtype)
+                    dev = inp_node.device.index
+                    return VirtualTensor(name="", dtype=onnx_dtype, shape=full_shape, device=dev)
+                if not hasattr(inp_node, "name") or not self.builder.has_type(inp_node.name):
+                    return None
+                name = inp_node.name
+                dtype = self.builder.get_type(name)
+                if self.builder.has_shape(name):
+                    shape = self.builder.get_shape(name)
+                elif self.builder.has_rank(name):
+                    shape = tuple(None for _ in range(self.builder.get_rank(name)))
+                else:
+                    shape = None
+                device = self.builder.get_device(name) if self.builder.has_device(name) else None
+                return VirtualTensor(name=name, dtype=dtype, shape=shape, device=device)
+
+            for inp_node in carried_nodes:
+                vt = _node_to_virtual(inp_node)
+                if vt is None:
+                    sub_args = None
+                    break
+                sub_args.append(vt)
+            if sub_args is None:
+                continue
+
+            for inp_node in additional_nodes:
+                vt = _node_to_virtual(inp_node)
                 if vt is None:
                     sub_args = None
                     break
@@ -1584,6 +1651,22 @@ class FxGraphInterpreter:
                     ):
                         if dtype and not self.builder.has_type(out_name):
                             self.builder.set_type(out_name, dtype)
+            # When aten_while_loop created a Loop node in the tracing path,
+            # propagate output dtype and shape from the body-function builder
+            # (stored in get_attr via _store_cond_func_output_info).  The body
+            # function outputs match the loop-variable shapes exactly.
+            if aten_name == "aten_while_loop" and self._cond_func_output_info:
+                # args = [cond_fn_name, body_fn_name, carried_vars, additional_inputs]
+                body_fn_name = args[1] if len(args) > 1 else None
+                if body_fn_name and body_fn_name in self._cond_func_output_info:
+                    res_list = list(res) if isinstance(res, (tuple, list)) else [res]
+                    for out_name, (dtype, shape) in zip(
+                        res_list, self._cond_func_output_info[body_fn_name]
+                    ):
+                        if dtype and not self.builder.has_type(out_name):
+                            self.builder.set_type(out_name, dtype)
+                        if shape is not None and not self.builder.has_shape(out_name):
+                            self.builder.set_shape(out_name, shape)
 
         n_nodes_after = len(self.builder.nodes) + len(self.builder.initializers_dict)
         if res is None:
@@ -1964,7 +2047,7 @@ class FxGraphInterpreter:
                 if isinstance(v, self.torch.Tensor):
                     self.builder.set_device(r, v.get_device(), keep_this_device=True)
                     dtype = _get_type(v.dtype)
-                    if i >= 1 and node.target.name() in {
+                    if i >= 1 and hasattr(node.target, "name") and node.target.name() in {
                         "aten::_native_batch_norm_legit.no_stats",
                         "aten::_native_batch_norm_legit_no_training",
                         "aten::_scaled_dot_product_efficient_attention",

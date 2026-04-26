@@ -45,6 +45,18 @@ _ORIGINAL_TORCH_ONES: Callable = torch.ones
 # carry no backing storage.
 _ORIGINAL_TORCH_TENSOR_SPLIT: Callable = torch.tensor_split
 
+# Capture the real ``torch._higher_order_ops.while_loop`` and
+# ``torch.ops.higher_order.while_loop`` at import time so that calls during
+# new-tracing are intercepted and recorded as FX nodes.  Both attributes may
+# refer to the same callable on some PyTorch versions; we patch whichever
+# locations exist.
+_ORIGINAL_TORCH_WHILE_LOOP: Optional[Callable] = getattr(
+    getattr(torch, "_higher_order_ops", None), "while_loop", None
+)
+_ORIGINAL_TORCH_WHILE_LOOP_OP: Optional[Callable] = getattr(
+    getattr(torch.ops, "higher_order", None), "while_loop", None
+)
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -324,6 +336,60 @@ def _roll_dynamic_shape_ctx() -> Generator:
 
 
 @contextlib.contextmanager
+def _while_loop_replacement_ctx(
+    tracer: "GraphTracer",  # type: ignore[name-defined]  # noqa: F821
+) -> Generator:
+    """
+    Temporarily replaces ``torch._higher_order_ops.while_loop`` (and
+    ``torch.ops.higher_order.while_loop`` when it is a distinct object) with a
+    tracing-aware handler so that while-loop calls encountered during
+    :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.trace` are captured as
+    FX ``call_function`` nodes instead of being executed eagerly.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_while_loop` should be used as the replacement.
+
+    Yields:
+        Control while the while_loop callable is temporarily replaced, then
+        restores all original callables on exit.
+    """
+    if _ORIGINAL_TORCH_WHILE_LOOP is None and _ORIGINAL_TORCH_WHILE_LOOP_OP is None:
+        yield
+        return
+
+    def _while_loop_handler(
+        cond_fn: Callable,
+        body_fn: Callable,
+        carried_inputs: Any,
+        additional_inputs: Optional[List] = None,
+    ) -> Any:
+        return tracer._handle_while_loop(cond_fn, body_fn, carried_inputs, additional_inputs)
+
+    _higher_order_ops = getattr(torch, "_higher_order_ops", None)
+    _higher_order = getattr(torch.ops, "higher_order", None)
+
+    if _ORIGINAL_TORCH_WHILE_LOOP is not None and _higher_order_ops is not None:
+        _higher_order_ops.while_loop = _while_loop_handler  # type: ignore[assignment]
+    if (
+        _ORIGINAL_TORCH_WHILE_LOOP_OP is not None
+        and _higher_order is not None
+        and _ORIGINAL_TORCH_WHILE_LOOP_OP is not _ORIGINAL_TORCH_WHILE_LOOP
+    ):
+        _higher_order.while_loop = _while_loop_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        if _ORIGINAL_TORCH_WHILE_LOOP is not None and _higher_order_ops is not None:
+            _higher_order_ops.while_loop = _ORIGINAL_TORCH_WHILE_LOOP  # type: ignore[assignment]
+        if (
+            _ORIGINAL_TORCH_WHILE_LOOP_OP is not None
+            and _higher_order is not None
+            and _ORIGINAL_TORCH_WHILE_LOOP_OP is not _ORIGINAL_TORCH_WHILE_LOOP
+        ):
+            _higher_order.while_loop = _ORIGINAL_TORCH_WHILE_LOOP_OP  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
 def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
     """
     Applies all tracing-time torch replacement context managers at once.
@@ -344,5 +410,6 @@ def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         _roll_dynamic_shape_ctx(),
         _scan_replacement_ctx(tracer),
         _tensor_split_replacement_ctx(tracer),
+        _while_loop_replacement_ctx(tracer),
     ):
         yield

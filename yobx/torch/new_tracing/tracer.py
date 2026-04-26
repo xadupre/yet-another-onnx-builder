@@ -18,12 +18,14 @@ from ._patches import (
     _ORIGINAL_TORCH_ONES,
     _ORIGINAL_TORCH_SCAN,
     _ORIGINAL_TORCH_TENSOR_SPLIT,
+    _ORIGINAL_TORCH_WHILE_LOOP,
     _cond_replacement_ctx,
     _check_replacement_ctx,
     _full_replacement_ctx,
     _zeros_replacement_ctx,
     _ones_replacement_ctx,
     _scan_replacement_ctx,
+    _while_loop_replacement_ctx,
     _trace_replacement_ctx,
 )
 
@@ -1129,6 +1131,15 @@ class GraphTracer:
         # reused in branch graphs.
         sub._mapped_dimension = dict(self._mapped_dimension)
         sub._sym_int_to_dynamic_dimension = dict(self._sym_int_to_dynamic_dimension)
+        # Share the parent's ShapeEnv and FakeTensorMode so that unbacked SymInts
+        # stored in _mapped_dimension (which were created by the parent's ShapeEnv)
+        # remain valid when sub.make_fake() uses them inside sub._fake_mode.  Without
+        # this sharing, checks like is_contiguous for multi-dimensional tensors with
+        # dynamic shapes raise "vr must not be None for symbol uN" because the SymInt
+        # belongs to the parent's ShapeEnv while the FakeTensorMode runs under the
+        # sub-tracer's independent ShapeEnv.
+        sub._shape_env = self._shape_env
+        sub._fake_mode = self._fake_mode
 
         sub_operands: List[Any] = []
         for i, op in enumerate(operands):
@@ -1146,6 +1157,7 @@ class GraphTracer:
             _full_replacement_ctx(sub),
             _zeros_replacement_ctx(sub),
             _ones_replacement_ctx(sub),
+            _while_loop_replacement_ctx(sub),
         ):
             out = fn(*sub_operands)
 
@@ -1323,6 +1335,10 @@ class GraphTracer:
         # Share symbolic dimension mappings so symbolic dim names are consistent.
         sub._mapped_dimension = dict(self._mapped_dimension)
         sub._sym_int_to_dynamic_dimension = dict(self._sym_int_to_dynamic_dimension)
+        # Share the parent's ShapeEnv and FakeTensorMode (same rationale as
+        # _trace_branch) so that parent SymInts remain valid inside sub._fake_mode.
+        sub._shape_env = self._shape_env
+        sub._fake_mode = self._fake_mode
 
         sub_operands: List[Any] = []
 
@@ -1440,6 +1456,109 @@ class GraphTracer:
                 results.append(tt)
             else:
                 results.append(None)
+
+        node.meta["val"] = tuple(results)
+        return tuple(results)
+
+    # ------------------------------------------------------------------
+    # torch._higher_order_ops.while_loop support
+    # ------------------------------------------------------------------
+
+    def _handle_while_loop(
+        self,
+        cond_fn: Callable,
+        body_fn: Callable,
+        carried_inputs: Union[List[Any], Tuple[Any, ...]],
+        additional_inputs: Optional[Union[List[Any], Tuple[Any, ...]]] = None,
+    ) -> Any:
+        """
+        Handles a ``torch._higher_order_ops.while_loop`` call intercepted
+        during graph tracing.
+
+        This method is invoked by :func:`_while_loop_replacement_ctx`'s
+        handler whenever user code calls ``while_loop`` while a
+        :meth:`trace` is in progress.  It:
+
+        1. Registers *cond_fn* and *body_fn* in :attr:`_callables` and emits
+           ``get_attr`` nodes for them.
+        2. Traces both functions in private sub-:class:`GraphTracer` instances
+           (using *carried_inputs* + *additional_inputs* as placeholders) and
+           stores the results in :attr:`_sub_tracers`.
+        3. Emits a ``call_function`` node for
+           ``torch._higher_order_ops.while_loop`` in the **main** graph.
+        4. Wraps the outputs in fresh :class:`TracingTensor` instances whose
+           shapes are taken from the *body_fn* traced outputs (which match the
+           shapes of *carried_inputs*).
+
+        :param cond_fn: Condition callable.  Receives
+            ``(*carried_inputs, *additional_inputs)`` and returns a scalar
+            bool tensor.
+        :param body_fn: Body callable.  Receives
+            ``(*carried_inputs, *additional_inputs)`` and returns a tuple of
+            tensors with the same shapes as *carried_inputs*.
+        :param carried_inputs: The initial loop-variable tensors.
+        :param additional_inputs: Extra read-only tensors forwarded to both
+            *cond_fn* and *body_fn* unchanged.
+        :returns: A tuple of :class:`TracingTensor` instances corresponding to
+            the final loop-variable values.
+        """
+        additional_inputs = list(additional_inputs) if additional_inputs else []
+        while_loop_target = _ORIGINAL_TORCH_WHILE_LOOP
+        assert (
+            while_loop_target is not None
+        ), "torch._higher_order_ops.while_loop is not available on this PyTorch version"
+
+        # --- Register cond_fn and body_fn as callables ---
+        cond_name = self._register_callable("while_cond", cond_fn)
+        body_name = self._register_callable("while_body", body_fn)
+
+        # --- Trace both functions (all operands = carried + additional) ---
+        all_operands: List[Any] = list(carried_inputs) + additional_inputs
+        sub_cond, _ = self._trace_branch(cond_fn, all_operands)
+        sub_body, body_out = self._trace_branch(body_fn, all_operands)
+
+        self._sub_tracers[cond_name] = sub_cond
+        self._sub_tracers[body_name] = sub_body
+
+        # --- Create get_attr nodes for the callables ---
+        cond_fn_node = self.graph.get_attr(cond_name)
+        cond_fn_node.meta["stack_trace"] = "".join(traceback.format_stack())
+        cond_fn_node.meta["callable"] = cond_fn
+        body_fn_node = self.graph.get_attr(body_name)
+        body_fn_node.meta["stack_trace"] = "".join(traceback.format_stack())
+        body_fn_node.meta["callable"] = body_fn
+
+        # --- Get FX nodes for all arguments ---
+        def _to_node(x: Any) -> Any:
+            if isinstance(x, TracingTensor):
+                return self._get_node(x)
+            return x
+
+        carried_nodes = [_to_node(x) for x in carried_inputs]
+        additional_nodes = [_to_node(x) for x in additional_inputs]
+
+        # --- Emit the while_loop call_function node ---
+        node = self.graph.call_function(
+            while_loop_target,
+            args=(cond_fn_node, body_fn_node, carried_nodes, additional_nodes),
+            kwargs={},
+        )
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+
+        # --- Build output TracingTensors from body_fn output shapes ---
+        # while_loop outputs have the same shapes/dtypes as carried_inputs.
+        body_out_list: List[Any] = (
+            list(body_out) if isinstance(body_out, (list, tuple)) else [body_out]
+        )
+        results: List[Any] = []
+        for i, item in enumerate(body_out_list):
+            if isinstance(item, TracingTensor):
+                get_node = self.graph.call_function(operator.getitem, args=(node, i), kwargs={})
+                tt = self._make_tracing_tensor(item.shape, item.dtype, item.device, get_node)
+                get_node.meta["val"] = tt
+                results.append(tt)
+            else:
+                results.append(item)
 
         node.meta["val"] = tuple(results)
         return tuple(results)

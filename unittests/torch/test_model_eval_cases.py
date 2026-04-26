@@ -376,6 +376,21 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    def test_run_exporter_controlflow_while_dec_new_tracing(self):
+        evaluation(
+            cases="ControlFlowWhileDec", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_while_inc_new_tracing(self):
+        evaluation(
+            cases="ControlFlowWhileInc", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_while_new_tracing(self):
+        evaluation(
+            cases="ControlFlowWhile", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
     def test_run_exporter_layer_norm_tracing(self):
         evaluation(cases="LayerNorm", exporters="yobx-tracing", quiet=False, dynamic=True)
 
