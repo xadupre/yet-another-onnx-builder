@@ -218,10 +218,7 @@ class EinsumSubOp:
             assert isinstance(axis, tuple), (
                 "Parameter axes of expand_dims should be a tuple of tuple, axes=%r." % axes
             )
-            assert row[axis[1]] == -1, "Dimension should be -1 in row %r axis=%r." % (
-                row,
-                axes,
-            )
+            assert row[axis[1]] == -1, "Dimension should be -1 in row %r axis=%r." % (row, axes)
         self._check_row_(row, verbose=verbose)
 
     def _compute_output_row_reduce_sum(
@@ -441,7 +438,9 @@ class EinsumSubOp:
             self.full_dim,
         )
 
-    def _get_data(self, data: Dict[int, Any], key: Union[int, "EinsumSubOp"]) -> Any:
+    def _get_data(
+        self, data: Union[Dict[int, Any], List[Any]], key: Union[int, "EinsumSubOp"]
+    ) -> Any:
         if isinstance(key, int):
             assert key in data, f"Unable to find key {key!r} in {list(sorted(data))}"
             return data[key]
@@ -723,11 +722,11 @@ class EinsumSubOp:
 
     def _to_onnx_id(
         self,
-        names: List[str],
+        names: Dict[int, str],
         opset: Optional[int],
         verbose: bool = False,
         **kwargs: Dict[str, Any],
-    ) -> Iterable[NodeProto]:
+    ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(1)
         inp = self.inputs[0]
         name = self._get_data(names, inp)
@@ -735,11 +734,11 @@ class EinsumSubOp:
 
     def _to_onnx_expand_dims(
         self,
-        names: List[str],
+        names: Dict[int, str],
         opset: Optional[int],
         verbose: bool = False,
         **kwargs: Dict[str, Any],
-    ) -> Iterable[NodeProto]:
+    ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(1)
         self._check_onnx_opset_(opset, 11)
         inp = self.inputs[0]
@@ -759,11 +758,11 @@ class EinsumSubOp:
 
     def _to_onnx_squeeze(
         self,
-        names: List[str],
+        names: Dict[int, str],
         opset: Optional[int],
         verbose: bool = False,
         **kwargs: Dict[str, Any],
-    ) -> Iterable[NodeProto]:
+    ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(1)
         self._check_onnx_opset_(opset, 11)
         inp = self.inputs[0]
@@ -790,11 +789,11 @@ class EinsumSubOp:
 
     def _to_onnx_transpose(
         self,
-        names: List[str],
+        names: Dict[int, str],
         opset: Optional[int],
         verbose: bool = False,
         **kwargs: Dict[str, Any],
-    ) -> Iterable[NodeProto]:
+    ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(1)
         inp = self.inputs[0]
         name = self._get_data(names, inp)
@@ -810,11 +809,11 @@ class EinsumSubOp:
 
     def _to_onnx_reduce_sum(
         self,
-        names: List[str],
+        names: Dict[int, str],
         opset: Optional[int],
         verbose: bool = False,
         **kwargs: Dict[str, Any],
-    ) -> Iterable[NodeProto]:
+    ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(1)
         self._check_onnx_opset_(opset, 11)
         inp = self.inputs[0]
@@ -823,9 +822,7 @@ class EinsumSubOp:
         s_axes = "".join(map(str, axes))
         if opset is not None and opset >= 13:
             name_axes = self._onnx_name() + "_axes"
-            yield numpy_helper.from_array(
-                numpy.array(axes, dtype=numpy.int64), name=name_axes
-            )
+            yield numpy_helper.from_array(numpy.array(axes, dtype=numpy.int64), name=name_axes)
             yield helper.make_node(
                 "ReduceSum",
                 [name, name_axes],
@@ -844,22 +841,22 @@ class EinsumSubOp:
             )
 
     def _to_onnx_mul(
-        self, data: List[Any], verbose: bool = False, **kwargs: Dict[str, Any]
-    ) -> Iterable[NodeProto]:
+        self, names: Dict[int, str], verbose: bool = False, **kwargs: Dict[str, Any]
+    ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(2)
         inp1 = self.inputs[0]
         inp2 = self.inputs[1]
-        m1 = self._get_data(data, inp1)
-        m2 = self._get_data(data, inp2)
+        m1 = self._get_data(names, inp1)
+        m2 = self._get_data(names, inp2)
         yield helper.make_node("Mul", [m1, m2], [self._onnx_name()])
 
     def _to_onnx_batch_dot(
         self,
-        names: List[str],
+        names: Dict[int, str],
         opset: Optional[int],
         verbose: bool = False,
         **kwargs: Dict[str, Any],
-    ) -> Iterable[NodeProto]:
+    ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(2)
         self._check_onnx_opset_(opset, 13)
         inp1, inp2 = self.inputs[:2]
@@ -887,12 +884,14 @@ class EinsumSubOp:
         yield helper.make_node("Shape", [name1], [name_shape1])
         yield helper.make_node("Shape", [name2], [name_shape2])
 
+        name_batch_axes: Optional[str] = None
         if len(batch_axes) > 0:
             name_batch_axes = root + "_batch_axes"
             yield numpy_helper.from_array(
                 numpy.array(batch_axes, dtype=numpy.int64), name=name_batch_axes
             )
 
+        name_sum_axes: Optional[str] = None
         if len(sum_axes) > 0:
             name_sum_axes = root + "_sum_axes"
             yield numpy_helper.from_array(
@@ -1097,11 +1096,11 @@ class EinsumSubOp:
 
     def to_onnx(
         self,
-        names: List[str],
+        names: Dict[int, str],
         opset: Optional[int],
         verbose: bool = False,
         **kwargs: Dict[str, Any],
-    ) -> Iterable[NodeProto]:
+    ) -> Iterable[Union[NodeProto, TensorProto]]:
         """
         Converts this node into ONNX. Enumerates all ONNX node
         which participate to the conversion. The last one
@@ -1226,9 +1225,10 @@ class GraphEinsumSubOp:
         Marks the last node as the final output.
         """
         assert self.last_added_op is not None, "last_added_op is None."
+        assert isinstance(self.last_added_op, EinsumSubOp), "last_added_op must be EinsumSubOp."
         self.mark(-1, self.last_added_op)
 
-    def mark(self, i: int, op: EinsumSubOp):
+    def mark(self, i: int, op: Union[int, EinsumSubOp]):
         """
         Marks one input or result as an intermediate result
         after a full einsum step.
@@ -1433,11 +1433,11 @@ class GraphEinsumSubOp:
                 op.name = op.name[:-3]
                 op.inputs = op.inputs[:1]
 
-    def _get_forward_nodes(self) -> Dict[int, EinsumSubOp]:
+    def _get_forward_nodes(self) -> Dict[int, List[EinsumSubOp]]:
         """
         Returns the forward nodes.
         """
-        forward: Dict[int, EinsumSubOp] = {}
+        forward: Dict[int, List[EinsumSubOp]] = {}
         for op in self:
             if isinstance(op, int):
                 continue
@@ -1594,7 +1594,7 @@ class GraphEinsumSubOp:
     def to_onnx(
         self,
         output: str,
-        *inputs: List[str],
+        *inputs: Any,
         dtype: Optional[Any] = None,
         verbose: bool = False,
         opset: Optional[int] = None,
@@ -1633,7 +1633,9 @@ class GraphEinsumSubOp:
                 "dtype=%r" % (inputs, output, opset, dtype)
             )
         onx_inputs = []
-        proto = _np_dtype_to_tensor_dtype(numpy.float32 if dtype is None else dtype)
+        proto = _np_dtype_to_tensor_dtype(
+            numpy.dtype(numpy.float32) if dtype is None else numpy.dtype(dtype)
+        )
         lengths = self.metadata["lengths"]
         names: Dict[int, str] = {}
         for inp, le in zip(inputs, lengths):
@@ -1644,13 +1646,13 @@ class GraphEinsumSubOp:
                     le,
                     typ.shape,
                 )
-                onx_inputs.append(helper.make_tensor_value_info(name, typ, shape))
-                names[len(names)] = name
+                onx_inputs.append(helper.make_tensor_value_info(str(name), typ, shape))
+                names[len(names)] = str(name)
             else:
                 onx_inputs.append(
-                    helper.make_tensor_value_info(inp, proto, [None for i in range(le)])
+                    helper.make_tensor_value_info(str(inp), proto, [None for i in range(le)])
                 )
-                names[len(names)] = inp
+                names[len(names)] = str(inp)
 
         # output
         onx_output = helper.make_tensor_value_info(
@@ -1658,29 +1660,32 @@ class GraphEinsumSubOp:
         )
 
         # nodes
-        nodes = []
+        nodes: List[NodeProto] = []
         inits: List[TensorProto] = []
         if "initializer" in kwargs:
-            inits.extend(kwargs["initializer"])
+            extra_inits = kwargs["initializer"]
+            if isinstance(extra_inits, list):
+                inits.extend(extra_inits)
         for op in self:
             for onx_node in op.to_onnx(names, verbose=verbose, opset=opset):
                 if hasattr(onx_node, "output"):
-                    nodes.append(onx_node)
+                    nodes.append(onx_node)  # type: ignore[arg-type]
                 else:
-                    inits.append(onx_node)
+                    inits.append(onx_node)  # type: ignore[arg-type]
 
         # last node
         last_node = nodes[-1]
         nodes.append(helper.make_node("Identity", [last_node.output[0]], [output]))
 
         # Builds the graph
+        graph_name = kwargs.get("name", "einsum")
         model = helper.make_model(
             opset_imports=[helper.make_operatorsetid("", opset)],
             ir_version=kwargs.get("ir_version", 8),
             producer_name=kwargs.get("producer_name", "onnx_extended"),
             producer_version=kwargs.get("producer_version", "0.0.dev"),
             graph=helper.make_graph(
-                name=kwargs.get("name", "einsum"),
+                name=str(graph_name),
                 inputs=onx_inputs,
                 outputs=[onx_output],
                 initializer=inits,

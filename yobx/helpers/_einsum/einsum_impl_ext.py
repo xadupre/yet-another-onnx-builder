@@ -124,9 +124,11 @@ def _numpy_extended_dot_equation(
     l3: List[Optional[str]] = [chr(i + 97) for i in range(m1_dim)]
     for a in left:
         l1[a] = l1[a].upper()
+        assert l3[a] is not None  # noqa: S101
         l3[a] = l3[a].upper()
     for a in right:
         l2[a] = l2[a].upper()
+        assert l3[a] is not None  # noqa: S101
         l3[a] = l3[a].upper()
     for a in axes:
         l1[a] = l1[a].lower()
@@ -134,6 +136,7 @@ def _numpy_extended_dot_equation(
         if a not in right:
             l3[a] = None
         else:
+            assert l3[a] is not None  # noqa: S101
             l3[a] = l3[a].lower()
     eq = f"{''.join(l1)},{''.join(l2)}->{''.join(s for s in l3 if s)}"
     return eq
@@ -321,9 +324,11 @@ def _numpy_extended_dot_python_l1l2l3(
     l3: List[Optional[str]] = [chr(i + 97) for i in range(m1_dim)]
     for a in left:
         l1[a] = l1[a].upper()
+        assert l3[a] is not None  # noqa: S101
         l3[a] = l3[a].upper()
     for a in right:
         l2[a] = l2[a].upper()
+        assert l3[a] is not None  # noqa: S101
         l3[a] = l3[a].upper()
     for a in axes:
         l1[a] = l1[a].lower()
@@ -331,6 +336,7 @@ def _numpy_extended_dot_python_l1l2l3(
         if a not in right:
             l3[a] = "-"
         else:
+            assert l3[a] is not None  # noqa: S101
             l3[a] = l3[a].lower()
     return l1, l2, l3
 
@@ -419,10 +425,11 @@ def _numpy_extended_dot_python_update_broadcast(
         if (kind[i] & 4) > 0:
             # Summation axis is part of the output.
             assert let[inp] is not None, f"Unexpected value for let[{inp}] in let={let}."
-            if let[inp].lower() == let[inp]:
-                let[inp] = let[inp].upper()
+            let_inp: str = let[inp]
+            if let_inp.lower() == let_inp:
+                let[inp] = let_inp.upper()
             else:
-                let[inp] = let[inp].lower()
+                let[inp] = let_inp.lower()
             l3[p] = let[inp]
             if inp == 1:
                 l2[p] = let[inp]
@@ -433,10 +440,11 @@ def _numpy_extended_dot_python_update_broadcast(
         else:
             # Summation axis is not part of the output.
             assert let[inp] is not None, f"Unexpected value for let[{inp}] in let={let}."
-            if let[inp].lower() == let[inp]:
-                let[inp] = let[inp].upper()
+            let_inp = let[inp]
+            if let_inp.lower() == let_inp:
+                let[inp] = let_inp.upper()
             else:
-                let[inp] = let[inp].lower()
+                let[inp] = let_inp.lower()
             if inp == 1:
                 l2[p] = let[inp]
             else:
@@ -527,7 +535,9 @@ def numpy_extended_dot_python(
         [m1.shape[pos[n]] if (kind[n] & 1) == 1 else m2.shape[pos[n]] for n in range(len(names))],
         dtype=numpy.int64,
     )
-    plo = numpy.array([-1 if c not in names else names.index(c) for c in l3], dtype=numpy.int64)
+    plo = numpy.array(
+        [-1 if c is None or c not in names else names.index(c) for c in l3], dtype=numpy.int64
+    )
 
     if verbose:
         print(

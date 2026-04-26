@@ -103,11 +103,19 @@ def decompose_einsum(
     n_inputs = len(equation.split("->")[0].split(","))
     input_names = [f"X{i}" for i in range(n_inputs)]
 
-    graph = _decompose_einsum_equation(
-        equation, *input_shapes, strategy=strategy, clean=clean, verbose=verbose
+    # The decomposition algorithm only uses the rank (number of dimensions),
+    # not the actual dim values, so convert any symbolic dims to concrete ints.
+    concrete_shapes: tuple = (
+        tuple(tuple(d if isinstance(d, int) else 2 for d in sh) for sh in input_shapes)
+        if input_shapes
+        else ()
     )
 
-    kwargs = {}
+    graph = _decompose_einsum_equation(
+        equation, *concrete_shapes, strategy=strategy, clean=clean, verbose=verbose
+    )
+
+    kwargs: dict = {}
     if opset is not None:
         kwargs["opset"] = opset
 
@@ -115,10 +123,8 @@ def decompose_einsum(
     # them to to_onnx via the (name, (elem_type, shape)) tuple format so that
     # the produced value_info carries the correct shape information.
     if input_shapes:
-        proto = _np_dtype_to_tensor_dtype(dtype)
-        shaped_inputs = [
-            (name, (proto, list(sh))) for name, sh in zip(input_names, input_shapes)
-        ]
+        proto = _np_dtype_to_tensor_dtype(np.dtype(dtype))
+        shaped_inputs = [(name, (proto, list(sh))) for name, sh in zip(input_names, input_shapes)]
         model: onnx.ModelProto = graph.to_onnx(
             "Z", *shaped_inputs, dtype=dtype, verbose=verbose, **kwargs
         )
@@ -128,9 +134,7 @@ def decompose_einsum(
 
 
 def list_decomposed_nodes(
-    equation: str,
-    *input_shapes: Tuple[Union[int, str, None], ...],
-    verbose: bool = False,
+    equation: str, *input_shapes: Tuple[Union[int, str, None], ...], verbose: bool = False
 ) -> List[str]:
     """
     Returns the list of ONNX operator types that result from decomposing
