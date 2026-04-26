@@ -9,7 +9,8 @@ https://github.com/sdpython/onnx-extended/blob/main/onnx_extended/tools/einsum/e
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, Union
 import numpy
 from onnx import helper, numpy_helper, ModelProto, NodeProto, TensorProto
-from .einsum_config import DEFAULT_IR_VERSION, DEFAULT_OPSET, guess_proto_dtype
+import onnx
+from yobx.helpers.onnx_helper import np_dtype_to_tensor_dtype as _np_dtype_to_tensor_dtype
 from .einsum_impl_ext import (
     numpy_extended_dot,
     numpy_diagonal,
@@ -1092,7 +1093,7 @@ class EinsumSubOp:
         :return: output
         """
         if opset is None:
-            opset = DEFAULT_OPSET
+            opset = min(18, onnx.defs.onnx_opset_version())
         if verbose:
             print()
             print(
@@ -1604,14 +1605,14 @@ class GraphEinsumSubOp:
 
         # inputs
         if opset is None:
-            opset = DEFAULT_OPSET
+            opset = min(18, onnx.defs.onnx_opset_version())
         if verbose:
             print(
                 "[GraphEinsumSubOp.to_onnx] %r -> %s opset=%r "
                 "dtype=%r" % (inputs, output, opset, dtype)
             )
         onx_inputs = []
-        proto = guess_proto_dtype(numpy.float32 if dtype is None else dtype)
+        proto = _np_dtype_to_tensor_dtype(numpy.float32 if dtype is None else dtype)
         lengths = self.metadata["lengths"]
         names: Dict[int, str] = {}
         for inp, le in zip(inputs, lengths):
@@ -1654,7 +1655,7 @@ class GraphEinsumSubOp:
         # Builds the graph
         model = helper.make_model(
             opset_imports=[helper.make_operatorsetid("", opset)],
-            ir_version=kwargs.get("ir_version", DEFAULT_IR_VERSION),
+            ir_version=kwargs.get("ir_version", 8),
             producer_name=kwargs.get("producer_name", "onnx_extended"),
             producer_version=kwargs.get("producer_version", "0.0.dev"),
             graph=helper.make_graph(
