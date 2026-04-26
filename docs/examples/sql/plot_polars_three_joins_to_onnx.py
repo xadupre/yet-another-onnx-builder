@@ -1,17 +1,21 @@
 """
 .. _l-plot-polars-three-joins-to-onnx:
 
-Three Consecutive Joins to ONNX (polars-style)
-===============================================
+Three Consecutive Joins to ONNX (pandas and polars-style)
+==========================================================
 
 This example shows how to convert a pipeline that performs **three consecutive
 inner joins** into a self-contained ONNX model using
 :func:`~yobx.sql.dataframe_to_onnx`.
 
-The API accepts a plain Python callable that receives
-:class:`~yobx.xtracing.dataframe_trace.TracedDataFrame` objects and returns
-one.  The callable's interface deliberately mirrors the polars DataFrame API,
-so existing polars code can be adapted with minimal changes.
+Two flavours are demonstrated:
+
+1. **pandas** — pandas DataFrames are passed directly as ``input_dtypes``
+   so column names and dtypes are extracted automatically.
+2. **polars / TracedDataFrame** — explicit dtype dicts are supplied; the
+   transform callable uses the
+   :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame` API, which
+   mirrors polars' :class:`polars.LazyFrame`.
 
 Scenario
 --------
@@ -96,14 +100,111 @@ unit_price = np.array([50.0, 80.0, 60.0], dtype=np.float32)
 wid = np.array([1000, 2000], dtype=np.int64)
 shipping_cost = np.array([5.0, 8.0], dtype=np.float32)
 
+# reusable feeds dict (column name → numpy array)
+feeds = {
+    "order_id": order_id,
+    "customer_id": customer_id,
+    "product_id": product_id,
+    "warehouse_id": warehouse_id,
+    "qty": qty,
+    "cid": cid,
+    "discount": discount,
+    "pid": pid,
+    "unit_price": unit_price,
+    "wid": wid,
+    "shipping_cost": shipping_cost,
+}
+expected_total = np.array([95.0, 72.0, 167.0, 58.0], dtype=np.float32)
+
 # %%
-# 1. Define the transform — three consecutive joins
-# -------------------------------------------------
+# 1. Pandas — pass DataFrames as input_dtypes
+# --------------------------------------------
 #
-# The callable receives :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame`
-# objects.  Their ``.join()`` method mirrors polars'
-# :meth:`polars.LazyFrame.join`, accepting ``left_key`` / ``right_key``
-# arguments for the join column names on each side.
+# When pandas :class:`~pandas.DataFrame` objects are passed as ``input_dtypes``,
+# :func:`~yobx.sql.dataframe_to_onnx` extracts column names and dtypes
+# automatically.  This is the most concise entry point for code that already
+# builds its tables as pandas DataFrames.
+
+import pandas as pd  # noqa: E402
+
+pd_orders = pd.DataFrame(
+    {
+        "order_id": order_id,
+        "customer_id": customer_id,
+        "product_id": product_id,
+        "warehouse_id": warehouse_id,
+        "qty": qty,
+    }
+)
+pd_customers = pd.DataFrame({"cid": cid, "discount": discount})
+pd_products = pd.DataFrame({"pid": pid, "unit_price": unit_price})
+pd_warehouses = pd.DataFrame({"wid": wid, "shipping_cost": shipping_cost})
+
+# %%
+# The equivalent pandas pipeline using :func:`pandas.merge`:
+#
+# .. code-block:: python
+#
+#     j1 = pd.merge(pd_orders, pd_customers, left_on="customer_id", right_on="cid")
+#     j2 = pd.merge(j1, pd_products, left_on="product_id", right_on="pid")
+#     j3 = pd.merge(j2, pd_warehouses, left_on="warehouse_id", right_on="wid")
+#     j3["total"] = j3["qty"] * j3["unit_price"] * (1 - j3["discount"]) + j3["shipping_cost"]
+
+
+def transform_pandas(orders, customers, products, warehouses):
+    """Apply three consecutive inner joins and compute total order cost."""
+    j1 = orders.join(customers, left_key="customer_id", right_key="cid")
+    j2 = j1.join(products, left_key="product_id", right_key="pid")
+    j3 = j2.join(warehouses, left_key="warehouse_id", right_key="wid")
+    return j3.select(
+        [
+            j3["order_id"],
+            j3["qty"],
+            j3["discount"],
+            j3["unit_price"],
+            j3["shipping_cost"],
+            (j3["qty"] * j3["unit_price"] * (1.0 - j3["discount"]) + j3["shipping_cost"]).alias(
+                "total"
+            ),
+        ]
+    )
+
+
+artifact_pandas = dataframe_to_onnx(
+    transform_pandas, [pd_orders, pd_customers, pd_products, pd_warehouses]
+)
+
+print("(pandas) ONNX input names :", artifact_pandas.input_names)
+print("(pandas) ONNX output names:", artifact_pandas.output_names)
+
+# %%
+# Run with the reference evaluator and onnxruntime:
+
+ref_pd = ExtendedReferenceEvaluator(artifact_pandas)
+results_pd = ref_pd.run(None, feeds)
+for name, val in zip(artifact_pandas.output_names, results_pd):
+    print(f"  {name}: {val}")
+
+total_idx_pd = artifact_pandas.output_names.index("total")
+np.testing.assert_allclose(results_pd[total_idx_pd], expected_total, rtol=1e-5)
+print("(pandas) Reference evaluator: totals match expected values ✓")
+
+sess_pd = onnxruntime.InferenceSession(
+    artifact_pandas.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+ort_results_pd = sess_pd.run(None, feeds)
+np.testing.assert_allclose(ort_results_pd[total_idx_pd], expected_total, rtol=1e-5)
+print("(pandas) OnnxRuntime:         totals match expected values ✓")
+
+# %%
+# 2. Define the transform — three consecutive joins (dtype-dict style)
+# --------------------------------------------------------------------
+#
+# The same transform function is used when ``input_dtypes`` is supplied as
+# explicit dtype dicts — the entry point for code that mirrors the polars
+# :class:`polars.LazyFrame` API.  The callable receives
+# :class:`~yobx.xtracing.dataframe_trace.TracedDataFrame` objects regardless
+# of which flavour of ``input_dtypes`` is chosen.
 
 
 def transform(orders, customers, products, warehouses):
@@ -129,8 +230,8 @@ def transform(orders, customers, products, warehouses):
 
 
 # %%
-# 2. Convert to ONNX
-# ------------------
+# 3. Convert to ONNX (dtype-dict style)
+# --------------------------------------
 #
 # :func:`~yobx.sql.dataframe_to_onnx` traces *transform* and emits a
 # self-contained ONNX model.  The ``input_dtypes`` list describes each of the
@@ -155,26 +256,13 @@ print("ONNX input names :", artifact.input_names)
 print("ONNX output names:", artifact.output_names)
 
 # %%
-# 3. Run with the reference evaluator
+# 4. Run with the reference evaluator
 # ------------------------------------
 #
 # :class:`~yobx.reference.ExtendedReferenceEvaluator` lets us verify the model
 # without onnxruntime.
 
 ref = ExtendedReferenceEvaluator(artifact)
-feeds = {
-    "order_id": order_id,
-    "customer_id": customer_id,
-    "product_id": product_id,
-    "warehouse_id": warehouse_id,
-    "qty": qty,
-    "cid": cid,
-    "discount": discount,
-    "pid": pid,
-    "unit_price": unit_price,
-    "wid": wid,
-    "shipping_cost": shipping_cost,
-}
 ref_outputs = ref.run(None, feeds)
 
 # Show the result
@@ -186,13 +274,12 @@ for name, val in zip(artifact.output_names, ref_outputs):
 # order 2: qty=1, price=80, disc=0.2, ship=8  → 1*80*0.8+8 = 72
 # order 3: qty=3, price=60, disc=0.1, ship=5  → 3*60*0.9+5 = 167
 # order 4: qty=1, price=50, disc=0.0, ship=8  → 1*50*1.0+8 = 58
-expected_total = np.array([95.0, 72.0, 167.0, 58.0], dtype=np.float32)
 total_idx = artifact.output_names.index("total")
 np.testing.assert_allclose(ref_outputs[total_idx], expected_total, rtol=1e-5)
 print("Reference evaluator: totals match expected values ✓")
 
 # %%
-# 4. Run with onnxruntime
+# 5. Run with onnxruntime
 # -----------------------
 #
 # The same feeds work transparently with onnxruntime.
@@ -205,7 +292,7 @@ np.testing.assert_allclose(ort_outputs[total_idx], expected_total, rtol=1e-5)
 print("OnnxRuntime:        totals match expected values ✓")
 
 # %%
-# 5. Inspect the ONNX graph
+# 6. Inspect the ONNX graph
 # -------------------------
 #
 # Each join is translated to a broadcast equality check followed by
@@ -215,7 +302,7 @@ print("OnnxRuntime:        totals match expected values ✓")
 print(pretty_onnx(artifact.proto))
 
 # %%
-# 6. Node count per join step
+# 7. Node count per join step
 # ---------------------------
 #
 # The bar chart below shows how many ONNX nodes are added by each join and
@@ -245,7 +332,7 @@ plt.tight_layout()
 plt.show()
 
 # %%
-# 7. Display the ONNX graph
+# 8. Display the ONNX graph
 # -------------------------
 #
 # :func:`~yobx.doc.plot_dot` renders the full ONNX graph so you can trace
