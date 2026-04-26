@@ -2882,8 +2882,8 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
     # EmbedLayerNormalization: BERT-style embedding layer fusion.
     # Inputs: input_ids [B, S], segment_ids [B, S] (opt), word_embedding [V, D],
     #         position_embedding [P, D], segment_embedding [NS, D] (opt),
-    #         gamma [D], beta [D], mask [B, S] (opt), position_ids [B, S] (opt)
-    # Outputs: output [B, S, D], mask_index [B]
+    #         gamma [D], beta [D], mask [B, S] (opt), position_ids [B, S] (opt).
+    # Outputs: output [B, S, D], mask_index [B].
     if node.op_type == "EmbedLayerNormalization" and node.domain == "com.microsoft":
         # word_embedding is input[2]; its dtype gives the output float type
         word_emb_input = node.input[2] if len(node.input) > 2 else ""
