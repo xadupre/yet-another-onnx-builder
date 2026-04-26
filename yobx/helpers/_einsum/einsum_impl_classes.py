@@ -820,16 +820,28 @@ class EinsumSubOp:
         inp = self.inputs[0]
         name = self._get_data(names, inp)
         axes = self.kwargs["axes"]
-        name_axes = self._onnx_name() + "_axes"
-        yield numpy_helper.from_array(numpy.array(axes, dtype=numpy.int64), name=name_axes)
         s_axes = "".join(map(str, axes))
-        yield helper.make_node(
-            "ReduceSum",
-            [name, name_axes],
-            [self._onnx_name()],
-            keepdims=1,
-            name="ReduceSum%s_%d" % (s_axes, id(self)),
-        )
+        if opset is not None and opset >= 13:
+            name_axes = self._onnx_name() + "_axes"
+            yield numpy_helper.from_array(
+                numpy.array(axes, dtype=numpy.int64), name=name_axes
+            )
+            yield helper.make_node(
+                "ReduceSum",
+                [name, name_axes],
+                [self._onnx_name()],
+                keepdims=1,
+                name="ReduceSum%s_%d" % (s_axes, id(self)),
+            )
+        else:
+            yield helper.make_node(
+                "ReduceSum",
+                [name],
+                [self._onnx_name()],
+                axes=axes,
+                keepdims=1,
+                name="ReduceSum%s_%d" % (s_axes, id(self)),
+            )
 
     def _to_onnx_mul(
         self, data: List[Any], verbose: bool = False, **kwargs: Dict[str, Any]
