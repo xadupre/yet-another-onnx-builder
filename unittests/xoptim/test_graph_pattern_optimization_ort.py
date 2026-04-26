@@ -3978,6 +3978,111 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         # The matmul output is used twice so fusion should NOT happen.
         self.assertNotIn("FusedMatMulActivation", [n.op_type for n in opt_onx.graph.node])
 
+    # ---------------------------------------------------------------
+    # Tests for GreedySearchPattern
+    # ---------------------------------------------------------------
+
+    def _build_greedy_search_model(self, input_dtype=TensorProto.INT64):
+        """Builds a minimal ONNX model containing a com.microsoft.GreedySearch node.
+
+        The decoder subgraph is a trivial Cast(INT32→FLOAT) that satisfies the
+        type constraints without executing any real language-model logic.
+        """
+        from onnx import AttributeProto
+
+        decoder_graph = oh.make_graph(
+            [oh.make_node("Cast", ["input_ids"], ["logits"], to=TensorProto.FLOAT)],
+            "decoder",
+            [oh.make_tensor_value_info("input_ids", TensorProto.INT32, [1, None])],
+            [oh.make_tensor_value_info("logits", TensorProto.FLOAT, [1, None])],
+        )
+
+        gs_node = oh.make_node(
+            "GreedySearch",
+            ["input_ids", "max_length"],
+            ["sequences"],
+            domain="com.microsoft",
+            eos_token_id=1,
+            pad_token_id=0,
+        )
+        decoder_attr = AttributeProto()
+        decoder_attr.name = "decoder"
+        decoder_attr.g.CopyFrom(decoder_graph)
+        decoder_attr.type = AttributeProto.GRAPH
+        gs_node.attribute.append(decoder_attr)
+
+        model = oh.make_model(
+            oh.make_graph(
+                [gs_node],
+                "greedy_search_test",
+                [
+                    oh.make_tensor_value_info("input_ids", input_dtype, [2, 5]),
+                    oh.make_tensor_value_info("max_length", input_dtype, [1]),
+                ],
+                [oh.make_tensor_value_info("sequences", TensorProto.INT32, [2, None])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        return model
+
+    def test_greedy_search_int64_cast(self):
+        """GreedySearchPattern inserts Cast(INT64→INT32) for integer inputs."""
+        model = self._build_greedy_search_model(input_dtype=TINT64)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=InferShapesOptions.BUILDER,
+            optimization_options=OptimizationOptions(patterns=["GreedySearch"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+
+        op_types = [(n.op_type, n.domain) for n in opt_onx.graph.node]
+        self.assertIn(("Cast", ""), op_types)
+        self.assertIn(("GreedySearch", "com.microsoft"), op_types)
+
+        gs_nodes = [
+            n
+            for n in opt_onx.graph.node
+            if n.op_type == "GreedySearch" and n.domain == "com.microsoft"
+        ]
+        self.assertEqual(1, len(gs_nodes))
+
+    def test_greedy_search_no_cast_when_int32(self):
+        """GreedySearchPattern does not fire when inputs are already INT32."""
+        model = self._build_greedy_search_model(input_dtype=TensorProto.INT32)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=InferShapesOptions.BUILDER,
+            optimization_options=OptimizationOptions(patterns=["GreedySearch"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+
+        op_types = [(n.op_type, n.domain) for n in opt_onx.graph.node]
+        # No Cast nodes should be introduced
+        self.assertNotIn(("Cast", ""), op_types)
+        self.assertIn(("GreedySearch", "com.microsoft"), op_types)
+
+    def test_greedy_search_in_pattern_list(self):
+        """GreedySearchPattern is in the default ORT pattern list."""
+        from yobx.xoptim.patterns_ort import get_onnxruntime_patterns
+
+        patterns = get_onnxruntime_patterns()
+        names = [p.__class__.__name__ for p in patterns]
+        self.assertIn("GreedySearchPattern", names)
+
+    def test_greedy_search_shape_inference(self):
+        """Shape inference sets output type to INT32 with rank 2 for GreedySearch."""
+        model = self._build_greedy_search_model(input_dtype=TensorProto.INT32)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=InferShapesOptions.BUILDER,
+            optimization_options=OptimizationOptions(patterns=[]),
+        )
+        opt_onx = gr.to_onnx(optimize=False)
+
+        output_types = {vi.name: vi.type.tensor_type.elem_type for vi in opt_onx.graph.output}
+        self.assertEqual(output_types.get("sequences"), TensorProto.INT32)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
