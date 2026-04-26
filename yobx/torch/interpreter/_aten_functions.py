@@ -1978,6 +1978,86 @@ def aten_bitwise_or__Tensor(
     return aten_bitwise_or_Tensor(g, sts, outputs, x, y, name=name)
 
 
+def aten_block_diag(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    tensors: Sequence[T],
+    name: str = "block_diag",
+) -> T:
+    """Creates a block diagonal matrix from the provided tensors.
+
+    Each input is normalised to 2-D (0-D scalars become ``[1, 1]``, 1-D
+    vectors of length ``n`` become ``[1, n]``) and then placed on the
+    diagonal of the output 2-D matrix.
+    """
+    assert len(tensors) > 0, f"block_diag: empty tensor list{g.get_debug_msg()}"
+    assert all(
+        g.has_type(t) for t in tensors
+    ), f"block_diag: missing type for at least one tensor{g.get_debug_msg()}"
+    itype = g.get_type(tensors[0])
+
+    # Normalise every input to 2-D.
+    mats = []
+    for t in tensors:
+        rank = g.get_rank(t) if g.has_rank(t) else None
+        if rank == 0:
+            m = g.op.Reshape(t, np.array([1, 1], dtype=np.int64), name=name)
+        elif rank == 1:
+            m = g.op.UnsqueezeAnyOpset(t, np.array([0], dtype=np.int64), name=name)
+        else:
+            m = t
+        mats.append(m)
+
+    if len(mats) == 1:
+        res = g.op.Identity(mats[0], outputs=outputs, name=name)
+        if not sts:
+            g.set_type(res, itype)
+            g.set_rank(res, 2)
+        return res
+
+    # Compute per-tensor shape tensors as 1-D INT64 tensors of shape [1].
+    r_1ds = [g.op.Shape(m, start=0, end=1, name=name) for m in mats]
+    c_1ds = [g.op.Shape(m, start=1, end=2, name=name) for m in mats]
+
+    # Total rows and columns (shape [1]).
+    total_r = g.op.ReduceSumAnyOpset(
+        g.op.Concat(*r_1ds, axis=0, name=name), keepdims=1, name=name
+    )
+    total_c = g.op.ReduceSumAnyOpset(
+        g.op.Concat(*c_1ds, axis=0, name=name), keepdims=1, name=name
+    )
+
+    # Pad each 2-D matrix to [total_r, total_c] and sum the results.
+    # Running cumulative offsets start at [0].
+    row_before: Any = g.ZERO
+    col_before: Any = g.ZERO
+    padded = []
+    for m, r_1d, c_1d in zip(mats, r_1ds, c_1ds):
+        row_after = g.op.Sub(g.op.Sub(total_r, row_before, name=name), r_1d, name=name)
+        col_after = g.op.Sub(g.op.Sub(total_c, col_before, name=name), c_1d, name=name)
+        pads = g.op.Concat(row_before, col_before, row_after, col_after, axis=0, name=name)
+        padded.append(g.op.Pad(m, pads, name=name))
+        row_before = g.op.Add(row_before, r_1d, name=name)
+        col_before = g.op.Add(col_before, c_1d, name=name)
+
+    # Sum the padded (non-overlapping) blocks.
+    res = padded[0]
+    for p in padded[1:]:
+        res = g.op.Add(res, p, name=name)
+    res = g.op.Identity(res, outputs=outputs, name=name)
+    if not sts:
+        g.set_type(res, itype)
+        # Set the exact output shape when all normalised shapes are static.
+        if all(g.has_shape(m) and is_static_shape(g.get_shape(m)) for m in mats):
+            total_r_val = sum(g.get_shape(m)[0] for m in mats)
+            total_c_val = sum(g.get_shape(m)[1] for m in mats)
+            g.set_shape(res, (total_r_val, total_c_val))
+        else:
+            g.set_rank(res, 2)
+    return res
+
+
 def aten_bmm(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T) -> T:
     "bmm"
     assert g.get_type(x) == g.get_type(y), (

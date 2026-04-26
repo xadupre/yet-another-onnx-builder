@@ -71,7 +71,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "addr",
         "alias_copy",
         "bernoulli",
-        "block_diag",
         "conj_physical",
         "copysign",
         "cross",
