@@ -605,7 +605,7 @@ class EinsumSubOp:
         m2sh = m2.reshape((dim0b, dimb, dim2))
 
         batch_kind = self.get_dot_kind()
-        if batch_kind in ("11", "N1", "N1"):
+        if batch_kind in ("11", "N1", "1N"):
             m1sh = m1sh.reshape((-1, m1sh.shape[-1]))
             m2sh = m2sh.reshape((-1, m2sh.shape[-1]))
             if verbose:
