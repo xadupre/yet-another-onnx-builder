@@ -6,7 +6,7 @@ https://github.com/sdpython/onnx-extended/blob/main/onnx_extended/tools/einsum/e
 (MIT licence).
 """
 
-from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple, Union
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Union
 import numpy
 from onnx import helper, numpy_helper, ModelProto, NodeProto, TensorProto
 import onnx
@@ -21,7 +21,7 @@ from .einsum_impl_ext import (
 from .blas_lapack import gemm_dot
 
 
-def single_axes(axes: Tuple[int, ...]) -> Optional[List[int]]:
+def single_axes(axes: Any) -> Optional[List[int]]:
     """
     *axes* contains positive values, then it is the position
     of this axis in the original matrix, otherwise it is -1
@@ -71,7 +71,7 @@ class EinsumSubOp:
     }
 
     def __init__(
-        self, full_dim: int, name: str, *inputs: List["EinsumSubOp"], **kwargs: Dict[str, Any]
+        self, full_dim: int, name: str, *inputs: Union[int, "EinsumSubOp"], **kwargs: Any
     ):
         self.full_dim = full_dim
         self.name = name
@@ -151,7 +151,7 @@ class EinsumSubOp:
             self.name,
         )
 
-    def _check_row_(self, row: numpy.ndarray, inp: bool = False, verbose: bool = False):
+    def _check_row_(self, row: Optional[numpy.ndarray], inp: bool = False, verbose: bool = False):
         """
         Checks input or output is valid.
         """
@@ -411,7 +411,7 @@ class EinsumSubOp:
         meth(row, row2=row2, ab=ab, verbose=verbose)
         self.add_info(o_row=single_axes(row), o_row2=single_axes(row2))
 
-    def add_info(self, **kwargs: Dict[str, Any]):
+    def add_info(self, **kwargs: Any):
         """
         Adds information to the node.
 
@@ -450,17 +450,13 @@ class EinsumSubOp:
             return data[skey]
         raise TypeError(f"Unexpected input type {type(key)!r}.")
 
-    def _apply_id(
-        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]
-    ) -> Any:
+    def _apply_id(self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any) -> Any:
         self._check_inputs_(1)
         inp = self.inputs[0]
         output = self._get_data(data, inp)
         return output
 
-    def _apply_diagonal(
-        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]
-    ) -> Any:
+    def _apply_diagonal(self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any) -> Any:
         self._check_inputs_(1)
         inp = self.inputs[0]
         m = self._get_data(data, inp)
@@ -476,7 +472,7 @@ class EinsumSubOp:
         return output
 
     def _apply_expand_dims(
-        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]
+        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any
     ) -> Any:
         self._check_inputs_(1)
         inp = self.inputs[0]
@@ -488,9 +484,7 @@ class EinsumSubOp:
             output = numpy.expand_dims(output, axis[0])
         return output
 
-    def _apply_transpose(
-        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]
-    ) -> Any:
+    def _apply_transpose(self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any) -> Any:
         self._check_inputs_(1, True)
         inp = self.inputs[0]
         m = self._get_data(data, inp)
@@ -502,7 +496,7 @@ class EinsumSubOp:
         return output
 
     def _apply_transpose_mm(
-        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]
+        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any
     ) -> Any:
         self._check_inputs_(2, True)
         inp = self.inputs[0]
@@ -514,9 +508,7 @@ class EinsumSubOp:
         self._check_shape_(output)
         return output
 
-    def _apply_matmul(
-        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]
-    ) -> Any:
+    def _apply_matmul(self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any) -> Any:
         self._check_inputs_(2)
         inp1 = self.inputs[0]
         inp2 = self.inputs[1]
@@ -546,9 +538,7 @@ class EinsumSubOp:
         self._check_shape_(output)
         return output
 
-    def _apply_mul(
-        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]
-    ) -> Any:
+    def _apply_mul(self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any) -> Any:
         self._check_inputs_(2)
         inp1 = self.inputs[0]
         inp2 = self.inputs[1]
@@ -564,9 +554,7 @@ class EinsumSubOp:
         self._check_shape_(output)
         return output
 
-    def _apply_batch_dot(
-        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]
-    ) -> Any:
+    def _apply_batch_dot(self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any) -> Any:
         self._check_inputs_(2)
         inp1 = self.inputs[0]
         inp2 = self.inputs[1]
@@ -636,7 +624,7 @@ class EinsumSubOp:
         return output
 
     def _apply_reduce_sum(
-        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]
+        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any
     ) -> Any:
         self._check_inputs_(1)
         inp = self.inputs[0]
@@ -650,7 +638,7 @@ class EinsumSubOp:
         return output
 
     def _apply_reduce_sum_mm(
-        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]
+        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any
     ) -> Any:
         self._check_inputs_(2, True)
         inp = self.inputs[0]
@@ -662,9 +650,7 @@ class EinsumSubOp:
         self._check_shape_(output)
         return output
 
-    def _apply_squeeze(
-        self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]
-    ) -> Any:
+    def _apply_squeeze(self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any) -> Any:
         self._check_inputs_(1)
         inp = self.inputs[0]
         m = self._get_data(data, inp)
@@ -676,7 +662,7 @@ class EinsumSubOp:
             output = numpy.squeeze(output, axis=a)
         return output
 
-    def apply(self, data: Dict[int, Any], verbose: bool = False, **kwargs: Dict[str, Any]) -> Any:
+    def apply(self, data: Dict[int, Any], verbose: bool = False, **kwargs: Any) -> Any:
         """
         Applies one operator on the data.
 
@@ -721,11 +707,7 @@ class EinsumSubOp:
             )
 
     def _to_onnx_id(
-        self,
-        names: Dict[int, str],
-        opset: Optional[int],
-        verbose: bool = False,
-        **kwargs: Dict[str, Any],
+        self, names: Dict[int, str], opset: Optional[int], verbose: bool = False, **kwargs: Any
     ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(1)
         inp = self.inputs[0]
@@ -733,11 +715,7 @@ class EinsumSubOp:
         yield helper.make_node("Identity", [name], [self._onnx_name()])
 
     def _to_onnx_expand_dims(
-        self,
-        names: Dict[int, str],
-        opset: Optional[int],
-        verbose: bool = False,
-        **kwargs: Dict[str, Any],
+        self, names: Dict[int, str], opset: Optional[int], verbose: bool = False, **kwargs: Any
     ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(1)
         self._check_onnx_opset_(opset, 11)
@@ -757,11 +735,7 @@ class EinsumSubOp:
         )
 
     def _to_onnx_squeeze(
-        self,
-        names: Dict[int, str],
-        opset: Optional[int],
-        verbose: bool = False,
-        **kwargs: Dict[str, Any],
+        self, names: Dict[int, str], opset: Optional[int], verbose: bool = False, **kwargs: Any
     ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(1)
         self._check_onnx_opset_(opset, 11)
@@ -788,11 +762,7 @@ class EinsumSubOp:
             )
 
     def _to_onnx_transpose(
-        self,
-        names: Dict[int, str],
-        opset: Optional[int],
-        verbose: bool = False,
-        **kwargs: Dict[str, Any],
+        self, names: Dict[int, str], opset: Optional[int], verbose: bool = False, **kwargs: Any
     ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(1)
         inp = self.inputs[0]
@@ -808,11 +778,7 @@ class EinsumSubOp:
         )
 
     def _to_onnx_reduce_sum(
-        self,
-        names: Dict[int, str],
-        opset: Optional[int],
-        verbose: bool = False,
-        **kwargs: Dict[str, Any],
+        self, names: Dict[int, str], opset: Optional[int], verbose: bool = False, **kwargs: Any
     ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(1)
         self._check_onnx_opset_(opset, 11)
@@ -841,7 +807,7 @@ class EinsumSubOp:
             )
 
     def _to_onnx_mul(
-        self, names: Dict[int, str], verbose: bool = False, **kwargs: Dict[str, Any]
+        self, names: Dict[int, str], verbose: bool = False, **kwargs: Any
     ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(2)
         inp1 = self.inputs[0]
@@ -851,11 +817,7 @@ class EinsumSubOp:
         yield helper.make_node("Mul", [m1, m2], [self._onnx_name()])
 
     def _to_onnx_batch_dot(
-        self,
-        names: Dict[int, str],
-        opset: Optional[int],
-        verbose: bool = False,
-        **kwargs: Dict[str, Any],
+        self, names: Dict[int, str], opset: Optional[int], verbose: bool = False, **kwargs: Any
     ) -> Iterable[Union[NodeProto, TensorProto]]:
         self._check_inputs_(2)
         self._check_onnx_opset_(opset, 13)
@@ -901,6 +863,7 @@ class EinsumSubOp:
         # dim0 = int(numpy.prod([m1.shape[i] for i in batch_axes]))
         # dim0b = int(numpy.prod([m2.shape[i] for i in batch_axes]))
         if len(batch_axes) > 1:
+            assert name_batch_axes is not None  # noqa: S101
             name_dim0 = root + "_dim0"
             name_dim0b = root + "_dim0b"
             name_dim0g = name_dim0 + "g"
@@ -912,6 +875,7 @@ class EinsumSubOp:
             yield helper.make_node("ReduceProd", [name_dim0g], [name_dim0], keepdims=1)
             yield helper.make_node("ReduceProd", [name_dim0bg], [name_dim0b], keepdims=1)
         elif len(batch_axes) == 1:
+            assert name_batch_axes is not None  # noqa: S101
             name_dim0g = root + "_dim0g"
             name_dim0bg = root + "_dim0bg"
             name_dim0 = name_dim0g
@@ -970,6 +934,7 @@ class EinsumSubOp:
             concat_left.append(name_dim1)
             concat_right.append(name_dim2)
         elif len(sum_axes) == 1:
+            assert name_sum_axes is not None  # noqa: S101
             name_dim1 = root + "_dim1"
             name_dim2 = root + "_dim2"
             name_dim1g = name_dim1
@@ -979,6 +944,7 @@ class EinsumSubOp:
             yield helper.make_node("Gather", [name_shape1, name_sum_axes], [name_dim1g])
             yield helper.make_node("Gather", [name_shape2, name_sum_axes], [name_dim2g])
         else:
+            assert name_sum_axes is not None  # noqa: S101
             name_dim1 = root + "_dim1"
             name_dim2 = root + "_dim2"
             name_dim1g = name_dim1 + "g"
@@ -1095,11 +1061,7 @@ class EinsumSubOp:
         yield helper.make_node("Reshape", [name_dot, name_new_shape], [name_final])
 
     def to_onnx(
-        self,
-        names: Dict[int, str],
-        opset: Optional[int],
-        verbose: bool = False,
-        **kwargs: Dict[str, Any],
+        self, names: Dict[int, str], opset: Optional[int], verbose: bool = False, **kwargs: Any
     ) -> Iterable[Union[NodeProto, TensorProto]]:
         """
         Converts this node into ONNX. Enumerates all ONNX node
@@ -1252,14 +1214,14 @@ class GraphEinsumSubOp:
         "Iterates on nodes."
         yield from self._ops
 
-    def to_dot(self, **kwargs: Dict[str, Any]) -> str:
+    def to_dot(self, **kwargs: Any) -> str:
         """
         Produces a graph in :epkg:`dot`.
 
         :param kwargs: additional graph option
         :return: string
         """
-        options = {
+        options: Dict[str, Any] = {
             "orientation": "portrait",
             "ranksep": "0.25",
             "nodesep": "0.05",
@@ -1284,19 +1246,19 @@ class GraphEinsumSubOp:
             return " ".join(it)
 
         rows = ["digraph{"]
-        for k, v in options.items():
-            if isinstance(v, str) and "[" in v:
-                rows.append(f"{k} {v};")
+        for opt_key, opt_val in options.items():
+            if isinstance(opt_val, str) and "[" in opt_val:
+                rows.append(f"{opt_key} {opt_val};")
             else:
-                rows.append(f"{k}={v};")
-        for k, v in self._nodes.items():
-            if isinstance(v, int):
+                rows.append(f"{opt_key}={opt_val};")
+        for node_id, node in self._nodes.items():
+            if isinstance(node, int):
                 let = [
                     (r, self.metadata["letters"][i])
-                    for i, r in enumerate(self.metadata["mat0"][v])
+                    for i, r in enumerate(self.metadata["mat0"][node])
                     if r != -1
                 ]
-                dup = self.metadata["duplicates"][v]
+                dup = self.metadata["duplicates"][node]
                 if dup is None:
                     dup = ""
                 else:
@@ -1304,39 +1266,37 @@ class GraphEinsumSubOp:
                 let.sort()
                 letters = "".join(_[1] for _ in let)
                 lab = "input %d\\\\n%s\\\\n%s%s" % (
-                    v,
+                    node,
                     letters,
-                    str(self.metadata["mat0"][v]),
+                    str(self.metadata["mat0"][node]),
                     dup,
                 )
-                sk = v
+                sk = node
                 extended_lab = ""
             else:
-                lab = f"{v.name}\\\\n{d2s(v.kwargs)}"
-                sk = id(v)
-                extended_lab = v.dot_label()
+                lab = f"{node.name}\\\\n{d2s(node.kwargs)}"
+                sk = id(node)
+                extended_lab = node.dot_label()
                 if extended_lab:
                     extended_lab = "\\\\n" + extended_lab
 
-            if sk in self._mark and isinstance(self._mark[sk], int):
-                la = self._mark[sk]
-                lab = lab.replace("\\\\n", " - I%d\\\\n" % la)
-                s = f'{k} [label="{lab}{extended_lab}" style=filled fillcolor=red];'
+            la_raw = self._mark.get(sk)
+            if la_raw is not None and isinstance(la_raw, int):
+                lab = lab.replace("\\\\n", " - I%d\\\\n" % la_raw)
+                s = f'{node_id} [label="{lab}{extended_lab}" style=filled fillcolor=red];'
             else:
-                s = f'{k} [label="{lab}{extended_lab}"];'
+                s = f'{node_id} [label="{lab}{extended_lab}"];'
             rows.append(s)
-            if not hasattr(v, "inputs"):
+            if not hasattr(node, "inputs"):
                 continue
-            for i in v.inputs:
-                vid = i if isinstance(i, int) else id(i)
-                s = "%d -> %d;" % (vid, k)
+            for inp_node in node.inputs:
+                vid = inp_node if isinstance(inp_node, int) else id(inp_node)
+                s = "%d -> %d;" % (vid, node_id)
                 rows.append(s)
         rows.append("}")
         return "\n".join(rows)
 
-    def apply_sequence(
-        self, *inputs: List[EinsumSubOp], verbose: bool = False, **kwargs: Dict[str, Any]
-    ) -> Any:
+    def apply_sequence(self, *inputs: Any, verbose: bool = False, **kwargs: Any) -> Any:
         """
         Applies a sequence of operations on a list of inputs.
 
@@ -1492,14 +1452,14 @@ class GraphEinsumSubOp:
                 )
                 del self._mark[dels[0]]
 
-        dels = set(id(o) for o in deleted)
+        del_ids = set(id(o) for o in deleted)
         rem = []
         for i, op in enumerate(self._ops):
-            if id(op) in dels:
+            if id(op) in del_ids:
                 rem.append(i)
         assert len(rem) == len(
             deleted
-        ), f"Mismatched length {rem!r}, {dels!r}, len={len(deleted)!r}."
+        ), f"Mismatched length {rem!r}, {del_ids!r}, len={len(deleted)!r}."
         for i in reversed(rem):
             del self._ops[i]
         self.last_added_op = None
@@ -1598,7 +1558,7 @@ class GraphEinsumSubOp:
         dtype: Optional[Any] = None,
         verbose: bool = False,
         opset: Optional[int] = None,
-        **kwargs: Dict[str, Any],
+        **kwargs: Any,
     ) -> ModelProto:
         """
         Converts the graph into ONNX.

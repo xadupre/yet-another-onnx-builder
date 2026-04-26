@@ -124,20 +124,23 @@ def _numpy_extended_dot_equation(
     l3: List[Optional[str]] = [chr(i + 97) for i in range(m1_dim)]
     for a in left:
         l1[a] = l1[a].upper()
-        assert l3[a] is not None  # noqa: S101
-        l3[a] = l3[a].upper()
+        l3a = l3[a]
+        assert l3a is not None  # noqa: S101
+        l3[a] = l3a.upper()
     for a in right:
         l2[a] = l2[a].upper()
-        assert l3[a] is not None  # noqa: S101
-        l3[a] = l3[a].upper()
+        l3a = l3[a]
+        assert l3a is not None  # noqa: S101
+        l3[a] = l3a.upper()
     for a in axes:
         l1[a] = l1[a].lower()
         l2[a] = l2[a].lower()
         if a not in right:
             l3[a] = None
         else:
-            assert l3[a] is not None  # noqa: S101
-            l3[a] = l3[a].lower()
+            l3a = l3[a]
+            assert l3a is not None  # noqa: S101
+            l3[a] = l3a.lower()
     eq = f"{''.join(l1)},{''.join(l2)}->{''.join(s for s in l3 if s)}"
     return eq
 
@@ -324,20 +327,23 @@ def _numpy_extended_dot_python_l1l2l3(
     l3: List[Optional[str]] = [chr(i + 97) for i in range(m1_dim)]
     for a in left:
         l1[a] = l1[a].upper()
-        assert l3[a] is not None  # noqa: S101
-        l3[a] = l3[a].upper()
+        l3a = l3[a]
+        assert l3a is not None  # noqa: S101
+        l3[a] = l3a.upper()
     for a in right:
         l2[a] = l2[a].upper()
-        assert l3[a] is not None  # noqa: S101
-        l3[a] = l3[a].upper()
+        l3a = l3[a]
+        assert l3a is not None  # noqa: S101
+        l3[a] = l3a.upper()
     for a in axes:
         l1[a] = l1[a].lower()
         l2[a] = l2[a].lower()
         if a not in right:
             l3[a] = "-"
         else:
-            assert l3[a] is not None  # noqa: S101
-            l3[a] = l3[a].lower()
+            l3a = l3[a]
+            assert l3a is not None  # noqa: S101
+            l3[a] = l3a.lower()
     return l1, l2, l3
 
 
@@ -426,29 +432,25 @@ def _numpy_extended_dot_python_update_broadcast(
             # Summation axis is part of the output.
             assert let[inp] is not None, f"Unexpected value for let[{inp}] in let={let}."
             let_inp: str = let[inp]
-            if let_inp.lower() == let_inp:
-                let[inp] = let_inp.upper()
-            else:
-                let[inp] = let_inp.lower()
-            l3[p] = let[inp]
+            new_let: str = let_inp.upper() if let_inp.lower() == let_inp else let_inp.lower()
+            let[inp] = new_let
+            l3[p] = new_let
             if inp == 1:
-                l2[p] = let[inp]
+                l2[p] = new_let
             else:
-                l1[p] = let[inp]
+                l1[p] = new_let
             if verbose:
                 print(f"    B1 l1={l1!r}, l2={l2!r} l3={l3!r}")
         else:
             # Summation axis is not part of the output.
             assert let[inp] is not None, f"Unexpected value for let[{inp}] in let={let}."
             let_inp = let[inp]
-            if let_inp.lower() == let_inp:
-                let[inp] = let_inp.upper()
-            else:
-                let[inp] = let_inp.lower()
+            new_let = let_inp.upper() if let_inp.lower() == let_inp else let_inp.lower()
+            let[inp] = new_let
             if inp == 1:
-                l2[p] = let[inp]
+                l2[p] = new_let
             else:
-                l1[p] = let[inp]
+                l1[p] = new_let
             if verbose:
                 print(f"    B2 l1={l1!r}, l2={l2!r} l3={l3!r}")
 
