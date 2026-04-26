@@ -355,3 +355,379 @@ class RelativePositionBiasPattern(PatternOptimization):
         )
 
         return [rpb_node]
+
+
+class GatedRelativePositionBiasPattern(PatternOptimization):
+    """
+    Implements the fusion of gated relative position bias computation (DeBERTa-v2/v3 style)
+    into ``com.microsoft.GatedRelativePositionBias``.
+
+    The fused pattern corresponds to the DeBERTa disentangled self-attention
+    gating computation, which applies a learned sigmoid gate to modulate a
+    pre-computed relative position bias tensor.
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_query_layer(["query_layer FLOAT(batch, seq_len, num_heads*head_size)"])
+            I_rel_pos(["rel_pos FLOAT(1, num_heads, seq_len, seq_len)"])
+            i_query_bias["query_bias FLOAT(num_heads*head_size)"]
+            i_gate_weight["gate_weight FLOAT(head_size, D)"]
+            i_gate_bias["gate_bias FLOAT(D)"]
+            i_eco_a["eco_a FLOAT(1, num_heads, 1, 1)"]
+
+            Add_0[["Add(query_layer, query_bias)"]]
+            Reshape_1[["Reshape(., [batch, seq_len, num_heads, head_size])"]]
+            Transpose_2[["Transpose(., perm=[0,2,1,3])"]]
+            MatMul_3[["MatMul(., gate_weight)"]]
+            Add_4[["Add(., gate_bias)"]]
+            Reshape_5[["Reshape(., [batch, num_heads, seq_len, 2, D//2])"]]
+            ReduceSum_6[["ReduceSum(., axis=-1, keepdims=0)"]]
+            Sigmoid_7[["Sigmoid(.)"]]
+            Split_8[["Split(., axis=-1)"]]
+            Mul_9[["Mul(gate_r, eco_a)"]]
+            Sub_10[["Sub(., 1.0)"]]
+            Mul_11[["Mul(gate_u, .)"]]
+            Add_12[["Add(., 2.0)"]]
+            Mul_13[["Mul(gate_u_1, rel_pos)"]]
+
+            I_query_layer -->|"FLOAT(batch, seq_len, num_heads*head_size)"| Add_0
+            i_query_bias -->|"FLOAT(num_heads*head_size)"| Add_0
+            Add_0 --> Reshape_1
+            Reshape_1 --> Transpose_2
+            Transpose_2 --> MatMul_3
+            i_gate_weight -->|"FLOAT(head_size, D)"| MatMul_3
+            MatMul_3 --> Add_4
+            i_gate_bias -->|"FLOAT(D)"| Add_4
+            Add_4 --> Reshape_5
+            Reshape_5 --> ReduceSum_6
+            ReduceSum_6 --> Sigmoid_7
+            Sigmoid_7 --> Split_8
+            Split_8 -->|"gate_r"| Mul_9
+            i_eco_a -->|"FLOAT(1, num_heads, 1, 1)"| Mul_9
+            Mul_9 --> Sub_10
+            Split_8 -->|"gate_u"| Mul_11
+            Sub_10 --> Mul_11
+            Mul_11 --> Add_12
+            Add_12 --> Mul_13
+            I_rel_pos -->|"FLOAT(1, num_heads, seq_len, seq_len)"| Mul_13
+
+            O_Y(["Y FLOAT(batch, num_heads, seq_len, seq_len)"])
+            Mul_13 --> O_Y
+
+            class I_query_layer,I_rel_pos,O_Y ioNode
+            class i_query_bias,i_gate_weight,i_gate_bias,i_eco_a initNode
+            class Add_0,Reshape_1,Transpose_2,MatMul_3,Add_4 opNode
+            class Reshape_5,ReduceSum_6,Sigmoid_7,Split_8 opNode
+            class Mul_9,Sub_10,Mul_11,Add_12,Mul_13 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_query_layer(["query_layer FLOAT(batch, seq_len, num_heads*head_size)"])
+            I_rel_pos(["rel_pos FLOAT(1, num_heads, seq_len, seq_len)"])
+            i_query_bias["query_bias FLOAT(num_heads*head_size)"]
+            i_gate_weight["gate_weight FLOAT(head_size, D)"]
+            i_gate_bias["gate_bias FLOAT(D)"]
+            i_eco_a["eco_a FLOAT(1, num_heads, 1, 1)"]
+
+            GatedRPB_0[["com.microsoft.GatedRelativePositionBias(., ., ., ., ., .)"]]
+
+            I_query_layer -->|"FLOAT(batch, seq_len, num_heads*head_size)"| GatedRPB_0
+            i_query_bias -->|"FLOAT(num_heads*head_size)"| GatedRPB_0
+            I_rel_pos -->|"FLOAT(1, num_heads, seq_len, seq_len)"| GatedRPB_0
+            i_gate_weight -->|"FLOAT(head_size, D)"| GatedRPB_0
+            i_gate_bias -->|"FLOAT(D)"| GatedRPB_0
+            i_eco_a -->|"FLOAT(1, num_heads, 1, 1)"| GatedRPB_0
+
+            O_Y(["Y FLOAT(batch, num_heads, seq_len, seq_len)"])
+            GatedRPB_0 --> O_Y
+
+            class I_query_layer,I_rel_pos,O_Y ioNode
+            class i_query_bias,i_gate_weight,i_gate_bias,i_eco_a initNode
+            class GatedRPB_0 opNode
+    """
+
+    def __init__(self, verbose: int = 0, priority: int = 2):
+        super().__init__(verbose, priority)
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        # The final operation is Mul(gate_u_1, rel_pos).
+        if node.op_type != "Mul" or node.domain != "":
+            return self.none()
+
+        # Identify gate_u_1 = Add(Mul(gate_u, Sub(Mul(gate_r, eco_a), 1.0)), 2.0).
+        # Either input[0] or input[1] could be gate_u_1.
+        add_two_node = None
+        for gate_u_1_idx in range(2):
+            candidate = g.node_before(node.input[gate_u_1_idx])
+            if candidate is not None and candidate.op_type == "Add" and candidate.domain == "":
+                add_two_node = candidate
+                break
+        if add_two_node is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Add must have a constant 2.0 input.
+        const_two_idx = None
+        for i in range(2):
+            if g.is_constant_scalar(add_two_node.input[i]):
+                if abs(g.get_constant_scalar(add_two_node.input[i]) - 2.0) < 1e-5:
+                    const_two_idx = i
+                    break
+        if const_two_idx is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Add.input[1-const_two_idx] = Mul(gate_u, sub_result).
+        mul_gate_u_node = g.node_before(add_two_node.input[1 - const_two_idx])
+        if (
+            mul_gate_u_node is None
+            or mul_gate_u_node.op_type != "Mul"
+            or mul_gate_u_node.domain != ""
+        ):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Identify sub_result = Sub(Mul(gate_r, eco_a), 1.0) among the inputs of mul_gate_u_node.
+        sub_node = None
+        gate_u_out = None
+        for i in range(2):
+            candidate_sub = g.node_before(mul_gate_u_node.input[i])
+            if (
+                candidate_sub is not None
+                and candidate_sub.op_type == "Sub"
+                and candidate_sub.domain == ""
+            ):
+                if (
+                    g.is_constant_scalar(candidate_sub.input[1])
+                    and abs(g.get_constant_scalar(candidate_sub.input[1]) - 1.0) < 1e-5
+                ):
+                    sub_node = candidate_sub
+                    gate_u_out = mul_gate_u_node.input[1 - i]
+                    break
+        if sub_node is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Sub.input[0] = Mul(gate_r, eco_a).
+        mul_eco_a_node = g.node_before(sub_node.input[0])
+        if (
+            mul_eco_a_node is None
+            or mul_eco_a_node.op_type != "Mul"
+            or mul_eco_a_node.domain != ""
+        ):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # eco_a must be a constant (shape (1, num_heads, 1, 1)).
+        eco_a = None
+        gate_r_out = None
+        for i in range(2):
+            if g.is_constant(mul_eco_a_node.input[i]):
+                eco_a = mul_eco_a_node.input[i]
+                gate_r_out = mul_eco_a_node.input[1 - i]
+                break
+        if eco_a is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # gate_u and gate_r must come from the same Split node.
+        split_node = g.node_before(gate_u_out)
+        if split_node is None or split_node.op_type != "Split" or split_node.domain != "":
+            return self.none(node, inspect.currentframe().f_lineno)
+        if len(split_node.output) != 2:
+            return self.none(node, inspect.currentframe().f_lineno)
+        if gate_r_out not in split_node.output:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Split must be along the last axis (-1 or 3 for a 4-D tensor).
+        split_axis = g.get_attributes_with_default(split_node, axis=0)["axis"]
+        if split_axis not in (-1, 3):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Sigmoid -> ReduceSum -> Reshape -> Add(gate_bias) -> MatMul(query_t, gate_weight).
+        sigmoid_node = g.node_before(split_node.input[0])
+        if sigmoid_node is None or sigmoid_node.op_type != "Sigmoid" or sigmoid_node.domain != "":
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        reduce_sum_node = g.node_before(sigmoid_node.input[0])
+        if (
+            reduce_sum_node is None
+            or reduce_sum_node.op_type != "ReduceSum"
+            or reduce_sum_node.domain != ""
+        ):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        reshape_2_node = g.node_before(reduce_sum_node.input[0])
+        if (
+            reshape_2_node is None
+            or reshape_2_node.op_type != "Reshape"
+            or reshape_2_node.domain != ""
+        ):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        add_gate_bias_node = g.node_before(reshape_2_node.input[0])
+        if (
+            add_gate_bias_node is None
+            or add_gate_bias_node.op_type != "Add"
+            or add_gate_bias_node.domain != ""
+        ):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Identify MatMul and gate_bias from the Add node.
+        matmul_node = None
+        for i in range(2):
+            candidate_mm = g.node_before(add_gate_bias_node.input[i])
+            if (
+                candidate_mm is not None
+                and candidate_mm.op_type == "MatMul"
+                and candidate_mm.domain == ""
+                and g.is_constant(candidate_mm.input[1])
+            ):
+                candidate_bias = add_gate_bias_node.input[1 - i]
+                if g.is_constant(candidate_bias):
+                    matmul_node = candidate_mm
+                    break
+        if matmul_node is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # MatMul.input[0] = Transpose.
+        transpose_node = g.node_before(matmul_node.input[0])
+        if (
+            transpose_node is None
+            or transpose_node.op_type != "Transpose"
+            or transpose_node.domain != ""
+        ):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Transpose.input[0] = Reshape.
+        reshape_1_node = g.node_before(transpose_node.input[0])
+        if (
+            reshape_1_node is None
+            or reshape_1_node.op_type != "Reshape"
+            or reshape_1_node.domain != ""
+        ):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Reshape.input[0] = Add(query_layer, query_bias).
+        add_query_bias_node = g.node_before(reshape_1_node.input[0])
+        if (
+            add_query_bias_node is None
+            or add_query_bias_node.op_type != "Add"
+            or add_query_bias_node.domain != ""
+        ):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # One input is query_layer (dynamic), the other is query_bias (constant).
+        query_bias = None
+        for i in range(2):
+            if g.is_constant(add_query_bias_node.input[i]):
+                query_bias = add_query_bias_node.input[i]
+                break
+        if query_bias is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # eco_a must be a 4-D tensor of shape (1, num_heads, 1, 1).
+        eco_a_arr = g.get_computed_constant(eco_a)
+        if eco_a_arr is None or eco_a_arr.ndim != 4:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        return MatchResult(
+            self,
+            [
+                add_query_bias_node,
+                reshape_1_node,
+                transpose_node,
+                matmul_node,
+                add_gate_bias_node,
+                reshape_2_node,
+                reduce_sum_node,
+                sigmoid_node,
+                split_node,
+                mul_eco_a_node,
+                sub_node,
+                mul_gate_u_node,
+                add_two_node,
+                node,  # final_mul_node
+            ],
+            self.apply,
+            insert_at=node,
+        )
+
+    def apply(
+        self,
+        g: "GraphBuilder",  # noqa: F821
+        add_query_bias_node: NodeProto,
+        reshape_1_node: NodeProto,
+        transpose_node: NodeProto,
+        matmul_node: NodeProto,
+        add_gate_bias_node: NodeProto,
+        reshape_2_node: NodeProto,
+        reduce_sum_node: NodeProto,
+        sigmoid_node: NodeProto,
+        split_node: NodeProto,
+        mul_eco_a_node: NodeProto,
+        sub_node: NodeProto,
+        mul_gate_u_node: NodeProto,
+        add_two_node: NodeProto,
+        final_mul_node: NodeProto,
+    ) -> List[NodeProto]:
+        # Extract query_layer and query_bias from Add(query_layer, query_bias).
+        if g.is_constant(add_query_bias_node.input[0]):
+            query_bias = add_query_bias_node.input[0]
+            query_layer = add_query_bias_node.input[1]
+        else:
+            query_bias = add_query_bias_node.input[1]
+            query_layer = add_query_bias_node.input[0]
+
+        # Gate projection weight and bias.
+        gate_weight = matmul_node.input[1]
+        matmul_out = matmul_node.output[0]
+        if add_gate_bias_node.input[0] == matmul_out:
+            gate_bias = add_gate_bias_node.input[1]
+        else:
+            gate_bias = add_gate_bias_node.input[0]
+
+        # eco_a from Mul(gate_r, eco_a).
+        if g.is_constant(mul_eco_a_node.input[0]):
+            eco_a = mul_eco_a_node.input[0]
+        else:
+            eco_a = mul_eco_a_node.input[1]
+
+        # rel_pos is the input of the final Mul that is NOT gate_u_1.
+        gate_u_1_out = add_two_node.output[0]
+        if final_mul_node.input[0] == gate_u_1_out:
+            rel_pos = final_mul_node.input[1]
+        else:
+            rel_pos = final_mul_node.input[0]
+
+        # Determine num_heads from eco_a shape (1, num_heads, 1, 1).
+        eco_a_arr = g.get_computed_constant(eco_a)
+        num_heads = int(eco_a_arr.shape[1])
+
+        grpb_node = g.make_node(
+            "GatedRelativePositionBias",
+            [query_layer, query_bias, rel_pos, gate_weight, gate_bias, eco_a],
+            final_mul_node.output,
+            domain="com.microsoft",
+            num_heads=num_heads,
+            name=f"{self.__class__.__name__}--{final_mul_node.name}",
+        )
+
+        return [grpb_node]

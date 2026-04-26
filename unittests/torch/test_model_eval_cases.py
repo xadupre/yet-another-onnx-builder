@@ -325,6 +325,14 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    def test_run_exporter_controlflow_indirect_ranks_cat_new_tracing(self):
+        evaluation(
+            cases="ControlFlowIndirectRanksCat",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_controlflow_shape_check_new_tracing(self):
         evaluation(
             cases="ControlFlowShapeCheck", exporters="yobx-new-tracing", quiet=False, dynamic=True

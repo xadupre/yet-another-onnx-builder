@@ -1292,6 +1292,65 @@ class TestGraphTracerTorchCheck(ExtTestCase):
                     dim1.is_static, "Output dimension 1 must be symbolic, not static"
                 )
 
+    def test_trace_cat_ndim_indirect(self):
+        """Tracing a model that cats two tensors then checks ndim.
+
+        Replicates the ControlFlowIndirectRanksCat pattern:
+        ``cat = torch.cat([x1, y1], dim=1); if cat.ndim == 2: return cat.clone()``.
+
+        Since ndim is always known statically, the true branch must be taken and
+        the graph must contain aten.cat.default and aten.clone.default nodes.
+        The cat output shape must carry a compound symbolic dimension (e.g. ``seq+4``)
+        for the concatenated axis.
+        """
+        from yobx.torch.new_tracing.shape import TracingInt
+
+        class CatNdimModel(torch.nn.Module):
+            def forward(self, x, y):
+                x1 = x + 1
+                y1 = y + 2
+                cat = torch.cat([x1, y1], dim=1)
+                if cat.ndim == 2:
+                    return cat.clone()
+                return cat / cat.ndim
+
+        DIM = torch.export.Dim
+        model = CatNdimModel()
+        x = torch.rand(3, 4)
+        y = torch.rand(3, 2)
+        dynamic_shapes = {"x": {0: DIM("batch")}, "y": {0: DIM("batch"), 1: DIM("seq")}}
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (x, y), dynamic_shapes=dynamic_shapes)
+        graph.lint()
+
+        call_targets = [n.target for n in graph.nodes if n.op == "call_function"]
+
+        # aten.cat.default must appear
+        self.assertIn(
+            torch.ops.aten.cat.default,
+            call_targets,
+            "Expected aten.cat.default node in traced graph",
+        )
+        # True branch (clone) must be taken since ndim == 2 is always True
+        self.assertIn(
+            torch.ops.aten.clone.default,
+            call_targets,
+            "Expected aten.clone.default node (true branch) in traced graph",
+        )
+
+        # The cat node's output shape must have a compound symbolic dimension
+        cat_node = next(
+            n
+            for n in graph.nodes
+            if n.op == "call_function" and n.target is torch.ops.aten.cat.default
+        )
+        cat_shape = cat_node.meta["val"]._tracing_shape
+        dim1 = cat_shape.dims[1]
+        self.assertIsInstance(
+            dim1, TracingInt, "Cat output dim 1 must be a TracingInt (symbolic expression)"
+        )
+        self.assertFalse(dim1.is_static, "Cat output dim 1 must be symbolic, not static")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
