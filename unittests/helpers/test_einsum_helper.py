@@ -82,7 +82,32 @@ class TestEinsumHelper(ExtTestCase):
         with self.assertRaises((NotImplementedError, AssertionError, ValueError)):
             decompose_einsum("ij,jk")
 
-    def test_decompose_einsum_no_external_dep(self):
+    def test_decompose_einsum_symbolic_shapes(self):
+        """Tests that symbolic (string) dim names appear in the produced ONNX model."""
+        model = decompose_einsum("bij,bjk->bik", ("batch", 3, 4), ("batch", 4, 5))
+        # Input 0 should have "batch" as a named symbolic dimension.
+        dim0 = model.graph.input[0].type.tensor_type.shape.dim[0]
+        self.assertEqual(dim0.dim_param, "batch")
+        # The model should still run with any concrete batch size.
+        a = np.random.rand(2, 3, 4).astype(np.float32)
+        b = np.random.rand(2, 4, 5).astype(np.float32)
+        result = self._run(model, {"X0": a, "X1": b})
+        expected = np.einsum("bij,bjk->bik", a, b)
+        self.assertAlmostEqual(result, expected, atol=1e-5)
+
+    def test_decompose_einsum_none_shapes(self):
+        """Tests that None dimension values produce fully dynamic ONNX shapes."""
+        model = decompose_einsum("ij,jk->ik", (None, 4), (4, None))
+        # None dims should be dynamic (dim_param="", dim_value=0 in ONNX).
+        dim0_input0 = model.graph.input[0].type.tensor_type.shape.dim[0]
+        self.assertFalse(dim0_input0.HasField("dim_value") and dim0_input0.dim_value > 0)
+        # The model should still run.
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(4, 5).astype(np.float32)
+        result = self._run(model, {"X0": a, "X1": b})
+        expected = np.einsum("ij,jk->ik", a, b)
+        self.assertAlmostEqual(result, expected, atol=1e-5)
+
         """Tests that decompose_einsum works without onnx_extended installed."""
         import sys
 

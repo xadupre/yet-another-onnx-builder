@@ -19,11 +19,12 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 import onnx
 from ._einsum import decompose_einsum_equation as _decompose_einsum_equation
+from .onnx_helper import np_dtype_to_tensor_dtype as _np_dtype_to_tensor_dtype
 
 
 def decompose_einsum(
     equation: str,
-    *input_shapes: Tuple[int, ...],
+    *input_shapes: Tuple[Union[int, str, None], ...],
     dtype: Union[np.dtype, type] = np.float32,
     opset: Optional[int] = None,
     strategy: str = "numpy",
@@ -41,11 +42,16 @@ def decompose_einsum(
 
     :param equation: einsum equation string (e.g. ``"ij,jk->ik"``).
         The equation must contain an explicit output (``->``).
-    :param input_shapes: optional shapes for each input operand, used as
-        hints for the decomposition algorithm.  When omitted, shapes with
-        all dimensions equal to ``2`` are assumed.  The shapes do **not**
-        constrain the resulting ONNX model—any conforming shape works at
-        runtime.
+    :param input_shapes: optional shapes for each input operand.
+        Each element of the tuple may be an integer (concrete size),
+        a string (symbolic dimension name, e.g. ``"batch"``), or
+        ``None`` (unknown dimension).  When omitted, shapes with all
+        dimensions equal to ``2`` are used internally and the produced
+        ONNX model will have fully dynamic input shapes.  When provided,
+        the shapes are reflected in the ``value_info`` of the returned
+        model—concrete integers become fixed-size dimensions, strings
+        become named symbolic dimensions, and ``None`` values remain
+        dynamic.
     :param dtype: numpy scalar type used for the model inputs and output,
         defaults to ``numpy.float32``.  Supported values are
         ``numpy.float32``, ``numpy.float64``, ``numpy.int32``, and
@@ -105,14 +111,26 @@ def decompose_einsum(
     if opset is not None:
         kwargs["opset"] = opset
 
-    model: onnx.ModelProto = graph.to_onnx(
-        "Z", *input_names, dtype=dtype, verbose=verbose, **kwargs
-    )
+    # When caller provides shapes (possibly with symbolic string dims), forward
+    # them to to_onnx via the (name, (elem_type, shape)) tuple format so that
+    # the produced value_info carries the correct shape information.
+    if input_shapes:
+        proto = _np_dtype_to_tensor_dtype(dtype)
+        shaped_inputs = [
+            (name, (proto, list(sh))) for name, sh in zip(input_names, input_shapes)
+        ]
+        model: onnx.ModelProto = graph.to_onnx(
+            "Z", *shaped_inputs, dtype=dtype, verbose=verbose, **kwargs
+        )
+    else:
+        model = graph.to_onnx("Z", *input_names, dtype=dtype, verbose=verbose, **kwargs)
     return model
 
 
 def list_decomposed_nodes(
-    equation: str, *input_shapes: Tuple[int, ...], verbose: bool = False
+    equation: str,
+    *input_shapes: Tuple[Union[int, str, None], ...],
+    verbose: bool = False,
 ) -> List[str]:
     """
     Returns the list of ONNX operator types that result from decomposing
