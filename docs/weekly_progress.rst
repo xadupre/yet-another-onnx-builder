@@ -277,3 +277,40 @@ A new workflow posts a comment listing impacted subfolders.
 ``validate_model`` was enriched with per-node-type statistics and a discrepancy
 sheet in the Excel output.
 Documentation now tracks and displays the five slowest Sphinx pages to build.
+
+----
+
+What Copilot Could Not Do (or Struggled With)
+==============================================
+
+**Instantly-abandoned WIP PRs** (no code committed):
+
+* `#1801 <https://github.com/xadupre/yet-another-onnx-builder/pull/1801>`_ — Fix std/std_mean for test_onnx_export_common_methods
+* `#1493 <https://github.com/xadupre/yet-another-onnx-builder/pull/1493>`_ — Fix CropLastDimensionWithTensorContent for torch converter
+
+**Wrong approaches discarded** (real code, but incorrect design or near-zero coverage):
+
+* `#1962 <https://github.com/xadupre/yet-another-onnx-builder/pull/1962>`_ — ControlFlowShapeCheck default exporter fix (6 % patch coverage, test did not exercise fix)
+* `#1798 <https://github.com/xadupre/yet-another-onnx-builder/pull/1798>`_ — AtenAsStrided new-tracing fix (multi-file interaction too subtle)
+* `#1709 <https://github.com/xadupre/yet-another-onnx-builder/pull/1709>`_ — Symbolic TracingShape propagation (fragile instance-level state, conflicted with later design)
+* `#1690 <https://github.com/xadupre/yet-another-onnx-builder/pull/1690>`_ — GraphBuilderTorchProtocol extension (wrong abstraction layer)
+* `#1682 <https://github.com/xadupre/yet-another-onnx-builder/pull/1682>`_ — CustomProxyInt offset-comparison (introduced edge cases in other paths)
+* `#1673 <https://github.com/xadupre/yet-another-onnx-builder/pull/1673>`_ — ControlFlowNumelZero2 (0 % coverage, flags not threaded through shape-guard machinery)
+
+**Multiple attempts needed**:
+
+* DataFrame gallery example — 3 PRs (`#1590 <https://github.com/xadupre/yet-another-onnx-builder/pull/1590>`_, `#1609 <https://github.com/xadupre/yet-another-onnx-builder/pull/1609>`_, `#1632 <https://github.com/xadupre/yet-another-onnx-builder/pull/1632>`_): incomplete or inconsistent with gallery style
+* Top-level ``to_onnx`` dispatcher — 2 PRs (`#1394 <https://github.com/xadupre/yet-another-onnx-builder/pull/1394>`_ + merged): too much logic duplicated in dispatcher
+* ``ControlFlowNumelZero2`` — 2 failed PRs before fix in `#1933 <https://github.com/xadupre/yet-another-onnx-builder/pull/1933>`_
+
+**``xoptim`` patterns abandoned** (correctness conditions too hard to specify):
+
+* `#1659 <https://github.com/xadupre/yet-another-onnx-builder/pull/1659>`_ — ConstantOfShapeIdentityPattern (shape-equality guards only approximate)
+* `#1645 <https://github.com/xadupre/yet-another-onnx-builder/pull/1645>`_ — CustomTracer.remove_tests() (too aggressive, removed indirectly-used nodes)
+* `#1448 <https://github.com/xadupre/yet-another-onnx-builder/pull/1448>`_ — ``op_types`` attribute on PatternOptimization (did not handle computed node types)
+* `#1263 <https://github.com/xadupre/yet-another-onnx-builder/pull/1263>`_ — BinaryUnsqueezeExpandPattern (wrong shapes with multi-axis broadcasting)
+
+**Repeated ``concrete_value`` in ``TracingInt``** (explicit instruction repeatedly ignored):
+
+* `#1933 <https://github.com/xadupre/yet-another-onnx-builder/pull/1933>`_ — added ``concrete_value`` to ``TracingInt``; after *"never"* review comment, moved it to ``GraphTracer._dim_concrete_values``; after *"i already said no concrete values!"* removed it entirely and used a symbolic ``torch._check`` / ``_known_true_conditions`` solution
+* `#1971 <https://github.com/xadupre/yet-another-onnx-builder/pull/1971>`_ — re-introduced ``concrete_value`` in ``TracingInt``; after *"i said that many times"* replaced it with a constant ``1`` + ``TracingTensor.__getitem__`` override, no input values stored
