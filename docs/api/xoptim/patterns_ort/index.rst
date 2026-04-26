@@ -10,6 +10,7 @@ yobx.xoptim.patterns_ort
     complex_mul
     fused_conv
     fused_matmul
+    greedy_search
     llm_optim
     missing_kernels
     relative_position_bias
