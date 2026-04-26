@@ -220,7 +220,7 @@ class EinsumSubOp:
             )
             assert row[axis[1]] == -1, "Dimension should be -1 in row %r axis=%r." % (
                 row,
-                self.kwargs["axis"],
+                axes,
             )
         self._check_row_(row, verbose=verbose)
 
