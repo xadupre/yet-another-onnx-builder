@@ -955,3 +955,138 @@ class TransposeFusedMatMulBPattern(PatternOptimization):
             if att.name != "transB":
                 nodes[-1].attribute.append(att)
         return nodes
+
+
+class FusedMatMulActivationPattern(PatternOptimization):
+    """
+    Replaces the sequence (Fused)MatMul followed by an activation function
+    into com.microsoft.FusedMatMulActivation.
+
+    Supported activations: ``Relu``, ``Tanh``, ``Sigmoid``, ``LeakyRelu``,
+    ``HardSigmoid``.
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(2, 2, 32, 64)"])
+            I_Y(["Y FLOAT(2, 2, 64, 16)"])
+
+            FusedMatMul_0[["com.microsoft.FusedMatMul(., .)"]]
+            Relu_1[["Relu(.)"]]
+
+            I_X -->|"FLOAT(2, 2, 32, 64)"| FusedMatMul_0
+            I_Y -->|"FLOAT(2, 2, 64, 16)"| FusedMatMul_0
+            FusedMatMul_0 -->|"FLOAT(2, 2, 32, 16)"| Relu_1
+
+            O_Z(["Z FLOAT(2, 2, 32, 16)"])
+            Relu_1 --> O_Z
+
+            class I_X,I_Y,O_Z ioNode
+            class FusedMatMul_0,Relu_1 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(2, 2, 32, 64)"])
+            I_Y(["Y FLOAT(2, 2, 64, 16)"])
+
+            FusedMatMulActivation_0[["com.microsoft.FusedMatMulActivation(., .)"]]
+
+            I_X -->|"FLOAT(2, 2, 32, 64)"| FusedMatMulActivation_0
+            I_Y -->|"FLOAT(2, 2, 64, 16)"| FusedMatMulActivation_0
+
+            O_Z(["Z FLOAT(2, 2, 32, 16)"])
+            FusedMatMulActivation_0 --> O_Z
+
+            class I_X,I_Y,O_Z ioNode
+            class FusedMatMulActivation_0 opNode
+    """
+
+    #: Activation op types (ONNX domain ``""``) fused without extra parameters.
+    _SIMPLE_ACTIVATIONS = frozenset({"Relu", "Tanh", "Sigmoid"})
+
+    #: Activation op types that carry extra scalar parameters.
+    _PARAMETRIC_ACTIVATIONS = frozenset({"LeakyRelu", "HardSigmoid"})
+
+    def __init__(self, verbose: int = 0, priority: int = 2):
+        super().__init__(verbose, priority)
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if (node.op_type != "MatMul" or node.domain != "") and (
+            node.op_type != "FusedMatMul" or node.domain != "com.microsoft"
+        ):
+            return self.none()
+
+        if g.is_used_more_than_once(node.output[0]):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        next_nodes = g.next_nodes(node.output[0])
+        if len(next_nodes) != 1:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        act_node = next_nodes[0]
+        if act_node.domain != "":
+            return self.none(node, inspect.currentframe().f_lineno)
+        if act_node.op_type not in self._SIMPLE_ACTIVATIONS | self._PARAMETRIC_ACTIVATIONS:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        return MatchResult(self, [node, act_node], self.apply, insert_at=act_node)
+
+    def apply(
+        self, g: "GraphBuilder", node: NodeProto, act_node: NodeProto  # noqa: F821
+    ) -> List[NodeProto]:
+        kwargs = {}
+        for att in node.attribute:
+            if att.name in {"alpha", "transA", "transB", "transBatchA", "transBatchB"}:
+                kwargs[att.name] = att.f if att.name == "alpha" else att.i
+
+        kwargs["activation"] = act_node.op_type
+
+        if act_node.op_type == "LeakyRelu":
+            alpha_val = 0.01
+            for att in act_node.attribute:
+                if att.name == "alpha":
+                    alpha_val = att.f
+            kwargs["activation_alpha"] = alpha_val
+        elif act_node.op_type == "HardSigmoid":
+            alpha_val = 0.2
+            beta_val = 0.5
+            for att in act_node.attribute:
+                if att.name == "alpha":
+                    alpha_val = att.f
+                elif att.name == "beta":
+                    beta_val = att.f
+            kwargs["activation_alpha"] = alpha_val
+            kwargs["activation_beta"] = beta_val
+
+        return [
+            g.make_node(
+                "FusedMatMulActivation",
+                node.input,
+                act_node.output,
+                domain="com.microsoft",
+                name=f"{self.__class__.__name__}--{node.name}",
+                **kwargs,
+            )
+        ]
