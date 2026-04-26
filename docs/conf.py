@@ -161,8 +161,9 @@ intersphinx_mapping = {
 
 suppress_warnings = ["intersphinx.external"]
 if int(os.environ.get("UNITTEST_GOING", "0")):
-    # Suppress toctree warnings for pages intentionally excluded on CI.
-    suppress_warnings += ["toc.excluded"]
+    # Suppress toctree and cross-reference warnings for pages intentionally
+    # excluded on CI (e.g. case_coverage.rst, ci_durations.rst).
+    suppress_warnings += ["toc.excluded", "ref.ref"]
 
 sphinx_gallery_conf = {
     # path to your examples scripts
