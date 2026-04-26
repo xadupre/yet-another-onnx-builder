@@ -54,10 +54,14 @@ Equivalent polars code
     j1 = orders_lf.join(customers_lf, left_on="customer_id", right_on="cid")
     j2 = j1.join(products_lf, left_on="product_id", right_on="pid")
     j3 = j2.join(warehouses_lf, left_on="warehouse_id", right_on="wid")
-    result_lf = j3.select([
-        pl.col("qty") * pl.col("unit_price") * (1 - pl.col("discount"))
-        + pl.col("shipping_cost")
-    ].alias("total"))
+    result_lf = j3.select(
+        [
+            (
+                pl.col("qty") * pl.col("unit_price") * (1 - pl.col("discount"))
+                + pl.col("shipping_cost")
+            ).alias("total")
+        ]
+    )
     print(result_lf.collect())
 
 The :func:`~yobx.sql.dataframe_to_onnx` converter below produces an ONNX model
