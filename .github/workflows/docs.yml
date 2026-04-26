@@ -46,13 +46,9 @@ jobs:
             -D "sphinx_gallery_conf.filename_pattern=/tensorflow/" \
             docs docs/_build/html -j 1
       - name: Build documentation
-        env:
-          DOCS_EXCLUDE_PATTERNS: "['design/torch/case_coverage.rst', 'ci_durations.rst', 'commits_per_week.rst']"
         run: |
           UNITTEST_GOING=1 sphinx-build -b html \
-            -D "exclude_patterns=${DOCS_EXCLUDE_PATTERNS}" \
             docs docs/_build/html -W -j auto || \
           (echo "Parallel build failed, retrying sequentially..." && \
-          sphinx-build -b html \
-            -D "exclude_patterns=${DOCS_EXCLUDE_PATTERNS}" \
+          UNITTEST_GOING=1 sphinx-build -b html \
             docs docs/_build/html -W)
