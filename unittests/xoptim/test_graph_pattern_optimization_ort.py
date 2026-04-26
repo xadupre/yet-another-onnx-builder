@@ -3202,7 +3202,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         self.assertIn("RelativePositionBiasPattern", names)
 
     def _build_gated_relative_position_bias_model(self):
-        """Builds a DeBERTa-style gated relative position bias ONNX model."""
+        """Constructs a DeBERTa-style gated relative position bias ONNX model."""
         batch_size = 2
         seq_len_val = 5
         num_heads = 4
@@ -3292,7 +3292,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         return model
 
     def test_gated_relative_position_bias(self):
-        """Tests that GatedRelativePositionBiasPattern fuses the DeBERTa gating subgraph."""
+        """Verifies that GatedRelativePositionBiasPattern fuses the DeBERTa gating subgraph."""
         model = self._build_gated_relative_position_bias_model()
         gr = GraphBuilder(
             model,
@@ -3321,7 +3321,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         self.assertEqual(4, attr_map["num_heads"].i)
 
     def test_gated_relative_position_bias_in_pattern_list(self):
-        """Tests that GatedRelativePositionBiasPattern is in the default ORT pattern list."""
+        """Verifies that GatedRelativePositionBiasPattern is in the default ORT pattern list."""
         from yobx.xoptim.patterns_ort import get_onnxruntime_patterns
 
         patterns = get_onnxruntime_patterns()

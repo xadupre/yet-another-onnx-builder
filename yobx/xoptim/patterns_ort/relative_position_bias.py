@@ -359,8 +359,8 @@ class RelativePositionBiasPattern(PatternOptimization):
 
 class GatedRelativePositionBiasPattern(PatternOptimization):
     """
-    Fuses the gated relative position bias computation (DeBERTa-v2/v3 style) into
-    ``com.microsoft.GatedRelativePositionBias``.
+    Implements the fusion of gated relative position bias computation (DeBERTa-v2/v3 style)
+    into ``com.microsoft.GatedRelativePositionBias``.
 
     The fused pattern corresponds to the DeBERTa disentangled self-attention
     gating computation, which applies a learned sigmoid gate to modulate a
