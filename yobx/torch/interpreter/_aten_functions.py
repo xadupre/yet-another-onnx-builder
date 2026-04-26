@@ -2017,29 +2017,29 @@ def aten_block_diag(
         return res
 
     # Compute per-tensor shape tensors as 1-D INT64 tensors of shape [1].
-    r_1ds = [g.op.Shape(m, start=0, end=1, name=name) for m in mats]
-    c_1ds = [g.op.Shape(m, start=1, end=2, name=name) for m in mats]
+    row_sizes = [g.op.Shape(m, start=0, end=1, name=name) for m in mats]
+    col_sizes = [g.op.Shape(m, start=1, end=2, name=name) for m in mats]
 
     # Total rows and columns (shape [1]).
-    total_r = g.op.ReduceSumAnyOpset(
-        g.op.Concat(*r_1ds, axis=0, name=name), keepdims=1, name=name
+    total_rows = g.op.ReduceSumAnyOpset(
+        g.op.Concat(*row_sizes, axis=0, name=name), keepdims=1, name=name
     )
-    total_c = g.op.ReduceSumAnyOpset(
-        g.op.Concat(*c_1ds, axis=0, name=name), keepdims=1, name=name
+    total_cols = g.op.ReduceSumAnyOpset(
+        g.op.Concat(*col_sizes, axis=0, name=name), keepdims=1, name=name
     )
 
-    # Pad each 2-D matrix to [total_r, total_c] and sum the results.
+    # Pad each 2-D matrix to [total_rows, total_cols] and sum the results.
     # Running cumulative offsets start at [0].
     row_before: Any = g.ZERO
     col_before: Any = g.ZERO
     padded = []
-    for m, r_1d, c_1d in zip(mats, r_1ds, c_1ds):
-        row_after = g.op.Sub(g.op.Sub(total_r, row_before, name=name), r_1d, name=name)
-        col_after = g.op.Sub(g.op.Sub(total_c, col_before, name=name), c_1d, name=name)
+    for m, row_size, col_size in zip(mats, row_sizes, col_sizes):
+        row_after = g.op.Sub(g.op.Sub(total_rows, row_before, name=name), row_size, name=name)
+        col_after = g.op.Sub(g.op.Sub(total_cols, col_before, name=name), col_size, name=name)
         pads = g.op.Concat(row_before, col_before, row_after, col_after, axis=0, name=name)
         padded.append(g.op.Pad(m, pads, name=name))
-        row_before = g.op.Add(row_before, r_1d, name=name)
-        col_before = g.op.Add(col_before, c_1d, name=name)
+        row_before = g.op.Add(row_before, row_size, name=name)
+        col_before = g.op.Add(col_before, col_size, name=name)
 
     # Sum the padded (non-overlapping) blocks.
     res = padded[0]
