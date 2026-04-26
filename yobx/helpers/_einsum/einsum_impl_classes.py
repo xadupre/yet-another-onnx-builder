@@ -992,7 +992,7 @@ class EinsumSubOp:
             yield helper.make_node("ReduceProd", [name_dim2g], [name_dim2], keepdims=1)
 
         batch_kind = self.get_dot_kind()
-        if batch_kind in ("11", "N1", "N1"):
+        if batch_kind in ("11", "N1", "1N"):
             # *shape1, *shape2
             name_minus_one = root + "__01"
             yield numpy_helper.from_array(
