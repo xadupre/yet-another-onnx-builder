@@ -3201,8 +3201,133 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         names = [p.__class__.__name__ for p in patterns]
         self.assertIn("RelativePositionBiasPattern", names)
 
+    def _build_gated_relative_position_bias_model(self):
+        """Builds a DeBERTa-style gated relative position bias ONNX model."""
+        batch_size = 2
+        seq_len_val = 5
+        num_heads = 4
+        head_size = 8
+        D = 4  # gate_ur_linear output dim, must be even; D//2 = 2
 
-class TestMissingKernelPatterns(ExtTestCase):
+        # Constants for shapes
+        # query_layer: (batch, seq_len, num_heads * head_size) = (2, 5, 32)
+        query_hidden = num_heads * head_size  # 32
+
+        query_bias = np.zeros(query_hidden, dtype=np.float32)
+        gate_weight = np.arange(head_size * D, dtype=np.float32).reshape(head_size, D) * 0.01
+        gate_bias = np.zeros(D, dtype=np.float32)
+        eco_a = np.ones((1, num_heads, 1, 1), dtype=np.float32)
+
+        # Reshape targets
+        reshape1_shape = np.array([0, 0, num_heads, head_size], dtype=np.int64)
+        reshape2_shape = np.array([0, num_heads, 0, 2, D // 2], dtype=np.int64)
+
+        nodes = [
+            # Add(query_layer, query_bias)
+            oh.make_node("Add", ["query_layer", "query_bias"], ["added_query"]),
+            # Reshape to (batch, seq_len, num_heads, head_size)
+            oh.make_node("Reshape", ["added_query", "reshape1_shape"], ["reshaped_q"]),
+            # Transpose to (batch, num_heads, seq_len, head_size)
+            oh.make_node("Transpose", ["reshaped_q"], ["transposed_q"], perm=[0, 2, 1, 3]),
+            # MatMul with gate_weight -> (batch, num_heads, seq_len, D)
+            oh.make_node("MatMul", ["transposed_q", "gate_weight"], ["gate_mm"]),
+            # Add gate_bias
+            oh.make_node("Add", ["gate_mm", "gate_bias"], ["gate_biased"]),
+            # Reshape to (batch, num_heads, seq_len, 2, D//2)
+            oh.make_node("Reshape", ["gate_biased", "reshape2_shape"], ["gate_r2"]),
+            # ReduceSum along axis=-1, keepdims=0
+            oh.make_node("ReduceSum", ["gate_r2", "reduce_axis"], ["gate_sum"], keepdims=0),
+            # Sigmoid
+            oh.make_node("Sigmoid", ["gate_sum"], ["gate_sig"]),
+            # Split along axis=-1 -> gate_u (output[0]), gate_r (output[1])
+            oh.make_node("Split", ["gate_sig", "split_sizes"], ["gate_u", "gate_r"], axis=-1),
+            # Mul(gate_r, eco_a)
+            oh.make_node("Mul", ["gate_r", "eco_a"], ["gate_r_eco"]),
+            # Sub(gate_r_eco, 1.0)
+            oh.make_node("Sub", ["gate_r_eco", "one_f"], ["gate_r_eco_sub"]),
+            # Mul(gate_u, gate_r_eco_sub)
+            oh.make_node("Mul", ["gate_u", "gate_r_eco_sub"], ["gate_u_mul"]),
+            # Add(gate_u_mul, 2.0)
+            oh.make_node("Add", ["gate_u_mul", "two_f"], ["gate_u_1"]),
+            # Mul(gate_u_1, rel_pos)
+            oh.make_node("Mul", ["gate_u_1", "rel_pos"], ["output"]),
+        ]
+
+        inits = [
+            onh.from_array(query_bias, name="query_bias"),
+            onh.from_array(gate_weight, name="gate_weight"),
+            onh.from_array(gate_bias, name="gate_bias"),
+            onh.from_array(eco_a, name="eco_a"),
+            onh.from_array(reshape1_shape, name="reshape1_shape"),
+            onh.from_array(reshape2_shape, name="reshape2_shape"),
+            onh.from_array(np.array([-1], dtype=np.int64), name="reduce_axis"),
+            onh.from_array(np.array([1, 1], dtype=np.int64), name="split_sizes"),
+            onh.from_array(np.array(1.0, dtype=np.float32), name="one_f"),
+            onh.from_array(np.array(2.0, dtype=np.float32), name="two_f"),
+        ]
+
+        model = oh.make_model(
+            oh.make_graph(
+                nodes,
+                "grpb_test",
+                [
+                    oh.make_tensor_value_info(
+                        "query_layer", TFLOAT, [batch_size, seq_len_val, query_hidden]
+                    ),
+                    oh.make_tensor_value_info(
+                        "rel_pos", TFLOAT, [1, num_heads, seq_len_val, seq_len_val]
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        "output", TFLOAT, [batch_size, num_heads, seq_len_val, seq_len_val]
+                    )
+                ],
+                inits,
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        check_model(model)
+        return model
+
+    def test_gated_relative_position_bias(self):
+        """Tests that GatedRelativePositionBiasPattern fuses the DeBERTa gating subgraph."""
+        model = self._build_gated_relative_position_bias_model()
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["GatedRelativePositionBias"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+
+        op_types = [(n.op_type, n.domain) for n in opt_onx.graph.node]
+        self.assertIn(("GatedRelativePositionBias", "com.microsoft"), op_types)
+        self.assertNotIn(("Split", ""), op_types)
+        self.assertNotIn(("Sigmoid", ""), op_types)
+        self.assertNotIn(("ReduceSum", ""), op_types)
+
+        grpb_nodes = [
+            n
+            for n in opt_onx.graph.node
+            if n.op_type == "GatedRelativePositionBias" and n.domain == "com.microsoft"
+        ]
+        self.assertEqual(1, len(grpb_nodes))
+
+        attr_map = {a.name: a for a in grpb_nodes[0].attribute}
+        self.assertIn("num_heads", attr_map)
+        self.assertEqual(4, attr_map["num_heads"].i)
+
+    def test_gated_relative_position_bias_in_pattern_list(self):
+        """Tests that GatedRelativePositionBiasPattern is in the default ORT pattern list."""
+        from yobx.xoptim.patterns_ort import get_onnxruntime_patterns
+
+        patterns = get_onnxruntime_patterns()
+        names = [p.__class__.__name__ for p in patterns]
+        self.assertIn("GatedRelativePositionBiasPattern", names)
+
     """Tests for MissingReduceMaxPattern and MissingTopKPattern."""
 
     def _range(self, *shape, bias: Optional[float] = None):
@@ -3713,9 +3838,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node(
-                        "FusedMatMul", ["X", "Y"], ["mm"], domain="com.microsoft"
-                    ),
+                    oh.make_node("FusedMatMul", ["X", "Y"], ["mm"], domain="com.microsoft"),
                     oh.make_node("Relu", ["mm"], ["Z"]),
                 ],
                 "dummy",
@@ -3740,9 +3863,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["FusedMatMulActivation"], [n.op_type for n in opt_onx.graph.node]
-        )
+        self.assertEqual(["FusedMatMulActivation"], [n.op_type for n in opt_onx.graph.node])
         node = opt_onx.graph.node[0]
         self.assertEqual(node.domain, "com.microsoft")
         act_attr = {a.name: a for a in node.attribute}
@@ -3755,10 +3876,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
     def test_fused_matmul_activation_from_matmul(self):
         model = oh.make_model(
             oh.make_graph(
-                [
-                    oh.make_node("MatMul", ["X", "Y"], ["mm"]),
-                    oh.make_node("Tanh", ["mm"], ["Z"]),
-                ],
+                [oh.make_node("MatMul", ["X", "Y"], ["mm"]), oh.make_node("Tanh", ["mm"], ["Z"])],
                 "dummy",
                 [
                     oh.make_tensor_value_info("X", TFLOAT, [4, 8]),
@@ -3781,9 +3899,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["FusedMatMulActivation"], [n.op_type for n in opt_onx.graph.node]
-        )
+        self.assertEqual(["FusedMatMulActivation"], [n.op_type for n in opt_onx.graph.node])
         node = opt_onx.graph.node[0]
         self.assertEqual(node.domain, "com.microsoft")
         act_attr = {a.name: a for a in node.attribute}
@@ -3797,9 +3913,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node(
-                        "FusedMatMul", ["X", "Y"], ["mm"], domain="com.microsoft"
-                    ),
+                    oh.make_node("FusedMatMul", ["X", "Y"], ["mm"], domain="com.microsoft"),
                     oh.make_node("LeakyRelu", ["mm"], ["Z"], alpha=0.1),
                 ],
                 "dummy",
@@ -3824,9 +3938,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
-        self.assertEqual(
-            ["FusedMatMulActivation"], [n.op_type for n in opt_onx.graph.node]
-        )
+        self.assertEqual(["FusedMatMulActivation"], [n.op_type for n in opt_onx.graph.node])
         node = opt_onx.graph.node[0]
         self.assertEqual(node.domain, "com.microsoft")
         act_attr = {a.name: a for a in node.attribute}
@@ -3841,9 +3953,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         model = oh.make_model(
             oh.make_graph(
                 [
-                    oh.make_node(
-                        "FusedMatMul", ["X", "Y"], ["mm"], domain="com.microsoft"
-                    ),
+                    oh.make_node("FusedMatMul", ["X", "Y"], ["mm"], domain="com.microsoft"),
                     oh.make_node("Relu", ["mm"], ["r"]),
                     oh.make_node("Add", ["mm", "r"], ["Z"]),
                 ],
