@@ -53,6 +53,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         MissingTopKPattern,
     )
 
+    from .embed_layer_normalization import EmbedLayerNormalizationPattern
     from .relative_position_bias import RelativePositionBiasPattern
     from .simplified_layer_normalization import (
         SimplifiedLayerNormalizationPattern,
@@ -72,6 +73,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         ComplexMulConjPattern(verbose=verbose),
         ContribRotaryEmbeddingPattern(verbose=verbose),
         ContribRotaryEmbedding3DPattern(verbose=verbose),
+        EmbedLayerNormalizationPattern(verbose=verbose),
         GeluOrtPattern(verbose=verbose),
         GeluErfPattern(verbose=verbose),
         GroupQueryAttention3DPattern(verbose=verbose),

@@ -2879,6 +2879,42 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             self.set_rank(node.output[0], 4)
         return None
 
+    # EmbedLayerNormalization: BERT-style embedding layer fusion.
+    # Inputs: input_ids [B, S], segment_ids [B, S] (opt), word_embedding [V, D],
+    #         position_embedding [P, D], segment_embedding [NS, D] (opt),
+    #         gamma [D], beta [D], mask [B, S] (opt), position_ids [B, S] (opt)
+    # Outputs: output [B, S, D], mask_index [B]
+    if node.op_type == "EmbedLayerNormalization" and node.domain == "com.microsoft":
+        # word_embedding is input[2]; its dtype gives the output float type
+        word_emb_input = node.input[2] if len(node.input) > 2 else ""
+        dtype = (
+            self.get_type(word_emb_input)
+            if word_emb_input and self.has_type(word_emb_input)
+            else None
+        )
+        if dtype is not None and node.output[0]:
+            self.set_type(node.output[0], dtype)
+        # mask_index is INT32
+        if len(node.output) > 1 and node.output[1]:
+            self.set_type(node.output[1], TensorProto.INT32)
+        if self.has_device(node.input[0]) and node.output[0]:
+            self.set_device(node.output[0], self.get_device(node.input[0]))
+        if self.has_shape(node.input[0]) and word_emb_input and self.has_shape(word_emb_input):
+            ids_shape = self.get_shape(node.input[0])
+            emb_shape = self.get_shape(word_emb_input)
+            if len(ids_shape) >= 2 and len(emb_shape) >= 2 and node.output[0]:
+                hidden = emb_shape[1]
+                output_shape = (*ids_shape, hidden)
+                self.set_shape(node.output[0], output_shape)
+            if len(ids_shape) >= 1 and len(node.output) > 1 and node.output[1]:
+                self.set_shape(node.output[1], (ids_shape[0],))
+        elif self.has_rank(node.input[0]) and node.output[0]:
+            rank = self.get_rank(node.input[0])
+            self.set_rank(node.output[0], rank + 1)
+            if len(node.output) > 1 and node.output[1]:
+                self.set_rank(node.output[1], 1)
+        return None
+
     # CausalConvWithState: stateful causal depthwise convolution.
     # Inputs: input (N, C, L), weight (C, 1, K), bias (C, optional),
     #         past_state (N, C, K-1, optional).
