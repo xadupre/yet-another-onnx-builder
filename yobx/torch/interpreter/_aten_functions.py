@@ -1979,11 +1979,7 @@ def aten_bitwise_or__Tensor(
 
 
 def aten_block_diag(
-    g: GraphBuilder,
-    sts: Optional[Dict[str, Any]],
-    outputs: List[str],
-    tensors: Sequence[T],
-    name: str = "block_diag",
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], *tensors: T
 ) -> T:
     """Creates a block diagonal matrix from the provided tensors.
 
@@ -1991,6 +1987,7 @@ def aten_block_diag(
     vectors of length ``n`` become ``[1, n]``) and then placed on the
     diagonal of the output 2-D matrix.
     """
+    _name = "block_diag"
     assert len(tensors) > 0, f"block_diag: empty tensor list{g.get_debug_msg()}"
     assert all(
         g.has_type(t) for t in tensors
@@ -2002,30 +1999,30 @@ def aten_block_diag(
     for t in tensors:
         rank = g.get_rank(t) if g.has_rank(t) else None
         if rank == 0:
-            m = g.op.Reshape(t, np.array([1, 1], dtype=np.int64), name=name)
+            m = g.op.Reshape(t, np.array([1, 1], dtype=np.int64), name=_name)
         elif rank == 1:
-            m = g.op.UnsqueezeAnyOpset(t, np.array([0], dtype=np.int64), name=name)
+            m = g.op.UnsqueezeAnyOpset(t, np.array([0], dtype=np.int64), name=_name)
         else:
             m = t
         mats.append(m)
 
     if len(mats) == 1:
-        res = g.op.Identity(mats[0], outputs=outputs, name=name)
+        res = g.op.Identity(mats[0], outputs=outputs, name=_name)
         if not sts:
             g.set_type(res, itype)
             g.set_rank(res, 2)
         return res
 
     # Compute per-tensor shape tensors as 1-D INT64 tensors of shape [1].
-    row_sizes = [g.op.Shape(m, start=0, end=1, name=name) for m in mats]
-    col_sizes = [g.op.Shape(m, start=1, end=2, name=name) for m in mats]
+    row_sizes = [g.op.Shape(m, start=0, end=1, name=_name) for m in mats]
+    col_sizes = [g.op.Shape(m, start=1, end=2, name=_name) for m in mats]
 
     # Total rows and columns (shape [1]).
     total_rows = g.op.ReduceSumAnyOpset(
-        g.op.Concat(*row_sizes, axis=0, name=name), keepdims=1, name=name
+        g.op.Concat(*row_sizes, axis=0, name=_name), keepdims=1, name=_name
     )
     total_cols = g.op.ReduceSumAnyOpset(
-        g.op.Concat(*col_sizes, axis=0, name=name), keepdims=1, name=name
+        g.op.Concat(*col_sizes, axis=0, name=_name), keepdims=1, name=_name
     )
 
     # Pad each 2-D matrix to [total_rows, total_cols] and sum the results.
@@ -2034,18 +2031,18 @@ def aten_block_diag(
     col_before: Any = g.ZERO
     padded = []
     for m, row_size, col_size in zip(mats, row_sizes, col_sizes):
-        row_after = g.op.Sub(g.op.Sub(total_rows, row_before, name=name), row_size, name=name)
-        col_after = g.op.Sub(g.op.Sub(total_cols, col_before, name=name), col_size, name=name)
-        pads = g.op.Concat(row_before, col_before, row_after, col_after, axis=0, name=name)
-        padded.append(g.op.Pad(m, pads, name=name))
-        row_before = g.op.Add(row_before, row_size, name=name)
-        col_before = g.op.Add(col_before, col_size, name=name)
+        row_after = g.op.Sub(g.op.Sub(total_rows, row_before, name=_name), row_size, name=_name)
+        col_after = g.op.Sub(g.op.Sub(total_cols, col_before, name=_name), col_size, name=_name)
+        pads = g.op.Concat(row_before, col_before, row_after, col_after, axis=0, name=_name)
+        padded.append(g.op.Pad(m, pads, name=_name))
+        row_before = g.op.Add(row_before, row_size, name=_name)
+        col_before = g.op.Add(col_before, col_size, name=_name)
 
     # Sum the padded (non-overlapping) blocks.
     res = padded[0]
     for p in padded[1:]:
-        res = g.op.Add(res, p, name=name)
-    res = g.op.Identity(res, outputs=outputs, name=name)
+        res = g.op.Add(res, p, name=_name)
+    res = g.op.Identity(res, outputs=outputs, name=_name)
     if not sts:
         g.set_type(res, itype)
         # Set the exact output shape when all normalised shapes are static.
