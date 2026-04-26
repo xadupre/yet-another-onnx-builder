@@ -293,26 +293,19 @@ helps calibrate expectations and guides where human review is most valuable.
 Instantly-Abandoned WIP Pull Requests
 --------------------------------------
 
-On three occasions Copilot opened a pull request but committed nothing beyond
+On two occasions Copilot opened a pull request but committed nothing beyond
 the boilerplate template message.  These are the clearest sign that it lacked
 enough context or that the problem was too open-ended to start without explicit
 guidance:
 
-* `PR #2009 <https://github.com/xadupre/yet-another-onnx-builder/pull/2009>`_ —
-  *[WIP] Support ai.onnx.ml>=5 when computing statistics on trees* (Apr 25).
-  The PR body was empty (just the issue template); no code was written and the
-  PR was closed the same day it was opened.  After the issue was reformulated
-  and restricted in scope, Copilot succeeded in
-  `PR #2012 <https://github.com/xadupre/yet-another-onnx-builder/pull/2012>`_.
-
 * `PR #1801 <https://github.com/xadupre/yet-another-onnx-builder/pull/1801>`_ —
   *[WIP] Fix std and std_mean for test_onnx_export_common_methods* (Apr 7).
-  Same pattern: Copilot opened the draft with no commits.  A narrower issue was
+  Copilot opened the draft with no commits.  A narrower issue was
   later resolved as part of the Week 8 batch of aten converters.
 
 * `PR #1493 <https://github.com/xadupre/yet-another-onnx-builder/pull/1493>`_ —
   *[WIP] Fix CropLastDimensionWithTensorContent for the torch converter* (Mar 25).
-  Again no code; the PR was discarded immediately.  The root fix required
+  No code was committed; the PR was discarded immediately.  The root fix required
   understanding the interplay between dynamic-shape tracing and tensor-content
   slicing — context that Copilot could not assemble from the issue text alone.
 
