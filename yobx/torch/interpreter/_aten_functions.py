@@ -1979,7 +1979,7 @@ def aten_bitwise_or__Tensor(
 
 
 def aten_block_diag(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], *tensors: T
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], tensors: Sequence[T]
 ) -> T:
     """Creates a block diagonal matrix from the provided tensors.
 
