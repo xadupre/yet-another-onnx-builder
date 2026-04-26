@@ -2950,15 +2950,13 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
         if self.has_shape(node.input[0]):
             input_shape = self.get_shape(node.input[0])
             batch_size = input_shape[0]
-            max_len_val = (
-                self.value_as_shape(node.input[1])
-                if len(node.input) > 1 and node.input[1]
-                else None
-            )
+            has_max_length = len(node.input) > 1 and node.input[1]
+            max_len_val = self.value_as_shape(node.input[1]) if has_max_length else None
             if max_len_val is not None and len(max_len_val) == 1:
                 max_len = max_len_val[0]
             else:
-                max_len = node.input[1] if len(node.input) > 1 and node.input[1] else "max_len"
+                # Use the input name as a symbolic dimension reference.
+                max_len = node.input[1] if has_max_length else "max_len"
             self.set_shape(node.output[0], (batch_size, max_len))
         else:
             self.set_rank(node.output[0], 2)
