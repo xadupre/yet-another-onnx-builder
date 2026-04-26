@@ -11,9 +11,8 @@ equation into a sub-graph built from simpler operators
 (``Transpose``, ``Reshape``, ``MatMul``, ``Mul``, ``ReduceSum``, …)
 that every compliant ONNX runtime understands.
 
-The decomposition is delegated to the
-:mod:`onnx_extended.tools.einsum` package
-(``pip install onnx-extended``).
+The decomposition is implemented in :mod:`yobx.helpers._einsum`, a
+self-contained sub-package — no external dependency is required.
 """
 
 import numpy as np
