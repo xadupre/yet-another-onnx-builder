@@ -1502,7 +1502,7 @@ class GraphEinsumSubOp:
         ), f"Mismatched length {rem!r}, {dels!r}, len={len(deleted)!r}."
         for i in reversed(rem):
             del self._ops[i]
-        self.last_add_op = None
+        self.last_added_op = None
 
         # insertion
         if added is not None:
