@@ -4083,6 +4083,189 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         output_types = {vi.name: vi.type.tensor_type.elem_type for vi in opt_onx.graph.output}
         self.assertEqual(output_types.get("sequences"), TensorProto.INT32)
 
+    def test_embed_layer_normalization_3_embeddings(self):
+        from onnxruntime import InferenceSession
+
+        vocab_size, pos_size, seg_size, hidden = 100, 20, 2, 16
+        np.random.seed(42)
+        word_table = np.random.randn(vocab_size, hidden).astype(np.float32) * 0.1
+        pos_table = np.random.randn(pos_size, hidden).astype(np.float32) * 0.1
+        seg_table = np.random.randn(seg_size, hidden).astype(np.float32) * 0.1
+        gamma = np.ones(hidden, dtype=np.float32)
+        beta = np.zeros(hidden, dtype=np.float32)
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Gather", ["word_table", "input_ids"], ["word_embed"]),
+                    oh.make_node("Gather", ["pos_table", "position_ids"], ["pos_embed"]),
+                    oh.make_node("Gather", ["seg_table", "segment_ids"], ["seg_embed"]),
+                    oh.make_node("Add", ["word_embed", "pos_embed"], ["add1"]),
+                    oh.make_node("Add", ["add1", "seg_embed"], ["add2"]),
+                    oh.make_node(
+                        "LayerNormalization",
+                        ["add2", "gamma", "beta"],
+                        ["output"],
+                        axis=-1,
+                        epsilon=1e-5,
+                    ),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("input_ids", TINT64, ["B", "S"]),
+                    oh.make_tensor_value_info("segment_ids", TINT64, ["B", "S"]),
+                    oh.make_tensor_value_info("position_ids", TINT64, ["B", "S"]),
+                ],
+                [oh.make_tensor_value_info("output", TFLOAT, ["B", "S", hidden])],
+                [
+                    onh.from_array(word_table, name="word_table"),
+                    onh.from_array(pos_table, name="pos_table"),
+                    onh.from_array(seg_table, name="seg_table"),
+                    onh.from_array(gamma, name="gamma"),
+                    onh.from_array(beta, name="beta"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+
+        B, S = 2, 5
+        feeds = {
+            "input_ids": np.random.randint(0, vocab_size, (B, S)).astype(np.int64),
+            "segment_ids": np.random.randint(0, seg_size, (B, S)).astype(np.int64),
+            "position_ids": np.tile(np.arange(S, dtype=np.int64), (B, 1)),
+        }
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["EmbedLayerNormalization"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertIn("EmbedLayerNormalization", [n.op_type for n in opt_onx.graph.node])
+        self.assertIn("com.microsoft", [n.domain for n in opt_onx.graph.node])
+
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+
+    def test_embed_layer_normalization_2_embeddings(self):
+        from onnxruntime import InferenceSession
+
+        vocab_size, pos_size, hidden = 100, 20, 16
+        np.random.seed(42)
+        word_table = np.random.randn(vocab_size, hidden).astype(np.float32) * 0.1
+        pos_table = np.random.randn(pos_size, hidden).astype(np.float32) * 0.1
+        gamma = np.ones(hidden, dtype=np.float32)
+        beta = np.zeros(hidden, dtype=np.float32)
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Gather", ["word_table", "input_ids"], ["word_embed"]),
+                    oh.make_node("Gather", ["pos_table", "position_ids"], ["pos_embed"]),
+                    oh.make_node("Add", ["word_embed", "pos_embed"], ["add1"]),
+                    oh.make_node(
+                        "LayerNormalization",
+                        ["add1", "gamma", "beta"],
+                        ["output"],
+                        axis=-1,
+                        epsilon=1e-5,
+                    ),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("input_ids", TINT64, ["B", "S"]),
+                    oh.make_tensor_value_info("position_ids", TINT64, ["B", "S"]),
+                ],
+                [oh.make_tensor_value_info("output", TFLOAT, ["B", "S", hidden])],
+                [
+                    onh.from_array(word_table, name="word_table"),
+                    onh.from_array(pos_table, name="pos_table"),
+                    onh.from_array(gamma, name="gamma"),
+                    onh.from_array(beta, name="beta"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+
+        B, S = 2, 5
+        feeds = {
+            "input_ids": np.random.randint(0, vocab_size, (B, S)).astype(np.int64),
+            "position_ids": np.tile(np.arange(S, dtype=np.int64), (B, 1)),
+        }
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["EmbedLayerNormalization"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertIn("EmbedLayerNormalization", [n.op_type for n in opt_onx.graph.node])
+        self.assertIn("com.microsoft", [n.domain for n in opt_onx.graph.node])
+
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+
+    def test_embed_layer_normalization_no_fusion_without_bias(self):
+        vocab_size, pos_size, hidden = 100, 20, 16
+        np.random.seed(42)
+        word_table = np.random.randn(vocab_size, hidden).astype(np.float32) * 0.1
+        pos_table = np.random.randn(pos_size, hidden).astype(np.float32) * 0.1
+        gamma = np.ones(hidden, dtype=np.float32)
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Gather", ["word_table", "input_ids"], ["word_embed"]),
+                    oh.make_node("Gather", ["pos_table", "position_ids"], ["pos_embed"]),
+                    oh.make_node("Add", ["word_embed", "pos_embed"], ["add1"]),
+                    # No bias (beta) provided - should NOT fuse
+                    oh.make_node(
+                        "LayerNormalization", ["add1", "gamma"], ["output"], axis=-1, epsilon=1e-5
+                    ),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("input_ids", TINT64, ["B", "S"]),
+                    oh.make_tensor_value_info("position_ids", TINT64, ["B", "S"]),
+                ],
+                [oh.make_tensor_value_info("output", TFLOAT, ["B", "S", hidden])],
+                [
+                    onh.from_array(word_table, name="word_table"),
+                    onh.from_array(pos_table, name="pos_table"),
+                    onh.from_array(gamma, name="gamma"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["EmbedLayerNormalization"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # EmbedLayerNormalization requires both gamma and beta - should NOT fuse
+        self.assertNotIn("EmbedLayerNormalization", [n.op_type for n in opt_onx.graph.node])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
