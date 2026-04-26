@@ -2879,6 +2879,31 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             self.set_rank(node.output[0], 4)
         return None
 
+    # GatedRelativePositionBias: DeBERTa-v2/v3 style gated relative attention bias.
+    # Inputs: query_layer (batch, seq_len, num_heads*head_size), query_bias,
+    #         rel_pos (1, num_heads, seq_len, seq_len), weight, bias,
+    #         eco_a (1, num_heads, 1, 1), [token_offset]
+    # Output: (batch_size, num_heads, seq_len, seq_len)
+    if node.op_type == "GatedRelativePositionBias" and node.domain == "com.microsoft":
+        if self.has_type(node.input[0]):
+            self.set_type(node.output[0], self.get_type(node.input[0]))
+        if self.has_device(node.input[0]):
+            self.set_device(node.output[0], self.get_device(node.input[0]))
+        # Derive output shape from query_layer (batch from input[0])
+        # and rel_pos (dims from input[2]).
+        rel_pos_idx = 2
+        if self.has_shape(node.input[0]) and self.has_shape(node.input[rel_pos_idx]):
+            query_shape = self.get_shape(node.input[0])
+            rel_pos_shape = self.get_shape(node.input[rel_pos_idx])
+            batch_dim = query_shape[0]
+            num_heads_dim = rel_pos_shape[1]
+            seq_q_dim = rel_pos_shape[2]
+            seq_k_dim = rel_pos_shape[3]
+            self.set_shape(node.output[0], (batch_dim, num_heads_dim, seq_q_dim, seq_k_dim))
+        elif self.has_rank(node.input[0]):
+            self.set_rank(node.output[0], 4)
+        return None
+
     # CausalConvWithState: stateful causal depthwise convolution.
     # Inputs: input (N, C, L), weight (C, 1, K), bias (C, optional),
     #         past_state (N, C, K-1, optional).

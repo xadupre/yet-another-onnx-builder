@@ -53,7 +53,10 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         MissingTopKPattern,
     )
 
-    from .relative_position_bias import RelativePositionBiasPattern
+    from .relative_position_bias import (
+        RelativePositionBiasPattern,
+        GatedRelativePositionBiasPattern,
+    )
     from .simplified_layer_normalization import (
         SimplifiedLayerNormalizationPattern,
         SimplifiedLayerNormalizationMulPattern,
@@ -83,6 +86,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         FusedMatMulDivPattern(verbose=verbose),
         FusedMatMulTransposePattern(verbose=verbose),
         GemmFastGeluPattern(verbose=verbose),
+        GatedRelativePositionBiasPattern(verbose=verbose),
         MissingCosSinPattern(verbose=verbose),
         MissingRangePattern(verbose=verbose),
         MissingReduceMaxPattern(verbose=verbose),
