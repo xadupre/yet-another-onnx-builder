@@ -161,8 +161,8 @@ intersphinx_mapping = {
 
 suppress_warnings = ["intersphinx.external"]
 if int(os.environ.get("UNITTEST_GOING", "0")):
-    # Suppress undefined-label warnings for pages intentionally excluded on CI.
-    suppress_warnings += ["ref.ref"]
+    # Suppress toctree warnings for pages intentionally excluded on CI.
+    suppress_warnings += ["toc.excluded"]
 
 sphinx_gallery_conf = {
     # path to your examples scripts
