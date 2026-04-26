@@ -405,6 +405,44 @@ precisely:
   *BinaryUnsqueezeExpandPattern*.  Correct for the common case but produced
   wrong shapes when broadcasting rules applied across more than one axis.
 
+Repeated Attempts to Introduce ``concrete_value`` in ``TracingInt``
+--------------------------------------------------------------------
+
+On two separate pull requests, Copilot re-introduced a ``concrete_value``
+field into ``TracingInt`` despite being explicitly told not to each time.
+
+* **First incident — `PR #1933 <https://github.com/xadupre/yet-another-onnx-builder/pull/1933>`_
+  (Fix ControlFlowNumelZero2, Apr 18–20).**
+  When asked to fix ``TracingTensor.numel()`` for symbolic dimensions,
+  Copilot added a ``concrete_value: Optional[int]`` parameter and property
+  to ``TracingInt`` to store the actual trace-time size (commit ``35c4449``).
+  The reviewer commented *"you cannot use concrete values for TracingInt,
+  never"*.  Copilot responded by moving the concrete value into a
+  ``GraphTracer._dim_concrete_values: Dict[str, int]`` dictionary (commit
+  ``cbf517e``) — still storing concrete values, just in a different class.
+  A second review comment arrived: *"i already said no concrete values!"*.
+  Only then did Copilot remove all concrete storage and implement a fully
+  symbolic resolution via ``torch._check`` / ``_known_true_conditions``
+  negation (commit ``315b261``).
+
+* **Second incident — `PR #1971 <https://github.com/xadupre/yet-another-onnx-builder/pull/1971>`_
+  (ControlFlowScan2Carried tests and ``x[0]`` fix, Apr 23–24).**
+  While fixing the ``C++`` bounds-check failure for ``x[0]`` on tensors with
+  symbolic dimensions, Copilot once again added ``concrete_value: Optional[int]``
+  to ``TracingInt`` and used backed ``SymInt`` creation (commit ``a41712d``).
+  The reviewer commented *"you cannot use concrete_values, i said that many
+  times"*.  Copilot then replaced the approach with a constant ``1`` (no
+  input values) for the wrapper tensor size plus a dedicated
+  ``TracingTensor.__getitem__`` override that bypasses both C++ dispatch and
+  ``FakeTensorMode`` entirely (commit ``70f0db6``), with no concrete values
+  anywhere.
+
+The recurring root cause was Copilot reaching for a local, test-passing
+shortcut (cache the real size) rather than preserving the symbolic-only
+invariant that the ``new_tracing`` design requires.  The correct solution
+in both cases required understanding the global design constraint first and
+only then choosing a mechanism that respects it.
+
 Common Themes
 -------------
 
