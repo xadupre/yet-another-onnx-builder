@@ -277,3 +277,162 @@ A new workflow posts a comment listing impacted subfolders.
 ``validate_model`` was enriched with per-node-type statistics and a discrepancy
 sheet in the Excel output.
 Documentation now tracks and displays the five slowest Sphinx pages to build.
+
+----
+
+What Copilot Could Not Do (or Struggled With)
+==============================================
+
+The vast majority of the work in this project was driven by **GitHub Copilot**
+as a coding agent.  This section records the cases where it fell short — either
+opening a pull request but producing no working code, taking a wrong approach
+that had to be discarded, or needing several attempts before landing a correct
+solution.  The goal is transparency: understanding where an AI agent struggles
+helps calibrate expectations and guides where human review is most valuable.
+
+Instantly-Abandoned WIP Pull Requests
+--------------------------------------
+
+On three occasions Copilot opened a pull request but committed nothing beyond
+the boilerplate template message.  These are the clearest sign that it lacked
+enough context or that the problem was too open-ended to start without explicit
+guidance:
+
+* `PR #2009 <https://github.com/xadupre/yet-another-onnx-builder/pull/2009>`_ —
+  *[WIP] Support ai.onnx.ml>=5 when computing statistics on trees* (Apr 25).
+  The PR body was empty (just the issue template); no code was written and the
+  PR was closed the same day it was opened.  After the issue was reformulated
+  and restricted in scope, Copilot succeeded in
+  `PR #2012 <https://github.com/xadupre/yet-another-onnx-builder/pull/2012>`_.
+
+* `PR #1801 <https://github.com/xadupre/yet-another-onnx-builder/pull/1801>`_ —
+  *[WIP] Fix std and std_mean for test_onnx_export_common_methods* (Apr 7).
+  Same pattern: Copilot opened the draft with no commits.  A narrower issue was
+  later resolved as part of the Week 8 batch of aten converters.
+
+* `PR #1493 <https://github.com/xadupre/yet-another-onnx-builder/pull/1493>`_ —
+  *[WIP] Fix CropLastDimensionWithTensorContent for the torch converter* (Mar 25).
+  Again no code; the PR was discarded immediately.  The root fix required
+  understanding the interplay between dynamic-shape tracing and tensor-content
+  slicing — context that Copilot could not assemble from the issue text alone.
+
+Wrong Approaches That Had to Be Discarded
+------------------------------------------
+
+A larger set of pull requests contained real code, but the design or algorithm
+was incorrect and the PR had to be closed in favour of a fresh attempt:
+
+* `PR #1962 <https://github.com/xadupre/yet-another-onnx-builder/pull/1962>`_ —
+  *fix ControlFlowShapeCheck for the default exporter* (Apr 23).
+  The patch covered only 6 % of the lines it touched and the test it added did
+  not actually exercise the fixed code paths.  The issue was later resolved
+  correctly in the new-tracing path.
+
+* `PR #1798 <https://github.com/xadupre/yet-another-onnx-builder/pull/1798>`_ —
+  *Fix AtenAsStrided export for new-tracing with dynamic shapes* (Apr 6–7).
+  Copilot tried to patch ``TracingShape.from_existing_shape`` and
+  ``DynamoInterpreter._get_tensor_shape``, but the multi-file interaction was
+  too subtle; the draft was discarded and the fix was absorbed into a later
+  refactor.
+
+* `PR #1709 <https://github.com/xadupre/yet-another-onnx-builder/pull/1709>`_ —
+  *Propagate symbolic TracingShape through operations in new dispatch tracer*
+  (Apr 3).  An ambitious draft adding ``is_symbolic`` properties and
+  ``_infer_output_tracing_shape`` helpers.  The approach added fragile
+  instance-level state that conflicted with subsequent design choices; the
+  PR was dropped and the problem was solved differently.
+
+* `PR #1690 <https://github.com/xadupre/yet-another-onnx-builder/pull/1690>`_ —
+  *Extend GraphBuilderTorchProtocol with missing make_* methods* (Apr 2).
+  The protocol extension itself was correct but was not the right abstraction
+  layer; the PR was closed without merge.
+
+* `PR #1682 <https://github.com/xadupre/yet-another-onnx-builder/pull/1682>`_ —
+  *CustomProxyInt: statically resolve comparisons between offset-derived
+  proxies* (Apr 1).  Root/offset tracking was added to ``CustomProxyInt``,
+  but the approach introduced edge cases that broke other comparison paths.
+  The issue was later fixed differently.
+
+* `PR #1673 <https://github.com/xadupre/yet-another-onnx-builder/pull/1673>`_ —
+  *Fix ControlFlowNumelZero2 tracing* (Apr 1).  Copilot added
+  ``can_be_null``/``only_positive`` flags to ``CustomProxy.numel()`` but the
+  flags were not threaded correctly through the shape-guard machinery; the PR
+  had 0 % patch coverage and was discarded.  ``ControlFlowNumelZero2`` was
+  eventually fixed in
+  `PR #1933 <https://github.com/xadupre/yet-another-onnx-builder/pull/1933>`_
+  using a completely different strategy.
+
+Features That Needed Multiple Attempts
+---------------------------------------
+
+Some features required two or three separate PRs before a mergeable
+implementation was produced:
+
+* **DataFrame gallery example** — three attempts:
+  `PR #1590 <https://github.com/xadupre/yet-another-onnx-builder/pull/1590>`_,
+  `PR #1609 <https://github.com/xadupre/yet-another-onnx-builder/pull/1609>`_,
+  `PR #1632 <https://github.com/xadupre/yet-another-onnx-builder/pull/1632>`_
+  (Mar 26–29).  Each attempt produced a runnable example, but the result was
+  either incomplete, structurally inconsistent with the existing gallery, or a
+  near-duplicate of a prior attempt.
+
+* **Top-level ``to_onnx`` dispatcher** — two attempts in rapid succession
+  (`PR #1394 <https://github.com/xadupre/yet-another-onnx-builder/pull/1394>`_
+  and the merged implementation in Week 5).  The first attempt put too much
+  logic in the dispatcher itself and duplicated code from framework-specific
+  modules.
+
+* **``ControlFlowNumelZero2``** — two failed PRs (#1673, and an earlier
+  exploratory one) before the fix landed in PR #1933.
+
+Graph-Optimisation Patterns Abandoned Mid-Implementation
+---------------------------------------------------------
+
+Several ``xoptim`` pattern proposals were opened as pull requests but closed
+without merging because the correctness conditions were too hard to specify
+precisely:
+
+* `PR #1659 <https://github.com/xadupre/yet-another-onnx-builder/pull/1659>`_ —
+  *Add ConstantOfShapeIdentityPattern* to fold ``x + zeros_like(x)`` → ``x``.
+  The pattern is mathematically sound but required shape-equality guards that
+  the proposed implementation checked only approximately.
+
+* `PR #1645 <https://github.com/xadupre/yet-another-onnx-builder/pull/1645>`_ —
+  *Add CustomTracer.remove_tests()* to prune dead comparison nodes.  The method
+  worked for the motivating test case but was too aggressive: it removed nodes
+  whose results were indirectly used through boolean short-circuit chains.
+
+* `PR #1448 <https://github.com/xadupre/yet-another-onnx-builder/pull/1448>`_ —
+  *Add* ``op_types`` *static attribute to* ``PatternOptimization``.  The
+  implementation had 100 % patch coverage and no test failures, but was closed
+  because the design did not account for patterns that match on computed
+  node types (e.g. custom ops) rather than fixed strings.
+
+* `PR #1263 <https://github.com/xadupre/yet-another-onnx-builder/pull/1263>`_ —
+  *BinaryUnsqueezeExpandPattern*.  Correct for the common case but produced
+  wrong shapes when broadcasting rules applied across more than one axis.
+
+Common Themes
+-------------
+
+Reviewing these cases, a few recurring difficulties stand out:
+
+* **Multi-file interactions with tight invariants** — Bugs at the boundary
+  between ``new_tracing``, ``GraphBuilder``, and the ONNX interpreter require
+  holding a large amount of invariant context simultaneously.  Copilot tends to
+  fix the symptom in one file while missing a side-effect in another.
+
+* **Correctness conditions that are easy to state but hard to check** —
+  "``x + zeros_like(x)`` is always ``x``" sounds simple, but verifying that
+  the shapes are genuinely compatible requires traversing the ONNX graph in ways
+  that Copilot did not fully implement.
+
+* **Iterative discovery tasks** — When the issue asked Copilot to *find all
+  cases* of a problem and fix them, it often found the most obvious one and
+  missed the rest.  These tasks benefited most from explicit guidance (e.g. a
+  list of failing test cases to use as a checklist).
+
+* **Open-ended documentation / gallery examples** — Asking Copilot to write a
+  "good example" for a feature produced structurally correct but pedagogically
+  weak examples.  Multiple rounds of feedback were needed to arrive at examples
+  that fit naturally into the existing gallery style.
