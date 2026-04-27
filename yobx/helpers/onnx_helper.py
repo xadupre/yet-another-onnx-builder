@@ -1376,7 +1376,6 @@ def unary_like_op_types() -> Set[str]:
         "Sin",
         "Sinh",
         "Softmax",
-        "SoftmaxCrossEntropyLoss",
         "Softplus",
         "Softsign",
         "Sqrt",

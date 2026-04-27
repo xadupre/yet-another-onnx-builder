@@ -1783,6 +1783,129 @@ def aten_bilinear(
     return res
 
 
+def aten_binary_cross_entropy(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    target: T,
+    weight: Optional[T] = None,
+    reduction: int = Reduction.MEAN.value,
+    name: str = "binary_cross_entropy",
+) -> T:
+    """binary_cross_entropy
+
+    Computes ``-[target * log(x) + (1 - target) * log(1 - x)]`` then applies *weight*
+    and *reduction*.
+    """
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    eps = np.array([1e-12], dtype=dtype)
+    # Clamp x to avoid log(0): log(max(x, eps)) and log(max(1-x, eps))
+    log_x = g.op.Log(g.op.Clip(x, eps, name=name), name=name)
+    log_1mx = g.op.Log(g.op.Clip(g.op.Sub(np.array([1.0], dtype=dtype), x, name=name), eps, name=name), name=name)
+    one_minus_target = g.op.Sub(np.array([1.0], dtype=dtype), target, name=name)
+    term1 = g.op.Mul(target, log_x, name=name)
+    term2 = g.op.Mul(one_minus_target, log_1mx, name=name)
+    loss_elem = g.op.Neg(g.op.Add(term1, term2, name=name), name=name)
+    if weight is not None:
+        loss_elem = g.op.Mul(loss_elem, weight, name=name)
+    if reduction in (Reduction.MEAN.value, "mean"):
+        res = g.op.ReduceMeanAnyOpset(loss_elem, name=name, outputs=outputs, keepdims=0)
+    elif reduction in (Reduction.SUM.value, "sum"):
+        res = g.op.ReduceSumAnyOpset(loss_elem, name=name, outputs=outputs, keepdims=0)
+    elif reduction in (Reduction.NONE.value, "none"):
+        res = g.op.Identity(loss_elem, name=name, outputs=outputs)
+    else:
+        raise NotImplementedError(
+            f"binary_cross_entropy with reduction={reduction!r} is not implemented"
+            f"{g.get_debug_msg()}"
+        )
+    if not sts:
+        if reduction in (Reduction.NONE.value, "none"):
+            set_type_shape_unary_op(g, res, x)
+        else:
+            g.set_type(res, g.get_type(x))
+            g.set_shape(res, ())
+    return res
+
+
+def aten_binary_cross_entropy_with_logits(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    target: T,
+    weight: Optional[T] = None,
+    pos_weight: Optional[T] = None,
+    reduction: int = Reduction.MEAN.value,
+    name: str = "binary_cross_entropy_with_logits",
+) -> T:
+    """binary_cross_entropy_with_logits
+
+    Numerically stable formula:
+    ``max(x, 0) - x * target + log(1 + exp(-abs(x)))``.
+    When *pos_weight* is given, the positive term is scaled.
+    """
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    zero = np.array([0.0], dtype=dtype)
+    one = np.array([1.0], dtype=dtype)
+    relu_x = g.op.Relu(x, name=name)
+    if pos_weight is not None:
+        # loss = (1 - target) * x + (1 + (pos_weight - 1) * target) * log(1 + exp(-|x|))
+        log_weight = g.op.Add(
+            one,
+            g.op.Mul(g.op.Sub(pos_weight, one, name=name), target, name=name),
+            name=name,
+        )
+        log_term = g.op.Mul(
+            log_weight,
+            g.op.Log(
+                g.op.Add(one, g.op.Exp(g.op.Neg(g.op.Abs(x, name=name), name=name), name=name), name=name),
+                name=name,
+            ),
+            name=name,
+        )
+        loss_elem = g.op.Add(
+            g.op.Sub(relu_x, g.op.Mul(x, target, name=name), name=name),
+            log_term,
+            name=name,
+        )
+    else:
+        log_term = g.op.Log(
+            g.op.Add(
+                one,
+                g.op.Exp(g.op.Neg(g.op.Abs(x, name=name), name=name), name=name),
+                name=name,
+            ),
+            name=name,
+        )
+        loss_elem = g.op.Add(
+            g.op.Sub(relu_x, g.op.Mul(x, target, name=name), name=name),
+            log_term,
+            name=name,
+        )
+    if weight is not None:
+        loss_elem = g.op.Mul(loss_elem, weight, name=name)
+    if reduction in (Reduction.MEAN.value, "mean"):
+        res = g.op.ReduceMeanAnyOpset(loss_elem, name=name, outputs=outputs, keepdims=0)
+    elif reduction in (Reduction.SUM.value, "sum"):
+        res = g.op.ReduceSumAnyOpset(loss_elem, name=name, outputs=outputs, keepdims=0)
+    elif reduction in (Reduction.NONE.value, "none"):
+        res = g.op.Identity(loss_elem, name=name, outputs=outputs)
+    else:
+        raise NotImplementedError(
+            f"binary_cross_entropy_with_logits with reduction={reduction!r} is not implemented"
+            f"{g.get_debug_msg()}"
+        )
+    if not sts:
+        if reduction in (Reduction.NONE.value, "none"):
+            set_type_shape_unary_op(g, res, x)
+        else:
+            g.set_type(res, g.get_type(x))
+            g.set_shape(res, ())
+    return res
+
+
 def aten_bitwise_not(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -2007,19 +2130,31 @@ def aten_broadcast_tensors(
     assert (
         len(outputs) == 1
     ), f"Mismatch between tensors={tensors} and outputs={outputs}{g.get_debug_msg()}"
+    # Use #-indexed sub-outputs so that downstream getitem nodes can find
+    # each broadcast tensor by name (f"{outputs[0]}#{i}").  This also lets
+    # _set_shape_and_type detect a list result via r[0].endswith("#0").
+    sub_outputs = [f"{outputs[0]}#{i}" for i in range(len(tensors))]
     if all((g.has_shape(t) and is_static_shape(g.get_shape(t))) for t in tensors):
         shapes = [g.get_shape(t) for t in tensors]
         if len(tensors) == 2:
             new_shape = broadcast_shape(*shapes, graph_builder=g)
-            np_shape = np.array(new_shape, dtype=np.int64)
-            new_tensors = [
-                g.op.Reshape(t, np_shape, name=f"{name}_{i}") for i, t in enumerate(tensors)
-            ]
-            seq = g.op.SequenceConstruct(*new_tensors, outputs=outputs, name=name)
-
+            if new_shape == ():
+                # Both tensors are scalars; broadcast is a no-op — use Identity.
+                new_tensors = [
+                    g.op.Identity(t, outputs=[o], name=f"{name}_{i}")
+                    for i, (t, o) in enumerate(zip(tensors, sub_outputs))
+                ]
+            else:
+                np_shape = np.array(new_shape, dtype=np.int64)
+                new_tensors = [
+                    g.op.Reshape(t, np_shape, outputs=[o], name=f"{name}_{i}")
+                    for i, (t, o) in enumerate(zip(tensors, sub_outputs))
+                ]
             if not sts:
-                g.set_sequence(seq, g.get_type(tensors[0]), shapes=[new_shape for _t in tensors])
-            return seq
+                for nt in new_tensors:
+                    g.set_type(nt, g.get_type(tensors[0]))
+                    g.set_shape(nt, new_shape)
+            return tuple(new_tensors)
         raise NotImplementedError(
             f"broadcast_tensors applies on more than 2 tensors {tensors!r}{g.get_debug_msg()}"
         )
@@ -2170,6 +2305,30 @@ def aten_ceil(
 ) -> T:
     "ceil"
     res = g.op.Ceil(x, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_celu(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    alpha: float = 1.0,
+    inplace: bool = False,
+    name: str = "celu",
+) -> T:
+    "celu"
+    assert not inplace, f"inplace computation is not allowed with onnx{g.get_debug_msg()}"
+    itype = g.get_type(x)
+    if itype == TensorProto.FLOAT16:
+        # ONNX Celu does not support float16; promote to float32, apply, cast back.
+        xf = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+        res_f = g.op.Celu(xf, alpha=float(alpha), name=name)
+        res = g.op.Cast(res_f, to=TensorProto.FLOAT16, name=name, outputs=outputs)
+    else:
+        res = g.op.Celu(x, alpha=float(alpha), name=name, outputs=outputs)
     if not sts:
         set_type_shape_unary_op(g, res, x)
     return res
@@ -3005,9 +3164,20 @@ def aten_cross_entropy_loss(
     )
 
     if not sts:
-        g.set_type(outputs[0], g.get_type(x))
+        itype = g.get_type(x)
+        g.set_type(outputs[0], itype)
+        if reduction_name == "none":
+            # Output shape matches the target shape (N or N,d1,d2,...).
+            if g.has_shape(target):
+                g.set_shape(outputs[0], g.get_shape(target))
+            elif g.has_rank(target):
+                g.set_rank(outputs[0], g.get_rank(target))
+        else:
+            # mean/sum reduction → scalar output.
+            g.set_shape(outputs[0], ())
         if len(outputs) > 1:
-            g.set_type(outputs[1], g.get_type(x))
+            g.set_type(outputs[1], itype)
+            g.set_shape(outputs[1], ())
 
     return res
 
@@ -8192,27 +8362,40 @@ def aten_linear(
 ) -> T:
     "linear"
     weight_transposed = g.op.Transpose(weight, perm=[1, 0], name="linear")
+    # For 1-D input (in_features,), temporarily promote to (1, in_features),
+    # compute the matmul → (1, out_features), then squeeze back to (out_features,).
+    squeeze_output = False
+    if g.has_rank(x) and g.get_rank(x) == 1:
+        x = g.op.UnsqueezeAnyOpset(x, np.array([0], dtype=np.int64), name="linear")
+        squeeze_output = True
     if bias:
-        res = g.op.MatMul(x, weight_transposed)
+        res = g.op.MatMul(x, weight_transposed, name="linear")
         set_type_shape_matmul(g, res, x, weight_transposed)
-        res = g.op.Add(res, bias, outputs=outputs)
+        res = g.op.Add(res, bias, name="linear")
     else:
-        res = g.op.MatMul(x, weight_transposed, outputs=outputs, name="linear")
+        res = g.op.MatMul(x, weight_transposed, name="linear")
+    if squeeze_output:
+        res = g.op.SqueezeAnyOpset(res, np.array([0], dtype=np.int64), name="linear", outputs=outputs)
+    else:
+        res = g.op.Identity(res, name="linear", outputs=outputs)
     if not sts:
         if g.has_type(x):
             g.set_type(res, g.get_type(x))
         elif g.has_type(weight):
             g.set_type(res, g.get_type(weight))
-        if g.has_shape(x) and g.has_shape(weight):
-            shape_x = g.get_shape(x)
+        if g.has_shape(weight):
             shape_w = g.get_shape(weight)
-            new_shape = (shape_x[0], shape_w[0])
-            g.set_shape(res, new_shape)
-        elif g.has_rank(x) and g.has_rank(weight):
-            rkx = g.get_rank(x)
-            rkw = g.get_rank(weight)
-            if rkw == rkx:
-                g.set_rank(res, rkw)
+            out_features = shape_w[0]
+            if squeeze_output:
+                # 1-D input → (out_features,)
+                g.set_shape(res, (out_features,))
+            elif g.has_shape(x):
+                shape_x = g.get_shape(x)
+                g.set_shape(res, (*shape_x[:-1], out_features))
+            elif g.has_rank(x):
+                g.set_rank(res, g.get_rank(x))
+        elif g.has_rank(x):
+            g.set_rank(res, 1 if squeeze_output else g.get_rank(x))
     return res
 
 
@@ -8434,6 +8617,52 @@ def aten_logsumexp(
     if not sts:
         set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim)
     return result
+
+
+def aten_log_sigmoid(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "log_sigmoid",
+) -> T:
+    """log_sigmoid
+
+    Computes ``log(sigmoid(x)) = log(1 / (1 + exp(-x)))``, which equals
+    ``-softplus(-x)``.
+    """
+    sig = g.op.Sigmoid(x, name=name)
+    res = g.op.Log(sig, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_log_sigmoid_forward(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "log_sigmoid_forward",
+) -> Tuple[T, T]:
+    """log_sigmoid_forward — returns (log_sigmoid(x), buffer).
+
+    The second return value (*buffer*) is an implementation detail used by the
+    backward pass (it stores ``min(x, 0)``).  During forward-only export we
+    return a scalar zero placeholder for it.
+    """
+    sig = g.op.Sigmoid(x, name=name)
+    out = g.op.Log(sig, name=name, outputs=[outputs[0]])
+    if not sts:
+        set_type_shape_unary_op(g, out, x)
+    if len(outputs) > 1:
+        dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+        buf = g.op.Identity(np.array([0], dtype=dtype), outputs=[outputs[1]], name=name)
+        if not sts:
+            g.set_type(buf, g.get_type(x))
+            g.set_shape(buf, (0,))
+        return out, buf
+    return out
 
 
 def aten__log_softmax(
@@ -9394,6 +9623,26 @@ def aten_mse_loss(
         else:
             g.set_type(res, g.get_type(x))
             g.set_shape(res, tuple())
+    return res
+
+
+def aten_mish(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    inplace: bool = False,
+    name: str = "mish",
+) -> T:
+    """mish
+
+    Computes ``x * tanh(softplus(x)) = x * tanh(log(1 + exp(x)))``.
+    Uses the ONNX ``Mish`` operator (opset ≥ 18).
+    """
+    assert not inplace, f"inplace computation is not allowed with onnx{g.get_debug_msg()}"
+    res = g.op.Mish(x, name=name, outputs=outputs)
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
     return res
 
 
@@ -10404,6 +10653,66 @@ def aten_not_(
     )
 
 
+def aten_norm_ScalarOpt_dim(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    p: Optional[float] = 2.0,
+    dim: Optional[List[int]] = None,
+    keepdim: bool = False,
+    name: str = "norm_ScalarOpt_dim",
+) -> T:
+    """norm.ScalarOpt_dim — computes the p-norm along *dim*.
+
+    This is a general vector norm along specified dimensions, equivalent to
+    ``torch.norm(x, p=p, dim=dim, keepdim=keepdim)``.
+    """
+    if p is None:
+        p = 2.0
+    adim = np.array(dim if dim is not None else list(range(g.get_rank(x))), dtype=np.int64)
+    kd = 1 if keepdim else 0
+    if np.isinf(p) and p > 0:
+        res = g.op.ReduceMax(
+            g.op.Abs(x, name=name), adim, keepdims=kd, name=name, outputs=outputs
+        )
+    elif np.isinf(p) and p < 0:
+        res = g.op.ReduceMin(
+            g.op.Abs(x, name=name), adim, keepdims=kd, name=name, outputs=outputs
+        )
+    elif p == 1.0:
+        res = g.op.ReduceL1(x, adim, keepdims=kd, name=name, outputs=outputs)
+    elif p == 2.0:
+        res = g.op.ReduceL2(x, adim, keepdims=kd, name=name, outputs=outputs)
+    else:
+        dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+        p_arr = np.array([p], dtype=dtype)
+        inv_p = np.array([1.0 / p], dtype=dtype)
+        powered = g.op.Pow(g.op.Abs(x, name=name), p_arr, name=name)
+        red = g.op.ReduceSumAnyOpset(powered, adim, keepdims=kd, name=name)
+        res = g.op.Pow(red, inv_p, name=name, outputs=outputs)
+    if not sts:
+        if g.has_type(x):
+            # p-norm always produces a floating-point result.
+            g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            sh = g.get_shape(x)
+            if dim is not None:
+                norm_dims = set(d % len(sh) for d in dim)
+                if keepdim:
+                    out_sh = tuple(1 if i in norm_dims else s for i, s in enumerate(sh))
+                else:
+                    out_sh = tuple(s for i, s in enumerate(sh) if i not in norm_dims)
+            else:
+                out_sh = () if not keepdim else tuple(1 for _ in sh)
+            g.set_shape(res, out_sh)
+        elif g.has_rank(x):
+            rk = g.get_rank(x)
+            n = len(dim) if dim is not None else rk
+            g.set_rank(res, rk if keepdim else rk - n)
+    return res
+
+
 def aten_ones(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -10617,6 +10926,67 @@ def aten_constant_pad_nd(
         value=value,
         pad_is_right=pad_is_right,
     )
+
+
+def aten_pairwise_distance(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x1: T,
+    x2: T,
+    p: float = 2.0,
+    eps: float = 1e-6,
+    keepdim: bool = False,
+    name: str = "pairwise_distance",
+) -> T:
+    """pairwise_distance
+
+    Computes ``||x1 - x2 + eps||_p`` along the last dimension.
+    Integer inputs are promoted to float32 (matching PyTorch behaviour).
+    """
+    itype = g.get_type(x1)
+    is_integer = itype in (TensorProto.INT32, TensorProto.INT64, TensorProto.INT16, TensorProto.INT8, TensorProto.UINT8, TensorProto.UINT16, TensorProto.UINT32, TensorProto.UINT64)
+    if is_integer:
+        x1 = g.op.Cast(x1, to=TensorProto.FLOAT, name=name)
+        x2 = g.op.Cast(x2, to=TensorProto.FLOAT, name=name)
+        out_itype = TensorProto.FLOAT
+    else:
+        out_itype = itype
+    dtype = tensor_dtype_to_np_dtype(out_itype)
+    eps_arr = np.array([eps], dtype=dtype)
+    diff = g.op.Add(g.op.Sub(x1, x2, name=name), eps_arr, name=name)
+    if p == 2.0:
+        sq = g.op.Mul(diff, diff, name=name)
+        red = g.op.ReduceSumAnyOpset(
+            sq, np.array([-1], dtype=np.int64), keepdims=int(keepdim), name=name
+        )
+        res = g.op.Sqrt(red, name=name, outputs=outputs)
+    elif p == 1.0:
+        abs_diff = g.op.Abs(diff, name=name)
+        res = g.op.ReduceSumAnyOpset(
+            abs_diff, np.array([-1], dtype=np.int64), keepdims=int(keepdim), name=name, outputs=outputs
+        )
+    else:
+        p_arr = np.array([p], dtype=dtype)
+        inv_p = np.array([1.0 / p], dtype=dtype)
+        powered = g.op.Pow(g.op.Abs(diff, name=name), p_arr, name=name)
+        red = g.op.ReduceSumAnyOpset(
+            powered, np.array([-1], dtype=np.int64), keepdims=int(keepdim), name=name
+        )
+        res = g.op.Pow(red, inv_p, name=name, outputs=outputs)
+    if not sts:
+        g.set_type(res, out_itype)
+        if g.has_shape(x1):
+            shape_x1 = g.get_shape(x1)
+            if keepdim:
+                out_shape = (*shape_x1[:-1], 1)
+            else:
+                out_shape = shape_x1[:-1]
+            g.set_shape(res, out_shape)
+        elif g.has_rank(x1):
+            rk = g.get_rank(x1)
+            g.set_rank(res, rk if keepdim else rk - 1)
+    return res
 
 
 def aten_randn(
@@ -11611,6 +11981,29 @@ def aten_relu_(
     "`relu_`, inplace modifications are not allowed, we assume they were removed"
     assert isinstance(inplace, bool), f"wrong type for inplace{g.get_debug_msg()}"
     return aten_relu(g, sts, outputs, x, inplace, name=name)
+
+
+def aten_relu6(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    inplace: bool = False,
+    name: str = "relu6",
+) -> T:
+    "relu6 — clamps inputs to [0, 6]"
+    assert not inplace, f"inplace computation is not allowed with onnx{g.get_debug_msg()}"
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    res = g.op.Clip(
+        x,
+        np.array([0.0], dtype=dtype),
+        np.array([6.0], dtype=dtype),
+        name=name,
+        outputs=outputs,
+    )
+    if not sts:
+        set_type_shape_unary_op(g, res, x)
+    return res
 
 
 def aten_rrelu_with_noise_backward(
@@ -13550,6 +13943,93 @@ def aten_softsign(
     res = g.op.Div(x, denom, outputs=outputs, name=name)
     if not sts:
         set_type_shape_unary_op(g, res, x)
+    return res
+
+
+def aten_smooth_l1_loss(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    target: T,
+    reduction: int = Reduction.MEAN.value,
+    beta: float = 1.0,
+    name: str = "smooth_l1_loss",
+) -> T:
+    """smooth_l1_loss (Huber loss)
+
+    For each element ``z = |x - target|``:
+
+    * ``0.5 * z^2 / beta``  when ``z < beta``
+    * ``z - 0.5 * beta``    otherwise
+    """
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    beta_arr = np.array([beta], dtype=dtype)
+    half = np.array([0.5], dtype=dtype)
+    diff = g.op.Sub(x, target, name=name)
+    abs_diff = g.op.Abs(diff, name=name)
+    quadratic = g.op.Mul(half, g.op.Div(g.op.Mul(diff, diff, name=name), beta_arr, name=name), name=name)
+    linear = g.op.Sub(abs_diff, g.op.Mul(half, beta_arr, name=name), name=name)
+    loss_elem = g.op.Where(
+        g.op.Less(abs_diff, beta_arr, name=name),
+        quadratic,
+        linear,
+        name=name,
+    )
+    if reduction in (Reduction.MEAN.value, "mean"):
+        res = g.op.ReduceMeanAnyOpset(loss_elem, name=name, outputs=outputs, keepdims=0)
+    elif reduction in (Reduction.SUM.value, "sum"):
+        res = g.op.ReduceSumAnyOpset(loss_elem, name=name, outputs=outputs, keepdims=0)
+    elif reduction in (Reduction.NONE.value, "none"):
+        res = g.op.Identity(loss_elem, name=name, outputs=outputs)
+    else:
+        raise NotImplementedError(
+            f"smooth_l1_loss with reduction={reduction!r} is not implemented"
+            f"{g.get_debug_msg()}"
+        )
+    if not sts:
+        if reduction in (Reduction.NONE.value, "none"):
+            set_type_shape_unary_op(g, res, x)
+        else:
+            g.set_type(res, g.get_type(x))
+            g.set_shape(res, ())
+    return res
+
+
+def aten_soft_margin_loss(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    target: T,
+    reduction: int = Reduction.MEAN.value,
+    name: str = "soft_margin_loss",
+) -> T:
+    """soft_margin_loss
+
+    Computes ``log(1 + exp(-x * target))`` then applies *reduction*.
+    """
+    dtype = tensor_dtype_to_np_dtype(g.get_type(x))
+    one = np.array([1.0], dtype=dtype)
+    neg_prod = g.op.Neg(g.op.Mul(x, target, name=name), name=name)
+    loss_elem = g.op.Log(g.op.Add(one, g.op.Exp(neg_prod, name=name), name=name), name=name)
+    if reduction in (Reduction.MEAN.value, "mean"):
+        res = g.op.ReduceMeanAnyOpset(loss_elem, name=name, outputs=outputs, keepdims=0)
+    elif reduction in (Reduction.SUM.value, "sum"):
+        res = g.op.ReduceSumAnyOpset(loss_elem, name=name, outputs=outputs, keepdims=0)
+    elif reduction in (Reduction.NONE.value, "none"):
+        res = g.op.Identity(loss_elem, name=name, outputs=outputs)
+    else:
+        raise NotImplementedError(
+            f"soft_margin_loss with reduction={reduction!r} is not implemented"
+            f"{g.get_debug_msg()}"
+        )
+    if not sts:
+        if reduction in (Reduction.NONE.value, "none"):
+            set_type_shape_unary_op(g, res, x)
+        else:
+            g.set_type(res, g.get_type(x))
+            g.set_shape(res, ())
     return res
 
 

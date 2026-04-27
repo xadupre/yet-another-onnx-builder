@@ -113,18 +113,10 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "mv",
         "nanmedian",
         "nextafter",
-        "nn_functional_binary_cross_entropy",
-        "nn_functional_binary_cross_entropy_with_logits",
-        "nn_functional_celu",
-        "nn_functional_logsigmoid",
-        "nn_functional_mish",
         "nn_functional_multi_margin_loss",
         "nn_functional_multilabel_margin_loss",
         "nn_functional_multilabel_soft_margin_loss",
-        "nn_functional_pairwise_distance",
         "nn_functional_pdist",
-        "nn_functional_relu6",
-        "nn_functional_soft_margin_loss",
         "pinverse",
         "positive",
         "qr",
@@ -203,11 +195,6 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "jiterator_binary_return_by_ref",
             "jiterator_unary",
             "logical_not",
-            "nn_functional_cross_entropy",
-            "nn_functional_l1_loss",
-            "nn_functional_linear",
-            "nn_functional_mse_loss",
-            "nn_functional_smooth_l1_loss",
             # Data-dependent output shapes (DataDependentOutputException):
             "corrcoef",
             "cov",
@@ -377,6 +364,7 @@ XFAIL_OPS_INT32: Dict[str, FrozenSet[str]] = {
             "prod",  # type mismatch: int32 input produces int64 output
             "sum",  # type mismatch: int32 input produces int64 output
             "xlogy",  # ONNX Log only supports float dtypes
+            "nn_functional_linear",  # NOT_IMPLEMENTED: Gemm not supported for int32
         }
     ),
     "tracing": frozenset(),
@@ -443,6 +431,7 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
             "tanh",  # ONNX op only supports float dtypes
             "trunc",  # InvalidGraph: int64 not supported by Round
             "xlogy",  # ONNX Log only supports float dtypes
+            "nn_functional_linear",  # NOT_IMPLEMENTED: Gemm not supported for int64
         }
     ),
     # short.int64: aten_meth_short is now implemented; no extra failures for this dtype.
@@ -468,6 +457,7 @@ ATOL_OPS_FLOAT32: Dict[str, float] = {
 ATOL_OPS_FLOAT16: Dict[str, float] = {
     "addr": 0.02,
     "linalg.cross": 5e-2,  # float16: cross product accumulates rounding error
+    "nn.functional.pairwise_distance": 2e-2,  # float16: distance accumulates rounding error
     "std": 1e-1,  # variance accumulates float16 rounding; sqrt amplifies
     "std_mean": 3e-1,  # same compound error as std
 }
@@ -477,6 +467,8 @@ ATOL_OPS_FLOAT16: Dict[str, float] = {
 # tolerance than the global _ATOL_BFLOAT16 = 2e-2.
 ATOL_OPS_BFLOAT16: Dict[str, float] = {
     "logit": 5e-2,  # bfloat16 log precision compounds across Sub(Log(x), Log(1-x))
+    "nn.functional.pairwise_distance": 1e-1,  # bfloat16: distance accumulates rounding error
+    "nn.functional.smooth_l1_loss": 1.0,  # bfloat16: reduced precision in conditional branch
     "std": 2e-1,  # bfloat16 precision loss is larger than float16
     "std_mean": 2e-1,  # same compound error as std
 }
