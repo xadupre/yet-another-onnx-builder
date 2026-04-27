@@ -1978,6 +1978,98 @@ def aten_bitwise_or__Tensor(
     return aten_bitwise_or_Tensor(g, sts, outputs, x, y, name=name)
 
 
+def aten_block_diag(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], *tensors: T
+) -> T:
+    """Creates a block diagonal matrix from the provided tensors.
+
+    Each input is normalised to 2-D (0-D scalars become ``[1, 1]``, 1-D
+    vectors of length ``n`` become ``[1, n]``) and then placed on the
+    diagonal of the output 2-D matrix.
+
+    The function handles two FX graph representations of
+    ``aten::block_diag``:
+
+    - ``torch.export.export`` lowers to ``aten.block_diag.default`` whose
+      schema is ``Tensor[] tensors``, so the interpreter passes a single
+      ``list`` argument; in that case ``tensors`` is a 1-tuple containing
+      the list.
+    - The ``CustomTracer`` path keeps the Python-level
+      ``torch.block_diag(x, t1, t2, ...)`` call intact, so each tensor
+      name arrives as a separate positional argument.
+
+    Both forms are normalised to a flat sequence of tensor names.
+    """
+    _name = "block_diag"
+    if len(tensors) == 1 and isinstance(tensors[0], list):
+        tensors = tensors[0]
+    assert len(tensors) > 0, f"block_diag: empty tensor list{g.get_debug_msg()}"
+    assert all(
+        g.has_type(t) for t in tensors
+    ), f"block_diag: missing type for at least one tensor{g.get_debug_msg()}"
+    itype = g.get_type(tensors[0])
+
+    # Normalise every input to 2-D.
+    mats = []
+    for t in tensors:
+        rank = g.get_rank(t) if g.has_rank(t) else None
+        if rank == 0:
+            m = g.op.Reshape(t, np.array([1, 1], dtype=np.int64), name=_name)
+        elif rank == 1:
+            m = g.op.UnsqueezeAnyOpset(t, np.array([0], dtype=np.int64), name=_name)
+        else:
+            m = t
+        mats.append(m)
+
+    if len(mats) == 1:
+        res = g.op.Identity(mats[0], outputs=outputs, name=_name)
+        if not sts:
+            g.set_type(res, itype)
+            g.set_rank(res, 2)
+        return res
+
+    # Compute per-tensor shape tensors as 1-D INT64 tensors of shape [1].
+    row_sizes = [g.op.Shape(m, start=0, end=1, name=_name) for m in mats]
+    col_sizes = [g.op.Shape(m, start=1, end=2, name=_name) for m in mats]
+
+    # Total rows and columns (shape [1]).
+    total_rows = g.op.ReduceSumAnyOpset(
+        g.op.Concat(*row_sizes, axis=0, name=_name), keepdims=1, name=_name
+    )
+    total_cols = g.op.ReduceSumAnyOpset(
+        g.op.Concat(*col_sizes, axis=0, name=_name), keepdims=1, name=_name
+    )
+
+    # Pad each 2-D matrix to [total_rows, total_cols] and sum the results.
+    # Running cumulative offsets start at [0].
+    row_before: Any = g.ZERO
+    col_before: Any = g.ZERO
+    padded = []
+    for m, row_size, col_size in zip(mats, row_sizes, col_sizes):
+        row_after = g.op.Sub(g.op.Sub(total_rows, row_before, name=_name), row_size, name=_name)
+        col_after = g.op.Sub(g.op.Sub(total_cols, col_before, name=_name), col_size, name=_name)
+        pads = g.op.Concat(row_before, col_before, row_after, col_after, axis=0, name=_name)
+        padded.append(g.op.Pad(m, pads, name=_name))
+        row_before = g.op.Add(row_before, row_size, name=_name)
+        col_before = g.op.Add(col_before, col_size, name=_name)
+
+    # Sum the padded (non-overlapping) blocks.
+    res = padded[0]
+    for p in padded[1:]:
+        res = g.op.Add(res, p, name=_name)
+    res = g.op.Identity(res, outputs=outputs, name=_name)
+    if not sts:
+        g.set_type(res, itype)
+        # Set the exact output shape when all normalised shapes are static.
+        if all(g.has_shape(m) and is_static_shape(g.get_shape(m)) for m in mats):
+            total_r_val = sum(g.get_shape(m)[0] for m in mats)
+            total_c_val = sum(g.get_shape(m)[1] for m in mats)
+            g.set_shape(res, (total_r_val, total_c_val))
+        else:
+            g.set_rank(res, 2)
+    return res
+
+
 def aten_bmm(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T) -> T:
     "bmm"
     assert g.get_type(x) == g.get_type(y), (
