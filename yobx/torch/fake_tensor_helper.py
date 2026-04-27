@@ -350,7 +350,7 @@ def make_fake(
         from yobx.torch.fake_tensor_helper import make_fake
         from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
 
-        inputs, _ = make_fake(
+        inputs, ctx = make_fake(
             dict(
                 input_ids=torch.randint(30360, size=(2, 3), dtype=torch.int64),
                 attention_mask=torch.randint(1, size=(2, 33), dtype=torch.int64),
@@ -370,6 +370,9 @@ def make_fake(
             )
         )
         pprint.pprint(inputs)
+        # ctx must be kept alive while inputs are in use to avoid a
+        # segmentation fault (ctx holds the C++ ShapeEnv / FakeTensorMode).
+        del ctx
     """
     if x is None:
         return None, None
@@ -397,11 +400,12 @@ def make_fake_with_dynamic_dimensions(
         import torch
         from yobx.torch.fake_tensor_helper import make_fake_with_dynamic_dimensions
 
-        inputs, _ = make_fake_with_dynamic_dimensions(
+        inputs, ctx = make_fake_with_dynamic_dimensions(
             torch.rand((2, 3, 4, 5), dtype=torch.float32),
             {0: "batch", 2: "cache_length"},
         )
         print(inputs)
+        del ctx
 
     Two tensors:
 
@@ -411,7 +415,7 @@ def make_fake_with_dynamic_dimensions(
         import torch
         from yobx.torch.fake_tensor_helper import make_fake_with_dynamic_dimensions
 
-        inputs, _ = make_fake_with_dynamic_dimensions(
+        inputs, ctx = make_fake_with_dynamic_dimensions(
             (
                 torch.rand((2, 3, 4, 5), dtype=torch.float32),
                 torch.rand((2, 3, 4, 5), dtype=torch.float32),
@@ -419,6 +423,7 @@ def make_fake_with_dynamic_dimensions(
             ({0: "batch", 2: "cache_length"}, {0: "batch", 2: "cache_length"}),
         )
         print(inputs)
+        del ctx
 
     With a cache:
 
@@ -430,7 +435,7 @@ def make_fake_with_dynamic_dimensions(
         from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
         from yobx.torch.fake_tensor_helper import make_fake_with_dynamic_dimensions
 
-        inputs, _ = make_fake_with_dynamic_dimensions(
+        inputs, ctx = make_fake_with_dynamic_dimensions(
             dict(
                 input_ids=torch.randint(30360, size=(2, 3), dtype=torch.int64),
                 attention_mask=torch.randint(1, size=(2, 33), dtype=torch.int64),
@@ -461,6 +466,7 @@ def make_fake_with_dynamic_dimensions(
             },
         )
         pprint.pprint(inputs)
+        del ctx
     """
     if x is None:
         return None, None
