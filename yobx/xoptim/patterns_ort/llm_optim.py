@@ -616,9 +616,11 @@ class ContribRotaryEmbedding3DPattern(PatternOptimization):
 
 class ContribGemmaRotaryEmbeddingPattern(PatternOptimization):
     """
-    Fuses two :class:`intermediate.HalfRotaryEmbedding
-    <yobx.xoptim.patterns.onnx_rotary.FunctionHalfRotaryEmbeddingPattern>` nodes
-    that share cos/sin inputs traced back through ``Unsqueeze([Cast(]Cos/Sin(emb)[)])``
+    Fuses two
+    :class:`intermediate.HalfRotaryEmbedding
+    <yobx.xoptim.patterns.onnx_rotary.FunctionHalfRotaryEmbeddingPattern>`
+    nodes that share cos/sin inputs traced back through
+    ``Unsqueeze([Cast(]Cos/Sin(emb)[)])``
     into a single ``com.microsoft.GemmaRotaryEmbedding`` node.
 
     Model with nodes to be fused (after
@@ -724,9 +726,8 @@ class ContribGemmaRotaryEmbeddingPattern(PatternOptimization):
         expected_trig_op: str,
     ) -> Tuple[Optional[str], Optional["NodeProto"], Optional["NodeProto"]]:  # noqa: F821
         """Traces ``Unsqueeze([Cast(]trig_op(emb)[)])`` and returns
-        ``(emb, unsq_node, cast_node)``.
-
-        Returns ``(None, None, None)`` if the pattern does not match.
+        ``(emb_tensor_name, unsqueeze_node, cast_node_or_none)`` if the pattern
+        matches, otherwise ``(None, None, None)``.
         """
         if unsq_node is None or unsq_node.op_type != "Unsqueeze" or unsq_node.domain != "":
             return None, None, None

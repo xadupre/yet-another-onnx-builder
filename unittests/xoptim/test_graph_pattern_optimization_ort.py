@@ -1797,6 +1797,9 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         got = ref_opt.run(None, feeds)
         self.assertEqualArray(expected[0], got[0], atol=1e-5)
         self.assertEqualArray(expected[1], got[1], atol=1e-5)
+
+    @hide_stdout()
+    def test_missing_kernels(self):
         opset = 20
         model = oh.make_model(
             oh.make_graph(
