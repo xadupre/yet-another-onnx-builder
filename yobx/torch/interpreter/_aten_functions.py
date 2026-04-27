@@ -1791,13 +1791,28 @@ def aten_binary_cross_entropy(
     target: T,
     weight: Optional[T] = None,
     reduction: int = Reduction.MEAN.value,
+    size_average: Optional[bool] = None,
+    reduce: Optional[bool] = None,
     name: str = "binary_cross_entropy",
 ) -> T:
     """binary_cross_entropy
 
     Computes ``-[target * log(x) + (1 - target) * log(1 - x)]`` then applies *weight*
     and *reduction*.
+
+    *size_average* and *reduce* are deprecated legacy arguments.  When present
+    they are mapped to the *reduction* enum value following PyTorch semantics.
     """
+    # Handle deprecated size_average / reduce kwargs.
+    if size_average is not None or reduce is not None:
+        _size_average = True if size_average is None else size_average
+        _reduce = True if reduce is None else reduce
+        if not _reduce:
+            reduction = Reduction.NONE.value
+        elif _size_average:
+            reduction = Reduction.MEAN.value
+        else:
+            reduction = Reduction.SUM.value
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     eps = np.array([1e-12], dtype=dtype)
     # Clamp x to avoid log(0): log(max(x, eps)) and log(max(1-x, eps))
@@ -1838,6 +1853,8 @@ def aten_binary_cross_entropy_with_logits(
     weight: Optional[T] = None,
     pos_weight: Optional[T] = None,
     reduction: int = Reduction.MEAN.value,
+    size_average: Optional[bool] = None,
+    reduce: Optional[bool] = None,
     name: str = "binary_cross_entropy_with_logits",
 ) -> T:
     """binary_cross_entropy_with_logits
@@ -1845,7 +1862,20 @@ def aten_binary_cross_entropy_with_logits(
     Numerically stable formula:
     ``max(x, 0) - x * target + log(1 + exp(-abs(x)))``.
     When *pos_weight* is given, the positive term is scaled.
+
+    *size_average* and *reduce* are deprecated legacy arguments.  When present
+    they are mapped to the *reduction* enum value following PyTorch semantics.
     """
+    # Handle deprecated size_average / reduce kwargs.
+    if size_average is not None or reduce is not None:
+        _size_average = True if size_average is None else size_average
+        _reduce = True if reduce is None else reduce
+        if not _reduce:
+            reduction = Reduction.NONE.value
+        elif _size_average:
+            reduction = Reduction.MEAN.value
+        else:
+            reduction = Reduction.SUM.value
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     zero = np.array([0.0], dtype=dtype)
     one = np.array([1.0], dtype=dtype)
@@ -13954,6 +13984,8 @@ def aten_smooth_l1_loss(
     target: T,
     reduction: int = Reduction.MEAN.value,
     beta: float = 1.0,
+    size_average: Optional[bool] = None,
+    reduce: Optional[bool] = None,
     name: str = "smooth_l1_loss",
 ) -> T:
     """smooth_l1_loss (Huber loss)
@@ -13962,7 +13994,20 @@ def aten_smooth_l1_loss(
 
     * ``0.5 * z^2 / beta``  when ``z < beta``
     * ``z - 0.5 * beta``    otherwise
+
+    *size_average* and *reduce* are deprecated legacy arguments.  When present
+    they are mapped to the *reduction* enum value following PyTorch semantics.
     """
+    # Handle deprecated size_average / reduce kwargs.
+    if size_average is not None or reduce is not None:
+        _size_average = True if size_average is None else size_average
+        _reduce = True if reduce is None else reduce
+        if not _reduce:
+            reduction = Reduction.NONE.value
+        elif _size_average:
+            reduction = Reduction.MEAN.value
+        else:
+            reduction = Reduction.SUM.value
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     beta_arr = np.array([beta], dtype=dtype)
     half = np.array([0.5], dtype=dtype)
@@ -14003,12 +14048,27 @@ def aten_soft_margin_loss(
     x: T,
     target: T,
     reduction: int = Reduction.MEAN.value,
+    size_average: Optional[bool] = None,
+    reduce: Optional[bool] = None,
     name: str = "soft_margin_loss",
 ) -> T:
     """soft_margin_loss
 
     Computes ``log(1 + exp(-x * target))`` then applies *reduction*.
+
+    *size_average* and *reduce* are deprecated legacy arguments.  When present
+    they are mapped to the *reduction* enum value following PyTorch semantics.
     """
+    # Handle deprecated size_average / reduce kwargs.
+    if size_average is not None or reduce is not None:
+        _size_average = True if size_average is None else size_average
+        _reduce = True if reduce is None else reduce
+        if not _reduce:
+            reduction = Reduction.NONE.value
+        elif _size_average:
+            reduction = Reduction.MEAN.value
+        else:
+            reduction = Reduction.SUM.value
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     one = np.array([1.0], dtype=dtype)
     neg_prod = g.op.Neg(g.op.Mul(x, target, name=name), name=name)
