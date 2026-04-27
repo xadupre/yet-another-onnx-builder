@@ -216,6 +216,7 @@ epkg_dictionary = {
     "category_encoders": "https://contrib.scikit-learn.org/category_encoders/",
     "Custom Backends": "https://docs.pytorch.org/docs/stable/torch.compiler_custom_backends.html",
     "diffusers": "https://github.com/huggingface/diffusers",
+    "dot": "https://graphviz.org/doc/info/lang.html",
     "DOT": "https://graphviz.org/doc/info/lang.html",
     "executorch": "https://pytorch.org/executorch/stable/intro-overview.html",
     "ExecuTorch": "https://pytorch.org/executorch/stable/intro-overview.html",
