@@ -29,6 +29,7 @@ def match_input_parameters(
 
     .. runpython::
         :showcode:
+        :process:
 
         import torch
         from torch._subclasses.fake_tensor import FakeTensorMode

@@ -181,6 +181,7 @@ def make_dynamic_cache(
 
     .. runpython::
         :showcode:
+        :process:
 
         import torch
         from yobx.helpers import string_type
@@ -374,6 +375,7 @@ def make_static_cache(
 
     .. runpython::
         :showcode:
+        :process:
 
         import torch
         from yobx.helpers import string_type

@@ -275,8 +275,8 @@ def _roll_dynamic_shape_ctx() -> Generator:
     from collections.abc import Iterable as _Iterable
 
     import torch._prims_common as _prims_common
-    from torch._decomp import decomposition_table as _decomp_table
     import torch.fx.experimental.symbolic_shapes as _sym_shapes
+    from torch._decomp import decomposition_table as _decomp_table
 
     _roll_op = torch.ops.aten.roll.default
     _orig_decomp = _decomp_table.get(_roll_op)

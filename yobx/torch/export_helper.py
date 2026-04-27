@@ -1,13 +1,12 @@
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 import torch
-import torch.fx.experimental.symbolic_shapes as _tds
 from ..helpers import flatten_object
 from .input_observer import InputCandidate
 
-_torch_guard_or = _tds._guard_or
-
 
 def _guard_or(a: "BoolLikeType", default: bool) -> bool:  # type: ignore # noqa: F821
+    import torch.fx.experimental.symbolic_shapes as _tds
+
     if not isinstance(a, _tds.SymBool):
         assert isinstance(a, bool)
         return a
@@ -49,6 +48,8 @@ def torch_export(
     if backed_size_oblivious == "half":
         if verbose:
             print(f"[torch_export] backed_size_oblivious={backed_size_oblivious!r}")
+        import torch.fx.experimental.symbolic_shapes as _tds
+
         value = _tds.ShapeEnv._init.__kwdefaults__["specialize_zero_one"]  # type: ignore
         _tds.ShapeEnv._init.__kwdefaults__["specialize_zero_one"] = False  # type: ignore
         _tds._guard_or = _guard_or
@@ -58,7 +59,7 @@ def torch_export(
                 mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=strict, **export_kwargs
             )
 
-        _tds._guard_or = _torch_guard_or
+        _tds._guard_or = _tds._torch_guard_or
         _tds.ShapeEnv._init.__kwdefaults__["specialize_zero_one"] = value  # type: ignore
         return ep
 

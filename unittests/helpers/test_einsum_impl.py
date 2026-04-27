@@ -31,7 +31,6 @@ from yobx.helpers._einsum.einsum_impl_ext import (
     numpy_extended_dot_python,
 )
 
-
 # ---------------------------------------------------------------------------
 # Tests ported from test_einsum.py
 # ---------------------------------------------------------------------------
@@ -67,9 +66,7 @@ class TestEinsumImpl(ExtTestCase):
         m1 = numpy.arange(4).reshape((2, 2)).astype(numpy.float32) + 10
         m2 = m1 + 90
 
-        self.assertRaise(
-            lambda: numpy_extended_dot(m1, m2.T, [0], [1], [2]), AssertionError
-        )
+        self.assertRaise(lambda: numpy_extended_dot(m1, m2.T, [0], [1], [2]), AssertionError)
         dm1 = m1.reshape((2, 2, 1))
         dm2 = m2.reshape((1, 2, 2))
         dot = numpy_extended_dot(dm1, dm2, axes=[1], left=[0], right=[2])
@@ -134,22 +131,15 @@ class TestEinsumImpl(ExtTestCase):
 
     def test_analyse_einsum_equation(self):
         self.assertRaise(lambda: analyse_einsum_equation("abc"), NotImplementedError)
-        self.assertRaise(
-            lambda: analyse_einsum_equation("abc0,ch->ah"), ValueError
-        )
-        self.assertRaise(
-            lambda: analyse_einsum_equation("abc,ch->a0"), AssertionError
-        )
+        self.assertRaise(lambda: analyse_einsum_equation("abc0,ch->ah"), ValueError)
+        self.assertRaise(lambda: analyse_einsum_equation("abc,ch->a0"), AssertionError)
         res = analyse_einsum_equation("abc,ch->ah")
         self.assertEqual(len(res), 4)
         letters, mat, lengths, duplicates = res
         self.assertEqual(letters, "abch")
         self.assertEqual(lengths, [3, 2, 2])
         self.assertEqualArray(
-            mat,
-            numpy.array(
-                [[0, 1, 2, -1], [-1, -1, 0, 1], [0, -1, -1, 1]], dtype=numpy.int8
-            ),
+            mat, numpy.array([[0, 1, 2, -1], [-1, -1, 0, 1], [0, -1, -1, 1]], dtype=numpy.int8)
         )
         self.assertEqual(duplicates, [None, None, None])
 
@@ -160,9 +150,7 @@ class TestEinsumImpl(ExtTestCase):
         self.assertEqual(letters, "ac")
         self.assertEqual(lengths, [3, 2, 2])
         self.assertEqual(duplicates, [{"a": [0, 1], "c": [2]}, None, {"a": [0, 1]}])
-        self.assertEqualArray(
-            mat, numpy.array([[1, 2], [1, 0], [1, -1]], dtype=numpy.int8)
-        )
+        self.assertEqualArray(mat, numpy.array([[1, 2], [1, 0], [1, -1]], dtype=numpy.int8))
 
     # ------------------------------------------------------------------
     # decompose_einsum_equation — exception cases
@@ -176,17 +164,14 @@ class TestEinsumImpl(ExtTestCase):
             ValueError,
         )
         self.assertRaise(
-            lambda: decompose_einsum_equation(
-                "abc,ch->ah", (2, 2, 2), (2, 2), "donotexist"
-            ),
+            lambda: decompose_einsum_equation("abc,ch->ah", (2, 2, 2), (2, 2), "donotexist"),
             TypeError,
         )
         self.assertRaise(
             lambda: decompose_einsum_equation("abc,ch->ah", (2, 2, 2)), AssertionError
         )
         self.assertRaise(
-            lambda: decompose_einsum_equation("abc,ch->ah", (2, 2), (2, 2)),
-            AssertionError,
+            lambda: decompose_einsum_equation("abc,ch->ah", (2, 2), (2, 2)), AssertionError
         )
 
     # ------------------------------------------------------------------
@@ -200,9 +185,7 @@ class TestEinsumImpl(ExtTestCase):
 
         def fct():
             print("########################## DECOMPOSE")
-            seq = decompose_einsum_equation(
-                "bac,ch->ah", (2, 2, 2), (2, 2), verbose=True
-            )
+            seq = decompose_einsum_equation("bac,ch->ah", (2, 2, 2), (2, 2), verbose=True)
             print("########################## APPLY")
             dot = seq.to_dot()
             print(dot)
@@ -231,12 +214,7 @@ class TestEinsumImpl(ExtTestCase):
         def fct():
             print("########################## DECOMPOSE")
             seq = decompose_einsum_equation(
-                "bac,chg->ah",
-                (2, 2, 2),
-                (2, 2, 2),
-                verbose=True,
-                clean=True,
-                strategy="numpy",
+                "bac,chg->ah", (2, 2, 2), (2, 2, 2), verbose=True, clean=True, strategy="numpy"
             )
             print("########################## APPLY")
             dot = seq.to_dot()
@@ -266,19 +244,13 @@ class TestEinsumImpl(ExtTestCase):
         verbose = False
         for strat, opname in [("numpy", "batch_dot"), ("simple", "matmul")]:
             with self.subTest(strategy=strat):
-                seq = decompose_einsum_equation(
-                    "bac,ch->ah", strategy=strat, verbose=verbose
-                )
+                seq = decompose_einsum_equation("bac,ch->ah", strategy=strat, verbose=verbose)
                 self.assertIn(opname, seq.to_dot())
                 res1 = apply_einsum_sequence(seq, m1, m2, verbose=verbose)
-                res2 = apply_einsum_sequence(
-                    seq, m1, m2, matmul_impl="py", verbose=verbose
-                )
+                res2 = apply_einsum_sequence(seq, m1, m2, matmul_impl="py", verbose=verbose)
                 if strat == "simple":
                     self.assertRaise(
-                        lambda seq=seq: apply_einsum_sequence(
-                            seq, m1, m2, matmul_impl="py2"
-                        ),
+                        lambda seq=seq: apply_einsum_sequence(seq, m1, m2, matmul_impl="py2"),
                         ValueError,
                     )
                 self.assertEqualArray(res1, res2)
@@ -294,14 +266,10 @@ class TestEinsumImpl(ExtTestCase):
                 )
                 self.assertIn(opname, seq.to_dot())
                 res1 = apply_einsum_sequence(seq, m1, m2, verbose=verbose)
-                res2 = apply_einsum_sequence(
-                    seq, m1, m2, matmul_impl="py", verbose=verbose
-                )
+                res2 = apply_einsum_sequence(seq, m1, m2, matmul_impl="py", verbose=verbose)
                 if strat == "simple":
                     self.assertRaise(
-                        lambda seq=seq: apply_einsum_sequence(
-                            seq, m1, m2, matmul_impl="py2"
-                        ),
+                        lambda seq=seq: apply_einsum_sequence(seq, m1, m2, matmul_impl="py2"),
                         ValueError,
                     )
                 self.assertEqualArray(res1, res2)
@@ -328,8 +296,7 @@ class TestEinsumImpl(ExtTestCase):
                     onx.SerializeToString(), providers=["CPUExecutionProvider"]
                 )
                 (res2,) = oinf.run(
-                    None,
-                    {"X1": m1.astype(numpy.float32), "X2": m2.astype(numpy.float32)},
+                    None, {"X1": m1.astype(numpy.float32), "X2": m2.astype(numpy.float32)}
                 )
                 self.assertEqualArray(res1, res2)
 
@@ -367,13 +334,9 @@ class TestEinsumImpl(ExtTestCase):
                 self.assertEqualArray(res1, res2)
 
                 so = onnxruntime.SessionOptions()
-                so.graph_optimization_level = (
-                    onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
-                )
+                so.graph_optimization_level = onnxruntime.GraphOptimizationLevel.ORT_DISABLE_ALL
                 oinf2 = InferenceSession(
-                    onx.SerializeToString(),
-                    so,
-                    providers=["CPUExecutionProvider"],
+                    onx.SerializeToString(), so, providers=["CPUExecutionProvider"]
                 )
                 (res3,) = oinf2.run(
                     None,
@@ -451,9 +414,7 @@ class TestEinsumImpl(ExtTestCase):
 
     def test_many_2(self):
         """Exhaustive 2-operand equation check (numpy + ONNX via InferenceSession)."""
-        m1 = (
-            numpy.arange(2 * 2 * 2).reshape((2, 2, 2)).astype(numpy.float32) + 10
-        )
+        m1 = numpy.arange(2 * 2 * 2).reshape((2, 2, 2)).astype(numpy.float32) + 10
         m2 = numpy.arange(4).reshape((2, 2)).astype(numpy.float32) + 100
 
         equations = []
@@ -479,11 +440,7 @@ class TestEinsumImpl(ExtTestCase):
                 self.assertEqualArray(exp, res)
 
                 seq2 = decompose_einsum_equation(
-                    eq,
-                    m1.shape,
-                    m2.shape,
-                    strategy="numpy",
-                    clean=True,
+                    eq, m1.shape, m2.shape, strategy="numpy", clean=True
                 )
                 res2 = apply_einsum_sequence(seq2, m1, m2)
                 self.assertEqualArray(exp, res2)
@@ -499,9 +456,7 @@ class TestEinsumImpl(ExtTestCase):
 
     def test_many_3(self):
         """Exhaustive 3-operand equation check (numpy apply path)."""
-        m1 = (
-            numpy.arange(2 * 2 * 2).reshape((2, 2, 2)).astype(numpy.float32) + 10
-        )
+        m1 = numpy.arange(2 * 2 * 2).reshape((2, 2, 2)).astype(numpy.float32) + 10
         m2 = numpy.arange(4).reshape((2, 2)).astype(numpy.float32) + 100
         m3 = numpy.arange(8).reshape((2, 2, 2)).astype(numpy.float32) + 1000
 
@@ -514,9 +469,7 @@ class TestEinsumImpl(ExtTestCase):
                             sp1 = "".join(p1)
                             sp2 = "".join(p2)
                             sp3 = "".join(p3)
-                            equation = (
-                                f"{sp1},{sp2},{sp3}->{sp1[0]}{sp1[i]}{sp3[j]}"
-                            )
+                            equation = f"{sp1},{sp2},{sp3}->{sp1[0]}{sp1[i]}{sp3[j]}"
                             try:
                                 r = numpy.einsum(equation, m1, m2, m3)
                                 equations.append((equation, r))
@@ -552,9 +505,7 @@ class TestEinsumBug(ExtTestCase):
         onx = seq.to_onnx("Y", "X1", "X2")
         a = numpy.random.rand(*list((2,) * dim1)).astype(numpy.float32)
         b = numpy.random.rand(*list((2,) * dim2)).astype(numpy.float32)
-        oinf = InferenceSession(
-            onx.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        oinf = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
         (got,) = oinf.run(None, {"X1": a, "X2": b})
         expected = numpy.einsum(equation, a, b)
         self.assertEqualArray(expected, got, atol=1e-5)

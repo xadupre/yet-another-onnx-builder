@@ -3,31 +3,27 @@ import operator
 import traceback
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 import torch
-import torch.fx
-import torch.utils._pytree as pytree
-from torch._subclasses.fake_tensor import FakeTensorMode
-from torch.fx.experimental.symbolic_shapes import ShapeEnv
-from torch.fx.experimental.sym_node import SymNode
 from ...xexpressions import rename_expression
 from .shape import TracingShape, TracingInt, TracingBool, register_condition, clear_conditions
 from .tensor import TracingTensor
-from ._patches import (
-    _ORIGINAL_TORCH_COND,
-    _ORIGINAL_TORCH_FULL,
-    _ORIGINAL_TORCH_ZEROS,
-    _ORIGINAL_TORCH_ONES,
-    _ORIGINAL_TORCH_SCAN,
-    _ORIGINAL_TORCH_TENSOR_SPLIT,
-    _ORIGINAL_TORCH_WHILE_LOOP,
-    _cond_replacement_ctx,
-    _check_replacement_ctx,
-    _full_replacement_ctx,
-    _zeros_replacement_ctx,
-    _ones_replacement_ctx,
-    _scan_replacement_ctx,
-    _while_loop_replacement_ctx,
-    _trace_replacement_ctx,
-)
+
+# from ._patches import (
+#    _ORIGINAL_TORCH_COND,
+#    _ORIGINAL_TORCH_FULL,
+#    _ORIGINAL_TORCH_ZEROS,
+#    _ORIGINAL_TORCH_ONES,
+#    _ORIGINAL_TORCH_SCAN,
+#    _ORIGINAL_TORCH_TENSOR_SPLIT,
+#    _ORIGINAL_TORCH_WHILE_LOOP,
+#    _cond_replacement_ctx,
+#    _check_replacement_ctx,
+#    _full_replacement_ctx,
+#    _zeros_replacement_ctx,
+#    _ones_replacement_ctx,
+#    _scan_replacement_ctx,
+#    _while_loop_replacement_ctx,
+#    _trace_replacement_ctx,
+# )
 
 
 class GraphTracer:
@@ -111,6 +107,9 @@ class GraphTracer:
     def __init__(
         self, verbose: int = 0, module_leaves: Optional[Dict[type, Callable[..., bool]]] = None
     ) -> None:
+        from torch._subclasses.fake_tensor import FakeTensorMode
+        from torch.fx.experimental.symbolic_shapes import ShapeEnv
+
         self.graph: torch.fx.Graph = torch.fx.Graph()
         self._external_tensor_to_node: Dict[int, torch.fx.Node] = {}
         self._placeholder_count: int = 0
@@ -777,6 +776,8 @@ class GraphTracer:
             return value
         if hasattr(value, "node") and isinstance(value.node, str):
             return f"{value.node}"
+        from torch.fx.experimental.sym_node import SymNode
+
         if hasattr(value, "node") and isinstance(value.node, SymNode):
             # '_expr' is safer than expr
             return str(value.node._expr).replace(" ", "")
@@ -977,6 +978,8 @@ class GraphTracer:
         :return: A callable that accepts the same positional/keyword arguments
             as ``module.forward`` but emits a single graph node.
         """
+        from torch._subclasses.fake_tensor import FakeTensorMode
+
         original_forward = module.forward
         tracer = self
 
@@ -1126,6 +1129,15 @@ class GraphTracer:
             value of *fn* (containing :class:`TracingTensor` instances from
             the sub-tracer).
         """
+        from ._patches import (
+            _cond_replacement_ctx,
+            _check_replacement_ctx,
+            _full_replacement_ctx,
+            _zeros_replacement_ctx,
+            _ones_replacement_ctx,
+            _while_loop_replacement_ctx,
+        )
+
         sub = GraphTracer(verbose=self.verbose)
         # Share symbolic dimension mappings so the same dynamic-dim names are
         # reused in branch graphs.
@@ -1166,6 +1178,8 @@ class GraphTracer:
                 return sub._get_node(x)
             return x
 
+        import torch.utils._pytree as pytree
+
         out_val = pytree.tree_map(_to_node, out)
         sub.graph.output(out_val)
         return sub, out
@@ -1204,6 +1218,8 @@ class GraphTracer:
         # Always use the real torch.cond (captured at import time) as the FX
         # node target so that nested tracing contexts do not accidentally record
         # the shim function instead.
+        from ._patches import _ORIGINAL_TORCH_COND
+
         cond_target = _ORIGINAL_TORCH_COND
         # --- node for the predicate ---
         if isinstance(pred, TracingTensor):
@@ -1321,6 +1337,8 @@ class GraphTracer:
         :return: A flat tuple of :class:`TracingTensor` instances
             ``(carry_0_final, ..., scan_out_0_accum, ...)``.
         """
+        from ._patches import _scan_replacement_ctx, _check_replacement_ctx, _ORIGINAL_TORCH_SCAN
+
         additional_inputs = list(additional_inputs) if additional_inputs else []
         n_carry = len(init_states)
 
@@ -1386,6 +1404,8 @@ class GraphTracer:
             if isinstance(x, TracingTensor):
                 return sub._get_node(x)
             return x
+
+        import torch.utils._pytree as pytree
 
         out_val = pytree.tree_map(_body_to_node, body_out)
         sub.graph.output(out_val)
@@ -1502,6 +1522,8 @@ class GraphTracer:
         :returns: A tuple of :class:`TracingTensor` instances corresponding to
             the final loop-variable values.
         """
+        from ._patches import _ORIGINAL_TORCH_WHILE_LOOP
+
         additional_inputs = list(additional_inputs) if additional_inputs else []
         while_loop_target = _ORIGINAL_TORCH_WHILE_LOOP
         assert (
@@ -1620,6 +1642,8 @@ class GraphTracer:
             A :class:`TracingTensor` when symbolic dimensions are present,
             otherwise the eager ``torch.full`` result.
         """
+        from ._patches import _ORIGINAL_TORCH_FULL
+
         if isinstance(size, torch.Size):
             size = tuple(size)
         if not isinstance(size, (tuple, list)):
@@ -1687,6 +1711,8 @@ class GraphTracer:
             Returns a :class:`TracingTensor` when symbolic dimensions are present,
             otherwise returns the eager ``torch.zeros`` result.
         """
+        from ._patches import _ORIGINAL_TORCH_ZEROS
+
         if isinstance(size, torch.Size):
             size = tuple(size)
         if not isinstance(size, (tuple, list)):
@@ -1754,6 +1780,8 @@ class GraphTracer:
             Returns a :class:`TracingTensor` when symbolic dimensions are present,
             otherwise returns the eager ``torch.ones`` result.
         """
+        from ._patches import _ORIGINAL_TORCH_ONES
+
         if isinstance(size, torch.Size):
             size = tuple(size)
         if not isinstance(size, (tuple, list)):
@@ -1848,6 +1876,8 @@ class GraphTracer:
         # calls where the input is a genuine TracingTensor.                   #
         # ------------------------------------------------------------------ #
         if not isinstance(input, TracingTensor):
+            from ._patches import _ORIGINAL_TORCH_TENSOR_SPLIT
+
             return _ORIGINAL_TORCH_TENSOR_SPLIT(input, indices_or_sections, dim)
         # ------------------------------------------------------------------ #
         # Case 1: indices_or_sections is NOT a TracingTensor.                 #
@@ -2092,6 +2122,8 @@ class GraphTracer:
             graph = GraphTracer().trace(add, (torch.randn(3, 4), torch.randn(3, 4)))
             print(graph)
         """
+        from ._patches import _trace_replacement_ctx
+
         if self.verbose:
             s = str(func).split("\n")[0]
             print(f"[GraphTracer.trace] trace {s}")
@@ -2158,6 +2190,8 @@ class GraphTracer:
                 "All tensor outputs must be TracingTensor instances produced during tracing."
             )
             return x
+
+        import torch.utils._pytree as pytree
 
         output_val = pytree.tree_map(_to_output_node, out)
         self.graph.output(output_val)
