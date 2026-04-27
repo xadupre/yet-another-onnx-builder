@@ -1979,15 +1979,30 @@ def aten_bitwise_or__Tensor(
 
 
 def aten_block_diag(
-    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], tensors: Sequence[T]
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], *tensors: T
 ) -> T:
     """Creates a block diagonal matrix from the provided tensors.
 
     Each input is normalised to 2-D (0-D scalars become ``[1, 1]``, 1-D
     vectors of length ``n`` become ``[1, n]``) and then placed on the
     diagonal of the output 2-D matrix.
+
+    The function handles two FX graph representations of
+    ``aten::block_diag``:
+
+    - ``torch.export.export`` lowers to ``aten.block_diag.default`` whose
+      schema is ``Tensor[] tensors``, so the interpreter passes a single
+      ``list`` argument; in that case ``tensors`` is a 1-tuple containing
+      the list.
+    - The ``CustomTracer`` path keeps the Python-level
+      ``torch.block_diag(x, t1, t2, ...)`` call intact, so each tensor
+      name arrives as a separate positional argument.
+
+    Both forms are normalised to a flat sequence of tensor names.
     """
     _name = "block_diag"
+    if len(tensors) == 1 and isinstance(tensors[0], list):
+        tensors = tensors[0]
     assert len(tensors) > 0, f"block_diag: empty tensor list{g.get_debug_msg()}"
     assert all(
         g.has_type(t) for t in tensors
