@@ -520,6 +520,19 @@ def _set_shape_type_op_any_rotary_embedding(self: ShapeBuilder, node: NodeProto)
     return set_type_shape_unary_op(self, node.output[0], node.input[0])
 
 
+def _set_shape_type_op_any_gemma_rotary_embedding(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shapes for node type GemmaRotaryEmbedding.
+
+    Inputs: ``emb`` (batch, seq, dim), ``q`` (batch, heads_q, seq, dim),
+    ``q_rot``, ``k`` (batch, heads_k, seq, dim), ``k_rot``.
+    Outputs: ``q_embed`` matching ``q``, ``k_embed`` matching ``k``.
+    """
+    if len(node.output) >= 1 and node.output[0]:
+        set_type_shape_unary_op(self, node.output[0], node.input[1])
+    if len(node.output) >= 2 and node.output[1]:
+        set_type_shape_unary_op(self, node.output[1], node.input[3])
+
+
 def _set_shape_type_op_any_castlike(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type CastLike."
     return set_type_shape_unary_op(
@@ -2696,6 +2709,7 @@ _set_shape_type_op_any_custom = {
     "FusedConv": _set_shape_type_op_any_conv_max_pool,
     "Gelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "GemmFastGelu": lambda g, node: set_type_shape_matmul(g, node.output[0], *node.input[:2]),
+    "GemmaRotaryEmbedding": _set_shape_type_op_any_gemma_rotary_embedding,
     "MaskedScatterNDOfShape": set_type_shape_scatter_nd_of_shape,
     "MulAdd": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
     "MulMul": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),

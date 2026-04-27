@@ -1713,7 +1713,90 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         self.assertEqualArray(z, zz, atol=1e-4)
 
     @hide_stdout()
-    def test_missing_kernels(self):
+    def test_contrib_gemma_rotary_embedding(self):
+        from onnx.reference.op_run import OpRun
+
+        class GemmaRotaryEmbedding(OpRun):
+            op_domain = "com.microsoft"
+
+            def _run(self, emb, q, q_rot, k, k_rot):
+                # emb: (batch, seq, dim); q/q_rot/k/k_rot: (batch, heads, seq, dim)
+                sin = np.sin(emb)[:, np.newaxis, :, :]
+                cos = np.cos(emb)[:, np.newaxis, :, :]
+                output1 = q * cos + q_rot * sin
+                output2 = k * cos + k_rot * sin
+                return (output1.astype(q.dtype), output2.astype(k.dtype))
+
+        opset = 20
+        # emb: (batch=2, seq=3, dim=4), q: (batch=2, heads=2, seq=3, dim=4),
+        # k: (batch=2, heads=1, seq=3, dim=4)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    # Compute sin/cos from emb and unsqueeze for broadcasting
+                    oh.make_node("Sin", ["emb"], ["sin_emb"]),
+                    oh.make_node("Cos", ["emb"], ["cos_emb"]),
+                    oh.make_node("Unsqueeze", ["sin_emb", "axes1"], ["sin_4d"]),
+                    oh.make_node("Unsqueeze", ["cos_emb", "axes1"], ["cos_4d"]),
+                    # q rotary embedding: rotate_half(q) * sin + q * cos
+                    oh.make_node("Split", ["q"], ["q1", "q2"], axis=-1, num_outputs=2),
+                    oh.make_node("Neg", ["q2"], ["neg_q2"]),
+                    oh.make_node("Concat", ["neg_q2", "q1"], ["q_rot"], axis=-1),
+                    oh.make_node("Mul", ["q_rot", "sin_4d"], ["q_sin"]),
+                    oh.make_node("Mul", ["q", "cos_4d"], ["q_cos"]),
+                    oh.make_node("Add", ["q_sin", "q_cos"], ["q_embed"]),
+                    # k rotary embedding: rotate_half(k) * sin + k * cos
+                    oh.make_node("Split", ["k"], ["k1", "k2"], axis=-1, num_outputs=2),
+                    oh.make_node("Neg", ["k2"], ["neg_k2"]),
+                    oh.make_node("Concat", ["neg_k2", "k1"], ["k_rot"], axis=-1),
+                    oh.make_node("Mul", ["k_rot", "sin_4d"], ["k_sin"]),
+                    oh.make_node("Mul", ["k", "cos_4d"], ["k_cos"]),
+                    oh.make_node("Add", ["k_sin", "k_cos"], ["k_embed"]),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("emb", TFLOAT, [2, 3, 4]),
+                    oh.make_tensor_value_info("q", TFLOAT, [2, 2, 3, 4]),
+                    oh.make_tensor_value_info("k", TFLOAT, [2, 1, 3, 4]),
+                ],
+                [
+                    oh.make_tensor_value_info("q_embed", TFLOAT, [2, 2, 3, 4]),
+                    oh.make_tensor_value_info("k_embed", TFLOAT, [2, 1, 3, 4]),
+                ],
+                [onh.from_array(np.array([1], dtype=np.int64), name="axes1")],
+            ),
+            opset_imports=[oh.make_operatorsetid("", opset)],
+            ir_version=10,
+        )
+
+        rng = np.random.default_rng(42)
+        feeds = {
+            "emb": rng.random((2, 3, 4)).astype(np.float32),
+            "q": rng.random((2, 2, 3, 4)).astype(np.float32),
+            "k": rng.random((2, 1, 3, 4)).astype(np.float32),
+        }
+
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=InferShapesOptions.BUILDER,
+            optimization_options=OptimizationOptions(
+                patterns=["FunctionHalfRotaryEmbedding", "ContribGemmaRotaryEmbedding"],
+                verbose=10,
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.dump_onnx("test_contrib_gemma_rotary_embedding.onnx", opt_onx)
+        self.assertIn("GemmaRotaryEmbedding", [n.op_type for n in opt_onx.graph.node])
+        self.assertIn("com.microsoft", [n.domain for n in opt_onx.graph.node])
+
+        # Verify the output of the fused graph matches using a custom reference evaluator
+        ref_opt = ExtendedReferenceEvaluator(opt_onx, new_ops=[GemmaRotaryEmbedding])
+        got = ref_opt.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+        self.assertEqualArray(expected[1], got[1], atol=1e-5)
         opset = 20
         model = oh.make_model(
             oh.make_graph(
