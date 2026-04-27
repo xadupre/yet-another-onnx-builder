@@ -614,6 +614,240 @@ class ContribRotaryEmbedding3DPattern(PatternOptimization):
         return nodes
 
 
+class ContribGemmaRotaryEmbeddingPattern(PatternOptimization):
+    """
+    Fuses two
+    :class:`intermediate.HalfRotaryEmbedding
+    <yobx.xoptim.patterns.onnx_rotary.FunctionHalfRotaryEmbeddingPattern>`
+    nodes that share cos/sin inputs traced back through
+    ``Unsqueeze([Cast(]Cos/Sin(emb)[)])``
+    into a single ``com.microsoft.GemmaRotaryEmbedding`` node.
+
+    Model with nodes to be fused (after
+    :class:`yobx.xoptim.patterns.onnx_rotary.FunctionHalfRotaryEmbeddingPattern`):
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_emb(["emb FLOAT(a, b, c)"])
+            I_q(["q FLOAT(a, h1, b, c)"])
+            I_k(["k FLOAT(a, h2, b, c)"])
+
+            Sin_0[["Sin(.)"]]
+            Cos_1[["Cos(.)"]]
+            Unsqueeze_2[["Unsqueeze(., [1])"]]
+            Unsqueeze_3[["Unsqueeze(., [1])"]]
+            HalfRotaryEmbedding_4[["intermediate.HalfRotaryEmbedding(., ., .)"]]
+            HalfRotaryEmbedding_5[["intermediate.HalfRotaryEmbedding(., ., .)"]]
+
+            I_emb -->|"FLOAT(a, b, c)"| Sin_0
+            I_emb -->|"FLOAT(a, b, c)"| Cos_1
+            Sin_0 -->|"FLOAT(a, b, c)"| Unsqueeze_2
+            Cos_1 -->|"FLOAT(a, b, c)"| Unsqueeze_3
+            I_q -->|"FLOAT(a, h1, b, c)"| HalfRotaryEmbedding_4
+            Unsqueeze_3 -->|"FLOAT(a, 1, b, c)"| HalfRotaryEmbedding_4
+            Unsqueeze_2 -->|"FLOAT(a, 1, b, c)"| HalfRotaryEmbedding_4
+            I_k -->|"FLOAT(a, h2, b, c)"| HalfRotaryEmbedding_5
+            Unsqueeze_3 -->|"FLOAT(a, 1, b, c)"| HalfRotaryEmbedding_5
+            Unsqueeze_2 -->|"FLOAT(a, 1, b, c)"| HalfRotaryEmbedding_5
+
+            O_q_embed(["q_embed FLOAT(a, h1, b, c)"])
+            HalfRotaryEmbedding_4 --> O_q_embed
+            O_k_embed(["k_embed FLOAT(a, h2, b, c)"])
+            HalfRotaryEmbedding_5 --> O_k_embed
+
+            class I_emb,I_q,I_k,O_q_embed,O_k_embed ioNode
+            class Sin_0,Cos_1,Unsqueeze_2,Unsqueeze_3 opNode
+            class HalfRotaryEmbedding_4,HalfRotaryEmbedding_5 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_emb(["emb FLOAT(a, b, c)"])
+            I_q(["q FLOAT(a, h1, b, c)"])
+            I_k(["k FLOAT(a, h2, b, c)"])
+
+            Split_0[["Split(q, num_outputs=2, axis=-1)"]]
+            Neg_1[["Neg(.)"]]
+            Concat_2[["Concat(., ., axis=-1)"]]
+            Split_3[["Split(k, num_outputs=2, axis=-1)"]]
+            Neg_4[["Neg(.)"]]
+            Concat_5[["Concat(., ., axis=-1)"]]
+            GemmaRotaryEmbedding_6[["com.microsoft.GemmaRotaryEmbedding(., ., ., ., .)"]]
+
+            I_q --> Split_0
+            Split_0 --> Neg_1
+            Neg_1 --> Concat_2
+            Split_0 --> Concat_2
+            I_k --> Split_3
+            Split_3 --> Neg_4
+            Neg_4 --> Concat_5
+            Split_3 --> Concat_5
+            I_emb -->|"FLOAT(a, b, c)"| GemmaRotaryEmbedding_6
+            I_q -->|"FLOAT(a, h1, b, c)"| GemmaRotaryEmbedding_6
+            Concat_2 -->|"FLOAT(a, h1, b, c)"| GemmaRotaryEmbedding_6
+            I_k -->|"FLOAT(a, h2, b, c)"| GemmaRotaryEmbedding_6
+            Concat_5 -->|"FLOAT(a, h2, b, c)"| GemmaRotaryEmbedding_6
+
+            O_q_embed(["q_embed FLOAT(a, h1, b, c)"])
+            GemmaRotaryEmbedding_6 --> O_q_embed
+            O_k_embed(["k_embed FLOAT(a, h2, b, c)"])
+            GemmaRotaryEmbedding_6 --> O_k_embed
+
+            class I_emb,I_q,I_k,O_q_embed,O_k_embed ioNode
+            class Split_0,Neg_1,Concat_2,Split_3,Neg_4,Concat_5 opNode
+            class GemmaRotaryEmbedding_6 opNode
+    """
+
+    _operator_name = FunctionHalfRotaryEmbeddingPattern._operator_name
+    _domain_name = FunctionHalfRotaryEmbeddingPattern._domain_name
+
+    def __init__(self, verbose: int = 0, priority: int = 2):
+        super().__init__(verbose, priority)
+
+    def _trace_to_emb(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        unsq_node: "NodeProto",  # noqa: F821
+        expected_trig_op: str,
+    ) -> Tuple[Optional[str], Optional["NodeProto"], Optional["NodeProto"]]:  # noqa: F821
+        """Traces ``Unsqueeze([Cast(]trig_op(emb)[)])`` and returns
+        ``(emb_tensor_name, unsqueeze_node, cast_node_or_none)`` if the pattern
+        matches, otherwise ``(None, None, None)``.
+        """
+        if unsq_node is None or unsq_node.op_type != "Unsqueeze" or unsq_node.domain != "":
+            return None, None, None
+        before_unsq = g.node_before(unsq_node.input[0])
+        if before_unsq is None:
+            return None, None, None
+        cast_node = None
+        if before_unsq.op_type == "Cast" and before_unsq.domain == "":
+            cast_node = before_unsq
+            trig_node = g.node_before(cast_node.input[0])
+        else:
+            trig_node = before_unsq
+        if trig_node is None or trig_node.op_type != expected_trig_op or trig_node.domain != "":
+            return None, None, None
+        return trig_node.input[0], unsq_node, cast_node
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if node.op_type != self._operator_name or node.domain != self._domain_name:
+            return self.none()
+        if not g.has_rank(node.input[0]) or g.get_rank(node.input[0]) != 4:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # node.input[1] must trace back to Unsqueeze([Cast(]Cos(emb)[)])
+        cos_4d_node = g.node_before(node.input[1])
+        emb_from_cos, _cos_unsq, _cos_cast = self._trace_to_emb(g, cos_4d_node, "Cos")
+        if emb_from_cos is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # node.input[2] must trace back to Unsqueeze([Cast(]Sin(emb)[)])
+        sin_4d_node = g.node_before(node.input[2])
+        emb_from_sin, _sin_unsq, _sin_cast = self._trace_to_emb(g, sin_4d_node, "Sin")
+        if emb_from_sin is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Both must trace back to the same emb tensor
+        if emb_from_cos != emb_from_sin:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # emb must be 3D
+        if not g.has_rank(emb_from_cos) or g.get_rank(emb_from_cos) != 3:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Find the second HalfRotaryEmbedding using the same cos/sin tensors
+        other_node = None
+        for user in g.next_nodes(node.input[1]):
+            if (
+                user is not node
+                and user.op_type == self._operator_name
+                and user.domain == self._domain_name
+                and user.input[1] == node.input[1]
+                and user.input[2] == node.input[2]
+            ):
+                other_node = user
+                break
+
+        if other_node is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        return MatchResult(
+            self, [node, other_node], self.apply, comment="GemmaRotaryEmbedding fusion"
+        )
+
+    def apply(
+        self, g: "GraphBuilder", node_first: NodeProto, node_second: NodeProto  # noqa: F821
+    ) -> List[NodeProto]:
+        q = node_first.input[0]
+        k = node_second.input[0]
+        q_embed = node_first.output[0]
+        k_embed = node_second.output[0]
+
+        # Recover emb by tracing through cos_4d → Unsqueeze → [Cast] → Cos(emb)
+        cos_unsq = g.node_before(node_first.input[1])
+        before_unsq = g.node_before(cos_unsq.input[0])
+        if before_unsq.op_type == "Cast":
+            cos_trig = g.node_before(before_unsq.input[0])
+        else:
+            cos_trig = before_unsq
+        emb = cos_trig.input[0]
+
+        name_prefix = f"{self.__class__.__name__}--{node_first.name}"
+
+        # Compute q_rot = rotate_half(q): Split → Neg → Concat
+        q1 = g.unique_name(f"{self.__class__.__name__}--{q}--q1")
+        q2 = g.unique_name(f"{self.__class__.__name__}--{q}--q2")
+        neg_q2 = g.unique_name(f"{self.__class__.__name__}--{q}--neg_q2")
+        q_rot = g.unique_name(f"{self.__class__.__name__}--{q}--q_rot")
+
+        # Compute k_rot = rotate_half(k): Split → Neg → Concat
+        k1 = g.unique_name(f"{self.__class__.__name__}--{k}--k1")
+        k2 = g.unique_name(f"{self.__class__.__name__}--{k}--k2")
+        neg_k2 = g.unique_name(f"{self.__class__.__name__}--{k}--neg_k2")
+        k_rot = g.unique_name(f"{self.__class__.__name__}--{k}--k_rot")
+
+        nodes = [
+            g._make_node("Split", [q], [q1, q2], axis=-1, num_outputs=2, name=name_prefix),
+            g._make_node("Neg", [q2], [neg_q2], name=name_prefix),
+            g._make_node("Concat", [neg_q2, q1], [q_rot], axis=-1, name=name_prefix),
+            g._make_node("Split", [k], [k1, k2], axis=-1, num_outputs=2, name=name_prefix),
+            g._make_node("Neg", [k2], [neg_k2], name=name_prefix),
+            g._make_node("Concat", [neg_k2, k1], [k_rot], axis=-1, name=name_prefix),
+        ]
+        gemma_node = g.make_node(
+            "GemmaRotaryEmbedding",
+            [emb, q, q_rot, k, k_rot],
+            [q_embed, k_embed],
+            name=name_prefix,
+            domain="com.microsoft",
+        )
+        nodes.append(gemma_node)
+        for n in nodes:
+            if not n.name:
+                n.name = g.builder.unique_node_name(name_prefix)
+        return nodes
+
+
 class MultiHeadAttention3DPattern(PatternOptimization):
     """
     Merges multiple nodes into MultiHeadAttention. It assumes pattern

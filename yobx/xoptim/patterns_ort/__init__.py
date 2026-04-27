@@ -42,6 +42,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
     )
     from .llm_optim import (
         Attention3DPattern,
+        ContribGemmaRotaryEmbeddingPattern,
         ContribRotaryEmbeddingPattern,
         ContribRotaryEmbedding3DPattern,
         GroupQueryAttention3DPattern,
@@ -77,6 +78,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         ComplexMulConjPattern(verbose=verbose),
         ContribRotaryEmbeddingPattern(verbose=verbose),
         ContribRotaryEmbedding3DPattern(verbose=verbose),
+        ContribGemmaRotaryEmbeddingPattern(verbose=verbose),
         EmbedLayerNormalizationPattern(verbose=verbose),
         GeluOrtPattern(verbose=verbose),
         GeluErfPattern(verbose=verbose),
