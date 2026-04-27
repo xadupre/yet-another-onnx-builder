@@ -438,6 +438,9 @@ def _decompose_einsum_equation_simple(
         print(f"LETTERS={letters!r}", f"LENGTHS={lengths!r}")
         print(f"DUPLICATES={duplicates!r}")
 
+    op: EinsumSubOp = EinsumSubOp(
+        fd, "id", 0
+    )  # initialized before loop; overwritten each iteration
     for i, sh in enumerate(actual_shapes):
         if verbose:
             print()

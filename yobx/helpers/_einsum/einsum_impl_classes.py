@@ -862,6 +862,8 @@ class EinsumSubOp:
 
         # dim0 = int(numpy.prod([m1.shape[i] for i in batch_axes]))
         # dim0b = int(numpy.prod([m2.shape[i] for i in batch_axes]))
+        name_dim0g: str = ""
+        name_dim0bg: str = ""
         if len(batch_axes) > 1:
             assert name_batch_axes is not None  # noqa: S101
             name_dim0 = root + "_dim0"
