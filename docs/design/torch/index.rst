@@ -15,6 +15,7 @@ on basic examples.
    :maxdepth: 1
 
    converter
+   fake_tensor_helper
    flatten
    flatten_list
    patches
