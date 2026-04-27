@@ -2975,6 +2975,29 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
                 self.set_rank(node.output[1], rk)
         return None
 
+    # GreedySearch: generates sequences greedily.
+    # Input[0]: input_ids (batch_size, sequence_length) INT32
+    # Input[1]: max_length (1,) INT32
+    # Output[0]: sequences (batch_size, max_length_value) INT32
+    if node.op_type == "GreedySearch" and node.domain == "com.microsoft":
+        self.set_type(node.output[0], TensorProto.INT32)
+        if self.has_device(node.input[0]):
+            self.set_device(node.output[0], self.get_device(node.input[0]))
+        if self.has_shape(node.input[0]):
+            input_shape = self.get_shape(node.input[0])
+            batch_size = input_shape[0]
+            has_max_length = len(node.input) > 1 and node.input[1]
+            max_len_val = self.value_as_shape(node.input[1]) if has_max_length else None
+            if max_len_val is not None and len(max_len_val) == 1:
+                max_len = max_len_val[0]
+            else:
+                # Use the input name as a symbolic dimension reference.
+                max_len = node.input[1] if has_max_length else "max_len"
+            self.set_shape(node.output[0], (batch_size, max_len))
+        else:
+            self.set_rank(node.output[0], 2)
+        return None
+
     assert node.domain not in {
         "ai.onnx.ml",
         "intermediate",

@@ -29,6 +29,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
     from .causal_conv import CausalConvWithStatePattern
     from .complex_mul import ComplexMulPattern, ComplexMulConjPattern
     from .fused_conv import FusedConvPattern
+    from .greedy_search import GreedySearchPattern
     from .fused_matmul import (
         FusedMatMulDivPattern,
         FusedMatMulPattern,
@@ -89,6 +90,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         FusedMatMulTransposePattern(verbose=verbose),
         GemmFastGeluPattern(verbose=verbose),
         GatedRelativePositionBiasPattern(verbose=verbose),
+        GreedySearchPattern(verbose=verbose),
         MissingCosSinPattern(verbose=verbose),
         MissingRangePattern(verbose=verbose),
         MissingReduceMaxPattern(verbose=verbose),

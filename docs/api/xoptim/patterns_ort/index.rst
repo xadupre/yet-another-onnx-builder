@@ -11,6 +11,7 @@ yobx.xoptim.patterns_ort
     embed_layer_normalization
     fused_conv
     fused_matmul
+    greedy_search
     llm_optim
     missing_kernels
     relative_position_bias
