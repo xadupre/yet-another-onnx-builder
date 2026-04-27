@@ -1148,7 +1148,7 @@ class GraphEinsumSubOp:
         letters: str,
         mat: numpy.ndarray,
         lengths: List[int],
-        duplicates: List[Dict[str, int]],
+        duplicates: List[Optional[Dict[str, Any]]],
     ):
         self._nodes: Dict[int, Union[int, EinsumSubOp]] = {}
         self._mark: Dict[int, Union[int, EinsumSubOp]] = {}

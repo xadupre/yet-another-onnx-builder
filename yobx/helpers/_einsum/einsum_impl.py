@@ -431,7 +431,7 @@ def _decompose_einsum_equation_simple(
 
     # last_row, current_row (row = shape)
     rows = numpy.full((2, mat.shape[1]), -1)
-    graph = GraphEinsumSubOp(letters, mat, lengths, duplicates)  # type: ignore[arg-type]
+    graph = GraphEinsumSubOp(letters, mat, lengths, duplicates)
     fd = mat.shape[1]
     if verbose:
         print(f"EQUATION={equation!r}")
@@ -481,9 +481,10 @@ def _decompose_einsum_equation_simple(
                 print(mat)
                 print("  -")
                 print(rows)
-            op = EinsumSubOp(
-                fd, "reduce_sum", graph.last_added_op, axes=tuple(red)  # type: ignore[arg-type]
-            )
+            assert isinstance(
+                graph.last_added_op, EinsumSubOp
+            ), "Expected last_added_op to be an EinsumSubOp at reduce step."
+            op = EinsumSubOp(fd, "reduce_sum", graph.last_added_op, axes=tuple(red))
             op.compute_output_row(rows[1, :], verbose=verbose)
             marked = graph.append(op)
 
@@ -525,7 +526,8 @@ def _decompose_einsum_equation_simple(
                 marked = graph.append(op)
 
         # End
-        graph.mark(i, marked)  # type: ignore[arg-type]
+        assert marked is not None, "Expected EinsumSubOp from graph.append at mark step."
+        graph.mark(i, marked)
         rows[0, :] = rows[1, :]
 
     # Final output
