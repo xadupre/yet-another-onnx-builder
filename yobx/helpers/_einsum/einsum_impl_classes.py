@@ -127,7 +127,7 @@ class EinsumSubOp:
 
     def dot_label(self) -> Optional[str]:
         """
-        Displays some informations useful to understand the operator.
+        Displays some information useful to understand the operator.
         """
         if self.name == "matmul":
             ndim = self.kwargs["ndim"]
@@ -672,7 +672,7 @@ class EinsumSubOp:
             methods `_apply*`
         :return: output
 
-        Known additional paramaters:
+        Known additional parameters:
 
         * 'matmul_impl': if None calls :func:`numpy.einsum` through
           :func:`numpy_extended_dot
@@ -1156,7 +1156,7 @@ class GraphEinsumSubOp:
         self._inputs: Dict[int, Union[int, EinsumSubOp]] = {}
         self.last_op: Optional[Union[int, EinsumSubOp]] = None
         self.last_added_op: Optional[Union[int, EinsumSubOp]] = None
-        self.metadata = dict(
+        self.metadata: Dict[str, Any] = dict(
             letters=letters, mat=mat, lengths=lengths, mat0=mat.copy(), duplicates=duplicates
         )
 
@@ -1276,7 +1276,7 @@ class GraphEinsumSubOp:
             else:
                 lab = f"{node.name}\\\\n{d2s(node.kwargs)}"
                 sk = id(node)
-                extended_lab = node.dot_label()
+                extended_lab = node.dot_label() or ""
                 if extended_lab:
                     extended_lab = "\\\\n" + extended_lab
 
@@ -1517,6 +1517,9 @@ class GraphEinsumSubOp:
                 cand = candidates[0]
                 op2 = cand
                 op1 = cand.inputs[0]
+                assert isinstance(
+                    op1, EinsumSubOp
+                ), "Expected EinsumSubOp in remove_duplicate_transpose but got %r." % type(op1)
                 perm1 = op1.kwargs["perm"]
                 perm2 = op2.kwargs["perm"]
                 assert len(perm1) == len(

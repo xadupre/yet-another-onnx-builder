@@ -87,7 +87,7 @@ def analyse_einsum_equation(
 
 def decompose_einsum_equation(
     equation: str,
-    *shapes: List[Tuple[int, ...]],
+    *shapes: Tuple[int, ...],
     strategy: str = "simple",
     clean: bool = False,
     verbose: bool = False,
@@ -170,8 +170,8 @@ def decompose_einsum_equation(
 
 
 def apply_einsum_sequence(
-    seq: List[numpy.ndarray],
-    *inputs: List[EinsumSubOp],
+    seq: "GraphEinsumSubOp",
+    *inputs: numpy.ndarray,
     verbose: bool = False,
     **kwargs: Dict[str, Any],
 ) -> numpy.ndarray:
@@ -206,7 +206,7 @@ def apply_einsum_sequence(
     return seq.apply_sequence(*inputs, verbose=verbose, **kwargs)
 
 
-def is_transpose_identity(perm: Tuple[int, ...]) -> bool:
+def is_transpose_identity(perm: Union[Tuple[int, ...], List[int], numpy.ndarray]) -> bool:
     """
     Tells if the permutation *perm* does nothing (identity).
 
@@ -236,7 +236,9 @@ def _basic_verification(lengths: List[int], shapes: List[Tuple[int, ...]], equat
         )
 
 
-def _apply_transpose_reshape(op: Union[int, EinsumSubOp], row: str) -> Iterable[EinsumSubOp]:
+def _apply_transpose_reshape(
+    op: Union[int, EinsumSubOp], row: numpy.ndarray
+) -> Iterable[EinsumSubOp]:
     """
     Put all dimensions in the same order.
 
@@ -269,27 +271,26 @@ def _apply_transpose_reshape(op: Union[int, EinsumSubOp], row: str) -> Iterable[
 
 
 def _apply_squeeze_transpose(
-    op: Union[int, EinsumSubOp], row_last: str, row_output: List[int]
+    op: Union[int, EinsumSubOp], row_last: numpy.ndarray, row_output: numpy.ndarray
 ) -> Iterable[EinsumSubOp]:
     """
     Puts output dimension in the expected order.
     """
-    perm = []
+    perm_with_idx: List[Tuple[int, int]] = []
     sq = []
     for i, d in enumerate(row_output):
         if d == -1:
             sq.append(i)
         else:
-            perm.append((d, i))
-    perm.sort()
+            perm_with_idx.append((d, i))
+    perm_with_idx.sort()
     new_perm = numpy.arange(len(row_last))
     p = 0
     for i, d in enumerate(row_output):
         if d == -1:
             continue
-        new_perm[i] = perm[p][1]
+        new_perm[i] = perm_with_idx[p][1]
         p += 1
-    perm = [p[1] for p in perm]
     if not is_transpose_identity(new_perm):
         op = EinsumSubOp(len(row_last), "transpose", op, perm=tuple(new_perm))
         yield op
@@ -360,9 +361,9 @@ def _apply_einsum_matmul(
             yield op2
 
         # Reshape
-        all_axes = list(range(ndim))
-        new_axes = all_axes[-len(axes) :] if len(axes) > 0 else []
-        new_common_axes = all_axes[: len(common_axes)]
+        ndim_range = list(range(ndim))
+        new_axes = ndim_range[-len(axes) :] if len(axes) > 0 else []
+        new_common_axes = ndim_range[: len(common_axes)]
         not_in_both = []
         for i in range(ndim):
             if i not in left and i not in right and i not in common_axes:
@@ -389,9 +390,9 @@ def _apply_einsum_matmul(
             + [i for i in right if i not in left]
             + not_in_both
         )
-        rev_perm = [(a, i) for i, a in enumerate(ordered_axes)]
-        rev_perm.sort()
-        rev_perm = [p[1] for p in rev_perm]
+        rev_perm_pairs: List[Tuple[int, int]] = [(a, i) for i, a in enumerate(ordered_axes)]
+        rev_perm_pairs.sort()
+        rev_perm = [pair[1] for pair in rev_perm_pairs]
 
         if not is_transpose_identity(rev_perm):
             op_unused = EinsumSubOp(fd, "transpose_mm", op1, op, perm=tuple(rev_perm))
@@ -406,10 +407,7 @@ def _apply_einsum_matmul(
 
 
 def _decompose_einsum_equation_simple(
-    equation: str,
-    *shapes: List[Tuple[int, ...]],
-    verbose: bool = False,
-    op_matmul: str = "matmul",
+    equation: str, *shapes: Tuple[int, ...], verbose: bool = False, op_matmul: str = "matmul"
 ) -> GraphEinsumSubOp:
     """
     Applies strategy `simple`, `numpy`
@@ -426,20 +424,21 @@ def _decompose_einsum_equation_simple(
     assert (
         len(letters) == mat.shape[1]
     ), f"Unexpected number of letters {letters!r}, shape={mat.shape!r}."
-    if not shapes:
-        shapes = [(2,) * le for le in lengths[:-1]]
-    _basic_verification(lengths, shapes, equation)
+    actual_shapes: List[Tuple[int, ...]] = (
+        list(shapes) if shapes else [(2,) * le for le in lengths[:-1]]
+    )
+    _basic_verification(lengths, actual_shapes, equation)
 
     # last_row, current_row (row = shape)
     rows = numpy.full((2, mat.shape[1]), -1)
-    graph = GraphEinsumSubOp(letters, mat, lengths, duplicates)
+    graph = GraphEinsumSubOp(letters, mat, lengths, duplicates)  # type: ignore[arg-type]
     fd = mat.shape[1]
     if verbose:
         print(f"EQUATION={equation!r}")
         print(f"LETTERS={letters!r}", f"LENGTHS={lengths!r}")
         print(f"DUPLICATES={duplicates!r}")
 
-    for i, sh in enumerate(shapes):
+    for i, sh in enumerate(actual_shapes):
         if verbose:
             print()
             print("######### ROW %d shape=%r row=%r" % (i, sh, rows[1, :]))
@@ -482,7 +481,9 @@ def _decompose_einsum_equation_simple(
                 print(mat)
                 print("  -")
                 print(rows)
-            op = EinsumSubOp(fd, "reduce_sum", graph.last_added_op, axes=tuple(red))
+            op = EinsumSubOp(
+                fd, "reduce_sum", graph.last_added_op, axes=tuple(red)  # type: ignore[arg-type]
+            )
             op.compute_output_row(rows[1, :], verbose=verbose)
             marked = graph.append(op)
 
@@ -524,7 +525,7 @@ def _decompose_einsum_equation_simple(
                 marked = graph.append(op)
 
         # End
-        graph.mark(i, marked)
+        graph.mark(i, marked)  # type: ignore[arg-type]
         rows[0, :] = rows[1, :]
 
     # Final output
@@ -532,8 +533,8 @@ def _decompose_einsum_equation_simple(
         print()
         print(f"######### FIN row={rows[1, :]!r}")
 
-    if mat[len(shapes), :].max() >= 0:
-        rows[1, :] = mat[len(shapes), :]
+    if mat[len(actual_shapes), :].max() >= 0:
+        rows[1, :] = mat[len(actual_shapes), :]
         red = []
         for d in range(mat.shape[1]):
             if rows[0, d] > 0 and rows[1, d] == -1:
@@ -552,7 +553,7 @@ def _decompose_einsum_equation_simple(
             op.compute_output_row(rows[1, :], verbose=verbose)
 
         # Removes empty axes.
-        for iop in _apply_squeeze_transpose(op, rows[1, :], mat[len(shapes), :]):
+        for iop in _apply_squeeze_transpose(op, rows[1, :], mat[len(actual_shapes), :]):
             op = iop
             iop.compute_output_row(rows[1, :], verbose=verbose)
             graph.append(iop)

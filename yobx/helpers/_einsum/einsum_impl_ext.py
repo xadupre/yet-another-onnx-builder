@@ -430,8 +430,9 @@ def _numpy_extended_dot_python_update_broadcast(
             print(f"    B0 l1={l1!r}, l2={l2!r} l3={l3!r}")
         if (kind[i] & 4) > 0:
             # Summation axis is part of the output.
-            assert let[inp] is not None, f"Unexpected value for let[{inp}] in let={let}."
-            let_inp: str = let[inp]
+            let_tmp = let[inp]
+            assert let_tmp is not None, f"Unexpected value for let[{inp}] in let={let}."
+            let_inp: str = let_tmp
             new_let: str = let_inp.upper() if let_inp.lower() == let_inp else let_inp.lower()
             let[inp] = new_let
             l3[p] = new_let
@@ -443,8 +444,9 @@ def _numpy_extended_dot_python_update_broadcast(
                 print(f"    B1 l1={l1!r}, l2={l2!r} l3={l3!r}")
         else:
             # Summation axis is not part of the output.
-            assert let[inp] is not None, f"Unexpected value for let[{inp}] in let={let}."
-            let_inp = let[inp]
+            let_tmp = let[inp]
+            assert let_tmp is not None, f"Unexpected value for let[{inp}] in let={let}."
+            let_inp = let_tmp
             new_let = let_inp.upper() if let_inp.lower() == let_inp else let_inp.lower()
             let[inp] = new_let
             if inp == 1:

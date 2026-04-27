@@ -1,3 +1,3 @@
 [codespell]
-ignore-words-list = OT,mape
+ignore-words-list = OT,mape,strat
 skip = .git,docs/_build
