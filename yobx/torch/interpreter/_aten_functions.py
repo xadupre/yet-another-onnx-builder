@@ -8042,10 +8042,22 @@ def aten_l1_loss(
     x: T,
     target: T,
     reduction: str = "mean",
+    size_average: Optional[bool] = None,
+    reduce: Optional[bool] = None,
     name: str = "l1_loss",
 ) -> T:
     "l1_loss"
 
+    # Handle deprecated size_average / reduce kwargs.
+    if size_average is not None or reduce is not None:
+        _size_average = True if size_average is None else size_average
+        _reduce = True if reduce is None else reduce
+        if not _reduce:
+            reduction = "none"
+        elif _size_average:
+            reduction = "mean"
+        else:
+            reduction = "sum"
     diff_abs = g.op.Abs(g.op.Sub(x, target, name=name), name=name)
     if reduction in (1, "mean"):
         res = g.op.ReduceMeanAnyOpset(diff_abs, name=name, outputs=outputs, keepdims=0)
@@ -9631,10 +9643,22 @@ def aten_mse_loss(
     x: T,
     target: T,
     reduction: Union[int, str] = 1,
+    size_average: Optional[bool] = None,
+    reduce: Optional[bool] = None,
     name: str = "mse_loss",
 ) -> T:
     "mse_loss"
 
+    # Handle deprecated size_average / reduce kwargs.
+    if size_average is not None or reduce is not None:
+        _size_average = True if size_average is None else size_average
+        _reduce = True if reduce is None else reduce
+        if not _reduce:
+            reduction = Reduction.NONE.value
+        elif _size_average:
+            reduction = Reduction.MEAN.value
+        else:
+            reduction = Reduction.SUM.value
     diff = g.op.Sub(x, target, name=name)
     diff_mul = g.op.Mul(diff, diff, name=name)
     if reduction in (1, "mean"):
