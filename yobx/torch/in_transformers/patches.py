@@ -41,8 +41,8 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
     if model is None:
         from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
 
-        return [*get_patches(), _make_patch_info_for_rotary(LlamaRotaryEmbedding)]
-    patches = get_patches()
+        return [_make_patch_info_for_rotary(LlamaRotaryEmbedding)]
+    patches = []
     for _name, submodule in model.named_modules():
         if (
             hasattr(submodule.forward, "__wrapped__")

@@ -1,5 +1,5 @@
 from functools import wraps
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Optional, Tuple
 import torch
 import transformers
 
