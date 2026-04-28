@@ -7,24 +7,6 @@ from ...xexpressions import rename_expression
 from .shape import TracingShape, TracingInt, TracingBool, register_condition, clear_conditions
 from .tensor import TracingTensor
 
-# from ._patches import (
-#    _ORIGINAL_TORCH_COND,
-#    _ORIGINAL_TORCH_FULL,
-#    _ORIGINAL_TORCH_ZEROS,
-#    _ORIGINAL_TORCH_ONES,
-#    _ORIGINAL_TORCH_SCAN,
-#    _ORIGINAL_TORCH_TENSOR_SPLIT,
-#    _ORIGINAL_TORCH_WHILE_LOOP,
-#    _cond_replacement_ctx,
-#    _check_replacement_ctx,
-#    _full_replacement_ctx,
-#    _zeros_replacement_ctx,
-#    _ones_replacement_ctx,
-#    _scan_replacement_ctx,
-#    _while_loop_replacement_ctx,
-#    _trace_replacement_ctx,
-# )
-
 
 class GraphTracer:
     """
@@ -33,6 +15,7 @@ class GraphTracer:
 
     .. runpython::
         :showcode:
+        :process:
 
         import torch
         from yobx.torch.new_tracing.tracer import GraphTracer
@@ -52,6 +35,7 @@ class GraphTracer:
 
     .. runpython::
         :showcode:
+        :process:
 
         import torch
         from yobx.torch.new_tracing.tracer import GraphTracer
@@ -71,6 +55,7 @@ class GraphTracer:
 
     .. runpython::
         :showcode:
+        :process:
 
         import torch
         from yobx.torch.new_tracing.tracer import GraphTracer
@@ -101,7 +86,6 @@ class GraphTracer:
         call site and the tracer does not descend into its ``forward`` method.
         Internal parameters and buffers of leaf modules are also excluded from
         the graph's placeholder nodes.
-
     """
 
     def __init__(
