@@ -57,9 +57,9 @@ def apply_patches_for_model(
     """
     patches = PatchDetails()
     if patch_torch:
-        from .in_torch.patches import PATCHES
+        from .in_torch.patches import get_patches
 
-        patches.extend(PATCHES)
+        patches.extend(get_patches())
     if patch_transformers:
         from .in_transformers.patches import get_patches_for
 

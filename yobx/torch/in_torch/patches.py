@@ -326,6 +326,3 @@ def get_patches() -> List[PatchInfo]:
         ),
         PatchInfo.make(patched__maybe_broadcast, torch._refs, "_maybe_broadcast", family="torch"),
     ]
-
-
-PATCHES = get_patches()

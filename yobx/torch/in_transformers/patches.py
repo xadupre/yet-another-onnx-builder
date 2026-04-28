@@ -6,8 +6,6 @@ import transformers
 from ...helpers.patch_helper import PatchInfo
 from ._patches_model_rope_utils import common_RotaryEmbedding, patched_dynamic_rope_update
 
-PATCHES: List[PatchInfo] = []
-
 
 def _make_patch_info_for_rotary(submodule_class):
     patch = PatchInfo.make(
@@ -43,8 +41,8 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
     if model is None:
         from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
 
-        return [*PATCHES, _make_patch_info_for_rotary(LlamaRotaryEmbedding)]
-    patches = list(PATCHES)
+        return [*get_patches(), _make_patch_info_for_rotary(LlamaRotaryEmbedding)]
+    patches = get_patches()
     for _name, submodule in model.named_modules():
         if (
             hasattr(submodule.forward, "__wrapped__")
