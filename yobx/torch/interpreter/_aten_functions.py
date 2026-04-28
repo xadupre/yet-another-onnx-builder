@@ -397,7 +397,15 @@ def aten_add_Scalar(
 ) -> T:
     "add"
     assert alpha in (None, 1), f"alpha={alpha}, not implemented"
-    x, y = prepare_inputs_homogeneous_operator(g, x, y)
+    # When the FX graph provides a concrete output dtype (via sts["dtype"]),
+    # uses it as force_type so that integer + float_scalar correctly promotes
+    # to the floating-point result type that PyTorch produces.
+    force_type = None
+    if sts and isinstance(sts, dict) and "dtype" in sts:
+        dt = sts["dtype"]
+        if dt is not None and isinstance(dt, g.torch.dtype):
+            force_type = torch_dtype_to_onnx_dtype(dt)
+    x, y = prepare_inputs_homogeneous_operator(g, x, y, force_type=force_type)
     res = g.op.Add(x, y, outputs=outputs, name=name)
     if not sts:
         set_type_shape_binary_op(g, outputs[0], x, y)
@@ -1883,35 +1891,23 @@ def aten_binary_cross_entropy_with_logits(
     if pos_weight is not None:
         # loss = (1 - target) * x + (1 + (pos_weight - 1) * target) * log(1 + exp(-|x|))
         log_weight = g.op.Add(
-            one,
-            g.op.Mul(g.op.Sub(pos_weight, one, name=name), target, name=name),
-            name=name,
+            one, g.op.Mul(g.op.Sub(pos_weight, one, name=name), target, name=name), name=name
         )
         neg_abs_x = g.op.Neg(g.op.Abs(x, name=name), name=name)
         log_arg = g.op.Add(one, g.op.Exp(neg_abs_x, name=name), name=name)
-        log_term = g.op.Mul(
-            log_weight,
-            g.op.Log(log_arg, name=name),
-            name=name,
-        )
+        log_term = g.op.Mul(log_weight, g.op.Log(log_arg, name=name), name=name)
         loss_elem = g.op.Add(
-            g.op.Sub(relu_x, g.op.Mul(x, target, name=name), name=name),
-            log_term,
-            name=name,
+            g.op.Sub(relu_x, g.op.Mul(x, target, name=name), name=name), log_term, name=name
         )
     else:
         log_term = g.op.Log(
             g.op.Add(
-                one,
-                g.op.Exp(g.op.Neg(g.op.Abs(x, name=name), name=name), name=name),
-                name=name,
+                one, g.op.Exp(g.op.Neg(g.op.Abs(x, name=name), name=name), name=name), name=name
             ),
             name=name,
         )
         loss_elem = g.op.Add(
-            g.op.Sub(relu_x, g.op.Mul(x, target, name=name), name=name),
-            log_term,
-            name=name,
+            g.op.Sub(relu_x, g.op.Mul(x, target, name=name), name=name), log_term, name=name
         )
     if weight is not None:
         loss_elem = g.op.Mul(loss_elem, weight, name=name)
@@ -3252,9 +3248,15 @@ def aten_cross_entropy(
                 f"{g.get_debug_msg()}"
             )
     return aten_cross_entropy_loss(
-        g, sts, outputs, x, target,
-        weight=weight, reduction=reduction,
-        ignore_index=ignore_index, label_smoothing=label_smoothing,
+        g,
+        sts,
+        outputs,
+        x,
+        target,
+        weight=weight,
+        reduction=reduction,
+        ignore_index=ignore_index,
+        label_smoothing=label_smoothing,
     )
 
 
@@ -11049,8 +11051,14 @@ def aten_pairwise_distance(
     """
     itype = g.get_type(x1)
     is_integer = itype in (
-        TensorProto.INT32, TensorProto.INT64, TensorProto.INT16, TensorProto.INT8,
-        TensorProto.UINT8, TensorProto.UINT16, TensorProto.UINT32, TensorProto.UINT64,
+        TensorProto.INT32,
+        TensorProto.INT64,
+        TensorProto.INT16,
+        TensorProto.INT8,
+        TensorProto.UINT8,
+        TensorProto.UINT16,
+        TensorProto.UINT32,
+        TensorProto.UINT64,
     )
     if is_integer:
         x1 = g.op.Cast(x1, to=TensorProto.FLOAT, name=name)
@@ -12105,11 +12113,7 @@ def aten_relu6(
     assert not inplace, f"inplace computation is not allowed with onnx{g.get_debug_msg()}"
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
     res = g.op.Clip(
-        x,
-        np.array([0.0], dtype=dtype),
-        np.array([6.0], dtype=dtype),
-        name=name,
-        outputs=outputs,
+        x, np.array([0.0], dtype=dtype), np.array([6.0], dtype=dtype), name=name, outputs=outputs
     )
     if not sts:
         set_type_shape_unary_op(g, res, x)
@@ -14096,12 +14100,7 @@ def aten_smooth_l1_loss(
     diff_sq = g.op.Mul(diff, diff, name=name)
     quadratic = g.op.Mul(half, g.op.Div(diff_sq, beta_arr, name=name), name=name)
     linear = g.op.Sub(abs_diff, g.op.Mul(half, beta_arr, name=name), name=name)
-    loss_elem = g.op.Where(
-        g.op.Less(abs_diff, beta_arr, name=name),
-        quadratic,
-        linear,
-        name=name,
-    )
+    loss_elem = g.op.Where(g.op.Less(abs_diff, beta_arr, name=name), quadratic, linear, name=name)
     if reduction in (Reduction.MEAN.value, "mean"):
         res = g.op.ReduceMeanAnyOpset(loss_elem, name=name, outputs=outputs, keepdims=0)
     elif reduction in (Reduction.SUM.value, "sum"):
