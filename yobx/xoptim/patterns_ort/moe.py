@@ -25,12 +25,13 @@ class MoEPattern(PatternOptimization):
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
             I_input(["input FLOAT(T, H)"])
-            I_rp(["router_probs FLOAT(T, E)"])
+            I_rp(["router_logits FLOAT(T, E)"])
             I_fc1w(["fc1_w FLOAT(E, I, H)"])
             I_fc1b(["fc1_b FLOAT(E, I)"])
             I_fc2w(["fc2_w FLOAT(E, H, I)"])
             I_fc2b(["fc2_b FLOAT(E, H)"])
 
+            Softmax_0[["Softmax(., axis=-1) [optional]"]]
             TopK_0[["TopK(., k)"]]
             Reshape_ids[["Reshape(top_indices, (T,)) or Reshape(top_indices, (-1,))"]]
             Reshape_w[["Reshape(top_weights, (T, 1))"]]
@@ -51,7 +52,8 @@ class MoEPattern(PatternOptimization):
             Add_fc2[["Add(., .)"]]
             Mul_out[["Mul(., .)"]]
 
-            I_rp -->|"FLOAT(T, E)"| TopK_0
+            I_rp -->|"FLOAT(T, E)"| Softmax_0
+            Softmax_0 -->|"FLOAT(T, E)"| TopK_0
             TopK_0 -->|"weights FLOAT(T, 1)"| Reshape_w
             TopK_0 -->|"indices INT64(T, 1)"| Reshape_ids
             Reshape_ids -->|"INT64(T,)"| Gather_fc1w
@@ -101,7 +103,7 @@ class MoEPattern(PatternOptimization):
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
             I_input(["input FLOAT(T, H)"])
-            I_rp(["router_probs FLOAT(T, E)"])
+            I_rp(["router_logits FLOAT(T, E)"])
             I_fc1w(["fc1_w FLOAT(E, I, H)"])
             I_fc1b(["fc1_b FLOAT(E, I)"])
             I_fc2w(["fc2_w FLOAT(E, H, I)"])
@@ -214,12 +216,15 @@ class MoEPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
 
         # ---- flat_ids: Reshape of TopK indices ---------------------------
+        # Allow 2 or more consumers of the raw indices tensor (e.g. when the
+        # indices are also used as a model output or in an auxiliary loss).
+        # We just need at least one Reshape consumer to flatten them.
         topk_indices_name = topk_node.output[1]
         ids_consumers = g.next_nodes(topk_indices_name)
-        if len(ids_consumers) != 1:
-            return self.none(node, inspect.currentframe().f_lineno)
-        ids_reshape = ids_consumers[0]
-        if ids_reshape.op_type != "Reshape" or ids_reshape.domain != "":
+        ids_reshape = next(
+            (n for n in ids_consumers if n.op_type == "Reshape" and n.domain == ""), None
+        )
+        if ids_reshape is None:
             return self.none(node, inspect.currentframe().f_lineno)
         flat_ids = ids_reshape.output[0]
 
@@ -416,7 +421,21 @@ class MoEPattern(PatternOptimization):
         """Replaces the matched expert-computation sub-graph with one MoE node."""
         # Recover the original source tensor names from the matched nodes.
         input_name = input_unsqueeze.input[0]
-        router_probs = topk_node.input[0]
+
+        # com.microsoft.MoE applies Softmax to router_probs internally.
+        # If the pattern contains Softmax → TopK, pass the pre-softmax logits so
+        # that the fused and pre-fusion graphs are numerically equivalent.
+        router_probs_tensor = topk_node.input[0]
+        softmax_src = g.node_before(router_probs_tensor)
+        if (
+            softmax_src is not None
+            and softmax_src.op_type == "Softmax"
+            and softmax_src.domain == ""
+        ):
+            router_input = softmax_src.input[0]
+        else:
+            router_input = router_probs_tensor
+
         fc1_weights = fc1_w_gather.input[0]
         fc1_bias_source = fc1_bias_gather.input[0] if fc1_bias_gather is not None else None
         fc2_weights = fc2_w_gather.input[0]
@@ -434,12 +453,12 @@ class MoEPattern(PatternOptimization):
 
         # Build the input list:
         #   [0] input
-        #   [1] router_probs
+        #   [1] router_input  (logits if Softmax was present, else raw probs)
         #   [2] fc1_experts_weights
         #   [3] fc1_experts_bias  (empty string = not present)
         #   [4] fc2_experts_weights
         #   [5] fc2_experts_bias  (optional, omit if absent)
-        inputs = [input_name, router_probs, fc1_weights]
+        inputs = [input_name, router_input, fc1_weights]
         inputs.append(fc1_bias_source if fc1_bias_source is not None else "")
         inputs.append(fc2_weights)
         if fc2_bias_source is not None:
@@ -452,7 +471,7 @@ class MoEPattern(PatternOptimization):
             domain="com.microsoft",
             k=k_int,
             activation_type=activation_type,
-            normalize_routing_weights=1,
+            normalize_routing_weights=0,
             name=f"{self.__class__.__name__}--{mul_node.name}",
         )
         return [moe_node]

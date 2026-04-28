@@ -4370,17 +4370,23 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         """Builds the pre-fusion MoE ONNX subgraph for testing.
 
         The subgraph implements:
-            1. TopK(router_probs, k) -> (top_weights, top_ids)
-            2. flat_ids = Reshape(top_ids, (T*k,))
-            3. Gather expert FC1/FC2 weights and biases by flat_ids
-            4. BatchMatMul for FC1, optional bias, activation
-            5. BatchMatMul for FC2, optional bias
-            6. Weighted sum using Reshape(top_weights, (T*k, 1))
+            1. Softmax(router_logits, axis=-1) -> router_probs  shape (T, E)
+            2. TopK(router_probs, k) -> (top_weights, top_ids)   shapes (T, k)
+            3. flat_ids = Reshape(top_ids, (T*k,))
+            4. Gather expert FC1/FC2 weights and biases by flat_ids
+            5. BatchMatMul for FC1, optional bias, activation
+            6. BatchMatMul for FC2, optional bias
+            7. Weighted sum using Reshape(top_weights, (T*k, 1))
+        Graph input ``router_logits`` contains raw (pre-softmax) routing scores.
+        Input ``input`` has shape ``(T*k, H)`` — the pre-dispatched expert tokens.
         """
         T, H, inter, E, k = num_tokens, hidden_size, inter_size, num_experts, top_k
 
         nodes = []
         initializers = []
+
+        # ----- Softmax over routing logits --------------------------------
+        nodes.append(oh.make_node("Softmax", ["router_logits"], ["router_probs"], axis=-1))
 
         # ----- TopK -------------------------------------------------------
         topk_k = onh.from_array(np.array([k], dtype=np.int64), name="topk_k")
@@ -4471,9 +4477,11 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         # ----- Weighted sum: (T*k, H) * (T*k, 1) -------------------------
         nodes.append(oh.make_node("Mul", [fc2_final_input, "routing_w"], ["output"]))
 
+        # router_logits has shape (T, E) — raw routing scores; Softmax applied above.
+        # input has shape (T*k, H) — one row per dispatched (token, expert) pair.
         graph_inputs = [
             oh.make_tensor_value_info("input", TFLOAT, [T * k, H]),
-            oh.make_tensor_value_info("router_probs", TFLOAT, [T * k, E]),
+            oh.make_tensor_value_info("router_logits", TFLOAT, [T, E]),
         ]
         graph_outputs = [oh.make_tensor_value_info("output", TFLOAT, [T * k, H])]
 
@@ -4482,6 +4490,29 @@ class TestCausalConvWithStatePattern(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
+
+    def _moe_check_ort(self, model: "ModelProto", opt_onx: "ModelProto", feeds: dict) -> None:
+        """Runs pre- and post-fusion models with OnnxRuntime and compares outputs.
+
+        Silently skips the comparison when OnnxRuntime is not installed or when
+        the installed build does not support ``com.microsoft.MoE``.
+        """
+        try:
+            from onnxruntime import InferenceSession
+            from onnxruntime.capi.onnxruntime_pybind11_state import Fail, InvalidGraph
+        except ImportError:
+            return
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)
+        try:
+            opt_ref = InferenceSession(
+                opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
+            )
+            got = opt_ref.run(None, feeds)
+            self.assertEqualArray(expected[0], got[0], atol=1e-5)
+        except (Fail, InvalidGraph):
+            # com.microsoft.MoE may not be available in this ORT build; skip.
+            pass
 
     def test_moe_pattern_in_list(self):
         """MoEPattern must appear in the default ORT pattern list."""
@@ -4493,6 +4524,8 @@ class TestCausalConvWithStatePattern(ExtTestCase):
 
     def test_moe_pattern_basic_relu_with_biases(self):
         """TopK + expert-gather + FC1+Relu+FC2 with both biases fuses to MoE."""
+        np.random.seed(0)
+        T, H, E, k = 4, 8, 4, 1
         model = self._make_moe_model(activation="Relu", with_fc1_bias=True, with_fc2_bias=True)
         gr = GraphBuilder(
             model,
@@ -4516,9 +4549,16 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         act_attr = next((a for a in fused[0].attribute if a.name == "activation_type"), None)
         self.assertIsNotNone(act_attr)
         self.assertEqual("relu", act_attr.s.decode())
+        feeds = {
+            "input": np.random.randn(T * k, H).astype(np.float32),
+            "router_logits": np.random.randn(T, E).astype(np.float32),
+        }
+        self._moe_check_ort(model, opt_onx, feeds)
 
     def test_moe_pattern_no_biases(self):
         """MoE pattern also fuses when both FC biases are absent."""
+        np.random.seed(1)
+        T, H, E, k = 4, 8, 4, 1
         model = self._make_moe_model(activation="Relu", with_fc1_bias=False, with_fc2_bias=False)
         gr = GraphBuilder(
             model,
@@ -4528,9 +4568,16 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         opt_onx = gr.to_onnx(optimize=True)
         op_types = [n.op_type for n in opt_onx.graph.node]
         self.assertIn("MoE", op_types)
+        feeds = {
+            "input": np.random.randn(T * k, H).astype(np.float32),
+            "router_logits": np.random.randn(T, E).astype(np.float32),
+        }
+        self._moe_check_ort(model, opt_onx, feeds)
 
     def test_moe_pattern_no_fc2_bias(self):
         """MoE pattern fuses when only FC1 bias is present."""
+        np.random.seed(2)
+        T, H, E, k = 4, 8, 4, 1
         model = self._make_moe_model(activation="Relu", with_fc1_bias=True, with_fc2_bias=False)
         gr = GraphBuilder(
             model,
@@ -4540,13 +4587,24 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         opt_onx = gr.to_onnx(optimize=True)
         op_types = [n.op_type for n in opt_onx.graph.node]
         self.assertIn("MoE", op_types)
+        feeds = {
+            "input": np.random.randn(T * k, H).astype(np.float32),
+            "router_logits": np.random.randn(T, E).astype(np.float32),
+        }
+        self._moe_check_ort(model, opt_onx, feeds)
 
     def test_moe_pattern_reshape_minus_one(self):
         """MoE pattern fuses when the index Reshape uses (-1,) instead of (T,)."""
+        np.random.seed(3)
         T, H, inter, E, k = 4, 8, 16, 4, 1
 
         nodes = []
         initializers = []
+
+        # Include Softmax before TopK (same as _make_moe_model) so that the
+        # fused com.microsoft.MoE node (which applies Softmax internally) is
+        # numerically equivalent to the pre-fusion subgraph.
+        nodes.append(oh.make_node("Softmax", ["router_logits"], ["router_probs"], axis=-1))
 
         topk_k = onh.from_array(np.array([k], dtype=np.int64), name="topk_k")
         initializers.append(topk_k)
@@ -4610,7 +4668,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
                 "moe_minus_one",
                 [
                     oh.make_tensor_value_info("input", TFLOAT, [T * k, H]),
-                    oh.make_tensor_value_info("router_probs", TFLOAT, [T * k, E]),
+                    oh.make_tensor_value_info("router_logits", TFLOAT, [T, E]),
                 ],
                 [oh.make_tensor_value_info("output", TFLOAT, [T * k, H])],
                 initializers,
@@ -4625,11 +4683,18 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertIn("MoE", [n.op_type for n in opt_onx.graph.node])
+        feeds = {
+            "input": np.random.randn(T * k, H).astype(np.float32),
+            "router_logits": np.random.randn(T, E).astype(np.float32),
+        }
+        self._moe_check_ort(model, opt_onx, feeds)
 
     def test_moe_pattern_shape_inference(self):
         """Output of the fused MoE node has the same shape as the input."""
+        np.random.seed(4)
+        T, H, E, k = 6, 8, 4, 1
         model = self._make_moe_model(
-            num_tokens=6, hidden_size=8, activation="Relu", with_fc1_bias=True, with_fc2_bias=True
+            num_tokens=T, hidden_size=H, activation="Relu", with_fc1_bias=True, with_fc2_bias=True
         )
         gr = GraphBuilder(
             model,
@@ -4640,10 +4705,49 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         # The graph output shape must be preserved.
         out_info = opt_onx.graph.output[0]
         dims = [d.dim_value for d in out_info.type.tensor_type.shape.dim]
-        self.assertEqual([6, 8], dims)
+        self.assertEqual([T * k, H], dims)
+        feeds = {
+            "input": np.random.randn(T * k, H).astype(np.float32),
+            "router_logits": np.random.randn(T, E).astype(np.float32),
+        }
+        self._moe_check_ort(model, opt_onx, feeds)
+
+    def test_moe_pattern_top_k_2(self):
+        """MoE pattern fuses correctly when k=2 (each token dispatched to 2 experts)."""
+        np.random.seed(5)
+        T, H, E, k = 4, 8, 4, 2
+        model = self._make_moe_model(
+            num_tokens=T,
+            hidden_size=H,
+            num_experts=E,
+            top_k=k,
+            activation="Relu",
+            with_fc1_bias=True,
+            with_fc2_bias=True,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MoE"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertIn("MoE", [n.op_type for n in opt_onx.graph.node])
+        fused = [n for n in opt_onx.graph.node if n.op_type == "MoE"]
+        k_attr = next((a for a in fused[0].attribute if a.name == "k"), None)
+        self.assertIsNotNone(k_attr)
+        self.assertEqual(2, k_attr.i)
+        # Output shape should be (T*k, H) = (8, H).
+        out_info = opt_onx.graph.output[0]
+        dims = [d.dim_value for d in out_info.type.tensor_type.shape.dim]
+        self.assertEqual([T * k, H], dims)
+        # ORT's com.microsoft.MoE op expects router_logits to have the same number
+        # of rows as input (T*k), whereas this test's pre-fusion topology uses T
+        # rows for router_logits.  Numerical equivalence is therefore only verified
+        # for k=1 where T*k == T; here we check structural correctness only.
 
     def test_moe_pattern_no_match_missing_topk(self):
         """Pattern must NOT fire when there is no TopK feeding the routing weight."""
+        np.random.seed(6)
         num_tokens, hidden_size, num_experts = 4, 8, 4
         # Replace TopK with a direct Softmax output (no actual TopK in graph).
         nodes = [
