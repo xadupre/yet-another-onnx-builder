@@ -8071,10 +8071,10 @@ def aten_l1_loss(
         )
     if not sts:
         if reduction == "none":
-            set_type_shape_unary_op(res, x)
+            set_type_shape_unary_op(g, res, x)
         else:
             g.set_type(res, g.get_type(x))
-            g.get_shape(res, tuple())
+            g.set_shape(res, tuple())
     return res
 
 
@@ -9643,6 +9643,7 @@ def aten_mse_loss(
     x: T,
     target: T,
     reduction: Union[int, str] = 1,
+    weight: Optional[T] = None,
     size_average: Optional[bool] = None,
     reduce: Optional[bool] = None,
     name: str = "mse_loss",
