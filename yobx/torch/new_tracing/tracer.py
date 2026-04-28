@@ -2096,6 +2096,7 @@ class GraphTracer:
 
         .. runpython::
             :showcode:
+            :process:
 
             import torch
             from yobx.torch.new_tracing.tracer import GraphTracer

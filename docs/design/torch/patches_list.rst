@@ -10,6 +10,7 @@ torch
 .. runpython::
     :rst:
     :showcode:
+    :process:
 
     import textwrap
     from yobx.torch import apply_patches_for_model
@@ -41,6 +42,7 @@ transformers
 .. runpython::
     :rst:
     :showcode:
+    :process:
 
     import textwrap
     from yobx.torch import apply_patches_for_model
