@@ -31,6 +31,7 @@ Default export path
 .. runpython::
     :rst:
     :warningout: UserWarning
+    :process:
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
     print(get_op_coverage_rst("default"))
@@ -41,6 +42,7 @@ Torch tracing export path
 .. runpython::
     :rst:
     :warningout: UserWarning
+    :process:
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
     print(get_op_coverage_rst("tracing"))
@@ -51,6 +53,7 @@ New-tracing export path
 .. runpython::
     :rst:
     :warningout: UserWarning
+    :process:
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
     print(get_op_coverage_rst("new-tracing"))
@@ -65,6 +68,7 @@ paths side by side.
 .. runpython::
     :rst:
     :warningout: UserWarning
+    :process:
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_float32_comparison_rst
     print(get_op_coverage_float32_comparison_rst())
