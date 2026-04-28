@@ -14,6 +14,7 @@ yobx.xoptim.patterns_ort
     greedy_search
     llm_optim
     missing_kernels
+    moe
     relative_position_bias
     simplified_layer_normalization
 
