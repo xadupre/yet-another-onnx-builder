@@ -4541,6 +4541,91 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         op_types = [n.op_type for n in opt_onx.graph.node]
         self.assertIn("MoE", op_types)
 
+    def test_moe_pattern_reshape_minus_one(self):
+        """MoE pattern fuses when the index Reshape uses (-1,) instead of (T,)."""
+        T, H, inter, E, k = 4, 8, 16, 4, 1
+
+        nodes = []
+        initializers = []
+
+        topk_k = onh.from_array(np.array([k], dtype=np.int64), name="topk_k")
+        initializers.append(topk_k)
+        nodes.append(
+            oh.make_node("TopK", ["router_probs", "topk_k"], ["top_weights", "top_ids"], axis=1)
+        )
+
+        # Use -1 instead of T*k to flatten the indices.
+        flat_shape = onh.from_array(np.array([-1], dtype=np.int64), name="flat_shape")
+        initializers.append(flat_shape)
+        nodes.append(oh.make_node("Reshape", ["top_ids", "flat_shape"], ["flat_ids"]))
+
+        w_shape = onh.from_array(np.array([T * k, 1], dtype=np.int64), name="w_shape")
+        initializers.append(w_shape)
+        nodes.append(oh.make_node("Reshape", ["top_weights", "w_shape"], ["routing_w"]))
+
+        initializers.append(
+            onh.from_array(
+                np.random.randn(E, inter, H).astype(np.float32), name="fc1_experts_weights"
+            )
+        )
+        nodes.append(
+            oh.make_node("Gather", ["fc1_experts_weights", "flat_ids"], ["sel_fc1_w"], axis=0)
+        )
+        nodes.append(oh.make_node("Transpose", ["sel_fc1_w"], ["sel_fc1_w_t"], perm=[0, 2, 1]))
+
+        unsq_axis1 = onh.from_array(np.array([1], dtype=np.int64), name="unsq_axis1")
+        initializers.append(unsq_axis1)
+        nodes.append(oh.make_node("Unsqueeze", ["input", "unsq_axis1"], ["input_3d"]))
+
+        nodes.append(oh.make_node("MatMul", ["input_3d", "sel_fc1_w_t"], ["fc1_3d"]))
+        sq_axis1 = onh.from_array(np.array([1], dtype=np.int64), name="sq_axis1")
+        initializers.append(sq_axis1)
+        nodes.append(oh.make_node("Squeeze", ["fc1_3d", "sq_axis1"], ["fc1_out"]))
+        nodes.append(oh.make_node("Relu", ["fc1_out"], ["fc1_act"]))
+
+        unsq_axis2 = onh.from_array(np.array([1], dtype=np.int64), name="unsq_axis2")
+        initializers.append(unsq_axis2)
+        nodes.append(oh.make_node("Unsqueeze", ["fc1_act", "unsq_axis2"], ["fc1_act_3d"]))
+
+        initializers.append(
+            onh.from_array(
+                np.random.randn(E, H, inter).astype(np.float32), name="fc2_experts_weights"
+            )
+        )
+        nodes.append(
+            oh.make_node("Gather", ["fc2_experts_weights", "flat_ids"], ["sel_fc2_w"], axis=0)
+        )
+        nodes.append(oh.make_node("Transpose", ["sel_fc2_w"], ["sel_fc2_w_t"], perm=[0, 2, 1]))
+
+        nodes.append(oh.make_node("MatMul", ["fc1_act_3d", "sel_fc2_w_t"], ["fc2_3d"]))
+        sq_axis2 = onh.from_array(np.array([1], dtype=np.int64), name="sq_axis2")
+        initializers.append(sq_axis2)
+        nodes.append(oh.make_node("Squeeze", ["fc2_3d", "sq_axis2"], ["fc2_out"]))
+
+        nodes.append(oh.make_node("Mul", ["fc2_out", "routing_w"], ["output"]))
+
+        model = oh.make_model(
+            oh.make_graph(
+                nodes,
+                "moe_minus_one",
+                [
+                    oh.make_tensor_value_info("input", TFLOAT, [T * k, H]),
+                    oh.make_tensor_value_info("router_probs", TFLOAT, [T * k, E]),
+                ],
+                [oh.make_tensor_value_info("output", TFLOAT, [T * k, H])],
+                initializers,
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MoE"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertIn("MoE", [n.op_type for n in opt_onx.graph.node])
+
     def test_moe_pattern_shape_inference(self):
         """Output of the fused MoE node has the same shape as the input."""
         model = self._make_moe_model(
@@ -4571,18 +4656,10 @@ class TestCausalConvWithStatePattern(ExtTestCase):
                 nodes,
                 "no_topk",
                 [
-                    oh.make_tensor_value_info(
-                        "input", TFLOAT, [num_tokens, hidden_size]
-                    ),
-                    oh.make_tensor_value_info(
-                        "router_probs", TFLOAT, [num_tokens, num_experts]
-                    ),
+                    oh.make_tensor_value_info("input", TFLOAT, [num_tokens, hidden_size]),
+                    oh.make_tensor_value_info("router_probs", TFLOAT, [num_tokens, num_experts]),
                 ],
-                [
-                    oh.make_tensor_value_info(
-                        "final", TFLOAT, [num_tokens, hidden_size]
-                    )
-                ],
+                [oh.make_tensor_value_info("final", TFLOAT, [num_tokens, hidden_size])],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,

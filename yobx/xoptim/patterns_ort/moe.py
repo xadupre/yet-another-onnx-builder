@@ -32,7 +32,7 @@ class MoEPattern(PatternOptimization):
             I_fc2b(["fc2_b FLOAT(E, H)"])
 
             TopK_0[["TopK(., k)"]]
-            Reshape_ids[["Reshape(top_indices, (T,))"]]
+            Reshape_ids[["Reshape(top_indices, (T,)) or Reshape(top_indices, (-1,))"]]
             Reshape_w[["Reshape(top_weights, (T, 1))"]]
             Gather_fc1w[["Gather(fc1_w, flat_ids, 0)"]]
             Gather_fc1b[["Gather(fc1_b, flat_ids, 0)"]]
