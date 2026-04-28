@@ -1,11 +1,3 @@
-"""
-Numpy helper functions for the einsum decomposition.
-
-Ported from
-https://github.com/sdpython/onnx-extended/blob/main/onnx_extended/tools/einsum/einsum_impl_ext.py
-(MIT licence).
-"""
-
 from typing import Dict, List, Optional, Tuple, Union
 import numpy
 

@@ -33,7 +33,6 @@ dev = [
 docs = [
     "black",
     "matplotlib",
-    "onnx-diagnostic",
     "onnx-ir",
     "onnx-shape-inference",
     "openpyxl",

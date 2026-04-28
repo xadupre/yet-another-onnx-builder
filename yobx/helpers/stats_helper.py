@@ -244,13 +244,6 @@ def model_statistics(
     return ModelStatistics(model, verbose=verbose).compute()
 
 
-# ---------------------------------------------------------------------------
-# Tree-ensemble statistics
-# Adapted from onnx_extended.tools.stats_nodes
-# (https://github.com/sdpython/onnx-extended/blob/main/onnx_extended/tools/stats_nodes.py)
-# ---------------------------------------------------------------------------
-
-
 def extract_attributes(node: NodeProto) -> Dict[str, Any]:
     """
     Extracts all attributes of a node into a plain Python/NumPy dictionary.

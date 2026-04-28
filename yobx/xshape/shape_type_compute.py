@@ -3019,7 +3019,7 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
         "com.microsoft",
         "local_domain",
         "SimplifyingFunction",
-        "onnx_extended.ortops.optim.cuda",
+        "yaourt.ortops.fused_kernel.cuda",
     }, (
         f"Unable to find a function computing the output shape of node "
         f"{(node.domain, node.op_type)}, list of functions is "

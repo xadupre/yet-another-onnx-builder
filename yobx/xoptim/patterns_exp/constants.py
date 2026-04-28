@@ -60,7 +60,7 @@ class TriMatrixPattern(PatternOptimization):
 
             I_shape(["shape INT64(2)"])
 
-            TriMatrix_0[["onnx_extended.ortops.optim.cuda.TriMatrix(
+            TriMatrix_0[["yaourt.ortops.fused_kernel.cuda.TriMatrix(
             ., [0.0, 0.0, -3.4028235e+38])"]]
 
             I_shape -->|"INT64(2)"| TriMatrix_0
@@ -177,6 +177,6 @@ class TriMatrixPattern(PatternOptimization):
             [cst_node.input[0], cst_name],
             where_node.output,
             name=f"{self.__class__.__name__}--{where_node.name}",
-            domain="onnx_extended.ortops.optim.cuda",
+            domain="yaourt.ortops.fused_kernel.cuda",
         )
         return [new_node]

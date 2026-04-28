@@ -256,8 +256,6 @@ epkg_dictionary = {
     "onnxruntime-genai": "https://github.com/microsoft/onnxruntime-genai",
     "onnxruntime-training": "https://onnxruntime.ai/docs/get-started/training-on-device.html",
     "onnxruntime kernels": "https://onnxruntime.ai/docs/reference/operators/OperatorKernels.html",
-    "onnx-diagnostic": "https://sdpython.github.io/doc/onnx-diagnostic/dev/",
-    "onnx-extended": "https://sdpython.github.io/doc/onnx-extended/dev/",
     "onnx-script": "https://github.com/microsoft/onnxscript",
     "onnxscript": "https://github.com/microsoft/onnxscript",
     "onnxscript Tutorial": "https://microsoft.github.io/onnxscript/tutorial/index.html",
@@ -303,6 +301,7 @@ epkg_dictionary = {
     "Windows": "https://www.microsoft.com/windows",
     "xgboost": "https://xgboost.readthedocs.io/en/stable/get_started.html",
     "XGBoost": "https://xgboost.readthedocs.io/en/stable/get_started.html",
+    "yet-another-onnxruntime-extensions": "https://sdpython.github.io/doc/yet-another-onnxruntime-extensions/dev/",
 }
 
 # models

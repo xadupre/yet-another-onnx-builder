@@ -1,11 +1,3 @@
-"""
-Einsum decomposition graph node classes.
-
-Ported from
-https://github.com/sdpython/onnx-extended/blob/main/onnx_extended/tools/einsum/einsum_impl_classes.py
-(MIT licence).
-"""
-
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Union
 import numpy
 from onnx import helper, numpy_helper, ModelProto, NodeProto, TensorProto
@@ -676,7 +668,7 @@ class EinsumSubOp:
 
         * 'matmul_impl': if None calls :func:`numpy.einsum` through
           :func:`numpy_extended_dot
-          <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot>`
+          <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot>` (wrong)
           (default) or 'py' to call
           :func:`numpy_extended_dot_python
           <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot_python>`

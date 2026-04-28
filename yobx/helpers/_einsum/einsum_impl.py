@@ -1,11 +1,3 @@
-"""
-Core einsum decomposition algorithm.
-
-Ported from
-https://github.com/sdpython/onnx-extended/blob/main/onnx_extended/tools/einsum/einsum_impl.py
-(MIT licence).
-"""
-
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
 import numpy
 from .einsum_impl_classes import EinsumSubOp, GraphEinsumSubOp

@@ -1,14 +1,3 @@
-"""
-Unit tests ported from onnx-extended ``_unittests/ut_tools/test_einsum.py``
-and ``_unittests/ut_tools/test_einsum_bug.py`` (MIT licence).
-
-The tests verify the internal einsum decomposition logic that lives in
-``yobx.helpers._einsum``.  All imports that previously pointed at
-``onnx_extended.tools.einsum`` have been rewritten to use the
-self-contained sub-package, and ``CReferenceEvaluator`` calls have been
-replaced with ``onnxruntime.InferenceSession``.
-"""
-
 import io
 import itertools
 import unittest

@@ -7,12 +7,6 @@ The decomposition replaces a single ``Einsum`` node with a sequence of
 for any input shapes.  The resulting sub-graph is embedded in a
 stand-alone :class:`onnx.ModelProto` so it can be inspected, optimised,
 or stitched into a larger graph.
-
-The decomposition algorithm is implemented in the private
-:mod:`yobx.helpers._einsum` sub-package, which is a self-contained port
-of the einsum decomposition logic from
-https://github.com/sdpython/onnx-extended/tree/main/onnx_extended/tools/einsum
-(MIT licence).
 """
 
 from typing import List, Optional, Tuple, Union
