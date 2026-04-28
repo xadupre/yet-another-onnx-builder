@@ -1817,7 +1817,8 @@ def aten_binary_cross_entropy(
     eps = np.array([1e-12], dtype=dtype)
     # Clamp x to avoid log(0): log(max(x, eps)) and log(max(1-x, eps))
     log_x = g.op.Log(g.op.Clip(x, eps, name=name), name=name)
-    log_1mx = g.op.Log(g.op.Clip(g.op.Sub(np.array([1.0], dtype=dtype), x, name=name), eps, name=name), name=name)
+    one_minus_x = g.op.Sub(np.array([1.0], dtype=dtype), x, name=name)
+    log_1mx = g.op.Log(g.op.Clip(one_minus_x, eps, name=name), name=name)
     one_minus_target = g.op.Sub(np.array([1.0], dtype=dtype), target, name=name)
     term1 = g.op.Mul(target, log_x, name=name)
     term2 = g.op.Mul(one_minus_target, log_1mx, name=name)
@@ -1877,7 +1878,6 @@ def aten_binary_cross_entropy_with_logits(
         else:
             reduction = Reduction.SUM.value
     dtype = tensor_dtype_to_np_dtype(g.get_type(x))
-    zero = np.array([0.0], dtype=dtype)
     one = np.array([1.0], dtype=dtype)
     relu_x = g.op.Relu(x, name=name)
     if pos_weight is not None:
@@ -1887,12 +1887,11 @@ def aten_binary_cross_entropy_with_logits(
             g.op.Mul(g.op.Sub(pos_weight, one, name=name), target, name=name),
             name=name,
         )
+        neg_abs_x = g.op.Neg(g.op.Abs(x, name=name), name=name)
+        log_arg = g.op.Add(one, g.op.Exp(neg_abs_x, name=name), name=name)
         log_term = g.op.Mul(
             log_weight,
-            g.op.Log(
-                g.op.Add(one, g.op.Exp(g.op.Neg(g.op.Abs(x, name=name), name=name), name=name), name=name),
-                name=name,
-            ),
+            g.op.Log(log_arg, name=name),
             name=name,
         )
         loss_elem = g.op.Add(
@@ -3210,6 +3209,53 @@ def aten_cross_entropy_loss(
             g.set_shape(outputs[1], ())
 
     return res
+
+
+def aten_cross_entropy(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    target: T,
+    weight: Optional[T] = None,
+    size_average: Optional[bool] = None,
+    ignore_index: int = -100,
+    reduce: Optional[bool] = None,
+    reduction: Union[int, str] = "mean",
+    label_smoothing: float = 0.0,
+    name: str = "cross_entropy",
+) -> T:
+    """cross_entropy — wrapper for torch.nn.functional.cross_entropy.
+
+    Handles the deprecated *size_average* and *reduce* kwargs and delegates
+    to :func:`aten_cross_entropy_loss`.
+    """
+    if size_average is not None or reduce is not None:
+        _size_average = True if size_average is None else size_average
+        _reduce = True if reduce is None else reduce
+        if not _reduce:
+            reduction = Reduction.NONE.value
+        elif _size_average:
+            reduction = Reduction.MEAN.value
+        else:
+            reduction = Reduction.SUM.value
+    elif isinstance(reduction, str):
+        if reduction == "none":
+            reduction = Reduction.NONE.value
+        elif reduction == "mean":
+            reduction = Reduction.MEAN.value
+        elif reduction == "sum":
+            reduction = Reduction.SUM.value
+        else:
+            raise NotImplementedError(
+                f"cross_entropy with reduction={reduction!r} is not implemented"
+                f"{g.get_debug_msg()}"
+            )
+    return aten_cross_entropy_loss(
+        g, sts, outputs, x, target,
+        weight=weight, reduction=reduction,
+        ignore_index=ignore_index, label_smoothing=label_smoothing,
+    )
 
 
 def aten_cumsum(
@@ -8417,7 +8463,9 @@ def aten_linear(
     else:
         res = g.op.MatMul(x, weight_transposed, name="linear")
     if squeeze_output:
-        res = g.op.SqueezeAnyOpset(res, np.array([0], dtype=np.int64), name="linear", outputs=outputs)
+        res = g.op.SqueezeAnyOpset(
+            res, np.array([0], dtype=np.int64), name="linear", outputs=outputs
+        )
     else:
         res = g.op.Identity(res, name="linear", outputs=outputs)
     if not sts:
@@ -11000,7 +11048,10 @@ def aten_pairwise_distance(
     Integer inputs are promoted to float32 (matching PyTorch behaviour).
     """
     itype = g.get_type(x1)
-    is_integer = itype in (TensorProto.INT32, TensorProto.INT64, TensorProto.INT16, TensorProto.INT8, TensorProto.UINT8, TensorProto.UINT16, TensorProto.UINT32, TensorProto.UINT64)
+    is_integer = itype in (
+        TensorProto.INT32, TensorProto.INT64, TensorProto.INT16, TensorProto.INT8,
+        TensorProto.UINT8, TensorProto.UINT16, TensorProto.UINT32, TensorProto.UINT64,
+    )
     if is_integer:
         x1 = g.op.Cast(x1, to=TensorProto.FLOAT, name=name)
         x2 = g.op.Cast(x2, to=TensorProto.FLOAT, name=name)
@@ -11019,7 +11070,11 @@ def aten_pairwise_distance(
     elif p == 1.0:
         abs_diff = g.op.Abs(diff, name=name)
         res = g.op.ReduceSumAnyOpset(
-            abs_diff, np.array([-1], dtype=np.int64), keepdims=int(keepdim), name=name, outputs=outputs
+            abs_diff,
+            np.array([-1], dtype=np.int64),
+            keepdims=int(keepdim),
+            name=name,
+            outputs=outputs,
         )
     else:
         p_arr = np.array([p], dtype=dtype)
@@ -14038,7 +14093,8 @@ def aten_smooth_l1_loss(
     half = np.array([0.5], dtype=dtype)
     diff = g.op.Sub(x, target, name=name)
     abs_diff = g.op.Abs(diff, name=name)
-    quadratic = g.op.Mul(half, g.op.Div(g.op.Mul(diff, diff, name=name), beta_arr, name=name), name=name)
+    diff_sq = g.op.Mul(diff, diff, name=name)
+    quadratic = g.op.Mul(half, g.op.Div(diff_sq, beta_arr, name=name), name=name)
     linear = g.op.Sub(abs_diff, g.op.Mul(half, beta_arr, name=name), name=name)
     loss_elem = g.op.Where(
         g.op.Less(abs_diff, beta_arr, name=name),

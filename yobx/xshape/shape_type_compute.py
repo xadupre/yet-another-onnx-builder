@@ -2301,7 +2301,10 @@ def _set_shape_type_op_any_softmax_cross_entropy_loss(
         if self.has_shape(node.input[0]):
             scores_shape = self.get_shape(node.input[0])
             # Remove the class dimension (index 1); output shape is (N, d1,...,dk).
-            out_shape = (scores_shape[0], *scores_shape[2:]) if len(scores_shape) > 2 else (scores_shape[0],)
+            if len(scores_shape) > 2:
+                out_shape = (scores_shape[0], *scores_shape[2:])
+            else:
+                out_shape = (scores_shape[0],)
             self.set_shape(out0, out_shape)
         elif self.has_rank(node.input[0]):
             self.set_rank(out0, self.get_rank(node.input[0]) - 1)
