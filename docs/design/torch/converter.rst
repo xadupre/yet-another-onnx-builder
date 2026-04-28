@@ -156,6 +156,7 @@ Basic usage
 
 .. runpython::
     :showcode:
+    :process:
 
     import torch
     from yobx.torch.interpreter import to_onnx

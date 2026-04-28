@@ -1,10 +1,7 @@
 from functools import wraps
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Optional, Tuple
 import torch
 import transformers
-from ...helpers.patch_helper import PatchInfo
-
-PATCHES: List[PatchInfo] = []
 
 
 def patched__compute_dynamic_ntk_parameters(

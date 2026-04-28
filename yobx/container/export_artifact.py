@@ -388,7 +388,7 @@ class ExportReport:
         cost = bs.run_model(model, inference=InferenceMode.COST)
 
         rows = []
-        for node, (op_type, flops, _) in zip(model.graph.node, cost):
+        for node, (op_type, flops, _) in zip(model.graph.node, cost):  # type: ignore
             rows.append({"op_type": op_type, "node_name": node.name, "symbolic_flops": flops})
         self.symbolic_flops = rows
         return self

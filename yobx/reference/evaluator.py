@@ -177,7 +177,7 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         SimplifiedLayerNormalization,
         SkipLayerNormalization,
         ToComplex,
-        # onnx_extended.ortops.optim.cuda
+        # yaourt.ortops.fused_kernel.cuda
         AddAdd,
         AddMul,
         AddSharedInput,

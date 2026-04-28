@@ -1,8 +1,7 @@
 """
 Functions to compute statistics on an ONNX model such as number of nodes
 per op_type and estimation of computational cost.  Also provides classes
-and helpers for computing per-tree statistics on ``TreeEnsemble*`` operators
-(adapted from :mod:`onnx_extended.tools.stats_nodes`).
+and helpers for computing per-tree statistics on ``TreeEnsemble*`` operators.
 """
 
 import pprint
@@ -242,13 +241,6 @@ def model_statistics(
     :return: statistics dictionary — see :meth:`ModelStatistics.compute` for details
     """
     return ModelStatistics(model, verbose=verbose).compute()
-
-
-# ---------------------------------------------------------------------------
-# Tree-ensemble statistics
-# Adapted from onnx_extended.tools.stats_nodes
-# (https://github.com/sdpython/onnx-extended/blob/main/onnx_extended/tools/stats_nodes.py)
-# ---------------------------------------------------------------------------
 
 
 def extract_attributes(node: NodeProto) -> Dict[str, Any]:

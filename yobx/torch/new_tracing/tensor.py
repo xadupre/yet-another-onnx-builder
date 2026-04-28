@@ -2,8 +2,6 @@ import operator
 import traceback
 from typing import Any, Dict, List, Optional, Tuple, Union
 import torch
-import torch.fx
-import torch.utils._pytree as _pytree
 from .shape import TracingInt, TracingShape
 
 
@@ -275,6 +273,8 @@ class TracingTensor(torch.Tensor):
         Intercept every dispatched operation, create an FX graph node, and
         return a new :class:`TracingTensor` (or tuple thereof) for the result.
         """
+        import torch.utils._pytree as _pytree
+
         # Use pytree to find the tracer from any TracingTensor in the
         # (possibly nested) args.  This handles ops like ``aten.cat.default``
         # where the first argument is a *list* of tensors, not a bare tensor.

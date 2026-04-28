@@ -1,11 +1,3 @@
-"""
-Pure-Python / numpy helpers used by the einsum decomposition.
-
-Ported from
-https://github.com/sdpython/onnx-extended/blob/main/onnx_extended/tools/einsum/blas_lapack.py
-(MIT licence).
-"""
-
 import numpy
 
 

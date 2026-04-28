@@ -1391,8 +1391,6 @@ class TinyLLM(torch.nn.Module):
 
     def forward(self, input_ids, attention_mask, position_ids, past_key_0, past_value_0):
         """Performs the forward pass and returns the logits tensor."""
-        from ..in_transformers.cache_helper import make_dynamic_cache
-
         past_key_values = make_dynamic_cache([(past_key_0, past_value_0)])
         return self._model(
             input_ids=input_ids,

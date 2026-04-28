@@ -1,11 +1,3 @@
-"""
-Einsum decomposition graph node classes.
-
-Ported from
-https://github.com/sdpython/onnx-extended/blob/main/onnx_extended/tools/einsum/einsum_impl_classes.py
-(MIT licence).
-"""
-
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Union
 import numpy
 from onnx import helper, numpy_helper, ModelProto, NodeProto, TensorProto
@@ -676,10 +668,10 @@ class EinsumSubOp:
 
         * 'matmul_impl': if None calls :func:`numpy.einsum` through
           :func:`numpy_extended_dot
-          <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot>`
+          <yobx.helpers._einsum.einsum_impl_ext.numpy_extended_dot>` (wrong)
           (default) or 'py' to call
           :func:`numpy_extended_dot_python
-          <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot_python>`
+          <yobx.helpers._einsum.einsum_impl_ext.numpy_extended_dot_python>`
           instead.
         """
         if verbose:
@@ -1139,10 +1131,10 @@ class GraphEinsumSubOp:
 
     :param letters: list of distinct letters
     :param mat: matrix, see :func:`analyse_einsum_equation
-        <onnx_extended.tools.einsum.einsum_impl.analyse_einsum_equation>`
+        <yobx.helpers._einsum.einsum_impl.analyse_einsum_equation>`
     :param lengths: lengths of every input
     :param duplicates: see :func:`analyse_einsum_equation
-        <onnx_extended.tools.einsum.einsum_impl.analyse_einsum_equation>`
+        <yobx.helpers._einsum.einsum_impl.analyse_einsum_equation>`
     """
 
     def __init__(
@@ -1167,7 +1159,7 @@ class GraphEinsumSubOp:
         Adds one input or result.
 
         :param op: integer (an input) or an instance of :class:`EinsumSubOp
-            <onnx_extended.tools.einsum.einsum_impl_classes.EinsumSubOp>`.
+            <yobx.helpers._einsum.einsum_impl_classes.EinsumSubOp>`.
         :return: op or None if op is an integer
         """
         if isinstance(op, int):
@@ -1199,7 +1191,7 @@ class GraphEinsumSubOp:
 
         :param i: a position
         :param op: an instance of :class:`EinsumSubOp
-            <onnx_extended.tools.einsum.einsum_impl_classes.EinsumSubOp>`.
+            <yobx.helpers._einsum.einsum_impl_classes.EinsumSubOp>`.
         """
         assert isinstance(i, int), f"i must an integer not {type(i)!r}."
         if i != -1 and i not in self._inputs:
@@ -1306,7 +1298,7 @@ class GraphEinsumSubOp:
         :param verbose: prints out intermediate results
         :param kwargs: additional parameters,
             see :meth:`apply
-            <onnx_extended.tools.einsum.einsum_impl_classes.EinsumSubOp.apply>`.
+            <yobx.helpers._einsum.einsum_impl_classes.EinsumSubOp.apply>`.
         :return: output
         """
         if verbose:
@@ -1647,7 +1639,7 @@ class GraphEinsumSubOp:
         model = helper.make_model(
             opset_imports=[helper.make_operatorsetid("", opset)],
             ir_version=kwargs.get("ir_version", 8),
-            producer_name=kwargs.get("producer_name", "onnx_extended"),
+            producer_name=kwargs.get("producer_name", "yobx"),
             producer_version=kwargs.get("producer_version", "0.0.dev"),
             graph=helper.make_graph(
                 name=str(graph_name),

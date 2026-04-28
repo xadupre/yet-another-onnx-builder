@@ -49,7 +49,7 @@ Patterns specific to ai.onnx.ml
 Experimental Patterns
 =====================
 
-This works on CUDA with :epkg:`onnx-extended`.
+This works on CUDA with :epkg:`yet-another-onnxruntime-extensions`.
 
 .. runpython::
     :showcode:

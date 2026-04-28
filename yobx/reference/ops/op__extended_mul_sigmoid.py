@@ -9,7 +9,7 @@ def sigmoid(x):  # type: ignore
 
 
 class MulSigmoid(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def __init__(self, onnx_node, run_params):  # type: ignore
         OpRun.__init__(self, onnx_node, run_params)

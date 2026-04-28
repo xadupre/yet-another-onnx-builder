@@ -686,8 +686,7 @@ def get_parser_validate() -> ArgumentParser:
         prog="validate",
         description=textwrap.dedent("""
             Validates an ONNX export for a HuggingFace model.
-            Unlike onnx_diagnostic validate which uses random/dummy inputs,
-            this command captures real inputs by running the model on a default
+            This command captures real inputs by running the model on a default
             text prompt with InputObserver, then exports to ONNX and checks
             discrepancies.
             """),

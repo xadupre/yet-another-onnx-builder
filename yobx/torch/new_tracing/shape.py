@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Union
 import itertools
-from ...xexpressions import simplify_expression
 import torch
+from ...xexpressions import simplify_expression
 
 # ---------------------------------------------------------------------------
 # Registry of conditions known to be True (populated by _handle_check during

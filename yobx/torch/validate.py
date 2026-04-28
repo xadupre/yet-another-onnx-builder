@@ -1,9 +1,7 @@
 """
 Validates an ONNX export for a HuggingFace model using
 :class:`InputObserver <yobx.torch.InputObserver>` and a default text prompt.
-
-Unlike :func:`onnx_diagnostic.torch_models.validate.validate_model`, which uses
-random/dummy tensors as inputs, this module captures real model inputs by running the
+This module captures real model inputs by running the
 model on a default prompt through an :class:`InputObserver`.  The observed inputs and
 inferred dynamic shapes are then used for the ONNX export.
 """

@@ -362,7 +362,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                 return g.op.Mul(X, g.op.Mul(Y, g.op.Sigmoid(Y)))
 
             def apply_pattern(self, g: GraphBuilderExtendedProtocol, X, Y):
-                return g.anyop.MulMulSigmoid(X, Y, domain="onnx_extended.ortops.optim.cuda")
+                return g.anyop.MulMulSigmoid(X, Y, domain="yaourt.ortops.fused_kernel.cuda")
 
             def validate_mapping(
                 self,
@@ -571,7 +571,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                 return g.op.Concat(g.op.Neg(x2), x1, axis=-1)
 
             def apply_pattern(self, g: GraphBuilderExtendedProtocol, x):
-                return g.op.Rotary(x, side="right", domain="onnx_extended.ortops.optim.cuda")
+                return g.op.Rotary(x, side="right", domain="yaourt.ortops.fused_kernel.cuda")
 
             def validate_mapping(
                 self,
@@ -594,7 +594,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                 return g.op.Concat(x2, g.op.Neg(x1), axis=-1)
 
             def apply_pattern(self, g: GraphBuilderExtendedProtocol, x):
-                return g.op.Rotary(x, side="left", domain="onnx_extended.ortops.optim.cuda")
+                return g.op.Rotary(x, side="left", domain="yaourt.ortops.fused_kernel.cuda")
 
         class Rotary3(EasyPatternOptimization):
             def match_pattern(self, g: GraphBuilderExtendedProtocol, x, splits):
@@ -626,7 +626,7 @@ class TestGraphPatternBuilder(ExtTestCase):
 
             def apply_pattern(self, g: GraphBuilderExtendedProtocol, x, splits):
                 return g.op.Rotary(
-                    x, splits, side="right", domain="onnx_extended.ortops.optim.cuda"
+                    x, splits, side="right", domain="yaourt.ortops.fused_kernel.cuda"
                 )
 
         class Rotary4(Rotary3):
@@ -636,7 +636,7 @@ class TestGraphPatternBuilder(ExtTestCase):
 
             def apply_pattern(self, g: GraphBuilderExtendedProtocol, x, splits):
                 return g.op.Rotary(
-                    x, splits, side="left", domain="onnx_extended.ortops.optim.cuda"
+                    x, splits, side="left", domain="yaourt.ortops.fused_kernel.cuda"
                 )
 
         verbose = 0
@@ -666,8 +666,8 @@ class TestGraphPatternBuilder(ExtTestCase):
 
                 check_model(opt_onx)
                 opsets = {v.domain: v.version for v in opt_onx.opset_import}
-                self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-                self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+                self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+                self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
                 ref2 = ExtendedReferenceEvaluator(opt_onx)
                 got = ref2.run(None, feeds)
@@ -758,7 +758,7 @@ class TestGraphPatternBuilder(ExtTestCase):
 
             def apply_pattern(self, g: GraphBuilderExtendedProtocol, x, y, z):
                 return g.op.AddSharedInput(
-                    x, y, z, domain="onnx_extended.ortops.optim.cuda", outputs=2
+                    x, y, z, domain="yaourt.ortops.fused_kernel.cuda", outputs=2
                 )
 
         class AddSharedInput2(_CombineBinary):
@@ -767,7 +767,7 @@ class TestGraphPatternBuilder(ExtTestCase):
 
             def apply_pattern(self, g: GraphBuilderExtendedProtocol, x, y, z):
                 return g.op.AddSharedInput(
-                    x, y, z, domain="onnx_extended.ortops.optim.cuda", outputs=2
+                    x, y, z, domain="yaourt.ortops.fused_kernel.cuda", outputs=2
                 )
 
         class MulSharedInput1(_CombineBinary):
@@ -776,7 +776,7 @@ class TestGraphPatternBuilder(ExtTestCase):
 
             def apply_pattern(self, g: GraphBuilderExtendedProtocol, x, y, z):
                 return g.op.MulSharedInput(
-                    x, y, z, domain="onnx_extended.ortops.optim.cuda", outputs=2
+                    x, y, z, domain="yaourt.ortops.fused_kernel.cuda", outputs=2
                 )
 
         class MulSharedInput2(_CombineBinary):
@@ -785,7 +785,7 @@ class TestGraphPatternBuilder(ExtTestCase):
 
             def apply_pattern(self, g: GraphBuilderExtendedProtocol, x, y, z):
                 return g.op.MulSharedInput(
-                    x, y, z, domain="onnx_extended.ortops.optim.cuda", outputs=2
+                    x, y, z, domain="yaourt.ortops.fused_kernel.cuda", outputs=2
                 )
 
         verbose = 0
@@ -812,8 +812,8 @@ class TestGraphPatternBuilder(ExtTestCase):
                     [f"{op_type}SharedInput"], [_.op_type for _ in opt_onx.graph.node]
                 )
                 opsets = {v.domain: v.version for v in opt_onx.opset_import}
-                self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-                self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+                self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+                self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
                 feeds = {
                     "X": np.array([10, 11], dtype=np.float32),

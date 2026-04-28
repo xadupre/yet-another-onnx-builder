@@ -1,11 +1,3 @@
-"""
-Numpy helper functions for the einsum decomposition.
-
-Ported from
-https://github.com/sdpython/onnx-extended/blob/main/onnx_extended/tools/einsum/einsum_impl_ext.py
-(MIT licence).
-"""
-
 from typing import Dict, List, Optional, Tuple, Union
 import numpy
 
@@ -23,7 +15,7 @@ def numpy_diagonal(m: numpy.ndarray, axis: int, axes: Tuple[int, ...]) -> numpy.
         :showcode:
 
         import numpy
-        from onnx_extended.tools.einsum import numpy_diagonal
+        from yobx.helpers._einsum import numpy_diagonal
 
         mat = numpy.arange(8).reshape((2, 2, 2))
         print(mat)
@@ -66,7 +58,7 @@ def _numpy_extended_dot_equation(
     Returns the equation equivalent to an extended version
     of an aligned matrix multiplication
     (see :func:`numpy_extended_dot
-    <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot>`).
+    <yobx.helpers._einsum.einsum_impl_ext.numpy_extended_dot>`).
 
     :param m1: number of dimensions of the first matrix
     :param m2: number of dimensions of the second matrix
@@ -78,7 +70,7 @@ def _numpy_extended_dot_equation(
         :showcode:
 
         import numpy
-        from onnx_extended.tools.einsum.einsum_impl_ext import (
+        from yobx.helpers._einsum.einsum_impl_ext import (
             numpy_extended_dot_python, _numpy_extended_dot_equation)
 
         a = numpy.arange(6).reshape((3, 2, 1))
@@ -155,7 +147,7 @@ def _common_check_numpy_extended_dot(
     """
     Common verifications for all implementations of
     :func:`numpy_extended_dot
-     <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot>`.
+     <yobx.helpers._einsum.einsum_impl_ext.numpy_extended_dot>`.
     """
     assert (
         m1.dtype == m2.dtype
@@ -207,7 +199,7 @@ def numpy_extended_dot(
         :showcode:
 
         import numpy
-        from onnx_extended.tools.einsum import numpy_extended_dot
+        from yobx.helpers._einsum import numpy_extended_dot
 
         m1 = numpy.arange(4).reshape((2, 2))
         m2 = m1 + 10
@@ -228,7 +220,7 @@ def numpy_extended_dot(
         :showcode:
 
         import numpy
-        from onnx_extended.tools.einsum import numpy_extended_dot
+        from yobx.helpers._einsum import numpy_extended_dot
 
         m1 = numpy.arange(4).reshape((2, 2))
         m2 = m1 + 10
@@ -248,7 +240,7 @@ def numpy_extended_dot(
         :showcode:
 
         import numpy
-        from onnx_extended.tools.einsum import numpy_extended_dot
+        from yobx.helpers._einsum import numpy_extended_dot
 
         m1 = numpy.arange(4).reshape((2, 2))
         m2 = m1 + 10
@@ -264,7 +256,7 @@ def numpy_extended_dot(
         :showcode:
 
         import numpy
-        from onnx_extended.tools.einsum import numpy_extended_dot
+        from yobx.helpers._einsum import numpy_extended_dot
 
         m1 = numpy.arange(8).reshape((2, 2, 2))
         m2 = m1 + 10
@@ -299,9 +291,9 @@ def numpy_extended_dot_output_shape(
     """
     Computes the output shape of results produced by function
     :func:`numpy_extended_dot
-    <onnx_extended.tools.einsum_impl_ext.numpy_extended_dot>` or
+    <yobx.helpers._einsum_impl_ext.numpy_extended_dot>` or
     :func:`numpy_extended_dot_python
-    <onnx_extended.tools.einsum_impl_ext.numpy_extended_dot_python>`.
+    <yobx.helpers._einsum_impl_ext.numpy_extended_dot_python>`.
     """
     _common_check_numpy_extended_dot(m1, m2, axes, left, right)
     m1_dim = len(m1.shape)
@@ -469,7 +461,7 @@ def numpy_extended_dot_python(
 ) -> numpy.ndarray:
     """
     Implementation of :func:`numpy_extended_dot
-    <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot>`
+    <yobx.helpers._einsum.einsum_impl_ext.numpy_extended_dot>`
     in pure python. This implementation is not efficient
     but shows how to implement this operation without :func:`numpy.einsum`.
 
@@ -477,8 +469,8 @@ def numpy_extended_dot_python(
         :showcode:
 
         import numpy
-        from onnx_extended.tools.einsum import numpy_extended_dot_python
-        from onnx_extended.tools.einsum.einsum_impl_ext import (
+        from yobx.helpers._einsum import numpy_extended_dot_python
+        from yobx.helpers._einsum.einsum_impl_ext import (
             _numpy_extended_dot_equation)
 
         a = numpy.arange(6).reshape((3, 2, 1))
@@ -599,18 +591,18 @@ def numpy_extended_dot_matrix(
 ) -> numpy.ndarray:
     """
     Implementation of :func:`numpy_extended_dot
-    <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot>`
+    <yobx.helpers._einsum.einsum_impl_ext.numpy_extended_dot>`
     using dot product, multiplication, transpose and reduction
     but not a custom python implementation like
     :func:`numpy_extended_dot_python
-    <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot_python>`.
+    <yobx.helpers._einsum.einsum_impl_ext.numpy_extended_dot_python>`.
 
     .. runpython::
         :showcode:
 
         import numpy
-        from onnx_extended.tools.einsum import numpy_extended_dot_matrix
-        from onnx_extended.tools.einsum.einsum_impl_ext import (
+        from yobx.helpers._einsum import numpy_extended_dot_matrix
+        from yobx.helpers._einsum.einsum_impl_ext import (
             _numpy_extended_dot_equation)
 
         a = numpy.arange(6).reshape((3, 2, 1))
