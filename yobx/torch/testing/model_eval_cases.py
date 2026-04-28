@@ -126,6 +126,8 @@ def _flatten_inputs(x: Any) -> List["torch.Tensor"]:  # noqa: F821
                 i, (torch.Tensor, torch.SymInt, torch.SymFloat, int, float, TracingInt)
             ):
                 res.append(i)
+            elif i.__class__.__name__ == "DynamicCache":
+                res.append(i)
             else:
                 res.extend(_flatten_inputs(i))
         return tuple(res) if isinstance(x, tuple) else res
