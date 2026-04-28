@@ -2288,6 +2288,53 @@ def _set_shape_type_op_any_loop(self: ShapeBuilder, node: NodeProto):
     return True
 
 
+def _set_shape_type_op_any_softmax_cross_entropy_loss(
+    self: "ShapeBuilder", node: NodeProto
+) -> bool:
+    """Sets shape/type for SoftmaxCrossEntropyLoss.
+
+    Output 0 shape depends on the ``reduction`` attribute:
+
+    * ``"none"``: batch shape = input[0] shape without the class dimension (dim 1),
+      i.e. ``(N,)`` for 2-D input or ``(N, d1, ..., dk)`` for higher-rank input.
+    * ``"mean"`` / ``"sum"``: scalar ``()``.
+
+    Output 1 (log_prob, optional): same shape as input[0].
+    """
+    if not node.input or not self.has_type(node.input[0]):
+        return False
+    itype = self.get_type(node.input[0])
+    reduction_attr = self.get_attribute(node, "reduction", exc=False)
+    reduction = reduction_attr.s.decode() if reduction_attr is not None else "mean"
+
+    # Output 0
+    out0 = node.output[0]
+    self.set_type(out0, itype)
+    if reduction == "none":
+        if self.has_shape(node.input[0]):
+            scores_shape = self.get_shape(node.input[0])
+            # Remove the class dimension (index 1); output shape is (N, d1,...,dk).
+            if len(scores_shape) > 2:
+                out_shape = (scores_shape[0], *scores_shape[2:])
+            else:
+                out_shape = (scores_shape[0],)
+            self.set_shape(out0, out_shape)
+        elif self.has_rank(node.input[0]):
+            self.set_rank(out0, self.get_rank(node.input[0]) - 1)
+    else:
+        self.set_shape(out0, ())
+
+    # Output 1 (log_prob) — optional
+    if len(node.output) > 1 and node.output[1]:
+        out1 = node.output[1]
+        self.set_type(out1, itype)
+        if self.has_shape(node.input[0]):
+            self.set_shape(out1, self.get_shape(node.input[0]))
+        elif self.has_rank(node.input[0]):
+            self.set_rank(out1, self.get_rank(node.input[0]))
+    return True
+
+
 _set_shape_type_op_any_known = {
     "ArgMax": _set_shape_type_op_any_arg_max_min,
     "ArgMin": _set_shape_type_op_any_arg_max_min,
@@ -2350,6 +2397,7 @@ _set_shape_type_op_any_known = {
     "Size": _set_shape_type_op_any_size,
     "Slice": _set_shape_type_op_any_slice,
     "Softmax": _set_shape_type_op_any_unary,
+    "SoftmaxCrossEntropyLoss": _set_shape_type_op_any_softmax_cross_entropy_loss,
     "Swish": _set_shape_type_op_any_unary,
     "SpaceToDepth": _set_shape_type_op_any_space_to_depth,
     "Split": _set_shape_type_op_any_split,
