@@ -4492,27 +4492,16 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         )
 
     def _moe_check_ort(self, model: "ModelProto", opt_onx: "ModelProto", feeds: dict) -> None:
-        """Runs pre- and post-fusion models with OnnxRuntime and compares outputs.
+        """Runs pre- and post-fusion models with OnnxRuntime and compares outputs."""
+        from onnxruntime import InferenceSession
 
-        Silently skips the comparison when OnnxRuntime is not installed or when
-        the installed build does not support ``com.microsoft.MoE``.
-        """
-        try:
-            from onnxruntime import InferenceSession
-            from onnxruntime.capi.onnxruntime_pybind11_state import Fail, InvalidGraph
-        except ImportError:
-            return
         ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         expected = ref.run(None, feeds)
-        try:
-            opt_ref = InferenceSession(
-                opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
-            )
-            got = opt_ref.run(None, feeds)
-            self.assertEqualArray(expected[0], got[0], atol=1e-5)
-        except (Fail, InvalidGraph):
-            # com.microsoft.MoE may not be available in this ORT build; skip.
-            pass
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
 
     def test_moe_pattern_in_list(self):
         """MoEPattern must appear in the default ORT pattern list."""
