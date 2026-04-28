@@ -184,8 +184,8 @@ def apply_einsum_sequence(
         :showcode:
 
         import numpy
-        from yobx.helpers._einsum import (
-            decompose_einsum_equation, apply_einsum_sequence)
+        from yobx.helpers._einsum import decompose_einsum_equation
+        from yobx.helpers._einsum.einsum_impl import apply_einsum_sequence
 
         m1 = numpy.arange(2 * 2 * 2).reshape((2, 2, 2)) + 10
         m2 = numpy.arange(4).reshape((2, 2)) + 100

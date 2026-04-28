@@ -12,8 +12,8 @@ or stitched into a larger graph.
 from typing import List, Optional, Tuple, Union
 import numpy as np
 import onnx
-from ._einsum import decompose_einsum_equation as _decompose_einsum_equation
-from .onnx_helper import np_dtype_to_tensor_dtype as _np_dtype_to_tensor_dtype
+from ._einsum import decompose_einsum_equation
+from .onnx_helper import np_dtype_to_tensor_dtype
 
 
 def decompose_einsum(
@@ -105,7 +105,7 @@ def decompose_einsum(
         else ()
     )
 
-    graph = _decompose_einsum_equation(
+    graph = decompose_einsum_equation(
         equation, *concrete_shapes, strategy=strategy, clean=clean, verbose=verbose
     )
 
@@ -117,7 +117,7 @@ def decompose_einsum(
     # them to to_onnx via the (name, (elem_type, shape)) tuple format so that
     # the produced value_info carries the correct shape information.
     if input_shapes:
-        proto = _np_dtype_to_tensor_dtype(np.dtype(dtype))
+        proto = np_dtype_to_tensor_dtype(np.dtype(dtype))
         shaped_inputs = [(name, (proto, list(sh))) for name, sh in zip(input_names, input_shapes)]
         model: onnx.ModelProto = graph.to_onnx(
             "Z", *shaped_inputs, dtype=dtype, verbose=verbose, **kwargs
