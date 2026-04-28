@@ -756,22 +756,6 @@ def requires_statsmodels(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
-def requires_onnx_diagnostic(version: str = "", msg: str = "") -> Callable:
-    """Skips a unit test if :epkg:`onnx-diagnostic` is not recent enough."""
-    try:
-        import onnx_diagnostic
-    except ImportError:
-        return unittest.skip(msg or "onnx_diagnostic not installed")
-
-    if not version:
-        return lambda x: x
-
-    if PvVersion(onnx_diagnostic.__version__) < PvVersion(version):
-        msg = f"onnx_diagnostic version {onnx_diagnostic.__version__} < {version}: {msg}"
-        return unittest.skip(msg)
-    return lambda x: x
-
-
 def requires_matplotlib(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`pytorch` is not recent enough."""
     try:

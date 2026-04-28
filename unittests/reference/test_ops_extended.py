@@ -5,7 +5,7 @@ import onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
 
-DOMAIN = "onnx_extended.ortops.optim.cuda"
+DOMAIN = "yaourt.ortops.fused_kernel.cuda"
 TFLOAT = onnx.TensorProto.FLOAT
 TFLOAT16 = onnx.TensorProto.FLOAT16
 TINT64 = onnx.TensorProto.INT64

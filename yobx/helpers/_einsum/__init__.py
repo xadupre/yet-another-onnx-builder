@@ -1,11 +1,6 @@
 """
 Internal einsum decomposition utilities.
 
-This package is a self-contained port of the einsum decomposition logic
-originally developed in:
-https://github.com/sdpython/onnx-extended/tree/main/onnx_extended/tools/einsum
-(MIT licence).
-
 Public entry points (used by :func:`yobx.helpers.einsum_helper.decompose_einsum`):
 
 * :func:`decompose_einsum_equation` — decomposes an equation into a

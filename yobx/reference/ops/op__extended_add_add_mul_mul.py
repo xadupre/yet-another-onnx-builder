@@ -3,21 +3,21 @@ from onnx.reference.op_run import OpRun
 
 
 class AddAdd(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z):
         return (x + y + z,)
 
 
 class MulMul(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z):
         return (x * y * z,)
 
 
 class AddMul(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z, transposeMiddle=None):
         res = (x + y) * z
@@ -27,7 +27,7 @@ class AddMul(OpRun):
 
 
 class MulAdd(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z, transposeMiddle=None):
         res = (x * y) + z
@@ -37,7 +37,7 @@ class MulAdd(OpRun):
 
 
 class SubMul(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z, negative=None):
         if negative:
@@ -46,7 +46,7 @@ class SubMul(OpRun):
 
 
 class MulSub(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z, negative=None):
         if negative:
@@ -55,14 +55,14 @@ class MulSub(OpRun):
 
 
 class AddSharedInput(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z):
         return (x + y, x + z)
 
 
 class MulSharedInput(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z):
         return (x * y, x * z)

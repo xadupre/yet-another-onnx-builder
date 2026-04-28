@@ -6,9 +6,6 @@ import textwrap
 import types
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
 import torch
-import torch.utils._pytree as pytree
-from torch.fx import Node
-from torch.fx.proxy import TracerBase
 from ..helpers import flatten_object, string_type
 from .fake_tensor_helper import make_fake_with_dynamic_dimensions
 from .torch_helper import torch_deepcopy
@@ -88,7 +85,9 @@ class CustomProxy(torch.fx.proxy.Proxy):
     Works with :class:`CustomTracer`.
     """
 
-    def __init__(self, node: Node, tracer: Optional["TracerBase"] = None):
+    def __init__(
+        self, node: "torch.fx.Node", tracer: Optional["torch.fx.TracerBase"] = None
+    ):  # noqa: F821
         super().__init__(node, tracer=tracer)
         assert isinstance(
             self.tracer, CustomTracer
@@ -498,8 +497,8 @@ class CustomProxyInt(CustomProxy):
 
     def __init__(
         self,
-        node: Node,
-        tracer: Optional["TracerBase"] = None,
+        node: "torch.fx.Node",  # noqa: F821
+        tracer: Optional["torch.fx.TracerBase"] = None,
         concrete_val: Any = _MISSING,
         only_positive: bool = False,
         can_be_null: bool = True,
@@ -595,7 +594,7 @@ class CustomAttribute(CustomProxy):
         self.root = root
         self.attr = attr
         self.tracer = root.tracer
-        self._node: Optional[Node] = None
+        self._node: Optional["torch.fx.Node"] = None  # noqa: F821
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.attr})"
@@ -631,7 +630,10 @@ class CustomProxyShape(CustomProxy):
     """
 
     def __init__(
-        self, node: Node, tracer: Optional["TracerBase"] = None, concrete_val: Any = _MISSING
+        self,
+        node: "torch.fx.Node",  # noqa: F821
+        tracer: Optional["torch.fx.TracerBase"] = None,  # noqa: F821
+        concrete_val: Any = _MISSING,
     ):
         super().__init__(node, tracer=tracer)
         self.values = concrete_val
@@ -734,7 +736,9 @@ class CustomParameterProxy(CustomProxy):
     so that conditional tests on these attributes will not throw exception during tracing.
     """
 
-    def __init__(self, tracer: TracerBase, node: Node, name, param):
+    def __init__(
+        self, tracer: "torch.fx.TracerBase", node: "torch.fx.Node", name, param
+    ):  # noqa: F821
         super().__init__(node, tracer)
         assert isinstance(param, torch.nn.Parameter)
         self.param = param
@@ -764,7 +768,9 @@ class CustomParameterProxy(CustomProxy):
         return self.param.nelement()
 
 
-def tree_unflatten_with_proxy(tree_spec: pytree.PyTree, leaves: Iterable[Any]) -> Any:
+def tree_unflatten_with_proxy(
+    tree_spec: "pytree.PyTree", leaves: Iterable[Any]  # noqa: F821
+) -> Any:
     """
     More robust implementation of ``pytree.tree_unflatten``
     supporting ``DynamicCache``.
@@ -778,6 +784,8 @@ def tree_unflatten_with_proxy(tree_spec: pytree.PyTree, leaves: Iterable[Any]) -
     )
     if tree_spec.is_leaf():
         return leaves[0]
+
+    import torch.utils._pytree as pytree
 
     unflatten_fn = pytree.SUPPORTED_NODES[tree_spec.type].unflatten_fn
 
@@ -1243,6 +1251,8 @@ class CustomTracer(torch.fx.Tracer):
 
     @classmethod
     def make_wrapped_model(cls, root, concrete_args):
+        import torch.utils._pytree as pytree
+
         flat_concrete_args, spec = pytree.tree_flatten(concrete_args)
         args_names = cls.make_args_names(concrete_args, flat_concrete_args)
 
@@ -1338,6 +1348,8 @@ class CustomTracer(torch.fx.Tracer):
         If the model had to be wrapped before being traced, attribute ``traced_model``
         is added to the tracer.
         """
+        import torch.utils._pytree as pytree
+
         assert concrete_args is None or isinstance(
             concrete_args, dict
         ), f"Unexpected type for concrete_args: {string_type(concrete_args)}"

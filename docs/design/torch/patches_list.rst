@@ -10,15 +10,16 @@ torch
 .. runpython::
     :rst:
     :showcode:
+    :process:
 
     import textwrap
     from yobx.torch import apply_patches_for_model
-    from yobx.torch.in_torch.patches import PATCHES
+    from yobx.torch.in_torch.patches import get_patches
 
     with apply_patches_for_model(patch_torch=True):
         link = []
         rows = []
-        for i, patch in enumerate(PATCHES):
+        for i, patch in enumerate(get_patches()):
             name = f"patch-torch-{i+1}"
             link.append(f"* :ref:`{name}`")
             rows.extend([
@@ -41,10 +42,10 @@ transformers
 .. runpython::
     :rst:
     :showcode:
+    :process:
 
     import textwrap
     from yobx.torch import apply_patches_for_model
-    from yobx.torch.in_torch.patches import PATCHES
 
     with apply_patches_for_model(patch_transformers=True) as details:
         link = []

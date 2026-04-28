@@ -1,16 +1,8 @@
 import inspect
+from functools import reduce
 from typing import Any, List, Sequence
-import sympy
 import torch
-import torch._export.non_strict_utils
-import torch._refs
-import torch._subclasses.fake_impls
-import torch.export._trace
-import torch.fx.experimental.symbolic_shapes as fx_symbolic_shapes
-from torch._subclasses.fake_tensor import FakeTensorMode
 from ...helpers.patch_helper import PatchInfo
-
-PATCHES: List[PatchInfo] = []
 
 
 class patched_DynamicDimConstraintPrinter:
@@ -20,24 +12,15 @@ class patched_DynamicDimConstraintPrinter:
     Valid for ``torch>=2.10``.
     """
 
-    __CLASS__ = fx_symbolic_shapes.DynamicDimConstraintPrinter
     __METHODS__ = ["_print_Symbol"]
 
-    def _print_Symbol(self, expr: sympy.Symbol) -> str:
+    def _print_Symbol(self, expr: "sympy.Symbol") -> str:  # type: ignore # noqa: F821
+        import sympy
+
         assert isinstance(expr, sympy.Symbol), str(type(expr))
         if self.symbol_to_source.get(expr):  # type: ignore
             return self.symbol_to_source[expr][0].name  # type: ignore
         return str(expr)
-
-
-PATCHES.append(
-    PatchInfo.make(
-        patched_DynamicDimConstraintPrinter._print_Symbol,
-        fx_symbolic_shapes.DynamicDimConstraintPrinter,
-        "_print_Symbol",
-        family="torch",
-    )
-)
 
 
 def patched_infer_size(a, b):
@@ -46,6 +29,8 @@ def patched_infer_size(a, b):
     This patch is needed to export
     :class:`yobx.torch.tiny_models.TinyBroadcastAddModel`.
     """
+    import torch.fx.experimental.symbolic_shapes as _sym_shapes
+
     dimsA = len(a)
     dimsB = len(b)
     ndim = max(dimsA, dimsB)
@@ -69,28 +54,23 @@ def patched_infer_size(a, b):
         # were not the case, we'd need to write this using torch.sym_or() or
         # something like that).
         try:
-            b1 = fx_symbolic_shapes.guard_or_false(sizeA == 1)
-        except fx_symbolic_shapes.GuardOnDataDependentSymNode:
+            b1 = _sym_shapes.guard_or_false(sizeA == 1)
+        except _sym_shapes.GuardOnDataDependentSymNode:
             b1 = False
         try:
-            b2 = fx_symbolic_shapes.guard_or_false(sizeB == 1)
-        except fx_symbolic_shapes.GuardOnDataDependentSymNode:
+            b2 = _sym_shapes.guard_or_false(sizeB == 1)
+        except _sym_shapes.GuardOnDataDependentSymNode:
             b2 = False
         try:
-            b3 = fx_symbolic_shapes.guard_or_false(sizeA == sizeB)
-        except fx_symbolic_shapes.GuardOnDataDependentSymNode:
+            b3 = _sym_shapes.guard_or_false(sizeA == sizeB)
+        except _sym_shapes.GuardOnDataDependentSymNode:
             b3 = False
         if b1 or b2 or b3:
-            expandedSizes[i] = sizeB if fx_symbolic_shapes.guard_or_false(sizeA == 1) else sizeA
+            expandedSizes[i] = sizeB if _sym_shapes.guard_or_false(sizeA == 1) else sizeA
         else:
             # PATCHED: generic case, the dimension is known, no need to assert
             expandedSizes[i] = torch.sym_max(sizeA, sizeB)  # type: ignore
     return tuple(expandedSizes)
-
-
-PATCHES.append(
-    PatchInfo.make(patched_infer_size, torch._subclasses.fake_impls, "infer_size", family="torch")
-)
 
 
 def patched__broadcast_shapes(*_shapes):
@@ -99,7 +79,8 @@ def patched__broadcast_shapes(*_shapes):
     This patch is needed to export
     :class:`yobx.torch.tiny_models.TinyBroadcastAddModel`.
     """
-    from functools import reduce
+    import torch.fx.experimental.symbolic_shapes as _sym_shapes
+
     from torch._prims_common import IntLike
 
     shapes = tuple(
@@ -122,23 +103,23 @@ def patched__broadcast_shapes(*_shapes):
     common_shape = [1] * reduce(max, (len(shape) for shape in shapes))
     for _arg_idx, shape in enumerate(shapes):
         for idx in range(-1, -1 - len(shape), -1):
-            if fx_symbolic_shapes.is_nested_int(shape[idx]):
+            if _sym_shapes.is_nested_int(shape[idx]):
                 # Broadcasting is allowed for (j0, 1) or (j0, j0);
                 # not (j0, j1), (j0, 5), etc.
-                if fx_symbolic_shapes.is_nested_int(
-                    common_shape[idx]
-                ) and fx_symbolic_shapes.guard_or_false(shape[idx] == common_shape[idx]):
+                if _sym_shapes.is_nested_int(common_shape[idx]) and _sym_shapes.guard_or_false(
+                    shape[idx] == common_shape[idx]
+                ):
                     continue
             else:
-                if fx_symbolic_shapes.guard_or_false(shape[idx] == common_shape[idx]):
+                if _sym_shapes.guard_or_false(shape[idx] == common_shape[idx]):
                     continue
             # PATCHED: two cases, if == for sure, no broadcast,
             # otherwise maybe broadcast with max(dimensions)
-            if fx_symbolic_shapes.guard_or_false(common_shape[idx] != 1):
+            if _sym_shapes.guard_or_false(common_shape[idx] != 1):
                 pass
-            elif fx_symbolic_shapes.guard_or_false(
-                common_shape[idx] == 1
-            ) or fx_symbolic_shapes.guard_or_false(shape[idx] != 1):
+            elif _sym_shapes.guard_or_false(common_shape[idx] == 1) or _sym_shapes.guard_or_false(
+                shape[idx] != 1
+            ):
                 if shape[idx] < 0:
                     raise ValueError("Attempting to broadcast a dimension with negative length!")
                 common_shape[idx] = shape[idx]  # type: ignore
@@ -146,11 +127,6 @@ def patched__broadcast_shapes(*_shapes):
                 common_shape[idx] = torch.sym_max(common_shape[idx], shape[idx])  # type: ignore
 
     return common_shape
-
-
-PATCHES.append(
-    PatchInfo.make(patched__broadcast_shapes, torch._refs, "_broadcast_shapes", family="torch")
-)
 
 
 def _combine_args(f, args, kwargs, preserve_order: bool = False) -> dict[str, Any]:
@@ -214,7 +190,7 @@ def _combine_args(f, args, kwargs, preserve_order: bool = False) -> dict[str, An
 
 def patched__get_range_constraints(
     mod: torch.nn.Module,
-    export_artifact: torch.export._trace.ExportArtifact,
+    export_artifact: "torch.export._trace.ExportArtifact",  # noqa: F821
     args,
     kwargs,
     dynamic_shapes,
@@ -227,7 +203,7 @@ def patched__get_range_constraints(
     export_graph_signature: torch.export.graph_signature.ExportGraphSignature = (
         export_artifact.aten.sig
     )
-    fake_mode: FakeTensorMode = export_artifact.fake_mode
+    fake_mode: "FakeTensorMode" = export_artifact.fake_mode  # type: ignore # noqa: F821
     num_lifted = next(
         (
             i
@@ -248,16 +224,6 @@ def patched__get_range_constraints(
         fake_mode, gm, combined_args, dynamic_shapes, num_lifted
     )
     return range_constraints
-
-
-PATCHES.append(
-    PatchInfo.make(
-        patched__get_range_constraints,
-        torch.export._trace,
-        "_get_range_constraints",
-        family="torch",
-    )
-)
 
 
 def patched__maybe_broadcast(*args, preserve_cpu_scalar_tensors=True):
@@ -325,6 +291,30 @@ def patched__maybe_broadcast(*args, preserve_cpu_scalar_tensors=True):
     return tuple(__maybe_broadcast(x, common_shape) for x in args)
 
 
-PATCHES.append(
-    PatchInfo.make(patched__maybe_broadcast, torch._refs, "_maybe_broadcast", family="torch")
-)
+def get_patches() -> List[PatchInfo]:
+    import torch._refs
+    import torch._subclasses.fake_impls
+    import torch.export._trace
+    import torch.fx.experimental.symbolic_shapes as _sym_shapes
+
+    return [
+        PatchInfo.make(
+            patched_DynamicDimConstraintPrinter._print_Symbol,
+            _sym_shapes.DynamicDimConstraintPrinter,
+            "_print_Symbol",
+            family="torch",
+        ),
+        PatchInfo.make(
+            patched_infer_size, torch._subclasses.fake_impls, "infer_size", family="torch"
+        ),
+        PatchInfo.make(
+            patched__broadcast_shapes, torch._refs, "_broadcast_shapes", family="torch"
+        ),
+        PatchInfo.make(
+            patched__get_range_constraints,
+            torch.export._trace,
+            "_get_range_constraints",
+            family="torch",
+        ),
+        PatchInfo.make(patched__maybe_broadcast, torch._refs, "_maybe_broadcast", family="torch"),
+    ]

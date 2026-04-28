@@ -104,19 +104,13 @@ class TestGraphPatternCombination(ExtTestCase):
         opsets = {d.domain: d.version for d in onx.opset_import}
         options = onnxruntime.SessionOptions()
         providers = ["CPUExecutionProvider"]
-        if "onnx_extended.ortops.optim.cuda" in opsets:
-            try:
-                from onnx_extended.ortops.optim.cuda import get_ort_ext_libs
-            except ImportError:
-                raise unittest.SkipTest("onnx_extended not installed.")  # noqa: B904
+        if "yaourt.ortops.fused_kernel.cuda" in opsets:
+            from yaourt.ortops.fused_kernel.cuda import get_ort_ext_libs
 
             options.register_custom_ops_library(get_ort_ext_libs()[0])
             providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
-        if "onnx_extended.ortops.optim.cpu" in opsets:
-            try:
-                from onnx_extended.ortops.optim.cpu import get_ort_ext_libs
-            except ImportError:
-                raise unittest.SkipTest("onnx_extended not installed.")  # noqa: B904
+        if "yaourt.ortops.sparse." in opsets:
+            from yaourt.ortops.sparse.cpu import get_ort_ext_libs
 
             options.register_custom_ops_library(get_ort_ext_libs()[0])
 

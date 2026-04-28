@@ -107,18 +107,6 @@ class TestEinsumHelper(ExtTestCase):
         result = self._run(model, {"X0": a, "X1": b})
         expected = np.einsum("ij,jk->ik", a, b)
         self.assertAlmostEqual(result, expected, atol=1e-5)
-
-        """Tests that decompose_einsum works without onnx_extended installed."""
-        import sys
-
-        # Verify that onnx_extended is NOT imported by einsum_helper itself
-        import yobx.helpers.einsum_helper  # noqa: F401 (trigger import)
-
-        einsum_helper_imports = {k: v for k, v in sys.modules.items() if "einsum_helper" in k}
-        for mod_name in einsum_helper_imports:
-            self.assertNotIn("onnx_extended", mod_name)
-
-        # The function still works fine without onnx_extended
         model = decompose_einsum("ij,jk->ik", (2, 3), (3, 4))
         self.assertGreater(len(model.graph.node), 1)
 

@@ -15,6 +15,7 @@ The summary explicitly includes the ``new-tracing`` exporter next to
     :rst:
     :toggle: code
     :warningout: UserWarning
+    :process:
 
     import inspect
     import textwrap
