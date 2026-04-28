@@ -96,7 +96,7 @@ def decompose_einsum_equation(
     :param clean: clean the unnecessary node in the graph
     :param verbose: verbosity
     :return: instance of :class:`GraphEinsumSubOp
-        <onnx_extended.tools.einsum.einsum_impl_classes.GraphEinsumSubOp>`
+        <yobx.helpers._einsum.einsum_impl_classes.GraphEinsumSubOp>`
 
     About *strategy*:
 
@@ -104,22 +104,22 @@ def decompose_einsum_equation(
       some generic matrix multiplication remains implemented with
       :func:`numpy.einsum` but only with two matrices aligned on
       the same dimension (see :func:`numpy_extended_dot
-      <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot>`)
+      <yobx.helpers._einsum.einsum_impl_ext.numpy_extended_dot>`)
     * `'numpy'`: same as `simple` but the decomposition does not use
       :func:`numpy.einsum` anymore but only multiplication or
       matrix multiplication merged into a single operator called
       *batch_dot* (see :func:`numpy_extended_dot_matrix
-      <onnx_extended.tools.einsum.einsum_impl_ext.numpy_extended_dot_matrix>`)
+      <yobx.helpers._einsum.einsum_impl_ext.numpy_extended_dot_matrix>`)
 
     Available operations: *expand_dims*, *transpose*, *matmul*, *reduce_sum*,
     *id*, *squeeze*, *diagonal*. It analyses an equation and produces a graph
     where nodes are instance of class :class:`EinsumSubOp
-    <onnx_extended.tools.einsum.einsum_impl_classes.EinsumSubOp>`.
+    <yobx.helpers._einsum.einsum_impl_classes.EinsumSubOp>`.
 
     .. runpython::
         :showcode:
 
-        from onnx_extended.tools.einsum import decompose_einsum_equation
+        from yobx.helpers._einsum import decompose_einsum_equation
         seq = decompose_einsum_equation("bac,cd,def->ebc")
         for op in seq:
             print(op)
@@ -130,7 +130,7 @@ def decompose_einsum_equation(
         :script: DOT-SECTION
         :process:
 
-        from onnx_extended.tools.einsum import decompose_einsum_equation
+        from yobx.helpers._einsum import decompose_einsum_equation
         seq = decompose_einsum_equation(
             "bac,cd,def->ebc", (2, 2, 2), (2, 2), (2, 2, 2))
         print("DOT-SECTION", seq.to_dot())
@@ -177,14 +177,14 @@ def apply_einsum_sequence(
     :param verbose: verbosity
     :param kwargs: additional parameters,
         see `apply_sequence` in :class:`GraphEinsumSubOp
-        <onnx_extended.tools.einsum.einsum_impl_classes.GraphEinsumSubOp>`
+        <yobx.helpers._einsum.einsum_impl_classes.GraphEinsumSubOp>`
     :return: output
 
     .. runpython::
         :showcode:
 
         import numpy
-        from onnx_extended.tools.einsum import (
+        from yobx.helpers._einsum import (
             decompose_einsum_equation, apply_einsum_sequence)
 
         m1 = numpy.arange(2 * 2 * 2).reshape((2, 2, 2)) + 10

@@ -14,7 +14,7 @@ class patched_DynamicDimConstraintPrinter:
 
     __METHODS__ = ["_print_Symbol"]
 
-    def _print_Symbol(self, expr: "sympy.Symbol") -> str:  # noqa: F821
+    def _print_Symbol(self, expr: "sympy.Symbol") -> str:  # type: ignore # noqa: F821
         import sympy
 
         assert isinstance(expr, sympy.Symbol), str(type(expr))
@@ -203,7 +203,7 @@ def patched__get_range_constraints(
     export_graph_signature: torch.export.graph_signature.ExportGraphSignature = (
         export_artifact.aten.sig
     )
-    fake_mode: "FakeTensorMode" = export_artifact.fake_mode  # noqa: F821
+    fake_mode: "FakeTensorMode" = export_artifact.fake_mode  # type: ignore # noqa: F821
     num_lifted = next(
         (
             i

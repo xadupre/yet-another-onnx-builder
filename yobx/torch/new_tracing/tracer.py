@@ -1890,7 +1890,7 @@ class GraphTracer:
                     {},
                 )
             # Fall back to original for anything else (should not normally occur).
-            return _ORIGINAL_TORCH_TENSOR_SPLIT(input, indices_or_sections, dim)
+            return _ORIGINAL_TORCH_TENSOR_SPLIT(input, indices_or_sections, dim)  # type: ignore
 
         # ------------------------------------------------------------------ #
         # Case 2: indices_or_sections IS a TracingTensor.                     #
@@ -1921,7 +1921,7 @@ class GraphTracer:
         )
 
         # Shape inference using real (non-tracing, non-fake) tensors.
-        concrete_results = _ORIGINAL_TORCH_TENSOR_SPLIT(concrete_x, concrete_indices, dim)
+        concrete_results = _ORIGINAL_TORCH_TENSOR_SPLIT(concrete_x, concrete_indices, dim)  # type: ignore
 
         # Emit FX node for the split op.
         func = torch.ops.aten.tensor_split.Tensor_indices_or_sections

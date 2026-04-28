@@ -110,7 +110,7 @@ class TestGraphPatternCombination(ExtTestCase):
             options.register_custom_ops_library(get_ort_ext_libs()[0])
             providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
         if "yaourt.ortops.sparse." in opsets:
-            from onnx_extended.ortops.optim.cpu import get_ort_ext_libs
+            from yaourt.ortops.sparse.cpu import get_ort_ext_libs
 
             options.register_custom_ops_library(get_ort_ext_libs()[0])
 

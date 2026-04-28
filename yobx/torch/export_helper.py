@@ -59,7 +59,7 @@ def torch_export(
                 mod, args, kwargs, dynamic_shapes=dynamic_shapes, strict=strict, **export_kwargs
             )
 
-        _tds._guard_or = _tds._torch_guard_or
+        _tds._guard_or = _tds._torch_guard_or  # type: ignore
         _tds.ShapeEnv._init.__kwdefaults__["specialize_zero_one"] = value  # type: ignore
         return ep
 

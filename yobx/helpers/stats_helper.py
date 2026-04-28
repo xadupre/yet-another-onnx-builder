@@ -1,8 +1,7 @@
 """
 Functions to compute statistics on an ONNX model such as number of nodes
 per op_type and estimation of computational cost.  Also provides classes
-and helpers for computing per-tree statistics on ``TreeEnsemble*`` operators
-(adapted from :mod:`onnx_extended.tools.stats_nodes`).
+and helpers for computing per-tree statistics on ``TreeEnsemble*`` operators.
 """
 
 import pprint
