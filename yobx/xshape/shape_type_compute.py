@@ -3012,6 +3012,21 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
             self.set_rank(node.output[0], 2)
         return None
 
+    # MoE: Mixture of Experts.
+    # Input[0]: input (num_tokens, hidden_size) or (batch_size, seq_len, hidden_size)
+    # Output[0]: output – same shape and dtype as input[0]
+    if node.op_type == "MoE" and node.domain == "com.microsoft":
+        dtype = self.get_type(node.input[0]) if self.has_type(node.input[0]) else None
+        if dtype is not None:
+            self.set_type(node.output[0], dtype)
+        if self.has_device(node.input[0]):
+            self.set_device(node.output[0], self.get_device(node.input[0]))
+        if self.has_shape(node.input[0]):
+            self.set_shape(node.output[0], self.get_shape(node.input[0]))
+        elif self.has_rank(node.input[0]):
+            self.set_rank(node.output[0], self.get_rank(node.input[0]))
+        return None
+
     assert node.domain not in {
         "ai.onnx.ml",
         "intermediate",

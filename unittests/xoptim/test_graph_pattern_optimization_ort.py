@@ -4352,6 +4352,249 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         # EmbedLayerNormalization requires both gamma and beta - should NOT fuse
         self.assertNotIn("EmbedLayerNormalization", [n.op_type for n in opt_onx.graph.node])
 
+    # -----------------------------------------------------------------------
+    # MoE tests
+    # -----------------------------------------------------------------------
+
+    def _make_moe_model(
+        self,
+        num_tokens: int = 4,
+        hidden_size: int = 8,
+        inter_size: int = 16,
+        num_experts: int = 4,
+        top_k: int = 1,
+        with_fc1_bias: bool = True,
+        with_fc2_bias: bool = True,
+        activation: str = "Relu",
+    ) -> "ModelProto":
+        """Builds the pre-fusion MoE ONNX subgraph for testing.
+
+        The subgraph implements:
+            1. TopK(router_probs, k) -> (top_weights, top_ids)
+            2. flat_ids = Reshape(top_ids, (T*k,))
+            3. Gather expert FC1/FC2 weights and biases by flat_ids
+            4. BatchMatMul for FC1, optional bias, activation
+            5. BatchMatMul for FC2, optional bias
+            6. Weighted sum using Reshape(top_weights, (T*k, 1))
+        """
+        T, H, inter, E, k = num_tokens, hidden_size, inter_size, num_experts, top_k
+
+        nodes = []
+        initializers = []
+
+        # ----- TopK -------------------------------------------------------
+        topk_k = onh.from_array(np.array([k], dtype=np.int64), name="topk_k")
+        initializers.append(topk_k)
+        nodes.append(
+            oh.make_node("TopK", ["router_probs", "topk_k"], ["top_weights", "top_ids"], axis=1)
+        )
+
+        # ----- Reshape indices to (T*k,) ----------------------------------
+        flat_shape = onh.from_array(np.array([T * k], dtype=np.int64), name="flat_shape")
+        initializers.append(flat_shape)
+        nodes.append(oh.make_node("Reshape", ["top_ids", "flat_shape"], ["flat_ids"]))
+
+        # ----- Reshape weights to (T*k, 1) --------------------------------
+        w_shape = onh.from_array(np.array([T * k, 1], dtype=np.int64), name="w_shape")
+        initializers.append(w_shape)
+        nodes.append(oh.make_node("Reshape", ["top_weights", "w_shape"], ["routing_w"]))
+
+        # ----- Gather FC1 weights (E, inter, H) by flat_ids -----------------
+        initializers.append(
+            onh.from_array(
+                np.random.randn(E, inter, H).astype(np.float32), name="fc1_experts_weights"
+            )
+        )
+        nodes.append(
+            oh.make_node("Gather", ["fc1_experts_weights", "flat_ids"], ["sel_fc1_w"], axis=0)
+        )
+        nodes.append(oh.make_node("Transpose", ["sel_fc1_w"], ["sel_fc1_w_t"], perm=[0, 2, 1]))
+
+        # ----- Unsqueeze input (T*k, 1, H) --------------------------------
+        unsq_axis1 = onh.from_array(np.array([1], dtype=np.int64), name="unsq_axis1")
+        initializers.append(unsq_axis1)
+        nodes.append(oh.make_node("Unsqueeze", ["input", "unsq_axis1"], ["input_3d"]))
+
+        # ----- FC1 MatMul: (T*k, 1, H) x (T*k, H, inter) -> (T*k, 1, inter) ---
+        nodes.append(oh.make_node("MatMul", ["input_3d", "sel_fc1_w_t"], ["fc1_3d"]))
+        sq_axis1 = onh.from_array(np.array([1], dtype=np.int64), name="sq_axis1")
+        initializers.append(sq_axis1)
+        nodes.append(oh.make_node("Squeeze", ["fc1_3d", "sq_axis1"], ["fc1_out"]))
+
+        fc1_act_input = "fc1_out"
+        if with_fc1_bias:
+            initializers.append(
+                onh.from_array(np.zeros((E, inter), dtype=np.float32), name="fc1_experts_bias")
+            )
+            nodes.append(
+                oh.make_node("Gather", ["fc1_experts_bias", "flat_ids"], ["sel_fc1_b"], axis=0)
+            )
+            nodes.append(oh.make_node("Add", ["fc1_out", "sel_fc1_b"], ["fc1_biased"]))
+            fc1_act_input = "fc1_biased"
+
+        # ----- Activation -------------------------------------------------
+        nodes.append(oh.make_node(activation, [fc1_act_input], ["fc1_act"]))
+
+        # ----- Unsqueeze for FC2 (T*k, 1, inter) ----------------------------
+        unsq_axis2 = onh.from_array(np.array([1], dtype=np.int64), name="unsq_axis2")
+        initializers.append(unsq_axis2)
+        nodes.append(oh.make_node("Unsqueeze", ["fc1_act", "unsq_axis2"], ["fc1_act_3d"]))
+
+        # ----- Gather FC2 weights (E, H, inter) by flat_ids -----------------
+        initializers.append(
+            onh.from_array(
+                np.random.randn(E, H, inter).astype(np.float32), name="fc2_experts_weights"
+            )
+        )
+        nodes.append(
+            oh.make_node("Gather", ["fc2_experts_weights", "flat_ids"], ["sel_fc2_w"], axis=0)
+        )
+        nodes.append(oh.make_node("Transpose", ["sel_fc2_w"], ["sel_fc2_w_t"], perm=[0, 2, 1]))
+
+        # ----- FC2 MatMul: (T*k, 1, inter) x (T*k, inter, H) -> (T*k, 1, H) --
+        nodes.append(oh.make_node("MatMul", ["fc1_act_3d", "sel_fc2_w_t"], ["fc2_3d"]))
+        sq_axis2 = onh.from_array(np.array([1], dtype=np.int64), name="sq_axis2")
+        initializers.append(sq_axis2)
+        nodes.append(oh.make_node("Squeeze", ["fc2_3d", "sq_axis2"], ["fc2_out"]))
+
+        fc2_final_input = "fc2_out"
+        if with_fc2_bias:
+            initializers.append(
+                onh.from_array(np.zeros((E, H), dtype=np.float32), name="fc2_experts_bias")
+            )
+            nodes.append(
+                oh.make_node("Gather", ["fc2_experts_bias", "flat_ids"], ["sel_fc2_b"], axis=0)
+            )
+            nodes.append(oh.make_node("Add", ["fc2_out", "sel_fc2_b"], ["fc2_biased"]))
+            fc2_final_input = "fc2_biased"
+
+        # ----- Weighted sum: (T*k, H) * (T*k, 1) -------------------------
+        nodes.append(oh.make_node("Mul", [fc2_final_input, "routing_w"], ["output"]))
+
+        graph_inputs = [
+            oh.make_tensor_value_info("input", TFLOAT, [T * k, H]),
+            oh.make_tensor_value_info("router_probs", TFLOAT, [T * k, E]),
+        ]
+        graph_outputs = [oh.make_tensor_value_info("output", TFLOAT, [T * k, H])]
+
+        return oh.make_model(
+            oh.make_graph(nodes, "moe_pattern", graph_inputs, graph_outputs, initializers),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+
+    def test_moe_pattern_in_list(self):
+        """MoEPattern must appear in the default ORT pattern list."""
+        from yobx.xoptim.patterns_ort import get_onnxruntime_patterns
+
+        patterns = get_onnxruntime_patterns()
+        names = [p.__class__.__name__ for p in patterns]
+        self.assertIn("MoEPattern", names)
+
+    def test_moe_pattern_basic_relu_with_biases(self):
+        """TopK + expert-gather + FC1+Relu+FC2 with both biases fuses to MoE."""
+        model = self._make_moe_model(activation="Relu", with_fc1_bias=True, with_fc2_bias=True)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MoE"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("MoE", op_types)
+        self.assertNotIn("TopK", op_types)
+        self.assertNotIn("Gather", op_types)
+        self.assertNotIn("MatMul", op_types)
+        fused = [n for n in opt_onx.graph.node if n.op_type == "MoE"]
+        self.assertEqual(1, len(fused))
+        self.assertEqual("com.microsoft", fused[0].domain)
+        # Check the k attribute.
+        k_attr = next((a for a in fused[0].attribute if a.name == "k"), None)
+        self.assertIsNotNone(k_attr)
+        self.assertEqual(1, k_attr.i)
+        # Check activation_type attribute.
+        act_attr = next((a for a in fused[0].attribute if a.name == "activation_type"), None)
+        self.assertIsNotNone(act_attr)
+        self.assertEqual("relu", act_attr.s.decode())
+
+    def test_moe_pattern_no_biases(self):
+        """MoE pattern also fuses when both FC biases are absent."""
+        model = self._make_moe_model(activation="Relu", with_fc1_bias=False, with_fc2_bias=False)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MoE"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("MoE", op_types)
+
+    def test_moe_pattern_no_fc2_bias(self):
+        """MoE pattern fuses when only FC1 bias is present."""
+        model = self._make_moe_model(activation="Relu", with_fc1_bias=True, with_fc2_bias=False)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MoE"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("MoE", op_types)
+
+    def test_moe_pattern_shape_inference(self):
+        """Output of the fused MoE node has the same shape as the input."""
+        model = self._make_moe_model(
+            num_tokens=6, hidden_size=8, activation="Relu", with_fc1_bias=True, with_fc2_bias=True
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MoE"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # The graph output shape must be preserved.
+        out_info = opt_onx.graph.output[0]
+        dims = [d.dim_value for d in out_info.type.tensor_type.shape.dim]
+        self.assertEqual([6, 8], dims)
+
+    def test_moe_pattern_no_match_missing_topk(self):
+        """Pattern must NOT fire when there is no TopK feeding the routing weight."""
+        num_tokens, hidden_size, num_experts = 4, 8, 4
+        # Replace TopK with a direct Softmax output (no actual TopK in graph).
+        nodes = [
+            oh.make_node("Softmax", ["router_probs"], ["routing_w"], axis=-1),
+            oh.make_node("Relu", ["input"], ["output"]),
+            oh.make_node("Mul", ["output", "routing_w"], ["final"]),
+        ]
+        model = oh.make_model(
+            oh.make_graph(
+                nodes,
+                "no_topk",
+                [
+                    oh.make_tensor_value_info(
+                        "input", TFLOAT, [num_tokens, hidden_size]
+                    ),
+                    oh.make_tensor_value_info(
+                        "router_probs", TFLOAT, [num_tokens, num_experts]
+                    ),
+                ],
+                [
+                    oh.make_tensor_value_info(
+                        "final", TFLOAT, [num_tokens, hidden_size]
+                    )
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["MoE"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertNotIn("MoE", [n.op_type for n in opt_onx.graph.node])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

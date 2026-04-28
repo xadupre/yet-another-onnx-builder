@@ -54,6 +54,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         MissingReduceMaxPattern,
         MissingTopKPattern,
     )
+    from .moe import MoEPattern
 
     from .embed_layer_normalization import EmbedLayerNormalizationPattern
     from .relative_position_bias import (
@@ -97,6 +98,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         MissingRangePattern(verbose=verbose),
         MissingReduceMaxPattern(verbose=verbose),
         MissingTopKPattern(verbose=verbose),
+        MoEPattern(verbose=verbose),
         MultiHeadAttention3DPattern(verbose=verbose),
         QuickGeluPattern(verbose=verbose),
         ReshapeGemmPattern(verbose=verbose),
