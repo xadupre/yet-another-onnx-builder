@@ -9,8 +9,11 @@ class FakeTensorContext:
         self, fake_mode: Optional["torch._subclasses.fake_tensor.FakeTensorMode"] = None
     ):
         if fake_mode is None:
-            shape_env = torch.fx.experimental.symbolic_shapes.ShapeEnv()
-            self.fake_mode = torch._subclasses.fake_tensor.FakeTensorMode(shape_env=shape_env)
+            from torch._subclasses.fake_tensor import FakeTensorMode
+            from torch.fx.experimental.symbolic_shapes import ShapeEnv
+
+            shape_env = ShapeEnv()
+            self.fake_mode = FakeTensorMode(shape_env=shape_env)
         else:
             self.fake_mode = fake_mode
         self._candidates = self._first_primes()
