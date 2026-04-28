@@ -17,6 +17,8 @@ The summary explicitly includes the ``new-tracing`` exporter next to
     :warningout: UserWarning
     :process:
 
+    import warnings
+    warnings.filterwarnings("ignore")
     import inspect
     import textwrap
     import pandas
