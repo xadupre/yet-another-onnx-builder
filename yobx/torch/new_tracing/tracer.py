@@ -2227,6 +2227,7 @@ def trace_model(
 
     .. runpython::
         :showcode:
+        :process:
 
         import torch
         from yobx.torch.new_tracing import trace_model
