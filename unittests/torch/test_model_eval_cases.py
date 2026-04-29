@@ -475,6 +475,26 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=False,
         )
 
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_yobx(self):
+        evaluation(cases="DynamicCacheInput", exporters="yobx", quiet=False, dynamic=True)
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_yobx_static(self):
+        evaluation(cases="DynamicCacheInput", exporters="yobx", quiet=False, dynamic=False)
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_mixed_layers_yobx(self):
+        evaluation(
+            cases="DynamicCacheInputMixedLayers", exporters="yobx", quiet=False, dynamic=True
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_mixed_layers_yobx_static(self):
+        evaluation(
+            cases="DynamicCacheInputMixedLayers", exporters="yobx", quiet=False, dynamic=False
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
