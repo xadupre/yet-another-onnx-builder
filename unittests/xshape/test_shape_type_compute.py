@@ -26,6 +26,7 @@ from yobx.xshape.shape_type_compute import (
     set_type_shape_unary_op,
     set_type_shape_unary_op_abs,
     set_shape_type_custom,
+    supported_ops_in_set_shape_type_custom,
     _set_shape_type_op_any_sequence_empty,
     _set_shape_type_op_any_known,
     _set_shape_type_op_any_attention,
@@ -2093,6 +2094,45 @@ class TestShapeTypeCompute(ExtTestCase):
 
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
+
+    def test_supported_ops_in_set_shape_type_custom(self):
+        result = supported_ops_in_set_shape_type_custom()
+        self.assertIsInstance(result, dict)
+        # Check that all three expected domains are present.
+        self.assertIn("ai.onnx.ml", result)
+        self.assertIn("", result)
+        self.assertIn("com.microsoft", result)
+        # Check that ai.onnx.ml contains the tree ensemble ops.
+        ai_ml_ops = result["ai.onnx.ml"]
+        self.assertIn("TreeEnsemble", ai_ml_ops)
+        self.assertIn("TreeEnsembleRegressor", ai_ml_ops)
+        self.assertIn("TreeEnsembleClassifier", ai_ml_ops)
+        # Check that domain-agnostic unary ops are present.
+        no_domain_ops = result[""]
+        self.assertIn("ReplaceZero", no_domain_ops)
+        self.assertIn("NegXplus1", no_domain_ops)
+        # Check that custom ops from _set_shape_type_op_any_custom are included.
+        self.assertIn("FusedMatMul", no_domain_ops)
+        self.assertIn("BiasSplitGelu", no_domain_ops)
+        # Check that com.microsoft ops are present.
+        ms_ops = result["com.microsoft"]
+        for op in (
+            "Attention",
+            "CausalConvWithState",
+            "CDist",
+            "EmbedLayerNormalization",
+            "GatedRelativePositionBias",
+            "GreedySearch",
+            "GroupQueryAttention",
+            "MoE",
+            "MurmurHash3",
+            "PackedMultiHeadAttention",
+            "RelativePositionBias",
+        ):
+            self.assertIn(op, ms_ops)
+        # All values must be frozensets.
+        for ops in result.values():
+            self.assertIsInstance(ops, frozenset)
 
     def test_argmax_keepdims(self):
         g = _MockShapeBuilder()

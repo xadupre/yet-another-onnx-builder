@@ -1,5 +1,5 @@
 from collections import Counter
-from typing import List, Optional, Sequence, Tuple
+from typing import Any, Dict, FrozenSet, List, Optional, Sequence, Tuple
 import numpy as np
 import onnx
 from onnx import NodeProto, TensorProto
@@ -2784,13 +2784,273 @@ _set_shape_type_op_any_custom = {
 }
 
 
+def _set_shape_type_packed_multi_head_attention(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.PackedMultiHeadAttention``."""
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+
+
+def _set_shape_type_attention_microsoft(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.Attention``."""
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_shape(node.input[0]):
+        self.set_shape(node.output[0], self.get_shape(node.input[0]))
+    elif self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+
+
+def _set_shape_type_group_query_attention(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.GroupQueryAttention``."""
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+
+
+def _set_shape_type_murmur_hash3(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.MurmurHash3``."""
+    self.set_type(node.output[0], TensorProto.INT32)
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_shape(node.input[0]):
+        self.set_shape(node.output[0], self.get_shape(node.input[0]))
+    elif self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+
+
+def _set_shape_type_cdist(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.CDist``.
+
+    Input A has shape ``(N, D)`` and input B has shape ``(M, D)``, so the
+    output has shape ``(N, M)``.
+    """
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_shape(node.input[0]) and self.has_shape(node.input[1]):
+        shape_a = self.get_shape(node.input[0])
+        shape_b = self.get_shape(node.input[1])
+        self.set_shape(node.output[0], (shape_a[0], shape_b[0]))
+    elif self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], 2)
+
+
+def _set_shape_type_relative_position_bias(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.RelativePositionBias``.
+
+    Inputs: ``bias_table (num_heads, num_buckets)``, ``query_length ()``,
+    ``key_length ()``.  Output: ``(1, num_heads, query_length, key_length)``.
+    """
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_shape(node.input[0]):
+        bias_shape = self.get_shape(node.input[0])
+        num_heads = bias_shape[0]
+        q_val = self.value_as_shape(node.input[1])
+        k_val = self.value_as_shape(node.input[2])
+        q_dim = q_val[0] if q_val is not None and len(q_val) == 1 else node.input[1]
+        k_dim = k_val[0] if k_val is not None and len(k_val) == 1 else node.input[2]
+        self.set_shape(node.output[0], (1, num_heads, q_dim, k_dim))
+    else:
+        self.set_rank(node.output[0], 4)
+
+
+def _set_shape_type_embed_layer_normalization(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.EmbedLayerNormalization``.
+
+    Inputs: ``input_ids [B, S]``, ``segment_ids [B, S]`` (optional),
+    ``word_embedding [V, D]``, ``position_embedding [P, D]``,
+    ``segment_embedding [NS, D]`` (optional), ``gamma [D]``, ``beta [D]``,
+    ``mask [B, S]`` (optional), ``position_ids [B, S]`` (optional).
+    Outputs: ``output [B, S, D]``, ``mask_index [B]``.
+    """
+    word_emb_input = node.input[2] if len(node.input) > 2 else ""
+    dtype = (
+        self.get_type(word_emb_input)
+        if word_emb_input and self.has_type(word_emb_input)
+        else None
+    )
+    if dtype is not None and node.output[0]:
+        self.set_type(node.output[0], dtype)
+    if len(node.output) > 1 and node.output[1]:
+        self.set_type(node.output[1], TensorProto.INT32)
+    if self.has_device(node.input[0]) and node.output[0]:
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_shape(node.input[0]) and word_emb_input and self.has_shape(word_emb_input):
+        ids_shape = self.get_shape(node.input[0])
+        emb_shape = self.get_shape(word_emb_input)
+        if len(ids_shape) >= 2 and len(emb_shape) >= 2 and node.output[0]:
+            hidden = emb_shape[1]
+            output_shape = (*ids_shape, hidden)
+            self.set_shape(node.output[0], output_shape)
+        if len(ids_shape) >= 1 and len(node.output) > 1 and node.output[1]:
+            self.set_shape(node.output[1], (ids_shape[0],))
+    elif self.has_rank(node.input[0]) and node.output[0]:
+        rank = self.get_rank(node.input[0])
+        self.set_rank(node.output[0], rank + 1)
+        if len(node.output) > 1 and node.output[1]:
+            self.set_rank(node.output[1], 1)
+
+
+def _set_shape_type_gated_relative_position_bias(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.GatedRelativePositionBias``.
+
+    Inputs: ``query_layer (batch, seq_len, num_heads*head_size)``,
+    ``query_bias``, ``rel_pos (1, num_heads, seq_len, seq_len)``, ``weight``,
+    ``bias``, ``eco_a (1, num_heads, 1, 1)``, ``[token_offset]``.
+    Output: ``(batch_size, num_heads, seq_len, seq_len)``.
+    """
+    if self.has_type(node.input[0]):
+        self.set_type(node.output[0], self.get_type(node.input[0]))
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    rel_pos_idx = 2
+    if self.has_shape(node.input[0]) and self.has_shape(node.input[rel_pos_idx]):
+        query_shape = self.get_shape(node.input[0])
+        rel_pos_shape = self.get_shape(node.input[rel_pos_idx])
+        batch_dim = query_shape[0]
+        num_heads_dim = rel_pos_shape[1]
+        seq_q_dim = rel_pos_shape[2]
+        seq_k_dim = rel_pos_shape[3]
+        self.set_shape(node.output[0], (batch_dim, num_heads_dim, seq_q_dim, seq_k_dim))
+    elif self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], 4)
+
+
+def _set_shape_type_causal_conv_with_state(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.CausalConvWithState``.
+
+    Inputs: ``input (N, C, L)``, ``weight (C, 1, K)``, ``bias (C)``
+    (optional), ``past_state (N, C, K-1)`` (optional).
+    Outputs: ``output`` (same shape as input),
+    ``present_state (N, C, K-1)`` (optional).
+    """
+    dtype = self.get_type(node.input[0]) if self.has_type(node.input[0]) else None
+    if dtype is not None:
+        self.set_type(node.output[0], dtype)
+        if len(node.output) > 1 and node.output[1]:
+            self.set_type(node.output[1], dtype)
+    if self.has_device(node.input[0]):
+        dev = self.get_device(node.input[0])
+        self.set_device(node.output[0], dev)
+        if len(node.output) > 1 and node.output[1]:
+            self.set_device(node.output[1], dev)
+    if self.has_shape(node.input[0]):
+        input_shape = self.get_shape(node.input[0])
+        self.set_shape(node.output[0], input_shape)
+        if len(node.output) > 1 and node.output[1]:
+            if len(node.input) > 1 and self.has_shape(node.input[1]):
+                weight_shape = self.get_shape(node.input[1])
+                kernel_size = weight_shape[2]
+                state_len = kernel_size - 1 if isinstance(kernel_size, int) else kernel_size
+                self.set_shape(node.output[1], (input_shape[0], input_shape[1], state_len))
+            else:
+                self.set_rank(node.output[1], len(input_shape))
+    elif self.has_rank(node.input[0]):
+        rk = self.get_rank(node.input[0])
+        self.set_rank(node.output[0], rk)
+        if len(node.output) > 1 and node.output[1]:
+            self.set_rank(node.output[1], rk)
+
+
+def _set_shape_type_greedy_search(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.GreedySearch``.
+
+    Input ``input_ids`` has shape ``(batch_size, sequence_length)`` and type
+    INT32.  Input ``max_length`` is a scalar INT32.  Output ``sequences`` has
+    shape ``(batch_size, max_length_value)`` and type INT32.
+    """
+    self.set_type(node.output[0], TensorProto.INT32)
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_shape(node.input[0]):
+        input_shape = self.get_shape(node.input[0])
+        batch_size = input_shape[0]
+        has_max_length = len(node.input) > 1 and node.input[1]
+        max_len_val = self.value_as_shape(node.input[1]) if has_max_length else None
+        if max_len_val is not None and len(max_len_val) == 1:
+            max_len = max_len_val[0]
+        else:
+            max_len = node.input[1] if has_max_length else "max_len"
+        self.set_shape(node.output[0], (batch_size, max_len))
+    else:
+        self.set_rank(node.output[0], 2)
+
+
+def _set_shape_type_moe(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.MoE`` (Mixture of Experts).
+
+    Input ``input`` has shape ``(num_tokens, hidden_size)`` or
+    ``(batch_size, seq_len, hidden_size)``.  Output ``output`` has the same
+    shape and dtype as the input.
+    """
+    dtype = self.get_type(node.input[0]) if self.has_type(node.input[0]) else None
+    if dtype is not None:
+        self.set_type(node.output[0], dtype)
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_shape(node.input[0]):
+        self.set_shape(node.output[0], self.get_shape(node.input[0]))
+    elif self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+
+
+_set_shape_type_com_microsoft_ops: Dict[str, Any] = {
+    "Attention": _set_shape_type_attention_microsoft,
+    "CausalConvWithState": _set_shape_type_causal_conv_with_state,
+    "CDist": _set_shape_type_cdist,
+    "EmbedLayerNormalization": _set_shape_type_embed_layer_normalization,
+    "GatedRelativePositionBias": _set_shape_type_gated_relative_position_bias,
+    "GreedySearch": _set_shape_type_greedy_search,
+    "GroupQueryAttention": _set_shape_type_group_query_attention,
+    "MoE": _set_shape_type_moe,
+    "MurmurHash3": _set_shape_type_murmur_hash3,
+    "PackedMultiHeadAttention": _set_shape_type_packed_multi_head_attention,
+    "RelativePositionBias": _set_shape_type_relative_position_bias,
+}
+
+_SUPPORTED_AI_ONNX_ML_OPS: FrozenSet[str] = frozenset(
+    {"TreeEnsemble", "TreeEnsembleClassifier", "TreeEnsembleRegressor"}
+)
+
+_SUPPORTED_UNARY_CUSTOM_OPS: FrozenSet[str] = frozenset({"NegXplus1", "ReplaceZero"})
+
+
+def supported_ops_in_set_shape_type_custom() -> Dict[str, FrozenSet[str]]:
+    """Returns the ops supported by :func:`set_shape_type_custom` grouped by domain.
+
+    Returns a dictionary mapping each ONNX domain name to a :class:`frozenset`
+    of op type names for which :func:`set_shape_type_custom` provides shape and
+    type inference.
+
+    The special key ``""`` (empty string) groups ops that are handled
+    regardless of their domain (i.e. no domain check is performed for them).
+    Local functions registered at runtime are not included because they are
+    determined dynamically.
+
+    Returns:
+        Dictionary mapping domain name to a frozenset of supported op types.
+    """
+    return {
+        "ai.onnx.ml": _SUPPORTED_AI_ONNX_ML_OPS,
+        "": _SUPPORTED_UNARY_CUSTOM_OPS | frozenset(_set_shape_type_op_any_custom),
+        "com.microsoft": frozenset(_set_shape_type_com_microsoft_ops),
+    }
+
+
 def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False):
     """Sets the shape and type if it can."""
     if node.domain == "ai.onnx.ml":
-        if node.op_type in ("TreeEnsembleRegressor", "TreeEnsembleClassifier", "TreeEnsemble"):
+        if node.op_type in _SUPPORTED_AI_ONNX_ML_OPS:
             return set_type_shape_tree_ensemble(self, node)
         return None
-    if node.op_type in {"ReplaceZero", "NegXplus1"}:
+    if node.op_type in _SUPPORTED_UNARY_CUSTOM_OPS:
         return set_type_shape_unary_op(self, node.output[0], node.input[0])
     if node.op_type in _set_shape_type_op_any_custom:
         return _set_shape_type_op_any_custom[node.op_type](self, node)
@@ -2869,211 +3129,8 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
                 self.set_rank(o, local_function_builder.get_rank(lo))
         return None
 
-    # to be improved later
-    if node.op_type in {"PackedMultiHeadAttention"} and node.domain == "com.microsoft":
-        if self.has_type(node.input[0]):
-            self.set_type(node.output[0], self.get_type(node.input[0]))
-        if self.has_rank(node.input[0]):
-            self.set_rank(node.output[0], self.get_rank(node.input[0]))
-        return None
-
-    # to be improved later
-    if node.op_type in {"Attention"} and node.domain == "com.microsoft":
-        if self.has_type(node.input[0]):
-            self.set_type(node.output[0], self.get_type(node.input[0]))
-        if self.has_shape(node.input[0]):
-            self.set_shape(node.output[0], self.get_shape(node.input[0]))
-        elif self.has_rank(node.input[0]):
-            self.set_rank(node.output[0], self.get_rank(node.input[0]))
-        return None
-
-    # to be improved later
-    if node.op_type in {"GroupQueryAttention"} and node.domain == "com.microsoft":
-        if self.has_type(node.input[0]):
-            self.set_type(node.output[0], self.get_type(node.input[0]))
-        if self.has_rank(node.input[0]):
-            self.set_rank(node.output[0], self.get_rank(node.input[0]))
-        return None
-
-    # MurmurHash3: hashes a string (or int) tensor to INT32 with the same shape.
-    if node.op_type == "MurmurHash3" and node.domain == "com.microsoft":
-        self.set_type(node.output[0], 6)  # INT32
-        if self.has_device(node.input[0]):
-            self.set_device(node.output[0], self.get_device(node.input[0]))
-        if self.has_shape(node.input[0]):
-            self.set_shape(node.output[0], self.get_shape(node.input[0]))
-        elif self.has_rank(node.input[0]):
-            self.set_rank(node.output[0], self.get_rank(node.input[0]))
-        return None
-
-    # CDist: computes pairwise distances between two sets of vectors.
-    # Input A: (N, D), Input B: (M, D) → Output: (N, M)
-    if node.op_type == "CDist" and node.domain == "com.microsoft":
-        if self.has_type(node.input[0]):
-            self.set_type(node.output[0], self.get_type(node.input[0]))
-        if self.has_device(node.input[0]):
-            self.set_device(node.output[0], self.get_device(node.input[0]))
-        if self.has_shape(node.input[0]) and self.has_shape(node.input[1]):
-            shape_a = self.get_shape(node.input[0])
-            shape_b = self.get_shape(node.input[1])
-            self.set_shape(node.output[0], (shape_a[0], shape_b[0]))
-        elif self.has_rank(node.input[0]):
-            self.set_rank(node.output[0], 2)
-        return None
-
-    # RelativePositionBias: T5-style relative attention bias.
-    # Inputs: bias_table (num_heads, num_buckets), query_length (), key_length ()
-    # Output: (1, num_heads, query_length, key_length)
-    if node.op_type == "RelativePositionBias" and node.domain == "com.microsoft":
-        if self.has_type(node.input[0]):
-            self.set_type(node.output[0], self.get_type(node.input[0]))
-        if self.has_device(node.input[0]):
-            self.set_device(node.output[0], self.get_device(node.input[0]))
-        if self.has_shape(node.input[0]):
-            bias_shape = self.get_shape(node.input[0])
-            num_heads = bias_shape[0]
-            q_val = self.value_as_shape(node.input[1])
-            k_val = self.value_as_shape(node.input[2])
-            q_dim = q_val[0] if q_val is not None and len(q_val) == 1 else node.input[1]
-            k_dim = k_val[0] if k_val is not None and len(k_val) == 1 else node.input[2]
-            self.set_shape(node.output[0], (1, num_heads, q_dim, k_dim))
-        else:
-            self.set_rank(node.output[0], 4)
-        return None
-
-    # EmbedLayerNormalization: BERT-style embedding layer fusion.
-    # Inputs: input_ids [B, S], segment_ids [B, S] (opt), word_embedding [V, D],
-    #         position_embedding [P, D], segment_embedding [NS, D] (opt),
-    #         gamma [D], beta [D], mask [B, S] (opt), position_ids [B, S] (opt).
-    # Outputs: output [B, S, D], mask_index [B].
-    if node.op_type == "EmbedLayerNormalization" and node.domain == "com.microsoft":
-        # word_embedding is input[2]; its dtype gives the output float type
-        word_emb_input = node.input[2] if len(node.input) > 2 else ""
-        dtype = (
-            self.get_type(word_emb_input)
-            if word_emb_input and self.has_type(word_emb_input)
-            else None
-        )
-        if dtype is not None and node.output[0]:
-            self.set_type(node.output[0], dtype)
-        # mask_index is INT32
-        if len(node.output) > 1 and node.output[1]:
-            self.set_type(node.output[1], TensorProto.INT32)
-        if self.has_device(node.input[0]) and node.output[0]:
-            self.set_device(node.output[0], self.get_device(node.input[0]))
-        if self.has_shape(node.input[0]) and word_emb_input and self.has_shape(word_emb_input):
-            ids_shape = self.get_shape(node.input[0])
-            emb_shape = self.get_shape(word_emb_input)
-            if len(ids_shape) >= 2 and len(emb_shape) >= 2 and node.output[0]:
-                hidden = emb_shape[1]
-                output_shape = (*ids_shape, hidden)
-                self.set_shape(node.output[0], output_shape)
-            if len(ids_shape) >= 1 and len(node.output) > 1 and node.output[1]:
-                self.set_shape(node.output[1], (ids_shape[0],))
-        elif self.has_rank(node.input[0]) and node.output[0]:
-            rank = self.get_rank(node.input[0])
-            self.set_rank(node.output[0], rank + 1)
-            if len(node.output) > 1 and node.output[1]:
-                self.set_rank(node.output[1], 1)
-        return None
-
-    # GatedRelativePositionBias: DeBERTa-v2/v3 style gated relative attention bias.
-    # Inputs: query_layer (batch, seq_len, num_heads*head_size), query_bias,
-    #         rel_pos (1, num_heads, seq_len, seq_len), weight, bias,
-    #         eco_a (1, num_heads, 1, 1), [token_offset]
-    # Output: (batch_size, num_heads, seq_len, seq_len)
-    if node.op_type == "GatedRelativePositionBias" and node.domain == "com.microsoft":
-        if self.has_type(node.input[0]):
-            self.set_type(node.output[0], self.get_type(node.input[0]))
-        if self.has_device(node.input[0]):
-            self.set_device(node.output[0], self.get_device(node.input[0]))
-        # Derive output shape from query_layer (batch from input[0])
-        # and rel_pos (dims from input[2]).
-        rel_pos_idx = 2
-        if self.has_shape(node.input[0]) and self.has_shape(node.input[rel_pos_idx]):
-            query_shape = self.get_shape(node.input[0])
-            rel_pos_shape = self.get_shape(node.input[rel_pos_idx])
-            batch_dim = query_shape[0]
-            num_heads_dim = rel_pos_shape[1]
-            seq_q_dim = rel_pos_shape[2]
-            seq_k_dim = rel_pos_shape[3]
-            self.set_shape(node.output[0], (batch_dim, num_heads_dim, seq_q_dim, seq_k_dim))
-        elif self.has_rank(node.input[0]):
-            self.set_rank(node.output[0], 4)
-        return None
-
-    # CausalConvWithState: stateful causal depthwise convolution.
-    # Inputs: input (N, C, L), weight (C, 1, K), bias (C, optional),
-    #         past_state (N, C, K-1, optional).
-    # Outputs: output (same shape as input), present_state (N, C, K-1, optional).
-    if node.op_type == "CausalConvWithState" and node.domain == "com.microsoft":
-        dtype = self.get_type(node.input[0]) if self.has_type(node.input[0]) else None
-        if dtype is not None:
-            self.set_type(node.output[0], dtype)
-            if len(node.output) > 1 and node.output[1]:
-                self.set_type(node.output[1], dtype)
-        if self.has_device(node.input[0]):
-            dev = self.get_device(node.input[0])
-            self.set_device(node.output[0], dev)
-            if len(node.output) > 1 and node.output[1]:
-                self.set_device(node.output[1], dev)
-        if self.has_shape(node.input[0]):
-            input_shape = self.get_shape(node.input[0])
-            # Output has the same shape as the input.
-            self.set_shape(node.output[0], input_shape)
-            if len(node.output) > 1 and node.output[1]:
-                # present_state shape: (N, C, K-1) where K is the kernel size.
-                if len(node.input) > 1 and self.has_shape(node.input[1]):
-                    weight_shape = self.get_shape(node.input[1])
-                    kernel_size = weight_shape[2]
-                    state_len = kernel_size - 1 if isinstance(kernel_size, int) else kernel_size
-                    self.set_shape(node.output[1], (input_shape[0], input_shape[1], state_len))
-                else:
-                    self.set_rank(node.output[1], len(input_shape))
-        elif self.has_rank(node.input[0]):
-            rk = self.get_rank(node.input[0])
-            self.set_rank(node.output[0], rk)
-            if len(node.output) > 1 and node.output[1]:
-                self.set_rank(node.output[1], rk)
-        return None
-
-    # GreedySearch: generates sequences greedily.
-    # Input[0]: input_ids (batch_size, sequence_length) INT32
-    # Input[1]: max_length (1,) INT32
-    # Output[0]: sequences (batch_size, max_length_value) INT32
-    if node.op_type == "GreedySearch" and node.domain == "com.microsoft":
-        self.set_type(node.output[0], TensorProto.INT32)
-        if self.has_device(node.input[0]):
-            self.set_device(node.output[0], self.get_device(node.input[0]))
-        if self.has_shape(node.input[0]):
-            input_shape = self.get_shape(node.input[0])
-            batch_size = input_shape[0]
-            has_max_length = len(node.input) > 1 and node.input[1]
-            max_len_val = self.value_as_shape(node.input[1]) if has_max_length else None
-            if max_len_val is not None and len(max_len_val) == 1:
-                max_len = max_len_val[0]
-            else:
-                # Use the input name as a symbolic dimension reference.
-                max_len = node.input[1] if has_max_length else "max_len"
-            self.set_shape(node.output[0], (batch_size, max_len))
-        else:
-            self.set_rank(node.output[0], 2)
-        return None
-
-    # MoE: Mixture of Experts.
-    # Input[0]: input (num_tokens, hidden_size) or (batch_size, seq_len, hidden_size)
-    # Output[0]: output – same shape and dtype as input[0]
-    if node.op_type == "MoE" and node.domain == "com.microsoft":
-        dtype = self.get_type(node.input[0]) if self.has_type(node.input[0]) else None
-        if dtype is not None:
-            self.set_type(node.output[0], dtype)
-        if self.has_device(node.input[0]):
-            self.set_device(node.output[0], self.get_device(node.input[0]))
-        if self.has_shape(node.input[0]):
-            self.set_shape(node.output[0], self.get_shape(node.input[0]))
-        elif self.has_rank(node.input[0]):
-            self.set_rank(node.output[0], self.get_rank(node.input[0]))
-        return None
+    if node.op_type in _set_shape_type_com_microsoft_ops and node.domain == "com.microsoft":
+        return _set_shape_type_com_microsoft_ops[node.op_type](self, node)
 
     assert node.domain not in {
         "ai.onnx.ml",
