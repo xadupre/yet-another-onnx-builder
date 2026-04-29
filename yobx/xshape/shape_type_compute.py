@@ -3001,9 +3001,7 @@ def set_shape_type_moe(self: ShapeBuilder, node: NodeProto):
         self.set_rank(node.output[0], self.get_rank(node.input[0]))
 
 
-_set_shape_type_com_microsoft_ops: Dict[
-    str, Callable[[ShapeBuilder, NodeProto], None]
-] = {
+_set_shape_type_com_microsoft_ops: Dict[str, Callable[[ShapeBuilder, NodeProto], None]] = {
     "Attention": set_shape_type_attention_microsoft,
     "CausalConvWithState": set_shape_type_causal_conv_with_state,
     "CDist": set_shape_type_cdist,
