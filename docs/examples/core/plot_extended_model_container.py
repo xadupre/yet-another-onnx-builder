@@ -175,7 +175,7 @@ def make_add_model(weight_shape: list) -> onnx.ModelProto:
 
 
 shape = [2, 3]
-np_weight = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)
+np_weight = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)  # you can use torch as well
 
 container_np = ExtendedModelContainer()
 container_np.model_proto = make_add_model(shape)
