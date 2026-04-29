@@ -461,15 +461,21 @@ class TracingTensor(torch.Tensor):
     def _is_slice_only_index(index: Any) -> bool:
         """
         Returns ``True`` if *index* consists solely of :class:`slice` objects
-        (or ``None``) — i.e. no integer, boolean, :class:`TracingTensor`, or
-        ``Ellipsis`` components.
+        (or ``None`` placeholders within a tuple) — i.e. no integer, boolean,
+        :class:`TracingTensor`, or ``Ellipsis`` components.
+
+        A scalar :class:`slice` (e.g. ``slice(2, -2)``) returns ``True``
+        directly.  A ``tuple`` returns ``True`` when every element is either
+        ``None`` or a :class:`slice`.  Any other type (``int``, ``bool``,
+        ``Ellipsis``, standalone ``None``, etc.) returns ``False``.
 
         This is used to decide whether a view produced by ``__getitem__`` can
         be tracked for inplace-mutation write-back via
         :func:`~yobx.torch.tracing.setitem_with_transformation`.
 
         :param index: Any index expression.
-        :returns: ``True`` when every component is a :class:`slice` or ``None``.
+        :returns: ``True`` when the index is a :class:`slice` or a tuple
+            whose elements are all :class:`slice` or ``None``.
         """
         if isinstance(index, slice):
             return True
