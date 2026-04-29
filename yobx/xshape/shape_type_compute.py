@@ -1,5 +1,5 @@
 from collections import Counter
-from typing import Any, Dict, FrozenSet, List, Optional, Sequence, Tuple
+from typing import Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 import numpy as np
 import onnx
 from onnx import NodeProto, TensorProto
@@ -3001,7 +3001,9 @@ def _set_shape_type_moe(self: ShapeBuilder, node: NodeProto):
         self.set_rank(node.output[0], self.get_rank(node.input[0]))
 
 
-_set_shape_type_com_microsoft_ops: Dict[str, Any] = {
+_set_shape_type_com_microsoft_ops: Dict[
+    str, Callable[[ShapeBuilder, NodeProto], None]
+] = {
     "Attention": _set_shape_type_attention_microsoft,
     "CausalConvWithState": _set_shape_type_causal_conv_with_state,
     "CDist": _set_shape_type_cdist,
@@ -3021,6 +3023,8 @@ _SUPPORTED_AI_ONNX_ML_OPS: FrozenSet[str] = frozenset(
 
 _SUPPORTED_UNARY_CUSTOM_OPS: FrozenSet[str] = frozenset({"NegXplus1", "ReplaceZero"})
 
+_SUPPORTED_OP_ANY_CUSTOM_OPS: FrozenSet[str] = frozenset(_set_shape_type_op_any_custom)
+
 
 def supported_ops_in_set_shape_type_custom() -> Dict[str, FrozenSet[str]]:
     """Returns the ops supported by :func:`set_shape_type_custom` grouped by domain.
@@ -3039,7 +3043,7 @@ def supported_ops_in_set_shape_type_custom() -> Dict[str, FrozenSet[str]]:
     """
     return {
         "ai.onnx.ml": _SUPPORTED_AI_ONNX_ML_OPS,
-        "": _SUPPORTED_UNARY_CUSTOM_OPS | frozenset(_set_shape_type_op_any_custom),
+        "": _SUPPORTED_UNARY_CUSTOM_OPS | _SUPPORTED_OP_ANY_CUSTOM_OPS,
         "com.microsoft": frozenset(_set_shape_type_com_microsoft_ops),
     }
 
