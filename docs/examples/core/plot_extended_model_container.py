@@ -151,7 +151,7 @@ for init in inline_proto2.graph.initializer:
 # ``weight`` initializer is stored externally, then verifies the result.
 
 
-def _make_external_proto(name: str, shape: list) -> onnx.TensorProto:
+def make_external_proto(name: str, shape: list) -> onnx.TensorProto:
     """Builds a TensorProto shell that points to an external location *name*."""
     proto = onnx.TensorProto()
     proto.name = name
@@ -164,12 +164,12 @@ def _make_external_proto(name: str, shape: list) -> onnx.TensorProto:
     return proto
 
 
-def _make_add_model(weight_shape: list) -> onnx.ModelProto:
+def make_add_model(weight_shape: list) -> onnx.ModelProto:
     """Builds ``Y = X + weight`` with *weight* stored as external data."""
     x_vi = oh.make_tensor_value_info("X", TFLOAT, weight_shape)
     y_vi = oh.make_tensor_value_info("Y", TFLOAT, weight_shape)
     node = oh.make_node("Add", inputs=["X", "weight"], outputs=["Y"])
-    weight_ext = _make_external_proto("weight", weight_shape)
+    weight_ext = make_external_proto("weight", weight_shape)
     g = oh.make_graph([node], "add_graph", [x_vi], [y_vi], initializer=[weight_ext])
     return oh.make_model(g, opset_imports=[oh.make_opsetid("", 18)], ir_version=10)
 
@@ -178,7 +178,7 @@ shape = [2, 3]
 np_weight = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)
 
 container_np = ExtendedModelContainer()
-container_np.model_proto = _make_add_model(shape)
+container_np.model_proto = make_add_model(shape)
 container_np.large_initializers = {"#weight": np_weight}
 
 proto_np = container_np.get_model_with_data()
