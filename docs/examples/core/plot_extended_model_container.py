@@ -6,9 +6,8 @@ ExtendedModelContainer: large-initializer ONNX models
 
 :class:`ExtendedModelContainer <yobx.container.ExtendedModelContainer>`
 extends the standard :class:`onnx.model_container.ModelContainer` to handle
-**large weight tensors** — numpy arrays, PyTorch ``Parameter`` objects, or
-TensorFlow tensors — that are stored separately from the main ``.onnx`` file
-instead of being serialised inside the protobuf.
+**large weight tensors** — numpy arrays stored separately from the main
+``.onnx`` file instead of being serialised inside the protobuf.
 
 This is the typical pattern when exporting models whose weights exceed the 2 GB
 protobuf limit or when you want to keep the metadata (graph topology) separate
@@ -21,7 +20,7 @@ The example shows:
 3. Reloading the saved model and running it with ONNX Runtime.
 4. Inlining external data back with :meth:`get_model_with_data
    <yobx.container.ExtendedModelContainer.get_model_with_data>`.
-5. Defining weights with a numpy array or a torch ``Parameter``.
+5. Defining weights with a numpy array.
 6. Converting the container to an :class:`onnx_ir.Model` via :meth:`to_ir
    <yobx.container.ExtendedModelContainer.to_ir>`.
 7. Plot: comparing the serialised sizes of the container ``.onnx`` file,
@@ -144,16 +143,12 @@ for init in inline_proto2.graph.initializer:
     print(f"Initializer '{init.name}': {len(init.raw_data)} bytes inlined")
 
 # %%
-# 5. Defining weights with numpy or torch
-# ----------------------------------------
+# 5. Defining weights with numpy
+# -------------------------------
 #
-# ``large_initializers`` accepts either plain :class:`numpy.ndarray` objects
-# **or** :class:`torch.Tensor` / :class:`torch.nn.Parameter` objects.
-# :meth:`get_raw_data <yobx.container.ExtendedModelContainer.get_raw_data>`
-# dispatches on the type and serialises the tensor to raw bytes automatically.
-#
+# ``large_initializers`` accepts plain :class:`numpy.ndarray` objects.
 # The helper below builds a minimal ``Y = X + weight`` model whose
-# ``weight`` initializer is stored externally.
+# ``weight`` initializer is stored externally, then verifies the result.
 
 
 def _make_external_proto(name: str, shape: list) -> onnx.TensorProto:
@@ -180,8 +175,6 @@ def _make_add_model(weight_shape: list) -> onnx.ModelProto:
 
 
 shape = [2, 3]
-
-# --- 5a. numpy weight ---
 np_weight = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)
 
 container_np = ExtendedModelContainer()
@@ -196,29 +189,6 @@ x_in = np.ones(shape, dtype=np.float32)
 (out_np,) = sess_np.run(None, {"X": x_in})
 print("numpy weight result:\n", out_np)
 assert np.allclose(out_np, x_in + np_weight)
-
-# --- 5b. torch.nn.Parameter weight (requires torch) ---
-try:
-    import torch  # noqa: F401
-
-    torch_weight = torch.nn.Parameter(
-        torch.tensor([[10, 20, 30], [40, 50, 60]], dtype=torch.float32)
-    )
-
-    container_pt = ExtendedModelContainer()
-    container_pt.model_proto = _make_add_model(shape)
-    container_pt.large_initializers = {"#weight": torch_weight}
-
-    proto_pt = container_pt.get_model_with_data()
-    sess_pt = onnxruntime.InferenceSession(
-        proto_pt.SerializeToString(), providers=["CPUExecutionProvider"]
-    )
-    (out_pt,) = sess_pt.run(None, {"X": x_in})
-    print("torch.nn.Parameter weight result:\n", out_pt)
-    assert np.allclose(out_pt, x_in + torch_weight.detach().numpy())
-    print("Both numpy and torch weights produce consistent results ✓")
-except ImportError:
-    print("torch not installed; skipping torch.nn.Parameter demo.")
 
 # %%
 # 6. Convert to ``onnx_ir.Model``
