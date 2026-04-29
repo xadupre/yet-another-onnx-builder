@@ -2784,7 +2784,7 @@ _set_shape_type_op_any_custom = {
 }
 
 
-def _set_shape_type_packed_multi_head_attention(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_packed_multi_head_attention(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.PackedMultiHeadAttention``."""
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
@@ -2792,7 +2792,7 @@ def _set_shape_type_packed_multi_head_attention(self: ShapeBuilder, node: NodePr
         self.set_rank(node.output[0], self.get_rank(node.input[0]))
 
 
-def _set_shape_type_attention_microsoft(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_attention_microsoft(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.Attention``."""
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
@@ -2802,7 +2802,7 @@ def _set_shape_type_attention_microsoft(self: ShapeBuilder, node: NodeProto):
         self.set_rank(node.output[0], self.get_rank(node.input[0]))
 
 
-def _set_shape_type_group_query_attention(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_group_query_attention(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.GroupQueryAttention``."""
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
@@ -2810,7 +2810,7 @@ def _set_shape_type_group_query_attention(self: ShapeBuilder, node: NodeProto):
         self.set_rank(node.output[0], self.get_rank(node.input[0]))
 
 
-def _set_shape_type_murmur_hash3(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_murmur_hash3(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.MurmurHash3``."""
     self.set_type(node.output[0], TensorProto.INT32)
     if self.has_device(node.input[0]):
@@ -2821,7 +2821,7 @@ def _set_shape_type_murmur_hash3(self: ShapeBuilder, node: NodeProto):
         self.set_rank(node.output[0], self.get_rank(node.input[0]))
 
 
-def _set_shape_type_cdist(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_cdist(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.CDist``.
 
     Input A has shape ``(N, D)`` and input B has shape ``(M, D)``, so the
@@ -2839,7 +2839,7 @@ def _set_shape_type_cdist(self: ShapeBuilder, node: NodeProto):
         self.set_rank(node.output[0], 2)
 
 
-def _set_shape_type_relative_position_bias(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_relative_position_bias(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.RelativePositionBias``.
 
     Inputs: ``bias_table (num_heads, num_buckets)``, ``query_length ()``,
@@ -2861,7 +2861,7 @@ def _set_shape_type_relative_position_bias(self: ShapeBuilder, node: NodeProto):
         self.set_rank(node.output[0], 4)
 
 
-def _set_shape_type_embed_layer_normalization(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_embed_layer_normalization(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.EmbedLayerNormalization``.
 
     Inputs: ``input_ids [B, S]``, ``segment_ids [B, S]`` (optional),
@@ -2898,7 +2898,7 @@ def _set_shape_type_embed_layer_normalization(self: ShapeBuilder, node: NodeProt
             self.set_rank(node.output[1], 1)
 
 
-def _set_shape_type_gated_relative_position_bias(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_gated_relative_position_bias(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.GatedRelativePositionBias``.
 
     Inputs: ``query_layer (batch, seq_len, num_heads*head_size)``,
@@ -2923,7 +2923,7 @@ def _set_shape_type_gated_relative_position_bias(self: ShapeBuilder, node: NodeP
         self.set_rank(node.output[0], 4)
 
 
-def _set_shape_type_causal_conv_with_state(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_causal_conv_with_state(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.CausalConvWithState``.
 
     Inputs: ``input (N, C, L)``, ``weight (C, 1, K)``, ``bias (C)``
@@ -2959,7 +2959,7 @@ def _set_shape_type_causal_conv_with_state(self: ShapeBuilder, node: NodeProto):
             self.set_rank(node.output[1], rk)
 
 
-def _set_shape_type_greedy_search(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_greedy_search(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.GreedySearch``.
 
     Input ``input_ids`` has shape ``(batch_size, sequence_length)`` and type
@@ -2983,7 +2983,7 @@ def _set_shape_type_greedy_search(self: ShapeBuilder, node: NodeProto):
         self.set_rank(node.output[0], 2)
 
 
-def _set_shape_type_moe(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_moe(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.MoE`` (Mixture of Experts).
 
     Input ``input`` has shape ``(num_tokens, hidden_size)`` or
@@ -3004,17 +3004,17 @@ def _set_shape_type_moe(self: ShapeBuilder, node: NodeProto):
 _set_shape_type_com_microsoft_ops: Dict[
     str, Callable[[ShapeBuilder, NodeProto], None]
 ] = {
-    "Attention": _set_shape_type_attention_microsoft,
-    "CausalConvWithState": _set_shape_type_causal_conv_with_state,
-    "CDist": _set_shape_type_cdist,
-    "EmbedLayerNormalization": _set_shape_type_embed_layer_normalization,
-    "GatedRelativePositionBias": _set_shape_type_gated_relative_position_bias,
-    "GreedySearch": _set_shape_type_greedy_search,
-    "GroupQueryAttention": _set_shape_type_group_query_attention,
-    "MoE": _set_shape_type_moe,
-    "MurmurHash3": _set_shape_type_murmur_hash3,
-    "PackedMultiHeadAttention": _set_shape_type_packed_multi_head_attention,
-    "RelativePositionBias": _set_shape_type_relative_position_bias,
+    "Attention": set_shape_type_attention_microsoft,
+    "CausalConvWithState": set_shape_type_causal_conv_with_state,
+    "CDist": set_shape_type_cdist,
+    "EmbedLayerNormalization": set_shape_type_embed_layer_normalization,
+    "GatedRelativePositionBias": set_shape_type_gated_relative_position_bias,
+    "GreedySearch": set_shape_type_greedy_search,
+    "GroupQueryAttention": set_shape_type_group_query_attention,
+    "MoE": set_shape_type_moe,
+    "MurmurHash3": set_shape_type_murmur_hash3,
+    "PackedMultiHeadAttention": set_shape_type_packed_multi_head_attention,
+    "RelativePositionBias": set_shape_type_relative_position_bias,
 }
 
 _SUPPORTED_AI_ONNX_ML_OPS: FrozenSet[str] = frozenset(
