@@ -703,3 +703,109 @@ keyword arguments:
 
     :ref:`l-design-evaluator` — overview of the three evaluators provided
     by ``yobx`` and when to use each one.
+
+.. _l-ort-run-options:
+
+onnxruntime.RunOptions
+======================
+
+:class:`onnxruntime.RunOptions` controls a single call to
+``InferenceSession.run()``.  It exposes a small set of named properties
+and, like ``SessionOptions``, an ``add_run_config_entry(key, value)``
+method for advanced per-run settings.
+
+Named properties
+----------------
+
+.. list-table::
+   :widths: 35 12 53
+   :header-rows: 1
+
+   * - Property
+     - Default
+     - Description
+   * - ``log_severity_level``
+     - ``2`` (WARNING)
+     - Minimum verbosity of messages logged during the run.
+       Same severity scale as
+       ``SessionOptions.log_severity_level``:
+       0 = VERBOSE, 1 = INFO, 2 = WARNING, 3 = ERROR, 4 = FATAL.
+   * - ``log_verbosity_level``
+     - ``0``
+     - Verbosity level for VERBOSE-severity messages.  Only
+       effective when ``log_severity_level`` is 0.
+   * - ``logid``
+     - ``""``
+     - Tag prepended to log messages emitted during this run.
+   * - ``terminate``
+     - ``False``
+     - Set to ``True`` to request early termination of an in-progress
+       ``run()`` call (e.g. from another thread).  Resets to ``False``
+       automatically before the next run.
+   * - ``only_execute_path_to_fetches``
+     - ``False``
+     - When ``True``, only the nodes required to compute the requested
+       output names are executed, skipping the rest of the graph.  Can
+       reduce latency when fetching a subset of outputs.
+   * - ``training_mode``
+     - ``False``
+     - Set to ``True`` to execute the model in training mode (e.g.
+       keep dropout active).
+
+.. _l-ort-run-config-entries:
+
+Run Configuration Entries
+--------------------------
+
+``add_run_config_entry(key, value)`` sets per-run configuration that
+cannot be expressed through named properties.  The full set of
+recognised keys is defined in
+``include/onnxruntime/core/session/onnxruntime_run_options_config_keys.h``.
+
+.. list-table::
+   :widths: 55 12 33
+   :header-rows: 1
+
+   * - Key
+     - Default
+     - Description
+   * - ``memory.enable_memory_arena_shrinkage``
+     - ``""``
+     - Semicolon-separated ``device:id`` pairs identifying memory arenas
+       to shrink after the run (e.g. ``"cpu:0;gpu:0"``).  Reduces peak
+       RSS between runs at the cost of re-allocation overhead.  The CPU
+       arena must not have been disabled via
+       ``SessionOptions.enable_cpu_mem_arena = False`` when ``"cpu"`` is
+       listed.
+   * - ``disable_synchronize_execution_providers``
+     - ``"0"``
+     - Set to ``"1"`` to skip synchronising execution providers (e.g.
+       the CUDA compute stream) with the CPU at the end of the run.
+       Useful for pipelined workloads where the caller synchronises
+       manually.
+   * - ``qnn.htp_perf_mode``
+     - ``"default"``
+     - HTP performance mode applied before the run for the QNN EP.
+       Allowed values: ``"burst"``, ``"balanced"``, ``"default"``,
+       ``"high_performance"``, ``"high_power_saver"``,
+       ``"low_balanced"``, ``"extreme_power_saver"``,
+       ``"low_power_saver"``, ``"power_saver"``,
+       ``"sustained_high_performance"``.
+   * - ``qnn.htp_perf_mode_post_run``
+     - ``"default"``
+     - HTP performance mode restored after the run for the QNN EP.
+       Accepts the same values as ``qnn.htp_perf_mode``.
+   * - ``qnn.rpc_control_latency``
+     - *(not set)*
+     - RPC control latency setting for the QNN HTP backend.
+   * - ``qnn.lora_config``
+     - *(not set)*
+     - Path to a QNN LoRA configuration file used to apply LoRA
+       weights inside the QNN context binary during inference.
+   * - ``gpu_graph_id``
+     - ``"0"``
+     - Graph annotation ID for CUDA EP when ``enable_cuda_graph`` is
+       enabled.  Allows capturing and replaying multiple distinct CUDA
+       graphs in the same session.  Set to ``"-1"`` to disable CUDA
+       graph capture/replay for a specific run.  Value ``"0"`` is
+       reserved for internal use.
