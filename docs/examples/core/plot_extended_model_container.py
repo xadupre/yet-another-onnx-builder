@@ -68,7 +68,7 @@ model_proto = oh.make_model(graph, opset_imports=[oh.make_opsetid("", 18)], ir_v
 # Assemble the container
 container = ExtendedModelContainer()
 container.model_proto = model_proto
-container.large_initializers = {"#weight": weight_data}
+container.set_large_initializers({"#weight": weight_data})
 
 print("model_proto graph inputs :", [i.name for i in model_proto.graph.input])
 print("model_proto initializers :", [t.name for t in model_proto.graph.initializer])
@@ -179,7 +179,7 @@ np_weight = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)  # you can use to
 
 container_np = ExtendedModelContainer()
 container_np.model_proto = make_add_model(shape)
-container_np.large_initializers = {"#weight": np_weight}
+container_np.set_large_initializers({"#weight": np_weight})
 
 proto_np = container_np.get_model_with_data()
 sess_np = onnxruntime.InferenceSession(

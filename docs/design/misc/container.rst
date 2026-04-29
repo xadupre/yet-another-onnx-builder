@@ -117,7 +117,7 @@ saves it through :class:`ExtendedModelContainer
     # ---- Populate the container and save ----
     container = ExtendedModelContainer()
     container.model_proto = model
-    container.large_initializers = {"#weight": data}
+    container.set_large_initializers({"#weight": data})
 
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "demo.onnx")
@@ -175,7 +175,7 @@ a PyTorch model to ONNX and deferring disk writes to a later stage.
 
     container = ExtendedModelContainer()
     container.model_proto = model
-    container.large_initializers = {"#weight": data}
+    container.set_large_initializers({"#weight": data})
 
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "demo_torch.onnx")
