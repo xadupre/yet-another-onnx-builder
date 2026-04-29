@@ -191,19 +191,6 @@ print("numpy weight result:\n", out_np)
 assert np.allclose(out_np, x_in + np_weight)
 
 # %%
-# 6. Convert to ``onnx_ir.Model``
-# --------------------------------
-#
-# :meth:`to_ir <yobx.container.ExtendedModelContainer.to_ir>` deserialises the
-# ``ModelProto`` (including any external tensors already loaded into
-# ``large_initializers``) into an :class:`onnx_ir.Model` object.  This gives
-# access to the full ONNX IR API for programmatic graph manipulation.
-
-ir_model = container.to_ir()
-print("onnx_ir.Model graph name :", ir_model.graph.name)
-print("onnx_ir initializers     :", [v.name for v in ir_model.graph.initializers.values()])
-
-# %%
 # 7. Plot: serialised size breakdown
 # ------------------------------------
 #
