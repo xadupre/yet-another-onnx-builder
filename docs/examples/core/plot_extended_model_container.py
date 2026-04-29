@@ -21,9 +21,10 @@ The example shows:
 3. Reloading the saved model and running it with ONNX Runtime.
 4. Inlining external data back with :meth:`get_model_with_data
    <yobx.container.ExtendedModelContainer.get_model_with_data>`.
-5. Converting the container to an :class:`onnx_ir.Model` via :meth:`to_ir
+5. Defining weights with a numpy array or a torch ``Parameter``.
+6. Converting the container to an :class:`onnx_ir.Model` via :meth:`to_ir
    <yobx.container.ExtendedModelContainer.to_ir>`.
-6. Plot: comparing the serialised sizes of the container ``.onnx`` file,
+7. Plot: comparing the serialised sizes of the container ``.onnx`` file,
    the separate weight file, and a self-contained model.
 """
 
@@ -143,7 +144,84 @@ for init in inline_proto2.graph.initializer:
     print(f"Initializer '{init.name}': {len(init.raw_data)} bytes inlined")
 
 # %%
-# 5. Convert to ``onnx_ir.Model``
+# 5. Defining weights with numpy or torch
+# ----------------------------------------
+#
+# ``large_initializers`` accepts either plain :class:`numpy.ndarray` objects
+# **or** :class:`torch.Tensor` / :class:`torch.nn.Parameter` objects.
+# :meth:`get_raw_data <yobx.container.ExtendedModelContainer.get_raw_data>`
+# dispatches on the type and serialises the tensor to raw bytes automatically.
+#
+# The helper below builds a minimal ``Y = X + weight`` model whose
+# ``weight`` initializer is stored externally.
+
+
+def _make_external_proto(name: str, shape: list) -> onnx.TensorProto:
+    """Builds a TensorProto shell that points to an external location *name*."""
+    proto = onnx.TensorProto()
+    proto.name = name
+    proto.data_type = TFLOAT
+    proto.data_location = onnx.TensorProto.EXTERNAL
+    proto.dims[:] = shape
+    entry = proto.external_data.add()
+    entry.key = "location"
+    entry.value = f"#{name}"
+    return proto
+
+
+def _make_add_model(weight_shape: list) -> onnx.ModelProto:
+    """Builds ``Y = X + weight`` with *weight* stored as external data."""
+    x_vi = oh.make_tensor_value_info("X", TFLOAT, weight_shape)
+    y_vi = oh.make_tensor_value_info("Y", TFLOAT, weight_shape)
+    node = oh.make_node("Add", inputs=["X", "weight"], outputs=["Y"])
+    weight_ext = _make_external_proto("weight", weight_shape)
+    g = oh.make_graph([node], "add_graph", [x_vi], [y_vi], initializer=[weight_ext])
+    return oh.make_model(g, opset_imports=[oh.make_opsetid("", 18)], ir_version=10)
+
+
+shape = [2, 3]
+
+# --- 5a. numpy weight ---
+np_weight = np.array([[1, 2, 3], [4, 5, 6]], dtype=np.float32)
+
+container_np = ExtendedModelContainer()
+container_np.model_proto = _make_add_model(shape)
+container_np.large_initializers = {"#weight": np_weight}
+
+proto_np = container_np.get_model_with_data()
+sess_np = onnxruntime.InferenceSession(
+    proto_np.SerializeToString(), providers=["CPUExecutionProvider"]
+)
+x_in = np.ones(shape, dtype=np.float32)
+(out_np,) = sess_np.run(None, {"X": x_in})
+print("numpy weight result:\n", out_np)
+assert np.allclose(out_np, x_in + np_weight)
+
+# --- 5b. torch.nn.Parameter weight (requires torch) ---
+try:
+    import torch  # noqa: F401
+
+    torch_weight = torch.nn.Parameter(
+        torch.tensor([[10, 20, 30], [40, 50, 60]], dtype=torch.float32)
+    )
+
+    container_pt = ExtendedModelContainer()
+    container_pt.model_proto = _make_add_model(shape)
+    container_pt.large_initializers = {"#weight": torch_weight}
+
+    proto_pt = container_pt.get_model_with_data()
+    sess_pt = onnxruntime.InferenceSession(
+        proto_pt.SerializeToString(), providers=["CPUExecutionProvider"]
+    )
+    (out_pt,) = sess_pt.run(None, {"X": x_in})
+    print("torch.nn.Parameter weight result:\n", out_pt)
+    assert np.allclose(out_pt, x_in + torch_weight.detach().numpy())
+    print("Both numpy and torch weights produce consistent results ✓")
+except ImportError:
+    print("torch not installed; skipping torch.nn.Parameter demo.")
+
+# %%
+# 6. Convert to ``onnx_ir.Model``
 # --------------------------------
 #
 # :meth:`to_ir <yobx.container.ExtendedModelContainer.to_ir>` deserialises the
@@ -156,7 +234,7 @@ print("onnx_ir.Model graph name :", ir_model.graph.name)
 print("onnx_ir initializers     :", [v.name for v in ir_model.graph.initializers.values()])
 
 # %%
-# 6. Plot: serialised size breakdown
+# 7. Plot: serialised size breakdown
 # ------------------------------------
 #
 # The bar chart below compares the sizes of the three artefacts written to
