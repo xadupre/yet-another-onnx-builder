@@ -7,6 +7,14 @@ from ...xexpressions import rename_expression
 from .shape import TracingShape, TracingInt, TracingBool, register_condition, clear_conditions
 from .tensor import TracingTensor
 
+# Mapping from ATen inplace op overloads to the transformation name string
+# recognised by :func:`~yobx.torch.tracing.setitem_with_transformation`.
+# Extend this dict to support additional elementwise inplace functions.
+_ATEN_INPLACE_TO_TRANSFORM_NAME: Dict[Any, str] = {
+    torch.ops.aten.exp_.default: "exp",
+    torch.ops.aten.sigmoid_.default: "sigmoid",
+}
+
 
 class GraphTracer:
     """
@@ -869,6 +877,44 @@ class GraphTracer:
                     f"[GraphTracer.dispatch] inplace op {func!r}: "
                     f"redirected {args[0]!r} _node -> {node.name!r}"
                 )
+            # If the inplace op targets a view (created by a slice-only
+            # __getitem__), propagate the mutation back to the source tensor
+            # via a setitem_with_transformation node.  This converts a pattern
+            # like ``torch.exp_(K[2:-2, 2:-2, :-1])`` into a functional
+            # write-back that the ONNX interpreter can handle.
+            _view_source = getattr(args[0], "_view_source", None)
+            _view_indices = getattr(args[0], "_view_indices", None)
+            if _view_source is not None and _view_indices is not None:
+                _transform_name = _ATEN_INPLACE_TO_TRANSFORM_NAME.get(func)
+                if _transform_name is not None:
+                    from ..tracing import setitem_with_transformation
+
+                    swt_node = self.graph.call_function(
+                        setitem_with_transformation,
+                        args=(
+                            _view_source._node,
+                            _view_indices,
+                            ((_transform_name, ()),),
+                        ),
+                        kwargs={},
+                    )
+                    meta_tt = self._make_tracing_tensor(
+                        _view_source._tracing_shape,
+                        _view_source.dtype,
+                        _view_source.device,
+                        swt_node,
+                    )
+                    swt_node.meta["val"] = meta_tt
+                    swt_node.meta["stack_trace"] = "".join(traceback.format_stack())
+                    # Redirect the source tensor so downstream uses (including
+                    # the graph output) see the mutated version.
+                    _view_source._node = swt_node
+                    if self.verbose > 1:
+                        print(
+                            f"[GraphTracer.dispatch] view inplace {func!r}: "
+                            f"emitted setitem_with_transformation node "
+                            f"{swt_node.name!r} for source {_view_source!r}"
+                        )
 
         flat_fake_res, treespec_res = torch.utils._pytree.tree_flatten(fake_res)
         flat_res = [

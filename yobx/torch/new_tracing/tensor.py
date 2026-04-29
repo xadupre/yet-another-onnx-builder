@@ -84,6 +84,11 @@ class TracingTensor(torch.Tensor):
             isinstance(i, int) for i in size
         ), f"Unexpected type for shape={size!r}"
         self._tracing_shape = size if isinstance(size, TracingShape) else TracingShape(size)
+        # View-source tracking: set by __getitem__ when a slice-only index is
+        # used, so that inplace ops on the view (e.g. torch.exp_) can be
+        # converted into a setitem_with_transformation node on the source.
+        self._view_source: Optional["TracingTensor"] = None
+        self._view_indices: Optional[Any] = None
 
     @property
     def shape(self) -> TracingShape:  # type: ignore
@@ -452,6 +457,26 @@ class TracingTensor(torch.Tensor):
             return any(TracingTensor._index_has_symbolic_tracing_int(i) for i in index)
         return False
 
+    @staticmethod
+    def _is_slice_only_index(index: Any) -> bool:
+        """
+        Returns ``True`` if *index* consists solely of :class:`slice` objects
+        (or ``None``) — i.e. no integer, boolean, :class:`TracingTensor`, or
+        ``Ellipsis`` components.
+
+        This is used to decide whether a view produced by ``__getitem__`` can
+        be tracked for inplace-mutation write-back via
+        :func:`~yobx.torch.tracing.setitem_with_transformation`.
+
+        :param index: Any index expression.
+        :returns: ``True`` when every component is a :class:`slice` or ``None``.
+        """
+        if isinstance(index, slice):
+            return True
+        if isinstance(index, tuple):
+            return all(i is None or isinstance(i, slice) for i in index)
+        return False
+
     def __getitem__(self, index: Any) -> Any:
         """
         Intercepts indexing on a :class:`TracingTensor` for two special cases:
@@ -471,6 +496,13 @@ class TracingTensor(torch.Tensor):
         For all other index types the default ``torch.Tensor.__getitem__``
         path is used.
 
+        When the result is a :class:`TracingTensor` and *index* consists only
+        of :class:`slice` objects, the view is tagged with
+        :attr:`_view_source` and :attr:`_view_indices` so that downstream
+        inplace operations (e.g. ``torch.exp_(t[...])`` ) can be captured
+        as :func:`~yobx.torch.tracing.setitem_with_transformation` graph
+        nodes by :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.dispatch`.
+
         :param index: Index expression.
         :returns: A :class:`TracingTensor` or the result of the default
             dispatch for other index types.
@@ -481,4 +513,14 @@ class TracingTensor(torch.Tensor):
                 return tracer._handle_select_int(self, 0, index)
             if self._index_has_symbolic_tracing_int(index):
                 return tracer._handle_symbolic_getitem(self, index)
-        return super().__getitem__(index)  # type: ignore
+        result = super().__getitem__(index)  # type: ignore
+        # Tag the view so that inplace ops on it can be written back to the
+        # source tensor as setitem_with_transformation nodes.
+        if (
+            tracer is not None
+            and isinstance(result, TracingTensor)
+            and self._is_slice_only_index(index)
+        ):
+            result._view_source = self
+            result._view_indices = index if isinstance(index, tuple) else (index,)
+        return result
