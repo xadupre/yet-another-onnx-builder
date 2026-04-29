@@ -127,7 +127,12 @@ def _flatten_inputs(x: Any) -> List["torch.Tensor"]:  # noqa: F821
             ):
                 res.append(i)
             elif i.__class__.__name__ == "DynamicCache":
-                res.append(i)
+                from ..in_transformers.cache_helper import CacheKeyValue
+
+                ca = CacheKeyValue(i)
+                for k, v in zip(ca.key_cache, ca.value_cache):
+                    res.append(k)
+                    res.append(v)
             else:
                 res.extend(_flatten_inputs(i))
         return tuple(res) if isinstance(x, tuple) else res
@@ -480,7 +485,7 @@ def _compares_on_one_example(
         return expected, None, res
 
     try:
-        disc = max_diff(expected, got)
+        disc = max_diff(expected, got, flatten=True)
     except Exception as e:
         if not quiet:
             raise
@@ -731,7 +736,7 @@ def _run_exporter_impl(
                 return dict(error=str(e), success=0, error_step=f"run.{index}")
 
             try:
-                d = max_diff(expected, got)
+                d = max_diff(expected, got, flatten=True)
             except Exception as e:
                 if not quiet:
                     raise
