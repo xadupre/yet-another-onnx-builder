@@ -1067,6 +1067,8 @@ class TestNewTracingTracer(ExtTestCase):
             result_node, si_node, "Output must reference the setitem node, not the clone node"
         )
 
+
+class TestGraphTracerTorchCheck(ExtTestCase):
     """Tests for torch._check interception in GraphTracer."""
 
     def test_handle_check_tracing_bool_registers_condition(self):
