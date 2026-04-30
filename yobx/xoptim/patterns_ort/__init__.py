@@ -48,6 +48,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         GroupQueryAttention3DPattern,
         MultiHeadAttention3DPattern,
     )
+    from .linear_attention import LinearAttentionPattern
     from .missing_kernels import (
         MissingCosSinPattern,
         MissingRangePattern,
@@ -86,6 +87,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         GroupQueryAttention3DPattern(verbose=verbose),
         FusedConvPattern(verbose=verbose),
         FastGeluPattern(verbose=verbose),
+        LinearAttentionPattern(verbose=verbose),
         FusedMatMulPattern(verbose=verbose),
         FusedMatMulActivationPattern(verbose=verbose),
         FusedMatMulx2Pattern(verbose=verbose),
