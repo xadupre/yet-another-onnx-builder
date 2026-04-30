@@ -688,6 +688,8 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         )
         got = opt_ref.run(None, feeds)
         self.assertEqualArray(expected[0], got[0], atol=2e-4)
+
+    def test_bias_gelu(self):
         from onnxruntime import InferenceSession
 
         model = oh.make_model(
