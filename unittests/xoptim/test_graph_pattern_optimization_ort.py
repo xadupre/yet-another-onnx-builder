@@ -5130,6 +5130,20 @@ class TestCausalConvWithStatePattern(ExtTestCase):
             ir_version=9,
         )
 
+    def _decoder_attention_check_ort(
+        self, model: "ModelProto", opt_onx: "ModelProto", feeds: dict
+    ) -> None:
+        """Runs pre- and post-fusion models with OnnxRuntime and compares outputs."""
+        from onnxruntime import InferenceSession
+
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+
     def test_decoder_attention_in_pattern_list(self):
         """DecoderAttentionPattern must appear in the default ORT pattern list."""
         from yobx.xoptim.patterns_ort import get_onnxruntime_patterns
@@ -5141,7 +5155,11 @@ class TestCausalConvWithStatePattern(ExtTestCase):
     def test_decoder_attention_pattern_cross_attention(self):
         """Cross-attention fuses into com.microsoft.DecoderAttention with static_kv=True."""
         np.random.seed(0)
-        model = self.make_decoder_attention_model(cross_attn=True)
+        S, T, B, N, d = 3, 5, 2, 4, 8
+        H = N * d
+        model = self.make_decoder_attention_model(
+            seq_len=S, enc_seq_len=T, batch=B, num_heads=N, head_dim=d, cross_attn=True
+        )
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
@@ -5170,10 +5188,20 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         self.assertIsNotNone(static_kv_val)
         self.assertTrue(bool(static_kv_val.flat[0]))
 
+        feeds = {
+            "query": np.random.randn(S, B, H).astype(np.float32),
+            "key": np.random.randn(T, B, H).astype(np.float32),
+        }
+        self._decoder_attention_check_ort(model, opt_onx, feeds)
+
     def test_decoder_attention_pattern_self_attention(self):
         """Self-attention fuses into com.microsoft.DecoderAttention with static_kv=False."""
         np.random.seed(1)
-        model = self.make_decoder_attention_model(cross_attn=False)
+        S, B, N, d = 3, 2, 4, 8
+        H = N * d
+        model = self.make_decoder_attention_model(
+            seq_len=S, batch=B, num_heads=N, head_dim=d, cross_attn=False
+        )
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
@@ -5196,6 +5224,9 @@ class TestCausalConvWithStatePattern(ExtTestCase):
 
         # For self-attention query == key input
         self.assertEqual(fused[0].input[0], fused[0].input[1])
+
+        feeds = {"query": np.random.randn(S, B, H).astype(np.float32)}
+        self._decoder_attention_check_ort(model, opt_onx, feeds)
 
     def test_decoder_attention_shape_inference(self):
         """Fused DecoderAttention has the correct output shape (S, B, H)."""
