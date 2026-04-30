@@ -84,15 +84,13 @@ def decompose_einsum(
         operations, e.g. ``"ii->i"``) are **not** supported and will raise
         :exc:`NotImplementedError`.
 
-    .. runpython::
-        :showcode:
+    .. plot::
 
-        import numpy as np
+        from yobx.doc import plot_dot
         from yobx.helpers.einsum_helper import decompose_einsum
 
         model = decompose_einsum("bij,bjk->bik", (2, 3, 4), (2, 4, 5))
-        ops = [n.op_type for n in model.graph.node]
-        print("ONNX node types:", ops)
+        plot_dot(model)
     """
     n_inputs = len(equation.split("->")[0].split(","))
     input_names = [f"X{i}" for i in range(n_inputs)]
