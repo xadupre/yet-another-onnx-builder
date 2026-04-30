@@ -2923,6 +2923,98 @@ def set_shape_type_gated_relative_position_bias(self: ShapeBuilder, node: NodePr
         self.set_rank(node.output[0], 4)
 
 
+def set_shape_type_linear_attention(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.LinearAttention``.
+
+    Inputs (3-D packed format):
+
+    * ``query``  ``(B, T, H_q * d_k)``
+    * ``key``    ``(B, T, H_kv * d_k)``
+    * ``value``  ``(B, T, H_kv * d_v)``
+    * ``past_state`` (optional) ``(B, H_kv, d_k, d_v)``
+    * ``decay``  (optional)
+    * ``beta``   (optional)
+
+    Outputs:
+
+    * ``output``        ``(B, T, H_q * d_v)``
+    * ``present_state`` ``(B, H_kv, d_k, d_v)``
+    """
+    dtype = self.get_type(node.input[0]) if self.has_type(node.input[0]) else None
+    if dtype is not None:
+        self.set_type(node.output[0], dtype)
+        if len(node.output) > 1 and node.output[1]:
+            self.set_type(node.output[1], dtype)
+    if self.has_device(node.input[0]):
+        dev = self.get_device(node.input[0])
+        self.set_device(node.output[0], dev)
+        if len(node.output) > 1 and node.output[1]:
+            self.set_device(node.output[1], dev)
+
+    # Output[0]: (B, T, H_q * d_v)
+    # We derive H_q from q_num_heads attribute and value shape.
+    q_num_heads = None
+    kv_num_heads = None
+    for attr in node.attribute:
+        if attr.name == "q_num_heads":
+            q_num_heads = attr.i
+        elif attr.name == "kv_num_heads":
+            kv_num_heads = attr.i
+
+    if self.has_shape(node.input[0]):
+        q_shape = self.get_shape(node.input[0])
+        # q_shape = (B, T, H_q * d_k)
+        b_dim = q_shape[0]
+        t_dim = q_shape[1]
+        hq_dk_dim = q_shape[2]
+
+        # Compute H_q * d_v from value shape and kv_num_heads / q_num_heads.
+        if len(node.input) > 2 and node.input[2] and self.has_shape(node.input[2]):
+            v_shape = self.get_shape(node.input[2])
+            # v_shape = (B, T, H_kv * d_v)
+            hkv_dv_dim = v_shape[2]
+            if q_num_heads is not None and kv_num_heads is not None and kv_num_heads > 0:
+                # d_v = H_kv * d_v / H_kv, then H_q * d_v = H_q * d_v
+                if isinstance(hkv_dv_dim, int):
+                    d_v = hkv_dv_dim // kv_num_heads
+                    out_last_dim = q_num_heads * d_v
+                else:
+                    out_last_dim = hkv_dv_dim
+            else:
+                out_last_dim = hkv_dv_dim
+            self.set_shape(node.output[0], (b_dim, t_dim, out_last_dim))
+        else:
+            self.set_shape(node.output[0], (b_dim, t_dim, hq_dk_dim))
+    elif self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], 3)
+
+    # Output[1]: present_state (B, H_kv, d_k, d_v) – same as past_state.
+    if len(node.output) > 1 and node.output[1]:
+        if len(node.input) > 3 and node.input[3] and self.has_shape(node.input[3]):
+            self.set_shape(node.output[1], self.get_shape(node.input[3]))
+        elif len(node.input) > 1 and self.has_shape(node.input[1]):
+            k_shape = self.get_shape(node.input[1])
+            b_dim = k_shape[0]
+            hkv_dk_dim = k_shape[2]
+            if (
+                kv_num_heads is not None
+                and kv_num_heads > 0
+                and isinstance(hkv_dk_dim, int)
+                and len(node.input) > 2
+                and node.input[2]
+                and self.has_shape(node.input[2])
+            ):
+                v_shape = self.get_shape(node.input[2])
+                hkv_dv_dim = v_shape[2]
+                d_k = hkv_dk_dim // kv_num_heads
+                d_v = hkv_dv_dim // kv_num_heads if isinstance(hkv_dv_dim, int) else hkv_dv_dim
+                self.set_shape(node.output[1], (b_dim, kv_num_heads, d_k, d_v))
+            else:
+                self.set_rank(node.output[1], 4)
+        else:
+            self.set_rank(node.output[1], 4)
+
+
 def set_shape_type_causal_conv_with_state(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for ``com.microsoft.CausalConvWithState``.
 
@@ -3009,6 +3101,7 @@ _set_shape_type_com_microsoft_ops: Dict[str, Callable[[ShapeBuilder, NodeProto],
     "GatedRelativePositionBias": set_shape_type_gated_relative_position_bias,
     "GreedySearch": set_shape_type_greedy_search,
     "GroupQueryAttention": set_shape_type_group_query_attention,
+    "LinearAttention": set_shape_type_linear_attention,
     "MoE": set_shape_type_moe,
     "MurmurHash3": set_shape_type_murmur_hash3,
     "PackedMultiHeadAttention": set_shape_type_packed_multi_head_attention,

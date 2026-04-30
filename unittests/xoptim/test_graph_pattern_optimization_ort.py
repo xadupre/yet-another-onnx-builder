@@ -4765,6 +4765,257 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         opt_onx = gr.to_onnx(optimize=True)
         self.assertNotIn("MoE", [n.op_type for n in opt_onx.graph.node])
 
+    # -----------------------------------------------------------------------
+    # LinearAttention tests
+    # -----------------------------------------------------------------------
+
+    def _make_linear_attention_model(
+        self,
+        batch: int = 2,
+        q_num_heads: int = 4,
+        kv_num_heads: int = 2,
+        head_dim_k: int = 8,
+        head_dim_v: int = 8,
+        update_rule: str = "linear",
+    ) -> "ModelProto":
+        """Builds a pre-fusion linear attention ONNX subgraph (T=1, decoding).
+
+        The graph implements (``'linear'`` rule):
+
+        1. Unpack 3-D packed Q/K/V:
+           ``Reshape + Transpose + Squeeze``
+        2. Outer product: ``k ⊗ v  = Mul(Unsqueeze(k, -1), Unsqueeze(v, -2))``
+        3. State update: ``S_new = Add(past_state, kv)``
+        4. Output: ``out = Mul(Squeeze(MatMul(Unsqueeze(q, -2), S_new)), scale)``
+        5. Repack: ``Unsqueeze + Transpose + Reshape``
+
+        For ``update_rule='gated'`` an ``Exp + Mul`` decay path is inserted
+        before the ``Add``.
+        """
+        B = batch
+        Hq, Hkv, Dk, Dv = q_num_heads, kv_num_heads, head_dim_k, head_dim_v
+        T = 1  # decoding step
+
+        import math
+
+        scale = 1.0 / math.sqrt(Dk)
+
+        nodes = []
+        initializers = []
+
+        # ---- reshape shapes -----------------------------------------------
+        shape_q = onh.from_array(np.array([0, T, Hq, Dk], dtype=np.int64), name="shape_q")
+        shape_k = onh.from_array(np.array([0, T, Hkv, Dk], dtype=np.int64), name="shape_k")
+        shape_v = onh.from_array(np.array([0, T, Hkv, Dv], dtype=np.int64), name="shape_v")
+        shape_out = onh.from_array(np.array([0, -1, Hq * Dv], dtype=np.int64), name="shape_out")
+        initializers += [shape_q, shape_k, shape_v, shape_out]
+
+        # ---- Unsqueeze / Squeeze axes ------------------------------------
+        ax2 = onh.from_array(np.array([2], dtype=np.int64), name="ax2")
+        ax_m1 = onh.from_array(np.array([-1], dtype=np.int64), name="ax_m1")
+        ax_m2 = onh.from_array(np.array([-2], dtype=np.int64), name="ax_m2")
+        initializers += [ax2, ax_m1, ax_m2]
+
+        # ---- scale constant -----------------------------------------------
+        scale_cst = onh.from_array(np.array([scale], dtype=np.float32), name="scale_cst")
+        initializers.append(scale_cst)
+
+        # ---- unpack Q -------------------------------------------------------
+        nodes.append(oh.make_node("Reshape", ["query", "shape_q"], ["q_4d"]))
+        nodes.append(oh.make_node("Transpose", ["q_4d"], ["q_t"], perm=[0, 2, 1, 3]))
+        nodes.append(oh.make_node("Squeeze", ["q_t", "ax2"], ["q_sq"]))
+
+        # ---- unpack K -------------------------------------------------------
+        nodes.append(oh.make_node("Reshape", ["key", "shape_k"], ["k_4d"]))
+        nodes.append(oh.make_node("Transpose", ["k_4d"], ["k_t"], perm=[0, 2, 1, 3]))
+        nodes.append(oh.make_node("Squeeze", ["k_t", "ax2"], ["k_sq"]))
+
+        # ---- unpack V -------------------------------------------------------
+        nodes.append(oh.make_node("Reshape", ["value", "shape_v"], ["v_4d"]))
+        nodes.append(oh.make_node("Transpose", ["v_4d"], ["v_t"], perm=[0, 2, 1, 3]))
+        nodes.append(oh.make_node("Squeeze", ["v_t", "ax2"], ["v_sq"]))
+
+        # ---- outer product k ⊗ v ------------------------------------------
+        nodes.append(oh.make_node("Unsqueeze", ["k_sq", "ax_m1"], ["k_col"]))
+        nodes.append(oh.make_node("Unsqueeze", ["v_sq", "ax_m2"], ["v_row"]))
+        nodes.append(oh.make_node("Mul", ["k_col", "v_row"], ["kv_outer"]))
+
+        # ---- state update -------------------------------------------------
+        if update_rule == "linear":
+            nodes.append(oh.make_node("Add", ["past_state", "kv_outer"], ["new_state"]))
+        elif update_rule == "gated":
+            # Gated: S_new = Mul(Exp(decay_sq), past_state) + kv_outer
+            nodes.append(oh.make_node("Reshape", ["decay", "shape_k"], ["d_4d"]))
+            nodes.append(oh.make_node("Transpose", ["d_4d"], ["d_t"], perm=[0, 2, 1, 3]))
+            nodes.append(oh.make_node("Squeeze", ["d_t", "ax2"], ["d_sq"]))
+            nodes.append(oh.make_node("Exp", ["d_sq"], ["d_exp"]))
+            # Broadcast Exp(decay) over d_v dimension:
+            # d_exp: [B, Hkv, Dk] → need [B, Hkv, Dk, 1] * past_state [B, Hkv, Dk, Dv]
+            nodes.append(oh.make_node("Unsqueeze", ["d_exp", "ax_m1"], ["d_exp_col"]))
+            nodes.append(oh.make_node("Mul", ["d_exp_col", "past_state"], ["s_gated"]))
+            nodes.append(oh.make_node("Add", ["s_gated", "kv_outer"], ["new_state"]))
+        else:
+            raise ValueError(f"Unknown update_rule: {update_rule}")
+
+        # ---- output computation -------------------------------------------
+        nodes.append(oh.make_node("Unsqueeze", ["q_sq", "ax_m2"], ["q_row"]))
+        nodes.append(oh.make_node("MatMul", ["q_row", "new_state"], ["out_us"]))
+        nodes.append(oh.make_node("Squeeze", ["out_us", "ax_m2"], ["out_sq"]))
+        nodes.append(oh.make_node("Mul", ["out_sq", "scale_cst"], ["out_scaled"]))
+
+        # ---- repack to 3D -------------------------------------------------
+        nodes.append(oh.make_node("Unsqueeze", ["out_scaled", "ax2"], ["out_4d"]))
+        nodes.append(oh.make_node("Transpose", ["out_4d"], ["out_t"], perm=[0, 2, 1, 3]))
+        nodes.append(oh.make_node("Reshape", ["out_t", "shape_out"], ["output"]))
+
+        # ---- graph inputs / outputs ---------------------------------------
+        graph_inputs = [
+            oh.make_tensor_value_info("query", TFLOAT, [B, T, Hq * Dk]),
+            oh.make_tensor_value_info("key", TFLOAT, [B, T, Hkv * Dk]),
+            oh.make_tensor_value_info("value", TFLOAT, [B, T, Hkv * Dv]),
+            oh.make_tensor_value_info("past_state", TFLOAT, [B, Hkv, Dk, Dv]),
+        ]
+        if update_rule == "gated":
+            graph_inputs.append(oh.make_tensor_value_info("decay", TFLOAT, [B, T, Hkv * Dk]))
+
+        graph_outputs = [
+            oh.make_tensor_value_info("output", TFLOAT, [B, T, Hq * Dv]),
+            oh.make_tensor_value_info("new_state", TFLOAT, [B, Hkv, Dk, Dv]),
+        ]
+
+        return oh.make_model(
+            oh.make_graph(nodes, "linear_attention", graph_inputs, graph_outputs, initializers),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+
+    def test_linear_attention_in_list(self):
+        """LinearAttentionPattern must appear in the default ORT pattern list."""
+        from yobx.xoptim.patterns_ort import get_onnxruntime_patterns
+
+        patterns = get_onnxruntime_patterns()
+        names = [p.__class__.__name__ for p in patterns]
+        self.assertIn("LinearAttentionPattern", names)
+
+    def test_linear_attention_pattern_linear_rule(self):
+        """Linear rule (no decay): fuses to com.microsoft.LinearAttention."""
+        np.random.seed(0)
+        model = self._make_linear_attention_model(update_rule="linear")
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["LinearAttention"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("LinearAttention", op_types)
+        self.assertNotIn("MatMul", op_types)
+        self.assertNotIn("Unsqueeze", op_types)
+        fused = [n for n in opt_onx.graph.node if n.op_type == "LinearAttention"]
+        self.assertEqual(1, len(fused))
+        self.assertEqual("com.microsoft", fused[0].domain)
+        # Check update_rule attribute
+        rule_attr = next((a for a in fused[0].attribute if a.name == "update_rule"), None)
+        self.assertIsNotNone(rule_attr)
+        self.assertEqual("linear", rule_attr.s.decode())
+        # Verify the state output is preserved in the fused graph
+        output_names = [o.name for o in opt_onx.graph.output]
+        self.assertIn("new_state", output_names)
+
+    def test_linear_attention_pattern_gated_rule(self):
+        """Gated rule (with Exp(decay)): fuses to com.microsoft.LinearAttention."""
+        np.random.seed(1)
+        model = self._make_linear_attention_model(update_rule="gated")
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["LinearAttention"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("LinearAttention", op_types)
+        self.assertNotIn("Exp", op_types)
+        self.assertNotIn("MatMul", op_types)
+        fused = [n for n in opt_onx.graph.node if n.op_type == "LinearAttention"]
+        self.assertEqual(1, len(fused))
+        self.assertEqual("com.microsoft", fused[0].domain)
+        rule_attr = next((a for a in fused[0].attribute if a.name == "update_rule"), None)
+        self.assertIsNotNone(rule_attr)
+        self.assertEqual("gated", rule_attr.s.decode())
+
+    def test_linear_attention_shape_inference(self):
+        """Output of fused LinearAttention node has the correct shape."""
+        np.random.seed(2)
+        B, Hq, Hkv, Dk, Dv = 2, 4, 2, 8, 8
+        model = self._make_linear_attention_model(
+            batch=B,
+            q_num_heads=Hq,
+            kv_num_heads=Hkv,
+            head_dim_k=Dk,
+            head_dim_v=Dv,
+            update_rule="linear",
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["LinearAttention"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        fused = [n for n in opt_onx.graph.node if n.op_type == "LinearAttention"]
+        self.assertEqual(1, len(fused))
+        # Check q_num_heads / kv_num_heads attributes
+        qnh = next((a for a in fused[0].attribute if a.name == "q_num_heads"), None)
+        kvnh = next((a for a in fused[0].attribute if a.name == "kv_num_heads"), None)
+        self.assertIsNotNone(qnh)
+        self.assertIsNotNone(kvnh)
+        self.assertEqual(Hq, qnh.i)
+        self.assertEqual(Hkv, kvnh.i)
+
+    def test_linear_attention_no_match_without_unpack(self):
+        """Pattern must NOT match when the Q/K/V are already 3D without unpack."""
+        import math
+
+        B, Hq, Hkv, Dk, Dv = 2, 2, 2, 4, 4
+        scale = 1.0 / math.sqrt(Dk)
+        # Build a simplified graph missing the Reshape+Transpose+Squeeze unpack
+        nodes = []
+        initializers = []
+        ax_m1 = onh.from_array(np.array([-1], dtype=np.int64), name="ax_m1")
+        ax_m2 = onh.from_array(np.array([-2], dtype=np.int64), name="ax_m2")
+        scale_cst = onh.from_array(np.array([scale], dtype=np.float32), name="scale_cst")
+        initializers += [ax_m1, ax_m2, scale_cst]
+
+        # Outer product directly on raw k/v (no unpack)
+        nodes.append(oh.make_node("Unsqueeze", ["key", "ax_m1"], ["k_col"]))
+        nodes.append(oh.make_node("Unsqueeze", ["value", "ax_m2"], ["v_row"]))
+        nodes.append(oh.make_node("Mul", ["k_col", "v_row"], ["kv_outer"]))
+        nodes.append(oh.make_node("Add", ["past_state", "kv_outer"], ["new_state"]))
+        nodes.append(oh.make_node("Unsqueeze", ["query", "ax_m2"], ["q_row"]))
+        nodes.append(oh.make_node("MatMul", ["q_row", "new_state"], ["out_us"]))
+        nodes.append(oh.make_node("Squeeze", ["out_us", "ax_m2"], ["out_sq"]))
+        nodes.append(oh.make_node("Mul", ["out_sq", "scale_cst"], ["output"]))
+
+        graph_inputs = [
+            oh.make_tensor_value_info("query", TFLOAT, [B, Hq, Dk]),
+            oh.make_tensor_value_info("key", TFLOAT, [B, Hkv, Dk]),
+            oh.make_tensor_value_info("value", TFLOAT, [B, Hkv, Dv]),
+            oh.make_tensor_value_info("past_state", TFLOAT, [B, Hkv, Dk, Dv]),
+        ]
+        graph_outputs = [oh.make_tensor_value_info("output", TFLOAT, [B, Hq, Dv])]
+        model = oh.make_model(
+            oh.make_graph(nodes, "no_unpack", graph_inputs, graph_outputs, initializers),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=9,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["LinearAttention"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Without the 3D unpack path the pattern should NOT fire.
+        self.assertNotIn("LinearAttention", [n.op_type for n in opt_onx.graph.node])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
