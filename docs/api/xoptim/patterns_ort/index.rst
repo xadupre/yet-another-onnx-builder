@@ -8,6 +8,7 @@ yobx.xoptim.patterns_ort
     activation
     causal_conv
     complex_mul
+    decoder_attention
     embed_layer_normalization
     fused_conv
     fused_matmul
