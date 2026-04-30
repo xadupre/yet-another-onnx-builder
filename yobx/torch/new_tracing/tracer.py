@@ -378,7 +378,7 @@ class GraphTracer:
         :returns: A list of ``(submodule, attr_name, original_tensor)``
             triples that must be restored after tracing.
         """
-        restored: List[Tuple[torch.nn.Module, str, torch.Tensor]] = []
+        replaced_attrs: List[Tuple[torch.nn.Module, str, torch.Tensor]] = []
         for subname, submod in module.named_modules():
             # Build the set of names already handled by named_parameters /
             # named_buffers so we do not double-register them.
@@ -406,7 +406,7 @@ class GraphTracer:
                         node,
                     )
                     object.__setattr__(submod, attr_name, tt)
-                    restored.append((submod, attr_name, attr_value))
+                    replaced_attrs.append((submod, attr_name, attr_value))
                     continue
                 # Register a new placeholder for this plain tensor attribute.
                 fq_name = f"{subname}.{attr_name}" if subname else attr_name
@@ -428,8 +428,8 @@ class GraphTracer:
                         f" + {fq_name!r}"
                     )
                 object.__setattr__(submod, attr_name, tt)
-                restored.append((submod, attr_name, attr_value))
-        return restored
+                replaced_attrs.append((submod, attr_name, attr_value))
+        return replaced_attrs
 
     def place(self, tt: TracingTensor, name: Optional[str] = None) -> TracingTensor:
         """

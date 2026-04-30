@@ -379,9 +379,8 @@ class TracingTensor(torch.Tensor):
 
     def new_zeros(self, size: Any, **kwargs: Any) -> Any:
         """
-        Overrides :meth:`torch.Tensor.new_zeros` to accept a
-        :class:`~yobx.torch.new_tracing.shape.TracingShape` as the *size*
-        argument.
+        Accepts a :class:`~yobx.torch.new_tracing.shape.TracingShape` as the
+        *size* argument in addition to the types accepted by the base class.
 
         When a module attribute is temporarily replaced with a
         :class:`TracingTensor` during tracing, ``self.attr.shape`` returns a
@@ -398,7 +397,9 @@ class TracingTensor(torch.Tensor):
             values are forwarded unchanged.
         :param kwargs: Additional keyword arguments forwarded to
             :meth:`torch.Tensor.new_zeros`.
-        :returns: A :class:`TracingTensor` representing the zero-filled tensor.
+
+        Returns:
+            A :class:`TracingTensor` representing the zero-filled tensor.
         """
         if isinstance(size, TracingShape):
             size = tuple(int(d) if isinstance(d, TracingInt) else d for d in size)
