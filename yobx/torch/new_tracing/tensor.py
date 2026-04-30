@@ -377,6 +377,33 @@ class TracingTensor(torch.Tensor):
             return self._div_by_tracing_int(other)
         return super().__truediv__(other)
 
+    def new_zeros(self, size: Any, **kwargs: Any) -> Any:
+        """
+        Overrides :meth:`torch.Tensor.new_zeros` to accept a
+        :class:`~yobx.torch.new_tracing.shape.TracingShape` as the *size*
+        argument.
+
+        When a module attribute is temporarily replaced with a
+        :class:`TracingTensor` during tracing, ``self.attr.shape`` returns a
+        :class:`~yobx.torch.new_tracing.shape.TracingShape` instead of a
+        ``torch.Size``.  The C++ pybind for ``new_zeros`` does not accept
+        custom sequence types, so this override converts concrete
+        :class:`~yobx.torch.new_tracing.shape.TracingShape` objects to plain
+        ``tuple`` of ``int`` before delegating to the parent implementation
+        (which routes through ``__torch_dispatch__``).
+
+        :param size: The desired output shape.  A
+            :class:`~yobx.torch.new_tracing.shape.TracingShape` with concrete
+            integer dimensions is converted to a plain ``tuple``; all other
+            values are forwarded unchanged.
+        :param kwargs: Additional keyword arguments forwarded to
+            :meth:`torch.Tensor.new_zeros`.
+        :returns: A :class:`TracingTensor` representing the zero-filled tensor.
+        """
+        if isinstance(size, TracingShape):
+            size = tuple(int(d) if isinstance(d, TracingInt) else d for d in size)
+        return super().new_zeros(size, **kwargs)
+
     def __setitem__(self, indices: Any, values: Any) -> None:
         """
         Captures inplace index-assignment as an ``operator.setitem`` FX node.

@@ -994,8 +994,79 @@ class TestNewTracingTracer(ExtTestCase):
             "Output must reference the setitem node, not the original new_zeros",
         )
 
+    def test_trace_inplace_setitem_ellipsis_2(self):
+        """Traces copy[..., index] = update via self.params.clone() and verifies graph."""
 
-class TestGraphTracerTorchCheck(ExtTestCase):
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.params = torch.zeros((1, 8192, 6), dtype=torch.float32)
+
+            def forward(self, index, update):
+                copy = self.params.clone()
+                copy[..., index] = update
+                return copy
+
+        model = Model()
+        index = torch.tensor([0, 3, 2, 5], dtype=torch.int64)
+        update = (torch.arange(4 * 8192) + 10).reshape((-1, 4)).to(torch.float32)
+
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            model,
+            args=(index, update),
+            dynamic_shapes={"index": {0: "batch"}, "update": {0: "batch"}},
+        )
+        graph.lint()
+
+        # The module attribute must be restored after tracing.
+        self.assertIsInstance(
+            model.params,
+            torch.Tensor,
+            "Module attribute must be restored to a plain Tensor after tracing",
+        )
+        self.assertFalse(
+            hasattr(model.params, "_tracer"),
+            "Module attribute must not be a TracingTensor after tracing",
+        )
+
+        # There must be a clone node in the graph (for self.params.clone()).
+        clone_nodes = [
+            n
+            for n in graph.nodes
+            if n.op == "call_function" and n.target is torch.ops.aten.clone.default
+        ]
+        self.assertEqual(len(clone_nodes), 1, "Expected exactly one aten.clone node")
+
+        # There must be an operator.setitem node in the graph.
+        setitem_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is operator.setitem
+        ]
+        self.assertEqual(len(setitem_nodes), 1, "Expected exactly one operator.setitem node")
+
+        # The setitem indices must be a tuple (Ellipsis, <FX node for index>).
+        si_node = setitem_nodes[0]
+        si_indices = si_node.args[1]
+        self.assertIsInstance(si_indices, tuple, "setitem indices must be a tuple")
+        self.assertEqual(len(si_indices), 2, "setitem indices tuple must have 2 elements")
+        self.assertIs(si_indices[0], Ellipsis, "First index must be Ellipsis")
+        self.assertIsInstance(
+            si_indices[1],
+            torch.fx.Node,
+            "Second index must be an FX Node (unwrapped TracingTensor)",
+        )
+
+        # The clone node must feed the setitem node.
+        clone_node = clone_nodes[0]
+        self.assertIs(si_node.args[0], clone_node, "setitem must operate on the clone result")
+
+        # The output must reference the setitem node.
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        result_node = output_node.args[0]
+        self.assertIs(
+            result_node, si_node, "Output must reference the setitem node, not the clone node"
+        )
+
     """Tests for torch._check interception in GraphTracer."""
 
     def test_handle_check_tracing_bool_registers_condition(self):
