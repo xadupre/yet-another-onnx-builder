@@ -7,6 +7,14 @@ from ...xexpressions import rename_expression
 from .shape import TracingShape, TracingInt, TracingBool, register_condition, clear_conditions
 from .tensor import TracingTensor
 
+# Mapping from ATen inplace op overloads to the transformation name string
+# recognised by :func:`~yobx.torch.tracing.setitem_with_transformation`.
+# Extend this dict to support additional elementwise inplace functions.
+_ATEN_INPLACE_TO_TRANSFORM_NAME: Dict[Any, str] = {
+    torch.ops.aten.exp_.default: "exp",
+    torch.ops.aten.sigmoid_.default: "sigmoid",
+}
+
 
 class GraphTracer:
     """
@@ -827,6 +835,49 @@ class GraphTracer:
             print(
                 f"[GraphTracer.dispatch] fake_kwargs={string_type(fake_kwargs, with_shape=True)}"
             )
+
+        # Early-exit for inplace ops on slice views.  Running the FakeTensor
+        # computation for ``exp_`` on a view of a dynamically-shaped tensor
+        # triggers GuardOnDataDependentSymNode (PyTorch tries to evaluate a
+        # symbolic shape equality such as ``batch-4 == 1`` which cannot be
+        # resolved statically).  Detects this case up-front, emits the
+        # ``setitem_with_transformation`` FX node immediately, and returns the
+        # view TracingTensor, skipping the fake computation entirely.
+        _transform_name = _ATEN_INPLACE_TO_TRANSFORM_NAME.get(func)
+        if (
+            _transform_name is not None
+            and args
+            and isinstance(args[0], TracingTensor)
+            and hasattr(func, "_schema")
+            and func._schema.is_mutable
+            and func._schema.arguments
+            and func._schema.arguments[0].alias_info is not None
+            and func._schema.arguments[0].alias_info.is_write
+        ):
+            view_tt = args[0]
+            _view_source = getattr(view_tt, "_view_source", None)
+            _view_indices = getattr(view_tt, "_view_indices", None)
+            if _view_source is not None and _view_indices is not None:
+                from ..tracing import setitem_with_transformation
+
+                swt_node = self.graph.call_function(
+                    setitem_with_transformation,
+                    args=(_view_source._node, _view_indices, ((_transform_name, ()),)),
+                    kwargs={},
+                )
+                meta_tt = self._make_tracing_tensor(
+                    _view_source._tracing_shape, _view_source.dtype, _view_source.device, swt_node
+                )
+                swt_node.meta["val"] = meta_tt
+                swt_node.meta["stack_trace"] = "".join(traceback.format_stack())
+                _view_source._node = swt_node
+                if self.verbose > 1:
+                    print(
+                        f"[GraphTracer.dispatch] view inplace {func!r}: "
+                        f"emitted setitem_with_transformation node "
+                        f"{swt_node.name!r} for source {_view_source!r}"
+                    )
+                return view_tt
 
         # running the function
         with self._fake_mode:
