@@ -42,15 +42,32 @@ def _on_build_finished(app, exception):
     if exception or not _PAGE_DURATIONS:
         return
     top5 = sorted(_PAGE_DURATIONS.items(), key=lambda kv: kv[1], reverse=True)[:5]
-    os.makedirs(os.path.dirname(_DOC_BUILD_DURATIONS_JSON), exist_ok=True)
+    static_dir = os.path.dirname(_DOC_BUILD_DURATIONS_JSON)
+    if os.path.exists(static_dir) and not os.path.isdir(static_dir):
+        os.remove(static_dir)
+    os.makedirs(static_dir, exist_ok=True)
     with open(_DOC_BUILD_DURATIONS_JSON, "w", encoding="utf-8") as fh:
         json.dump(
             [{"docname": name, "duration_s": round(dur, 3)} for name, dur in top5], fh, indent=2
         )
 
 
+def _on_builder_inited(app):
+    """Removes any non-directory file named '_static' in the output directory.
+
+    Sphinx 9.1 raises an error when it tries to create the ``_static`` subfolder
+    but finds a plain file with that name instead of a directory.  This hook
+    runs at builder-init time and removes such a stale file so that Sphinx can
+    proceed normally.
+    """
+    outdir_static = os.path.join(str(app.outdir), "_static")
+    if os.path.exists(outdir_static) and not os.path.isdir(outdir_static):
+        os.remove(outdir_static)
+
+
 def setup(app):
     """Connects duration-tracking hooks to Sphinx events."""
+    app.connect("builder-inited", _on_builder_inited)
     app.connect("source-read", _on_source_read)
     app.connect("doctree-read", _on_doctree_read)
     app.connect("build-finished", _on_build_finished)
