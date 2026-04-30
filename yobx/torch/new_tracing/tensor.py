@@ -377,7 +377,7 @@ class TracingTensor(torch.Tensor):
             return self._div_by_tracing_int(other)
         return super().__truediv__(other)
 
-    def new_zeros(self, size: Any, **kwargs: Any) -> Any:
+    def new_zeros(self, size: Any, **kwargs: Any) -> Any:  # type: ignore[override]
         """
         Accepts a :class:`~yobx.torch.new_tracing.shape.TracingShape` as the
         *size* argument in addition to the types accepted by the base class.
