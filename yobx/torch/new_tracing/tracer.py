@@ -840,12 +840,12 @@ class GraphTracer:
         # computation for ``exp_`` on a view of a dynamically-shaped tensor
         # triggers GuardOnDataDependentSymNode (PyTorch tries to evaluate a
         # symbolic shape equality such as ``batch-4 == 1`` which cannot be
-        # resolved statically).  We detect this case up-front, emit the
-        # ``setitem_with_transformation`` FX node immediately, and return the
-        # view TracingTensor – skipping the fake computation entirely.
-        _transform_name_early = _ATEN_INPLACE_TO_TRANSFORM_NAME.get(func)
+        # resolved statically).  Detects this case up-front, emits the
+        # ``setitem_with_transformation`` FX node immediately, and returns the
+        # view TracingTensor, skipping the fake computation entirely.
+        _transform_name = _ATEN_INPLACE_TO_TRANSFORM_NAME.get(func)
         if (
-            _transform_name_early is not None
+            _transform_name is not None
             and args
             and isinstance(args[0], TracingTensor)
             and hasattr(func, "_schema")
@@ -855,34 +855,27 @@ class GraphTracer:
             and func._schema.arguments[0].alias_info.is_write
         ):
             view_tt = args[0]
-            _view_source_early = getattr(view_tt, "_view_source", None)
-            _view_indices_early = getattr(view_tt, "_view_indices", None)
-            if _view_source_early is not None and _view_indices_early is not None:
+            _view_source = getattr(view_tt, "_view_source", None)
+            _view_indices = getattr(view_tt, "_view_indices", None)
+            if _view_source is not None and _view_indices is not None:
                 from ..tracing import setitem_with_transformation
 
                 swt_node = self.graph.call_function(
                     setitem_with_transformation,
-                    args=(
-                        _view_source_early._node,
-                        _view_indices_early,
-                        ((_transform_name_early, ()),),
-                    ),
+                    args=(_view_source._node, _view_indices, ((_transform_name, ()),)),
                     kwargs={},
                 )
                 meta_tt = self._make_tracing_tensor(
-                    _view_source_early._tracing_shape,
-                    _view_source_early.dtype,
-                    _view_source_early.device,
-                    swt_node,
+                    _view_source._tracing_shape, _view_source.dtype, _view_source.device, swt_node
                 )
                 swt_node.meta["val"] = meta_tt
                 swt_node.meta["stack_trace"] = "".join(traceback.format_stack())
-                _view_source_early._node = swt_node
+                _view_source._node = swt_node
                 if self.verbose > 1:
                     print(
-                        f"[GraphTracer.dispatch] view inplace {func!r} (early): "
+                        f"[GraphTracer.dispatch] view inplace {func!r}: "
                         f"emitted setitem_with_transformation node "
-                        f"{swt_node.name!r} for source {_view_source_early!r}"
+                        f"{swt_node.name!r} for source {_view_source!r}"
                     )
                 return view_tt
 
