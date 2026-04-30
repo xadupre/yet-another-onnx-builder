@@ -3480,13 +3480,14 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
 
         batch_size, seq_len_val, num_heads, head_size = 2, 5, 4, 8
         model = self._build_gated_relative_position_bias_model()
+        rng = np.random.default_rng(0)
         feeds = {
-            "query_layer": np.random.default_rng(0)
-            .standard_normal((batch_size, seq_len_val, num_heads * head_size))
-            .astype(np.float32),
-            "rel_pos": np.random.default_rng(1)
-            .standard_normal((1, num_heads, seq_len_val, seq_len_val))
-            .astype(np.float32),
+            "query_layer": rng.standard_normal(
+                (batch_size, seq_len_val, num_heads * head_size)
+            ).astype(np.float32),
+            "rel_pos": rng.standard_normal((1, num_heads, seq_len_val, seq_len_val)).astype(
+                np.float32
+            ),
         }
         ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
         expected = ref.run(None, feeds)
