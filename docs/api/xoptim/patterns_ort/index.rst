@@ -12,6 +12,7 @@ yobx.xoptim.patterns_ort
     fused_conv
     fused_matmul
     greedy_search
+    linear_attention
     llm_optim
     missing_kernels
     moe
