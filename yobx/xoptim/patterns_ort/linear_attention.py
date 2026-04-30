@@ -136,6 +136,7 @@ class LinearAttentionPattern(PatternOptimization):
     """
 
     def __init__(self, verbose: int = 0, priority: int = 2):
+        """Initializes the pattern with the given verbosity and matching priority."""
         super().__init__(verbose, priority)
 
     # ------------------------------------------------------------------
@@ -145,7 +146,7 @@ class LinearAttentionPattern(PatternOptimization):
     def _get_unsqueeze_axes(
         self, g: "GraphBuilderPatternOptimization", node: NodeProto  # noqa: F821
     ) -> Optional[Tuple[int, ...]]:
-        """Returns the axes of an Unsqueeze node as a tuple, or None."""
+        """Returns the axes of an Unsqueeze node as a tuple, or ``None``."""
         axes = g.get_constant_or_attribute(node, "axes", input_index=1, cvt=tuple)
         if axes is None:
             return None
@@ -154,7 +155,7 @@ class LinearAttentionPattern(PatternOptimization):
     def _get_squeeze_axes(
         self, g: "GraphBuilderPatternOptimization", node: NodeProto  # noqa: F821
     ) -> Optional[Tuple[int, ...]]:
-        """Returns the axes of a Squeeze node as a tuple, or None."""
+        """Returns the axes of a Squeeze node as a tuple, or ``None``."""
         if len(node.input) < 2:
             return None
         axes = g.get_constant_or_attribute(node, "axes", input_index=1, cvt=tuple)
@@ -165,7 +166,7 @@ class LinearAttentionPattern(PatternOptimization):
     def _get_transpose_perm(
         self, g: "GraphBuilderPatternOptimization", node: NodeProto  # noqa: F821
     ) -> Optional[Tuple[int, ...]]:
-        """Returns the perm attribute of a Transpose node as a tuple, or None."""
+        """Returns the perm attribute of a Transpose node as a tuple, or ``None``."""
         if node.op_type != "Transpose" or node.domain != "":
             return None
         perm = g.get_attribute(node, "perm")
@@ -176,7 +177,10 @@ class LinearAttentionPattern(PatternOptimization):
     def _match_unpack_3d(
         self, g: "GraphBuilderPatternOptimization", sq_out_name: str  # noqa: F821
     ) -> Optional[Tuple[NodeProto, NodeProto, NodeProto, str]]:
-        """Matches Squeeze([2]) ← Transpose([0,2,1,3]) ← Reshape ← packed_3d.
+        """Attempts to match a 3-D-unpacking path ending at *sq_out_name*.
+
+        The expected path is:
+        ``Squeeze([2]) ← Transpose([0,2,1,3]) ← Reshape ← packed_3d``
 
         Returns ``(reshape, transpose, squeeze, src_3d_name)`` or ``None``.
         """
@@ -204,8 +208,10 @@ class LinearAttentionPattern(PatternOptimization):
     def _match_repack_3d(
         self, g: "GraphBuilderPatternOptimization", scaled_out_name: str  # noqa: F821
     ) -> Optional[Tuple[NodeProto, NodeProto, NodeProto]]:
-        """Matches Unsqueeze([2]) → Transpose([0,2,1,3]) → Reshape starting
-        from the scalar (squeezed T-dim) scaled output tensor.
+        """Attempts to match the 3-D-repacking path starting from *scaled_out_name*.
+
+        The expected path is:
+        ``Unsqueeze([2]) → Transpose([0,2,1,3]) → Reshape``
 
         Returns ``(unsqueeze, transpose, reshape)`` or ``None``.
         """
@@ -242,8 +248,10 @@ class LinearAttentionPattern(PatternOptimization):
     def _match_outer_product(
         self, g: "GraphBuilderPatternOptimization", kv_node: NodeProto  # noqa: F821
     ) -> Optional[Tuple[NodeProto, NodeProto]]:
-        """Matches k ⊗ v = Mul(Unsqueeze(k, [-1]), Unsqueeze(v, [-2])) or
-        the MatMul equivalent.
+        """Attempts to match a k ⊗ v outer-product node.
+
+        Accepted forms: ``Mul(Unsqueeze(k, [-1]), Unsqueeze(v, [-2]))``
+        or the equivalent ``MatMul``.
 
         Returns ``(k_unsqueeze, v_unsqueeze)`` or ``None``.
         """
@@ -276,7 +284,7 @@ class LinearAttentionPattern(PatternOptimization):
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
-        """Anchors on the Mul node that applies the scalar scale to the output."""
+        """Attempts to match starting from a scalar-scale Mul anchor node."""
         # Anchor: Mul with exactly one constant scalar input.
         if node.op_type != "Mul" or node.domain != "":
             return self.none()
@@ -545,7 +553,7 @@ class LinearAttentionPattern(PatternOptimization):
         decay_name: Optional[str],
         add_state_name: str,
     ) -> List[NodeProto]:
-        """Creates the ``com.microsoft.LinearAttention`` node."""
+        """Creates and returns the ``com.microsoft.LinearAttention`` node."""
         scale_val = float(g.get_constant_scalar(scale_input)) if scale_input else None
 
         # Inputs: [query, key, value, past_state (opt), decay (opt)]
