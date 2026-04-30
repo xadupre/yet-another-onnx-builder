@@ -5020,7 +5020,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
     # DecoderAttentionPattern tests
     # ------------------------------------------------------------------
 
-    def _make_decoder_attention_model(
+    def make_decoder_attention_model(
         self,
         seq_len: int = 3,
         enc_seq_len: int = 5,
@@ -5141,7 +5141,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
     def test_decoder_attention_pattern_cross_attention(self):
         """Cross-attention fuses into com.microsoft.DecoderAttention with static_kv=True."""
         np.random.seed(0)
-        model = self._make_decoder_attention_model(cross_attn=True)
+        model = self.make_decoder_attention_model(cross_attn=True)
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
@@ -5173,7 +5173,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
     def test_decoder_attention_pattern_self_attention(self):
         """Self-attention fuses into com.microsoft.DecoderAttention with static_kv=False."""
         np.random.seed(1)
-        model = self._make_decoder_attention_model(cross_attn=False)
+        model = self.make_decoder_attention_model(cross_attn=False)
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
@@ -5202,7 +5202,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         np.random.seed(2)
         S, T, B, N, d = 3, 5, 2, 4, 8
         H = N * d
-        model = self._make_decoder_attention_model(
+        model = self.make_decoder_attention_model(
             seq_len=S, enc_seq_len=T, batch=B, num_heads=N, head_dim=d, cross_attn=True
         )
         gr = GraphBuilder(
@@ -5223,7 +5223,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         np.random.seed(3)
         N, d = 4, 8
         H = N * d
-        model = self._make_decoder_attention_model(num_heads=N, head_dim=d, cross_attn=True)
+        model = self.make_decoder_attention_model(num_heads=N, head_dim=d, cross_attn=True)
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
@@ -5247,7 +5247,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         np.random.seed(4)
         N, d = 4, 8
         H = N * d
-        model = self._make_decoder_attention_model(num_heads=N, head_dim=d, cross_attn=True)
+        model = self.make_decoder_attention_model(num_heads=N, head_dim=d, cross_attn=True)
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
