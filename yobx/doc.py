@@ -42,6 +42,14 @@ def reset_torch_transformers(gallery_conf, fname):  # pragma: no cover
     torch._dynamo.reset()
 
 
+def reset_tensorflow(gallery_conf, fname):  # pragma: no cover
+    """Suppresses TensorFlow logging for :epkg:`sphinx-gallery`."""
+    import logging
+
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+    logging.getLogger("tensorflow").setLevel(logging.ERROR)
+
+
 def plot_legend(
     text: str, text_bottom: str = "", color: str = "green", fontsize: int = 15
 ) -> "matplotlib.axes.Axes":  # noqa: F821

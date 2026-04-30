@@ -1,10 +1,15 @@
 import json
+import logging
 import os
 import shutil
 import sys
 import time
 from sphinx_runpython.github_link import make_linkcode_resolve
 import yobx
+
+# Suppress TensorFlow C++ and Python logging before any TF import occurs.
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
 
 # ---------------------------------------------------------------------------
 # Per-page build duration tracking (writes top-5 to a JSON file so that the
@@ -198,7 +203,11 @@ sphinx_gallery_conf = {
     "ignore_repr_types": "matplotlib\\.(text|axes)",
     # robubstness
     "reset_modules_order": "both",
-    "reset_modules": ("matplotlib", "yobx.doc.reset_torch_transformers"),
+    "reset_modules": (
+        "matplotlib",
+        "yobx.doc.reset_torch_transformers",
+        "yobx.doc.reset_tensorflow",
+    ),
 }
 
 substring_to_disable = []
