@@ -111,7 +111,7 @@ jobs:
           pytest --durations=10 unittests/builder/${{ needs.detect_builder_subfolder.outputs.subfolder }}
 
   no_torch_tests:
-    name: core (${{ matrix.os }}, py${{ matrix.python-version }})
+    name: core (${{ matrix.os }}, py${{ matrix.python-version }}, ${{ matrix.ort_package }})
     needs: core_targeted_tests
     # Run when targeted tests succeeded or were skipped (no unique subfolder / not a PR).
     # Do NOT run when targeted tests failed – that already signals a broken subfolder.
@@ -128,6 +128,7 @@ jobs:
       matrix:
         os: ["ubuntu-latest"]
         python-version: ["3.13"]
+        ort_package: ["onnxruntime", "ort-nightly"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
@@ -143,6 +144,12 @@ jobs:
 
       - name: Uninstall scikit-learn if present
         run: pip uninstall -y scikit-learn
+
+      - name: Install ort-nightly (override release build)
+        if: matrix.ort_package == 'ort-nightly'
+        run: |
+          pip uninstall -y onnxruntime
+          pip install ort-nightly --extra-index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/
 
       - name: pip freeze
         run: pip freeze
