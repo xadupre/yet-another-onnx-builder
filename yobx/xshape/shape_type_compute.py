@@ -3093,10 +3093,68 @@ def set_shape_type_moe(self: ShapeBuilder, node: NodeProto):
         self.set_rank(node.output[0], self.get_rank(node.input[0]))
 
 
+def set_shape_type_decoder_attention(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for ``com.microsoft.DecoderAttention``.
+
+    Inputs (sequence-first format):
+
+    * ``query``      ``(S, B, H)``  sequence_length, batch_size, hidden_size
+    * ``key``        ``(T, B, H)``
+    * ``q_weight``   ``(H, H)``
+    * ``kv_weight``  ``(H, 2*H)``
+    * ``bias``       ``(3*H,)``
+    * ``key_padding_mask`` (optional) ``(B, T)``
+    * ``key_cache``  (optional) ``(B, num_heads, *, head_size)``
+    * ``value_cache``(optional) ``(B, num_heads, *, head_size)``
+    * ``static_kv``, ``use_past``, ``has_layer_state``, ``has_key_padding_mask`` – bool scalars
+
+    Outputs:
+
+    * ``output``         ``(S, B, H)``
+    * ``new_key_cache``  (optional) ``(B, num_heads, *, head_size)``
+    * ``new_value_cache``(optional) ``(B, num_heads, *, head_size)``
+    """
+    dtype = self.get_type(node.input[0]) if self.has_type(node.input[0]) else None
+    if dtype is not None:
+        self.set_type(node.output[0], dtype)
+        for i in range(1, len(node.output)):
+            if node.output[i]:
+                self.set_type(node.output[i], dtype)
+    if self.has_device(node.input[0]):
+        dev = self.get_device(node.input[0])
+        self.set_device(node.output[0], dev)
+        for i in range(1, len(node.output)):
+            if node.output[i]:
+                self.set_device(node.output[i], dev)
+
+    # Output[0]: (S, B, H) – same shape as query.
+    if self.has_shape(node.input[0]):
+        self.set_shape(node.output[0], self.get_shape(node.input[0]))
+    elif self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], 3)
+
+    # Output[1] (new_key_cache) and Output[2] (new_value_cache):
+    # shape is (B, num_heads, new_seq_len, head_size).  We conservatively
+    # propagate the cache shape from key_cache/value_cache when available.
+    for cache_out_idx, cache_in_idx in ((1, 6), (2, 7)):
+        if len(node.output) <= cache_out_idx or not node.output[cache_out_idx]:
+            continue
+        if len(node.input) > cache_in_idx and node.input[cache_in_idx]:
+            if self.has_shape(node.input[cache_in_idx]):
+                self.set_shape(
+                    node.output[cache_out_idx], self.get_shape(node.input[cache_in_idx])
+                )
+            else:
+                self.set_rank(node.output[cache_out_idx], 4)
+        else:
+            self.set_rank(node.output[cache_out_idx], 4)
+
+
 _set_shape_type_com_microsoft_ops: Dict[str, Callable[[ShapeBuilder, NodeProto], None]] = {
     "Attention": set_shape_type_attention_microsoft,
     "CausalConvWithState": set_shape_type_causal_conv_with_state,
     "CDist": set_shape_type_cdist,
+    "DecoderAttention": set_shape_type_decoder_attention,
     "EmbedLayerNormalization": set_shape_type_embed_layer_normalization,
     "GatedRelativePositionBias": set_shape_type_gated_relative_position_bias,
     "GreedySearch": set_shape_type_greedy_search,
