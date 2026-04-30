@@ -165,7 +165,7 @@ class DecoderAttentionPattern(PatternOptimization):
     ) -> Optional[
         Tuple[NodeProto, Optional[NodeProto], Optional[str], NodeProto, NodeProto, str]
     ]:
-        """Matches a seq-first linear projection ending at *tensor_name*.
+        """Attempts to match a seq-first linear projection ending at *tensor_name*.
 
         Expected structure::
 
@@ -223,7 +223,7 @@ class DecoderAttentionPattern(PatternOptimization):
         node: NodeProto,
         matched: List[MatchResult],
     ) -> Optional[MatchResult]:
-        """Attempts to match starting from the output Reshape node."""
+        """Attempts to match the pattern starting from the output Reshape node."""
         # Anchor: Reshape with constant shape that produces (S, B, H) output.
         if node.op_type != "Reshape" or node.domain != "":
             return self.none()
@@ -490,7 +490,7 @@ class DecoderAttentionPattern(PatternOptimization):
         output_name: str,
         anchor_name: str,
     ) -> List[NodeProto]:
-        """Creates and returns the ``com.microsoft.DecoderAttention`` node."""
+        """Builds and returns the ``com.microsoft.DecoderAttention`` node."""
         nodes = []
         cls_name = self.__class__.__name__
 
