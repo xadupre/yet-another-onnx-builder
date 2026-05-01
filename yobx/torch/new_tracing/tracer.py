@@ -1970,9 +1970,9 @@ class GraphTracer:
         :param kwargs: Keyword arguments forwarded to ``torch.arange``.
 
         Returns:
-            Returns a :class:`TracingTensor` when any of *start*, *end*, or
-            *step* is a symbolic :class:`TracingInt`; otherwise returns the
-            eager ``torch.arange`` result.
+            A :class:`TracingTensor` when any of *start*, *end*, or *step* is
+            a symbolic :class:`TracingInt`; otherwise the eager
+            ``torch.arange`` result.
         """
         from ._patches import _ORIGINAL_TORCH_ARANGE
 

@@ -243,9 +243,8 @@ def _arange_replacement_ctx(
         whose :meth:`_handle_arange` should be used as the replacement.
 
     Returns:
-        A context manager that yields control while ``torch.arange``
-        is temporarily replaced, then restores the original implementation on
-        exit.
+        Yields control while ``torch.arange`` is temporarily replaced, then
+        restores the original implementation on exit.
     """
 
     def _arange_handler(*args: Any, **kwargs: Any) -> Any:
