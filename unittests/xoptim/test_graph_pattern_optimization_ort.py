@@ -657,6 +657,38 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         new_inputs = [tuple(n.input) for n in opt_onx.graph.node]
         self.assertNotEqual(inputs, new_inputs)
 
+    def test_fast_gelu_ort_cpu(self):
+        """FastGeluPattern: com.microsoft.FastGelu gives the same result as Gelu on ORT CPU."""
+        from onnxruntime import InferenceSession
+
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Gelu", ["X"], ["Y"])],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, [4, 8])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [4, 8])],
+            ),
+            opset_imports=[oh.make_opsetid("", 20), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        feeds = {"X": self._range(4, 8)}
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["FastGelu"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertIn("FastGelu", [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=2e-4)
+
     def test_bias_gelu(self):
         from onnxruntime import InferenceSession
 
@@ -3287,6 +3319,33 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         names = [p.__class__.__name__ for p in patterns]
         self.assertIn("RelativePositionBiasPattern", names)
 
+    @requires_cuda()
+    def test_relative_position_bias_ort_cuda(self):
+        """RelativePositionBiasPattern: fused model matches original on ORT CUDA."""
+        from onnxruntime import InferenceSession
+
+        model = self._build_relative_position_bias_model()
+        seq_len = np.array(5, dtype=np.int64)
+        feeds = {"seq_len": seq_len}
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["RelativePositionBias"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertIn("RelativePositionBias", [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CUDAExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-4)
+
     def _build_gated_relative_position_bias_model(self):
         """Constructs a DeBERTa-style gated relative position bias ONNX model."""
         batch_size = 2
@@ -3413,6 +3472,41 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         patterns = get_onnxruntime_patterns()
         names = [p.__class__.__name__ for p in patterns]
         self.assertIn("GatedRelativePositionBiasPattern", names)
+
+    @requires_cuda()
+    def test_gated_relative_position_bias_ort_cuda(self):
+        """GatedRelativePositionBiasPattern: fused model matches original on ORT CUDA."""
+        from onnxruntime import InferenceSession
+
+        batch_size, seq_len_val, num_heads, head_size = 2, 5, 4, 8
+        model = self._build_gated_relative_position_bias_model()
+        rng = np.random.default_rng(0)
+        feeds = {
+            "query_layer": rng.standard_normal(
+                (batch_size, seq_len_val, num_heads * head_size)
+            ).astype(np.float32),
+            "rel_pos": rng.standard_normal((1, num_heads, seq_len_val, seq_len_val)).astype(
+                np.float32
+            ),
+        }
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(
+                patterns=["GatedRelativePositionBias"], verbose=0
+            ),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertIn("GatedRelativePositionBias", [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CUDAExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-4)
 
     """Tests for MissingReduceMaxPattern and MissingTopKPattern."""
 
@@ -3809,6 +3903,37 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         self.assertEqual("com.microsoft", fused_nodes[0].domain)
         # Two outputs: convolution result + present_state.
         self.assertEqual(2, len(fused_nodes[0].output))
+
+    def test_causal_conv_with_state_ort(self):
+        """CausalConvWithState: fused model matches the original Concat+Conv+Slice on ORT CPU."""
+        from onnxruntime import InferenceSession
+
+        batch, channels, seq_len, kernel_size = 1, 4, 8, 3
+        model = self._make_causal_conv_model(with_slice=True)
+        rng = np.random.default_rng(0)
+        feeds = {
+            "input": rng.standard_normal((batch, channels, seq_len)).astype(np.float32),
+            "past_state": rng.standard_normal((batch, channels, kernel_size - 1)).astype(
+                np.float32
+            ),
+        }
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["CausalConvWithState"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertIn("CausalConvWithState", [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+        self.assertEqualArray(expected[1], got[1], atol=1e-5)
 
     def test_causal_conv_with_state_no_slice(self):
         """Concat + depthwise Conv (no Slice) also fuses to CausalConvWithState."""
@@ -4942,6 +5067,48 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         rule_attr = next((a for a in fused[0].attribute if a.name == "update_rule"), None)
         self.assertIsNotNone(rule_attr)
         self.assertEqual("gated", rule_attr.s.decode())
+
+    def test_linear_attention_ort_cpu(self):
+        """LinearAttentionPattern: fused LinearAttention matches original on ORT CPU.
+
+        ORT CPU's LinearAttention requires q_num_heads == kv_num_heads.
+        """
+        from onnxruntime import InferenceSession
+
+        B, Hq, Hkv, Dk, Dv = 2, 2, 2, 8, 8
+        T = 1
+        model = self._make_linear_attention_model(
+            batch=B,
+            q_num_heads=Hq,
+            kv_num_heads=Hkv,
+            head_dim_k=Dk,
+            head_dim_v=Dv,
+            update_rule="linear",
+        )
+        rng = np.random.default_rng(42)
+        feeds = {
+            "query": rng.standard_normal((B, T, Hq * Dk)).astype(np.float32),
+            "key": rng.standard_normal((B, T, Hkv * Dk)).astype(np.float32),
+            "value": rng.standard_normal((B, T, Hkv * Dv)).astype(np.float32),
+            "past_state": rng.standard_normal((B, Hkv, Dk, Dv)).astype(np.float32),
+        }
+        ref = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["LinearAttention"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertIn("LinearAttention", [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = InferenceSession(
+            opt_onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        got = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1e-5)
+        self.assertEqualArray(expected[1], got[1], atol=1e-5)
 
     def test_linear_attention_shape_inference(self):
         """Output of fused LinearAttention node has the correct shape."""
