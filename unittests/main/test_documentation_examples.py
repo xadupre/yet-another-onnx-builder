@@ -97,6 +97,7 @@ class TestDocumentationExamples(ExtTestCase):
                 and name
                 in {
                     "plot_dot_graph.py",
+                    "plot_einsum.py",
                     "plot_dump_intermediate_results.py",
                     "plot_export_report.py",
                     "plot_input_observer_tiny_llm.py",
