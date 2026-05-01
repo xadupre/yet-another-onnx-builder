@@ -14,3 +14,4 @@ Additional statistics and metadata about the documentation build.
    doc_build_durations
    comparison
    weekly_progress
+   pypi_downloads
