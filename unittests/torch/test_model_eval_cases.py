@@ -171,6 +171,11 @@ class TestModelEvalCases(ExtTestCase):
             verbose=0,
         )
 
+    def test_run_exporter_dimension0_new_tracing(self):
+        evaluation(
+            cases="ExportWithDimension0", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
     def test_run_exporter_dimension1(self):
         evaluation(
             cases="ExportWithDimension1",
