@@ -138,3 +138,40 @@ jobs:
         run: pip install transformers==5.2 && pip freeze
       - name: Run tests with transformers==5.2
         run: pytest unittests/torch --durations=10 --ignore=unittests/torch/coverage
+
+  torch_tests_ort_nightly:
+    name: tr-releases-ort-nightly (ubuntu-latest, py3.13, transformers-latest, torch-2.11)
+    needs: torch_targeted_tests
+    # Run when targeted tests succeeded or were skipped (no unique subfolder / not a PR).
+    # Do NOT run when targeted tests failed – that already signals a broken subfolder.
+    if: >-
+      always() && (
+        needs.torch_targeted_tests.result == 'success' ||
+        needs.torch_targeted_tests.result == 'skipped'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install pytorch 2.11
+        run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,torch,transformers]"
+
+      - name: Install onnxruntime nightly
+        run: |
+          pip uninstall -y onnxruntime || true
+          pip install ort-nightly --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/
+
+      - name: Install latest transformers and pip freeze
+        run: pip install --upgrade transformers && pip freeze
+
+      - name: Run tests with latest transformers and ort-nightly
+        run: pytest unittests/torch --durations=10 --ignore=unittests/torch/coverage

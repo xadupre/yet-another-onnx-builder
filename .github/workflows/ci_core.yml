@@ -164,3 +164,57 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: tensorflow
+
+  no_torch_tests_ort_nightly:
+    name: core-ort-nightly (${{ matrix.os }}, py${{ matrix.python-version }})
+    needs: core_targeted_tests
+    # Run when targeted tests succeeded or were skipped (no unique subfolder / not a PR).
+    # Do NOT run when targeted tests failed – that already signals a broken subfolder.
+    if: >-
+      always() && (
+        needs.core_targeted_tests.result == 'success' ||
+        needs.core_targeted_tests.result == 'skipped'
+      )
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install package
+        run: pip install -e .[dev,spox,onnxscript]
+
+      - name: Install pytest
+        run: pip install pytest
+
+      - name: Uninstall scikit-learn if present
+        run: pip uninstall -y scikit-learn
+
+      - name: Install onnxruntime nightly
+        run: |
+          pip uninstall -y onnxruntime || true
+          pip install ort-nightly --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/
+
+      - name: pip freeze
+        run: pip freeze
+
+      - name: Run tests (no torch, ort-nightly)
+        run: |
+          pytest --durations=10 \
+            --ignore=unittests/reference/test__inference_session_torch.py \
+            --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
+            --ignore=unittests/reference/test_torch_onnxruntime_evaluator.py \
+            --ignore=unittests/reference/test_torch_reference_evaluator.py \
+            --ignore=unittests/parity \
+            --ignore=unittests/sklearn \
+            --ignore=unittests/tensorflow \
+            --ignore=unittests/torch
