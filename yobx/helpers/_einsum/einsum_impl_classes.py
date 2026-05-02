@@ -798,6 +798,62 @@ class EinsumSubOp:
                 name="ReduceSum%s_%d" % (s_axes, id(self)),
             )
 
+    def _to_onnx_matmul(
+        self, names: Dict[int, str], opset: Optional[int], verbose: bool = False, **kwargs: Any
+    ) -> Iterable[Union[NodeProto, TensorProto]]:
+        """
+        Converts a ``matmul`` node to ONNX using an ``Einsum`` node followed by
+        an optional ``Unsqueeze`` that restores the summed-out dimensions as
+        size-1 axes so the result retains ``full_dim`` dimensions.
+        """
+        self._check_inputs_(2)
+        self._check_onnx_opset_(opset, 13)
+        inp1 = self.inputs[0]
+        inp2 = self.inputs[1]
+        name1 = self._get_data(names, inp1)
+        name2 = self._get_data(names, inp2)
+        axes = self.kwargs["axes"]
+        left = self.kwargs["left"]
+        right = self.kwargs["right"]
+        ndim = self.kwargs["ndim"]
+
+        # Build the 2-operand einsum equation that describes the contraction.
+        eq = _numpy_extended_dot_equation(ndim, ndim, axes, left, right)
+        root = self._onnx_name()
+
+        # Axes that are summed over but not kept in ``right`` are absent from
+        # the Einsum output.  Unsqueeze them back as size-1 dimensions so the
+        # result has the expected ``full_dim`` dimensions.
+        summed_axes = [a for a in sorted(axes) if a not in right]
+
+        if not summed_axes:
+            yield helper.make_node(
+                "Einsum",
+                [name1, name2],
+                [self._onnx_name()],
+                equation=eq,
+                name=f"Einsum_{id(self)}",
+            )
+        else:
+            name_einsum_raw = root + "_raw"
+            yield helper.make_node(
+                "Einsum",
+                [name1, name2],
+                [name_einsum_raw],
+                equation=eq,
+                name=f"Einsum_{id(self)}",
+            )
+            name_axes_tensor = root + "_usq_axes"
+            yield numpy_helper.from_array(
+                numpy.array(summed_axes, dtype=numpy.int64), name=name_axes_tensor
+            )
+            yield helper.make_node(
+                "Unsqueeze",
+                [name_einsum_raw, name_axes_tensor],
+                [self._onnx_name()],
+                name=f"UnsqueezeMatmul_{id(self)}",
+            )
+
     def _to_onnx_mul(
         self, names: Dict[int, str], verbose: bool = False, **kwargs: Any
     ) -> Iterable[Union[NodeProto, TensorProto]]:
@@ -1571,13 +1627,10 @@ class GraphEinsumSubOp:
             *producer_version*, *initializer*
         :return: ONNX graph
 
-        Not all graphs can be converted into ONNX. Only graphs produced
-        with `strategy='numpy'` can be converted otherwise the following
-        error shows up:
-
-        ::
-
-            NotImplementedError: to_onnx not implemented for 'matmul'.
+        Both ``strategy='numpy'`` and ``strategy='simple'`` graphs can be
+        converted to ONNX.  ``strategy='simple'`` emits ``Einsum`` nodes
+        (ONNX opset ≥ 12) while ``strategy='numpy'`` uses ``batch_dot``
+        and relies on ``Gemm`` / ``MatMul`` + ``Reshape``.
         """
         from ._onnx_utils import onnx_remove_node_unused
 

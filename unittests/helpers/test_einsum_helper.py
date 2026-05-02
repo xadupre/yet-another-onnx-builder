@@ -110,6 +110,59 @@ class TestEinsumHelper(ExtTestCase):
         model = decompose_einsum("ij,jk->ik", (2, 3), (3, 4))
         self.assertGreater(len(model.graph.node), 1)
 
+    # ------------------------------------------------------------------
+    # strategy="simple" — ONNX Einsum decomposition
+    # ------------------------------------------------------------------
+
+    def test_decompose_einsum_simple_matmul(self):
+        """Tests that strategy='simple' decomposes ``ij,jk->ik`` to ONNX Einsum."""
+        model = decompose_einsum("ij,jk->ik", (3, 4), (4, 5), strategy="simple")
+        self.assertIsNotNone(model)
+        op_types = [n.op_type for n in model.graph.node]
+        self.assertIn("Einsum", op_types)
+
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(4, 5).astype(np.float32)
+        result = self._run(model, {"X0": a, "X1": b})
+        expected = np.einsum("ij,jk->ik", a, b)
+        self.assertAlmostEqual(result, expected, atol=1e-5)
+
+    def test_decompose_einsum_simple_batched_matmul(self):
+        """Tests that strategy='simple' decomposes ``bij,bjk->bik`` correctly."""
+        model = decompose_einsum("bij,bjk->bik", (2, 3, 4), (2, 4, 5), strategy="simple")
+        op_types = [n.op_type for n in model.graph.node]
+        self.assertIn("Einsum", op_types)
+
+        a = np.random.rand(2, 3, 4).astype(np.float32)
+        b = np.random.rand(2, 4, 5).astype(np.float32)
+        result = self._run(model, {"X0": a, "X1": b})
+        expected = np.einsum("bij,bjk->bik", a, b)
+        self.assertAlmostEqual(result, expected, atol=1e-5)
+
+    def test_decompose_einsum_simple_three_operands(self):
+        """Tests that strategy='simple' handles three operands correctly."""
+        model = decompose_einsum(
+            "bac,cd,def->ebc", (2, 2, 2), (2, 2), (2, 2, 2), strategy="simple"
+        )
+        op_types = [n.op_type for n in model.graph.node]
+        self.assertIn("Einsum", op_types)
+
+        x0 = np.random.rand(2, 2, 2).astype(np.float32)
+        x1 = np.random.rand(2, 2).astype(np.float32)
+        x2 = np.random.rand(2, 2, 2).astype(np.float32)
+        result = self._run(model, {"X0": x0, "X1": x1, "X2": x2})
+        expected = np.einsum("bac,cd,def->ebc", x0, x1, x2)
+        self.assertAlmostEqual(result, expected, atol=1e-5)
+
+    def test_decompose_einsum_simple_dot(self):
+        """Tests strategy='simple' for a row-wise dot product ``ij,ij->i``."""
+        model = decompose_einsum("ij,ij->i", (3, 4), (3, 4), strategy="simple")
+        a = np.random.rand(3, 4).astype(np.float32)
+        b = np.random.rand(3, 4).astype(np.float32)
+        result = self._run(model, {"X0": a, "X1": b})
+        expected = np.einsum("ij,ij->i", a, b)
+        self.assertAlmostEqual(result, expected, atol=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

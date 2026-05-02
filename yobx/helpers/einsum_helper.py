@@ -55,7 +55,8 @@ def decompose_einsum(
     :param strategy: decomposition strategy.
         Use ``"numpy"`` (default) for a fully element-wise decomposition that
         avoids any remaining ``Einsum`` call, or ``"simple"`` for a simpler
-        decomposition that may retain a 2-operand ``Einsum`` internally.
+        decomposition that maps each 2-operand contraction to an ONNX
+        ``Einsum`` node (requires opset ≥ 12).
     :param clean: when ``True`` (default), removes unused intermediate nodes
         from the decomposed graph.
     :param verbose: print intermediate decomposition steps.
