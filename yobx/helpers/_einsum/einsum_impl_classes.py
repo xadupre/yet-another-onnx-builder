@@ -802,12 +802,12 @@ class EinsumSubOp:
         self, names: Dict[int, str], opset: Optional[int], verbose: bool = False, **kwargs: Any
     ) -> Iterable[Union[NodeProto, TensorProto]]:
         """
-        Converts a ``matmul`` node to ONNX using an ``Einsum`` node followed by
-        an optional ``Unsqueeze`` that restores the summed-out dimensions as
-        size-1 axes so the result retains ``full_dim`` dimensions.
+        Converts a ``matmul`` node to ONNX using an ``Einsum`` node (opset ≥ 12)
+        followed by an optional ``Unsqueeze`` that restores the summed-out
+        dimensions as size-1 axes so the result retains ``full_dim`` dimensions.
         """
         self._check_inputs_(2)
-        self._check_onnx_opset_(opset, 13)
+        self._check_onnx_opset_(opset, 12)
         inp1 = self.inputs[0]
         inp2 = self.inputs[1]
         name1 = self._get_data(names, inp1)
@@ -843,16 +843,25 @@ class EinsumSubOp:
                 equation=eq,
                 name=f"Einsum_{id(self)}",
             )
-            name_axes_tensor = root + "_usq_axes"
-            yield numpy_helper.from_array(
-                numpy.array(summed_axes, dtype=numpy.int64), name=name_axes_tensor
-            )
-            yield helper.make_node(
-                "Unsqueeze",
-                [name_einsum_raw, name_axes_tensor],
-                [self._onnx_name()],
-                name=f"UnsqueezeMatmul_{id(self)}",
-            )
+            if opset is not None and opset >= 13:
+                name_axes_tensor = root + "_usq_axes"
+                yield numpy_helper.from_array(
+                    numpy.array(summed_axes, dtype=numpy.int64), name=name_axes_tensor
+                )
+                yield helper.make_node(
+                    "Unsqueeze",
+                    [name_einsum_raw, name_axes_tensor],
+                    [self._onnx_name()],
+                    name=f"UnsqueezeMatmul_{id(self)}",
+                )
+            else:
+                yield helper.make_node(
+                    "Unsqueeze",
+                    [name_einsum_raw],
+                    [self._onnx_name()],
+                    axes=list(summed_axes),
+                    name=f"UnsqueezeMatmul_{id(self)}",
+                )
 
     def _to_onnx_mul(
         self, names: Dict[int, str], verbose: bool = False, **kwargs: Any
