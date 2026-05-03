@@ -184,6 +184,11 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    def test_run_exporter_dimension1_new_tracing(self):
+        evaluation(
+            cases="ExportWithDimension1", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
     @requires_torch("2.7", "scan")
     def test_run_exporter_vmap_python_nostrict(self):
         evaluation(cases="VmapPython", exporters="export-nostrict", quiet=False, dynamic=True)
