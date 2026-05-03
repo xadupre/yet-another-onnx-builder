@@ -27,7 +27,6 @@ from .einsum_2_onnx import (
     decompose_einsum_2inputs,
     EinsumBuilder,
     is_identity_perm,
-    make_value_info,
     parse_2input_equation,
 )
 
@@ -40,7 +39,6 @@ __all__ = [
     "decompose_einsum_2inputs",
     "decompose_einsum_equation",
     "is_identity_perm",
-    "make_value_info",
     "numpy_diagonal",
     "numpy_extended_dot",
     "numpy_extended_dot_matrix",

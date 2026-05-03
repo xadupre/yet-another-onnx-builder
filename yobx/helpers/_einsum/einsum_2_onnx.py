@@ -45,7 +45,8 @@ from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy
 import onnx
-from onnx import TensorProto, helper, numpy_helper
+import onnx.helper as oh
+import onnx.numpy_helper as onh
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -82,26 +83,7 @@ def is_identity_perm(perm: List[int]) -> bool:
 
 def const_int64(value: List[int], name: str) -> onnx.TensorProto:
     """Creates an int64 initializer tensor."""
-    return numpy_helper.from_array(numpy.array(value, dtype=numpy.int64), name=name)
-
-
-def make_value_info(
-    name: str, elem_type: int, shape: Optional[Sequence[Optional[Union[int, str]]]]
-) -> onnx.ValueInfoProto:
-    """
-    Builds an ONNX ``ValueInfoProto`` for a tensor input.
-
-    :param name: tensor name.
-    :param elem_type: ONNX element type (e.g. ``TensorProto.FLOAT``).
-    :param shape: optional list of dimension sizes.  Each element may be an
-        integer (fixed size), a string (symbolic name), or ``None`` (dynamic).
-        Pass ``None`` for a fully unranked input.
-    :return: :class:`onnx.ValueInfoProto`.
-    """
-    if shape is None:
-        return helper.make_tensor_value_info(name, elem_type, None)
-    onnx_dims: List[Optional[Union[int, str]]] = list(shape)
-    return helper.make_tensor_value_info(name, elem_type, onnx_dims)
+    return onh.from_array(numpy.array(value, dtype=numpy.int64), name=name)
 
 
 class EinsumBuilder:
@@ -146,7 +128,7 @@ class EinsumBuilder:
     def identity(self, inp: str, prefix: str = "id") -> str:
         """Emits an Identity node (used as a no-op rename)."""
         out = f"{prefix}_{self._uid()}"
-        self.nodes.append(helper.make_node("Identity", [inp], [out]))
+        self.nodes.append(oh.make_node("Identity", [inp], [out]))
         return out
 
     def transpose(self, inp: str, perm: List[int], prefix: str = "tr") -> str:
@@ -154,13 +136,13 @@ class EinsumBuilder:
         if is_identity_perm(perm):
             return inp
         out = f"{prefix}_{self._uid()}"
-        self.add_node(helper.make_node("Transpose", [inp], [out], perm=perm))
+        self.add_node(oh.make_node("Transpose", [inp], [out], perm=perm))
         return out
 
     def shape(self, inp: str, prefix: str = "shp") -> str:
         """Emits a Shape node and returns its output name."""
         out = f"{prefix}_{self._uid()}"
-        self.add_node(helper.make_node("Shape", [inp], [out]))
+        self.add_node(oh.make_node("Shape", [inp], [out]))
         return out
 
     def gather_dims(self, shape_name: str, indices: List[int], prefix: str) -> str:
@@ -175,7 +157,7 @@ class EinsumBuilder:
             return self.const_1d([1], prefix + "_one")
         idx_name = self.const_1d(indices, prefix + "_idx")
         out = f"{prefix}_gathered_{self._uid()}"
-        self.add_node(helper.make_node("Gather", [shape_name, idx_name], [out], axis=0))
+        self.add_node(oh.make_node("Gather", [shape_name, idx_name], [out], axis=0))
         return out
 
     def reduce_prod_1d(self, inp: str, prefix: str) -> str:
@@ -184,7 +166,7 @@ class EinsumBuilder:
         ``[product]`` via ``ReduceProd``.
         """
         out = f"{prefix}_prod_{self._uid()}"
-        self.add_node(helper.make_node("ReduceProd", [inp], [out], keepdims=1))
+        self.add_node(oh.make_node("ReduceProd", [inp], [out], keepdims=1))
         return out
 
     def dim_product(self, shape_name: str, indices: List[int], prefix: str) -> str:
@@ -204,7 +186,7 @@ class EinsumBuilder:
     def reshape(self, inp: str, shape_inp: str, prefix: str = "resh") -> str:
         """Emits a Reshape node."""
         out = f"{prefix}_{self._uid()}"
-        self.add_node(helper.make_node("Reshape", [inp, shape_inp], [out]))
+        self.add_node(oh.make_node("Reshape", [inp, shape_inp], [out]))
         return out
 
     def concat_shapes(self, parts: List[str], prefix: str = "cat") -> str:
@@ -212,14 +194,33 @@ class EinsumBuilder:
         if len(parts) == 1:
             return parts[0]
         out = f"{prefix}_{self._uid()}"
-        self.add_node(helper.make_node("Concat", parts, [out], axis=0))
+        self.add_node(oh.make_node("Concat", parts, [out], axis=0))
         return out
 
     def matmul(self, a: str, b: str, prefix: str = "mm") -> str:
         """Emits a MatMul node."""
         out = f"{prefix}_{self._uid()}"
-        self.add_node(helper.make_node("MatMul", [a, b], [out]))
+        self.add_node(oh.make_node("MatMul", [a, b], [out]))
         return out
+
+    @staticmethod
+    def make_value_info(
+        name: str, elem_type: int, shape: Optional[Sequence[Optional[Union[int, str]]]]
+    ) -> onnx.ValueInfoProto:
+        """
+        Builds an ONNX ``ValueInfoProto`` for a tensor input.
+
+        :param name: tensor name.
+        :param elem_type: ONNX element type (e.g. ``onnx.TensorProto.FLOAT``).
+        :param shape: optional list of dimension sizes.  Each element may be an
+            integer (fixed size), a string (symbolic name), or ``None`` (dynamic).
+            Pass ``None`` for a fully unranked input.
+        :return: :class:`onnx.ValueInfoProto`.
+        """
+        if shape is None:
+            return oh.make_tensor_value_info(name, elem_type, None)
+        onnx_dims: List[Optional[Union[int, str]]] = list(shape)
+        return oh.make_tensor_value_info(name, elem_type, onnx_dims)
 
 
 # ---------------------------------------------------------------------------
@@ -234,7 +235,7 @@ def decompose_einsum_2inputs(
     name0: str = "X0",
     name1: str = "X1",
     output_name: str = "Z",
-    dtype: int = TensorProto.FLOAT,
+    dtype: int = onnx.TensorProto.FLOAT,
     opset: Optional[int] = None,
 ) -> onnx.ModelProto:
     """
@@ -378,19 +379,19 @@ def decompose_einsum_2inputs(
 
     # Rename the final node output to ``output_name``.
     if final != output_name:
-        bld.nodes.append(helper.make_node("Identity", [final], [output_name]))
+        bld.nodes.append(oh.make_node("Identity", [final], [output_name]))
 
     # ------------------------------------------------------------------
     # Assemble the ONNX ModelProto.
     # ------------------------------------------------------------------
-    graph = helper.make_graph(
+    graph = oh.make_graph(
         bld.nodes,
         "einsum_2inputs",
-        [make_value_info(name0, dtype, shape0), make_value_info(name1, dtype, shape1)],
-        [helper.make_tensor_value_info(output_name, dtype, None)],
+        [bld.make_value_info(name0, dtype, shape0), bld.make_value_info(name1, dtype, shape1)],
+        [oh.make_tensor_value_info(output_name, dtype, None)],
         initializer=bld.initializers,
     )
 
-    model = helper.make_model(graph, opset_imports=[helper.make_opsetid("", opset)])
+    model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", opset)])
     model.ir_version = onnx.IR_VERSION
     return model
