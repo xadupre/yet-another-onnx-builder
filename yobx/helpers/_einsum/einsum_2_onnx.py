@@ -48,11 +48,11 @@ import onnx
 from onnx import TensorProto, helper, numpy_helper
 
 # ---------------------------------------------------------------------------
-# Internal helpers
+# Helpers
 # ---------------------------------------------------------------------------
 
 
-def _parse_2input_equation(equation: str) -> Tuple[str, str, str]:
+def parse_2input_equation(equation: str) -> Tuple[str, str, str]:
     """
     Parses a 2-input einsum equation into ``(lhs0, lhs1, rhs)``.
 
@@ -75,17 +75,17 @@ def _parse_2input_equation(equation: str) -> Tuple[str, str, str]:
     return lhs_parts[0], lhs_parts[1], parts[1]
 
 
-def _is_identity_perm(perm: List[int]) -> bool:
+def is_identity_perm(perm: List[int]) -> bool:
     """Returns ``True`` when *perm* is the identity permutation."""
     return perm == list(range(len(perm)))
 
 
-def _const_int64(value: List[int], name: str) -> onnx.TensorProto:
+def const_int64(value: List[int], name: str) -> onnx.TensorProto:
     """Creates an int64 initializer tensor."""
     return numpy_helper.from_array(numpy.array(value, dtype=numpy.int64), name=name)
 
 
-def _make_value_info(
+def make_value_info(
     name: str, elem_type: int, shape: Optional[Sequence[Optional[Union[int, str]]]]
 ) -> onnx.ValueInfoProto:
     """
@@ -104,7 +104,7 @@ def _make_value_info(
     return helper.make_tensor_value_info(name, elem_type, onnx_dims)
 
 
-class _Builder:
+class EinsumBuilder:
     """
     Stateful helper that accumulates ONNX nodes and initializers while
     generating unique names.
@@ -141,7 +141,7 @@ class _Builder:
     def const_1d(self, values: List[int], prefix: str = "c") -> str:
         """Emits a 1-D int64 constant and returns its name."""
         name = f"{prefix}_{self._uid()}"
-        return self.add_init(_const_int64(values, name))
+        return self.add_init(const_int64(values, name))
 
     def identity(self, inp: str, prefix: str = "id") -> str:
         """Emits an Identity node (used as a no-op rename)."""
@@ -151,7 +151,7 @@ class _Builder:
 
     def transpose(self, inp: str, perm: List[int], prefix: str = "tr") -> str:
         """Emits a Transpose node if *perm* is not the identity."""
-        if _is_identity_perm(perm):
+        if is_identity_perm(perm):
             return inp
         out = f"{prefix}_{self._uid()}"
         self.add_node(helper.make_node("Transpose", [inp], [out], perm=perm))
@@ -280,7 +280,7 @@ def decompose_einsum_2inputs(
     if opset is None:
         opset = min(18, onnx.defs.onnx_opset_version())
 
-    lhs0, lhs1, rhs = _parse_2input_equation(equation)
+    lhs0, lhs1, rhs = parse_2input_equation(equation)
 
     # ------------------------------------------------------------------
     # Classify index letters into four disjoint roles.
@@ -328,7 +328,7 @@ def decompose_einsum_2inputs(
     # ------------------------------------------------------------------
     # Build the ONNX graph.
     # ------------------------------------------------------------------
-    bld = _Builder(opset)
+    bld = EinsumBuilder(opset)
 
     # Step 1 – Transpose inputs to canonical order.
     x0t = bld.transpose(name0, perm0, prefix="x0t")
@@ -386,7 +386,7 @@ def decompose_einsum_2inputs(
     graph = helper.make_graph(
         bld.nodes,
         "einsum_2inputs",
-        [_make_value_info(name0, dtype, shape0), _make_value_info(name1, dtype, shape1)],
+        [make_value_info(name0, dtype, shape0), make_value_info(name1, dtype, shape1)],
         [helper.make_tensor_value_info(output_name, dtype, None)],
         initializer=bld.initializers,
     )
