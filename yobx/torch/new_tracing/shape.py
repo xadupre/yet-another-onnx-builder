@@ -1,5 +1,6 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Union
 import itertools
+import re
 import torch
 from ...xexpressions import simplify_expression
 
@@ -98,6 +99,54 @@ def _negate_condition(cond: str) -> Optional[str]:
     return None
 
 
+def _can_prove_expr_nonzero(expr: str) -> bool:
+    """Returns True if *expr* is provably non-zero given the known conditions.
+
+    Currently handles the common case where *expr* is a product of positive
+    integer constants and symbolic variables that are individually known to be
+    strictly positive (i.e. ``"var>0"`` appears in
+    :data:`_known_true_conditions`).  This covers patterns such as
+    ``10*_dyn_0*_dyn_1`` when ``torch._check(x.shape[0] > 0)`` and
+    ``torch._check(x.shape[2] > 0)`` have previously been called.
+
+    The function is conservative: any factor that is not a positive integer
+    literal or a simple identifier with a registered ``>0`` / ``>=1``
+    condition causes the function to return ``False`` (unknown).
+
+    :param expr: A symbolic expression string such as ``"10*_dyn_0*_dyn_1"``.
+
+    Returns:
+        ``True`` if every factor of the product is provably positive.
+    """
+    # Only handle "simple products" – expressions that contain no '+', '-', or
+    # parentheses at the top level.  This is conservative and avoids false
+    # positives for more complex expressions.
+    if "+" in expr or "-" in expr or "(" in expr:
+        return False
+    factors = expr.split("*")
+    for factor in factors:
+        factor = factor.strip()
+        if not factor:
+            return False
+        # Positive integer constant.
+        try:
+            val = int(factor)
+            if val > 0:
+                continue
+            return False
+        except ValueError:
+            pass
+        # Simple identifier – check for a registered positivity constraint.
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", factor):
+            if (
+                f"{factor}>0" in _known_true_conditions
+                or f"{factor}>=1" in _known_true_conditions
+            ):
+                continue
+        return False
+    return True
+
+
 class TracingBool:
     """
     Represents a boolean comparison that may involve symbolic :class:`TracingInt`
@@ -148,6 +197,19 @@ class TracingBool:
         neg = _negate_condition(self.value)
         if neg is not None and neg in _known_true_conditions:
             return False
+        # Handle ``E == 0`` where E is a product of factors that are each
+        # individually known to be strictly positive (e.g.
+        # ``torch._check(x.shape[0] > 0)`` and
+        # ``torch._check(x.shape[2] > 0)`` registered before
+        # ``if x.numel() == 0:``).  If every factor of E is provably > 0
+        # then E > 0 and the condition ``E == 0`` is False.
+        if "==" in self.value:
+            idx = self.value.index("==")
+            if idx > 0 and self.value[idx - 1] not in "<>":
+                lhs = self.value[:idx].strip()
+                rhs_str = self.value[idx + 2 :].strip()
+                if rhs_str == "0" and _can_prove_expr_nonzero(lhs):
+                    return False
         raise ValueError(
             f"TracingBool({self.value!r}) cannot be converted to a Python bool; "
             "the result depends on a symbolic/dynamic dimension. "

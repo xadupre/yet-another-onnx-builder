@@ -1424,6 +1424,117 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         )
         self.assertFalse(dim1.is_static, "Cat output dim 1 must be symbolic, not static")
 
+    def test_can_prove_expr_nonzero_helper(self):
+        """_can_prove_expr_nonzero returns True iff all product factors are provably > 0."""
+        from yobx.torch.new_tracing.shape import (
+            _can_prove_expr_nonzero,
+            clear_conditions,
+            register_condition,
+            TracingInt,
+        )
+
+        clear_conditions()
+        # Register two individual positivity constraints.
+        register_condition(TracingInt("a") > 0)
+        register_condition(TracingInt("b") > 0)
+
+        self.assertTrue(_can_prove_expr_nonzero("a"), "single positive var should be provable")
+        self.assertTrue(_can_prove_expr_nonzero("5"), "positive integer constant is provable")
+        self.assertTrue(_can_prove_expr_nonzero("5*a*b"), "product of known-positive factors")
+        self.assertTrue(_can_prove_expr_nonzero("a*b"), "product of two known-positive vars")
+        self.assertFalse(
+            _can_prove_expr_nonzero("c"), "unknown variable c should not be provable"
+        )
+        self.assertFalse(
+            _can_prove_expr_nonzero("a*c"), "product with unknown var should not be provable"
+        )
+        self.assertFalse(_can_prove_expr_nonzero("a+b"), "sum expression should not be provable")
+        self.assertFalse(
+            _can_prove_expr_nonzero("0"), "zero constant should not be provable nonzero"
+        )
+        clear_conditions()
+
+    def test_tracing_bool_can_prove_nonzero_resolves_to_false(self):
+        """TracingBool('E==0') resolves to False when E is a provably nonzero product.
+
+        This covers the ControlFlowNumelZero3 pattern:
+        ``torch._check(x.shape[0] > 0); torch._check(x.shape[2] > 0)``
+        followed by ``if x.numel() == 0:``.  The numel expression is a product
+        of positive factors so the condition should resolve to False.
+        """
+        from yobx.torch.new_tracing.shape import (
+            TracingBool,
+            TracingInt,
+            clear_conditions,
+            register_condition,
+        )
+
+        clear_conditions()
+        # Simulate two separate torch._check calls on individual dimensions.
+        register_condition(TracingInt("d0") > 0)
+        register_condition(TracingInt("d2") > 0)
+
+        # Numel expression: 2 * 5 * d0 * d2 = 10*d0*d2
+        cond = TracingBool("10*d0*d2==0")
+        self.assertFalse(bool(cond), "10*d0*d2==0 must be False since d0>0 and d2>0")
+
+        # A simple single-var case.
+        cond2 = TracingBool("d0==0")
+        self.assertFalse(bool(cond2), "d0==0 must be False since d0>0")
+
+        # An unknown variable should still raise.
+        cond3 = TracingBool("unknown==0")
+        with self.assertRaises(ValueError):
+            bool(cond3)
+        clear_conditions()
+
+    def test_trace_controlflow_numel_zero_3(self):
+        """Tracing ControlFlowNumelZero3 with two separate torch._check calls succeeds.
+
+        The model uses:
+            torch._check(x.shape[0] > 0)
+            torch._check(x.shape[2] > 0)
+            if x.numel() == 0: return 0
+            return x.shape[-2]
+
+        The condition ``x.numel() == 0`` must be resolvable to False via the
+        two registered positivity constraints, so the true-branch (``return 0``)
+        is not taken and tracing succeeds.
+        """
+        if not hasattr(torch, "_check"):
+            return
+        from yobx.torch.new_tracing.shape import clear_conditions
+
+        class ControlFlowNumelZero3(torch.nn.Module):
+            def forward(self, x):
+                def empty_cache(x):
+                    torch._check(x.shape[0] > 0)
+                    torch._check(x.shape[2] > 0)
+                    if x.numel() == 0:
+                        return 0
+                    return x.shape[-2]
+
+                size = (empty_cache(x), 1)
+                return torch.full(size, fill_value=2)
+
+        clear_conditions()
+        model = ControlFlowNumelZero3()
+        x = torch.rand(3, 2, 2, 5)
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            model,
+            (x,),
+            dynamic_shapes={"x": {0: torch.export.Dim.DYNAMIC, 2: torch.export.Dim.DYNAMIC}},
+        )
+        graph.lint()
+        clear_conditions()
+
+        # The graph must contain a torch.full call (the return value).
+        full_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.full
+        ]
+        self.assertEqual(len(full_nodes), 1, "Expected exactly one torch.full node")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
