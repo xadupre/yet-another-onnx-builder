@@ -9,24 +9,34 @@ Comparing Computational Cost of Two Einsum→ONNX Decomposition Approaches
 einsum equation into a graph of primitive ONNX operators, but they follow
 different strategies:
 
-* **decompose_einsum** — uses the :class:`~yobx.helpers._einsum.EinsumSubOp` /
+* **decompose_einsum** (strategy A) — uses the
+  :class:`~yobx.helpers._einsum.EinsumSubOp` /
   :class:`~yobx.helpers._einsum.GraphEinsumSubOp` framework (``"numpy"``
-  strategy by default).  It builds a step-by-step decomposition that can
-  handle an arbitrary number of input operands and uses ``Mul``,
-  ``ReduceSum``, ``Unsqueeze``, and ``Squeeze`` in addition to ``MatMul``.
+  strategy by default).  It builds a step-by-step decomposition that handles
+  an arbitrary number of input operands.
 
-* **decompose_einsum_2inputs** — a completely independent implementation
-  restricted to exactly two input operands.  It classifies every index
-  letter into one of four roles (*batch*, *contract*, *left*, *right*) and
-  emits a fixed ``Transpose → Reshape → MatMul → Reshape → Transpose``
-  pipeline.
+* **decompose_einsum_2inputs** (strategy B) — a completely independent
+  implementation restricted to exactly two input operands.  It classifies
+  every index letter into one of four roles (*batch*, *contract*, *left*,
+  *right*) and emits a fixed
+  ``Transpose → Reshape → MatMul → Reshape → Transpose`` pipeline.
 
-This example compares the two approaches on three representative einsum
-equations by counting the number of ONNX nodes each produces and estimating
-the floating-point operation (FLOPs) cost with
-:class:`~yobx.xshape.BasicShapeBuilder` using ``inference=InferenceMode.COST``.
+This example loops over seven representative equations — including 2-D,
+3-D, and 4-D cases as well as equations with reduction (contracted indices
+absent from the output) — and for each one:
+
+1. Builds both ONNX models.
+2. Computes the **symbolic FLOPs** cost (using string-typed input dimensions
+   so the cost formula stays general) where cost inference is supported.
+3. Evaluates **concrete FLOPs** by substituting actual tensor shapes.
+4. Counts the **distribution of operator types** in each graph.
+5. Runs a short **runtime benchmark** with :mod:`onnxruntime`.
 """
 
+import time
+from collections import Counter
+
+import matplotlib.pyplot as plt
 import numpy as np
 import onnxruntime
 
@@ -34,223 +44,303 @@ from yobx.helpers.einsum_helper import decompose_einsum, decompose_einsum_2input
 from yobx.xshape import BasicShapeBuilder, InferenceMode
 
 # %%
-# Helper functions
+# 1. Equation registry
+# --------------------
+#
+# Each entry specifies:
+#
+# * *equation* — the einsum string
+# * *sym0 / sym1* — symbolic dimension names for the two inputs (used when
+#   computing symbolic FLOPs; ``None`` means the equation is skipped for
+#   symbolic analysis)
+# * *sh0 / sh1* — concrete shapes used for numerical checks and benchmarks
+
+EQUATIONS = [
+    # ── 2-D equations ──────────────────────────────────────────────────────
+    {
+        "equation": "ij,jk->ik",
+        "label": "matmul 2D",
+        "sym0": ("M", "K"),
+        "sym1": ("K", "N"),
+        "sh0": (64, 128),
+        "sh1": (128, 32),
+    },
+    {
+        "equation": "ij,ij->i",
+        "label": "row dot (reduction)",
+        "sym0": ("M", "K"),
+        "sym1": ("M", "K"),
+        "sh0": (64, 128),
+        "sh1": (64, 128),
+    },
+    # ── 3-D equations ──────────────────────────────────────────────────────
+    {
+        "equation": "bij,bjk->bik",
+        "label": "batched matmul 3D",
+        "sym0": ("B", "M", "K"),
+        "sym1": ("B", "K", "N"),
+        "sh0": (4, 64, 128),
+        "sh1": (4, 128, 32),
+    },
+    {
+        "equation": "bij,bj->bi",
+        "label": "batched matvec (reduction)",
+        "sym0": ("B", "M", "K"),
+        "sym1": ("B", "K"),
+        "sh0": (4, 64, 128),
+        "sh1": (4, 128),
+    },
+    {
+        "equation": "bik,bjk->bij",
+        "label": "batch pairwise dot",
+        "sym0": ("B", "I", "K"),
+        "sym1": ("B", "J", "K"),
+        "sh0": (4, 16, 32),
+        "sh1": (4, 24, 32),
+    },
+    # ── 4-D equations ──────────────────────────────────────────────────────
+    # Symbolic cost inference is not supported for multi-batch 4-D equations
+    # (the shape-inference engine cannot evaluate multi-element Gather nodes
+    # that arise from ReduceProd over 2+ batch dimensions).  These entries are
+    # still included for node-count and benchmark comparisons.
+    {
+        "equation": "abij,abjk->abik",
+        "label": "multi-batch matmul 4D",
+        "sym0": None,
+        "sym1": None,
+        "sh0": (2, 3, 16, 32),
+        "sh1": (2, 3, 32, 8),
+    },
+    {
+        "equation": "abij,ij->ab",
+        "label": "4D→2D reduction",
+        "sym0": None,
+        "sym1": None,
+        "sh0": (2, 3, 16, 32),
+        "sh1": (16, 32),
+    },
+]
+
+# %%
+# 2. Analysis loop
 # ----------------
 #
-# ``total_flops`` runs :meth:`~yobx.xshape.BasicShapeBuilder.run_model` with
-# ``inference=InferenceMode.COST`` to get per-node FLOPs estimates (symbolic
-# when the model has dynamic/string input shapes, or integer when the shapes
-# are fully concrete), then sums them up.
-# ``evaluate_cost_with_true_inputs`` substitutes actual tensor shapes into any
-# remaining symbolic expressions.
+# For each equation we build both ONNX models, attempt symbolic and concrete
+# FLOPs estimation, collect node-type distributions, and run a micro-benchmark.
 
+N_BENCH = 50  # repetitions for the timing benchmark
 
-def total_flops(model, feeds):
-    """Computes the total FLOPs for *model* given concrete input *feeds*.
+rng = np.random.default_rng(42)
+results = []
 
-    :param model: ONNX model to evaluate.
-    :param feeds: mapping ``{name: array}`` of actual input tensors.
-    :returns: Sum of estimated FLOPs across all nodes.
-    """
-    builder = BasicShapeBuilder()
-    cost_sym = builder.run_model(model, inference=InferenceMode.COST)
-    cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
-    return sum(flops or 0 for _, flops, _ in cost_conc)
+for spec in EQUATIONS:
+    eq = spec["equation"]
+    sh0, sh1 = spec["sh0"], spec["sh1"]
+    sym0, sym1 = spec["sym0"], spec["sym1"]
+    label = spec["label"]
 
+    feeds = {
+        "X0": rng.standard_normal(sh0).astype(np.float32),
+        "X1": rng.standard_normal(sh1).astype(np.float32),
+    }
 
-def node_count(model):
-    """Returns the number of nodes in *model*'s graph.
+    row = {"equation": eq, "label": label}
 
-    :param model: ONNX model to count nodes for.
-    :returns: Integer count of nodes in the graph.
-    """
-    return len(model.graph.node)
+    for key, fn in [("A", decompose_einsum), ("B", decompose_einsum_2inputs)]:
+        model = fn(eq, sh0, sh1)
 
+        # --- node type distribution ---
+        type_dist = Counter(n.op_type for n in model.graph.node)
+        row[f"nodes_{key}"] = sum(type_dist.values())
+        row[f"dist_{key}"] = dict(type_dist)
 
-rng = np.random.default_rng(0)
+        # --- symbolic + concrete FLOPs ---
+        sym_total = None
+        conc_total = None
+        if sym0 is not None:
+            # Build a second model with symbolic (string) dimension names to get
+            # symbolic FLOPs expressions.
+            try:
+                sym_model = fn(eq, sym0, sym1)
+                bld_sym = BasicShapeBuilder()
+                cost_sym = bld_sym.run_model(sym_model, inference=InferenceMode.COST)
+                # Pick the node whose symbolic formula contains the most dimension
+                # products (longest string with '*') as a proxy for the most
+                # compute-intensive node.  Constant integer FLOPs (no '*') are
+                # scalar ops with negligible cost and are excluded.
+                sym_totals = [
+                    (op, fl) for op, fl, _ in cost_sym if isinstance(fl, str) and "*" in fl
+                ]
+                if sym_totals:
+                    sym_total = max(sym_totals, key=lambda t: len(t[1]))
+                # Evaluate with concrete feeds.
+                bld_conc = BasicShapeBuilder()
+                cost_conc_raw = bld_conc.run_model(model, inference=InferenceMode.COST)
+                cost_conc = bld_conc.evaluate_cost_with_true_inputs(feeds, cost_conc_raw)
+                conc_total = sum(f or 0 for _, f, _ in cost_conc)
+            except RuntimeError:
+                # BasicShapeBuilder does not yet handle multi-element Gather nodes
+                # that arise when multiple batch/left/right dimensions need to be
+                # gathered at once (4-D+ multi-batch equations).  Fall back to
+                # reporting cost as unavailable.
+                pass
 
-# %%
-# 1. Matrix multiplication — ``ij,jk->ik``
-# -----------------------------------------
-#
-# The simplest useful einsum: the plain 2-D matrix product.
-# Input shapes: ``(64, 128)`` and ``(128, 32)``.
+        row[f"sym_{key}"] = sym_total
+        row[f"flops_{key}"] = conc_total
 
-eq1 = "ij,jk->ik"
-M, K, N = 64, 128, 32
+        # --- ORT numerical check ---
+        sess = onnxruntime.InferenceSession(
+            model.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        (out,) = sess.run(None, feeds)
+        expected = np.einsum(eq, feeds["X0"], feeds["X1"])
+        assert np.allclose(out, expected, atol=1e-4), f"Mismatch for {eq} strategy {key}"
 
-model1_a = decompose_einsum(eq1, (M, K), (K, N))
-model1_b = decompose_einsum_2inputs(eq1, (M, K), (K, N))
+        # --- ORT benchmark ---
+        # Warm up, then time N_BENCH inference calls.
+        for _ in range(3):
+            sess.run(None, feeds)
+        t0 = time.perf_counter()
+        for _ in range(N_BENCH):
+            sess.run(None, feeds)
+        elapsed_ms = (time.perf_counter() - t0) / N_BENCH * 1000
+        row[f"ms_{key}"] = elapsed_ms
 
-feeds1 = {
-    "X0": rng.standard_normal((M, K)).astype(np.float32),
-    "X1": rng.standard_normal((K, N)).astype(np.float32),
-}
-
-flops1_a = total_flops(model1_a, feeds1)
-flops1_b = total_flops(model1_b, feeds1)
-nodes1_a = node_count(model1_a)
-nodes1_b = node_count(model1_b)
-
-print(f"Equation: {eq1}  (M={M}, K={K}, N={N})")
-print(f"  decompose_einsum      : {nodes1_a:3d} nodes,  {flops1_a:>12,} FLOPs")
-print(f"  decompose_einsum_2inp : {nodes1_b:3d} nodes,  {flops1_b:>12,} FLOPs")
-
-# Numerical sanity check
-(r1_a,) = onnxruntime.InferenceSession(
-    model1_a.SerializeToString(), providers=["CPUExecutionProvider"]
-).run(None, feeds1)
-(r1_b,) = onnxruntime.InferenceSession(
-    model1_b.SerializeToString(), providers=["CPUExecutionProvider"]
-).run(None, feeds1)
-assert np.allclose(r1_a, r1_b, atol=1e-5), "Results differ for equation 1"
-
-# %%
-# 2. Batched matrix multiplication — ``bij,bjk->bik``
-# ----------------------------------------------------
-#
-# A 3-D batched matrix product that exercises the *batch* letter role in both
-# decompositions.
-# Input shapes: ``(4, 64, 128)`` and ``(4, 128, 32)``.
-
-eq2 = "bij,bjk->bik"
-B = 4
-
-model2_a = decompose_einsum(eq2, (B, M, K), (B, K, N))
-model2_b = decompose_einsum_2inputs(eq2, (B, M, K), (B, K, N))
-
-feeds2 = {
-    "X0": rng.standard_normal((B, M, K)).astype(np.float32),
-    "X1": rng.standard_normal((B, K, N)).astype(np.float32),
-}
-
-flops2_a = total_flops(model2_a, feeds2)
-flops2_b = total_flops(model2_b, feeds2)
-nodes2_a = node_count(model2_a)
-nodes2_b = node_count(model2_b)
-
-print(f"\nEquation: {eq2}  (B={B}, M={M}, K={K}, N={N})")
-print(f"  decompose_einsum      : {nodes2_a:3d} nodes,  {flops2_a:>12,} FLOPs")
-print(f"  decompose_einsum_2inp : {nodes2_b:3d} nodes,  {flops2_b:>12,} FLOPs")
-
-(r2_a,) = onnxruntime.InferenceSession(
-    model2_a.SerializeToString(), providers=["CPUExecutionProvider"]
-).run(None, feeds2)
-(r2_b,) = onnxruntime.InferenceSession(
-    model2_b.SerializeToString(), providers=["CPUExecutionProvider"]
-).run(None, feeds2)
-assert np.allclose(r2_a, r2_b, atol=1e-5), "Results differ for equation 2"
+    results.append(row)
 
 # %%
-# 3. Transposed second input — ``ij,kj->ik``
-# -------------------------------------------
+# 3. Symbolic FLOPs formulas
+# --------------------------
 #
-# Same dimensions as equation 1, but the second input has its axes swapped
-# so ``j`` (the contracted dimension) is the *last* axis of ``X1`` instead of
-# the first.  The decompositions must therefore introduce extra ``Transpose``
-# nodes to bring the contracted axes into the right position before the
-# ``MatMul``.
-# Input shapes: ``(64, 128)`` and ``(32, 128)``.
+# For equations where symbolic shape inference is supported, we print the
+# largest symbolic-cost node for each strategy.  The formula uses the symbolic
+# dimension names supplied in the equation registry (e.g. ``M``, ``K``, ``N``).
 
-eq3 = "ij,kj->ik"
-
-model3_a = decompose_einsum(eq3, (M, K), (N, K))
-model3_b = decompose_einsum_2inputs(eq3, (M, K), (N, K))
-
-feeds3 = {
-    "X0": rng.standard_normal((M, K)).astype(np.float32),
-    "X1": rng.standard_normal((N, K)).astype(np.float32),
-}
-
-flops3_a = total_flops(model3_a, feeds3)
-flops3_b = total_flops(model3_b, feeds3)
-nodes3_a = node_count(model3_a)
-nodes3_b = node_count(model3_b)
-
-print(f"\nEquation: {eq3}  (M={M}, K={K}, N={N})")
-print(f"  decompose_einsum      : {nodes3_a:3d} nodes,  {flops3_a:>12,} FLOPs")
-print(f"  decompose_einsum_2inp : {nodes3_b:3d} nodes,  {flops3_b:>12,} FLOPs")
-
-(r3_a,) = onnxruntime.InferenceSession(
-    model3_a.SerializeToString(), providers=["CPUExecutionProvider"]
-).run(None, feeds3)
-(r3_b,) = onnxruntime.InferenceSession(
-    model3_b.SerializeToString(), providers=["CPUExecutionProvider"]
-).run(None, feeds3)
-assert np.allclose(r3_a, r3_b, atol=1e-5), "Results differ for equation 3"
+print(f"{'Equation':<28s}  {'Strategy':<4s}  {'Most expensive node FLOPs'}")
+print("-" * 75)
+for row in results:
+    for key in ("A", "B"):
+        sym = row[f"sym_{key}"]
+        if sym is not None:
+            op_name, formula = sym
+            label = "A=decompose_einsum" if key == "A" else "B=decompose_einsum_2inp"
+            print(f"{row['equation']:<28s}  {label:<22s}  {op_name}: {formula}")
+        else:
+            print(f"{row['equation']:<28s}  {key:<22s}  (not available)")
 
 # %%
-# 4. Summary table
-# ----------------
-#
-# We collect the results for all three equations and display them.
-
-equations = [eq1, eq2, eq3]
-nodes_a = [nodes1_a, nodes2_a, nodes3_a]
-nodes_b = [nodes1_b, nodes2_b, nodes3_b]
-flops_a = [flops1_a, flops2_a, flops3_a]
-flops_b = [flops1_b, flops2_b, flops3_b]
+# 4. Summary table: node count, FLOPs, and benchmark
+# ---------------------------------------------------
 
 print(
-    "\n{:<25s}  {:>6s}  {:>6s}  {:>14s}  {:>14s}".format(
-        "Equation", "#n(A)", "#n(B)", "FLOPs(A)", "FLOPs(B)"
+    "\n{:<28s}  {:>5s}  {:>5s}  {:>12s}  {:>12s}  {:>8s}  {:>8s}".format(
+        "Equation", "#n(A)", "#n(B)", "FLOPs(A)", "FLOPs(B)", "ms(A)", "ms(B)"
     )
 )
-print("-" * 72)
-for eq, na, nb, fa, fb in zip(equations, nodes_a, nodes_b, flops_a, flops_b):
-    print(f"{eq:<25s}  {na:>6d}  {nb:>6d}  {fa:>14,}  {fb:>14,}")
-print("\n(A) = decompose_einsum  (B) = decompose_einsum_2inputs")
+print("-" * 90)
+for row in results:
+    fa = f"{row['flops_A']:>12,}" if row["flops_A"] is not None else f"{'N/A':>12s}"
+    fb = f"{row['flops_B']:>12,}" if row["flops_B"] is not None else f"{'N/A':>12s}"
+    print(
+        f"{row['equation']:<28s}  {row['nodes_A']:>5d}  {row['nodes_B']:>5d}"
+        f"  {fa}  {fb}  {row['ms_A']:>7.3f}  {row['ms_B']:>7.3f}"
+    )
+print("\n(A) = decompose_einsum  (B) = decompose_einsum_2inputs   ms = ms/inference")
 
 # %%
-# 5. Bar chart comparison
-# -----------------------
+# 5. Operator-type distribution
+# -----------------------------
 #
-# The charts below compare the two approaches side by side for each equation.
-# The left panel shows the **node count** (a proxy for graph complexity) and
-# the right panel shows the **total FLOPs** (a proxy for theoretical compute
-# work).
+# We look at the node-type distributions for the two strategies on a
+# representative equation (batched matmul ``bij,bjk->bik``).
+
+target_eq = "bij,bjk->bik"
+target_row = next(r for r in results if r["equation"] == target_eq)
+
+all_op_types = sorted(set(target_row["dist_A"]) | set(target_row["dist_B"]))
+counts_a = [target_row["dist_A"].get(op, 0) for op in all_op_types]
+counts_b = [target_row["dist_B"].get(op, 0) for op in all_op_types]
+
+print(f"\nNode-type distribution for '{target_eq}':")
+print(f"  {'Op type':<18s}  {'A':>4s}  {'B':>4s}")
+print("  " + "-" * 28)
+for op, ca, cb in zip(all_op_types, counts_a, counts_b):
+    print(f"  {op:<18s}  {ca:>4d}  {cb:>4d}")
+
+# %%
+# 6. Charts
+# ---------
 #
-# Both approaches produce graphs with identical FLOPs for the core
-# ``MatMul`` computation; any difference in total FLOPs comes from the
-# auxiliary ``Transpose``, ``Reshape``, and element-wise nodes that wrap it.
+# **Top-left** — node count per equation (both strategies).
+# **Top-right** — concrete FLOPs per equation (where available).
+# **Bottom-left** — operator-type distribution for the representative equation.
+# **Bottom-right** — mean inference time per equation.
 
-import matplotlib.pyplot as plt  # noqa: E402
-
-labels = [f"eq{i + 1}\n{eq}" for i, eq in enumerate(equations)]
-x = np.arange(len(labels))
+equations_labels = [f"{r['equation']}\n({r['label']})" for r in results]
+x = np.arange(len(results))
 width = 0.35
 
-fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
-# Left: node count
-ax = axes[0]
-bars_a = ax.bar(x - width / 2, nodes_a, width, label="decompose_einsum", color="#4c72b0")
-bars_b = ax.bar(x + width / 2, nodes_b, width, label="decompose_einsum_2inputs", color="#dd8452")
+# Top-left: node count
+ax = axes[0, 0]
+ba = ax.bar(x - width / 2, [r["nodes_A"] for r in results], width, label="A", color="#4c72b0")
+bb = ax.bar(x + width / 2, [r["nodes_B"] for r in results], width, label="B", color="#dd8452")
 ax.set_xticks(x)
-ax.set_xticklabels(labels, fontsize=8)
-ax.set_ylabel("Number of ONNX nodes")
+ax.set_xticklabels(equations_labels, fontsize=7)
+ax.set_ylabel("ONNX node count")
 ax.set_title("Graph complexity (node count)", fontsize=9)
 ax.legend(fontsize=8)
-for bar in list(bars_a) + list(bars_b):
+for bar in list(ba) + list(bb):
     ax.text(
         bar.get_x() + bar.get_width() / 2,
-        bar.get_height() + 0.2,
+        bar.get_height() + 0.15,
         str(int(bar.get_height())),
         ha="center",
         va="bottom",
-        fontsize=7,
+        fontsize=6,
     )
 
-# Right: total FLOPs
-ax2 = axes[1]
-ax2.bar(x - width / 2, flops_a, width, label="decompose_einsum", color="#4c72b0")
-ax2.bar(x + width / 2, flops_b, width, label="decompose_einsum_2inputs", color="#dd8452")
-ax2.set_xticks(x)
-ax2.set_xticklabels(labels, fontsize=8)
+# Top-right: concrete FLOPs (skip N/A)
+ax2 = axes[0, 1]
+x_flops = [i for i, r in enumerate(results) if r["flops_A"] is not None]
+fa_vals = [results[i]["flops_A"] for i in x_flops]
+fb_vals = [results[i]["flops_B"] for i in x_flops]
+flop_labels = [equations_labels[i] for i in x_flops]
+xf = np.arange(len(x_flops))
+ax2.bar(xf - width / 2, fa_vals, width, label="A", color="#4c72b0")
+ax2.bar(xf + width / 2, fb_vals, width, label="B", color="#dd8452")
+ax2.set_xticks(xf)
+ax2.set_xticklabels(flop_labels, fontsize=7)
 ax2.set_ylabel("Total FLOPs")
-ax2.set_title("Total estimated FLOPs", fontsize=9)
+ax2.set_title("Estimated FLOPs (symbolic-capable equations)", fontsize=9)
 ax2.legend(fontsize=8)
 
-plt.suptitle("Einsum→ONNX decomposition: node count and FLOPs comparison", fontsize=10)
+# Bottom-left: op-type distribution for the representative equation
+ax3 = axes[1, 0]
+xo = np.arange(len(all_op_types))
+ax3.bar(xo - width / 2, counts_a, width, label="A", color="#4c72b0")
+ax3.bar(xo + width / 2, counts_b, width, label="B", color="#dd8452")
+ax3.set_xticks(xo)
+ax3.set_xticklabels(all_op_types, rotation=25, ha="right", fontsize=7)
+ax3.set_ylabel("Node count")
+ax3.set_title(f"Operator-type distribution — '{target_eq}'", fontsize=9)
+ax3.legend(fontsize=8)
+
+# Bottom-right: benchmark (ms/inference)
+ax4 = axes[1, 1]
+ax4.bar(x - width / 2, [r["ms_A"] for r in results], width, label="A", color="#4c72b0")
+ax4.bar(x + width / 2, [r["ms_B"] for r in results], width, label="B", color="#dd8452")
+ax4.set_xticks(x)
+ax4.set_xticklabels(equations_labels, fontsize=7)
+ax4.set_ylabel("Inference time (ms)")
+ax4.set_title("OnnxRuntime benchmark (ms / inference)", fontsize=9)
+ax4.legend(fontsize=8)
+
+plt.suptitle(
+    "Einsum→ONNX: node count, FLOPs, operator distribution and benchmark\n"
+    "(A = decompose_einsum, B = decompose_einsum_2inputs)",
+    fontsize=10,
+)
 plt.tight_layout()
 plt.show()
