@@ -46,7 +46,12 @@ from yobx.xshape import BasicShapeBuilder, InferenceMode
 
 
 def total_flops(model, feeds):
-    """Computes the total FLOPs for *model* given concrete input *feeds*."""
+    """Computes the total FLOPs for *model* given concrete input *feeds*.
+
+    :param model: ONNX model to evaluate.
+    :param feeds: mapping ``{name: array}`` of actual input tensors.
+    :returns: Sum of estimated FLOPs across all nodes.
+    """
     builder = BasicShapeBuilder()
     cost_sym = builder.run_model(model, inference=InferenceMode.COST)
     cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
@@ -54,7 +59,11 @@ def total_flops(model, feeds):
 
 
 def node_count(model):
-    """Returns the number of nodes in *model*'s graph."""
+    """Returns the number of nodes in *model*'s graph.
+
+    :param model: ONNX model to count nodes for.
+    :returns: Integer count of nodes in the graph.
+    """
     return len(model.graph.node)
 
 
