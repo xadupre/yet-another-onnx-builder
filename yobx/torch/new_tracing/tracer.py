@@ -355,6 +355,82 @@ class GraphTracer:
                 print(f"[GraphTracer.register_module_parameters] + {name!r}")
             self._external_tensor_to_node[key] = node
 
+    def _collect_and_replace_module_tensor_attrs(
+        self, module: torch.nn.Module
+    ) -> List[Tuple[torch.nn.Module, str, torch.Tensor]]:
+        """
+        Scans every (sub-)module for plain :class:`torch.Tensor` attributes
+        that are **not** registered parameters or buffers, registers each as a
+        placeholder node, and temporarily replaces the attribute with a
+        :class:`TracingTensor`.
+
+        This enables operations such as ``self.params.clone()`` — where
+        ``params`` is assigned as a plain tensor in ``__init__`` rather than
+        via :meth:`torch.nn.Module.register_buffer` or wrapped in
+        :class:`torch.nn.Parameter` — to pass through ``__torch_dispatch__``
+        during tracing so they produce proper FX graph nodes.
+
+        Each replaced attribute is recorded in the returned list so that
+        :meth:`trace` can restore the originals after the forward pass
+        completes.
+
+        :param module: The root :class:`torch.nn.Module` to scan.
+        :returns: A list of ``(submodule, attr_name, original_tensor)``
+            triples that must be restored after tracing.
+        """
+        replaced_attrs: List[Tuple[torch.nn.Module, str, torch.Tensor]] = []
+        for subname, submod in module.named_modules():
+            # Build the set of names already handled by named_parameters /
+            # named_buffers so we do not double-register them.
+            _registered: Set[str] = (
+                set(submod._parameters.keys())
+                | set(submod._buffers.keys())
+                | set(submod._modules.keys())
+            )
+            for attr_name, attr_value in list(vars(submod).items()):
+                if attr_name in _registered:
+                    continue
+                if not isinstance(attr_value, torch.Tensor):
+                    continue
+                if isinstance(attr_value, torch.nn.Parameter):
+                    continue
+                key = id(attr_value)
+                if key in self._external_tensor_to_node:
+                    # Already has a placeholder — create a TracingTensor for
+                    # the existing node and replace the attribute.
+                    node = self._external_tensor_to_node[key]
+                    tt = self._make_tracing_tensor(
+                        TracingShape(tuple(attr_value.shape)),
+                        attr_value.dtype,
+                        attr_value.device,
+                        node,
+                    )
+                    object.__setattr__(submod, attr_name, tt)
+                    replaced_attrs.append((submod, attr_name, attr_value))
+                    continue
+                # Register a new placeholder for this plain tensor attribute.
+                fq_name = f"{subname}.{attr_name}" if subname else attr_name
+                sanitized = fq_name.replace(".", "_")
+                node = self.graph.placeholder(sanitized)
+                tt = self._make_tracing_tensor(
+                    TracingShape(tuple(attr_value.shape)),
+                    attr_value.dtype,
+                    attr_value.device,
+                    node,
+                )
+                node.meta["val"] = tt
+                node.meta["torch_name"] = fq_name
+                node.meta["torch_value"] = attr_value
+                self._external_tensor_to_node[key] = node
+                if self.verbose:
+                    print(
+                        f"[GraphTracer._collect_and_replace_module_tensor_attrs]"
+                        f" + {fq_name!r}"
+                    )
+                object.__setattr__(submod, attr_name, tt)
+                replaced_attrs.append((submod, attr_name, attr_value))
+        return replaced_attrs
+
     def place(self, tt: TracingTensor, name: Optional[str] = None) -> TracingTensor:
         """
         Ensure *tt* is registered in this tracer's graph as a placeholder.
@@ -1868,6 +1944,94 @@ class GraphTracer:
         node.meta["stack_trace"] = "".join(traceback.format_stack())
         return res
 
+    def _handle_arange(self, *args: Any, **kwargs: Any) -> Any:
+        """
+        Tracing-aware replacement for ``torch.arange`` called via
+        :func:`_arange_replacement_ctx`.
+
+        Intercepts calls where *start*, *end*, or *step* is a symbolic
+        :class:`TracingInt` and emits a corresponding FX node without
+        requiring eager execution with concrete Python ``int`` values.
+
+        The signature mirrors ``torch.arange``:
+
+        * ``arange(end, ...)``
+        * ``arange(start, end, ...)``
+        * ``arange(start, end, step, ...)``
+
+        For symbolic :class:`TracingInt` arguments that originate from a
+        placeholder tensor dimension (``_source_node`` is set), an
+        ``aten.sym_size.int`` FX node is emitted and used as the graph
+        argument, producing a proper ONNX scalar with known rank/type.
+        For other symbolic TracingInts a ``TracingInt`` value string is
+        recorded as a fallback.
+
+        :param args: Positional arguments as passed to ``torch.arange``.
+        :param kwargs: Keyword arguments forwarded to ``torch.arange``.
+
+        Returns:
+            A :class:`TracingTensor` when any of *start*, *end*, or *step* is
+            a symbolic :class:`TracingInt`; otherwise the eager
+            ``torch.arange`` result.
+        """
+        from ._patches import _ORIGINAL_TORCH_ARANGE
+
+        has_tracing_int = any(isinstance(a, TracingInt) for a in args)
+        if not has_tracing_int:
+            return _ORIGINAL_TORCH_ARANGE(*args, **kwargs)
+
+        # Resolve TracingInt arguments:
+        # - fake_args: SymInt or int values for FakeTensorMode shape inference.
+        # - node_args: FX node args for the recorded call_function node.
+        #   Symbolic TracingInts with a known source placeholder emit an
+        #   aten.sym_size.int node so the ONNX interpreter can materialize
+        #   the dimension as a typed scalar.  Other TracingInts fall back to
+        #   recording the TracingInt directly (handled as a dimension string
+        #   by the ONNX interpreter).
+        fake_args: List[Any] = []
+        node_args: List[Any] = []
+        for a in args:
+            if isinstance(a, TracingInt):
+                fake_args.append(self._tracing_int_to_fake(a))
+                if a.is_static:
+                    node_args.append(a.value)
+                elif a._source_node is not None:
+                    # Emit aten.sym_size.int so the ONNX interpreter gets a
+                    # properly-typed scalar node whose rank is known.
+                    node_args.append(self._emit_sym_size_node(a))
+                else:
+                    dim_key = self._token_replace(a.value)
+                    assert isinstance(
+                        dim_key, str
+                    ), f"Expected string type for symbolic dimension key, got {type(dim_key)}"
+                    if dim_key not in self._mapped_dimension:
+                        symd = self._shape_env.create_unbacked_symint()
+                        self._mapped_dimension[dim_key] = symd
+                        symd_name = self._sym_int_to_str(symd)
+                        assert isinstance(symd_name, str), "type checking"
+                        self._sym_int_to_dynamic_dimension[symd_name] = dim_key
+                    node_args.append(TracingInt(dim_key))
+            else:
+                assert isinstance(
+                    a, (int, float)
+                ), f"Unexpected type {type(a)} for arange argument"
+                fake_args.append(a)
+                node_args.append(a)
+
+        with self._fake_mode:
+            fake_res = _ORIGINAL_TORCH_ARANGE(*fake_args, **kwargs)
+
+        node = self.graph.call_function(
+            _ORIGINAL_TORCH_ARANGE, args=tuple(node_args), kwargs=kwargs
+        )
+        res = self._make_tracing_tensor(
+            self._sym_shape_to_str_shape(fake_res.shape), fake_res.dtype, fake_res.device, node
+        )
+        node.meta["val"] = res
+        node.meta["fake_val"] = fake_res
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return res
+
     def _handle_tensor_split(self, input: Any, indices_or_sections: Any, dim: int = 0) -> Any:
         """
         Tracing-aware replacement for ``torch.tensor_split`` called via
@@ -2167,6 +2331,13 @@ class GraphTracer:
         if isinstance(func, torch.nn.Module):
             self.register_module_parameters(func)
 
+        # Temporarily replace plain tensor module attributes (not parameters or
+        # buffers) with TracingTensors so that operations like ``self.params.clone()``
+        # dispatch through ``__torch_dispatch__`` and produce proper FX nodes.
+        _replaced_attrs: List[Tuple[torch.nn.Module, str, torch.Tensor]] = []
+        if isinstance(func, torch.nn.Module):
+            _replaced_attrs = self._collect_and_replace_module_tensor_attrs(func)
+
         # Patch the ``forward`` of every top-level leaf sub-module so that
         # calling the sub-module during tracing emits a single
         # ``call_function`` node rather than tracing into its internals.
@@ -2211,6 +2382,10 @@ class GraphTracer:
         for submod, orig_fwd in _patched:
             submod.forward = orig_fwd
 
+        # Restore plain tensor module attributes replaced before forward.
+        for submod, attr_name, orig_tensor in _replaced_attrs:
+            object.__setattr__(submod, attr_name, orig_tensor)
+
         # Expose any registered callables (e.g. scan body functions) as
         # attributes on the traced module so that the downstream interpreter's
         # ``get_attr`` handler can retrieve them.
@@ -2232,6 +2407,16 @@ class GraphTracer:
         output_val = pytree.tree_map(_to_output_node, out)
         self.graph.output(output_val)
         self.graph.eliminate_dead_code()
+        # Remove placeholder nodes introduced by _collect_and_replace_module_tensor_attrs
+        # that were never used in the graph (e.g. when the attribute was only accessed
+        # for its .shape property, not dispatched as a tensor argument).
+        if _replaced_attrs:
+            for _, _, orig_tensor in _replaced_attrs:
+                key = id(orig_tensor)
+                node = self._external_tensor_to_node.get(key)
+                if node is not None and node.op == "placeholder" and len(node.users) == 0:
+                    self.graph.erase_node(node)
+                    del self._external_tensor_to_node[key]
         return self.graph
 
 

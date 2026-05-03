@@ -16,6 +16,7 @@ that maintain code across the project.
    design/shape/index
    design/builder/index
    design/xtracing/index
+   design/technical_details/index
    design/misc/index
    design/ci
    design/env_variables

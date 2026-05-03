@@ -171,12 +171,22 @@ class TestModelEvalCases(ExtTestCase):
             verbose=0,
         )
 
+    def test_run_exporter_dimension0_new_tracing(self):
+        evaluation(
+            cases="ExportWithDimension0", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
     def test_run_exporter_dimension1(self):
         evaluation(
             cases="ExportWithDimension1",
             exporters="export-nostrict-oblivious",
             quiet=False,
             dynamic=True,
+        )
+
+    def test_run_exporter_dimension1_new_tracing(self):
+        evaluation(
+            cases="ExportWithDimension1", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
     @requires_torch("2.7", "scan")
@@ -276,6 +286,14 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_inplace_setitem_ellipsis_2_tracing(self):
         evaluation(
             cases="InplaceSetItemEllipsis_2", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_inplace_setitem_ellipsis_2_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemEllipsis_2",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
         )
 
     def test_run_exporter_aten_as_strided_tracing(self):

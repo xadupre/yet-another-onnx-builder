@@ -28,6 +28,11 @@ _ORIGINAL_TORCH_SCAN: Optional[Callable] = getattr(
     getattr(torch.ops, "higher_order", None), "scan", None
 )
 
+# Capture the real ``torch.arange`` at import time so calls using a symbolic
+# ``TracingInt`` as the *end* (or *start*/*step*) argument can be redirected
+# during tracing.
+_ORIGINAL_TORCH_ARANGE: Callable = torch.arange
+
 # Capture the real ``torch.full`` at import time so shape-only constructors
 # can be redirected during tracing when they receive TracingInt sizes.
 _ORIGINAL_TORCH_FULL: Callable = torch.full
@@ -224,6 +229,35 @@ def _ones_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
 
 
 @contextlib.contextmanager
+def _arange_replacement_ctx(
+    tracer: "GraphTracer",  # type: ignore[name-defined]  # noqa: F821
+) -> Generator:
+    """
+    Temporarily replaces ``torch.arange`` with a tracing-aware handler so calls
+    using symbolic ``TracingInt`` values as *start*, *end*, or *step* arguments
+    are captured as FX nodes rather than failing when
+    :meth:`~yobx.torch.new_tracing.shape.TracingInt.__int__` is called on a
+    symbolic dimension.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_arange` should be used as the replacement.
+
+    Returns:
+        Yields control while ``torch.arange`` is temporarily replaced, then
+        restores the original implementation on exit.
+    """
+
+    def _arange_handler(*args: Any, **kwargs: Any) -> Any:
+        return tracer._handle_arange(*args, **kwargs)
+
+    torch.arange = _arange_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.arange = _ORIGINAL_TORCH_ARANGE  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
 def _tensor_split_replacement_ctx(
     tracer: "GraphTracer",  # type: ignore[name-defined]  # noqa: F821
 ) -> Generator:
@@ -407,6 +441,7 @@ def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         _full_replacement_ctx(tracer),
         _zeros_replacement_ctx(tracer),
         _ones_replacement_ctx(tracer),
+        _arange_replacement_ctx(tracer),
         _roll_dynamic_shape_ctx(),
         _scan_replacement_ctx(tracer),
         _tensor_split_replacement_ctx(tracer),
