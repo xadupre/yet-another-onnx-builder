@@ -27,7 +27,7 @@ absent from the output) — and for each one:
 
 1. Builds both ONNX models.
 2. Computes the **symbolic FLOPs** cost (using string-typed input dimensions
-   so the cost formula stays general) where cost inference is supported.
+   so the cost formula stays general).
 3. Evaluates **concrete FLOPs** by substituting actual tensor shapes.
 4. Counts the **distribution of operator types** in each graph.
 5. Runs a short **runtime benchmark** with :mod:`onnxruntime`.
@@ -51,8 +51,7 @@ from yobx.xshape import BasicShapeBuilder, InferenceMode
 #
 # * *equation* — the einsum string
 # * *sym0 / sym1* — symbolic dimension names for the two inputs (used when
-#   computing symbolic FLOPs; ``None`` means the equation is skipped for
-#   symbolic analysis)
+#   computing symbolic FLOPs)
 # * *sh0 / sh1* — concrete shapes used for numerical checks and benchmarks
 
 EQUATIONS = [
@@ -99,23 +98,19 @@ EQUATIONS = [
         "sh1": (4, 24, 32),
     },
     # ── 4-D equations ──────────────────────────────────────────────────────
-    # Symbolic cost inference is not supported for multi-batch 4-D equations
-    # (the shape-inference engine cannot evaluate multi-element Gather nodes
-    # that arise from ReduceProd over 2+ batch dimensions).  These entries are
-    # still included for node-count and benchmark comparisons.
     {
         "equation": "abij,abjk->abik",
         "label": "multi-batch matmul 4D",
-        "sym0": None,
-        "sym1": None,
+        "sym0": ("A", "B", "I", "K"),
+        "sym1": ("A", "B", "K", "N"),
         "sh0": (2, 3, 16, 32),
         "sh1": (2, 3, 32, 8),
     },
     {
         "equation": "abij,ij->ab",
         "label": "4D→2D reduction",
-        "sym0": None,
-        "sym1": None,
+        "sym0": ("A", "B", "I", "J"),
+        "sym1": ("I", "J"),
         "sh0": (2, 3, 16, 32),
         "sh1": (16, 32),
     },
@@ -160,30 +155,21 @@ for spec in EQUATIONS:
         if sym0 is not None:
             # Build a second model with symbolic (string) dimension names to get
             # symbolic FLOPs expressions.
-            try:
-                sym_model = fn(eq, sym0, sym1)
-                bld_sym = BasicShapeBuilder()
-                cost_sym = bld_sym.run_model(sym_model, inference=InferenceMode.COST)
-                # Pick the node whose symbolic formula contains the most dimension
-                # products (longest string with '*') as a proxy for the most
-                # compute-intensive node.  Constant integer FLOPs (no '*') are
-                # scalar ops with negligible cost and are excluded.
-                sym_totals = [
-                    (op, fl) for op, fl, _ in cost_sym if isinstance(fl, str) and "*" in fl
-                ]
-                if sym_totals:
-                    sym_total = max(sym_totals, key=lambda t: len(t[1]))
-                # Evaluate with concrete feeds.
-                bld_conc = BasicShapeBuilder()
-                cost_conc_raw = bld_conc.run_model(model, inference=InferenceMode.COST)
-                cost_conc = bld_conc.evaluate_cost_with_true_inputs(feeds, cost_conc_raw)
-                conc_total = sum(f or 0 for _, f, _ in cost_conc)
-            except RuntimeError:
-                # BasicShapeBuilder does not yet handle multi-element Gather nodes
-                # that arise when multiple batch/left/right dimensions need to be
-                # gathered at once (4-D+ multi-batch equations).  Fall back to
-                # reporting cost as unavailable.
-                pass
+            sym_model = fn(eq, sym0, sym1)
+            bld_sym = BasicShapeBuilder()
+            cost_sym = bld_sym.run_model(sym_model, inference=InferenceMode.COST)
+            # Pick the node whose symbolic formula contains the most dimension
+            # products (longest string with '*') as a proxy for the most
+            # compute-intensive node.  Constant integer FLOPs (no '*') are
+            # scalar ops with negligible cost and are excluded.
+            sym_totals = [(op, fl) for op, fl, _ in cost_sym if isinstance(fl, str) and "*" in fl]
+            if sym_totals:
+                sym_total = max(sym_totals, key=lambda t: len(t[1]))
+            # Evaluate with concrete feeds.
+            bld_conc = BasicShapeBuilder()
+            cost_conc_raw = bld_conc.run_model(model, inference=InferenceMode.COST)
+            cost_conc = bld_conc.evaluate_cost_with_true_inputs(feeds, cost_conc_raw)
+            conc_total = sum(f or 0 for _, f, _ in cost_conc)
 
         row[f"sym_{key}"] = sym_total
         row[f"flops_{key}"] = conc_total
@@ -272,7 +258,7 @@ for op, ca, cb in zip(all_op_types, counts_a, counts_b):
 # ---------
 #
 # **Top-left** — node count per equation (both strategies).
-# **Top-right** — concrete FLOPs per equation (where available).
+# **Top-right** — concrete FLOPs per equation.
 # **Bottom-left** — operator-type distribution for the representative equation.
 # **Bottom-right** — mean inference time per equation.
 
@@ -301,7 +287,7 @@ for bar in list(ba) + list(bb):
         fontsize=6,
     )
 
-# Top-right: concrete FLOPs (skip N/A)
+# Top-right: concrete FLOPs
 ax2 = axes[0, 1]
 x_flops = [i for i, r in enumerate(results) if r["flops_A"] is not None]
 fa_vals = [results[i]["flops_A"] for i in x_flops]
@@ -313,7 +299,7 @@ ax2.bar(xf + width / 2, fb_vals, width, label="B", color="#dd8452")
 ax2.set_xticks(xf)
 ax2.set_xticklabels(flop_labels, fontsize=7)
 ax2.set_ylabel("Total FLOPs")
-ax2.set_title("Estimated FLOPs (symbolic-capable equations)", fontsize=9)
+ax2.set_title("Estimated FLOPs", fontsize=9)
 ax2.legend(fontsize=8)
 
 # Bottom-left: op-type distribution for the representative equation

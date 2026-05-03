@@ -1147,12 +1147,16 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
                 f"iaxes=None when {axes=} (constant), "
                 f"node.input={node.input}{self.get_debug_msg()}"
             )
-        # Full reduction
+        # Full reduction (no axes attribute/input — all dimensions are reduced).
         if self.has_device(node.input[0]):
             self.set_device(node.output[0], self.get_device(node.input[0]))
-        self.set_shape(node.output[0], tuple())
         if self.has_type(node.input[0]):
             self.set_type(node.output[0], self.get_type(node.input[0]))
+        if keepdim and self.has_rank(node.input[0]):
+            # keepdims=1: every reduced dim is kept as size-1.
+            self.set_shape(node.output[0], (1,) * self.get_rank(node.input[0]))
+        else:
+            self.set_shape(node.output[0], tuple())
         return
 
     assert (

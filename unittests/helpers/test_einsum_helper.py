@@ -250,6 +250,58 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         self.assertNotIn("Einsum", op_types)
         self.assertIn("MatMul", op_types)
 
+    # ------------------------------------------------------------------
+    # Cost inference for 4-D multi-batch equations
+    # ------------------------------------------------------------------
+
+    def test_cost_inference_4d_multi_batch_decompose_einsum(self):
+        """BasicShapeBuilder.run_model with InferenceMode.COST must succeed for
+        a 4-D multi-batch equation using decompose_einsum (strategy A)."""
+        from yobx.xshape import BasicShapeBuilder, InferenceMode
+
+        model = decompose_einsum("abij,abjk->abik", (2, 3, 8, 4), (2, 3, 4, 6))
+        feeds = {
+            "X0": np.ones((2, 3, 8, 4), dtype=np.float32),
+            "X1": np.ones((2, 3, 4, 6), dtype=np.float32),
+        }
+        builder = BasicShapeBuilder()
+        cost_sym = builder.run_model(model, inference=InferenceMode.COST)
+        cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
+        total = sum(f or 0 for _, f, _ in cost_conc)
+        self.assertGreater(total, 0)
+
+    def test_cost_inference_4d_multi_batch_decompose_einsum_2inputs(self):
+        """BasicShapeBuilder.run_model with InferenceMode.COST must succeed for
+        a 4-D multi-batch equation using decompose_einsum_2inputs (strategy B)."""
+        from yobx.xshape import BasicShapeBuilder, InferenceMode
+
+        model = decompose_einsum_2inputs("abij,abjk->abik", (2, 3, 8, 4), (2, 3, 4, 6))
+        feeds = {
+            "X0": np.ones((2, 3, 8, 4), dtype=np.float32),
+            "X1": np.ones((2, 3, 4, 6), dtype=np.float32),
+        }
+        builder = BasicShapeBuilder()
+        cost_sym = builder.run_model(model, inference=InferenceMode.COST)
+        cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
+        total = sum(f or 0 for _, f, _ in cost_conc)
+        self.assertGreater(total, 0)
+
+    def test_cost_inference_4d_reduction(self):
+        """BasicShapeBuilder.run_model with InferenceMode.COST must succeed for
+        a 4-D reduction equation using decompose_einsum_2inputs (strategy B)."""
+        from yobx.xshape import BasicShapeBuilder, InferenceMode
+
+        model = decompose_einsum_2inputs("abij,ij->ab", (2, 3, 8, 4), (8, 4))
+        feeds = {
+            "X0": np.ones((2, 3, 8, 4), dtype=np.float32),
+            "X1": np.ones((8, 4), dtype=np.float32),
+        }
+        builder = BasicShapeBuilder()
+        cost_sym = builder.run_model(model, inference=InferenceMode.COST)
+        cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
+        total = sum(f or 0 for _, f, _ in cost_conc)
+        self.assertGreater(total, 0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

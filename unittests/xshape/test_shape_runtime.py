@@ -522,6 +522,55 @@ class TestShapeRuntime(ExtTestCase):
         result = b._update_value_shape_with_node_Unsqueeze(node)
         self.assertFalse(result)
 
+    # ------------------------------------------------------------------
+    # Gather with multi-element ndarray index (#SV-Ga8)
+    # ------------------------------------------------------------------
+
+    def test_gather_tuple_ndarray_multi_element_index(self):
+        # Gather on a concrete shape tuple with a two-element int64 index array.
+        # Gather((2, 3, 8, 4), [0, 1]) must yield value_shape (2, 3) and shape (2,).
+        # This covers the case that arises for multi-batch 4-D einsum equations.
+        b = _TestShapeBuilder()
+        b._known_value_shape["data"] = (2, 3, 8, 4)
+        b.set_shape("data", (4,))
+        b.set_type("data", TINT64)
+        b.set_constant("idx", _int64_cst("idx", [0, 1]))
+        node = oh.make_node("Gather", ["data", "idx"], ["out"])
+        result = b._update_value_shape_with_node_Gather(node)
+        self.assertTrue(result)
+        self.assertEqual(b.value_as_shape("out"), (2, 3))
+        self.assertEqual(b.get_shape("out"), (2,))
+
+    def test_gather_symbolic_tuple_ndarray_multi_element_index(self):
+        # Gather on a symbolic shape tuple with a two-element int64 index array.
+        # Gather(('A', 'B', 'I', 'K'), [0, 1]) must yield value_shape ('A', 'B')
+        # and output shape (2,).
+        b = _TestShapeBuilder()
+        b._known_value_shape["data"] = ("A", "B", "I", "K")
+        b.set_shape("data", (4,))
+        b.set_type("data", TINT64)
+        b.set_constant("idx", _int64_cst("idx", [0, 1]))
+        node = oh.make_node("Gather", ["data", "idx"], ["out"])
+        result = b._update_value_shape_with_node_Gather(node)
+        self.assertTrue(result)
+        self.assertEqual(b.value_as_shape("out"), ("A", "B"))
+        self.assertEqual(b.get_shape("out"), (2,))
+
+    def test_gather_tuple_ndarray_three_element_index(self):
+        # Gather on a concrete shape tuple with a three-element int64 index array.
+        # Gather((2, 3, 8, 4), [0, 1, 2]) must yield value_shape (2, 3, 8)
+        # and output shape (3,).
+        b = _TestShapeBuilder()
+        b._known_value_shape["data"] = (2, 3, 8, 4)
+        b.set_shape("data", (4,))
+        b.set_type("data", TINT64)
+        b.set_constant("idx", _int64_cst("idx", [0, 1, 2]))
+        node = oh.make_node("Gather", ["data", "idx"], ["out"])
+        result = b._update_value_shape_with_node_Gather(node)
+        self.assertTrue(result)
+        self.assertEqual(b.value_as_shape("out"), (2, 3, 8))
+        self.assertEqual(b.get_shape("out"), (3,))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
