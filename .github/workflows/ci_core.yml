@@ -149,7 +149,7 @@ jobs:
         if: matrix.ort-nightly == true
         run: |
           pip uninstall -y onnxruntime || true
-          pip install ort-nightly --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/
+          pip install --pre onnxruntime --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/
 
       - name: pip freeze
         run: pip freeze

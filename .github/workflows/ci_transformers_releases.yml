@@ -134,7 +134,7 @@ jobs:
         if: matrix.ort-nightly == true
         run: |
           pip uninstall -y onnxruntime || true
-          pip install ort-nightly --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/
+          pip install --pre onnxruntime --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/
 
       - name: install transformers==5.5 and pip freeze
         run: pip install transformers==5.5 && pip freeze
