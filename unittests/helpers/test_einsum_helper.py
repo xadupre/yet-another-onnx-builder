@@ -2,7 +2,11 @@ import unittest
 import numpy as np
 import onnxruntime
 from yobx.ext_test_case import ExtTestCase
-from yobx.helpers.einsum_helper import decompose_einsum, list_decomposed_nodes
+from yobx.helpers.einsum_helper import (
+    decompose_einsum,
+    decompose_einsum_2inputs,
+    list_decomposed_nodes,
+)
 
 
 class TestEinsumHelper(ExtTestCase):
@@ -109,6 +113,142 @@ class TestEinsumHelper(ExtTestCase):
         self.assertAlmostEqual(result, expected, atol=1e-5)
         model = decompose_einsum("ij,jk->ik", (2, 3), (3, 4))
         self.assertGreater(len(model.graph.node), 1)
+
+
+class TestDecomposeEinsum2Inputs(ExtTestCase):
+    """Tests for the new independent 2-input einsum ONNX decomposition algorithm."""
+
+    def _run(self, model, inputs: dict) -> np.ndarray:
+        """Runs an ONNX model with onnxruntime and returns the single output."""
+        sess = onnxruntime.InferenceSession(
+            model.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        return sess.run(None, inputs)[0]
+
+    def _check(self, equation, sh0, sh1, dtype=np.float32):
+        """Helper that builds, runs, and validates a 2-input decomposition."""
+        a = np.random.rand(*sh0).astype(dtype)
+        b = np.random.rand(*sh1).astype(dtype)
+        model = decompose_einsum_2inputs(equation, sh0, sh1, dtype=dtype)
+        result = self._run(model, {"X0": a, "X1": b})
+        expected = np.einsum(equation, a, b)
+        self.assertAlmostEqual(result, expected, atol=1e-5)
+
+    # ------------------------------------------------------------------
+    # Basic 2-D contractions
+    # ------------------------------------------------------------------
+
+    def test_matmul(self):
+        """Standard matrix multiplication ``ij,jk->ik``."""
+        self._check("ij,jk->ik", (3, 4), (4, 5))
+
+    def test_transposed_matmul(self):
+        """Matrix multiplication with transposed second operand ``ij,kj->ik``."""
+        self._check("ij,kj->ik", (3, 4), (5, 4))
+
+    def test_matrix_vector(self):
+        """Matrix-vector product ``ij,j->i``."""
+        self._check("ij,j->i", (3, 4), (4,))
+
+    def test_outer_product(self):
+        """Outer product ``i,j->ij`` (no contraction axis)."""
+        self._check("i,j->ij", (3,), (5,))
+
+    def test_elementwise_dot(self):
+        """Row-wise dot product ``ij,ij->i``."""
+        self._check("ij,ij->i", (3, 4), (3, 4))
+
+    def test_dot_to_scalar(self):
+        """Full dot product to scalar ``i,i->``."""
+        self._check("i,i->", (4,), (4,))
+
+    def test_full_sum_to_scalar(self):
+        """Element-wise product summed to scalar ``ij,ij->``."""
+        self._check("ij,ij->", (3, 4), (3, 4))
+
+    # ------------------------------------------------------------------
+    # Batched contractions
+    # ------------------------------------------------------------------
+
+    def test_batched_matmul(self):
+        """Batched matrix multiplication ``bij,bjk->bik``."""
+        self._check("bij,bjk->bik", (2, 3, 4), (2, 4, 5))
+
+    def test_multi_batch_matmul(self):
+        """Multi-batch matrix multiplication ``bcij,bcjk->bcik``."""
+        self._check("bcij,bcjk->bcik", (2, 3, 4, 5), (2, 3, 5, 6))
+
+    # ------------------------------------------------------------------
+    # Higher-rank contractions
+    # ------------------------------------------------------------------
+
+    def test_multi_dim_contraction(self):
+        """Higher-rank contraction ``abc,cde->abde``."""
+        self._check("abc,cde->abde", (2, 3, 4), (4, 5, 6))
+
+    def test_reordered_output(self):
+        """Contraction with non-trivial output permutation ``abc,cd->bad``."""
+        self._check("abc,cd->bad", (2, 3, 4), (4, 5))
+
+    def test_batched_with_free_dims(self):
+        """Batched contraction with separate free dims ``bik,bkj->bij``."""
+        self._check("bik,bkj->bij", (2, 3, 4), (2, 4, 5))
+
+    # ------------------------------------------------------------------
+    # Input with shared batch + non-trivial permutation
+    # ------------------------------------------------------------------
+
+    def test_transposed_subscripts(self):
+        """Subscripts in non-canonical order ``ba,bc->ac``."""
+        self._check("ba,bc->ac", (3, 2), (3, 4))
+
+    # ------------------------------------------------------------------
+    # dtype support
+    # ------------------------------------------------------------------
+
+    def test_float64(self):
+        """Decomposition should honour float64 dtype."""
+        import onnx
+
+        model = decompose_einsum_2inputs("ij,jk->ik", (3, 4), (4, 5), dtype=np.float64)
+        self.assertEqual(model.graph.input[0].type.tensor_type.elem_type, onnx.TensorProto.DOUBLE)
+
+    # ------------------------------------------------------------------
+    # Error handling
+    # ------------------------------------------------------------------
+
+    def test_wrong_number_of_inputs_raises(self):
+        """Three-input equation must raise ``ValueError``."""
+        with self.assertRaises(ValueError):
+            decompose_einsum_2inputs("ij,jk,kl->il")
+
+    def test_missing_arrow_raises(self):
+        """Equation without ``->`` must raise ``ValueError``."""
+        with self.assertRaises(ValueError):
+            decompose_einsum_2inputs("ij,jk")
+
+    def test_invalid_output_letter_raises(self):
+        """Letter in output that is absent from both inputs must raise ``ValueError``."""
+        with self.assertRaises(ValueError):
+            decompose_einsum_2inputs("ij,jk->iz")
+
+    # ------------------------------------------------------------------
+    # Output metadata
+    # ------------------------------------------------------------------
+
+    def test_default_input_output_names(self):
+        """Default names are X0, X1, Z."""
+        model = decompose_einsum_2inputs("ij,jk->ik", (3, 4), (4, 5))
+        self.assertEqual(model.graph.input[0].name, "X0")
+        self.assertEqual(model.graph.input[1].name, "X1")
+        self.assertEqual(model.graph.output[0].name, "Z")
+
+    def test_nodes_use_only_basic_ops(self):
+        """Decomposed graph must not contain an Einsum node."""
+        model = decompose_einsum_2inputs("ij,jk->ik", (3, 4), (4, 5))
+        op_types = {n.op_type for n in model.graph.node}
+        self.assertNotIn("Einsum", op_types)
+        self.assertIn("MatMul", op_types)
 
 
 if __name__ == "__main__":

@@ -9,10 +9,11 @@ stand-alone :class:`onnx.ModelProto` so it can be inspected, optimised,
 or stitched into a larger graph.
 """
 
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Sequence, Tuple, Union
 import numpy as np
 import onnx
 from ._einsum import decompose_einsum_equation
+from ._einsum.einsum_2_onnx import decompose_einsum_2inputs as _decompose_einsum_2inputs
 from .onnx_helper import np_dtype_to_tensor_dtype
 
 
@@ -54,8 +55,8 @@ def decompose_einsum(
         the current ONNX opset version (capped at 18).
     :param strategy: decomposition strategy.
         Use ``"numpy"`` (default) for a fully element-wise decomposition that
-        avoids any remaining ``Einsum`` call, or ``"simple"`` for a simpler
-        decomposition that may retain a 2-operand ``Einsum`` internally.
+        avoids any remaining ``Einsum`` call.  ``"simple"`` is supported for
+        numpy evaluation but cannot be converted to ONNX.
     :param clean: when ``True`` (default), removes unused intermediate nodes
         from the decomposed graph.
     :param verbose: print intermediate decomposition steps.
@@ -152,3 +153,66 @@ def list_decomposed_nodes(
     """
     model = decompose_einsum(equation, *input_shapes, verbose=verbose)
     return [node.op_type for node in model.graph.node]
+
+
+def decompose_einsum_2inputs(
+    equation: str,
+    shape0: Optional[Sequence[Union[int, str, None]]] = None,
+    shape1: Optional[Sequence[Union[int, str, None]]] = None,
+    dtype: Union[np.dtype, type] = np.float32,
+    opset: Optional[int] = None,
+) -> onnx.ModelProto:
+    """
+    Decomposes a 2-input einsum equation directly into basic ONNX operators.
+
+    This is a completely independent implementation — it does **not** use the
+    :class:`~yobx.helpers._einsum.EinsumSubOp` /
+    :class:`~yobx.helpers._einsum.GraphEinsumSubOp` framework.  It analyses
+    the equation, classifies every index letter into one of four roles
+    (*batch*, *contract*, *left*, *right*), and emits a fixed sequence of
+    ``Transpose``, ``Reshape``, ``MatMul``, ``Reshape``, ``Transpose`` nodes
+    that compute the result for *any* input shape.
+
+    :param equation: einsum equation string with exactly two inputs and an
+        explicit output, e.g. ``"ij,jk->ik"`` or ``"bij,bjk->bik"``.
+    :param shape0: optional shape of the first input.  Each element may be
+        an integer (fixed size), a string (symbolic name, e.g. ``"batch"``),
+        or ``None`` (dynamic dimension).
+    :param shape1: optional shape of the second input (same convention).
+    :param dtype: numpy scalar type for the model inputs and output
+        (default ``numpy.float32``).
+    :param opset: ONNX opset version; defaults to the current ONNX opset
+        capped at 18.
+    :return: :class:`onnx.ModelProto` that computes
+        ``numpy.einsum(equation, X0, X1)``.
+    :raises ValueError: if *equation* does not have exactly two inputs.
+
+    Example::
+
+        import numpy as np
+        import onnxruntime
+        from yobx.helpers.einsum_helper import decompose_einsum_2inputs
+
+        model = decompose_einsum_2inputs("bij,bjk->bik", (2, 3, 4), (2, 4, 5))
+        sess = onnxruntime.InferenceSession(
+            model.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        a = np.random.rand(2, 3, 4).astype(np.float32)
+        b = np.random.rand(2, 4, 5).astype(np.float32)
+        (result,) = sess.run(None, {"X0": a, "X1": b})
+        assert np.allclose(result, np.einsum("bij,bjk->bik", a, b), atol=1e-5)
+    """
+    from onnx import TensorProto
+
+    dtype_map = {
+        np.float32: TensorProto.FLOAT,
+        np.float64: TensorProto.DOUBLE,
+        np.int32: TensorProto.INT32,
+        np.int64: TensorProto.INT64,
+    }
+    dtype_key = np.dtype(dtype).type
+    onnx_dtype = dtype_map.get(dtype_key, TensorProto.FLOAT)
+
+    return _decompose_einsum_2inputs(
+        equation, shape0=shape0, shape1=shape1, dtype=onnx_dtype, opset=opset
+    )
