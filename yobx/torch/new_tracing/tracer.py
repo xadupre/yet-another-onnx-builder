@@ -1944,6 +1944,94 @@ class GraphTracer:
         node.meta["stack_trace"] = "".join(traceback.format_stack())
         return res
 
+    def _handle_arange(self, *args: Any, **kwargs: Any) -> Any:
+        """
+        Tracing-aware replacement for ``torch.arange`` called via
+        :func:`_arange_replacement_ctx`.
+
+        Intercepts calls where *start*, *end*, or *step* is a symbolic
+        :class:`TracingInt` and emits a corresponding FX node without
+        requiring eager execution with concrete Python ``int`` values.
+
+        The signature mirrors ``torch.arange``:
+
+        * ``arange(end, ...)``
+        * ``arange(start, end, ...)``
+        * ``arange(start, end, step, ...)``
+
+        For symbolic :class:`TracingInt` arguments that originate from a
+        placeholder tensor dimension (``_source_node`` is set), an
+        ``aten.sym_size.int`` FX node is emitted and used as the graph
+        argument, producing a proper ONNX scalar with known rank/type.
+        For other symbolic TracingInts a ``TracingInt`` value string is
+        recorded as a fallback.
+
+        :param args: Positional arguments as passed to ``torch.arange``.
+        :param kwargs: Keyword arguments forwarded to ``torch.arange``.
+
+        Returns:
+            A :class:`TracingTensor` when any of *start*, *end*, or *step* is
+            a symbolic :class:`TracingInt`; otherwise the eager
+            ``torch.arange`` result.
+        """
+        from ._patches import _ORIGINAL_TORCH_ARANGE
+
+        has_tracing_int = any(isinstance(a, TracingInt) for a in args)
+        if not has_tracing_int:
+            return _ORIGINAL_TORCH_ARANGE(*args, **kwargs)
+
+        # Resolve TracingInt arguments:
+        # - fake_args: SymInt or int values for FakeTensorMode shape inference.
+        # - node_args: FX node args for the recorded call_function node.
+        #   Symbolic TracingInts with a known source placeholder emit an
+        #   aten.sym_size.int node so the ONNX interpreter can materialize
+        #   the dimension as a typed scalar.  Other TracingInts fall back to
+        #   recording the TracingInt directly (handled as a dimension string
+        #   by the ONNX interpreter).
+        fake_args: List[Any] = []
+        node_args: List[Any] = []
+        for a in args:
+            if isinstance(a, TracingInt):
+                fake_args.append(self._tracing_int_to_fake(a))
+                if a.is_static:
+                    node_args.append(a.value)
+                elif a._source_node is not None:
+                    # Emit aten.sym_size.int so the ONNX interpreter gets a
+                    # properly-typed scalar node whose rank is known.
+                    node_args.append(self._emit_sym_size_node(a))
+                else:
+                    dim_key = self._token_replace(a.value)
+                    assert isinstance(
+                        dim_key, str
+                    ), f"Expected string type for symbolic dimension key, got {type(dim_key)}"
+                    if dim_key not in self._mapped_dimension:
+                        symd = self._shape_env.create_unbacked_symint()
+                        self._mapped_dimension[dim_key] = symd
+                        symd_name = self._sym_int_to_str(symd)
+                        assert isinstance(symd_name, str), "type checking"
+                        self._sym_int_to_dynamic_dimension[symd_name] = dim_key
+                    node_args.append(TracingInt(dim_key))
+            else:
+                assert isinstance(
+                    a, (int, float)
+                ), f"Unexpected type {type(a)} for arange argument"
+                fake_args.append(a)
+                node_args.append(a)
+
+        with self._fake_mode:
+            fake_res = _ORIGINAL_TORCH_ARANGE(*fake_args, **kwargs)
+
+        node = self.graph.call_function(
+            _ORIGINAL_TORCH_ARANGE, args=tuple(node_args), kwargs=kwargs
+        )
+        res = self._make_tracing_tensor(
+            self._sym_shape_to_str_shape(fake_res.shape), fake_res.dtype, fake_res.device, node
+        )
+        node.meta["val"] = res
+        node.meta["fake_val"] = fake_res
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return res
+
     def _handle_tensor_split(self, input: Any, indices_or_sections: Any, dim: int = 0) -> Any:
         """
         Tracing-aware replacement for ``torch.tensor_split`` called via
