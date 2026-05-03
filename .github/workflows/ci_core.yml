@@ -155,22 +155,8 @@ jobs:
         run: pip freeze
 
       - name: Run tests (no torch)
-        if: matrix.ort-nightly == false
         run: |
           pytest --cov=yobx --cov-report=xml --durations=10 \
-            --ignore=unittests/reference/test__inference_session_torch.py \
-            --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
-            --ignore=unittests/reference/test_torch_onnxruntime_evaluator.py \
-            --ignore=unittests/reference/test_torch_reference_evaluator.py \
-            --ignore=unittests/parity \
-            --ignore=unittests/sklearn \
-            --ignore=unittests/tensorflow \
-            --ignore=unittests/torch
-
-      - name: Run tests (no torch, ort-nightly)
-        if: matrix.ort-nightly == true
-        run: |
-          pytest --durations=10 \
             --ignore=unittests/reference/test__inference_session_torch.py \
             --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
             --ignore=unittests/reference/test_torch_onnxruntime_evaluator.py \
