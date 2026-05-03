@@ -85,6 +85,25 @@ def _const_int64(value: List[int], name: str) -> onnx.TensorProto:
     return numpy_helper.from_array(numpy.array(value, dtype=numpy.int64), name=name)
 
 
+def _make_value_info(
+    name: str, elem_type: int, shape: Optional[Sequence[Optional[Union[int, str]]]]
+) -> onnx.ValueInfoProto:
+    """
+    Builds an ONNX ``ValueInfoProto`` for a tensor input.
+
+    :param name: tensor name.
+    :param elem_type: ONNX element type (e.g. ``TensorProto.FLOAT``).
+    :param shape: optional list of dimension sizes.  Each element may be an
+        integer (fixed size), a string (symbolic name), or ``None`` (dynamic).
+        Pass ``None`` for a fully unranked input.
+    :return: :class:`onnx.ValueInfoProto`.
+    """
+    if shape is None:
+        return helper.make_tensor_value_info(name, elem_type, None)
+    onnx_dims: List[Optional[Union[int, str]]] = list(shape)
+    return helper.make_tensor_value_info(name, elem_type, onnx_dims)
+
+
 class _Builder:
     """
     Stateful helper that accumulates ONNX nodes and initializers while
@@ -364,16 +383,6 @@ def decompose_einsum_2inputs(
     # ------------------------------------------------------------------
     # Assemble the ONNX ModelProto.
     # ------------------------------------------------------------------
-    def _make_value_info(
-        name: str, elem_type: int, shape: Optional[Sequence[Optional[Union[int, str]]]]
-    ) -> onnx.ValueInfoProto:
-        if shape is None:
-            return helper.make_tensor_value_info(name, elem_type, None)
-        onnx_dims: List[Optional[Union[int, str]]] = []
-        for d in shape:
-            onnx_dims.append(d)  # int, str, or None are all valid
-        return helper.make_tensor_value_info(name, elem_type, onnx_dims)
-
     graph = helper.make_graph(
         bld.nodes,
         "einsum_2inputs",

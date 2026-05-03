@@ -55,8 +55,8 @@ def decompose_einsum(
         the current ONNX opset version (capped at 18).
     :param strategy: decomposition strategy.
         Use ``"numpy"`` (default) for a fully element-wise decomposition that
-        avoids any remaining ``Einsum`` call, or ``"simple"`` for a simpler
-        decomposition that may retain a 2-operand ``Einsum`` internally.
+        avoids any remaining ``Einsum`` call.  ``"simple"`` is supported for
+        numpy evaluation but cannot be converted to ONNX.
     :param clean: when ``True`` (default), removes unused intermediate nodes
         from the decomposed graph.
     :param verbose: print intermediate decomposition steps.
