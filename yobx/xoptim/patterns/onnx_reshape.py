@@ -378,6 +378,10 @@ class ReshapeReshapePattern(PatternOptimization):
                     return MatchResult(self, [node, next_node], self.apply, insert_at=next_node)
                 if i < len(cst2) and min(cst2[i:]) > 0:
                     return MatchResult(self, [node, next_node], self.apply, insert_at=next_node)
+            # shape1 is all positive: zeros in shape2 can be resolved by substituting shape1[i]
+            if all(d > 0 for d in cst1):
+                if 0 in cst2 and all(j < len(cst1) for j, d in enumerate(cst2) if d == 0):
+                    return MatchResult(self, [node, next_node], self.apply, insert_at=next_node)
 
         if g.is_constant(node.input[1]):
             cst = g.get_computed_constant(node.input[1])
@@ -462,16 +466,28 @@ class ReshapeReshapePattern(PatternOptimization):
         if g.is_constant(next_node.input[1]):
             cst2 = g.get_computed_constant(next_node.input[1])
             valid = True
+            shape_input = next_node.input[1]
             if 0 in cst2:
                 cst1 = g.get_computed_constant(node.input[1])
                 if cst1 is None or len(cst1) < len(cst2):
                     valid = False
+                elif all(int(d) > 0 for d in cst1):
+                    # shape1 is all-positive: zeros in shape2 refer to intermediate dims
+                    # which may differ from original input dims; substitute them explicitly.
+                    cst1_int = list(map(int, cst1))
+                    cst2_int = list(map(int, cst2))
+                    new_shape = [cst1_int[i] if d == 0 else d for i, d in enumerate(cst2_int)]
+                    shape_input = g.make_initializer(
+                        "",
+                        np.array(new_shape, dtype=np.int64),
+                        source="ReshapeReshapePattern.new_shape.zero_sub",
+                    )
             if valid:
                 # The second shape wins it all.
                 return [
                     g.make_node(
                         "Reshape",
-                        [node.input[0], next_node.input[1]],
+                        [node.input[0], shape_input],
                         [next_node.output[0]],
                         name=f"{self.__class__.__name__}--{next_node.name}",
                         doc_string=next_node.doc_string,
