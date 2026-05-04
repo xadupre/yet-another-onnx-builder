@@ -48,6 +48,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnxruntime
+import pandas as pd
 
 from yobx.doc import plot_dot
 from yobx.helpers.einsum_helper import decompose_einsum, decompose_einsum_2inputs
@@ -251,62 +252,62 @@ for spec in EQUATIONS:
 # 3. Symbolic FLOPs formulas
 # --------------------------
 #
-# For equations where symbolic shape inference is supported, we print the
+# For equations where symbolic shape inference is supported, we display the
 # largest symbolic-cost node for each strategy.  The formula uses the symbolic
 # dimension names supplied in the equation registry (e.g. ``M``, ``K``, ``N``).
 # Strategy C (single Einsum node) is omitted here since cost inference is not
 # available for the abstract Einsum operator.
 
-print(f"{'Equation':<28s}  {'Strategy':<4s}  {'Most expensive node FLOPs'}")
-print("-" * 75)
+sym_rows = []
 for row in results:
     for key in (sgA, sgB):
         sym = row[f"sym_{key}"]
+        strategy = f"{sgA}=decompose_einsum" if key == sgA else f"{sgB}=decompose_einsum_2inp"
         if sym is not None:
             op_name, formula = sym
-            label = f"{sgA}=decompose_einsum" if key == sgA else f"{sgB}=decompose_einsum_2inp"
-            print(f"{row['equation']:<28s}  {label:<22s}  {op_name}: {formula}")
+            sym_rows.append(
+                {
+                    "Equation": row["equation"],
+                    "Strategy": strategy,
+                    "Most expensive node FLOPs": f"{op_name}: {formula}",
+                }
+            )
         else:
-            print(f"{row['equation']:<28s}  {key:<22s}  (not available)")
+            sym_rows.append(
+                {
+                    "Equation": row["equation"],
+                    "Strategy": strategy,
+                    "Most expensive node FLOPs": "(not available)",
+                }
+            )
+
+df_sym = pd.DataFrame(sym_rows)
+print(df_sym.to_string(index=False))
 
 # %%
 # 4. Summary table: node count, FLOPs, and benchmark
 # ---------------------------------------------------
 
-print(
-    "\n{:<28s}  {:>5s}  {:>5s}  {:>5s}  {:>16s}  {:>16s}  {:>8s}  {:>8s}  {:>8s}".format(
-        "Equation",
-        f"#n({sgA})",
-        f"#n({sgB})",
-        f"#n({sgC})",
-        f"FLOPs({sgA})",
-        f"FLOPs({sgB})",
-        f"ms({sgA})",
-        f"ms({sgB})",
-        f"ms({sgC})",
-    )
-)
-print("-" * 110)
+summary_rows = []
 for row in results:
-
-    if row[f"flops_{sgA}"] is None:
-        fa = f"{'N/A':>12s}"
-    else:
-        fa = row[f"flops_{sgA}"]
-    if row[f"flops_{sgB}"] is None:
-        fb = f"{'N/A':>12s}"
-    else:
-        fb = row[f"flops_{sgB}"]
-    nc_a = row[f"nodes_{sgA}"]
-    nc_b = row[f"nodes_{sgB}"]
-    nc_c = row[f"nodes_{sgC}"]
-    ms_a = row[f"ms_{sgA}"]
-    ms_b = row[f"ms_{sgB}"]
-    ms_c = row[f"ms_{sgC}"]
-    print(
-        f"{row['equation']:<28s}  {nc_a:>5d}  {nc_b:>5d}  {nc_c:>5d}"
-        f"  {fa}  {fb}  {ms_a:>7.3f}  {ms_b:>7.3f}  {ms_c:>7.3f}"
+    fa = row[f"flops_{sgA}"]
+    fb = row[f"flops_{sgB}"]
+    summary_rows.append(
+        {
+            "Equation": row["equation"],
+            f"#nodes({sgA})": row[f"nodes_{sgA}"],
+            f"#nodes({sgB})": row[f"nodes_{sgB}"],
+            f"#nodes({sgC})": row[f"nodes_{sgC}"],
+            f"FLOPs({sgA})": int(fa) if fa is not None else "N/A",
+            f"FLOPs({sgB})": int(fb) if fb is not None else "N/A",
+            f"ms({sgA})": round(row[f"ms_{sgA}"], 3),
+            f"ms({sgB})": round(row[f"ms_{sgB}"], 3),
+            f"ms({sgC})": round(row[f"ms_{sgC}"], 3),
+        }
     )
+
+df_summary = pd.DataFrame(summary_rows)
+print(df_summary.to_string(index=False))
 print(
     f"\n({sgA}) = decompose_einsum  ({sgB}) = decompose_einsum_2inputs  "
     f"({sgC}) = ONNX Einsum node   ms = ms/inference"
@@ -332,10 +333,8 @@ counts_b = [target_row[f"dist_{sgB}"].get(op, 0) for op in all_op_types]
 counts_c = [target_row[f"dist_{sgC}"].get(op, 0) for op in all_op_types]
 
 print(f"\nNode-type distribution for '{target_eq}':")
-print(f"  {'Op type':<18s}  {'A':>4s}  {'B':>4s}  {'C':>4s}")
-print("  " + "-" * 34)
-for op, ca, cb, cc in zip(all_op_types, counts_a, counts_b, counts_c):
-    print(f"  {op:<18s}  {ca:>4d}  {cb:>4d}  {cc:>4d}")
+df_dist = pd.DataFrame({"Op type": all_op_types, sgA: counts_a, sgB: counts_b, sgC: counts_c})
+print(df_dist.to_string(index=False))
 
 # %%
 # 6. Graph comparison — equation with the largest structural difference
