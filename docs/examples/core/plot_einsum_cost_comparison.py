@@ -363,6 +363,7 @@ for ax_g, key, model_key in [
     plot_dot(diff_row[model_key], ax=ax_g)
     n_nodes = diff_row[f"nodes_{sgA if sgA in key else sgB}"]
     ax_g.set_title(f"{key}\n{diff_eq!r} — {n_nodes} nodes", fontsize=9)
+    ax_g.axis("off")
 
 fig_g.suptitle(
     f"ONNX graph comparison for '{diff_eq}' ({diff_label})\n"
