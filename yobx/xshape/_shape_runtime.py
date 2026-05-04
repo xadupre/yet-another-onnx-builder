@@ -127,6 +127,19 @@ class _ShapeRuntime:
                 return True
             if (
                 isinstance(y, tuple)
+                and isinstance(i, np.ndarray)
+                and i.dtype == np.int64
+                and i.ndim == 1
+                and len(i) > 1
+            ):
+                flat = [int(j) for j in i]
+                self.set_value_shape(node.output[0], tuple(y[j] for j in flat))
+                self.set_shape(node.output[0], (len(flat),))
+                self.set_type(node.output[0], self.get_type(node.input[0]))
+                node.doc_string += "#SV-Ga8"
+                return True
+            if (
+                isinstance(y, tuple)
                 and (
                     isinstance(i, np.ndarray)
                     or (

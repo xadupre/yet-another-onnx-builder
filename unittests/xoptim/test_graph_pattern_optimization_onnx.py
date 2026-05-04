@@ -8198,6 +8198,175 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
 
+    def test_shape_unsqueeze(self):
+        # Pattern: Gather(Shape(Unsqueeze(X, [axis])), indices_not_including_axis)
+        # Expected: Gather(Shape(X), remapped_indices)
+        for unsq_axis in [0, 1, 2, -1]:
+            with self.subTest(unsq_axis=unsq_axis):
+                # X has shape (a, b, c); Unsqueeze at unsq_axis gives rank-4 tensor.
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                            oh.make_node("Shape", ["xu"], ["sh"]),
+                            oh.make_node("Gather", ["sh", "idx"], ["Y"]),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [2])],
+                        [
+                            onh.from_array(np.array([unsq_axis], dtype=np.int64), name="axes"),
+                            # Gather indices: pick two positions from Shape output that
+                            # are not the inserted axis.  Normalise unsq_axis to [0, 4).
+                            onh.from_array(
+                                np.array(
+                                    [i for i in range(4) if i != (unsq_axis % 4)][:2],
+                                    dtype=np.int64,
+                                ),
+                                name="idx",
+                            ),
+                        ],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                check_model(model)
+                feeds = {"X": self._range(3, 5, 7)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(
+                        patterns=["ShapeUnsqueeze"], verbose=0
+                    ),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                self.assertIn(
+                    [n.op_type for n in opt_onx.graph.node],
+                    (["Shape", "Gather"], ["Gather"]),
+                    msg=f"Unexpected nodes for unsq_axis={unsq_axis}",
+                )
+                self.assertNotIn(
+                    "Unsqueeze",
+                    [n.op_type for n in opt_onx.graph.node],
+                    msg="Unsqueeze should have been eliminated",
+                )
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
+
+    def test_shape_unsqueeze_all_dims(self):
+        # When the Gather selects all non-inserted positions, the result is Shape(X).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                    oh.make_node("Shape", ["xu"], ["sh"]),
+                    oh.make_node("Gather", ["sh", "idx"], ["Y"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                [oh.make_tensor_value_info("Y", TINT64, [3])],
+                [
+                    # Unsqueeze at axis 0: shape becomes [1, a, b, c].
+                    onh.from_array(np.array([0], dtype=np.int64), name="axes"),
+                    # Gather positions 1, 2, 3 (all original dims).
+                    onh.from_array(np.array([1, 2, 3], dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(3, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ShapeUnsqueeze"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertNotIn("Unsqueeze", [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_shape_unsqueeze_no_match_axis_in_indices(self):
+        # When the Gather selects the inserted axis, the pattern must NOT fire.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                    oh.make_node("Shape", ["xu"], ["sh"]),
+                    oh.make_node("Gather", ["sh", "idx"], ["Y"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                [oh.make_tensor_value_info("Y", TINT64, [2])],
+                [
+                    onh.from_array(np.array([0], dtype=np.int64), name="axes"),
+                    # Index 0 is the inserted axis; pattern should not match.
+                    onh.from_array(np.array([0, 1], dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(3, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ShapeUnsqueeze"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Unsqueeze should still be present since the pattern did not fire.
+        self.assertIn("Unsqueeze", [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_shape_unsqueeze_multiple_axes(self):
+        # Unsqueeze with two axes; Gather skips both inserted positions.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                    oh.make_node("Shape", ["xu"], ["sh"]),
+                    oh.make_node("Gather", ["sh", "idx"], ["Y"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b"])],
+                [oh.make_tensor_value_info("Y", TINT64, [2])],
+                [
+                    # Unsqueeze at axes 0 and 3: shape becomes [1, a, b, 1].
+                    onh.from_array(np.array([0, 3], dtype=np.int64), name="axes"),
+                    # Gather positions 1 and 2 (the original dims a and b).
+                    onh.from_array(np.array([1, 2], dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(3, 5)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ShapeUnsqueeze"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertNotIn("Unsqueeze", [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
