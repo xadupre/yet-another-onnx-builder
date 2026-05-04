@@ -144,17 +144,24 @@ class UnsqueezeShapePattern(PatternOptimization):
         if not g.has_rank(node.input[0]):
             return self.none(node, inspect.currentframe().f_lineno)
 
-        # Unsqueeze output must only be consumed by one Shape node.
-        if g.is_used_more_than_once(node.output[0]):
-            return self.none(node, inspect.currentframe().f_lineno)
-        shape_node = g.next_node(node.output[0])
-        if shape_node is None or shape_node.op_type != "Shape" or shape_node.domain != "":
+        # Find a Shape consumer for the Unsqueeze output.  Even when the
+        # Unsqueeze output is consumed by other nodes as well, we can still
+        # eliminate the Shape(Unsqueeze(…)) sub-expression; apply() will
+        # preserve the Unsqueeze itself if it is still needed.
+        shape_node = next(
+            (n for n in g.next_nodes(node.output[0]) if n.op_type == "Shape" and n.domain == ""),
+            None,
+        )
+        if shape_node is None:
             return self.none(node, inspect.currentframe().f_lineno)
 
         return MatchResult(self, [node, shape_node], self.apply, insert_at=node)
 
     def apply(
-        self, g: "GraphBuilder", unsq_node: NodeProto, shape_node: NodeProto  # noqa: F821
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        unsq_node: NodeProto,
+        shape_node: NodeProto,
     ) -> List[NodeProto]:
         axes = g.get_computed_constant(unsq_node.input[1])
         input_rank = g.get_rank(unsq_node.input[0])
@@ -197,4 +204,12 @@ class UnsqueezeShapePattern(PatternOptimization):
             doc_string=unsq_node.doc_string,
         )
 
-        return [new_shape_node, new_gather_node]
+        # Both unsq_node and shape_node are in match.nodes and will be removed.
+        # If the Unsqueeze output is still consumed by nodes other than the Shape
+        # we just eliminated (or is a graph output / used by a subgraph), we must
+        # re-emit the Unsqueeze so those consumers remain valid.
+        result = []
+        if g.is_used_more_than_once(unsq_node.output[0]):
+            result.append(unsq_node)
+        result.extend([new_shape_node, new_gather_node])
+        return result
