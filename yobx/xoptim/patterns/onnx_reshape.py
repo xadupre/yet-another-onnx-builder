@@ -2026,7 +2026,7 @@ class ReshapeSqueezePattern(PatternOptimization):
 
     @classmethod
     def fast_op_type(cls) -> Set[str]:
-        "Starts matching with this node."
+        "Returns the set of op types to start matching with."
         return {"Squeeze"}
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -2061,6 +2061,8 @@ class ReshapeSqueezePattern(PatternOptimization):
         shape1 = tuple(int(s) for s in shape1)
         rank = len(shape1)
         axes_int = tuple(int(a) for a in axes)
+        if not axes_int:
+            return self.none(node, inspect.currentframe().f_lineno)
         # Normalize negative axes.
         norm_axes = tuple(a if a >= 0 else a + rank for a in axes_int)
         if any(a < 0 or a >= rank for a in norm_axes):
