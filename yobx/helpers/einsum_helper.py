@@ -114,11 +114,20 @@ def decompose_einsum(
     if opset is not None:
         kwargs["opset"] = opset
 
-    # When caller provides shapes (possibly with symbolic string dims), forward
-    # them to to_onnx via the (name, (elem_type, shape)) tuple format so that
-    # the produced value_info carries the correct shape information.
+    # Forward shapes to to_onnx via the (name, (elem_type, shape)) tuple
+    # format so that the produced value_info carries shape information.
+    # We preserve the original integer values here because the graph
+    # construction inside to_onnx may rely on them to build correct constant
+    # shapes.  After the model is assembled we replace integer dimensions in
+    # the input value_info with their einsum index letter so that the final
+    # ONNX model is dynamic by default and shared dimensions carry the same
+    # symbolic name across both inputs.  User-supplied string or ``None``
+    # dimensions are preserved as-is.
+    lhs_parts = equation.split("->")[0].split(",")
+
     if input_shapes:
         proto = np_dtype_to_tensor_dtype(np.dtype(dtype))
+        # Use the original shapes for graph construction.
         shaped_inputs = [(name, (proto, list(sh))) for name, sh in zip(input_names, input_shapes)]
         model: onnx.ModelProto = graph.to_onnx(
             "Z", *shaped_inputs, dtype=dtype, verbose=verbose, **kwargs
@@ -145,7 +154,32 @@ def decompose_einsum(
     # does not expect.  Stripping them and doing an onnx round-trip normalises
     # the protobuf so ORT can load it directly from SerializeToString().
     del opt_model.metadata_props[:]
-    return onnx.load_from_string(opt_model.SerializeToString())
+    final_model = onnx.load_from_string(opt_model.SerializeToString())
+
+    # Post-processing: replace integer dimensions in the input value_info
+    # with their einsum index letters so the returned model is dynamic by
+    # default.  User-supplied strings are already correct; ``None`` (unknown)
+    # dims are left as-is.  We do this after graph construction and
+    # optimisation so that the Reshape constants computed during graph build
+    # are based on the concrete sizes (avoiding shape-mismatch errors).
+    if input_shapes:
+        name_to_letters = {
+            name: letters for name, _, letters in zip(input_names, input_shapes, lhs_parts)
+        }
+        for inp_vi in final_model.graph.input:
+            letters = name_to_letters.get(inp_vi.name)
+            if letters is None:
+                continue
+            sh_proto = inp_vi.type.tensor_type.shape
+            if sh_proto is None:
+                continue
+            for dim, letter in zip(sh_proto.dim, letters):
+                if dim.HasField("dim_value"):
+                    # Replace concrete integer with the symbolic letter.
+                    dim.ClearField("dim_value")
+                    dim.dim_param = letter
+
+    return final_model
 
 
 def list_decomposed_nodes(
