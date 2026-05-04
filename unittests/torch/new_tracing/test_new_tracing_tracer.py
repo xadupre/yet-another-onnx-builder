@@ -1538,6 +1538,107 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         ]
         self.assertEqual(len(full_nodes), 1, "Expected exactly one torch.full node")
 
+    def test_is_positivity_condition_helper(self):
+        """_is_positivity_condition returns True only for simple >0 / >=N constraints."""
+        from yobx.torch.new_tracing.shape import _is_positivity_condition
+
+        # Simple "var>0" forms.
+        self.assertTrue(_is_positivity_condition("d0>0"))
+        self.assertTrue(_is_positivity_condition("_dyn_1>0"))
+        # "var>=N" forms where N >= 1.
+        self.assertTrue(_is_positivity_condition("d0>=1"))
+        self.assertTrue(_is_positivity_condition("d0>=2"))
+        # Non-positivity conditions.
+        self.assertFalse(_is_positivity_condition("d0>0 and d2>0"))
+        self.assertFalse(_is_positivity_condition("d0!=0"))
+        self.assertFalse(_is_positivity_condition("d0==0"))
+        self.assertFalse(_is_positivity_condition("d0>=0"))
+        self.assertFalse(_is_positivity_condition("unknown==0"))
+        self.assertFalse(_is_positivity_condition(""))
+
+    def test_tracing_bool_positivity_condition_self_registers(self):
+        """TracingBool('var>0') self-registers as known-True when bool() is called.
+
+        This covers the ControlFlowNumelZero4 pattern where Python's ``and``
+        operator evaluates ``bool(TracingBool("d0>0"))`` before the full compound
+        expression reaches ``torch._check``.  The condition must be registered so
+        that subsequent ``if x.numel() == 0:`` guards can be resolved to False.
+        """
+        from yobx.torch.new_tracing.shape import (
+            TracingBool,
+            TracingInt,
+            _known_true_conditions,
+            clear_conditions,
+        )
+
+        clear_conditions()
+        # Simulates what happens when Python evaluates
+        # `torch._check(x.shape[0] > 0 and x.shape[2] > 0)`:
+        # The `and` calls bool() on the left operand.
+        cond = TracingBool("d0>0")
+        self.assertNotIn("d0>0", _known_true_conditions, "should not be registered yet")
+        result = bool(cond)
+        self.assertTrue(result, "positivity condition must resolve to True")
+        self.assertIn("d0>0", _known_true_conditions, "must be self-registered after bool()")
+
+        # After self-registration the numel==0 condition for a product involving
+        # d0 must now resolve to False.
+        # Also register d2>0 to simulate the second `and` operand being registered.
+        from yobx.torch.new_tracing.shape import register_condition
+
+        register_condition(TracingInt("d2") > 0)
+        cond_numel = TracingBool("10*d0*d2==0")
+        self.assertFalse(
+            bool(cond_numel), "10*d0*d2==0 must be False after registering both dims"
+        )
+        clear_conditions()
+
+    def test_trace_controlflow_numel_zero_4(self):
+        """Tracing ControlFlowNumelZero4 with a combined torch._check succeeds.
+
+        The model uses a single combined check:
+            torch._check(x.shape[0] > 0 and x.shape[2] > 0)
+            if x.numel() == 0: return 0
+            return x.shape[-2]
+
+        Python's ``and`` operator calls ``bool()`` on the left ``TracingBool``
+        before ``torch._check`` is called.  The self-registration mechanism in
+        :meth:`TracingBool.__bool__` must register both constraints so that
+        ``if x.numel() == 0:`` resolves to False and tracing succeeds.
+        """
+        if not hasattr(torch, "_check"):
+            return
+        from yobx.torch.new_tracing.shape import clear_conditions
+
+        class ControlFlowNumelZero4(torch.nn.Module):
+            def forward(self, x):
+                def empty_cache(x):
+                    torch._check(x.shape[0] > 0 and x.shape[2] > 0)
+                    if x.numel() == 0:
+                        return 0
+                    return x.shape[-2]
+
+                size = (empty_cache(x), 1)
+                return torch.full(size, fill_value=2)
+
+        clear_conditions()
+        model = ControlFlowNumelZero4()
+        x = torch.rand(3, 2, 2, 5)
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            model,
+            (x,),
+            dynamic_shapes={"x": {0: torch.export.Dim.DYNAMIC, 2: torch.export.Dim.DYNAMIC}},
+        )
+        graph.lint()
+        clear_conditions()
+
+        # The graph must contain a torch.full call (the return value).
+        full_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.full
+        ]
+        self.assertEqual(len(full_nodes), 1, "Expected exactly one torch.full node")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
