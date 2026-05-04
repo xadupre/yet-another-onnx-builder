@@ -1569,7 +1569,6 @@ class TestGraphTracerTorchCheck(ExtTestCase):
             TracingInt,
             _known_true_conditions,
             clear_conditions,
-            set_tracing_check_context,
         )
 
         clear_conditions()
@@ -1578,12 +1577,7 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         # The `and` calls bool() on the left operand.
         cond = TracingBool("d0>0")
         self.assertNotIn("d0>0", _known_true_conditions, "should not be registered yet")
-        # Self-registration only occurs within the tracing check context.
-        set_tracing_check_context(True)
-        try:
-            result = bool(cond)
-        finally:
-            set_tracing_check_context(False)
+        result = bool(cond)
         self.assertTrue(result, "positivity condition must resolve to True")
         self.assertIn("d0>0", _known_true_conditions, "must be self-registered after bool()")
 
