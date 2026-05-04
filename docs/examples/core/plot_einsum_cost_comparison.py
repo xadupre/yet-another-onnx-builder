@@ -205,8 +205,15 @@ for spec in EQUATIONS:
         # --- symbolic + concrete FLOPs ---
         # Strategy C (single Einsum node) has no per-op cost estimator; skip.
         sym_total = None
+        sym_reason = None
         conc_total = None
-        if sym0 is not None and key != sgC:
+        if sym0 is None:
+            sym_reason = "no symbolic dims defined for this equation"
+        elif key == sgC:
+            sym_reason = (
+                "the abstract Einsum operator has no per-op FLOPs estimator"
+            )
+        else:
             # Build a second model with symbolic (string) dimension names to get
             # symbolic FLOPs expressions.
             sym_model = fn(eq, sym0, sym1)
@@ -219,6 +226,8 @@ for spec in EQUATIONS:
             sym_totals = [(op, fl) for op, fl, _ in cost_sym if isinstance(fl, str) and "*" in fl]
             if sym_totals:
                 sym_total = max(sym_totals, key=lambda t: len(t[1]))
+            else:
+                sym_reason = "no node produced a multi-factor symbolic formula"
             # Evaluate with concrete feeds.
             bld_conc = BasicShapeBuilder()
             cost_conc_raw = bld_conc.run_model(model, inference=InferenceMode.COST)
@@ -226,6 +235,7 @@ for spec in EQUATIONS:
             conc_total = sum(f or 0 for _, f, _ in cost_conc)
 
         row[f"sym_{key}"] = sym_total
+        row[f"sym_reason_{key}"] = sym_reason
         row[f"flops_{key}"] = conc_total
 
         # --- ORT numerical check ---
@@ -262,6 +272,7 @@ sym_rows = []
 for row in results:
     for key in (sgA, sgB):
         sym = row[f"sym_{key}"]
+        reason = row[f"sym_reason_{key}"]
         strategy = f"{sgA}=decompose_einsum" if key == sgA else f"{sgB}=decompose_einsum_2inp"
         if sym is not None:
             op_name, formula = sym
@@ -269,7 +280,8 @@ for row in results:
                 {
                     "Equation": row["equation"],
                     "Strategy": strategy,
-                    "Most expensive node FLOPs": f"{op_name}: {formula}",
+                    "Op type": op_name,
+                    "FLOPs formula": formula,
                 }
             )
         else:
@@ -277,7 +289,8 @@ for row in results:
                 {
                     "Equation": row["equation"],
                     "Strategy": strategy,
-                    "Most expensive node FLOPs": "(not available)",
+                    "Op type": "(not available)",
+                    "FLOPs formula": f"(not available: {reason})",
                 }
             )
 
