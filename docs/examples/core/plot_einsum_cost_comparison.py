@@ -221,7 +221,7 @@ for spec in EQUATIONS:
         else:
             # The model was already built with symbolic dims; run cost
             # inference directly (no separate sym_model needed).
-            bld = BasicShapeBuilder(verbose=10)
+            bld = BasicShapeBuilder()
             cost = bld.run_model(model, inference=InferenceMode.COST)
             # Pick the node whose symbolic formula contains the most dimension
             # products (longest string with '*') as a proxy for the most
@@ -292,7 +292,7 @@ for row in results:
                 {
                     "Equation": row["equation"],
                     "Strategy": strategy,
-                    "Op type": "N/A",
+                    "Op type": op_name,
                     "FLOPs formula": f"(not available: {reason})",
                 }
             )
