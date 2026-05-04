@@ -294,6 +294,8 @@ def decompose_einsum_2inputs(
         (result,) = sess.run(None, {"X0": a, "X1": b})
         assert np.allclose(result, np.einsum("ij,jk->ik", a, b), atol=1e-5)
     """
+    from ..onnx_helper import pretty_onnx
+
     if opset is None:
         opset = min(18, onnx.defs.onnx_opset_version())
 
@@ -421,6 +423,12 @@ def decompose_einsum_2inputs(
 
     model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", opset)])
     model.ir_version = onnx.IR_VERSION
+
+    for inp in model.graph.input:
+        shape = tuple(d.dim_param or d.dim_value for d in inp.type.tensor_type.shape.dim)
+        assert (
+            None not in shape and "" not in shape
+        ), f"Wrong shape {shape} for input {input.name} in model {pretty_onnx(model)}"
 
     # Optimize: remove identity nodes, constant-fold shape arithmetic,
     # and apply pattern rewrites (e.g. Transpose+MatMul fusion).

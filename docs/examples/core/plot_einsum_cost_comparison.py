@@ -210,14 +210,13 @@ for spec in EQUATIONS:
         if sym0 is None:
             sym_reason = "no symbolic dims defined for this equation"
         elif key == sgC:
-            sym_reason = (
-                "the abstract Einsum operator has no per-op FLOPs estimator"
-            )
+            sym_reason = "the abstract Einsum operator has no per-op FLOPs estimator"
         else:
             # Build a second model with symbolic (string) dimension names to get
             # symbolic FLOPs expressions.
             sym_model = fn(eq, sym0, sym1)
-            bld_sym = BasicShapeBuilder()
+
+            bld_sym = BasicShapeBuilder(verbose=10)
             cost_sym = bld_sym.run_model(sym_model, inference=InferenceMode.COST)
             # Pick the node whose symbolic formula contains the most dimension
             # products (longest string with '*') as a proxy for the most
@@ -228,8 +227,9 @@ for spec in EQUATIONS:
                 sym_total = max(sym_totals, key=lambda t: len(t[1]))
             else:
                 sym_reason = "no node produced a multi-factor symbolic formula"
+
             # Evaluate with concrete feeds.
-            bld_conc = BasicShapeBuilder()
+            bld_conc = BasicShapeBuilder(verbose=10)
             cost_conc_raw = bld_conc.run_model(model, inference=InferenceMode.COST)
             cost_conc = bld_conc.evaluate_cost_with_true_inputs(feeds, cost_conc_raw)
             conc_total = sum(f or 0 for _, f, _ in cost_conc)
@@ -375,8 +375,7 @@ print(
 rowdot_row = next((r for r in results if r["equation"] == "ij,ij->i"), diff_row)
 
 for fig_idx, (row, extra_title) in enumerate(
-    [(diff_row, "largest A/B difference"), (rowdot_row, "row-dot reduction")],
-    start=0,
+    [(diff_row, "largest A/B difference"), (rowdot_row, "row-dot reduction")], start=0
 ):
     eq = row["equation"]
     label = row["label"]

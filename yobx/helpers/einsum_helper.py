@@ -93,6 +93,8 @@ def decompose_einsum(
         model = decompose_einsum("bij,bjk->bik", (2, 3, 4), (2, 4, 5))
         plot_dot(model)
     """
+    from .onnx_helper import pretty_onnx
+
     n_inputs = len(equation.split("->")[0].split(","))
     input_names = [f"X{i}" for i in range(n_inputs)]
 
@@ -123,6 +125,13 @@ def decompose_einsum(
         )
     else:
         model = graph.to_onnx("Z", *input_names, dtype=dtype, verbose=verbose, **kwargs)
+
+    for inp in model.graph.input:
+        shape = tuple(d.dim_param or d.dim_value for d in inp.type.tensor_type.shape.dim)
+        assert (
+            None not in shape and "" not in shape
+        ), f"Wrong shape {shape} for input {input.name} in model {pretty_onnx(model)}"
+
     # Optimize: apply GraphBuilder pattern rewrites, identity removal, and
     # constant folding.  Import deferred to avoid a circular import with
     # yobx.xbuilder.

@@ -590,6 +590,7 @@ class BasicShapeBuilder(
         :param shape: shape
         :param exc: raise an exception if inconsistency
         """
+        assert 0 not in shape, f"Issue with shape {shape} for {name!r}{self.get_debug_msg()}"
         assert isinstance(name, str), f"Unexpected type {type(name)} for name."
         assert isinstance(shape, tuple), f"Unexpected shape type {type(shape)}"
         assert (
@@ -802,6 +803,8 @@ class BasicShapeBuilder(
             for i in graph.sparse_initializer:
                 self.set_constant(i.values.name, i)
             for i in graph.input:
+                print("*******", i.name)
+                print(graph.input)
                 self.run_value_info(i, True)
                 shape = self.get_shape(i.name)
                 for s in shape:
@@ -835,7 +838,14 @@ class BasicShapeBuilder(
                         )
                     )
             for i in graph.output:
-                self.run_value_info(i, False)
+                shape = tuple(d.dim_param or d.dim_value for d in i.type.tensor_type.shape.dim)
+                if None in shape or "" in shape or set(shape) == {0}:
+                    # The shape is undefined. Let's skip it.
+                    continue
+                if len(shape) == 0 and self.has_rank(i.name) and self.get_rank(i.name) != 0:
+                    # The shape is undefined. Let's skip it.
+                    continue
+                self.run_value_info(i, True)
 
             self._improves_dynamic_dimension_naming(original, True)
 
