@@ -437,7 +437,7 @@ def decompose_einsum_2inputs(
         shape = tuple(d.dim_param or d.dim_value for d in inp.type.tensor_type.shape.dim)
         assert (
             None not in shape and "" not in shape
-        ), f"Wrong shape {shape} for input {input.name} in model {pretty_onnx(model)}"
+        ), f"Wrong shape {shape} for input {inp.name!r} in model {pretty_onnx(model)}"
 
     # Optimize: remove identity nodes, constant-fold shape arithmetic,
     # and apply pattern rewrites (e.g. Transpose+MatMul fusion).
