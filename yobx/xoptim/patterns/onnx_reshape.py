@@ -1958,3 +1958,143 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
                 doc_string=reshape_node.doc_string,
             )
         ]
+
+
+class ReshapeSqueezePattern(PatternOptimization):
+    """
+    Replaces the sequence Reshape, Squeeze by a single Reshape when the
+    Reshape introduces a size-1 dimension that is then removed by the Squeeze.
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            %% Nodes
+            X([Input: X <br/> float, 'a', 'b', 'c', 'd'])
+            C1[Constant <br/> value: 0, 0, 0, 1, 8]
+            C2[Constant <br/> value: 3]
+            R[[Reshape]]
+            S[[Squeeze]]
+            Z([Output: Z <br/> float, 'a', 'b', 'c', 8])
+
+            %% Flow
+            C1 -->|shape| R
+            X --> R
+            R --> S
+            C2 -->|axes| S
+            S --> Z
+
+            %% Styling
+            class C1 constNode
+            class C2 constNode
+            class R opNode
+            class S opNode
+            class X ioNode
+            class Z ioNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            %% Nodes
+            X([Input: X <br/> float, 'a', 'b', 'c', 'd'])
+            C[Constant <br/> value: 0, 0, 0, 8]
+            R[[Reshape]]
+            Z([Output: Z <br/> float, 'a', 'b', 'c', 8])
+
+            %% Flow
+            C -->|shape| R
+            X --> R
+            R --> Z
+
+            %% Styling
+            class C constNode
+            class R opNode
+            class X ioNode
+            class Z ioNode
+    """
+
+    @classmethod
+    def fast_op_type(cls) -> Set[str]:
+        "Starts matching with this node."
+        return {"Squeeze"}
+
+    def __init__(self, verbose: int = 0, priority: int = 0):
+        super().__init__(verbose, priority)
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if node.op_type != "Squeeze" or node.domain != "":
+            return self.none()
+        # Require explicit constant axes (opset >= 13 form).
+        if len(node.input) < 2 or not g.is_constant(node.input[1]):
+            return self.none(node, inspect.currentframe().f_lineno)
+        axes = g.get_computed_constant(node.input[1])
+        if axes is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+        # The squeeze input must come exclusively from a Reshape.
+        if g.is_used_more_than_once(node.input[0]):
+            return self.none(node, inspect.currentframe().f_lineno)
+        reshape = g.node_before(node.input[0])
+        if reshape is None or reshape.op_type != "Reshape" or reshape.domain != "":
+            return self.none(node, inspect.currentframe().f_lineno)
+        # The reshape shape must be a constant.
+        if not g.is_constant(reshape.input[1]):
+            return self.none(node, inspect.currentframe().f_lineno)
+        shape1 = g.get_computed_constant(reshape.input[1])
+        if shape1 is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+        shape1 = tuple(int(s) for s in shape1)
+        rank = len(shape1)
+        axes_int = tuple(int(a) for a in axes)
+        # Normalize negative axes.
+        norm_axes = tuple(a if a >= 0 else a + rank for a in axes_int)
+        if any(a < 0 or a >= rank for a in norm_axes):
+            return self.none(node, inspect.currentframe().f_lineno)
+        # All squeezed positions must have value 1 in the reshape shape.
+        if any(shape1[a] != 1 for a in norm_axes):
+            return self.none(node, inspect.currentframe().f_lineno)
+        # No position after the earliest squeezed axis may use 0 (copy-dim
+        # semantics), because removing an earlier axis shifts the index and
+        # would change which input dimension is copied.
+        min_axis = min(norm_axes)
+        norm_axes_set = set(norm_axes)
+        for i in range(min_axis + 1, rank):
+            if i not in norm_axes_set and shape1[i] == 0:
+                return self.none(node, inspect.currentframe().f_lineno)
+        return MatchResult(self, [reshape, node], self.apply, insert_at=node)
+
+    def apply(
+        self, g: "GraphBuilder", reshape: NodeProto, squeeze: NodeProto  # noqa: F821
+    ) -> List[NodeProto]:
+        shape1 = tuple(int(s) for s in g.get_computed_constant(reshape.input[1]))
+        rank = len(shape1)
+        axes_int = tuple(int(a) for a in g.get_computed_constant(squeeze.input[1]))
+        norm_axes = set(a if a >= 0 else a + rank for a in axes_int)
+        new_shape = np.array(
+            [s for i, s in enumerate(shape1) if i not in norm_axes], dtype=np.int64
+        )
+        new_shape_init = g.make_initializer("", new_shape, source="ReshapeSqueezePattern.apply")
+        return [
+            g.make_node(
+                "Reshape",
+                [reshape.input[0], new_shape_init],
+                squeeze.output,
+                name=f"{self.__class__.__name__}--{reshape.name}",
+                doc_string=reshape.doc_string,
+            )
+        ]
