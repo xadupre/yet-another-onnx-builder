@@ -66,9 +66,12 @@ sgC = "Einsum"
 def make_einsum_model(equation, sh0, sh1, opset=18):
     """Creates a minimal ONNX model containing a single Einsum node (strategy C).
 
-    Accepts either concrete integer shapes or symbolic string shapes.
-    All input and output dimensions are annotated dynamically (``None`` or the
-    supplied string) so the model works with any batch size at runtime.
+    Both input shapes and output dims are annotated dynamically so the model
+    works with any concrete tensor size at runtime.  Each element of *sh0* /
+    *sh1* may be an integer (stored as ``dim_value``) or a string symbol
+    (stored as ``dim_param``).  Output dimensions are always fully dynamic
+    (``None``), since computing them symbolically would require running the
+    einsum — the rank is derived directly from the equation's right-hand side.
 
     Returns:
         An :class:`onnx.ModelProto` with one ``Einsum`` node and no initializers.
@@ -289,7 +292,7 @@ for row in results:
                 {
                     "Equation": row["equation"],
                     "Strategy": strategy,
-                    "Op type": None,
+                    "Op type": "N/A",
                     "FLOPs formula": f"(not available: {reason})",
                 }
             )
