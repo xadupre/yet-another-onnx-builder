@@ -1,7 +1,7 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Union
 import itertools
 import torch
-from ...xexpressions import simplify_expression
+from ...xexpressions import evaluate_expression, simplify_expression
 
 # ---------------------------------------------------------------------------
 # Registry of conditions known to be True (populated by _handle_check during
@@ -98,6 +98,58 @@ def _negate_condition(cond: str) -> Optional[str]:
     return None
 
 
+def _can_prove_expr_nonzero(expr: str) -> bool:
+    """Returns True if *expr* is provably non-zero given the known conditions.
+
+    Builds a context mapping each variable known to be strictly positive
+    (i.e. ``"var>0"`` or ``"var>=1"`` appears in
+    :data:`_known_true_conditions`) to ``1`` — the smallest positive integer
+    value — then delegates to :func:`~yobx.xexpressions.evaluate_expression`.
+    If the expression evaluates to a non-zero integer value, the expression is
+    provably non-zero.  This covers patterns such as ``10*_dyn_0*_dyn_1`` when
+    ``torch._check(x.shape[0] > 0)`` and ``torch._check(x.shape[2] > 0)``
+    have previously been called.
+
+    If any variable in *expr* is absent from the context (i.e. its sign is
+    unknown), :func:`~yobx.xexpressions.evaluate_expression` raises
+    :exc:`NameError` and the function conservatively returns ``False``.
+
+    :param expr: A symbolic expression string such as ``"10*_dyn_0*_dyn_1"``.
+
+    Returns:
+        ``True`` if the expression evaluates to a non-zero integer given the
+        minimal positive assignment for each constrained variable.
+    """
+    # Build context: map each variable known to be strictly positive to 1.
+    ctx: Dict[str, int] = {}
+    for cond in _known_true_conditions:
+        # "var>=N" where N >= 1  →  var is at least 1, map to 1.
+        if ">=" in cond:
+            parts = cond.split(">=", 1)
+            var = parts[0].strip()
+            try:
+                if int(parts[1].strip()) >= 1:
+                    ctx[var] = 1
+            except ValueError:
+                pass
+        # "var>N" where N == 0  →  var is at least 1, map to 1.
+        elif ">" in cond:
+            parts = cond.split(">", 1)
+            var = parts[0].strip()
+            try:
+                if int(parts[1].strip()) == 0:
+                    ctx[var] = 1
+            except ValueError:
+                pass
+    if not ctx:
+        return False
+    try:
+        val = evaluate_expression(expr, ctx)
+        return val != 0
+    except (NameError, TypeError, SyntaxError, ValueError):
+        return False
+
+
 class TracingBool:
     """
     Represents a boolean comparison that may involve symbolic :class:`TracingInt`
@@ -148,6 +200,19 @@ class TracingBool:
         neg = _negate_condition(self.value)
         if neg is not None and neg in _known_true_conditions:
             return False
+        # Handle ``E == 0`` where E is a product of factors that are each
+        # individually known to be strictly positive (e.g.
+        # ``torch._check(x.shape[0] > 0)`` and
+        # ``torch._check(x.shape[2] > 0)`` registered before
+        # ``if x.numel() == 0:``).  If every factor of E is provably > 0
+        # then E > 0 and the condition ``E == 0`` is False.
+        if "==" in self.value:
+            idx = self.value.index("==")
+            if idx > 0 and self.value[idx - 1] not in "<>":
+                lhs = self.value[:idx].strip()
+                rhs_str = self.value[idx + 2 :].strip()
+                if rhs_str == "0" and _can_prove_expr_nonzero(lhs):
+                    return False
         raise ValueError(
             f"TracingBool({self.value!r}) cannot be converted to a Python bool; "
             "the result depends on a symbolic/dynamic dimension. "
