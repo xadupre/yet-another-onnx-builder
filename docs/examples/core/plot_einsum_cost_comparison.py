@@ -289,7 +289,7 @@ for row in results:
                 {
                     "Equation": row["equation"],
                     "Strategy": strategy,
-                    "Op type": "(not available)",
+                    "Op type": op_name,
                     "FLOPs formula": f"(not available: {reason})",
                 }
             )
