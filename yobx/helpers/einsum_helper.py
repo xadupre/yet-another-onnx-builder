@@ -93,6 +93,8 @@ def decompose_einsum(
         model = decompose_einsum("bij,bjk->bik", (2, 3, 4), (2, 4, 5))
         plot_dot(model)
     """
+    from .onnx_helper import pretty_onnx
+
     n_inputs = len(equation.split("->")[0].split(","))
     input_names = [f"X{i}" for i in range(n_inputs)]
 
@@ -112,18 +114,72 @@ def decompose_einsum(
     if opset is not None:
         kwargs["opset"] = opset
 
-    # When caller provides shapes (possibly with symbolic string dims), forward
-    # them to to_onnx via the (name, (elem_type, shape)) tuple format so that
-    # the produced value_info carries the correct shape information.
+    # Forward shapes to to_onnx via the (name, (elem_type, shape)) tuple
+    # format so that the produced value_info carries shape information.
+    # We preserve the original integer values here because the graph
+    # construction inside to_onnx may rely on them to build correct constant
+    # shapes.  After the model is assembled we replace integer dimensions in
+    # the input value_info with their einsum index letter so that the final
+    # ONNX model is dynamic by default and shared dimensions carry the same
+    # symbolic name across both inputs.  User-supplied string or ``None``
+    # dimensions are preserved as-is.
+    lhs_parts = equation.split("->")[0].split(",")
+
     if input_shapes:
         proto = np_dtype_to_tensor_dtype(np.dtype(dtype))
+        # Use the original shapes for graph construction.
         shaped_inputs = [(name, (proto, list(sh))) for name, sh in zip(input_names, input_shapes)]
         model: onnx.ModelProto = graph.to_onnx(
             "Z", *shaped_inputs, dtype=dtype, verbose=verbose, **kwargs
         )
     else:
         model = graph.to_onnx("Z", *input_names, dtype=dtype, verbose=verbose, **kwargs)
-    return model
+
+    for inp in model.graph.input:
+        shape = tuple(d.dim_param or d.dim_value for d in inp.type.tensor_type.shape.dim)
+        assert (
+            None not in shape and "" not in shape
+        ), f"Wrong shape {shape} for input {inp.name!r} in model {pretty_onnx(model)}"
+
+    # Optimize: apply GraphBuilder pattern rewrites, identity removal, and
+    # constant folding.  Import deferred to avoid a circular import with
+    # yobx.xbuilder.
+    from yobx.xbuilder.graph_builder import GraphBuilder
+
+    gb = GraphBuilder(model, verbose=0)
+    gb.optimize()
+    artifact = gb.to_onnx(optimize=False)
+    opt_model = artifact.get_proto()
+    # GraphBuilder embeds extra metadata_props (e.g. statistics) that ORT
+    # does not expect.  Stripping them and doing an onnx round-trip normalises
+    # the protobuf so ORT can load it directly from SerializeToString().
+    del opt_model.metadata_props[:]
+    final_model = onnx.load_from_string(opt_model.SerializeToString())
+
+    # Post-processing: replace integer dimensions in the input value_info
+    # with their einsum index letters so the returned model is dynamic by
+    # default.  User-supplied strings are already correct; ``None`` (unknown)
+    # dims are left as-is.  We do this after graph construction and
+    # optimisation so that the Reshape constants computed during graph build
+    # are based on the concrete sizes (avoiding shape-mismatch errors).
+    if input_shapes:
+        name_to_letters = {
+            name: letters for name, _, letters in zip(input_names, input_shapes, lhs_parts)
+        }
+        for inp_vi in final_model.graph.input:
+            letters = name_to_letters.get(inp_vi.name)
+            if letters is None:
+                continue
+            sh_proto = inp_vi.type.tensor_type.shape
+            if sh_proto is None:
+                continue
+            for dim, letter in zip(sh_proto.dim, letters):
+                if dim.HasField("dim_value"):
+                    # Replace concrete integer with the symbolic letter.
+                    dim.ClearField("dim_value")
+                    dim.dim_param = letter
+
+    return final_model
 
 
 def list_decomposed_nodes(
@@ -176,8 +232,9 @@ def decompose_einsum_2inputs(
     :param equation: einsum equation string with exactly two inputs and an
         explicit output, e.g. ``"ij,jk->ik"`` or ``"bij,bjk->bik"``.
     :param shape0: optional shape of the first input.  Each element may be
-        an integer (fixed size), a string (symbolic name, e.g. ``"batch"``),
-        or ``None`` (dynamic dimension).
+        an integer (rank hint — the ONNX graph input is made fully dynamic),
+        a string (symbolic name, e.g. ``"batch"``), or ``None`` (dynamic
+        dimension).  Use string dims when you need symbolic FLOPs estimation.
     :param shape1: optional shape of the second input (same convention).
     :param dtype: numpy scalar type for the model inputs and output
         (default ``numpy.float32``).
@@ -202,17 +259,14 @@ def decompose_einsum_2inputs(
         (result,) = sess.run(None, {"X0": a, "X1": b})
         assert np.allclose(result, np.einsum("bij,bjk->bik", a, b), atol=1e-5)
     """
-    from onnx import TensorProto
-
     dtype_map = {
-        np.float32: TensorProto.FLOAT,
-        np.float64: TensorProto.DOUBLE,
-        np.int32: TensorProto.INT32,
-        np.int64: TensorProto.INT64,
+        np.float32: onnx.TensorProto.FLOAT,
+        np.float64: onnx.TensorProto.DOUBLE,
+        np.int32: onnx.TensorProto.INT32,
+        np.int64: onnx.TensorProto.INT64,
     }
     dtype_key = np.dtype(dtype).type
-    onnx_dtype = dtype_map.get(dtype_key, TensorProto.FLOAT)
-
+    onnx_dtype = dtype_map.get(dtype_key, onnx.TensorProto.FLOAT)
     return _decompose_einsum_2inputs(
         equation, shape0=shape0, shape1=shape1, dtype=onnx_dtype, opset=opset
     )

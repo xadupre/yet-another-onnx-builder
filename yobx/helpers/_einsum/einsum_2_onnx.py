@@ -248,8 +248,13 @@ def decompose_einsum_2inputs(
     :param equation: einsum equation string with exactly two input operands
         and an explicit output, e.g. ``"ij,jk->ik"`` or ``"bij,bjk->bik"``.
     :param shape0: optional shape of the first input.  Each element may be
-        an integer (fixed size), a string (symbolic name), or ``None``
-        (fully dynamic).  When omitted the input has no shape annotation.
+        an integer or ``None`` (the ONNX graph dimension is annotated with
+        the corresponding einsum index letter so that dimensions shared
+        across both inputs carry the same string), or a string (symbolic
+        name preserved as-is).  When omitted the input has no shape
+        annotation.  Pass string elements (e.g. ``("M", "K")``) when you
+        need the :class:`~yobx.xshape.BasicShapeBuilder` to propagate
+        symbolic FLOPs formulae through the graph.
     :param shape1: optional shape of the second input (same convention).
     :param name0: name used for the first graph input (default ``"X0"``).
     :param name1: name used for the second graph input (default ``"X1"``).
@@ -262,6 +267,18 @@ def decompose_einsum_2inputs(
         ``numpy.einsum(equation, X0, X1)``.
     :raises ValueError: if *equation* does not have exactly two inputs or
         contains letters in the output that do not appear in any input.
+
+    The ONNX graph produced for ``"ij,jk->ik"`` (matrix multiply) looks like:
+
+    .. gdot::
+        :script: DOT-SECTION
+        :process:
+
+        from yobx.helpers._einsum.einsum_2_onnx import decompose_einsum_2inputs
+        from yobx.helpers.dot_helper import to_dot
+
+        model = decompose_einsum_2inputs("ij,jk->ik", (3, 4), (4, 5))
+        print("DOT-SECTION", to_dot(model))
 
     Example::
 
@@ -278,6 +295,8 @@ def decompose_einsum_2inputs(
         (result,) = sess.run(None, {"X0": a, "X1": b})
         assert np.allclose(result, np.einsum("ij,jk->ik", a, b), atol=1e-5)
     """
+    from ..onnx_helper import pretty_onnx
+
     if opset is None:
         opset = min(18, onnx.defs.onnx_opset_version())
 
@@ -384,14 +403,54 @@ def decompose_einsum_2inputs(
     # ------------------------------------------------------------------
     # Assemble the ONNX ModelProto.
     # ------------------------------------------------------------------
+    # Build symbolic-shaped inputs: use the einsum index letter as the
+    # dimension name so that dimensions that must be equal (e.g. the shared
+    # contracting dimension ``j`` in ``ij,jk->ik``) carry the *same* string
+    # across both inputs.  User-supplied string dimensions are preserved
+    # as-is; ``None`` entries remain ``None``.
+    def _annotated_shape(shape, letters):
+        if shape is None:
+            return None
+        result = []
+        for d, letter in zip(shape, letters):
+            if isinstance(d, str):
+                result.append(d)  # user-supplied symbolic name preserved
+            else:
+                result.append(letter)  # integer or None → use the index letter
+        return tuple(result)
+
     graph = oh.make_graph(
         bld.nodes,
         "einsum_2inputs",
-        [bld.make_value_info(name0, dtype, shape0), bld.make_value_info(name1, dtype, shape1)],
+        [
+            bld.make_value_info(name0, dtype, _annotated_shape(shape0, lhs0)),
+            bld.make_value_info(name1, dtype, _annotated_shape(shape1, lhs1)),
+        ],
         [oh.make_tensor_value_info(output_name, dtype, None)],
         initializer=bld.initializers,
     )
 
     model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", opset)])
     model.ir_version = onnx.IR_VERSION
+
+    for inp in model.graph.input:
+        shape = tuple(d.dim_param or d.dim_value for d in inp.type.tensor_type.shape.dim)
+        assert (
+            None not in shape and "" not in shape
+        ), f"Wrong shape {shape} for input {inp.name!r} in model {pretty_onnx(model)}"
+
+    # Optimize: remove identity nodes, constant-fold shape arithmetic,
+    # and apply pattern rewrites (e.g. Transpose+MatMul fusion).
+    # Skip optimization for scalar output to avoid pattern-rewrite edge cases.
+    # Import deferred to avoid a circular import with yobx.xbuilder.
+    if rhs:
+        from yobx.xbuilder.graph_builder import GraphBuilder
+
+        gb = GraphBuilder(model, verbose=0)
+        gb.optimize()
+        artifact = gb.to_onnx(optimize=False)
+        opt_model = artifact.get_proto()
+        # Strip GraphBuilder metadata_props to keep the model lean.
+        del opt_model.metadata_props[:]
+        return opt_model
     return model
