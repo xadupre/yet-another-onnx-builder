@@ -306,6 +306,136 @@ def plot_dot(
     return ax
 
 
+def _run_mmdc(filename: str, image: str) -> str:
+    """
+    Runs the :epkg:`Mermaid` CLI tool ``mmdc`` to render a diagram.
+
+    :param filename: path to the ``.mmd`` input file
+    :param image: path to the output image (``.svg`` or ``.png``)
+    :return: combined stdout/stderr output from ``mmdc``.
+    """
+    import json
+
+    assert not sys.platform.startswith("win"), "this is not working on Windows"
+    if os.path.exists(image):
+        os.remove(image)
+    with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as pup_cfg:
+        json.dump({"args": ["--no-sandbox"]}, pup_cfg)
+        pup_cfg_path = pup_cfg.name
+
+    cmd = ["mmdc", "-i", filename, "-o", image, "--puppeteerConfigFile", pup_cfg_path]
+    output = _run_subprocess(cmd)
+    os.remove(pup_cfg_path)
+    assert os.path.exists(image), (
+        f"Unable to find {image!r}, command line is "
+        f"{' '.join(cmd)!r}, mmdc failed due to\n{output}"
+    )
+    return output
+
+
+def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str) -> str:
+    """
+    Draws a Mermaid flowchart to an image file using the ``mmdc`` CLI tool.
+
+    :param mermaid: Mermaid flowchart string or ModelProto
+    :param image: output image file path (``.svg`` or ``.png``)
+    :return: ``mmdc`` console output.
+
+    The function creates a temporary ``.mmd`` file, invokes :func:`_run_mmdc`,
+    and removes the temporary file afterwards.
+    """
+    from .helpers.mermaid_helper import to_mermaid
+
+    if isinstance(mermaid, onnx.ModelProto):
+        smmd = to_mermaid(mermaid)
+    else:
+        smmd = mermaid
+
+    with tempfile.NamedTemporaryFile(suffix=".mmd", delete=False, mode="w") as fp:
+        fp.write(smmd)
+        fp.close()
+        filename = fp.name
+
+    assert os.path.exists(filename), f"File {filename!r} cannot be created to store the diagram."
+    out = _run_mmdc(filename, image)
+    assert os.path.exists(
+        image
+    ), f"mmdc failed with no reason, {image!r} not found, output is {out}."
+    os.remove(filename)
+    return out
+
+
+def plot_mermaid(
+    mermaid: Union[str, onnx.ModelProto],
+    ax: Optional["matplotlib.axis.Axis"] = None,  # noqa: F821
+    figsize: Optional[Tuple[int, int]] = None,
+) -> "matplotlib.axis.Axis":  # noqa: F821
+    """
+    Draws a Mermaid flowchart into a matplotlib axis.
+
+    :param mermaid: Mermaid flowchart string or ModelProto
+    :param ax: optional matplotlib axis; if None, a new figure and axis are created
+    :param figsize: size of the figure if *ax* is None
+    :return: matplotlib axis containing the rendered graph image.
+
+    The function renders the diagram to an SVG file via :func:`draw_graph_mermaid`,
+    converts the SVG to a raster image with :epkg:`cairosvg`, and displays it
+    using :func:`matplotlib.axes.Axes.imshow`.
+
+    .. plot::
+
+        import matplotlib.pyplot as plt
+        import onnx.parser
+        from yobx.doc import plot_mermaid
+
+        model = onnx.parser.parse_model(
+            '''
+            <ir_version: 8, opset_import: [ "": 18]>
+            agraph (float[N] x) => (float[N] z) {
+                two = Constant <value_float=2.0> ()
+                four = Add(two, two)
+                z = Mul(four, four)
+            }
+        ''')
+
+        ax = plot_mermaid(model)
+        ax.set_title("Dummy graph")
+        plt.show()
+    """
+    if ax is None:
+        import matplotlib.pyplot as plt
+
+        _, ax = plt.subplots(1, 1, figsize=figsize)
+        clean = True
+    else:
+        clean = False
+
+    import cairosvg
+    import io
+    import numpy as np
+
+    from PIL import Image
+
+    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as fp:
+        fp.close()
+
+        draw_graph_mermaid(mermaid, fp.name)
+        png_bytes = cairosvg.svg2png(url=fp.name)
+        img = np.asarray(Image.open(io.BytesIO(png_bytes)))
+        os.remove(fp.name)
+
+        ax.imshow(img)
+
+    if clean:
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+        ax.set_axis_off()
+        ax.get_figure().tight_layout()
+    return ax
+
+
 def plot_text(
     text: str,
     ax: Optional["plt.axes"] = None,  # noqa: F821

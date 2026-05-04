@@ -29,6 +29,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
+from yobx.doc import plot_mermaid
 from yobx.helpers.mermaid_helper import to_mermaid
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -69,3 +70,9 @@ model = oh.make_model(
 
 mermaid_src = to_mermaid(model)
 print(mermaid_src)
+
+# %%
+# Display the graph
+# ------------------
+
+plot_mermaid(model)
