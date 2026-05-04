@@ -2797,24 +2797,24 @@ class TestDevicePropagation(ExtTestCase):
 
     def test_reduce_prod_full_reduction_keepdims_0(self):
         """ReduceProd with no axes and keepdims=0 on a rank-1 input must yield scalar shape ()."""
-        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_reduce
+        from yobx.xshape.shape_type_compute import set_shape_type_op_any_reduce
 
         b = _TestShapeBuilder()
         b.set_type("X", TINT64)
         b.set_shape("X", (2,))
         node = oh.make_node("ReduceProd", ["X"], ["Y"], keepdims=0)
-        _set_shape_type_op_any_reduce(b, node)
+        set_shape_type_op_any_reduce(b, node)
         self.assertEqual(b.get_shape("Y"), ())
 
     def test_reduce_prod_full_reduction_keepdims_1(self):
         """ReduceProd with no axes and keepdims=1 on a rank-1 input must yield shape (1,)."""
-        from yobx.xshape.shape_type_compute import _set_shape_type_op_any_reduce
+        from yobx.xshape.shape_type_compute import set_shape_type_op_any_reduce
 
         b = _TestShapeBuilder()
         b.set_type("X", TINT64)
         b.set_shape("X", (2,))
         node = oh.make_node("ReduceProd", ["X"], ["Y"], keepdims=1)
-        _set_shape_type_op_any_reduce(b, node)
+        set_shape_type_op_any_reduce(b, node)
         self.assertEqual(b.get_shape("Y"), (1,))
 
 

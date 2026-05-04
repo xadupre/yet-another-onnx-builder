@@ -66,15 +66,17 @@ sgC = "Einsum"
 def make_einsum_model(equation, sh0, sh1, opset=18):
     """Creates a minimal ONNX model containing a single Einsum node (strategy C).
 
+    Accepts either concrete integer shapes or symbolic string shapes.
+    All input and output dimensions are annotated dynamically (``None`` or the
+    supplied string) so the model works with any batch size at runtime.
+
     Returns:
         An :class:`onnx.ModelProto` with one ``Einsum`` node and no initializers.
     """
     dtype = onnx.TensorProto.FLOAT
-    out_shape = list(
-        np.einsum(
-            equation, np.zeros(sh0, dtype=np.float32), np.zeros(sh1, dtype=np.float32)
-        ).shape
-    )
+    # Derive output rank from the equation; keep output dims fully dynamic.
+    out_rank = len(equation.split("->")[1])
+    out_shape = [None] * out_rank
     node = oh.make_node("Einsum", ["X0", "X1"], ["Z"], equation=equation)
     graph = oh.make_graph(
         [node],
@@ -192,7 +194,11 @@ for spec in EQUATIONS:
     row = {"equation": eq, "label": label, "sh0": sh0, "sh1": sh1}
 
     for key, fn in STRATEGIES:
-        model = fn(eq, sh0, sh1)
+        # Always build with symbolic (string) dimensions so the model is
+        # dynamic by default.  Strategies A and B already support symbolic
+        # dims natively; strategy C's make_einsum_model was updated to accept
+        # them too.
+        model = fn(eq, sym0, sym1)
 
         # Store model for graph comparison later.
         row[f"model_{key}"] = model
@@ -207,31 +213,25 @@ for spec in EQUATIONS:
         sym_total = None
         sym_reason = None
         conc_total = None
-        if sym0 is None:
-            sym_reason = "no symbolic dims defined for this equation"
-        elif key == sgC:
+        if key == sgC:
             sym_reason = "the abstract Einsum operator has no per-op FLOPs estimator"
         else:
-            # Build a second model with symbolic (string) dimension names to get
-            # symbolic FLOPs expressions.
-            sym_model = fn(eq, sym0, sym1)
-
-            bld_sym = BasicShapeBuilder(verbose=10)
-            cost_sym = bld_sym.run_model(sym_model, inference=InferenceMode.COST)
+            # The model was already built with symbolic dims; run cost
+            # inference directly (no separate sym_model needed).
+            bld = BasicShapeBuilder(verbose=10)
+            cost = bld.run_model(model, inference=InferenceMode.COST)
             # Pick the node whose symbolic formula contains the most dimension
             # products (longest string with '*') as a proxy for the most
             # compute-intensive node.  Constant integer FLOPs (no '*') are
             # scalar ops with negligible cost and are excluded.
-            sym_totals = [(op, fl) for op, fl, _ in cost_sym if isinstance(fl, str) and "*" in fl]
+            sym_totals = [(op, fl) for op, fl, _ in cost if isinstance(fl, str) and "*" in fl]
             if sym_totals:
                 sym_total = max(sym_totals, key=lambda t: len(t[1]))
             else:
                 sym_reason = "no node produced a multi-factor symbolic formula"
 
-            # Evaluate with concrete feeds.
-            bld_conc = BasicShapeBuilder(verbose=10)
-            cost_conc_raw = bld_conc.run_model(model, inference=InferenceMode.COST)
-            cost_conc = bld_conc.evaluate_cost_with_true_inputs(feeds, cost_conc_raw)
+            # Evaluate with concrete feeds by substituting actual shapes.
+            cost_conc = bld.evaluate_cost_with_true_inputs(feeds, cost)
             conc_total = sum(f or 0 for _, f, _ in cost_conc)
 
         row[f"sym_{key}"] = sym_total
@@ -289,7 +289,7 @@ for row in results:
                 {
                     "Equation": row["equation"],
                     "Strategy": strategy,
-                    "Op type": op_name,
+                    "Op type": None,
                     "FLOPs formula": f"(not available: {reason})",
                 }
             )
