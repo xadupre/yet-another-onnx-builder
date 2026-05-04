@@ -2318,7 +2318,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # set_shape_type_op_any_attention
     # ------------------------------------------------------------------
 
-    def testset_shape_type_op_any_attention_4d(self):
+    def test_set_shape_type_op_any_attention_4d(self):
         # 4D input: (batch, head, seq, size)
         g = _MockShapeBuilder()
         for name, shape in [("Q", (2, 8, 10, 64)), ("K", (2, 8, 10, 64)), ("V", (2, 8, 10, 32))]:
@@ -2329,7 +2329,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._shapes.get("out"), (2, 8, 10, 32))
         self.assertEqual(g._types.get("out"), TFLOAT)
 
-    def testset_shape_type_op_any_attention_3d(self):
+    def test_set_shape_type_op_any_attention_3d(self):
         # 3D input: (batch, seq, hidden_size) with q/kv head attributes
         g = _MockShapeBuilder()
         for name, shape in [("Q", (2, 10, 512)), ("K", (2, 10, 256)), ("V", (2, 10, 256))]:
@@ -2341,7 +2341,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._shapes.get("out"), (2, 10, 512))
         self.assertEqual(g._types.get("out"), TFLOAT)
 
-    def testset_shape_type_op_any_attention_3d_present_outputs(self):
+    def test_set_shape_type_op_any_attention_3d_present_outputs(self):
         # 3D with present key/value outputs (output[1] and output[2]), no past inputs
         g = _MockShapeBuilder()
         for name, shape in [("Q", (2, 10, 512)), ("K", (2, 10, 512)), ("V", (2, 10, 512))]:
@@ -2364,7 +2364,7 @@ class TestShapeTypeCompute(ExtTestCase):
         # output[2]: (batch, v_head, total_seq, v_size) = (2, 8, 10, 64)
         self.assertEqual(g._shapes.get("present_value"), (2, 8, 10, 64))
 
-    def testset_shape_type_op_any_attention_rank_only(self):
+    def test_set_shape_type_op_any_attention_rank_only(self):
         # Only rank information available; rank of output[0] = rank of input[0]
         g = _MockShapeBuilder()
         g._types["Q"] = TFLOAT
@@ -2373,7 +2373,7 @@ class TestShapeTypeCompute(ExtTestCase):
         set_shape_type_op_any_attention(g, node)
         self.assertEqual(g._ranks.get("out"), 3)
 
-    def testset_shape_type_op_any_attention_type_propagation(self):
+    def test_set_shape_type_op_any_attention_type_propagation(self):
         # Type from input[0] propagates to all outputs; output[2] uses input[2] type
         g = _MockShapeBuilder()
         g._types["Q"] = TFLOAT16
@@ -2385,7 +2385,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._types.get("present_key"), TFLOAT16)
         self.assertEqual(g._types.get("present_value"), TFLOAT)
 
-    def testset_shape_type_op_any_softmax_with_shape(self):
+    def test_set_shape_type_op_any_softmax_with_shape(self):
         g = _MockShapeBuilder()
         g._types["X"] = TFLOAT
         g._shapes["X"] = (2, 10)
@@ -2394,7 +2394,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(g._shapes.get("Y"), (2, 10))
         self.assertEqual(g._types.get("Y"), TFLOAT)
 
-    def testset_shape_type_op_any_softmax_rank_only(self):
+    def test_set_shape_type_op_any_softmax_rank_only(self):
         g = _MockShapeBuilder()
         g._types["X"] = TFLOAT
         g._ranks["X"] = 3
