@@ -178,9 +178,7 @@ class UnsqueezeShapePattern(PatternOptimization):
         # set_value_shape would fire when the new Gather node is inserted.
         # Clearing the stale entry lets the graph builder recompute the correct
         # value shape from the replacement nodes.
-        stale = shape_node.output[0]
-        if stale in g.builder._known_value_shape:
-            del g.builder._known_value_shape[stale]
+        g.builder.clear_value_shape(shape_node.output[0])
 
         new_shape_name = g.unique_name(f"{self.__class__.__name__}_{shape_node.output[0]}")
         new_shape_node = g.make_node(

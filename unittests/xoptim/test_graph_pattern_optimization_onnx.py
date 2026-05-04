@@ -8251,6 +8251,7 @@ class TestGraphPatternOptimization(ExtTestCase):
     def test_unsqueeze_shape_multiple_axes(self):
         # Unsqueeze at axes [0, 3]: shape (a, b) → (1, a, b, 1).
         # After optimization: Gather(Shape(X), [0, 1]) = [a, b].
+        inserted_axes = [0, 3]
         model = oh.make_model(
             oh.make_graph(
                 [
@@ -8260,7 +8261,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 "test",
                 [oh.make_tensor_value_info("X", TFLOAT, ["a", "b"])],
                 [oh.make_tensor_value_info("Y", TINT64, [None])],
-                [onh.from_array(np.array([0, 3], dtype=np.int64), name="axes")],
+                [onh.from_array(np.array(inserted_axes, dtype=np.int64), name="axes")],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
@@ -8269,7 +8270,8 @@ class TestGraphPatternOptimization(ExtTestCase):
         ref = ExtendedReferenceEvaluator(model)
         original_out = ref.run(None, feeds)[0]  # [1, 3, 5, 1]
         expected = np.array(
-            [v for i, v in enumerate(original_out) if i not in {0, 3}], dtype=np.int64
+            [v for i, v in enumerate(original_out) if i not in set(inserted_axes)],
+            dtype=np.int64,
         )
 
         gr = GraphBuilder(
