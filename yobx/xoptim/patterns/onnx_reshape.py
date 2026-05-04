@@ -55,7 +55,8 @@ class ReshapePattern(PatternOptimization):
 
 class ShapedBasedReshapePattern(ReshapePattern):
     """
-    Checks that a Reshape is really needed based on the input shape.
+    Replaces a Reshape with Identity when the target shape implies the output
+    is identical to the input, based on the input rank.
 
     Handles two cases where the reshape target shape implies identity:
 
@@ -131,7 +132,8 @@ class ShapedBasedReshapePattern(ReshapePattern):
         if len(cst) == 0:
             return self.none(node, inspect.currentframe().f_lineno)
         all_zeros = set(cst) == {0}
-        if not all_zeros and (cst[-1] == 0 or set(cst[:-1]) != {0}):
+        leading_zeros_nonzero_last = cst[-1] != 0 and set(cst[:-1]) == {0}
+        if not all_zeros and not leading_zeros_nonzero_last:
             return self.none(node, inspect.currentframe().f_lineno)
         if not g.has_rank(node.input[0]) or g.get_rank(node.input[0]) != len(cst):
             return self.none(node, inspect.currentframe().f_lineno)
