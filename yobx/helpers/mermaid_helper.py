@@ -49,33 +49,27 @@ def to_mermaid(model: onnx.ModelProto) -> str:
         mermaid_src = to_mermaid(model)
         print(mermaid_src)
     """
-    builder = None
-    try:
-        from ..xshape import BasicShapeBuilder
+    from ..xshape import BasicShapeBuilder
 
-        builder = BasicShapeBuilder()
-        builder.run_model(model)
-    except Exception:
-        builder = None
+    builder = BasicShapeBuilder()
+    builder.run_model(model)
 
     edge_labels: Dict[str, str] = {}
-    if builder is not None:
-        for node in model.graph.node:
-            for name in node.output:
-                if name and builder.has_type(name) and builder.has_shape(name):
-                    itype = builder.get_type(name)
-                    if itype == onnx.TensorProto.UNDEFINED:
-                        continue
-                    shape = builder.get_shape(name)
-                    res = [
-                        str(a)
-                        for a in [
-                            ("?" if isinstance(s, str) and s.startswith("unk") else s)
-                            for s in shape
-                        ]
+    for node in model.graph.node:
+        for name in node.output:
+            if name and builder.has_type(name) and builder.has_shape(name):
+                itype = builder.get_type(name)
+                if itype == onnx.TensorProto.UNDEFINED:
+                    continue
+                shape = builder.get_shape(name)
+                res = [
+                    str(a)
+                    for a in [
+                        ("?" if isinstance(s, str) and s.startswith("unk") else s) for s in shape
                     ]
-                    sshape = ",".join(res)
-                    edge_labels[name] = f"{onnx_dtype_name(itype)}({sshape})"
+                ]
+                sshape = ",".join(res)
+                edge_labels[name] = f"{onnx_dtype_name(itype)}({sshape})"
 
     from ..translate.mermaid_emitter import MermaidEmitter
     from ..translate.translator import Translator
