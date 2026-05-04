@@ -123,6 +123,7 @@ def decompose_einsum(
         )
     else:
         model = graph.to_onnx("Z", *input_names, dtype=dtype, verbose=verbose, **kwargs)
+    # call GraphBuilder optimization
     return model
 
 
