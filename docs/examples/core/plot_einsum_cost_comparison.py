@@ -343,6 +343,7 @@ print(df_dist.to_string(index=False))
 # We select the equation where strategies A and B differ the most in total
 # node count and render both ONNX graphs side by side so the structural
 # difference is visible at a glance.
+# TODO: ij,ij->i
 
 diff_row = max(results, key=lambda r: abs(r[f"nodes_{sgA}"] - r[f"nodes_{sgB}"]))
 diff_eq = diff_row["equation"]
