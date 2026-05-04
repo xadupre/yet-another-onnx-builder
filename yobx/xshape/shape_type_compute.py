@@ -110,7 +110,7 @@ def broadcast_shape(
     return tuple(new_shape)
 
 
-def _set_shape_type_op_any_attention(g: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_attention(g: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Attention."
     if g.has_device(node.input[0]):
         for o in node.output:
@@ -464,7 +464,7 @@ def set_type_shape_reduce_op(
 ########################################
 
 
-def _set_shape_type_op_any_batch_normalization(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_batch_normalization(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type BatchNormalization."
     res = []
     res.append(set_type_shape_unary_op(self, node.output[0], node.input[0]))
@@ -475,7 +475,7 @@ def _set_shape_type_op_any_batch_normalization(self: ShapeBuilder, node: NodePro
     return None if set(res) == {None} else res
 
 
-def _set_shape_type_op_any_layer_normalization(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_layer_normalization(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type LayerNormalization."
     res = []
     res.append(set_type_shape_unary_op(self, node.output[0], node.input[0]))
@@ -486,17 +486,17 @@ def _set_shape_type_op_any_layer_normalization(self: ShapeBuilder, node: NodePro
     return None if set(res) == {None} else res
 
 
-def _set_shape_type_op_any_instance_normalization(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_instance_normalization(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type InstanceNormalization."
     return set_type_shape_unary_op(self, node.output[0], node.input[0])
 
 
-def _set_shape_type_op_any_lp_normalization(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_lp_normalization(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type LpNormalization."
     return set_type_shape_unary_op(self, node.output[0], node.input[0])
 
 
-def _set_shape_type_op_any_cast(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_cast(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Cast."
     r = set_type_shape_unary_op(
         self, node.output[0], node.input[0], itype=self.get_attribute(node, "to").i
@@ -507,7 +507,7 @@ def _set_shape_type_op_any_cast(self: ShapeBuilder, node: NodeProto):
     return r
 
 
-def _set_shape_type_op_any_dropout(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_dropout(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Dropout."
     res = set_type_shape_unary_op(self, node.output[0], node.input[0])
     if len(node.output) > 1 and node.output[1]:
@@ -515,12 +515,12 @@ def _set_shape_type_op_any_dropout(self: ShapeBuilder, node: NodeProto):
     return res
 
 
-def _set_shape_type_op_any_rotary_embedding(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_rotary_embedding(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type RotaryEmbedding."
     return set_type_shape_unary_op(self, node.output[0], node.input[0])
 
 
-def _set_shape_type_op_any_gemma_rotary_embedding(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_gemma_rotary_embedding(self: ShapeBuilder, node: NodeProto):
     """Sets the output shapes for node type GemmaRotaryEmbedding.
 
     Inputs: ``emb`` (batch, seq, dim), ``q`` (batch, heads_q, seq, dim),
@@ -533,14 +533,14 @@ def _set_shape_type_op_any_gemma_rotary_embedding(self: ShapeBuilder, node: Node
         set_type_shape_unary_op(self, node.output[1], node.input[3])
 
 
-def _set_shape_type_op_any_castlike(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_castlike(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type CastLike."
     return set_type_shape_unary_op(
         self, node.output[0], node.input[0], itype=self.get_type(node.input[1])
     )
 
 
-def _set_shape_type_op_any_compress(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_compress(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Compress."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -567,7 +567,7 @@ def _set_shape_type_op_any_compress(self: ShapeBuilder, node: NodeProto):
         return new_shape
 
 
-def _set_shape_type_op_any_concat(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_concat(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Concat."
     if all(self.has_device(i) for i in node.input):
         devs = {self.get_device(i) for i in node.input}
@@ -615,7 +615,7 @@ def _set_shape_type_op_any_concat(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_conv_max_pool(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_conv_max_pool(self: ShapeBuilder, node: NodeProto):
     """
     Sets the output shape for node types Conv, MaxPool.
 
@@ -813,7 +813,7 @@ def _set_shape_type_op_any_conv_max_pool(self: ShapeBuilder, node: NodeProto):
     return res
 
 
-def _set_shape_type_op_any_gather(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_gather(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Gather."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -838,7 +838,7 @@ def _set_shape_type_op_any_gather(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_gather_elements(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_gather_elements(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type GatherElements."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -862,7 +862,7 @@ def _set_shape_type_op_any_gather_elements(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_gemm(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_gemm(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Gemm."
     transA = self.get_attribute(node, "transA", exc=False)
     transB = self.get_attribute(node, "transB", exc=False)
@@ -878,7 +878,7 @@ def _set_shape_type_op_any_gemm(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_matmul(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_matmul(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type MatMul."
     r = set_type_shape_matmul(self, node.output[0], *node.input)
     assert r is not None or not self._debug_shape_missing, (
@@ -888,7 +888,7 @@ def _set_shape_type_op_any_matmul(self: ShapeBuilder, node: NodeProto):
     return r
 
 
-def _set_shape_type_op_any_einsum(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_einsum(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Einsum."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -975,7 +975,7 @@ def _set_shape_type_op_any_einsum(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_non_zero(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_non_zero(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type NonZero."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -992,7 +992,7 @@ def _set_shape_type_op_any_non_zero(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Pad."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1045,7 +1045,7 @@ def _set_shape_type_op_any_pad(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_range(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_range(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for for node type Range."
     # device for Range is not necessary known. It makes to host the inputs
     # on CPU but produce the output on CUDA.
@@ -1084,7 +1084,7 @@ def _set_shape_type_op_any_range(self: ShapeBuilder, node: NodeProto):
     return new_shape
 
 
-def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for Reduce node type."
     keepdim = self.get_attribute(node, "keepdims", exc=False)
     axes = self.get_attribute(node, "axes", exc=False)
@@ -1163,7 +1163,7 @@ def _set_shape_type_op_any_reduce(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
+def compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
     if 0 in shape2:
         # 0 means keeping the dimension coming from shape1
         new_shape2 = []
@@ -1209,7 +1209,7 @@ def _compute_reshape_shape(shape1: DYNAMIC_SHAPE, shape2: DYNAMIC_SHAPE):
     return tuple(s if s != -1 else ok for s in shape2)
 
 
-def _set_shape_type_op_any_reshape(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_reshape(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Reshape."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1234,7 +1234,7 @@ def _set_shape_type_op_any_reshape(self: ShapeBuilder, node: NodeProto):
                     self.set_shape(k, new_shape, allow_zero=0 in sh)
                     return new_shape
         if self.has_shape(node.input[0]):
-            combined_shape = _compute_reshape_shape(self.get_shape(node.input[0]), value)
+            combined_shape = compute_reshape_shape(self.get_shape(node.input[0]), value)
             if combined_shape is not None:
                 self.set_shape(node.output[0], combined_shape, allow_zero=0 in combined_shape)
                 return combined_shape
@@ -1252,7 +1252,7 @@ def _set_shape_type_op_any_reshape(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_expand(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_expand(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Reshape."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1288,12 +1288,12 @@ def _set_shape_type_op_any_expand(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_sign(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_sign(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Sign."
     return set_type_shape_unary_op(self, node.output[0], node.input[0])
 
 
-def _set_shape_type_op_any_size(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_size(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Sign."
     self.set_type(node.output[0], TensorProto.INT64)
     self.set_shape(node.output[0], tuple())
@@ -1312,7 +1312,7 @@ def _set_shape_type_op_any_size(self: ShapeBuilder, node: NodeProto):
     return True
 
 
-def _resolve_int_tuple_or_shape(self: ShapeBuilder, name: str):
+def resolve_int_tuple_or_shape(self: ShapeBuilder, name: str):
     if self.is_constant(name):
         cst = self.get_constant(name, exc=False, computed_value=True)
         if cst is not None:
@@ -1323,7 +1323,7 @@ def _resolve_int_tuple_or_shape(self: ShapeBuilder, name: str):
     return None
 
 
-def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Slice."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1334,9 +1334,9 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
         input_shape = self.get_shape(node.input[0])
         rank = len(input_shape)
 
-        starts = _resolve_int_tuple_or_shape(self, node.input[1])
-        ends = _resolve_int_tuple_or_shape(self, node.input[2])
-        axes = _resolve_int_tuple_or_shape(self, node.input[3]) if len(node.input) > 3 else None
+        starts = resolve_int_tuple_or_shape(self, node.input[1])
+        ends = resolve_int_tuple_or_shape(self, node.input[2])
+        axes = resolve_int_tuple_or_shape(self, node.input[3]) if len(node.input) > 3 else None
 
         if starts is None or ends is None:
             if axes is None:
@@ -1350,11 +1350,11 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
             return new_shape
 
         axes = (
-            _resolve_int_tuple_or_shape(self, node.input[3])
+            resolve_int_tuple_or_shape(self, node.input[3])
             if len(node.input) > 3
             else np.arange(len(starts))
         )
-        steps = _resolve_int_tuple_or_shape(self, node.input[4]) if len(node.input) > 4 else None
+        steps = resolve_int_tuple_or_shape(self, node.input[4]) if len(node.input) > 4 else None
 
         output_shape = list(input_shape)
         for idx, (s, e, a) in enumerate(zip(starts, ends, axes)):
@@ -1418,7 +1418,7 @@ def _set_shape_type_op_any_slice(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_split(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_split(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Split."
     if self.has_device(node.input[0]):
         for o in node.output:
@@ -1515,7 +1515,7 @@ def _set_shape_type_op_any_split(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_scatternd(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_scatternd(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type ScatterND."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1541,7 +1541,7 @@ def _set_shape_type_op_any_scatternd(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_sequence_empty(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_sequence_empty(self: ShapeBuilder, node: NodeProto):
     for att in node.attribute:
         if att.name == "dtype":
             self.set_sequence(node.output[0], dtype=att.i)
@@ -1549,7 +1549,7 @@ def _set_shape_type_op_any_sequence_empty(self: ShapeBuilder, node: NodeProto):
     raise AssertionError(f"Attribute 'dtype' is missong from node {node}{self.get_debug_msg()}")
 
 
-def _set_shape_type_op_any_transpose(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_transpose(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Transpose."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1591,7 +1591,7 @@ def _set_shape_type_op_any_transpose(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_tile(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_tile(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Tile."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1605,7 +1605,7 @@ def _set_shape_type_op_any_tile(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_topk(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_topk(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type TopK."
     if self.has_device(node.input[0]):
         for o in node.output:
@@ -1653,7 +1653,7 @@ def _set_shape_type_op_any_topk(self: ShapeBuilder, node: NodeProto):
         return ret_shapes
 
 
-def _set_shape_type_op_any_unsqueeze(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_unsqueeze(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Unsqueeze."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1744,7 +1744,7 @@ def _set_shape_type_op_any_unsqueeze(self: ShapeBuilder, node: NodeProto):
         )
 
 
-def _set_shape_type_op_any_squeeze(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_squeeze(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Squeeze."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1838,7 +1838,7 @@ def _set_shape_type_op_any_squeeze(self: ShapeBuilder, node: NodeProto):
         )
 
 
-def _set_shape_type_op_any_where(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_where(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Where."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1870,14 +1870,12 @@ def _set_shape_type_op_any_where(self: ShapeBuilder, node: NodeProto):
         )
 
 
-def _set_shape_type_op_any_unary(
-    self: ShapeBuilder, node: NodeProto, itype: Optional[int] = None
-):
+def set_shape_type_op_any_unary(self: ShapeBuilder, node: NodeProto, itype: Optional[int] = None):
     "Sets the output shape for any unary type."
     return set_type_shape_unary_op(self, node.output[0], node.input[0], itype=itype)
 
 
-def _set_shape_type_op_any_arg_max_min(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_arg_max_min(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for ArgMax and ArgMin."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1905,7 +1903,7 @@ def _set_shape_type_op_any_arg_max_min(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_global_pool(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_global_pool(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for GlobalAveragePool and GlobalMaxPool."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1925,7 +1923,7 @@ def _set_shape_type_op_any_global_pool(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_flatten(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_flatten(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for Flatten."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1958,7 +1956,7 @@ def _set_shape_type_op_any_flatten(self: ShapeBuilder, node: NodeProto):
     return True
 
 
-def _set_shape_type_op_any_eyelike(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_eyelike(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for EyeLike."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -1979,7 +1977,7 @@ def _set_shape_type_op_any_eyelike(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_depth_to_space(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_depth_to_space(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for DepthToSpace."
     blocksize = self.get_attribute(node, "blocksize").i
     if self.has_device(node.input[0]):
@@ -2008,7 +2006,7 @@ def _set_shape_type_op_any_depth_to_space(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_gridsample(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_gridsample(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for GridSample."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -2030,7 +2028,7 @@ def _set_shape_type_op_any_gridsample(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_space_to_depth(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_space_to_depth(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for SpaceToDepth."
     blocksize = self.get_attribute(node, "blocksize").i
     if self.has_device(node.input[0]):
@@ -2063,7 +2061,7 @@ def _set_shape_type_op_any_space_to_depth(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_window(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_window(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for BlackmanWindow, HannWindow, HammingWindow."
     dtype = self.get_attribute_with_default(node, "output_datatype", TensorProto.FLOAT)
     self.set_type(node.output[0], dtype)
@@ -2076,7 +2074,7 @@ def _set_shape_type_op_any_window(self: ShapeBuilder, node: NodeProto):
     self.set_rank(node.output[0], 1)
 
 
-def _set_shape_type_op_any_resize(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_resize(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Resize."
     if self.has_device(node.input[0]):
         self.set_device(node.output[0], self.get_device(node.input[0]))
@@ -2126,12 +2124,12 @@ def _set_shape_type_op_any_resize(self: ShapeBuilder, node: NodeProto):
     )
 
 
-def _set_shape_type_op_any_identity(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_identity(self: ShapeBuilder, node: NodeProto):
     "Sets the output type and shape for Identity (passthrough)."
     return set_type_shape_unary_op(self, node.output[0], node.input[0])
 
 
-def _set_shape_type_op_any_shape(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_shape(self: ShapeBuilder, node: NodeProto):
     "Sets the output type and rank for Shape op."
     if not self.has_device(node.output[0]):
         self.set_device(node.output[0], -1)
@@ -2145,7 +2143,7 @@ def _set_shape_type_op_any_shape(self: ShapeBuilder, node: NodeProto):
     return True
 
 
-def _set_shape_type_op_any_constantofshape(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_constantofshape(self: ShapeBuilder, node: NodeProto):
     "Sets the output type for ConstantOfShape."
     if node.attribute and node.attribute[0].name == "value":
         itype = node.attribute[0].t.data_type
@@ -2156,14 +2154,14 @@ def _set_shape_type_op_any_constantofshape(self: ShapeBuilder, node: NodeProto):
     return True
 
 
-def _set_shape_type_op_any_gathernd(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_gathernd(self: ShapeBuilder, node: NodeProto):
     "Sets the output type for GatherND."
     if self.has_type(node.input[0]):
         self.set_type(node.output[0], self.get_type(node.input[0]))
     return True
 
 
-def _set_shape_type_op_any_onehot(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_onehot(self: ShapeBuilder, node: NodeProto):
     "Sets the output type for OneHot (type from values input)."
     if len(node.input) >= 3 and self.has_type(node.input[2]):
         self.set_type(node.output[0], self.get_type(node.input[2]))
@@ -2172,7 +2170,7 @@ def _set_shape_type_op_any_onehot(self: ShapeBuilder, node: NodeProto):
     return True
 
 
-def _set_shape_type_op_any_qlinear_matmul(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_qlinear_matmul(self: ShapeBuilder, node: NodeProto):
     "Sets the output type for QLinearMatMul."
     if len(node.input) >= 6 and self.has_type(node.input[5]):
         self.set_type(node.output[0], self.get_type(node.input[5]))
@@ -2183,13 +2181,13 @@ def _set_shape_type_op_any_qlinear_matmul(self: ShapeBuilder, node: NodeProto):
     return True
 
 
-def _set_shape_type_op_any_nms(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_nms(self: ShapeBuilder, node: NodeProto):
     "Sets the output type for NonMaxSuppression (output is INT64)."
     self.set_type(node.output[0], TensorProto.INT64)
     return True
 
 
-def _set_shape_type_op_any_rnn(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_rnn(self: ShapeBuilder, node: NodeProto):
     "Sets the output types for RNN/GRU/LSTM."
     itype = self.get_type(node.input[0]) if self.has_type(node.input[0]) else TensorProto.FLOAT
     for out in node.output:
@@ -2198,7 +2196,7 @@ def _set_shape_type_op_any_rnn(self: ShapeBuilder, node: NodeProto):
     return True
 
 
-def _set_shape_type_op_any_mel_weight_matrix(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_mel_weight_matrix(self: ShapeBuilder, node: NodeProto):
     "Sets the output type for MelWeightMatrix."
     for att in node.attribute:
         if att.name == "output_datatype":
@@ -2208,7 +2206,7 @@ def _set_shape_type_op_any_mel_weight_matrix(self: ShapeBuilder, node: NodeProto
     return True
 
 
-def _set_shape_type_op_any_loop(self: ShapeBuilder, node: NodeProto):
+def set_shape_type_op_any_loop(self: ShapeBuilder, node: NodeProto):
     """Sets output types and shapes for the Loop operator from its body subgraph.
 
     The Loop body subgraph has the following output order:
@@ -2288,7 +2286,7 @@ def _set_shape_type_op_any_loop(self: ShapeBuilder, node: NodeProto):
     return True
 
 
-def _set_shape_type_op_any_softmax_cross_entropy_loss(
+def set_shape_type_op_any_softmax_cross_entropy_loss(
     self: "ShapeBuilder", node: NodeProto
 ) -> bool:
     """Sets shape/type for SoftmaxCrossEntropyLoss.
@@ -2335,88 +2333,88 @@ def _set_shape_type_op_any_softmax_cross_entropy_loss(
     return True
 
 
-_set_shape_type_op_any_known = {
-    "ArgMax": _set_shape_type_op_any_arg_max_min,
-    "ArgMin": _set_shape_type_op_any_arg_max_min,
-    "Attention": _set_shape_type_op_any_attention,
-    "BatchNormalization": _set_shape_type_op_any_batch_normalization,
-    "BlackmanWindow": _set_shape_type_op_any_window,
-    "Cast": _set_shape_type_op_any_cast,
-    "BitCast": _set_shape_type_op_any_cast,
-    "Clip": _set_shape_type_op_any_unary,
-    "Compress": _set_shape_type_op_any_compress,
-    "Concat": _set_shape_type_op_any_concat,
-    "ConstantOfShape": _set_shape_type_op_any_constantofshape,
-    "Conv": _set_shape_type_op_any_conv_max_pool,
-    "CumProd": _set_shape_type_op_any_unary,
-    "CumSum": _set_shape_type_op_any_unary,
-    "DepthToSpace": _set_shape_type_op_any_depth_to_space,
-    "Dropout": _set_shape_type_op_any_dropout,
-    "Einsum": _set_shape_type_op_any_einsum,
-    "EyeLike": _set_shape_type_op_any_eyelike,
-    "Expand": _set_shape_type_op_any_expand,
-    "Flatten": _set_shape_type_op_any_flatten,
-    "Gather": _set_shape_type_op_any_gather,
-    "GatherElements": _set_shape_type_op_any_gather_elements,
-    "GatherND": _set_shape_type_op_any_gathernd,
-    "Gelu": _set_shape_type_op_any_unary,
-    "HammingWindow": _set_shape_type_op_any_window,
-    "HannWindow": _set_shape_type_op_any_window,
-    "Gemm": _set_shape_type_op_any_gemm,
-    "GlobalAveragePool": _set_shape_type_op_any_global_pool,
-    "GlobalMaxPool": _set_shape_type_op_any_global_pool,
-    "GridSample": _set_shape_type_op_any_gridsample,
-    "Identity": _set_shape_type_op_any_identity,
-    "InstanceNormalization": _set_shape_type_op_any_instance_normalization,
-    "IsInf": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
-    "IsNaN": lambda *args: _set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
-    "LayerNormalization": _set_shape_type_op_any_layer_normalization,
-    "LpNormalization": _set_shape_type_op_any_lp_normalization,
-    "Log": _set_shape_type_op_any_unary,
-    "LogSoftmax": _set_shape_type_op_any_unary,
-    "MatMul": _set_shape_type_op_any_matmul,
-    "MaxPool": _set_shape_type_op_any_conv_max_pool,
-    "MelWeightMatrix": _set_shape_type_op_any_mel_weight_matrix,
-    "Loop": _set_shape_type_op_any_loop,
-    "NonMaxSuppression": _set_shape_type_op_any_nms,
-    "NonZero": _set_shape_type_op_any_non_zero,
-    "OneHot": _set_shape_type_op_any_onehot,
-    "Pad": _set_shape_type_op_any_pad,
-    "QLinearMatMul": _set_shape_type_op_any_qlinear_matmul,
-    "Range": _set_shape_type_op_any_range,
-    "Reshape": _set_shape_type_op_any_reshape,
-    "Resize": _set_shape_type_op_any_resize,
-    "RNN": _set_shape_type_op_any_rnn,
-    "RotaryEmbedding": _set_shape_type_op_any_rotary_embedding,
-    "RMSNormalization": _set_shape_type_op_any_layer_normalization,
-    "ScatterND": _set_shape_type_op_any_scatternd,
-    "SequenceEmpty": _set_shape_type_op_any_sequence_empty,
-    "Shape": _set_shape_type_op_any_shape,
-    "Sign": _set_shape_type_op_any_sign,
-    "SimplifiedLayerNormalization": _set_shape_type_op_any_layer_normalization,
-    "Size": _set_shape_type_op_any_size,
-    "Slice": _set_shape_type_op_any_slice,
-    "Softmax": _set_shape_type_op_any_unary,
-    "SoftmaxCrossEntropyLoss": _set_shape_type_op_any_softmax_cross_entropy_loss,
-    "Swish": _set_shape_type_op_any_unary,
-    "SpaceToDepth": _set_shape_type_op_any_space_to_depth,
-    "Split": _set_shape_type_op_any_split,
-    "Squeeze": _set_shape_type_op_any_squeeze,
-    "Tile": _set_shape_type_op_any_tile,
-    "TopK": _set_shape_type_op_any_topk,
-    "Transpose": _set_shape_type_op_any_transpose,
-    "Unsqueeze": _set_shape_type_op_any_unsqueeze,
-    "Upsample": _set_shape_type_op_any_resize,
-    "Where": _set_shape_type_op_any_where,
+set_shape_type_op_any_known = {
+    "ArgMax": set_shape_type_op_any_arg_max_min,
+    "ArgMin": set_shape_type_op_any_arg_max_min,
+    "Attention": set_shape_type_op_any_attention,
+    "BatchNormalization": set_shape_type_op_any_batch_normalization,
+    "BlackmanWindow": set_shape_type_op_any_window,
+    "Cast": set_shape_type_op_any_cast,
+    "BitCast": set_shape_type_op_any_cast,
+    "Clip": set_shape_type_op_any_unary,
+    "Compress": set_shape_type_op_any_compress,
+    "Concat": set_shape_type_op_any_concat,
+    "ConstantOfShape": set_shape_type_op_any_constantofshape,
+    "Conv": set_shape_type_op_any_conv_max_pool,
+    "CumProd": set_shape_type_op_any_unary,
+    "CumSum": set_shape_type_op_any_unary,
+    "DepthToSpace": set_shape_type_op_any_depth_to_space,
+    "Dropout": set_shape_type_op_any_dropout,
+    "Einsum": set_shape_type_op_any_einsum,
+    "EyeLike": set_shape_type_op_any_eyelike,
+    "Expand": set_shape_type_op_any_expand,
+    "Flatten": set_shape_type_op_any_flatten,
+    "Gather": set_shape_type_op_any_gather,
+    "GatherElements": set_shape_type_op_any_gather_elements,
+    "GatherND": set_shape_type_op_any_gathernd,
+    "Gelu": set_shape_type_op_any_unary,
+    "HammingWindow": set_shape_type_op_any_window,
+    "HannWindow": set_shape_type_op_any_window,
+    "Gemm": set_shape_type_op_any_gemm,
+    "GlobalAveragePool": set_shape_type_op_any_global_pool,
+    "GlobalMaxPool": set_shape_type_op_any_global_pool,
+    "GridSample": set_shape_type_op_any_gridsample,
+    "Identity": set_shape_type_op_any_identity,
+    "InstanceNormalization": set_shape_type_op_any_instance_normalization,
+    "IsInf": lambda *args: set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
+    "IsNaN": lambda *args: set_shape_type_op_any_unary(*args, itype=TensorProto.BOOL),
+    "LayerNormalization": set_shape_type_op_any_layer_normalization,
+    "LpNormalization": set_shape_type_op_any_lp_normalization,
+    "Log": set_shape_type_op_any_unary,
+    "LogSoftmax": set_shape_type_op_any_unary,
+    "MatMul": set_shape_type_op_any_matmul,
+    "MaxPool": set_shape_type_op_any_conv_max_pool,
+    "MelWeightMatrix": set_shape_type_op_any_mel_weight_matrix,
+    "Loop": set_shape_type_op_any_loop,
+    "NonMaxSuppression": set_shape_type_op_any_nms,
+    "NonZero": set_shape_type_op_any_non_zero,
+    "OneHot": set_shape_type_op_any_onehot,
+    "Pad": set_shape_type_op_any_pad,
+    "QLinearMatMul": set_shape_type_op_any_qlinear_matmul,
+    "Range": set_shape_type_op_any_range,
+    "Reshape": set_shape_type_op_any_reshape,
+    "Resize": set_shape_type_op_any_resize,
+    "RNN": set_shape_type_op_any_rnn,
+    "RotaryEmbedding": set_shape_type_op_any_rotary_embedding,
+    "RMSNormalization": set_shape_type_op_any_layer_normalization,
+    "ScatterND": set_shape_type_op_any_scatternd,
+    "SequenceEmpty": set_shape_type_op_any_sequence_empty,
+    "Shape": set_shape_type_op_any_shape,
+    "Sign": set_shape_type_op_any_sign,
+    "SimplifiedLayerNormalization": set_shape_type_op_any_layer_normalization,
+    "Size": set_shape_type_op_any_size,
+    "Slice": set_shape_type_op_any_slice,
+    "Softmax": set_shape_type_op_any_unary,
+    "SoftmaxCrossEntropyLoss": set_shape_type_op_any_softmax_cross_entropy_loss,
+    "Swish": set_shape_type_op_any_unary,
+    "SpaceToDepth": set_shape_type_op_any_space_to_depth,
+    "Split": set_shape_type_op_any_split,
+    "Squeeze": set_shape_type_op_any_squeeze,
+    "Tile": set_shape_type_op_any_tile,
+    "TopK": set_shape_type_op_any_topk,
+    "Transpose": set_shape_type_op_any_transpose,
+    "Unsqueeze": set_shape_type_op_any_unsqueeze,
+    "Upsample": set_shape_type_op_any_resize,
+    "Where": set_shape_type_op_any_where,
 }
 
 
 def set_shape_type_op_any(self: ShapeBuilder, node: NodeProto, exc: bool = False):
     """Sets the shape and type if it can."""
     if node.op_type.startswith("Reduce"):
-        return _set_shape_type_op_any_reduce(self, node)
-    if node.op_type in _set_shape_type_op_any_known:
-        fct = _set_shape_type_op_any_known[node.op_type]
+        return set_shape_type_op_any_reduce(self, node)
+    if node.op_type in set_shape_type_op_any_known:
+        fct = set_shape_type_op_any_known[node.op_type]
         return fct(self, node)
     if node.op_type in self._op_type_element_wise_cmp_types:
         r = set_type_shape_binary_op(self, node.output[0], *node.input, cmp_op=True)
@@ -2741,7 +2739,7 @@ def set_type_shape_bias_split_gelu(g: "ShapeBuilder", node: "NodeProto"):  # noq
         g.set_rank(out, g.get_rank(inp))
 
 
-_set_shape_type_op_any_custom = {
+set_shape_type_op_any_custom = {
     "AddAdd": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
     "AddMul": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
     "AddSharedInput": set_type_shape_shared_input,
@@ -2754,10 +2752,10 @@ _set_shape_type_op_any_custom = {
     "FastGelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "FusedMatMul": set_type_shape_fused_matmul,
     "FusedMatMulActivation": set_type_shape_fused_matmul,
-    "FusedConv": _set_shape_type_op_any_conv_max_pool,
+    "FusedConv": set_shape_type_op_any_conv_max_pool,
     "Gelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "GemmFastGelu": lambda g, node: set_type_shape_matmul(g, node.output[0], *node.input[:2]),
-    "GemmaRotaryEmbedding": _set_shape_type_op_any_gemma_rotary_embedding,
+    "GemmaRotaryEmbedding": set_shape_type_op_any_gemma_rotary_embedding,
     "MaskedScatterNDOfShape": set_type_shape_scatter_nd_of_shape,
     "MulAdd": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
     "MulMul": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
@@ -3150,7 +3148,7 @@ def set_shape_type_decoder_attention(self: ShapeBuilder, node: NodeProto):
             self.set_rank(node.output[cache_out_idx], 4)
 
 
-_set_shape_type_com_microsoft_ops: Dict[str, Callable[[ShapeBuilder, NodeProto], None]] = {
+set_shape_type_com_microsoft_ops: Dict[str, Callable[[ShapeBuilder, NodeProto], None]] = {
     "Attention": set_shape_type_attention_microsoft,
     "CausalConvWithState": set_shape_type_causal_conv_with_state,
     "CDist": set_shape_type_cdist,
@@ -3172,7 +3170,7 @@ _SUPPORTED_AI_ONNX_ML_OPS: FrozenSet[str] = frozenset(
 
 _SUPPORTED_UNARY_CUSTOM_OPS: FrozenSet[str] = frozenset({"NegXplus1", "ReplaceZero"})
 
-_SUPPORTED_OP_ANY_CUSTOM_OPS: FrozenSet[str] = frozenset(_set_shape_type_op_any_custom)
+_SUPPORTED_OP_ANY_CUSTOM_OPS: FrozenSet[str] = frozenset(set_shape_type_op_any_custom)
 
 
 def supported_ops_in_set_shape_type_custom() -> Dict[str, FrozenSet[str]]:
@@ -3193,7 +3191,7 @@ def supported_ops_in_set_shape_type_custom() -> Dict[str, FrozenSet[str]]:
     return {
         "ai.onnx.ml": _SUPPORTED_AI_ONNX_ML_OPS,
         "": _SUPPORTED_UNARY_CUSTOM_OPS | _SUPPORTED_OP_ANY_CUSTOM_OPS,
-        "com.microsoft": frozenset(_set_shape_type_com_microsoft_ops),
+        "com.microsoft": frozenset(set_shape_type_com_microsoft_ops),
     }
 
 
@@ -3205,8 +3203,8 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
         return None
     if node.op_type in _SUPPORTED_UNARY_CUSTOM_OPS:
         return set_type_shape_unary_op(self, node.output[0], node.input[0])
-    if node.op_type in _set_shape_type_op_any_custom:
-        return _set_shape_type_op_any_custom[node.op_type](self, node)
+    if node.op_type in set_shape_type_op_any_custom:
+        return set_shape_type_op_any_custom[node.op_type](self, node)
     if self.has_local_function(node.op_type, domain=node.domain, builder=True):
         local_function_builder = self.get_local_function(
             node.op_type, domain=node.domain, builder=True
@@ -3282,8 +3280,8 @@ def set_shape_type_custom(self: ShapeBuilder, node: NodeProto, exc: bool = False
                 self.set_rank(o, local_function_builder.get_rank(lo))
         return None
 
-    if node.op_type in _set_shape_type_com_microsoft_ops and node.domain == "com.microsoft":
-        return _set_shape_type_com_microsoft_ops[node.op_type](self, node)
+    if node.op_type in set_shape_type_com_microsoft_ops and node.domain == "com.microsoft":
+        return set_shape_type_com_microsoft_ops[node.op_type](self, node)
 
     assert node.domain not in {
         "ai.onnx.ml",
