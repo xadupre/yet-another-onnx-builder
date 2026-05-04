@@ -28,6 +28,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
     )
     from .causal_conv import CausalConvWithStatePattern
     from .complex_mul import ComplexMulPattern, ComplexMulConjPattern
+    from .decoder_attention import DecoderAttentionPattern
     from .fused_conv import FusedConvPattern
     from .greedy_search import GreedySearchPattern
     from .fused_matmul import (
@@ -81,6 +82,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         ContribRotaryEmbeddingPattern(verbose=verbose),
         ContribRotaryEmbedding3DPattern(verbose=verbose),
         ContribGemmaRotaryEmbeddingPattern(verbose=verbose),
+        DecoderAttentionPattern(verbose=verbose),
         EmbedLayerNormalizationPattern(verbose=verbose),
         GeluOrtPattern(verbose=verbose),
         GeluErfPattern(verbose=verbose),
