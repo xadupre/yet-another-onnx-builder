@@ -40,6 +40,29 @@ def _dim_spec_to_name(dim: Any) -> str:
 
 _known_true_conditions: Set[str] = set()
 
+# Set to True while torch._check is replaced by the tracing context manager.
+# TracingBool.__bool__ uses this flag to decide whether to self-register
+# positivity conditions that appear as left-hand operands of Python ``and``
+# expressions before torch._check is fully evaluated.
+_in_tracing_check_context: bool = False
+
+
+def set_tracing_check_context(active: bool) -> None:
+    """Sets whether tracing is currently intercepting ``torch._check`` calls.
+
+    When *active* is ``True``, :meth:`TracingBool.__bool__` will automatically
+    register simple positivity conditions (``"var>0"``, ``"var>=1"``, etc.)
+    instead of raising :exc:`ValueError`.  This allows compound conditions such
+    as ``torch._check(x.shape[0] > 0 and x.shape[2] > 0)`` to be evaluated
+    correctly despite Python's short-circuit ``and`` calling ``bool()`` on the
+    left operand before ``torch._check`` is invoked.
+
+    :param active: ``True`` when entering the tracing context, ``False`` when
+        leaving.
+    """
+    global _in_tracing_check_context
+    _in_tracing_check_context = active
+
 
 def register_condition(cond: "TracingBool") -> None:
     """Registers *cond* as a condition known to be True during tracing.
@@ -259,7 +282,10 @@ class TracingBool:
         # that the whole expression is True, each conjunct is also True.  We
         # self-register the condition and return ``True`` so that the right
         # operand is evaluated and can be registered by :meth:`_handle_check`.
-        if _is_positivity_condition(self.value):
+        # This is only safe inside the tracing context (when ``torch._check``
+        # has been replaced by the tracer's handler); outside that context the
+        # condition cannot be assumed True and we fall through to the ValueError.
+        if _in_tracing_check_context and _is_positivity_condition(self.value):
             _known_true_conditions.add(self.value)
             return True
         raise ValueError(

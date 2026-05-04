@@ -114,11 +114,15 @@ def _check_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
     def _check_handler(cond: Any, msg: Any = None) -> None:
         tracer._handle_check(cond, msg)
 
+    from .shape import set_tracing_check_context
+
+    set_tracing_check_context(True)
     torch._check = _check_handler  # type: ignore[assignment]
     try:
         yield
     finally:
         torch._check = _ORIGINAL_TORCH_CHECK  # type: ignore[assignment]
+        set_tracing_check_context(False)
 
 
 @contextlib.contextmanager
