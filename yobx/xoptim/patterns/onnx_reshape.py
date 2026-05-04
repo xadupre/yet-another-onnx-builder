@@ -2070,9 +2070,9 @@ class ReshapeSqueezePattern(PatternOptimization):
         # All squeezed positions must have value 1 in the reshape shape.
         if any(shape1[a] != 1 for a in norm_axes):
             return self.none(node, inspect.currentframe().f_lineno)
-        # No position after the earliest squeezed axis may use 0 (copy-dim
-        # semantics), because removing an earlier axis shifts the index and
-        # would change which input dimension is copied.
+        # Positions after the earliest squeezed axis cannot use 0 (copy-dimension
+        # semantics) because removing earlier axes shifts indices, potentially
+        # copying from incorrect input dimensions.
         min_axis = min(norm_axes)
         norm_axes_set = set(norm_axes)
         for i in range(min_axis + 1, rank):
@@ -2090,11 +2090,11 @@ class ReshapeSqueezePattern(PatternOptimization):
         new_shape = np.array(
             [s for i, s in enumerate(shape1) if i not in norm_axes], dtype=np.int64
         )
-        new_shape_init = g.make_initializer("", new_shape, source="ReshapeSqueezePattern.apply")
+        new_shape_name = g.make_initializer("", new_shape, source="ReshapeSqueezePattern.apply")
         return [
             g.make_node(
                 "Reshape",
-                [reshape.input[0], new_shape_init],
+                [reshape.input[0], new_shape_name],
                 squeeze.output,
                 name=f"{self.__class__.__name__}--{reshape.name}",
                 doc_string=reshape.doc_string,
