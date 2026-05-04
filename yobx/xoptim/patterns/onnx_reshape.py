@@ -55,19 +55,7 @@ class ReshapePattern(PatternOptimization):
 
 class ShapedBasedReshapePattern(ReshapePattern):
     """
-    Replaces a Reshape with Identity when the target shape implies the output
-    is identical to the input, based on the input rank.
-
-    Handles two cases where the reshape target shape implies identity:
-
-    1. All zeros ``[0, 0, 0]`` (or ``[0]``, ``[0, 0]``, ...): every dimension
-       is copied from the input, so the output shape equals the input shape.
-
-    2. Leading zeros with a non-zero last element ``[0, 0, -1]``: the first
-       ``N-1`` dimensions are copied from the input and the last is inferred;
-       when the rank matches the number of elements in the shape constant, the
-       inferred dimension equals the input's last dimension, again making the
-       operation an identity.
+    Checks that a Reshape is really needed based on the input shape.
 
     Model with nodes to be fused:
 
@@ -129,11 +117,7 @@ class ShapedBasedReshapePattern(ReshapePattern):
         if cst is None:
             return self.none(node, inspect.currentframe().f_lineno)
         cst = tuple(cst)
-        if len(cst) == 0:
-            return self.none(node, inspect.currentframe().f_lineno)
-        all_zeros = set(cst) == {0}
-        leading_zeros_nonzero_last = cst[-1] != 0 and set(cst[:-1]) == {0}
-        if not all_zeros and not leading_zeros_nonzero_last:
+        if cst[-1] == 0 or set(cst[:-1]) != {0}:
             return self.none(node, inspect.currentframe().f_lineno)
         if not g.has_rank(node.input[0]) or g.get_rank(node.input[0]) != len(cst):
             return self.none(node, inspect.currentframe().f_lineno)

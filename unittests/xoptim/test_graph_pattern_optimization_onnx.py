@@ -506,9 +506,7 @@ class TestGraphPatternOptimization(ExtTestCase):
             gr = GraphBuilder(
                 model,
                 infer_shapes_options=True,
-                optimization_options=OptimizationOptions(
-                    patterns=["ShapedBasedReshape"], verbose=0
-                ),
+                optimization_options=OptimizationOptions(patterns=["Identity"], verbose=0),
             )
             opt_onx = gr.to_onnx(optimize=True)
             self.assertEqual(

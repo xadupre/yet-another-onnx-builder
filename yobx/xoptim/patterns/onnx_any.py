@@ -519,7 +519,8 @@ class ShapeBasedSameChildrenPattern(PatternOptimization):
 class IdentityPattern(PatternOptimization):
     """
     Replaces operator such as
-    Div(X, 1), Mul(X, 1), Add(X, 0), Sub(X, 0), Transpose(X, [0, 1, 2, ...])
+    Div(X, 1), Mul(X, 1), Add(X, 0), Sub(X, 0), Transpose(X, [0, 1, 2, ...]),
+    Reshape(X, [0, 0, ...])
     by identity nodes. It looks into patterns involving the following operators:
 
     .. runpython::
@@ -587,6 +588,7 @@ class IdentityPattern(PatternOptimization):
         "Or",
         "Expand",
         "BatchNormalization",
+        "Reshape",
     }
 
     @classmethod
@@ -634,6 +636,19 @@ class IdentityPattern(PatternOptimization):
                 or set(g.get_computed_constant(ends))
                 != {9223372036854775807}  # this a value used by torch
             ):
+                return self.none(node, inspect.currentframe().f_lineno)
+            return MatchResult(self, [node], self.apply, insert_at=node)
+
+        if node.op_type == "Reshape":
+            if not g.is_constant(node.input[1]):
+                return self.none(node, inspect.currentframe().f_lineno)
+            cst = g.get_computed_constant(node.input[1])
+            if cst is None:
+                return self.none(node, inspect.currentframe().f_lineno)
+            cst = tuple(int(v) for v in cst)
+            if len(cst) == 0 or set(cst) != {0}:
+                return self.none(node, inspect.currentframe().f_lineno)
+            if not g.has_rank(node.input[0]) or g.get_rank(node.input[0]) != len(cst):
                 return self.none(node, inspect.currentframe().f_lineno)
             return MatchResult(self, [node], self.apply, insert_at=node)
 
