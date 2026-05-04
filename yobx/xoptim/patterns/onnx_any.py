@@ -520,8 +520,8 @@ class IdentityPattern(PatternOptimization):
     """
     Replaces operator such as
     Div(X, 1), Mul(X, 1), Add(X, 0), Sub(X, 0), Transpose(X, [0, 1, 2, ...]),
-    Reshape(X, [0, 0, ...])
-    by identity nodes. It looks into patterns involving the following operators:
+    or Reshape(X, [0, 0, ...]) by identity nodes.
+    It looks into patterns involving the following operators:
 
     .. runpython::
         :showcode:
@@ -645,7 +645,7 @@ class IdentityPattern(PatternOptimization):
             cst = g.get_computed_constant(node.input[1])
             if cst is None:
                 return self.none(node, inspect.currentframe().f_lineno)
-            cst = tuple(int(v) for v in cst)
+            cst = tuple(cst)
             if len(cst) == 0 or set(cst) != {0}:
                 return self.none(node, inspect.currentframe().f_lineno)
             if not g.has_rank(node.input[0]) or g.get_rank(node.input[0]) != len(cst):
