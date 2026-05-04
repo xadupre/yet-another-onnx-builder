@@ -123,9 +123,6 @@ def decompose_einsum(
     # dimensions are preserved as-is.
     lhs_parts = equation.split("->")[0].split(",")
 
-    def _annotated(sh, letters):
-        return tuple(d if isinstance(d, str) else letter for d, letter in zip(sh, letters))
-
     if input_shapes:
         proto = np_dtype_to_tensor_dtype(np.dtype(dtype))
         # Use the original shapes for graph construction.
@@ -158,7 +155,7 @@ def decompose_einsum(
     # are based on the concrete sizes (avoiding shape-mismatch errors).
     if input_shapes:
         name_to_letters = {
-            name: letters for name, sh, letters in zip(input_names, input_shapes, lhs_parts)
+            name: letters for name, _, letters in zip(input_names, input_shapes, lhs_parts)
         }
         for inp_vi in final_model.graph.input:
             letters = name_to_letters.get(inp_vi.name)
