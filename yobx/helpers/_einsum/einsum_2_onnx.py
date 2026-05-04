@@ -263,7 +263,17 @@ def decompose_einsum_2inputs(
     :raises ValueError: if *equation* does not have exactly two inputs or
         contains letters in the output that do not appear in any input.
 
-    .. plot an onnx graph here
+    The ONNX graph produced for ``"ij,jk->ik"`` (matrix multiply) looks like:
+
+    .. gdot::
+        :script: DOT-SECTION
+        :process:
+
+        from yobx.helpers._einsum.einsum_2_onnx import decompose_einsum_2inputs
+        from yobx.helpers.dot_helper import to_dot
+
+        model = decompose_einsum_2inputs("ij,jk->ik", (3, 4), (4, 5))
+        print("DOT-SECTION", to_dot(model))
 
     Example::
 
@@ -397,5 +407,18 @@ def decompose_einsum_2inputs(
     model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", opset)])
     model.ir_version = onnx.IR_VERSION
 
-    # call optimization here
+    # Optimize: remove identity nodes, constant-fold shape arithmetic,
+    # and apply pattern rewrites (e.g. Transpose+MatMul fusion).
+    # Skip optimization for scalar output to avoid pattern-rewrite edge cases.
+    # Import deferred to avoid a circular import with yobx.xbuilder.
+    if rhs:
+        from yobx.xbuilder.graph_builder import GraphBuilder
+
+        gb = GraphBuilder(model, verbose=0)
+        gb.optimize()
+        artifact = gb.to_onnx(optimize=False)
+        opt_model = artifact.get_proto()
+        # Strip GraphBuilder metadata_props to keep the model lean.
+        del opt_model.metadata_props[:]
+        return opt_model
     return model

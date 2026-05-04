@@ -117,7 +117,7 @@ class ShapedBasedReshapePattern(ReshapePattern):
         if cst is None:
             return self.none(node, inspect.currentframe().f_lineno)
         cst = tuple(cst)
-        if cst[-1] == 0 or set(cst[:-1]) != {0}:
+        if not cst or cst[-1] == 0 or set(cst[:-1]) != {0}:
             return self.none(node, inspect.currentframe().f_lineno)
         if not g.has_rank(node.input[0]) or g.get_rank(node.input[0]) != len(cst):
             return self.none(node, inspect.currentframe().f_lineno)
