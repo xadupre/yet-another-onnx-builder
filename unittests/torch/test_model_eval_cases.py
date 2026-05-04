@@ -184,6 +184,11 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    def test_run_exporter_dimension1_new_tracing(self):
+        evaluation(
+            cases="ExportWithDimension1", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
     @requires_torch("2.7", "scan")
     def test_run_exporter_vmap_python_nostrict(self):
         evaluation(cases="VmapPython", exporters="export-nostrict", quiet=False, dynamic=True)
@@ -318,6 +323,11 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_controlflow_numel_zero_2_new_tracing(self):
         evaluation(
             cases="ControlFlowNumelZero2", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_numel_zero_3_new_tracing(self):
+        evaluation(
+            cases="ControlFlowNumelZero3", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
     def test_run_exporter_controlflow_numel_zero_export_1_tracing(self):
