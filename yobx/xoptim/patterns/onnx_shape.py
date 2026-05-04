@@ -45,7 +45,7 @@ class ShapeBasedShapeShapeAddPattern(PatternOptimization):
         shape2_node: NodeProto,
         add_node: NodeProto,
     ) -> List[NodeProto]:
-        raise NotImplementedError(f"{self.___class__.__name__} is not implemented yet.")
+        raise NotImplementedError(f"{self.__class__.__name__} is not implemented yet.")
 
 
 class ShapeUnsqueezePattern(PatternOptimization):
