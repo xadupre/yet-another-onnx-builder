@@ -248,8 +248,12 @@ def decompose_einsum_2inputs(
     :param equation: einsum equation string with exactly two input operands
         and an explicit output, e.g. ``"ij,jk->ik"`` or ``"bij,bjk->bik"``.
     :param shape0: optional shape of the first input.  Each element may be
-        an integer (fixed size), a string (symbolic name), or ``None``
-        (fully dynamic).  When omitted the input has no shape annotation.
+        an integer (rank hint only — the ONNX graph input is made fully
+        dynamic), a string (symbolic name preserved in the shape annotation),
+        or ``None`` (dynamic dimension).  When omitted the input has no shape
+        annotation.  Pass string elements (e.g. ``("M", "K")``) when you need
+        the :class:`~yobx.xshape.BasicShapeBuilder` to propagate symbolic
+        FLOPs formulae through the graph.
     :param shape1: optional shape of the second input (same convention).
     :param name0: name used for the first graph input (default ``"X0"``).
     :param name1: name used for the second graph input (default ``"X1"``).
@@ -396,10 +400,21 @@ def decompose_einsum_2inputs(
     # ------------------------------------------------------------------
     # Assemble the ONNX ModelProto.
     # ------------------------------------------------------------------
+    # Build dynamic-shaped inputs: preserve the rank from *shape0*/*shape1* but
+    # replace every concrete integer dimension with ``None`` so that the graph
+    # accepts any batch size or sequence length at runtime.
+    def _dynamic_shape(shape):
+        if shape is None:
+            return None
+        return tuple(None if isinstance(d, int) else d for d in shape)
+
     graph = oh.make_graph(
         bld.nodes,
         "einsum_2inputs",
-        [bld.make_value_info(name0, dtype, shape0), bld.make_value_info(name1, dtype, shape1)],
+        [
+            bld.make_value_info(name0, dtype, _dynamic_shape(shape0)),
+            bld.make_value_info(name1, dtype, _dynamic_shape(shape1)),
+        ],
         [oh.make_tensor_value_info(output_name, dtype, None)],
         initializer=bld.initializers,
     )

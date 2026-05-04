@@ -189,8 +189,9 @@ def decompose_einsum_2inputs(
     :param equation: einsum equation string with exactly two inputs and an
         explicit output, e.g. ``"ij,jk->ik"`` or ``"bij,bjk->bik"``.
     :param shape0: optional shape of the first input.  Each element may be
-        an integer (fixed size), a string (symbolic name, e.g. ``"batch"``),
-        or ``None`` (dynamic dimension).
+        an integer (rank hint — the ONNX graph input is made fully dynamic),
+        a string (symbolic name, e.g. ``"batch"``), or ``None`` (dynamic
+        dimension).  Use string dims when you need symbolic FLOPs estimation.
     :param shape1: optional shape of the second input (same convention).
     :param dtype: numpy scalar type for the model inputs and output
         (default ``numpy.float32``).

@@ -272,10 +272,16 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
 
     def test_cost_inference_4d_multi_batch_decompose_einsum_2inputs(self):
         """BasicShapeBuilder.run_model with InferenceMode.COST must succeed for
-        a 4-D multi-batch equation using decompose_einsum_2inputs (strategy B)."""
+        a 4-D multi-batch equation using decompose_einsum_2inputs (strategy B).
+
+        Symbolic (string) dims are used so the shape builder can propagate
+        expressions through the graph; concrete values are substituted at
+        evaluation time via ``evaluate_cost_with_true_inputs``."""
         from yobx.xshape import BasicShapeBuilder, InferenceMode
 
-        model = decompose_einsum_2inputs("abij,abjk->abik", (2, 3, 8, 4), (2, 3, 4, 6))
+        model = decompose_einsum_2inputs(
+            "abij,abjk->abik", ("A", "B", "I", "K"), ("A", "B", "K", "L")
+        )
         feeds = {
             "X0": np.ones((2, 3, 8, 4), dtype=np.float32),
             "X1": np.ones((2, 3, 4, 6), dtype=np.float32),
@@ -288,10 +294,14 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
 
     def test_cost_inference_4d_reduction(self):
         """BasicShapeBuilder.run_model with InferenceMode.COST must succeed for
-        a 4-D reduction equation using decompose_einsum_2inputs (strategy B)."""
+        a 4-D reduction equation using decompose_einsum_2inputs (strategy B).
+
+        Symbolic (string) dims are used so the shape builder can propagate
+        expressions through the graph; concrete values are substituted at
+        evaluation time via ``evaluate_cost_with_true_inputs``."""
         from yobx.xshape import BasicShapeBuilder, InferenceMode
 
-        model = decompose_einsum_2inputs("abij,ij->ab", (2, 3, 8, 4), (8, 4))
+        model = decompose_einsum_2inputs("abij,ij->ab", ("A", "B", "I", "J"), ("I", "J"))
         feeds = {
             "X0": np.ones((2, 3, 8, 4), dtype=np.float32),
             "X1": np.ones((8, 4), dtype=np.float32),

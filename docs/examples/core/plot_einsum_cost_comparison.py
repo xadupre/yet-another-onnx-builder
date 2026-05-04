@@ -350,13 +350,15 @@ df_dist = pd.DataFrame({"Op type": all_op_types, sgA: counts_a, sgB: counts_b, s
 print(df_dist.to_string(index=False))
 
 # %%
-# 6. Graph comparison — equation with the largest structural difference
-# ---------------------------------------------------------------------
+# 6. Graph comparison
+# -------------------
 #
-# We select the equation where strategies A and B differ the most in total
-# node count and render both ONNX graphs side by side so the structural
-# difference is visible at a glance.
-# TODO: ij,ij->i
+# We render two graph comparisons side-by-side:
+#
+# * the equation where strategies A and B differ the **most** in total node
+#   count (largest structural difference), and
+# * the ``ij,ij->i`` row-dot reduction (an equation with a non-trivial
+#   reduction path that is handled differently by the two strategies).
 
 diff_row = max(results, key=lambda r: abs(r[f"nodes_{sgA}"] - r[f"nodes_{sgB}"]))
 diff_eq = diff_row["equation"]
@@ -369,24 +371,32 @@ print(
     f"  {sgA}={diff_a} nodes, {sgB}={diff_b} nodes, Δ={abs(diff_a - diff_b)}"
 )
 
-fig_g, axes_g = plt.subplots(1, 2, figsize=(18, 8))
-for ax_g, key, model_key in [
-    (axes_g[0], "ML — decompose_einsum", f"model_{sgA}"),
-    (axes_g[1], "Naive2 — decompose_einsum_2inputs", f"model_{sgB}"),
-]:
-    plot_dot(diff_row[model_key], ax=ax_g)
-    n_nodes = diff_row[f"nodes_{sgA if sgA in key else sgB}"]
-    ax_g.set_title(f"{key}\n{diff_eq!r} — {n_nodes} nodes", fontsize=9)
-    ax_g.axis("off")
+# Row-dot reduction equation always included for comparison.
+rowdot_row = next((r for r in results if r["equation"] == "ij,ij->i"), diff_row)
 
-fig_g.suptitle(
-    f"ONNX graph comparison for '{diff_eq}' ({diff_label})\n"
-    f"Strategy ML: {diff_a} nodes  |  Strategy Naive2: {diff_b} nodes",
-    fontsize=10,
-)
-fig_g.tight_layout()
-fig_g.savefig("plot_einsum_cost_comparison.0.png")
-# plt.show()
+for fig_idx, (row, extra_title) in enumerate(
+    [(diff_row, "largest A/B difference"), (rowdot_row, "row-dot reduction")],
+    start=0,
+):
+    eq = row["equation"]
+    label = row["label"]
+    na = row[f"nodes_{sgA}"]
+    nb = row[f"nodes_{sgB}"]
+    fig_g, axes_g = plt.subplots(1, 2, figsize=(18, 8))
+    for ax_g, key, model_key, n_nodes in [
+        (axes_g[0], "ML — decompose_einsum", f"model_{sgA}", na),
+        (axes_g[1], "Naive2 — decompose_einsum_2inputs", f"model_{sgB}", nb),
+    ]:
+        plot_dot(row[model_key], ax=ax_g)
+        ax_g.set_title(f"{key}\n{eq!r} — {n_nodes} nodes", fontsize=9)
+        ax_g.axis("off")
+    fig_g.suptitle(
+        f"ONNX graph comparison for '{eq}' ({label}) — {extra_title}\n"
+        f"Strategy ML: {na} nodes  |  Strategy Naive2: {nb} nodes",
+        fontsize=10,
+    )
+    fig_g.tight_layout()
+    fig_g.savefig(f"plot_einsum_cost_comparison.{fig_idx}.png")
 
 # %%
 # 7. Charts
@@ -420,7 +430,7 @@ for offset, key in [(-width, sgA), (0, sgB), (width, sgC)]:
             fontsize=5,
         )
 ax.set_xticks(x)
-ax.set_xticklabels(equations_labels, fontsize=7)
+ax.set_xticklabels(equations_labels, fontsize=7, rotation=30, ha="right")
 ax.set_ylabel("ONNX node count")
 ax.set_title("Graph complexity (node count)", fontsize=9)
 ax.legend(fontsize=8)
@@ -435,7 +445,7 @@ xf = np.arange(len(x_flops))
 ax2.bar(xf - width / 2, fa_vals, width, label=sgA, color=colors[sgA])
 ax2.bar(xf + width / 2, fb_vals, width, label=sgB, color=colors[sgB])
 ax2.set_xticks(xf)
-ax2.set_xticklabels(flop_labels, fontsize=7)
+ax2.set_xticklabels(flop_labels, fontsize=7, rotation=30, ha="right")
 ax2.set_ylabel("Total FLOPs")
 ax2.set_title(f"Estimated FLOPs ({sgA} and {sgB}; Einsum omitted — no estimator)", fontsize=9)
 ax2.legend(fontsize=8)
@@ -446,7 +456,7 @@ xo = np.arange(len(all_op_types))
 for offset, key, counts in [(-width, sgA, counts_a), (0, sgB, counts_b), (width, sgC, counts_c)]:
     ax3.bar(xo + offset, counts, width, label=key, color=colors[key])
 ax3.set_xticks(xo)
-ax3.set_xticklabels(all_op_types, rotation=25, ha="right", fontsize=7)
+ax3.set_xticklabels(all_op_types, rotation=30, ha="right", fontsize=7)
 ax3.set_ylabel("Node count")
 ax3.set_title(f"Operator-type distribution — '{target_eq}'", fontsize=9)
 ax3.legend(fontsize=8)
@@ -456,7 +466,7 @@ ax4 = axes[1, 1]
 for offset, key in [(-width, sgA), (0, sgB), (width, sgC)]:
     ax4.bar(x + offset, [r[f"ms_{key}"] for r in results], width, label=key, color=colors[key])
 ax4.set_xticks(x)
-ax4.set_xticklabels(equations_labels, fontsize=7)
+ax4.set_xticklabels(equations_labels, fontsize=7, rotation=30, ha="right")
 ax4.set_ylabel("Inference time (ms)")
 ax4.set_title("OnnxRuntime benchmark (ms / inference)", fontsize=9)
 ax4.legend(fontsize=8)
@@ -466,5 +476,5 @@ fig.suptitle(
     fontsize=10,
 )
 fig.tight_layout()
-fig.savefig("plot_einsum_cost_comparison.1.png")
+fig.savefig("plot_einsum_cost_comparison.2.png")
 # fig.show()
