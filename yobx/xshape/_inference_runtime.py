@@ -282,10 +282,13 @@ class _InferenceRuntime:
                                 : len(shape_cst) - 1 - shape_cst[::-1].index(0) + 1
                             ]
                             if len(sh) < len(shape_cst_last_zero):
-                                # The reshape increases the rank while using 0
-                                # (copy-from-input) at a position that exceeds
-                                # the input rank — shape cannot be determined
-                                # statically.
+                                # In ONNX Reshape, a 0 in the shape means
+                                # "copy the corresponding dimension from the
+                                # input tensor at the same index". When the
+                                # output rank is larger than the input rank,
+                                # the last 0 references an input index that
+                                # does not exist — shape inference cannot
+                                # determine the output shape statically.
                                 shape_cst = None
                             else:
                                 shape_cst = tuple(
