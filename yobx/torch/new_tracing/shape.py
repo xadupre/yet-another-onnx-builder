@@ -1,8 +1,7 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Set, Tuple, Union
 import itertools
-import re
 import torch
-from ...xexpressions import simplify_expression
+from ...xexpressions import evaluate_expression, simplify_expression
 
 # ---------------------------------------------------------------------------
 # Registry of conditions known to be True (populated by _handle_check during
@@ -102,49 +101,53 @@ def _negate_condition(cond: str) -> Optional[str]:
 def _can_prove_expr_nonzero(expr: str) -> bool:
     """Returns True if *expr* is provably non-zero given the known conditions.
 
-    Currently handles the common case where *expr* is a product of positive
-    integer constants and symbolic variables that are individually known to be
-    strictly positive (i.e. ``"var>0"`` appears in
-    :data:`_known_true_conditions`).  This covers patterns such as
-    ``10*_dyn_0*_dyn_1`` when ``torch._check(x.shape[0] > 0)`` and
-    ``torch._check(x.shape[2] > 0)`` have previously been called.
+    Builds a context mapping each variable known to be strictly positive
+    (i.e. ``"var>0"`` or ``"var>=1"`` appears in
+    :data:`_known_true_conditions`) to ``1`` — the smallest positive integer
+    value — then delegates to :func:`~yobx.xexpressions.evaluate_expression`.
+    If the expression evaluates to a non-zero integer value, the expression is
+    provably non-zero.  This covers patterns such as ``10*_dyn_0*_dyn_1`` when
+    ``torch._check(x.shape[0] > 0)`` and ``torch._check(x.shape[2] > 0)``
+    have previously been called.
 
-    The function is conservative: any factor that is not a positive integer
-    literal or a simple identifier with a registered ``>0`` / ``>=1``
-    condition causes the function to return ``False`` (unknown).
+    If any variable in *expr* is absent from the context (i.e. its sign is
+    unknown), :func:`~yobx.xexpressions.evaluate_expression` raises
+    :exc:`NameError` and the function conservatively returns ``False``.
 
     :param expr: A symbolic expression string such as ``"10*_dyn_0*_dyn_1"``.
 
     Returns:
-        ``True`` if every factor of the product is provably positive.
+        ``True`` if the expression evaluates to a non-zero integer given the
+        minimal positive assignment for each constrained variable.
     """
-    # Only handle "simple products" – expressions that contain no '+', '-', or
-    # parentheses at the top level.  This is conservative and avoids false
-    # positives for more complex expressions.
-    if "+" in expr or "-" in expr or "(" in expr:
+    # Build context: map each variable known to be strictly positive to 1.
+    ctx: Dict[str, int] = {}
+    for cond in _known_true_conditions:
+        # "var>=N" where N >= 1  →  var is at least 1, map to 1.
+        if ">=" in cond:
+            parts = cond.split(">=", 1)
+            var = parts[0].strip()
+            try:
+                if int(parts[1].strip()) >= 1:
+                    ctx[var] = 1
+            except ValueError:
+                pass
+        # "var>N" where N == 0  →  var is at least 1, map to 1.
+        elif ">" in cond:
+            parts = cond.split(">", 1)
+            var = parts[0].strip()
+            try:
+                if int(parts[1].strip()) == 0:
+                    ctx[var] = 1
+            except ValueError:
+                pass
+    if not ctx:
         return False
-    factors = expr.split("*")
-    for factor in factors:
-        factor = factor.strip()
-        if not factor:
-            return False
-        # Positive integer constant.
-        try:
-            val = int(factor)
-            if val > 0:
-                continue
-            return False
-        except ValueError:
-            pass
-        # Simple identifier – check for a registered positivity constraint.
-        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", factor):
-            if (
-                f"{factor}>0" in _known_true_conditions
-                or f"{factor}>=1" in _known_true_conditions
-            ):
-                continue
+    try:
+        val = evaluate_expression(expr, ctx)
+        return val != 0
+    except (NameError, TypeError, SyntaxError, ValueError):
         return False
-    return True
 
 
 class TracingBool:

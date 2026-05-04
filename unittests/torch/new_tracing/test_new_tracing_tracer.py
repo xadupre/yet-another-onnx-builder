@@ -1425,7 +1425,7 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         self.assertFalse(dim1.is_static, "Cat output dim 1 must be symbolic, not static")
 
     def test_can_prove_expr_nonzero_helper(self):
-        """_can_prove_expr_nonzero returns True iff all product factors are provably > 0."""
+        """_can_prove_expr_nonzero returns True when expression is provably non-zero."""
         from yobx.torch.new_tracing.shape import (
             _can_prove_expr_nonzero,
             clear_conditions,
@@ -1442,16 +1442,19 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         self.assertTrue(_can_prove_expr_nonzero("5"), "positive integer constant is provable")
         self.assertTrue(_can_prove_expr_nonzero("5*a*b"), "product of known-positive factors")
         self.assertTrue(_can_prove_expr_nonzero("a*b"), "product of two known-positive vars")
+        # Sum of positive vars is also provably nonzero via evaluate_expression.
+        self.assertTrue(_can_prove_expr_nonzero("a+b"), "sum of known-positive vars is nonzero")
         self.assertFalse(
             _can_prove_expr_nonzero("c"), "unknown variable c should not be provable"
         )
         self.assertFalse(
             _can_prove_expr_nonzero("a*c"), "product with unknown var should not be provable"
         )
-        self.assertFalse(_can_prove_expr_nonzero("a+b"), "sum expression should not be provable")
         self.assertFalse(
             _can_prove_expr_nonzero("0"), "zero constant should not be provable nonzero"
         )
+        # a - b evaluates to 0 when both are mapped to 1, so cannot be proven nonzero.
+        self.assertFalse(_can_prove_expr_nonzero("a-b"), "difference might be zero, not provable")
         clear_conditions()
 
     def test_tracing_bool_can_prove_nonzero_resolves_to_false(self):
