@@ -7279,6 +7279,101 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_reshape_squeeze_basic(self):
+        # squeeze(reshape(X, [0, 0, 0, 1, 8]), [3]) → reshape(X, [0, 0, 0, 8])
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Reshape", ["X", "shape1"], ["xr"]),
+                    oh.make_node("Squeeze", ["xr", "axes"], ["Z"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b", "c", "d"])],
+                [_mkv_("Z", TFLOAT, ["a", "b", "c", 8])],
+                [
+                    onh.from_array(np.array([0, 0, 0, 1, 8], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([3], dtype=np.int64), name="axes"),
+                ],
+            )
+        )
+        check_model(model)
+        feeds = {"X": self._range(2, 3, 4, 8)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReshapeSqueeze"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Reshape"], [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_reshape_squeeze_static_shape(self):
+        # squeeze(reshape(X, [2, 3, 4, 1, 8]), [3]) → reshape(X, [2, 3, 4, 8])
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Reshape", ["X", "shape1"], ["xr"]),
+                    oh.make_node("Squeeze", ["xr", "axes"], ["Z"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, [2, 3, 4, 8])],
+                [_mkv_("Z", TFLOAT, [2, 3, 4, 8])],
+                [
+                    onh.from_array(np.array([2, 3, 4, 1, 8], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([3], dtype=np.int64), name="axes"),
+                ],
+            )
+        )
+        check_model(model)
+        feeds = {"X": self._range(2, 3, 4, 8)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReshapeSqueeze"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Reshape"], [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_reshape_squeeze_zero_after_axis_not_applied(self):
+        # squeeze(reshape(X, [0, 0, 0, 1, 0]), [3]): the 0 at position 4 comes
+        # after the squeezed axis 3, so index-shift would break copy semantics.
+        # The pattern must NOT be applied.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Reshape", ["X", "shape1"], ["xr"]),
+                    oh.make_node("Squeeze", ["xr", "axes"], ["Z"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b", "c", "d", "e"])],
+                [_mkv_("Z", TFLOAT, ["a", "b", "c", "e"])],
+                [
+                    onh.from_array(np.array([0, 0, 0, 1, 0], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([3], dtype=np.int64), name="axes"),
+                ],
+            )
+        )
+        check_model(model)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReshapeSqueeze"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Pattern must not fire; Squeeze should still be present.
+        self.assertIn("Squeeze", [n.op_type for n in opt_onx.graph.node])
+
     def test_same_children_many_duplicated(self):
         nodes = [
             oh.make_node("Add", ["X", "one"], ["x1"]),
