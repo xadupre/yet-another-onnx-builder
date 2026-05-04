@@ -202,17 +202,14 @@ def decompose_einsum_2inputs(
         (result,) = sess.run(None, {"X0": a, "X1": b})
         assert np.allclose(result, np.einsum("bij,bjk->bik", a, b), atol=1e-5)
     """
-    from onnx import TensorProto
-
     dtype_map = {
-        np.float32: TensorProto.FLOAT,
-        np.float64: TensorProto.DOUBLE,
-        np.int32: TensorProto.INT32,
-        np.int64: TensorProto.INT64,
+        np.float32: onnx.TensorProto.FLOAT,
+        np.float64: onnx.TensorProto.DOUBLE,
+        np.int32: onnx.TensorProto.INT32,
+        np.int64: onnx.TensorProto.INT64,
     }
     dtype_key = np.dtype(dtype).type
-    onnx_dtype = dtype_map.get(dtype_key, TensorProto.FLOAT)
-
+    onnx_dtype = dtype_map.get(dtype_key, onnx.TensorProto.FLOAT)
     return _decompose_einsum_2inputs(
         equation, shape0=shape0, shape1=shape1, dtype=onnx_dtype, opset=opset
     )

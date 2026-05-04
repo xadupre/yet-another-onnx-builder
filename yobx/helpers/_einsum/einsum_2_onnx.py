@@ -263,6 +263,8 @@ def decompose_einsum_2inputs(
     :raises ValueError: if *equation* does not have exactly two inputs or
         contains letters in the output that do not appear in any input.
 
+    .. plot an onnx graph here
+
     Example::
 
         import numpy as np
@@ -394,4 +396,6 @@ def decompose_einsum_2inputs(
 
     model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", opset)])
     model.ir_version = onnx.IR_VERSION
+
+    # call optimization here
     return model
