@@ -106,6 +106,9 @@ def _is_positivity_condition(cond: str) -> bool:
     context.  These conditions arise when comparing a symbolic dimension or
     expression against zero, e.g. ``x.shape[0] > 0``.
 
+    Uses :func:`~yobx.xexpressions.evaluate_expression` to evaluate the
+    right-hand side so that constant expressions are handled uniformly.
+
     :param cond: A condition string such as ``"d0>0"`` or ``"_dyn_1>=1"``.
 
     Returns:
@@ -115,14 +118,16 @@ def _is_positivity_condition(cond: str) -> bool:
     if ">=" in cond:
         parts = cond.split(">=", 1)
         try:
-            return int(parts[1].strip()) >= 1
-        except ValueError:
+            rhs = evaluate_expression(parts[1].strip(), {})
+            return rhs >= 1
+        except (NameError, TypeError, SyntaxError, ValueError):
             return False
     if ">" in cond:
         parts = cond.split(">", 1)
         try:
-            return int(parts[1].strip()) == 0
-        except ValueError:
+            rhs = evaluate_expression(parts[1].strip(), {})
+            return rhs == 0
+        except (NameError, TypeError, SyntaxError, ValueError):
             return False
     return False
 
