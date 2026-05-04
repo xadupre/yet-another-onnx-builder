@@ -13,7 +13,7 @@ ONNX Graph Visualization with to_mermaid
 The function:
 
 * assigns different CSS classes to different node kinds (inputs are green,
-  initialisers are yellow, operators are light-grey, outputs are light-blue),
+  initializers are yellow, operators are light-grey, outputs are light-blue),
 * inlines small scalar constants and 1-D initializers whose length is ≤ 9
   directly onto the node label so the graph stays compact,
 * uses :class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`

@@ -17,7 +17,7 @@ def to_mermaid(model: onnx.ModelProto) -> str:
       outer-scope values consumed by the sub-graph.
 
     :param model: ONNX model to convert
-    :return: Mermaid flowchart string
+    :returns: Mermaid flowchart string
 
     Example::
 
