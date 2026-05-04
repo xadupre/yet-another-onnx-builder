@@ -8313,7 +8313,8 @@ class TestGraphPatternOptimization(ExtTestCase):
         ref = ExtendedReferenceEvaluator(model)
         expected_xu, original_sh = ref.run(None, feeds)
         # After optimization sh is the remapped (shorter) shape: original dims only.
-        norm_axis = unsq_axis % 4
+        # original_sh has len = input_rank + 1 (one axis inserted by Unsqueeze).
+        norm_axis = unsq_axis % len(original_sh)
         expected_sh = np.array(
             [v for i, v in enumerate(original_sh) if i != norm_axis], dtype=np.int64
         )
