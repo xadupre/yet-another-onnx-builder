@@ -121,6 +121,10 @@ class GraphTracer:
         # not traced into; instead a single ``call_function`` node is emitted for
         # the whole module call.
         self.module_leaves: Optional[Dict[type, Callable[..., bool]]] = module_leaves
+        # Set to True while dispatch() executes func(*fake_args) inside FakeMode
+        # so that factory-function handlers (e.g. _handle_full) can detect that
+        # they are being called by a FakeTensor kernel rather than by user code.
+        self._in_dispatch: bool = False
 
     def _is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
         """
@@ -956,20 +960,12 @@ class GraphTracer:
                 return view_tt
 
         # running the function
-        # Temporarily restore the torch.full patch to its original so that
-        # FakeTensor kernel implementations (e.g. _like constructors inside
-        # ``aten.batch_norm``) call the real ``torch.full`` and do not route
-        # through our tracing handler, which would create TracingTensors
-        # incompatible with FakeTensor.
-        from ._patches import _ORIGINAL_TORCH_FULL
-
-        _tracing_full = torch.full
-        torch.full = _ORIGINAL_TORCH_FULL
+        self._in_dispatch = True
         try:
             with self._fake_mode:
                 fake_res = func(*fake_args, **fake_kwargs)
         finally:
-            torch.full = _tracing_full
+            self._in_dispatch = False
         assert type(fake_res) is not torch.Tensor, f"Unexpected type {type(fake_res)} for output."
 
         # add a node in the graph
@@ -1760,20 +1756,24 @@ class GraphTracer:
         fully resolved to concrete integers (e.g. the static branch of a
         guard like ``if x.shape[0] != 0``) still appear in the FX graph.
 
-        FakeTensor kernel invocations within :meth:`dispatch` never reach this
-        handler because :meth:`dispatch` temporarily restores the original
-        ``torch.full`` before entering the FakeTensorMode context.  The handler
-        is only reached for ``torch.full`` calls made from user model code
-        during normal tracing.
+        When called from inside :meth:`dispatch`'s FakeTensorMode invocation
+        (``self._in_dispatch`` is ``True``), the call originates from a
+        FakeTensor kernel implementation rather than from user model code.
+        In that case the original ``torch.full`` is used directly and no FX
+        node is emitted.
 
         :param size: Full size argument passed to ``torch.full``.
         :param fill_value: Fill value passed to ``torch.full``.
         :param kwargs: Additional keyword arguments for ``torch.full``.
 
         Returns:
-            Returns a :class:`TracingTensor` wrapping an FX node for the call.
+            Returns a :class:`TracingTensor` wrapping an FX node for the call,
+            or the eager result when called from a FakeTensor kernel invocation.
         """
         from ._patches import _ORIGINAL_TORCH_FULL
+
+        if self._in_dispatch:
+            return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
 
         if isinstance(size, torch.Size):
             size = tuple(size)
