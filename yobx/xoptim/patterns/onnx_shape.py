@@ -663,7 +663,7 @@ class ShapeTransposePattern(PatternOptimization):
         if shape_start >= shape_end:
             return self.none(node, inspect.currentframe().f_lineno)
 
-        return MatchResult(self, [tr_node, node], self.apply, insert_at=node)
+        return MatchResult(self, [tr_node, node], self.apply, insert_at=tr_node)
 
     def apply(
         self,
