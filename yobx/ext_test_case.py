@@ -772,15 +772,6 @@ def requires_matplotlib(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
-def requires_cairosvg(msg: str = "") -> Callable:
-    """Skips a unit test if :epkg:`cairosvg` is not installed."""
-    try:
-        import cairosvg  # noqa: F401
-    except ImportError:
-        return unittest.skip(msg or "cairosvg not installed")
-    return lambda x: x
-
-
 def requires_numpy(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`numpy` is not recent enough."""
     try:

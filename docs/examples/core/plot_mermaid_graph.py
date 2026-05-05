@@ -25,11 +25,15 @@ The output is a plain Mermaid string; it can be embedded directly in Markdown
 or saved to a ``.mmd`` file.
 """
 
+import os
+import tempfile
+
 import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from yobx.doc import plot_mermaid
+from IPython.display import SVG as IPythonSVG
+from yobx.doc import draw_graph_mermaid
 from yobx.helpers.mermaid_helper import to_mermaid
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -74,5 +78,10 @@ print(mermaid_src)
 # %%
 # Display the graph
 # ------------------
+#
+# The diagram is rendered by ``mmdc`` to SVG and displayed using
+# :class:`IPython.display.SVG`.
 
-plot_mermaid(model)
+svg_path = os.path.join(tempfile.gettempdir(), "plot_mermaid_graph.svg")
+draw_graph_mermaid(model, svg_path)
+IPythonSVG(filename=svg_path)

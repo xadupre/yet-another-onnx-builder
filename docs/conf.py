@@ -188,6 +188,34 @@ if int(os.environ.get("UNITTEST_GOING", "0")):
     # excluded on CI (e.g. case_coverage.rst, ci_durations.rst).
     suppress_warnings += ["toc.excluded", "ref.ref"]
 
+
+class _SvgScraper:
+    """Embeds pre-generated SVG files in Sphinx Gallery.
+
+    Copies SVG files specified in the module-level ``__gallery_svgs__``
+    variable into the gallery image directory, generates reStructuredText
+    image directives, and removes temporary source files.
+    """
+
+    def __call__(self, block, block_vars, gallery_conf):
+        import re
+        import shutil
+        from sphinx_gallery.scrapers import figure_rst
+
+        svgs = block_vars["example_globals"].pop("__gallery_svgs__", None)
+        if not svgs:
+            return ""
+        image_paths = []
+        for svg_src in svgs:
+            image_path = str(next(block_vars["image_path_iterator"]))
+            image_path = re.sub(r"\.[a-z]+$", ".svg", image_path)
+            shutil.copy(str(svg_src), image_path)
+            if str(svg_src) != image_path:
+                os.remove(str(svg_src))
+            image_paths.append(image_path)
+        return figure_rst(image_paths, gallery_conf["src_dir"])
+
+
 sphinx_gallery_conf = {
     # path to your examples scripts
     "examples_dirs": [
@@ -219,6 +247,8 @@ sphinx_gallery_conf = {
     "recommender": {"enable": True, "n_examples": 3, "min_df": 3, "max_df": 0.9},
     # ignore capture for matplotib axes
     "ignore_repr_types": "matplotlib\\.(text|axes)",
+    # capture SVG/HTML repr from the last expression of a code block
+    "capture_repr": ("_repr_html_", "_repr_svg_"),
     # robubstness
     "reset_modules_order": "both",
     "reset_modules": (
@@ -226,6 +256,8 @@ sphinx_gallery_conf = {
         "yobx.doc.reset_torch_transformers",
         "yobx.doc.reset_tensorflow",
     ),
+    # image scrapers: default matplotlib + SVG-direct scraper
+    "image_scrapers": ("matplotlib", _SvgScraper()),
 }
 
 substring_to_disable = []
