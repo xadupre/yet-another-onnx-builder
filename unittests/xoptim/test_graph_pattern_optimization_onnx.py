@@ -8786,6 +8786,120 @@ class TestGraphPatternOptimization(ExtTestCase):
                 got = opt_ref.run(None, feeds)[0]
                 self.assertEqualArray(expected, got)
 
+    def test_gather_gather_scalar_index(self):
+        # Gather(Gather(X, cst1, axis=0), scalar_cst2, axis=0) -> Gather(X, cst1[scalar], axis=0)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Gather", ["X", "cst1"], ["Y"], axis=0),
+                    oh.make_node("Gather", ["Y", "cst2"], ["Z"], axis=0),
+                ],
+                "test",
+                [_mkv_("X", TFLOAT, [5, 4])],
+                [_mkv_("Z", TFLOAT, [4])],
+                [
+                    onh.from_array(np.array([1, 3, 0, 2, 4], dtype=np.int64), name="cst1"),
+                    onh.from_array(np.array(2, dtype=np.int64), name="cst2"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(5, 4)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_gather_1d_index(self):
+        # Gather(Gather(X, cst1, axis=0), cst2, axis=0) -> Gather(X, cst1[cst2], axis=0)
+        # cst2 is a 1-D array.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Gather", ["X", "cst1"], ["Y"], axis=0),
+                    oh.make_node("Gather", ["Y", "cst2"], ["Z"], axis=0),
+                ],
+                "test",
+                [_mkv_("X", TFLOAT, [5, 4])],
+                [_mkv_("Z", TFLOAT, [3, 4])],
+                [
+                    onh.from_array(np.array([1, 3, 0, 2, 4], dtype=np.int64), name="cst1"),
+                    onh.from_array(np.array([2, 0, 1], dtype=np.int64), name="cst2"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(5, 4)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_gather_inner_used_twice(self):
+        # When the intermediate Gather output is used by more than one node,
+        # the inner Gather must be preserved.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Gather", ["X", "cst1"], ["Y"], axis=0),
+                    oh.make_node("Gather", ["Y", "cst2"], ["Z"], axis=0),
+                    oh.make_node("Add", ["Y", "Y"], ["W"]),
+                ],
+                "test",
+                [_mkv_("X", TFLOAT, [5, 4])],
+                [_mkv_("Z", TFLOAT, [4]), _mkv_("W", TFLOAT, [5, 4])],
+                [
+                    onh.from_array(np.array([1, 3, 0, 2, 4], dtype=np.int64), name="cst1"),
+                    onh.from_array(np.array(2, dtype=np.int64), name="cst2"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(5, 4)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected_z, expected_w = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        # Inner Gather must be kept because Y is still used by Add.
+        self.assertIn("Gather", op_types)
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got_z, got_w = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected_z, got_z)
+        self.assertEqualArray(expected_w, got_w)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
