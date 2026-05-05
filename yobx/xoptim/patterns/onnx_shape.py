@@ -149,7 +149,7 @@ class UnsqueezeShapePattern(PatternOptimization):
         if len(node.input) < 2 or not g.is_constant(node.input[1]):
             return self.none(node, inspect.currentframe().f_lineno)
         axes = g.get_computed_constant(node.input[1])
-        if axes is None:
+        if axes is None or len(axes) == 0:
             return self.none(node, inspect.currentframe().f_lineno)
 
         # Need the rank of the Unsqueeze input to normalise negative axes.
