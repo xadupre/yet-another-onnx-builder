@@ -619,6 +619,56 @@ class TestNewTracingTracer(ExtTestCase):
             f"No parameter placeholder in sub-graph: {ph_names}",
         )
 
+    def test_trace_cond_with_constant_ones(self):
+        """torch.cond branch using torch.ones with a constant shape is traced correctly.
+
+        Regression test for ControlFlowCondConstant: the false_fn calls
+        ``torch.ones((1, N), ...)`` with a fully concrete integer shape.  Previously
+        _handle_ones early-exited and returned a plain tensor, which then appeared as
+        an ``param_N`` placeholder in the branch sub-graph.  With the fix, _handle_ones
+        always emits an FX node so the branch sub-graph stays self-contained.
+        """
+
+        class ConstantOnesModel(torch.nn.Module):
+            def forward(self, x):
+                def true_fn(x):
+                    return torch.sin(x) - torch.ones(x.shape, dtype=x.dtype, device=x.device)
+
+                def false_fn(x):
+                    return torch.cos(x) + torch.ones((1, 4), dtype=x.dtype, device=x.device)
+
+                return torch.cond(x.sum() > 0, true_fn, false_fn, [x])
+
+        model = ConstantOnesModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(model, (torch.randn(2, 4),))
+        graph.lint()
+
+        cond_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.cond
+        ]
+        self.assertEqual(len(cond_nodes), 1)
+
+        # Both branch sub-graphs should be valid
+        self.assertIn("_cb_cond_true_fn_0", tracer._sub_tracers)
+        self.assertIn("_cb_cond_false_fn_0", tracer._sub_tracers)
+        for _name, sub in tracer._sub_tracers.items():
+            sub.graph.lint()
+
+        # The false branch should contain a call_function node for torch.ones,
+        # not an extra placeholder for the constant tensor.
+        from yobx.torch.new_tracing._patches import _ORIGINAL_TORCH_ONES
+
+        false_sub = tracer._sub_tracers["_cb_cond_false_fn_0"]
+        ones_nodes = [
+            n
+            for n in false_sub.graph.nodes
+            if n.op == "call_function" and n.target is _ORIGINAL_TORCH_ONES
+        ]
+        self.assertGreaterEqual(
+            len(ones_nodes), 1, "Expected at least one ones() FX node in false branch sub-graph"
+        )
+
     # ------------------------------------------------------------------
     # torch.ops.higher_order.scan support
     # ------------------------------------------------------------------
