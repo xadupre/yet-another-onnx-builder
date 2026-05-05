@@ -178,6 +178,14 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         """Multi-batch matrix multiplication ``bcij,bcjk->bcik``."""
         self._check("bcij,bcjk->bcik", (2, 3, 4, 5), (2, 3, 5, 6))
 
+    def test_multi_batch_matmul_4d(self):
+        """Multi-batch 4D matmul ``abij,abjk->abik`` (label: multi-batch matmul 4D).
+
+        sym0=('A', 'B', 'I', 'K'), sym1=('A', 'B', 'K', 'N'),
+        sh0=(2, 3, 16, 32), sh1=(2, 3, 32, 8).
+        """
+        self._check("abij,abjk->abik", (2, 3, 16, 32), (2, 3, 32, 8))
+
     # ------------------------------------------------------------------
     # Higher-rank contractions
     # ------------------------------------------------------------------
