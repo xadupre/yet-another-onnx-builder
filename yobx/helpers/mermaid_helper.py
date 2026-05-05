@@ -19,7 +19,8 @@ def to_mermaid(model: onnx.ModelProto) -> str:
     :param model: ONNX model to convert
     :returns: Mermaid flowchart string
 
-    Example::
+    .. runpython::
+        :showcode:
 
         import numpy as np
         import onnx
@@ -48,6 +49,36 @@ def to_mermaid(model: onnx.ModelProto) -> str:
         )
         mermaid_src = to_mermaid(model)
         print(mermaid_src)
+
+    .. runmermaid::
+        :script:
+
+        import numpy as np
+        import onnx
+        import onnx.helper as oh
+        import onnx.numpy_helper as onh
+        from yobx.helpers.mermaid_helper import to_mermaid
+
+        TFLOAT = onnx.TensorProto.FLOAT
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Add", ["X", "Y"], ["added"]),
+                    oh.make_node("MatMul", ["added", "W"], ["mm"]),
+                    oh.make_node("Relu", ["mm"], ["Z"]),
+                ],
+                "add_matmul_relu",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq", 4]),
+                    oh.make_tensor_value_info("Y", TFLOAT, ["batch", "seq", 4]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, ["batch", "seq", 2])],
+                [onh.from_array(np.zeros((4, 2), dtype=np.float32), name="W")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        print(to_mermaid(model))
     """
     from ..xshape import BasicShapeBuilder
 
