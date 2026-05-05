@@ -316,7 +316,7 @@ def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str) -> None
     The diagram is rendered via the ``mermaid.ink`` online service through
     :class:`mermaid.Mermaid`.
     """
-    from mermaid import Mermaid as MermaidRenderer
+    from mermaid import Mermaid
 
     from .helpers.mermaid_helper import to_mermaid
 
@@ -325,7 +325,7 @@ def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str) -> None
     else:
         smmd = mermaid
 
-    renderer = MermaidRenderer(smmd)
+    renderer = Mermaid(smmd)
     if image.endswith(".svg"):
         renderer.to_svg(image)
     else:
