@@ -376,9 +376,16 @@ print(
 
 # Row-dot reduction equation always included for comparison.
 rowdot_row = next((r for r in results if r["equation"] == "ij,ij->i"), diff_row)
+colred_row = next((r for r in results if r["equation"] == "abij,ij->ab"), diff_row)
+
 
 for fig_idx, (row, extra_title) in enumerate(
-    [(diff_row, "largest A/B difference"), (rowdot_row, "row-dot reduction")], start=0
+    [
+        (diff_row, "largest A/B difference"),
+        (rowdot_row, "row-dot reduction"),
+        (colred_row, "column-dot reduction"),
+    ],
+    start=0,
 ):
     eq = row["equation"]
     label = row["label"]
@@ -478,5 +485,5 @@ fig.suptitle(
     fontsize=10,
 )
 fig.tight_layout()
-fig.savefig("plot_einsum_cost_comparison.2.png")
+fig.savefig("plot_einsum_cost_comparison.3.png")
 # fig.show()
