@@ -482,6 +482,46 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_reshape_all_zeros_identity(self):
+        # reshape(X, [0, 0, 0]) should become Identity when rank matches
+        for shape_values in ([0, 0, 0], [0], [0, 0]):
+            n = len(shape_values)
+            input_shape = list(range(2, 2 + n))
+            model = oh.make_model(
+                oh.make_graph(
+                    [oh.make_node("Reshape", ["X", "shape"], ["Y"])],
+                    "dummy",
+                    [_mkv_("X", TFLOAT, input_shape)],
+                    [_mkv_("Y", TFLOAT, input_shape)],
+                    [onh.from_array(np.array(shape_values, dtype=np.int64), name="shape")],
+                ),
+                opset_imports=[oh.make_opsetid("", 18)],
+                ir_version=9,
+            )
+            check_model(model)
+            feeds = {"X": self._range(*input_shape)}
+            ref = ExtendedReferenceEvaluator(model)
+            expected = ref.run(None, feeds)[0]
+
+            gr = GraphBuilder(
+                model,
+                infer_shapes_options=True,
+                optimization_options=OptimizationOptions(patterns=["Identity"], verbose=0),
+            )
+            opt_onx = gr.to_onnx(optimize=True)
+            self.assertEqual(
+                ["Identity"],
+                [n.op_type for n in opt_onx.graph.node],
+                msg=f"shape_values={shape_values}",
+            )
+            self.assertEqual(
+                0, len(opt_onx.graph.initializer), msg=f"shape_values={shape_values}"
+            )
+
+            opt_ref = ExtendedReferenceEvaluator(opt_onx)
+            got = opt_ref.run(None, feeds)[0]
+            self.assertEqualArray(expected, got)
+
     def test_reshape_reshape_zero(self):
         model = oh.make_model(
             oh.make_graph(
@@ -513,6 +553,41 @@ class TestGraphPatternOptimization(ExtTestCase):
             ["Gather", "Gather", "Concat", "Reshape"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(4, len(opt_onx.graph.initializer))
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_reshape_reshape_zero_from_positive(self):
+        # reshape(reshape(., [2, 3, 16, 8, 1]), [0, 0, 0, 1, 8]) should become one Reshape
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Reshape", ["X", "shape1"], ["xr"], name="R1"),
+                    oh.make_node("Reshape", ["xr", "shape2"], ["Y"], name="R2"),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, [2, 3, 16, 8])],
+                [_mkv_("Y", TFLOAT, [2, 3, 16, 1, 8])],
+                [
+                    onh.from_array(np.array([2, 3, 16, 8, 1], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([0, 0, 0, 1, 8], dtype=np.int64), name="shape2"),
+                ],
+            )
+        )
+        check_model(model)
+        feeds = {"X": self._range(2, 3, 16, 8)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReshapeReshape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Reshape"], [n.op_type for n in opt_onx.graph.node])
+        self.assertEqual(1, len(opt_onx.graph.initializer))
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
@@ -7243,6 +7318,101 @@ class TestGraphPatternOptimization(ExtTestCase):
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
+
+    def test_reshape_squeeze_basic(self):
+        # squeeze(reshape(X, [0, 0, 0, 1, 8]), [3]) → reshape(X, [0, 0, 0, 8])
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Reshape", ["X", "shape1"], ["xr"]),
+                    oh.make_node("Squeeze", ["xr", "axes"], ["Z"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b", "c", "d"])],
+                [_mkv_("Z", TFLOAT, ["a", "b", "c", 8])],
+                [
+                    onh.from_array(np.array([0, 0, 0, 1, 8], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([3], dtype=np.int64), name="axes"),
+                ],
+            )
+        )
+        check_model(model)
+        feeds = {"X": self._range(2, 3, 4, 8)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReshapeSqueeze"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Reshape"], [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_reshape_squeeze_static_shape(self):
+        # squeeze(reshape(X, [2, 3, 4, 1, 8]), [3]) → reshape(X, [2, 3, 4, 8])
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Reshape", ["X", "shape1"], ["xr"]),
+                    oh.make_node("Squeeze", ["xr", "axes"], ["Z"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, [2, 3, 4, 8])],
+                [_mkv_("Z", TFLOAT, [2, 3, 4, 8])],
+                [
+                    onh.from_array(np.array([2, 3, 4, 1, 8], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([3], dtype=np.int64), name="axes"),
+                ],
+            )
+        )
+        check_model(model)
+        feeds = {"X": self._range(2, 3, 4, 8)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReshapeSqueeze"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Reshape"], [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_reshape_squeeze_zero_after_axis_not_applied(self):
+        # squeeze(reshape(X, [0, 0, 0, 1, 0]), [3]): the 0 at position 4 comes
+        # after the squeezed axis 3, so index-shift would break copy semantics.
+        # The pattern must NOT be applied.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Reshape", ["X", "shape1"], ["xr"]),
+                    oh.make_node("Squeeze", ["xr", "axes"], ["Z"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b", "c", "d", "e"])],
+                [_mkv_("Z", TFLOAT, ["a", "b", "c", "e"])],
+                [
+                    onh.from_array(np.array([0, 0, 0, 1, 0], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([3], dtype=np.int64), name="axes"),
+                ],
+            )
+        )
+        check_model(model)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReshapeSqueeze"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Pattern must not fire; Squeeze should still be present.
+        self.assertIn("Squeeze", [n.op_type for n in opt_onx.graph.node])
 
     def test_same_children_many_duplicated(self):
         nodes = [

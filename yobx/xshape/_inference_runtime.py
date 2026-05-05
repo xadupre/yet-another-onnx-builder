@@ -281,19 +281,22 @@ class _InferenceRuntime:
                             shape_cst_last_zero = shape_cst[
                                 : len(shape_cst) - 1 - shape_cst[::-1].index(0) + 1
                             ]
-                            assert len(sh) >= len(shape_cst_last_zero), (
-                                f"Shape discrepancies for name={node.input[0]!r} "
-                                f"node.name={node.name!r} "
-                                f"between sh={sh} and shape_cst={shape_cst}, "
-                                f"shape_cst_last_zero={shape_cst_last_zero}"
-                                f"\ncst={cst}{self.get_debug_msg()}"
-                            )
-                            shape_cst = tuple(
-                                [
-                                    shape_cst[i] if shape_cst[i] != 0 else sh[i]
-                                    for i in range(len(shape_cst))
-                                ]
-                            )
+                            if len(sh) < len(shape_cst_last_zero):
+                                # In ONNX Reshape, a 0 in the shape means
+                                # "copy the corresponding dimension from the
+                                # input tensor at the same index". When the
+                                # output rank is larger than the input rank,
+                                # the last 0 references an input index that
+                                # does not exist — shape inference cannot
+                                # determine the output shape statically.
+                                shape_cst = None
+                            else:
+                                shape_cst = tuple(
+                                    [
+                                        shape_cst[i] if shape_cst[i] != 0 else sh[i]
+                                        for i in range(len(shape_cst))
+                                    ]
+                                )
                         else:
                             shape_cst = None
                     if shape_cst is not None:
