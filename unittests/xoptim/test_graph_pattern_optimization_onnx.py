@@ -8441,3 +8441,132 @@ class TestGraphPatternOptimization(ExtTestCase):
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
+
+    def test_shape_transpose(self):
+        # Pattern: Shape(Transpose(X, perm)) → Gather(Shape(X), perm)
+        # X: (a, b, c), perm=[2, 0, 1] → transposed shape is (c, a, b).
+        for perm in [[2, 0, 1], [1, 0, 2], [0, 2, 1], [2, 1, 0]]:
+            with self.subTest(perm=perm):
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Transpose", ["X"], ["xt"], perm=perm),
+                            oh.make_node("Shape", ["xt"], ["Y"]),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [3])],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                feeds = {"X": self._range(3, 5, 7)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]
+
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(
+                        patterns=["ShapeTranspose"], verbose=0
+                    ),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                op_types = [n.op_type for n in opt_onx.graph.node]
+                self.assertNotIn(
+                    "Transpose", op_types, msg="Transpose should have been eliminated"
+                )
+                self.assertIn("Shape", op_types)
+                self.assertIn("Gather", op_types)
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
+
+    def test_shape_transpose_with_start_end(self):
+        # Shape(Transpose(X, perm)) with start/end attributes on the Shape node.
+        # X: (a, b, c, d), perm=[2, 0, 1, 3] → transposed shape (c, a, b, d).
+        # Shape with start=1, end=3 → [a, b].
+        for shape_start, shape_end in [(1, 3), (0, 2), (2, 4), (0, 4)]:
+            with self.subTest(shape_start=shape_start, shape_end=shape_end):
+                perm = [2, 0, 1, 3]
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Transpose", ["X"], ["xt"], perm=perm),
+                            oh.make_node(
+                                "Shape", ["xt"], ["Y"], start=shape_start, end=shape_end
+                            ),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c", "d"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [shape_end - shape_start])],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                feeds = {"X": self._range(3, 5, 7, 11)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]
+
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(
+                        patterns=["ShapeTranspose"], verbose=0
+                    ),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                self.assertNotIn(
+                    "Transpose",
+                    [n.op_type for n in opt_onx.graph.node],
+                    msg="Transpose should have been eliminated",
+                )
+                self.assertIn("Gather", [n.op_type for n in opt_onx.graph.node])
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
+
+    def test_shape_transpose_multi_consumer(self):
+        # Transpose output consumed by BOTH Shape (→ sh) and the model output (xt directly).
+        # Pattern MUST fire but Transpose MUST be kept since xt is still a graph output.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Transpose", ["X"], ["xt"], perm=[2, 0, 1]),
+                    oh.make_node("Shape", ["xt"], ["sh"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                [
+                    oh.make_tensor_value_info("xt", TFLOAT, ["c", "a", "b"]),
+                    oh.make_tensor_value_info("sh", TINT64, [3]),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(3, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected_xt, expected_sh = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ShapeTranspose"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        # Transpose kept because xt is still a graph output.
+        self.assertIn("Transpose", op_types)
+        # Shape(X) + Gather replaces Shape(xt).
+        self.assertIn("Shape", op_types)
+        self.assertIn("Gather", op_types)
+        shape_inputs = [n.input[0] for n in opt_onx.graph.node if n.op_type == "Shape"]
+        self.assertTrue(
+            all(inp != "xt" for inp in shape_inputs), msg="Shape nodes should feed from X, not xt"
+        )
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got_xt, got_sh = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected_xt, got_xt)
+        self.assertEqualArray(expected_sh, got_sh)
