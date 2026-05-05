@@ -159,6 +159,20 @@ def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
     Temporarily replaces ``torch.full`` with a tracing-aware handler so calls
     using symbolic ``TracingInt`` sizes are captured as FX nodes.
 
+    The handler distinguishes two call sites:
+
+    * **User model code** — ``tracer._fake_mode`` has not yet been entered
+      (its ``enter_stack`` is empty); the handler delegates to
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_full` which
+      emits an FX node and returns a
+      :class:`~yobx.torch.new_tracing.tensor.TracingTensor`.
+    * **FakeTensor kernel implementations** — these arise during
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.dispatch`'s
+      ``with self._fake_mode:`` block; at that point
+      ``tracer._fake_mode.enter_stack`` is non-empty and the handler delegates
+      to the original ``torch.full`` so that FakeTensor kernels get the
+      correct FakeTensor results.
+
     :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
         whose :meth:`_handle_full` should be used as the replacement.
 
@@ -167,8 +181,17 @@ def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
         is temporarily replaced, then restores the original implementation on
         exit.
     """
-
     def _full_handler(size: Any, fill_value: Any, **kwargs: Any) -> Any:
+        # When tracer._fake_mode has been entered (enter_stack is non-empty) we
+        # are inside dispatch()'s `with self._fake_mode:` block — the call
+        # originates from a FakeTensor kernel implementation.  Delegate to the
+        # real torch.full so the kernel gets a proper FakeTensor result.
+        #
+        # Note: we cannot use _get_current_dispatch_mode_stack() here because
+        # FakeTensorMode temporarily pops itself from the stack during its own
+        # __torch_dispatch__ invocation to prevent infinite recursion.
+        if tracer._fake_mode.enter_stack:
+            return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
         return tracer._handle_full(size, fill_value, **kwargs)
 
     torch.full = _full_handler  # type: ignore[assignment]

@@ -35,6 +35,7 @@ torch
                 "",
             ])
         print("\n".join([*link, "", *rows]))
+    print()
 
 transformers
 ============

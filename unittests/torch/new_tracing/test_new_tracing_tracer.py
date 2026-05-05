@@ -1639,6 +1639,99 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         ]
         self.assertEqual(len(full_nodes), 1, "Expected exactly one torch.full node")
 
+    def test_trace_controlflow_numel_zero_5(self):
+        """Tracing ControlFlowNumelZero5 succeeds.
+
+        The model uses ``torch._check(x.numel() != 0)`` followed by a
+        per-dimension ``!= 0`` guard::
+
+            torch._check(x.numel() != 0)
+            if x.shape[0] != 0 and x.shape[2] != 0:
+                return 0
+            return x.shape[-2]
+
+        Under the assertion ``numel != 0`` (which registers
+        ``"10*d0*d2!=0"`` as a known-true condition), each individual
+        dimension ``shape[0] != 0`` and ``shape[2] != 0`` can be proved
+        True because the respective symbolic name is a multiplicative
+        factor of the known-nonzero product.
+
+        The true branch ``return 0`` is therefore taken, producing a
+        static size ``(0, 1)`` for ``torch.full``.  The tracer must still
+        emit an FX node for ``torch.full`` with the concrete size so that
+        the output is a :class:`~yobx.torch.new_tracing.tensor.TracingTensor`.
+        """
+        if not hasattr(torch, "_check"):
+            return
+        from yobx.torch.new_tracing.shape import clear_conditions
+
+        class ControlFlowNumelZero5(torch.nn.Module):
+            def forward(self, x):
+                def empty_cache(x):
+                    torch._check(x.numel() != 0)
+                    if x.shape[0] != 0 and x.shape[2] != 0:
+                        return 0
+                    return x.shape[-2]
+
+                size = (empty_cache(x), 1)
+                return torch.full(size, fill_value=2)
+
+        clear_conditions()
+        model = ControlFlowNumelZero5()
+        x = torch.rand(3, 2, 2, 5)
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            model,
+            (x,),
+            dynamic_shapes={"x": {0: torch.export.Dim.DYNAMIC, 2: torch.export.Dim.DYNAMIC}},
+        )
+        graph.lint()
+        clear_conditions()
+
+        # The graph must contain a torch.full call (the return value).
+        full_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is torch.full
+        ]
+        self.assertEqual(len(full_nodes), 1, "Expected exactly one torch.full node")
+
+    def test_can_prove_expr_nonzero_from_neq_conditions(self):
+        """_can_prove_expr_nonzero_from_neq_conditions returns True for factors of P!=0.
+
+        When ``torch._check(x.numel() != 0)`` registers ``"10*d0*d2!=0"``,
+        the individual factors ``"d0"`` and ``"d2"`` must each be proved
+        nonzero by :func:`_can_prove_expr_nonzero_from_neq_conditions`.
+        """
+        from yobx.torch.new_tracing.shape import (
+            TracingInt,
+            _can_prove_expr_nonzero_from_neq_conditions,
+            clear_conditions,
+            register_condition,
+        )
+
+        clear_conditions()
+
+        # Simulate numel registration: 10*d0*d1 != 0
+        d0 = TracingInt("_dyn_0")
+        d1 = TracingInt(2)
+        d2 = TracingInt("_dyn_1")
+        d3 = TracingInt(5)
+        numel = d0 * d1 * d2 * d3
+        register_condition(numel != 0)
+
+        self.assertTrue(
+            _can_prove_expr_nonzero_from_neq_conditions("_dyn_0"),
+            "_dyn_0 must be provably nonzero as a factor of 10*_dyn_0*_dyn_1",
+        )
+        self.assertTrue(
+            _can_prove_expr_nonzero_from_neq_conditions("_dyn_1"),
+            "_dyn_1 must be provably nonzero as a factor of 10*_dyn_0*_dyn_1",
+        )
+        self.assertFalse(
+            _can_prove_expr_nonzero_from_neq_conditions("_dyn_2"),
+            "_dyn_2 is not a factor of the registered condition",
+        )
+        clear_conditions()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

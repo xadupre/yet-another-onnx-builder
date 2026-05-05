@@ -9,6 +9,7 @@ from yobx.ext_test_case import (
     ExtTestCase,
     is_windows,
     ignore_errors,
+    has_ipython,
     has_jax,
     has_onnx_ir,
     has_onnx_shape_inference,
@@ -168,6 +169,9 @@ class TestDocumentationExamples(ExtTestCase):
 
             if not reason and not has_jax() and "jax" in name:
                 reason = "jax not installed"
+
+            if not reason and not has_ipython() and "mermaid" in name:
+                reason = "IPython not installed"
 
             if (
                 not reason

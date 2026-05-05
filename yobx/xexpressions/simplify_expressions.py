@@ -448,7 +448,12 @@ def simplify_expression(expr: Union[str, int]) -> Union[str, int]:
     if isinstance(expr, int):
         return expr
     assert isinstance(expr, str), f"Unexpected type {expr} for the expression."
-    tree = ast.parse(expr, mode="eval")
+    try:
+        tree = ast.parse(expr, mode="eval")
+    except SyntaxError:
+        # Expression contains characters (e.g. '::' from ONNX node names) that
+        # are not valid Python syntax; return it unchanged.
+        return expr
     transformers = [
         CeilToIntTransformer(expr=expr),
         SimpleSimpliflyTransformer(expr=expr),

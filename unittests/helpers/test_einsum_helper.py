@@ -192,6 +192,30 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         """
         self._check("abij,abjk->abik", (2, 3, 16, 32), (2, 3, 32, 8))
 
+    def test_decompose_einsum_symbolic(self):
+        decompose_einsum("abij,abjk->abik", ("A", "B", "I", "K"), ("A", "B", "K", "N"))
+
+    def test_decompose_einsum_symbolic_2(self):
+        decompose_einsum_2inputs("abij,abjk->abik", ("A", "B", "I", "K"), ("A", "B", "K", "N"))
+
+    def test_multi_batch_matmul_4d_cost_inference(self):
+        """Cost inference for ``abij,abjk->abik`` with symbolic dims
+        ('A', 'B', 'I', 'K') x ('A', 'B', 'K', 'N') and concrete feeds
+        (2, 3, 16, 32) x (2, 3, 32, 8)."""
+        from yobx.xshape import BasicShapeBuilder, InferenceMode
+
+        model = decompose_einsum_2inputs(
+            "abij,abjk->abik", ("A", "B", "I", "K"), ("A", "B", "K", "N")
+        )
+        feeds = {
+            "X0": np.ones((2, 3, 16, 32), dtype=np.float32),
+            "X1": np.ones((2, 3, 32, 8), dtype=np.float32),
+        }
+        builder = BasicShapeBuilder()
+        cost_sym = builder.run_model(model, inference=InferenceMode.COST)
+        cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
+        total = sum(f or 0 for _, f, _ in cost_conc)
+        self.assertGreater(total, 0)
     # ------------------------------------------------------------------
     # Higher-rank contractions
     # ------------------------------------------------------------------

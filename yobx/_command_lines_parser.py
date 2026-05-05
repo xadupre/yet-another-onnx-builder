@@ -104,6 +104,47 @@ def _cmd_dot(argv: List[Any]):
             print(err)
 
 
+def get_parser_mermaid() -> ArgumentParser:
+    parser = ArgumentParser(
+        prog="mermaid",
+        description=textwrap.dedent("""
+            Converts a model into a Mermaid flowchart string.
+            """),
+    )
+    parser.add_argument("input", type=str, help="onnx model to convert")
+    parser.add_argument(
+        "-o",
+        "--output",
+        default="",
+        type=str,
+        required=False,
+        help="file to save the Mermaid output or empty to print out the result",
+    )
+    parser.add_argument("-v", "--verbose", type=int, default=0, required=False, help="verbosity")
+    return parser
+
+
+def _cmd_mermaid(argv: List[Any]):
+    from .helpers.mermaid_helper import to_mermaid
+
+    parser = get_parser_mermaid()
+    args = parser.parse_args(argv[1:])
+    if args.verbose:
+        print(f"-- loads {args.input!r}")
+    onx = onnx.load(args.input, load_external_data=False)
+    if args.verbose:
+        print("-- converts into mermaid")
+    mermaid = to_mermaid(onx)
+    if args.output:
+        outname = process_outputname(args.output, args.input)
+        if args.verbose:
+            print(f"-- saves into {outname!r}")
+        with open(outname, "w") as f:
+            f.write(mermaid)
+    else:
+        print(mermaid)
+
+
 def get_parser_find() -> ArgumentParser:
     parser = ArgumentParser(
         prog="find",
@@ -936,6 +977,7 @@ def get_main_parser() -> ArgumentParser:
             agg               - aggregates statistics from multiple files
             dot               - converts an onnx model into dot format
             find              - find node consuming or producing a result
+            mermaid           - converts an onnx model into Mermaid flowchart format
             partition         - partition a model, each partition appears as local function
             print             - prints the model on standard output
             render-gallery    - convert a sphinx-gallery .py example to RST (no execution)
@@ -950,6 +992,7 @@ def get_main_parser() -> ArgumentParser:
             "agg",
             "dot",
             "find",
+            "mermaid",
             "partition",
             "print",
             "render-gallery",
@@ -967,6 +1010,7 @@ def main(argv: Optional[List[Any]] = None):
         agg=_cmd_agg,
         dot=_cmd_dot,
         find=_cmd_find,
+        mermaid=_cmd_mermaid,
         partition=_cmd_partition,
         print=_cmd_print,
         **{"render-gallery": _cmd_render_gallery},
@@ -986,6 +1030,7 @@ def main(argv: Optional[List[Any]] = None):
                 agg=get_parser_agg,
                 dot=get_parser_dot,
                 find=get_parser_find,
+                mermaid=get_parser_mermaid,
                 partition=get_parser_partition,
                 print=get_parser_print,
                 **{"render-gallery": get_parser_render_gallery},

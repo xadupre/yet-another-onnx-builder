@@ -35,6 +35,7 @@ Default export path
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
     print(get_op_coverage_rst("default"))
+    print()
 
 Torch tracing export path
 +++++++++++++++++++++++++
@@ -46,6 +47,7 @@ Torch tracing export path
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
     print(get_op_coverage_rst("tracing"))
+    print()
 
 New-tracing export path
 +++++++++++++++++++++++
@@ -57,6 +59,7 @@ New-tracing export path
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
     print(get_op_coverage_rst("new-tracing"))
+    print()
 
 Float32 comparison across export paths
 +++++++++++++++++++++++++++++++++++++++
@@ -72,3 +75,4 @@ paths side by side.
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_float32_comparison_rst
     print(get_op_coverage_float32_comparison_rst())
+    print()
