@@ -1,5 +1,5 @@
 import inspect
-from typing import List, Optional
+from typing import List, Optional, Tuple
 import numpy as np
 from onnx import NodeProto
 from ..patterns_api import MatchResult, PatternOptimization
@@ -489,4 +489,183 @@ class UnsqueezeShapePattern(PatternOptimization):
             result.append(unsq_node)
         result.extend(extra_nodes)
         result.append(concat_node)
+        return result
+
+
+class ShapeTransposePattern(PatternOptimization):
+    """
+    Replaces ``Shape(Transpose(X, perm))`` by ``Gather(Shape(X), perm_indices)``
+    so that the expensive Transpose on the full data tensor is avoided.
+
+    The key observation is that the shape of ``Transpose(X, perm)`` is simply
+    a permuted view of the shape of ``X``.  The permutation indices are known
+    at optimisation time (they are an attribute of the Transpose node), so we
+    can extract the desired dimensions directly from ``Shape(X)`` using a
+    ``Gather`` with the (sub-)permutation as the index tensor.
+
+    For ``X`` of shape ``(a, b, c)`` and ``perm=[2, 0, 1]`` the transformation
+    is::
+
+        # Before
+        xt = Transpose(X, perm=[2, 0, 1])   # (c, a, b)
+        Y  = Shape(xt)                       # [c, a, b]
+
+        # After
+        sx   = Shape(X)                      # [a, b, c]
+        perm = Initializer([2, 0, 1])
+        Y    = Gather(sx, perm, axis=0)      # [c, a, b]
+
+    Shape's optional ``start``/``end`` attributes are respected: the
+    permutation slice ``perm[start:end]`` is used as the Gather indices.
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(a, b, c)"])
+
+            Transpose_0[["Transpose(., perm=[2, 0, 1])"]]
+            Shape_1[["Shape(.)"]]
+
+            I_X -->|"FLOAT(a, b, c)"| Transpose_0
+            Transpose_0 -->|"FLOAT(c, a, b)"| Shape_1
+
+            O_Y(["Y INT64(3)"])
+            Shape_1 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Transpose_0,Shape_1 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(a, b, c)"])
+            C_perm(["perm INT64[2, 0, 1]"])
+
+            Shape_s[["Shape(.)"]]
+            Gather_0[["Gather(., ., axis=0)"]]
+
+            I_X -->|"FLOAT(a, b, c)"| Shape_s
+            Shape_s -->|"INT64(3)"| Gather_0
+            C_perm -->|"INT64(3)"| Gather_0
+
+            O_Y(["Y INT64(3)"])
+            Gather_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class C_perm constNode
+            class Shape_s,Gather_0 opNode
+    """
+
+    def __init__(self, verbose: int = 0, priority: int = 0):
+        super().__init__(verbose, priority)
+
+    @staticmethod
+    def _resolve_shape_start_end(shape_node: NodeProto, output_rank: int) -> Tuple[int, int]:
+        """Returns the effective (start, end) range from a Shape node's attributes.
+
+        Reads ``start`` and ``end`` attributes (both optional, defaulting to
+        ``0`` and ``output_rank`` respectively), normalises negative values
+        against ``output_rank``, and clamps the result to ``[0, output_rank]``.
+        """
+        shape_start = next(
+            (int(attr.i) for attr in shape_node.attribute if attr.name == "start"), 0
+        )
+        shape_end = next(
+            (int(attr.i) for attr in shape_node.attribute if attr.name == "end"), output_rank
+        )
+        if shape_start < 0:
+            shape_start += output_rank
+        if shape_end < 0:
+            shape_end += output_rank
+        shape_start = max(0, min(shape_start, output_rank))
+        shape_end = max(0, min(shape_end, output_rank))
+        return shape_start, shape_end
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if node.op_type != "Shape" or node.domain != "":
+            return self.none()
+
+        tr_node = g.node_before(node.input[0])
+        if tr_node is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+        if tr_node.op_type != "Transpose" or tr_node.domain != "":
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # The permutation must be present as an attribute.
+        perm_attr = next((a for a in tr_node.attribute if a.name == "perm"), None)
+        if perm_attr is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        perm = list(perm_attr.ints)
+        rank = len(perm)
+
+        # Guard against a degenerate (empty) perm slice after applying start/end.
+        shape_start, shape_end = self._resolve_shape_start_end(node, rank)
+        if shape_start >= shape_end:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        return MatchResult(self, [tr_node, node], self.apply, insert_at=node)
+
+    def apply(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        tr_node: NodeProto,
+        shape_node: NodeProto,
+    ) -> List[NodeProto]:
+        perm = list(next(a for a in tr_node.attribute if a.name == "perm").ints)
+        rank = len(perm)
+
+        shape_start, shape_end = self._resolve_shape_start_end(shape_node, rank)
+        perm_subset = perm[shape_start:shape_end]
+
+        result = []
+
+        # Re-emit the Transpose if its output is still needed by other consumers.
+        if g.is_used_more_than_once(tr_node.output[0]):
+            result.append(tr_node)
+
+        # Shape(X) – no start/end needed since we index via Gather.
+        shape_out = g.unique_name(f"{self.__class__.__name__}_{shape_node.output[0]}_sx")
+        result.append(
+            g.make_node(
+                "Shape", [tr_node.input[0]], [shape_out], name=f"{self.__class__.__name__}--shape"
+            )
+        )
+
+        # Gather indices = the (sub-)permutation.
+        perm_init = g.make_initializer(
+            "",
+            np.array(perm_subset, dtype=np.int64),
+            source=f"{self.__class__.__name__}.apply.perm",
+        )
+        result.append(
+            g.make_node(
+                "Gather",
+                [shape_out, perm_init],
+                shape_node.output,
+                axis=0,
+                name=f"{self.__class__.__name__}--{shape_node.name}",
+                doc_string=shape_node.doc_string,
+            )
+        )
         return result
