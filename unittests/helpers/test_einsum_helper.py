@@ -1,4 +1,5 @@
 import unittest
+from collections import Counter
 import numpy as np
 import onnxruntime
 from yobx.ext_test_case import ExtTestCase
@@ -171,12 +172,17 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_batched_matmul(self):
-        """Batched matrix multiplication ``bij,bjk->bik``."""
         self._check("bij,bjk->bik", (2, 3, 4), (2, 4, 5))
 
     def test_multi_batch_matmul(self):
-        """Multi-batch matrix multiplication ``bcij,bcjk->bcik``."""
         self._check("bcij,bcjk->bcik", (2, 3, 4, 5), (2, 3, 5, 6))
+
+    def test_pattern_optimization_concat_gather(self):
+        dec = decompose_einsum("bik,bjk->bij", ("B", "I", "K"), ("B", "J", "K"))
+        op_types = [n.op_type for n in dec.graph.node]
+        counter = Counter(op_types)
+        self.dump_onnx("test_pattern_optimization_concat_gather.onnx", dec)
+        self.assertEqual(counter["Concat"], 1)
 
     def test_multi_batch_matmul_4d(self):
         """Multi-batch 4D matmul ``abij,abjk->abik`` (label: multi-batch matmul 4D).
