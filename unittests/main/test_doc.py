@@ -7,6 +7,7 @@ import numpy as np
 import onnx
 from yobx.ext_test_case import (
     ExtTestCase,
+    requires_ipython,
     requires_matplotlib,
     skipif_ci_windows,
     skipif_ci_apple,
@@ -337,6 +338,21 @@ class TestDocPlotDot(ExtTestCase):
             ax = plot_dot(dot_str)
         self.assertIsInstance(ax, matplotlib.axes.Axes)
         self.plt.close("all")
+
+
+@skipif_ci_windows("too long")
+@skipif_ci_apple("too long")
+@requires_ipython()
+class TestDocPlotMermaid(ExtTestCase):
+    def test_plot_mermaid_graph(self):
+        from IPython.display import SVG as IPythonSVG
+
+        from yobx.doc import draw_graph_mermaid
+
+        # Verify IPython.display.SVG is importable (used in the gallery example).
+        self.assertIsNotNone(IPythonSVG)
+        # Verify draw_graph_mermaid is a callable.
+        self.assertTrue(callable(draw_graph_mermaid))
 
 
 if __name__ == "__main__":

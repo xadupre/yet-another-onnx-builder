@@ -772,6 +772,15 @@ def requires_matplotlib(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
+def requires_ipython(msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`IPython` is not installed."""
+    try:
+        import IPython  # noqa: F401
+    except ImportError:
+        return unittest.skip(msg or "IPython not installed")
+    return lambda x: x
+
+
 def requires_numpy(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`numpy` is not recent enough."""
     try:
@@ -965,6 +974,23 @@ def has_spox(version: str = "") -> bool:
         return True
 
     return PvVersion(spox.__version__) >= PvVersion(version)
+
+
+def has_ipython(version: str = "") -> bool:
+    """Returns ``True`` if :epkg:`IPython` is installed and recent enough."""
+    try:
+        import IPython
+    except (ImportError, AttributeError):
+        return False
+
+    if not version:
+        return True
+
+    if not hasattr(IPython, "__version__"):
+        # development version
+        return True
+
+    return PvVersion(IPython.__version__) >= PvVersion(version)
 
 
 def has_tensorflow(version: str = "") -> bool:

@@ -96,6 +96,7 @@ extensions = [
     "matplotlib.sphinxext.plot_directive",
     "sphinx_runpython.epkg",
     "sphinx_runpython.gdot",
+    "sphinx_runpython.runmermaid",
     "sphinx_runpython.runpython",
 ]
 if shutil.which("latex"):
@@ -188,6 +189,7 @@ if int(os.environ.get("UNITTEST_GOING", "0")):
     # excluded on CI (e.g. case_coverage.rst, ci_durations.rst).
     suppress_warnings += ["toc.excluded", "ref.ref"]
 
+
 sphinx_gallery_conf = {
     # path to your examples scripts
     "examples_dirs": [
@@ -260,6 +262,7 @@ epkg_dictionary = {
     "ai_edge_litert": "https://pypi.org/project/ai-edge-litert/",
     "flax": "https://flax.readthedocs.io/en/latest/",
     "equinox": "https://docs.kidger.site/equinox/",
+    "IPython": "https://ipython.org/",
     "ir-py": "https://onnx.ai/ir-py/",
     "jax": "https://docs.jax.dev/en/latest/",
     "JAX": "https://docs.jax.dev/en/latest/",
@@ -269,6 +272,7 @@ epkg_dictionary = {
     "LightGBM": "https://lightgbm.readthedocs.io/en/latest/",
     "Linux": "https://www.linux.org/",
     "LiteRT": "https://ai.google.dev/edge/litert/",
+    "mermaid-py": "https://pypi.org/project/mermaid-py/",
     "ml_dtypes": "https://github.com/jax-ml/ml_dtypes",
     "ModelBuilder": "https://onnxruntime.ai/docs/genai/howto/build-model.html",
     "monai": "https://github.com/Project-MONAI/MONAI",

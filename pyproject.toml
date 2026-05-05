@@ -32,7 +32,9 @@ dev = [
 ]
 docs = [
     "black",
+    "ipython",
     "matplotlib",
+    "mermaid-py",
     "onnx-ir",
     "onnx-shape-inference",
     "openpyxl",
@@ -44,7 +46,7 @@ docs = [
     "sphinx-copybutton",
     "sphinx-gallery",
     "sphinx-issues",
-    "sphinx-runpython",
+    "sphinx-runpython>=0.4.4",
     "tabulate",
     "tqdm",
     "xlsxwriter",
