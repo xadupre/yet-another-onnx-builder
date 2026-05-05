@@ -280,7 +280,7 @@ Saving and running the exported model
 ======================================
 
 Once you have an :class:`~yobx.container.ExportArtifact`, you can
-serialise it and run it with any ONNX-compatible runtime:
+serialize it and run it with any ONNX-compatible runtime:
 
 .. code-block:: python
 
@@ -303,7 +303,7 @@ OnnxRuntime operator fusions
 ==============================
 
 Passing ``"com.microsoft": 1`` in *target_opset* enables operator fusions
-(fused attention, layer normalisation, …) that are specific to
+(fused attention, layer normalization, …) that are specific to
 :epkg:`onnxruntime`:
 
 .. code-block:: python
