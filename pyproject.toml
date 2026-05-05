@@ -32,6 +32,7 @@ dev = [
 ]
 docs = [
     "black",
+    "ipython",
     "matplotlib",
     "mermaid-py",
     "onnx-ir",
