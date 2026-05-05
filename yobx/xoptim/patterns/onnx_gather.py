@@ -174,7 +174,7 @@ class GatherConcatPattern(PatternOptimization):
             offset += int(cst.shape[0])
 
         cst1 = g.get_computed_constant(gather_node.input[1])
-        cst2 = np.asarray(cst1 - offset, dtype=np.int64)
+        cst2 = np.asarray(cst1 - offset, dtype=cst1.dtype)
 
         new_indices = g.make_initializer("", cst2, source=f"{self.__class__.__name__}.indices")
         new_node = g.make_node(
