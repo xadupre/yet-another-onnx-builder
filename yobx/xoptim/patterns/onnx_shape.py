@@ -155,6 +155,7 @@ class UnsqueezeShapePattern(PatternOptimization):
         # Need the rank of the Unsqueeze input to normalise negative axes.
         if not g.has_rank(node.input[0]):
             return self.none(node, inspect.currentframe().f_lineno)
+        input_rank = g.get_rank(node.input[0])
 
         # Find a Shape consumer for the Unsqueeze output.  Even when the
         # Unsqueeze output is consumed by other nodes as well, we can still
@@ -165,6 +166,26 @@ class UnsqueezeShapePattern(PatternOptimization):
             None,
         )
         if shape_node is None:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Shape (opset ≥ 15) may carry start/end attributes that select a
+        # sub-range of the output shape.  Resolve them now so we can guard
+        # against a degenerate (empty) range, which would require a 0-input
+        # Concat (invalid ONNX).
+        output_rank = input_rank + len(axes)
+        shape_start = next(
+            (int(attr.i) for attr in shape_node.attribute if attr.name == "start"), 0
+        )
+        shape_end = next(
+            (int(attr.i) for attr in shape_node.attribute if attr.name == "end"), output_rank
+        )
+        if shape_start < 0:
+            shape_start += output_rank
+        if shape_end < 0:
+            shape_end += output_rank
+        shape_start = max(0, min(shape_start, output_rank))
+        shape_end = max(0, min(shape_end, output_rank))
+        if shape_start >= shape_end:
             return self.none(node, inspect.currentframe().f_lineno)
 
         return MatchResult(self, [node, shape_node], self.apply, insert_at=node)
@@ -180,12 +201,27 @@ class UnsqueezeShapePattern(PatternOptimization):
         output_rank = input_rank + len(axes)
         sorted_axes = sorted(int(a) % output_rank for a in axes.flatten())
 
-        # Reconstruct Shape(Unsqueeze(X, axes)) as Concat of Shape(X) slices
-        # interleaved with constant [1] tensors.  Each consecutive run of
-        # original (non-inserted) dimensions is extracted with a ranged Shape
-        # node; each inserted axis contributes a constant scalar [1].
+        # Resolve any start/end attributes on shape_node.  The Shape operator
+        # (opset ≥ 15) uses these to select a sub-range of the output shape
+        # instead of returning all dimensions.  Defaults match the full range.
+        shape_start = next(
+            (int(attr.i) for attr in shape_node.attribute if attr.name == "start"), 0
+        )
+        shape_end = next(
+            (int(attr.i) for attr in shape_node.attribute if attr.name == "end"), output_rank
+        )
+        if shape_start < 0:
+            shape_start += output_rank
+        if shape_end < 0:
+            shape_end += output_rank
+        shape_start = max(0, min(shape_start, output_rank))
+        shape_end = max(0, min(shape_end, output_rank))
+
+        # Reconstruct Shape(Unsqueeze(X, axes))[shape_start:shape_end] as a
+        # Concat of Shape(X, start, end) slices interleaved with constant [1]
+        # tensors, restricted to positions that fall inside [shape_start, shape_end).
         #
-        # Example: X shape (a, b, c), axes=[1]
+        # Example: X shape (a, b, c), axes=[1], shape_start=0, shape_end=4
         #   Shape(X, start=0, end=1)  →  [a]
         #   const [1]
         #   Shape(X, start=1, end=3)  →  [b, c]
@@ -196,45 +232,62 @@ class UnsqueezeShapePattern(PatternOptimization):
         out_cursor = 0  # running position in the unsqueezed output
 
         for axis in sorted_axes:
-            run_len = axis - out_cursor  # original dims before this inserted axis
+            # Run of original dims: out positions [out_cursor, axis),
+            # corresponding to X dims [x_cursor, x_cursor + run_len).
+            run_len = axis - out_cursor
             if run_len > 0:
+                seg_out_start = max(out_cursor, shape_start)
+                seg_out_end = min(axis, shape_end)
+                if seg_out_start < seg_out_end:
+                    x_seg_start = x_cursor + (seg_out_start - out_cursor)
+                    x_seg_end = x_cursor + (seg_out_end - out_cursor)
+                    seg_name = g.unique_name(
+                        f"{self.__class__.__name__}_{shape_node.output[0]}_s{x_seg_start}"
+                    )
+                    extra_nodes.append(
+                        g.make_node(
+                            "Shape",
+                            [unsq_node.input[0]],
+                            [seg_name],
+                            start=x_seg_start,
+                            end=x_seg_end,
+                            name=f"{self.__class__.__name__}--shape{x_seg_start}",
+                        )
+                    )
+                    concat_inputs.append(seg_name)
+                x_cursor += run_len
+            # Inserted axis at out position `axis`.
+            if shape_start <= axis < shape_end:
+                one_name = g.make_initializer(
+                    "",
+                    np.array([1], dtype=np.int64),
+                    source=f"{self.__class__.__name__}.apply.one",
+                )
+                concat_inputs.append(one_name)
+            out_cursor = axis + 1
+
+        # Trailing run of original dims: out positions [out_cursor, output_rank),
+        # corresponding to X dims [x_cursor, input_rank).
+        if x_cursor < input_rank:
+            seg_out_start = max(out_cursor, shape_start)
+            seg_out_end = min(output_rank, shape_end)
+            if seg_out_start < seg_out_end:
+                x_seg_start = x_cursor + (seg_out_start - out_cursor)
+                x_seg_end = x_cursor + (seg_out_end - out_cursor)
                 seg_name = g.unique_name(
-                    f"{self.__class__.__name__}_{shape_node.output[0]}_s{x_cursor}"
+                    f"{self.__class__.__name__}_{shape_node.output[0]}_s{x_seg_start}"
                 )
                 extra_nodes.append(
                     g.make_node(
                         "Shape",
                         [unsq_node.input[0]],
                         [seg_name],
-                        start=x_cursor,
-                        end=x_cursor + run_len,
-                        name=f"{self.__class__.__name__}--shape{x_cursor}",
+                        start=x_seg_start,
+                        end=x_seg_end,
+                        name=f"{self.__class__.__name__}--shape_tail",
                     )
                 )
                 concat_inputs.append(seg_name)
-                x_cursor += run_len
-            one_name = g.make_initializer(
-                "", np.array([1], dtype=np.int64), source=f"{self.__class__.__name__}.apply.one"
-            )
-            concat_inputs.append(one_name)
-            out_cursor = axis + 1
-
-        # Trailing non-axis run after the last inserted axis.
-        if x_cursor < input_rank:
-            seg_name = g.unique_name(
-                f"{self.__class__.__name__}_{shape_node.output[0]}_s{x_cursor}"
-            )
-            extra_nodes.append(
-                g.make_node(
-                    "Shape",
-                    [unsq_node.input[0]],
-                    [seg_name],
-                    start=x_cursor,
-                    end=input_rank,
-                    name=f"{self.__class__.__name__}--shape_tail",
-                )
-            )
-            concat_inputs.append(seg_name)
 
         concat_node = g.make_node(
             "Concat",
