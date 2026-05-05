@@ -149,7 +149,9 @@ class TestNewTracingShapes(ExtTestCase):
         from yobx.torch.new_tracing.shape import register_condition, clear_conditions
 
         clear_conditions()
-        tb = TracingInt("batch") > 0
+        # Use a non-positivity condition so that it is not auto-registered by
+        # __bool__ and the "before registration → ValueError" assertion holds.
+        tb = TracingInt("batch") != 0
         self.assertIsInstance(tb, TracingBool)
 
         # Before registering, __bool__ raises.
@@ -183,7 +185,8 @@ class TestNewTracingShapes(ExtTestCase):
         from yobx.torch.new_tracing.shape import clear_conditions
 
         clear_conditions()
-        tb = TracingInt("unknown") >= 1
+        # Use a non-positivity condition: != 0 is not auto-registered.
+        tb = TracingInt("unknown") != 0
         self.assertIsInstance(tb, TracingBool)
         with self.assertRaises(ValueError):
             bool(tb)
