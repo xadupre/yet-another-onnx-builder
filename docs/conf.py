@@ -188,6 +188,36 @@ if int(os.environ.get("UNITTEST_GOING", "0")):
     # excluded on CI (e.g. case_coverage.rst, ci_durations.rst).
     suppress_warnings += ["toc.excluded", "ref.ref"]
 
+
+class _SvgScraper:
+    """Sphinx Gallery image scraper that embeds pre-generated SVG files.
+
+    Gallery examples can signal SVG files to embed by setting the module-level
+    variable ``__gallery_svgs__`` to a list of SVG file paths before the end of
+    a code block.  The scraper copies each SVG into the gallery image directory,
+    generates the reStructuredText image directive, and removes the source
+    temporary files.
+    """
+
+    def __call__(self, block, block_vars, gallery_conf):
+        import re
+        import shutil
+        from sphinx_gallery.scrapers import figure_rst
+
+        svgs = block_vars["example_globals"].pop("__gallery_svgs__", None)
+        if not svgs:
+            return ""
+        image_paths = []
+        for svg_src in svgs:
+            image_path = str(next(block_vars["image_path_iterator"]))
+            image_path = re.sub(r"\.[a-z]+$", ".svg", image_path)
+            shutil.copy(str(svg_src), image_path)
+            if os.path.exists(str(svg_src)) and str(svg_src) != image_path:
+                os.remove(str(svg_src))
+            image_paths.append(image_path)
+        return figure_rst(image_paths, gallery_conf["src_dir"])
+
+
 sphinx_gallery_conf = {
     # path to your examples scripts
     "examples_dirs": [
@@ -226,6 +256,8 @@ sphinx_gallery_conf = {
         "yobx.doc.reset_torch_transformers",
         "yobx.doc.reset_tensorflow",
     ),
+    # image scrapers: default matplotlib + SVG-direct scraper
+    "image_scrapers": ("matplotlib", _SvgScraper()),
 }
 
 substring_to_disable = []
