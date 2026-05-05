@@ -7,7 +7,6 @@ import numpy as np
 import onnx
 from yobx.ext_test_case import (
     ExtTestCase,
-    requires_ipython,
     requires_matplotlib,
     skipif_ci_windows,
     skipif_ci_apple,
@@ -342,17 +341,61 @@ class TestDocPlotDot(ExtTestCase):
 
 @skipif_ci_windows("too long")
 @skipif_ci_apple("too long")
-@requires_ipython()
+@requires_matplotlib()
 class TestDocPlotMermaid(ExtTestCase):
+    @classmethod
+    def setUp(cls):
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+
+        cls.plt = plt
+
+    def _make_small_model(self):
+        TFLOAT = onnx.TensorProto.FLOAT
+        return onnx.helper.make_model(
+            onnx.helper.make_graph(
+                [onnx.helper.make_node("Add", ["X", "Y"], ["Z"])],
+                "test",
+                [
+                    onnx.helper.make_tensor_value_info("X", TFLOAT, [2]),
+                    onnx.helper.make_tensor_value_info("Y", TFLOAT, [2]),
+                ],
+                [onnx.helper.make_tensor_value_info("Z", TFLOAT, [2])],
+            ),
+            opset_imports=[onnx.helper.make_opsetid("", 18)],
+            ir_version=10,
+        )
+
+    def test_plot_mermaid_returns_axes(self):
+        import matplotlib.axes
+
+        from yobx.doc import plot_mermaid
+
+        model = self._make_small_model()
+        ax = plot_mermaid(model)
+        self.assertIsInstance(ax, matplotlib.axes.Axes)
+        self.plt.close("all")
+
+    def test_plot_mermaid_with_string(self):
+        import matplotlib.axes
+
+        from yobx.doc import plot_mermaid
+        from yobx.helpers.mermaid_helper import to_mermaid
+
+        model = self._make_small_model()
+        mermaid_src = to_mermaid(model)
+        ax = plot_mermaid(mermaid_src)
+        self.assertIsInstance(ax, matplotlib.axes.Axes)
+        self.plt.close("all")
+
     def test_plot_mermaid_graph(self):
-        from IPython.display import SVG as IPythonSVG
+        from yobx.doc import draw_graph_mermaid, plot_mermaid
 
-        from yobx.doc import draw_graph_mermaid
-
-        # Verify IPython.display.SVG is importable (used in the gallery example).
-        self.assertIsNotNone(IPythonSVG)
-        # Verify draw_graph_mermaid is a callable.
+        # Verify both callables are accessible.
         self.assertTrue(callable(draw_graph_mermaid))
+        self.assertTrue(callable(plot_mermaid))
 
 
 if __name__ == "__main__":

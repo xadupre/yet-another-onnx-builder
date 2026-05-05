@@ -29,8 +29,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from IPython.display import SVG as IPythonSVG
-from yobx.doc import draw_graph_mermaid
+from yobx.doc import plot_mermaid
 from yobx.helpers.mermaid_helper import to_mermaid
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -76,7 +75,10 @@ print(mermaid_src)
 # Display the graph
 # ------------------
 #
-# The diagram is rendered by ``mmdc`` to SVG and displayed using
-# :class:`IPython.display.SVG`.
+# :func:`plot_mermaid <yobx.doc.plot_mermaid>` renders the diagram via the
+# ``mermaid.ink`` online service (through :epkg:`mermaid-py`) and embeds it in a
+# :class:`matplotlib.axes.Axes` so that :epkg:`sphinx-gallery` can capture and
+# include it in the documentation page.  When the service is unavailable (e.g.
+# in an offline CI run) the raw Mermaid source is shown as plain text instead.
 
-IPythonSVG(draw_graph_mermaid(model))
+plot_mermaid(model)
