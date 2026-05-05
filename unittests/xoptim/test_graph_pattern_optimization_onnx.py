@@ -8238,6 +8238,206 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
 
+    def test_unsqueeze_shape(self):
+        # Pattern: Shape(Unsqueeze(X, [axis])) → Concat(Shape(X) slices, [1], ...)
+        # The output is preserved exactly: [a, 1, b, c] for axis=1 on (a,b,c).
+        for unsq_axis in [0, 1, 2, -1]:
+            with self.subTest(unsq_axis=unsq_axis):
+                # X has shape (a, b, c); Unsqueeze at unsq_axis → rank-4 tensor.
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                            oh.make_node("Shape", ["xu"], ["Y"]),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [4])],
+                        [onh.from_array(np.array([unsq_axis], dtype=np.int64), name="axes")],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                feeds = {"X": self._range(3, 5, 7)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]  # full unsqueezed shape
 
-if __name__ == "__main__":
-    unittest.main(verbosity=2)
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(
+                        patterns=["UnsqueezeShape"], verbose=0
+                    ),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                self.assertNotIn(
+                    "Unsqueeze",
+                    [n.op_type for n in opt_onx.graph.node],
+                    msg="Unsqueeze should have been eliminated",
+                )
+                self.assertIn("Shape", [n.op_type for n in opt_onx.graph.node])
+                self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
+
+    def test_unsqueeze_shape_multiple_axes(self):
+        # Unsqueeze at axes [0, 3]: shape (a, b) → (1, a, b, 1).
+        # After optimization: Concat([1], Shape(X,0,2), [1]) = [1, a, b, 1].
+        inserted_axes = [0, 3]
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                    oh.make_node("Shape", ["xu"], ["Y"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b"])],
+                [oh.make_tensor_value_info("Y", TINT64, [4])],
+                [onh.from_array(np.array(inserted_axes, dtype=np.int64), name="axes")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        feeds = {"X": self._range(3, 5)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]  # [1, 3, 5, 1]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["UnsqueezeShape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertNotIn("Unsqueeze", [n.op_type for n in opt_onx.graph.node])
+        self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_unsqueeze_shape_multi_consumer(self):
+        # Unsqueeze output consumed by BOTH Shape (→ sh) and the model output
+        # (xu directly).  The pattern MUST fire (Shape consumer is found), and
+        # the Unsqueeze MUST be kept because xu is still needed as a graph output.
+        # sh is preserved exactly (same as original output: the full unsqueeze shape).
+        unsq_axis = 1
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                    oh.make_node("Shape", ["xu"], ["sh"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                [
+                    oh.make_tensor_value_info("xu", TFLOAT, ["a", 1, "b", "c"]),
+                    oh.make_tensor_value_info("sh", TINT64, [4]),
+                ],
+                [onh.from_array(np.array([unsq_axis], dtype=np.int64), name="axes")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(3, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected_xu, expected_sh = ref.run(None, feeds)  # sh = [3, 1, 5, 7]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["UnsqueezeShape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        # Pattern fires: old Shape(xu) is gone, replaced by Shape(X) slices + Concat.
+        self.assertIn("Shape", op_types)
+        self.assertIn("Concat", op_types)
+        # All Shape nodes feed from X (not xu).
+        shape_inputs = [n.input[0] for n in opt_onx.graph.node if n.op_type == "Shape"]
+        self.assertTrue(
+            all(inp != "xu" for inp in shape_inputs), msg="Shape nodes should feed from X, not xu"
+        )
+        # Unsqueeze is kept because xu is still a graph output.
+        self.assertIn("Unsqueeze", op_types)
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got_xu, got_sh = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected_xu, got_xu)
+        self.assertEqualArray(expected_sh, got_sh)
+
+    def test_unsqueeze_shape_with_start_end(self):
+        # Shape(Unsqueeze(X, [1])) with start/end attributes on the Shape node.
+        # X: (a, b, c) → Unsqueeze → (a, 1, b, c), Shape with start=1, end=3 → [1, b].
+        # After optimization: only dimensions in [start:end] are reconstructed.
+        for shape_start, shape_end in [(1, 3), (0, 2), (2, 4), (1, 4)]:
+            with self.subTest(shape_start=shape_start, shape_end=shape_end):
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                            oh.make_node(
+                                "Shape", ["xu"], ["Y"], start=shape_start, end=shape_end
+                            ),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [shape_end - shape_start])],
+                        [onh.from_array(np.array([1], dtype=np.int64), name="axes")],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                feeds = {"X": self._range(3, 5, 7)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]
+
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(
+                        patterns=["UnsqueezeShape"], verbose=0
+                    ),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                self.assertNotIn(
+                    "Unsqueeze",
+                    [n.op_type for n in opt_onx.graph.node],
+                    msg="Unsqueeze should have been eliminated",
+                )
+                self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
+
+    def test_unsqueeze_shape_with_negative_start_end(self):
+        # Shape(Unsqueeze(X, [1])) with negative start/end on the Shape node.
+        # X: (a, b, c) → Unsqueeze → (a, 1, b, c), Shape with start=-3, end=-1 → [1, b].
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                    oh.make_node("Shape", ["xu"], ["Y"], start=-3, end=-1),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                [oh.make_tensor_value_info("Y", TINT64, [2])],
+                [onh.from_array(np.array([1], dtype=np.int64), name="axes")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        feeds = {"X": self._range(3, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]  # [1, 5] (positions 1 and 2 of [3,1,5,7])
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["UnsqueezeShape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertNotIn("Unsqueeze", [n.op_type for n in opt_onx.graph.node])
+        self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)

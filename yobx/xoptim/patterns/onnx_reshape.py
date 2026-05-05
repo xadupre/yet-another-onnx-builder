@@ -1949,7 +1949,7 @@ class UnsqueezeOrSqueezeReshapePattern(PatternOptimization):
             if not g.is_constant(node_before.input[1]):
                 return self.none(node, inspect.currentframe().f_lineno)
             axis = g.get_computed_constant(node_before.input[1])
-            if axis is None:
+            if axis is None or len(axis) == 0:
                 return self.none(node, inspect.currentframe().f_lineno)
             index_zero = max([i for i, z in enumerate(cst2) if z == 0])
             min_axis = min(axis)
