@@ -2236,20 +2236,6 @@ class GraphBuilder(
             else simplify_expression(value)
         )
 
-    def clear_value_shape(self, name: str) -> None:
-        """
-        Removes the cached value shape for ``name`` if it exists.
-
-        Optimisation patterns that intentionally change the number of elements
-        produced by a node (e.g. dropping inserted dimensions) must call this
-        before inserting replacement nodes so that ``set_value_shape`` can
-        register the new, shorter value without triggering the immutability
-        assertion.
-
-        :param name: result name whose cached value shape should be cleared.
-        """
-        self._known_value_shape.pop(name, None)
-
     def unique_function_name(self, prefix: str) -> str:
         """Returns a function which does not exist yet."""
         if prefix in self.functions:

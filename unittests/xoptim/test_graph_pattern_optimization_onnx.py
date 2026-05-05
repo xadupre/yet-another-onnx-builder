@@ -8310,8 +8310,7 @@ class TestGraphPatternOptimization(ExtTestCase):
         ref = ExtendedReferenceEvaluator(model)
         original_out = ref.run(None, feeds)[0]  # [1, 3, 5, 1]
         expected = np.array(
-            [v for i, v in enumerate(original_out) if i not in set(inserted_axes)],
-            dtype=np.int64,
+            [v for i, v in enumerate(original_out) if i not in set(inserted_axes)], dtype=np.int64
         )
 
         gr = GraphBuilder(

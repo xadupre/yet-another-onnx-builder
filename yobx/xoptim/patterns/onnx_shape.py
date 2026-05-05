@@ -178,15 +178,6 @@ class UnsqueezeShapePattern(PatternOptimization):
             "", new_indices, source=f"{self.__class__.__name__}.apply.remapped_indices"
         )
 
-        # The replacement Gather will output a shorter vector than the original
-        # Shape(Unsqueeze(...)) node.  The graph builder caches the "value shape"
-        # (symbolic element values) of every result.  If the cache already holds
-        # the old (longer) value for shape_node.output[0], the assertion inside
-        # set_value_shape would fire when the new Gather node is inserted.
-        # Clearing the stale entry lets the graph builder recompute the correct
-        # value shape from the replacement nodes.
-        g.builder.clear_value_shape(shape_node.output[0])
-
         new_shape_name = g.unique_name(f"{self.__class__.__name__}_{shape_node.output[0]}")
         new_shape_node = g.make_node(
             "Shape",
@@ -196,6 +187,7 @@ class UnsqueezeShapePattern(PatternOptimization):
             doc_string=shape_node.doc_string,
         )
 
+        assert False  # TODO: use concatenate
         new_gather_node = g.make_node(
             "Gather",
             [new_shape_name, new_indices_name],
