@@ -98,6 +98,40 @@ def _negate_condition(cond: str) -> Optional[str]:
     return None
 
 
+def _is_positivity_condition(cond: str) -> bool:
+    """Returns True if *cond* is a simple positivity constraint.
+
+    Recognises ``"expr>0"`` and ``"expr>=N"`` (N ≥ 1) patterns — the same
+    forms that :func:`_can_prove_expr_nonzero` uses to build its variable
+    context.  These conditions arise when comparing a symbolic dimension or
+    expression against zero, e.g. ``x.shape[0] > 0``.
+
+    Uses :func:`~yobx.xexpressions.evaluate_expression` to evaluate the
+    right-hand side so that constant expressions are handled uniformly.
+
+    :param cond: A condition string such as ``"d0>0"`` or ``"_dyn_1>=1"``.
+
+    Returns:
+        ``True`` when the condition asserts that some expression is strictly
+        positive, ``False`` otherwise.
+    """
+    if ">=" in cond:
+        parts = cond.split(">=", 1)
+        try:
+            rhs = evaluate_expression(parts[1].strip(), {})
+            return rhs >= 1
+        except (NameError, TypeError, SyntaxError, ValueError):
+            return False
+    if ">" in cond:
+        parts = cond.split(">", 1)
+        try:
+            rhs = evaluate_expression(parts[1].strip(), {})
+            return rhs == 0
+        except (NameError, TypeError, SyntaxError, ValueError):
+            return False
+    return False
+
+
 def _can_prove_expr_nonzero(expr: str) -> bool:
     """Returns True if *expr* is provably non-zero given the known conditions.
 
@@ -213,6 +247,24 @@ class TracingBool:
                 rhs_str = self.value[idx + 2 :].strip()
                 if rhs_str == "0" and _can_prove_expr_nonzero(lhs):
                     return False
+        # Handle simple positivity conditions (e.g. ``"var > 0"`` or ``"var >= 1"``)
+        # that arise during Python ``and``/``or`` short-circuit evaluation when
+        # such a condition is part of a compound expression passed to
+        # ``torch._check``.  For example::
+        #
+        #     torch._check(x.shape[0] > 0 and x.shape[2] > 0)
+        #
+        # Python evaluates ``bool(TracingBool("var > 0"))`` for the left operand
+        # before evaluating the right operand.  Since ``torch._check`` asserts
+        # that the whole expression is True, each conjunct is also True.  We
+        # self-register the condition and return ``True`` so that the right
+        # operand is evaluated and can be registered by :meth:`_handle_check`.
+        # A symbolic :class:`TracingBool` can only be produced by comparing a
+        # :class:`TracingInt` (which only exists during tracing), so this
+        # self-registration is always safe for positivity conditions.
+        if _is_positivity_condition(self.value):
+            _known_true_conditions.add(self.value)
+            return True
         raise ValueError(
             f"TracingBool({self.value!r}) cannot be converted to a Python bool; "
             "the result depends on a symbolic/dynamic dimension. "
