@@ -1839,6 +1839,9 @@ class GraphTracer:
 
         if isinstance(size, (torch.Size, TracingShape)):
             size = tuple(size)
+        # Scalar integer sizes (e.g. ``torch.zeros(5)``) are an unusual calling
+        # convention in model code; defer to the original implementation.  This
+        # matches the behaviour of :meth:`_handle_full`.
         if not isinstance(size, (tuple, list)):
             return _ORIGINAL_TORCH_ZEROS(size, **kwargs)
 
@@ -1913,6 +1916,9 @@ class GraphTracer:
 
         if isinstance(size, (torch.Size, TracingShape)):
             size = tuple(size)
+        # Scalar integer sizes (e.g. ``torch.ones(5)``) are an unusual calling
+        # convention in model code; defer to the original implementation.  This
+        # matches the behaviour of :meth:`_handle_full`.
         if not isinstance(size, (tuple, list)):
             return _ORIGINAL_TORCH_ONES(size, **kwargs)
 
