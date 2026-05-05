@@ -81,6 +81,6 @@ print(mermaid_src)
 # The diagram is rendered directly by ``mmdc`` to SVG and embedded in the
 # gallery without any rasterisation step.
 
-_svg_tmp = os.path.join(tempfile.gettempdir(), "plot_mermaid_graph.svg")
-draw_graph_mermaid(model, _svg_tmp)
-__gallery_svgs__ = [_svg_tmp]
+svg_path = os.path.join(tempfile.gettempdir(), "plot_mermaid_graph.svg")
+draw_graph_mermaid(model, svg_path)
+__gallery_svgs__ = [svg_path]

@@ -190,13 +190,11 @@ if int(os.environ.get("UNITTEST_GOING", "0")):
 
 
 class _SvgScraper:
-    """Sphinx Gallery image scraper that embeds pre-generated SVG files.
+    """Embeds pre-generated SVG files in Sphinx Gallery.
 
-    Gallery examples can signal SVG files to embed by setting the module-level
-    variable ``__gallery_svgs__`` to a list of SVG file paths before the end of
-    a code block.  The scraper copies each SVG into the gallery image directory,
-    generates the reStructuredText image directive, and removes the source
-    temporary files.
+    Copies SVG files specified in the module-level ``__gallery_svgs__``
+    variable into the gallery image directory, generates reStructuredText
+    image directives, and removes temporary source files.
     """
 
     def __call__(self, block, block_vars, gallery_conf):
@@ -212,7 +210,7 @@ class _SvgScraper:
             image_path = str(next(block_vars["image_path_iterator"]))
             image_path = re.sub(r"\.[a-z]+$", ".svg", image_path)
             shutil.copy(str(svg_src), image_path)
-            if os.path.exists(str(svg_src)) and str(svg_src) != image_path:
+            if str(svg_src) != image_path:
                 os.remove(str(svg_src))
             image_paths.append(image_path)
         return figure_rst(image_paths, gallery_conf["src_dir"])
