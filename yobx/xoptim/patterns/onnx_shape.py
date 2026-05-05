@@ -50,17 +50,28 @@ class ShapeBasedShapeShapeAddPattern(PatternOptimization):
 
 class UnsqueezeShapePattern(PatternOptimization):
     """
-    Replaces ``Shape(Unsqueeze(X, axes))`` by
-    ``Gather(Shape(X), remapped_indices)`` where ``remapped_indices``
-    are all positions in the unsqueezed shape that are *not* inserted by
-    the ``Unsqueeze``, mapped back to indices in the original tensor's shape.
+    Replaces ``Shape(Unsqueeze(X, axes))`` by a ``Concat`` of
+    ``Shape(X, start=s, end=e)`` slices interleaved with constant ``[1]``
+    tensors at the inserted axis positions.
 
     The key observation is that ``Shape(Unsqueeze(X, axes))`` produces a
-    shape vector that is identical to ``Shape(X)`` except for the inserted
-    ``1`` entries at the ``axes`` positions.  Gathering only the non-inserted
-    positions from ``Shape(X)`` avoids materialising the Unsqueeze on the
-    (potentially large) data tensor entirely; the same values are retrieved
-    by a cheap Gather on the tiny shape vector.
+    shape vector that is identical to ``Shape(X)`` with ``1`` entries
+    inserted at the ``axes`` positions.  By splitting ``Shape(X)`` into
+    segments and concatenating them with the constant ``1`` values, the
+    Unsqueeze on the (potentially large) data tensor is avoided entirely
+    while the output shape vector remains bit-for-bit identical.
+
+    For ``X`` of shape ``(a, b, c)`` and ``axes=[1]`` the transformation
+    is::
+
+        # Before
+        xu = Unsqueeze(X, [1])        # (a, 1, b, c)
+        Y  = Shape(xu)                # [a, 1, b, c]
+
+        # After
+        s0 = Shape(X, start=0, end=1) # [a]
+        s1 = Shape(X, start=1, end=3) # [b, c]
+        Y  = Concat([s0, [1], s1])    # [a, 1, b, c]
 
     Model with nodes to be fused:
 
@@ -98,27 +109,28 @@ class UnsqueezeShapePattern(PatternOptimization):
         graph TD
 
             classDef ioNode fill:#dfd,stroke:#333,color:#333
-            classDef initNode fill:#cccc00,stroke:#333,color:#333
             classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
             classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
 
             I_X(["X FLOAT(a, b, c)"])
-            I_indices(["indices INT64(3)"])
+            C1(["const INT64[1]"])
 
-            Constant_0[["Constant() -#gt; indices"]]
-            Shape_1[["Shape(.)"]]
-            Gather_2[["Gather(., .)"]]
+            Shape_s0[["Shape(., start=0, end=1)"]]
+            Shape_s1[["Shape(., start=1, end=3)"]]
+            Concat_2[["Concat(axis=0)"]]
 
-            I_X -->|"FLOAT(a, b, c)"| Shape_1
-            Shape_1 -->|"INT64(3)"| Gather_2
-            Constant_0 -->|"INT64(3)"| Gather_2
+            I_X -->|"FLOAT(a, b, c)"| Shape_s0
+            I_X -->|"FLOAT(a, b, c)"| Shape_s1
+            Shape_s0 -->|"INT64(1)"| Concat_2
+            C1 -->|"INT64(1)"| Concat_2
+            Shape_s1 -->|"INT64(2)"| Concat_2
 
-            O_Y(["Y INT64(3)"])
-            Gather_2 --> O_Y
+            O_Y(["Y INT64(4)"])
+            Concat_2 --> O_Y
 
-            class I_X,I_indices,O_Y ioNode
-            class Constant_0 constNode
-            class Shape_1,Gather_2 opNode
+            class I_X,O_Y ioNode
+            class C1 constNode
+            class Shape_s0,Shape_s1,Concat_2 opNode
     """
 
     def __init__(self, verbose: int = 0, priority: int = 0):
@@ -166,34 +178,71 @@ class UnsqueezeShapePattern(PatternOptimization):
         axes = g.get_computed_constant(unsq_node.input[1])
         input_rank = g.get_rank(unsq_node.input[0])
         output_rank = input_rank + len(axes)
-        axes_norm = set(int(a) % output_rank for a in axes.flatten())
+        sorted_axes = sorted(int(a) % output_rank for a in axes.flatten())
 
-        # All positions in the unsqueezed shape that are NOT inserted by Unsqueeze,
-        # remapped to coordinate space of the original tensor X.
-        non_axes = [i for i in range(output_rank) if i not in axes_norm]
-        remapped = [i - sum(1 for a in sorted(axes_norm) if a < i) for i in non_axes]
-        new_indices = np.array(remapped, dtype=np.int64)
+        # Reconstruct Shape(Unsqueeze(X, axes)) as Concat of Shape(X) slices
+        # interleaved with constant [1] tensors.  Each consecutive run of
+        # original (non-inserted) dimensions is extracted with a ranged Shape
+        # node; each inserted axis contributes a constant scalar [1].
+        #
+        # Example: X shape (a, b, c), axes=[1]
+        #   Shape(X, start=0, end=1)  →  [a]
+        #   const [1]
+        #   Shape(X, start=1, end=3)  →  [b, c]
+        #   Concat([a], [1], [b, c], axis=0)  →  [a, 1, b, c]
+        concat_inputs = []
+        extra_nodes = []
+        x_cursor = 0  # running position in X's dimension space
+        out_cursor = 0  # running position in the unsqueezed output
 
-        new_indices_name = g.make_initializer(
-            "", new_indices, source=f"{self.__class__.__name__}.apply.remapped_indices"
-        )
+        for axis in sorted_axes:
+            run_len = axis - out_cursor  # original dims before this inserted axis
+            if run_len > 0:
+                seg_name = g.unique_name(
+                    f"{self.__class__.__name__}_{shape_node.output[0]}_s{x_cursor}"
+                )
+                extra_nodes.append(
+                    g.make_node(
+                        "Shape",
+                        [unsq_node.input[0]],
+                        [seg_name],
+                        start=x_cursor,
+                        end=x_cursor + run_len,
+                        name=f"{self.__class__.__name__}--shape{x_cursor}",
+                    )
+                )
+                concat_inputs.append(seg_name)
+                x_cursor += run_len
+            one_name = g.make_initializer(
+                "", np.array([1], dtype=np.int64), source=f"{self.__class__.__name__}.apply.one"
+            )
+            concat_inputs.append(one_name)
+            out_cursor = axis + 1
 
-        new_shape_name = g.unique_name(f"{self.__class__.__name__}_{shape_node.output[0]}")
-        new_shape_node = g.make_node(
-            "Shape",
-            [unsq_node.input[0]],
-            [new_shape_name],
+        # Trailing non-axis run after the last inserted axis.
+        if x_cursor < input_rank:
+            seg_name = g.unique_name(
+                f"{self.__class__.__name__}_{shape_node.output[0]}_s{x_cursor}"
+            )
+            extra_nodes.append(
+                g.make_node(
+                    "Shape",
+                    [unsq_node.input[0]],
+                    [seg_name],
+                    start=x_cursor,
+                    end=input_rank,
+                    name=f"{self.__class__.__name__}--shape_tail",
+                )
+            )
+            concat_inputs.append(seg_name)
+
+        concat_node = g.make_node(
+            "Concat",
+            concat_inputs,
+            shape_node.output,
+            axis=0,
             name=f"{self.__class__.__name__}--{shape_node.name}",
             doc_string=shape_node.doc_string,
-        )
-
-        assert False  # TODO: use concatenate
-        new_gather_node = g.make_node(
-            "Gather",
-            [new_shape_name, new_indices_name],
-            shape_node.output,
-            name=f"{self.__class__.__name__}--{unsq_node.name}",
-            doc_string=unsq_node.doc_string,
         )
 
         # Both unsq_node and shape_node are in match.nodes and will be removed.
@@ -203,5 +252,6 @@ class UnsqueezeShapePattern(PatternOptimization):
         result = []
         if g.is_used_more_than_once(unsq_node.output[0]):
             result.append(unsq_node)
-        result.extend([new_shape_node, new_gather_node])
+        result.extend(extra_nodes)
+        result.append(concat_node)
         return result
