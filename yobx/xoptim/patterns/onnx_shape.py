@@ -136,6 +136,28 @@ class UnsqueezeShapePattern(PatternOptimization):
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
 
+    @staticmethod
+    def _resolve_shape_start_end(shape_node: NodeProto, output_rank: int) -> tuple:
+        """Returns the effective (start, end) range from a Shape node's attributes.
+
+        Reads ``start`` and ``end`` attributes (both optional, defaulting to
+        ``0`` and ``output_rank`` respectively), normalises negative values
+        against ``output_rank``, and clamps the result to ``[0, output_rank]``.
+        """
+        shape_start = next(
+            (int(attr.i) for attr in shape_node.attribute if attr.name == "start"), 0
+        )
+        shape_end = next(
+            (int(attr.i) for attr in shape_node.attribute if attr.name == "end"), output_rank
+        )
+        if shape_start < 0:
+            shape_start += output_rank
+        if shape_end < 0:
+            shape_end += output_rank
+        shape_start = max(0, min(shape_start, output_rank))
+        shape_end = max(0, min(shape_end, output_rank))
+        return shape_start, shape_end
+
     def match(
         self,
         g: "GraphBuilderPatternOptimization",  # noqa: F821
@@ -173,18 +195,7 @@ class UnsqueezeShapePattern(PatternOptimization):
         # against a degenerate (empty) range, which would require a 0-input
         # Concat (invalid ONNX).
         output_rank = input_rank + len(axes)
-        shape_start = next(
-            (int(attr.i) for attr in shape_node.attribute if attr.name == "start"), 0
-        )
-        shape_end = next(
-            (int(attr.i) for attr in shape_node.attribute if attr.name == "end"), output_rank
-        )
-        if shape_start < 0:
-            shape_start += output_rank
-        if shape_end < 0:
-            shape_end += output_rank
-        shape_start = max(0, min(shape_start, output_rank))
-        shape_end = max(0, min(shape_end, output_rank))
+        shape_start, shape_end = self._resolve_shape_start_end(shape_node, output_rank)
         if shape_start >= shape_end:
             return self.none(node, inspect.currentframe().f_lineno)
 
@@ -204,22 +215,14 @@ class UnsqueezeShapePattern(PatternOptimization):
         # Resolve any start/end attributes on shape_node.  The Shape operator
         # (opset ≥ 15) uses these to select a sub-range of the output shape
         # instead of returning all dimensions.  Defaults match the full range.
-        shape_start = next(
-            (int(attr.i) for attr in shape_node.attribute if attr.name == "start"), 0
-        )
-        shape_end = next(
-            (int(attr.i) for attr in shape_node.attribute if attr.name == "end"), output_rank
-        )
-        if shape_start < 0:
-            shape_start += output_rank
-        if shape_end < 0:
-            shape_end += output_rank
-        shape_start = max(0, min(shape_start, output_rank))
-        shape_end = max(0, min(shape_end, output_rank))
+        shape_start, shape_end = self._resolve_shape_start_end(shape_node, output_rank)
 
         # Reconstruct Shape(Unsqueeze(X, axes))[shape_start:shape_end] as a
         # Concat of Shape(X, start, end) slices interleaved with constant [1]
-        # tensors, restricted to positions that fall inside [shape_start, shape_end).
+        # tensors.  Only output positions that fall inside [shape_start, shape_end)
+        # contribute to the result: a run of original (non-inserted) dimensions
+        # is clipped to the requested window and extracted via a ranged Shape node,
+        # while each inserted axis within the window contributes a constant [1].
         #
         # Example: X shape (a, b, c), axes=[1], shape_start=0, shape_end=4
         #   Shape(X, start=0, end=1)  →  [a]
@@ -228,8 +231,8 @@ class UnsqueezeShapePattern(PatternOptimization):
         #   Concat([a], [1], [b, c], axis=0)  →  [a, 1, b, c]
         concat_inputs = []
         extra_nodes = []
-        x_cursor = 0  # running position in X's dimension space
-        out_cursor = 0  # running position in the unsqueezed output
+        x_cursor = 0  # next un-consumed position in X's dimension space
+        out_cursor = 0  # next un-consumed position in the unsqueezed output
 
         for axis in sorted_axes:
             # Run of original dims: out positions [out_cursor, axis),
