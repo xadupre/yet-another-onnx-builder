@@ -103,6 +103,7 @@ from .onnx_shape import (
     UnsqueezeShapePattern,
     ShapeTransposePattern,
 )
+from .onnx_gather import GatherGatherPattern
 from .onnx_slice import SliceSlicePattern
 from .onnx_split import GathersSplitPattern, SplitConcatPattern, SlicesSplitPattern
 from .onnx_sub import Sub1MulPattern
@@ -189,6 +190,7 @@ def get_default_patterns(verbose: int = 0) -> List[PatternOptimization]:
         ExpandBroadcastPattern(verbose=verbose),
         ExpandSwapPattern(verbose=verbose),
         ExpandUnsqueezeExpandPattern(verbose=verbose),
+        GatherGatherPattern(verbose=verbose),
         GathersSplitPattern(verbose=verbose),
         GeluPattern(verbose=verbose),
         IdentityPattern(verbose=verbose),
