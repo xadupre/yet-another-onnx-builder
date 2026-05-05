@@ -186,8 +186,6 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         # down to at most 1 (some optimizer passes may eliminate it entirely).
         self.assertLessEqual(counter.get("Concat", 0), 1)
         # Verify numerical correctness.
-        import onnxruntime
-
         sess = onnxruntime.InferenceSession(
             dec.SerializeToString(), providers=["CPUExecutionProvider"]
         )
