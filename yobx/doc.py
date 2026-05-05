@@ -381,6 +381,7 @@ def plot_mermaid(
     mermaid: Union[str, onnx.ModelProto],
     ax: Optional["matplotlib.axis.Axis"] = None,  # noqa: F821
     figsize: Optional[Tuple[int, int]] = None,
+    svg: Optional[str] = None,
 ) -> "matplotlib.axis.Axis":  # noqa: F821
     """
     Draws a Mermaid flowchart into a matplotlib axis.
@@ -388,6 +389,8 @@ def plot_mermaid(
     :param mermaid: Mermaid flowchart string or ModelProto
     :param ax: optional matplotlib axis; if None, a new figure and axis are created
     :param figsize: size of the figure if *ax* is None
+    :param svg: optional path where the intermediate SVG file is saved; if *None*
+        a temporary file is used and deleted afterwards
     :return: matplotlib axis containing the rendered graph image.
 
     The function renders the diagram to an SVG file via :func:`draw_graph_mermaid`,
@@ -428,15 +431,21 @@ def plot_mermaid(
 
     from PIL import Image
 
-    with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as fp:
-        fp.close()
-
-        draw_graph_mermaid(mermaid, fp.name)
-        png_bytes = cairosvg.svg2png(url=fp.name)
+    if svg is not None:
+        draw_graph_mermaid(mermaid, svg)
+        png_bytes = cairosvg.svg2png(url=svg)
         img = np.asarray(Image.open(io.BytesIO(png_bytes)))
-        os.remove(fp.name)
-
         ax.imshow(img)
+    else:
+        with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as fp:
+            fp.close()
+
+            draw_graph_mermaid(mermaid, fp.name)
+            png_bytes = cairosvg.svg2png(url=fp.name)
+            img = np.asarray(Image.open(io.BytesIO(png_bytes)))
+            os.remove(fp.name)
+
+            ax.imshow(img)
 
     if clean:
         ax.set_xticks([])
