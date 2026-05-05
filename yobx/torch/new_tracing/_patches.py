@@ -181,6 +181,7 @@ def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
         is temporarily replaced, then restores the original implementation on
         exit.
     """
+
     def _full_handler(size: Any, fill_value: Any, **kwargs: Any) -> Any:
         # When tracer._fake_mode has been entered (enter_stack is non-empty) we
         # are inside dispatch()'s `with self._fake_mode:` block — the call

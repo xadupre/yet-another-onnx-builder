@@ -25,6 +25,7 @@ def decompose_einsum(
     strategy: str = "numpy",
     clean: bool = True,
     verbose: bool = False,
+    patterns: Optional[str] = None,
 ) -> onnx.ModelProto:
     """
     Decomposes an einsum equation into a sequence of standard ONNX operators.
@@ -60,6 +61,7 @@ def decompose_einsum(
     :param clean: when ``True`` (default), removes unused intermediate nodes
         from the decomposed graph.
     :param verbose: print intermediate decomposition steps.
+    :param patterns: to select a particular set of optimization patterns to apply
     :return: :class:`onnx.ModelProto` whose graph computes the same result as
         ``numpy.einsum(equation, *inputs)``.
 
@@ -144,9 +146,13 @@ def decompose_einsum(
     # Optimize: apply GraphBuilder pattern rewrites, identity removal, and
     # constant folding.  Import deferred to avoid a circular import with
     # yobx.xbuilder.
-    from yobx.xbuilder.graph_builder import GraphBuilder
+    from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
 
-    gb = GraphBuilder(model, verbose=0)
+    gb = GraphBuilder(
+        model,
+        verbose=0,
+        optimization_options=None if not patterns else OptimizationOptions(patterns=patterns),
+    )
     gb.optimize()
     artifact = gb.to_onnx(optimize=False)
     opt_model = artifact.get_proto()
