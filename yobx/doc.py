@@ -310,8 +310,9 @@ def _run_mmdc(mermaid_src: str, image: str) -> str:
     """
     Runs the :epkg:`Mermaid` CLI tool ``mmdc`` to render a diagram.
 
-    The diagram source is passed via stdin (``-i -``), avoiding the need for a
-    temporary ``.mmd`` input file.
+    Both the diagram source (via stdin, ``-i -``) and the Puppeteer config (via
+    a pipe passed as ``/dev/fd/N``) are streamed in-memory — no temporary files
+    are created on disk.
 
     :param mermaid_src: Mermaid diagram source string
     :param image: path to the output image (``.svg`` or ``.png``)
@@ -322,11 +323,16 @@ def _run_mmdc(mermaid_src: str, image: str) -> str:
     assert not sys.platform.startswith("win"), "this is not working on Windows"
     if os.path.exists(image):
         os.remove(image)
-    with tempfile.NamedTemporaryFile(suffix=".json", mode="w", delete=False) as pup_cfg:
-        json.dump({"args": ["--no-sandbox"]}, pup_cfg)
-        pup_cfg_path = pup_cfg.name
 
-    cmd = ["mmdc", "-i", "-", "-o", image, "--puppeteerConfigFile", pup_cfg_path]
+    # Write puppeteer config to a pipe so mmdc can read it without a temp file.
+    # The config JSON is small enough to fit in the pipe buffer, so writing the
+    # entire payload before launching the subprocess is safe.
+    pup_cfg_bytes = json.dumps({"args": ["--no-sandbox"]}).encode()
+    read_fd, write_fd = os.pipe()
+    os.write(write_fd, pup_cfg_bytes)
+    os.close(write_fd)
+
+    cmd = ["mmdc", "-i", "-", "-o", image, "--puppeteerConfigFile", f"/dev/fd/{read_fd}"]
     p = subprocess.Popen(
         cmd,
         shell=False,
@@ -334,9 +340,10 @@ def _run_mmdc(mermaid_src: str, image: str) -> str:
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
+        pass_fds=(read_fd,),
     )
+    os.close(read_fd)
     stdout_data, stderr_data = p.communicate(input=mermaid_src.encode())
-    os.remove(pup_cfg_path)
     output = stdout_data.decode(errors="ignore") + "\n" + stderr_data.decode(errors="ignore")
     assert os.path.exists(image), (
         f"Unable to find {image!r}, command line is "
