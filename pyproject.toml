@@ -33,6 +33,7 @@ dev = [
 docs = [
     "black",
     "matplotlib",
+    "mermaid-py",
     "onnx-ir",
     "onnx-shape-inference",
     "openpyxl",

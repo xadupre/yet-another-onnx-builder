@@ -339,41 +339,5 @@ class TestDocPlotDot(ExtTestCase):
         self.plt.close("all")
 
 
-@skipif_ci_windows("too long")
-@skipif_ci_apple("too long")
-@requires_matplotlib()
-class TestDocPlotMermaid(ExtTestCase):
-    @classmethod
-    def setUp(cls):
-        import matplotlib
-
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-
-        cls.plt = plt
-
-    def test_plot_mermaid_graph(self):
-        import io
-        import matplotlib.axes
-        import numpy as np
-        from unittest.mock import patch
-        from PIL import Image
-        from yobx.doc import demo_mlp_model, plot_mermaid
-
-        model = demo_mlp_model("")
-
-        def _fake_draw(mermaid, image):
-            """Writes a minimal PNG so PIL can open it."""
-            buf = io.BytesIO()
-            Image.fromarray(np.zeros((4, 4, 3), dtype=np.uint8)).save(buf, format="PNG")
-            with open(image, "wb") as fh:
-                fh.write(buf.getvalue())
-
-        with patch("yobx.doc.draw_graph_mermaid", side_effect=_fake_draw):
-            ax = plot_mermaid(model)
-        self.assertIsInstance(ax, matplotlib.axes.Axes)
-        self.plt.close("all")
-
-
 if __name__ == "__main__":
     unittest.main(verbosity=2)

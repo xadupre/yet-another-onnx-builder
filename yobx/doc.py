@@ -306,63 +306,18 @@ def plot_dot(
     return ax
 
 
-def _run_mmdc(mermaid_src: str, image: str) -> str:
+def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str) -> None:
     """
-    Runs the :epkg:`Mermaid` CLI tool ``mmdc`` to render a diagram.
+    Draws a Mermaid flowchart to an image file using the :epkg:`mermaid-py` library.
 
-    Both the diagram source (via stdin, ``-i -``) and the Puppeteer config (via
-    a pipe passed as ``/dev/fd/N``) are streamed in-memory — no temporary files
-    are created on disk.
-
-    :param mermaid_src: Mermaid diagram source string
-    :param image: path to the output image (``.svg`` or ``.png``)
-    :return: combined stdout/stderr output from ``mmdc``.
-    """
-    import json
-
-    assert not sys.platform.startswith("win"), "this is not working on Windows"
-    if os.path.exists(image):
-        os.remove(image)
-
-    # Write puppeteer config to a pipe so mmdc can read it without a temp file.
-    # The config JSON is small enough to fit in the pipe buffer, so writing the
-    # entire payload before launching the subprocess is safe.
-    pup_cfg_bytes = json.dumps({"args": ["--no-sandbox"]}).encode()
-    read_fd, write_fd = os.pipe()
-    os.write(write_fd, pup_cfg_bytes)
-    os.close(write_fd)
-
-    cmd = ["mmdc", "-i", "-", "-o", image, "--puppeteerConfigFile", f"/dev/fd/{read_fd}"]
-    p = subprocess.Popen(
-        cmd,
-        shell=False,
-        env=os.environ,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        pass_fds=(read_fd,),
-    )
-    os.close(read_fd)
-    stdout_data, stderr_data = p.communicate(input=mermaid_src.encode())
-    output = stdout_data.decode(errors="ignore") + "\n" + stderr_data.decode(errors="ignore")
-    assert os.path.exists(image), (
-        f"Unable to find {image!r}, command line is "
-        f"{' '.join(cmd)!r}, mmdc failed due to\n{output}"
-    )
-    return output
-
-
-def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str) -> str:
-    """
-    Draws a Mermaid flowchart to an image file using the ``mmdc`` CLI tool.
-
-    :param mermaid: Mermaid flowchart string or ModelProto
+    :param mermaid: Mermaid flowchart string or :class:`onnx.ModelProto`
     :param image: output image file path (``.svg`` or ``.png``)
-    :return: ``mmdc`` console output.
 
-    The diagram source is piped directly to ``mmdc`` via stdin; no temporary
-    ``.mmd`` file is created.
+    The diagram is rendered via the ``mermaid.ink`` online service through
+    :class:`mermaid.Mermaid`.
     """
+    from mermaid import Mermaid as MermaidRenderer
+
     from .helpers.mermaid_helper import to_mermaid
 
     if isinstance(mermaid, onnx.ModelProto):
@@ -370,82 +325,11 @@ def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str) -> str:
     else:
         smmd = mermaid
 
-    out = _run_mmdc(smmd, image)
-    assert os.path.exists(
-        image
-    ), f"mmdc failed with no reason, {image!r} not found, output is {out}."
-    return out
-
-
-def plot_mermaid(
-    mermaid: Union[str, onnx.ModelProto],
-    ax: Optional["matplotlib.axis.Axis"] = None,  # noqa: F821
-    figsize: Optional[Tuple[int, int]] = None,
-    svg: Optional[str] = None,
-) -> "matplotlib.axis.Axis":  # noqa: F821
-    """
-    Draws a Mermaid flowchart into a matplotlib axis.
-
-    :param mermaid: Mermaid flowchart string or ModelProto
-    :param ax: optional matplotlib axis; if None, a new figure and axis are created
-    :param figsize: size of the figure if *ax* is None
-    :param svg: optional path where the SVG file is saved; when provided
-        :func:`draw_graph_mermaid` is called twice — once to produce the kept SVG
-        and once to produce a temporary PNG for display
-    :return: matplotlib axis containing the rendered graph image.
-
-    The function renders the diagram to a PNG file via :func:`draw_graph_mermaid`
-    and displays it using :func:`matplotlib.axes.Axes.imshow`.
-
-    .. plot::
-
-        import matplotlib.pyplot as plt
-        import onnx.parser
-        from yobx.doc import plot_mermaid
-
-        model = onnx.parser.parse_model(
-            '''
-            <ir_version: 8, opset_import: [ "": 18]>
-            agraph (float[N] x) => (float[N] z) {
-                two = Constant <value_float=2.0> ()
-                four = Add(two, two)
-                z = Mul(four, four)
-            }
-        ''')
-
-        ax = plot_mermaid(model)
-        ax.set_title("Dummy graph")
-        plt.show()
-    """
-    if ax is None:
-        import matplotlib.pyplot as plt
-
-        _, ax = plt.subplots(1, 1, figsize=figsize)
-        clean = True
+    renderer = MermaidRenderer(smmd)
+    if image.endswith(".svg"):
+        renderer.to_svg(image)
     else:
-        clean = False
-
-    from PIL import Image
-
-    if svg is not None:
-        draw_graph_mermaid(mermaid, svg)
-
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as fp:
-        fp.close()
-        draw_graph_mermaid(mermaid, fp.name)
-        img = np.asarray(Image.open(fp.name))
-        os.remove(fp.name)
-
-    ax.imshow(img)
-
-    if clean:
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.get_xaxis().set_visible(False)
-        ax.get_yaxis().set_visible(False)
-        ax.set_axis_off()
-        ax.get_figure().tight_layout()
-    return ax
+        renderer.to_png(image)
 
 
 def plot_text(
