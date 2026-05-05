@@ -133,11 +133,12 @@ def _is_positivity_condition(cond: str) -> bool:
 
 
 def _can_prove_expr_nonzero_from_neq_conditions(expr: str) -> bool:
-    """Returns True if *expr* is provably non-zero from registered ``!=0`` conditions.
+    """Checks whether *expr* is provably non-zero from registered ``!=0`` conditions.
 
-    Checks whether *expr* appears as a multiplicative factor in any registered
-    condition of the form ``"P!=0"``.  If ``"P!=0"`` is known-true and *expr*
-    is a factor of P, then *expr* must also be non-zero.
+    Determines whether *expr* appears as a multiplicative factor in any
+    registered condition of the form ``"P!=0"``.  If ``"P!=0"`` is
+    known-true and *expr* is a factor of P, then *expr* must also be
+    non-zero.
 
     This handles the :class:`~yobx.torch.testing._model_eval_cases.ControlFlowNumelZero5`
     pattern::
