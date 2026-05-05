@@ -9,7 +9,7 @@ class GatherShapePattern(PatternOptimization):
     """
     Simplifies ``Gather(Shape(X), indices)`` into ``Shape(X, start=s, end=e)``
     when *indices* is a constant 1-D ``int64`` array that forms a contiguous
-    ascending range ``[s, s+1, …, e-1]``.
+    ascending range ``[s, s+1, ..., e-1]``.
 
     This avoids materialising the full shape vector only to slice it immediately
     afterwards.  The Shape node may already carry ``start`` / ``end`` attributes
@@ -77,6 +77,13 @@ class GatherShapePattern(PatternOptimization):
                 return int(attr.i)
         return default
 
+    @staticmethod
+    def _clamp_dim(value: int, rank: int) -> int:
+        """Normalises a possibly negative dimension index and clamps it to ``[0, rank]``."""
+        if value < 0:
+            value += rank
+        return max(0, min(value, rank))
+
     def match(
         self,
         g: "GraphBuilderPatternOptimization",  # noqa: F821
@@ -141,12 +148,8 @@ class GatherShapePattern(PatternOptimization):
         s0 = shape_start_raw if shape_start_raw is not None else 0
         if rank is not None:
             e0 = shape_end_raw if shape_end_raw is not None else rank
-            if s0 < 0:
-                s0 += rank
-            if e0 < 0:
-                e0 += rank
-            s0 = max(0, min(s0, rank))
-            e0 = max(0, min(e0, rank))
+            s0 = self._clamp_dim(s0, rank)
+            e0 = self._clamp_dim(e0, rank)
             L = e0 - s0
         else:
             # No rank available; shape attrs must be non-negative (guaranteed by match).
