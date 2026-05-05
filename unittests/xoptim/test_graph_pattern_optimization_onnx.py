@@ -8684,3 +8684,226 @@ class TestGraphPatternOptimization(ExtTestCase):
         got_z, got_w = opt_ref.run(None, feeds)
         self.assertEqualArray(expected_z, got_z)
         self.assertEqualArray(expected_w, got_w)
+
+    def test_gather_concat_scalar_no_pre(self):
+        # Gather(Concat(X, C, axis=0), scalar) where scalar indexes into X (offset 0).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["X", "C"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, [])],
+                [
+                    onh.from_array(np.array([10, 20], dtype=np.int64), name="C"),
+                    onh.from_array(np.array(3, dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_concat_scalar_with_pre(self):
+        # Gather(Concat(C, X, axis=0), scalar) where scalar indexes into X.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["C", "X"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, [])],
+                [
+                    onh.from_array(np.array([10, 20, 30], dtype=np.int64), name="C"),
+                    onh.from_array(np.array(4, dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_concat_1d_index_with_pre(self):
+        # Gather(Concat(C, X, axis=0), 1d_indices) where all indices fall into X.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["C", "X"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, [3])],
+                [
+                    onh.from_array(np.array([10, 20, 30], dtype=np.int64), name="C"),
+                    onh.from_array(np.array([3, 5, 4], dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_concat_x_middle_with_post(self):
+        # Gather(Concat(C1, X, C2, axis=0), idx) where idx falls into X.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["C1", "X", "C2"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, [])],
+                [
+                    onh.from_array(np.array([10, 20], dtype=np.int64), name="C1"),
+                    onh.from_array(np.array([30, 40, 50], dtype=np.int64), name="C2"),
+                    onh.from_array(np.array(4, dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_concat_no_match_index_outside_x(self):
+        # Index points to the post-X constant region; no optimization should occur.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["C1", "X", "C2"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, [])],
+                [
+                    onh.from_array(np.array([10, 20], dtype=np.int64), name="C1"),
+                    onh.from_array(np.array([30, 40, 50], dtype=np.int64), name="C2"),
+                    # Index 8 = 2 (C1) + 5 (X) + 1 (into C2) → outside X.
+                    onh.from_array(np.array(8, dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Pattern must NOT have fired: Concat + Gather remain.
+        self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_concat_concat_used_twice(self):
+        # Concat output is consumed by both Gather and another node; Concat must be kept.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["C", "X"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                    oh.make_node("Identity", ["Z"], ["W"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, []), _mkv_("W", TINT64, [8])],
+                [
+                    onh.from_array(np.array([10, 20, 30], dtype=np.int64), name="C"),
+                    onh.from_array(np.array(4, dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected_y, expected_w = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Concat must survive because Z feeds Identity as well.
+        self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got_y, got_w = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected_y, got_y)
+        self.assertEqualArray(expected_w, got_w)
