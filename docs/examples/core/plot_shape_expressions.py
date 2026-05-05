@@ -62,6 +62,7 @@ import onnx
 import numpy as np
 import onnx.helper as oh
 import onnx.numpy_helper as onh
+from yobx.doc import plot_dot
 from yobx.xexpressions import simplify_expression
 from yobx.xshape import BasicShapeBuilder
 
@@ -87,6 +88,18 @@ builder.run_model(model)
 print("shape of X :", builder.get_shape("X"))
 print("shape of Y :", builder.get_shape("Y"))
 print("shape of Z :", builder.get_shape("Z"))  # ('batch', 'seq1+seq2')
+
+# %%
+# Graph: Concat with symbolic shape annotations
+# -----------------------------------------------
+#
+# :func:`plot_dot <yobx.doc.plot_dot>` renders the ONNX graph and annotates
+# every edge with the data type and symbolic shape inferred by
+# :class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`.
+# The ``seq1+seq2`` expression is visible on the edge leaving the ``Concat``
+# node.
+
+plot_dot(model)
 
 # %%
 # Evaluating symbolic shapes with concrete values
@@ -125,6 +138,15 @@ builder_reshape.run_model(model_reshape)
 
 print("shape of X  :", builder_reshape.get_shape("X"))
 print("shape of Xr :", builder_reshape.get_shape("Xr"))  # ('a', 'b', 2, 'c//2')
+
+# %%
+# Graph: Reshape with floor-division annotation
+# -----------------------------------------------
+#
+# The ``c//2`` expression produced by the ``Reshape`` node is annotated on
+# the output edge of the graph.
+
+plot_dot(model_reshape)
 
 # %%
 # Split: ceiling-division expressions
@@ -166,6 +188,15 @@ print("shape of S2 :", builder_split.get_shape("S2"))
 context_split = dict(a=3, b=4, c=6)
 print("concrete shape of S1:", builder_split.evaluate_shape("S1", context_split))
 print("concrete shape of S2:", builder_split.evaluate_shape("S2", context_split))
+
+# %%
+# Graph: Concat + Split with ceiling-division annotations
+# --------------------------------------------------------
+#
+# Both ``(1+b+c)//2`` and ``b+c-(1+b+c)//2`` appear as edge labels on the
+# outputs of the ``Split`` node.
+
+plot_dot(model_split)
 
 # %%
 # Automatic expression simplification
