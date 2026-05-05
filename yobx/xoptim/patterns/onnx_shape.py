@@ -97,17 +97,21 @@ class GatherShapePattern(PatternOptimization):
         if self._get_attr_i(node, "axis", 0) != 0:
             return self.none(node, inspect.currentframe().f_lineno)
 
-        # Indices must be a constant 1-D int64 array.
+        # Indices must be a constant 0-D (scalar) or 1-D int64 array.
         if not g.is_constant(node.input[1]):
             return self.none(node, inspect.currentframe().f_lineno)
         indices = g.get_computed_constant(node.input[1])
-        if indices is None or indices.ndim != 1 or len(indices) < 1:
+        if (
+            indices is None
+            or indices.ndim not in (0, 1)
+            or (indices.ndim == 1 and len(indices) < 1)
+        ):
             return self.none(node, inspect.currentframe().f_lineno)
         if indices.dtype != np.int64:
             return self.none(node, inspect.currentframe().f_lineno)
 
-        # Indices must form a strictly contiguous ascending range.
-        if len(indices) > 1 and not np.all(np.diff(indices) == 1):
+        # Indices must form a strictly contiguous ascending range (only for 1-D).
+        if indices.ndim == 1 and len(indices) > 1 and not np.all(np.diff(indices) == 1):
             return self.none(node, inspect.currentframe().f_lineno)
 
         # Data must come from a Shape node.
@@ -124,7 +128,9 @@ class GatherShapePattern(PatternOptimization):
         has_negative_shape_attr = (shape_start_raw is not None and shape_start_raw < 0) or (
             shape_end_raw is not None and shape_end_raw < 0
         )
-        has_negative_index = bool(indices[0] < 0)
+        has_negative_index = (
+            bool(indices.item() < 0) if indices.ndim == 0 else bool(indices[0] < 0)
+        )
         if has_negative_shape_attr or has_negative_index:
             if not g.has_rank(x_name):
                 return self.none(node, inspect.currentframe().f_lineno)
@@ -139,6 +145,7 @@ class GatherShapePattern(PatternOptimization):
     ) -> List[NodeProto]:
         indices = g.get_computed_constant(gather_node.input[1])
         x_name = shape_node.input[0]
+        is_scalar = indices.ndim == 0
 
         # Resolve the Shape node's start/end against the rank of X.
         rank = g.get_rank(x_name) if g.has_rank(x_name) else None
@@ -160,14 +167,46 @@ class GatherShapePattern(PatternOptimization):
                 L = None  # unknown
 
         # Normalise gather indices (may be negative when rank is known, per match guard).
-        gather_first = int(indices[0])
-        gather_last = int(indices[-1])
+        gather_first = indices.item() if is_scalar else int(indices[0])
+        gather_last = indices.item() if is_scalar else int(indices[-1])
         if gather_first < 0:
             gather_first += L
         if gather_last < 0:
             gather_last += L
         new_start = s0 + gather_first
         new_end = s0 + gather_last + 1
+
+        if is_scalar:
+            # Gather with a 0-D scalar index returns a scalar (0-D output); the
+            # replacement Shape(X, start, end) returns a 1-D tensor of length 1.
+            # Insert Squeeze(axes=[0]) to recover the scalar.
+            shape_out_name = g.unique_name(
+                f"{self.__class__.__name__}_{gather_node.output[0]}_1d"
+            )
+            new_shape_node = g.make_node(
+                "Shape",
+                [x_name],
+                [shape_out_name],
+                start=new_start,
+                end=new_end,
+                name=f"{self.__class__.__name__}--{gather_node.name}",
+                doc_string=gather_node.doc_string,
+            )
+            axes_name = g.make_initializer(
+                "",
+                np.array([0], dtype=np.int64),
+                source=f"{self.__class__.__name__}.apply.squeeze_axes",
+            )
+            squeeze_node = g.make_node(
+                "Squeeze",
+                [shape_out_name, axes_name],
+                gather_node.output,
+                name=f"{self.__class__.__name__}--squeeze--{gather_node.name}",
+                doc_string=gather_node.doc_string,
+            )
+            if g.is_used_more_than_once(shape_node.output[0]):
+                return [shape_node, new_shape_node, squeeze_node]
+            return [new_shape_node, squeeze_node]
 
         new_shape_node = g.make_node(
             "Shape",

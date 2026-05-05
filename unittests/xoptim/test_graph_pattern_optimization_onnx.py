@@ -8744,3 +8744,44 @@ class TestGraphPatternOptimization(ExtTestCase):
         opt_onx = gr.to_onnx(optimize=True)
         op_types = [n.op_type for n in opt_onx.graph.node]
         self.assertIn("Gather", op_types, msg="Gather must remain for non-contiguous indices")
+
+    def test_gather_shape_scalar_index(self):
+        # Gather(Shape(X), scalar_idx) where scalar_idx is a 0-D tensor should be
+        # replaced by Shape(X, start=i, end=i+1) + Squeeze(axes=[0]) to preserve
+        # the scalar (0-D) output that Gather with a scalar index produces.
+        for idx in [0, 1, 2, 3]:
+            with self.subTest(idx=idx):
+                scalar_idx = np.array(idx, dtype=np.int64)  # 0-D
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Shape", ["X"], ["shape"]),
+                            oh.make_node("Gather", ["shape", "scalar_idx"], ["Y"]),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c", "d"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [])],
+                        [onh.from_array(scalar_idx, name="scalar_idx")],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                feeds = {"X": self._range(2, 3, 5, 7)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]
+
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(patterns=["GatherShape"], verbose=0),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                op_types = [n.op_type for n in opt_onx.graph.node]
+                self.assertNotIn("Gather", op_types, msg="Gather should be eliminated")
+                self.assertIn(
+                    "Squeeze", op_types, msg="Squeeze must be present for scalar output"
+                )
+                self.assertIn("Shape", op_types)
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
