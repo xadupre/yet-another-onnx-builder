@@ -106,5 +106,5 @@ def to_mermaid(model: onnx.ModelProto) -> str:
     from ..translate.translator import Translator
 
     emitter = MermaidEmitter(edge_labels=edge_labels)
-    tr = Translator(model, emitter=emitter)
-    return tr.export(as_str=True)
+    tr = Translator(model, emitter=emitter)  # type: ignore
+    return tr.export(as_str=True)  # type: ignore
