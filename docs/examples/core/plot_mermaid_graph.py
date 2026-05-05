@@ -32,6 +32,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
+from IPython.display import SVG as IPythonSVG
 from yobx.doc import draw_graph_mermaid
 from yobx.helpers.mermaid_helper import to_mermaid
 
@@ -78,9 +79,9 @@ print(mermaid_src)
 # Display the graph
 # ------------------
 #
-# The diagram is rendered directly by ``mmdc`` to SVG and embedded in the
-# gallery without any rasterisation step.
+# The diagram is rendered by ``mmdc`` to SVG and displayed using
+# :class:`IPython.display.SVG`.
 
 svg_path = os.path.join(tempfile.gettempdir(), "plot_mermaid_graph.svg")
 draw_graph_mermaid(model, svg_path)
-__gallery_svgs__ = [svg_path]
+IPythonSVG(filename=svg_path)
