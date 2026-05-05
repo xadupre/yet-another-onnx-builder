@@ -227,11 +227,6 @@ sphinx_gallery_conf = {
         "yobx.doc.reset_torch_transformers",
         "yobx.doc.reset_tensorflow",
     ),
-    # image scrapers: default matplotlib
-    "image_scrapers": ("matplotlib",),
-    # capture IPython rich output (SVG, HTML) so gallery examples using
-    # IPython.display.SVG are rendered inline in the documentation
-    "capture_repr": ("_repr_html_", "_repr_svg_"),
 }
 
 substring_to_disable = []
