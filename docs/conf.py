@@ -114,10 +114,27 @@ document.addEventListener("DOMContentLoaded", function () {
         return document.documentElement.getAttribute("data-bs-theme") === "dark"
             ? "dark" : "default";
     }
+
+    // Save the original Mermaid source before the first render so that
+    // theme-switch re-renders can start from clean code rather than the
+    // already-rendered SVG (which would otherwise be passed to mermaid.run()
+    // as if it were Mermaid source, producing no output).
+    document.querySelectorAll(".mermaid").forEach(function (el) {
+        if (!el.getAttribute("data-mermaid-src")) {
+            el.setAttribute("data-mermaid-src", el.textContent.trim());
+        }
+    });
+
     mermaid.initialize({ startOnLoad: true, theme: getMermaidTheme() });
     new MutationObserver(function () {
         const theme = getMermaidTheme();
         document.querySelectorAll(".mermaid[data-processed]").forEach(function (el) {
+            // Restore the original Mermaid source so mermaid.run() can
+            // re-render from code instead of from the old SVG.
+            const src = el.getAttribute("data-mermaid-src");
+            if (src) {
+                el.innerHTML = src;
+            }
             el.removeAttribute("data-processed");
         });
         mermaid.initialize({ startOnLoad: false, theme: theme });
