@@ -292,6 +292,7 @@ epkg_dictionary = {
     "ai_edge_litert": "https://pypi.org/project/ai-edge-litert/",
     "flax": "https://flax.readthedocs.io/en/latest/",
     "equinox": "https://docs.kidger.site/equinox/",
+    "IPython": "https://ipython.org/",
     "ir-py": "https://onnx.ai/ir-py/",
     "jax": "https://docs.jax.dev/en/latest/",
     "JAX": "https://docs.jax.dev/en/latest/",

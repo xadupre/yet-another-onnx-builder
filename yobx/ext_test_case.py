@@ -976,6 +976,23 @@ def has_spox(version: str = "") -> bool:
     return PvVersion(spox.__version__) >= PvVersion(version)
 
 
+def has_ipython(version: str = "") -> bool:
+    """Returns ``True`` if :epkg:`IPython` is installed and recent enough."""
+    try:
+        import IPython
+    except (ImportError, AttributeError):
+        return False
+
+    if not version:
+        return True
+
+    if not hasattr(IPython, "__version__"):
+        # development version
+        return True
+
+    return PvVersion(IPython.__version__) >= PvVersion(version)
+
+
 def has_tensorflow(version: str = "") -> bool:
     """Returns ``True`` if :epkg:`tensorflow` is installed and recent enough."""
     try:
