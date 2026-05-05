@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+import onnx
 import onnxruntime
 from yobx.ext_test_case import ExtTestCase
 from yobx.helpers.einsum_helper import (
@@ -125,11 +126,14 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         )
         return sess.run(None, inputs)[0]
 
-    def _check(self, equation, sh0, sh1, dtype=np.float32):
+    def _check(self, equation, sh0, sh1, dtype=np.float32, dump: str = ""):
         """Helper that builds, runs, and validates a 2-input decomposition."""
         a = np.random.rand(*sh0).astype(dtype)
         b = np.random.rand(*sh1).astype(dtype)
         model = decompose_einsum_2inputs(equation, sh0, sh1, dtype=dtype)
+        if dump:
+            filename = self.get_dump_file(f"{dump}.onnx")
+            onnx.save(model, filename)
         result = self._run(model, {"X0": a, "X1": b})
         expected = np.einsum(equation, a, b)
         self.assertAlmostEqual(result, expected, atol=1e-5)
@@ -176,7 +180,7 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
 
     def test_multi_batch_matmul(self):
         """Multi-batch matrix multiplication ``bcij,bcjk->bcik``."""
-        self._check("bcij,bcjk->bcik", (2, 3, 4, 5), (2, 3, 5, 6))
+        self._check("bcij,bcjk->bcik", (2, 3, 4, 5), (2, 3, 5, 6), dump="test_multi_batch_matmul")
 
     # ------------------------------------------------------------------
     # Higher-rank contractions

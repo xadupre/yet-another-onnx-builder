@@ -8785,3 +8785,7 @@ class TestGraphPatternOptimization(ExtTestCase):
                 opt_ref = ExtendedReferenceEvaluator(opt_onx)
                 got = opt_ref.run(None, feeds)[0]
                 self.assertEqualArray(expected, got)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
