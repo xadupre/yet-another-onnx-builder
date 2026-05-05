@@ -956,8 +956,20 @@ class GraphTracer:
                 return view_tt
 
         # running the function
-        with self._fake_mode:
-            fake_res = func(*fake_args, **fake_kwargs)
+        # Temporarily restore the torch.full patch to its original so that
+        # FakeTensor kernel implementations (e.g. _like constructors inside
+        # ``aten.batch_norm``) call the real ``torch.full`` and do not route
+        # through our tracing handler, which would create TracingTensors
+        # incompatible with FakeTensor.
+        from ._patches import _ORIGINAL_TORCH_FULL
+
+        _tracing_full = torch.full
+        torch.full = _ORIGINAL_TORCH_FULL
+        try:
+            with self._fake_mode:
+                fake_res = func(*fake_args, **fake_kwargs)
+        finally:
+            torch.full = _tracing_full
         assert type(fake_res) is not torch.Tensor, f"Unexpected type {type(fake_res)} for output."
 
         # add a node in the graph
@@ -1748,25 +1760,20 @@ class GraphTracer:
         fully resolved to concrete integers (e.g. the static branch of a
         guard like ``if x.shape[0] != 0``) still appear in the FX graph.
 
-        Passes calls through to the original implementation when they arrive
-        during FakeTensor kernel invocations (triggered internally by
-        :class:`torch._subclasses.fake_tensor.FakeTensorMode` when simulating
-        another operation's shape) to avoid wrapping a meta-device result in a
-        :class:`~yobx.torch.new_tracing.tensor.TracingTensor`.
+        FakeTensor kernel invocations within :meth:`dispatch` never reach this
+        handler because :meth:`dispatch` temporarily restores the original
+        ``torch.full`` before entering the FakeTensorMode context.  The handler
+        is only reached for ``torch.full`` calls made from user model code
+        during normal tracing.
 
         :param size: Full size argument passed to ``torch.full``.
         :param fill_value: Fill value passed to ``torch.full``.
         :param kwargs: Additional keyword arguments for ``torch.full``.
 
         Returns:
-            Returns a :class:`TracingTensor` wrapping an FX node for the call,
-            or the eager result when called from within a FakeTensor kernel
-            invocation.
+            Returns a :class:`TracingTensor` wrapping an FX node for the call.
         """
         from ._patches import _ORIGINAL_TORCH_FULL
-
-        if self._fake_mode.in_kernel_invocation:
-            return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
 
         if isinstance(size, torch.Size):
             size = tuple(size)
