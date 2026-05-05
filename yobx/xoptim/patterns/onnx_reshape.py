@@ -1103,9 +1103,17 @@ class ConcatReshapePattern(PatternOptimization):
                 li = cst.tolist()
                 if -1 in li:
                     return self.none(node, inspect.currentframe().f_lineno)
+                # Each constant must contribute exactly one element to the shape
+                # vector; multi-element constants cannot be replaced by a single -1.
+                if len(li) != 1:
+                    return self.none(node, inspect.currentframe().f_lineno)
             else:
                 p = g.node_before(i)
                 if p is None:
+                    return self.none(node, inspect.currentframe().f_lineno)
+                # Each dynamic input must also produce exactly one element so that
+                # replacing it with -1 does not change the length of the shape vector.
+                if not g.has_shape(i) or g.get_shape(i) != (1,):
                     return self.none(node, inspect.currentframe().f_lineno)
                 op_types[p.op_type] = op_types.get(p.op_type, 0) + 1
 
@@ -1121,6 +1129,12 @@ class ConcatReshapePattern(PatternOptimization):
             total = sum(op_types.values())
             if op_types["Shape"] != total - 1:
                 return self.none(node, inspect.currentframe().f_lineno)
+        else:
+            # More than two distinct op types among non-constant inputs: cannot
+            # safely replace exactly one element with -1 (there would be no
+            # unique non-Shape element to replace, or too many non-Shape elements
+            # would each need a -1, producing an invalid Reshape shape).
+            return self.none(node, inspect.currentframe().f_lineno)
 
         if g.is_used_more_than_once(node.input[1]):
             # Not really safe to do the replacement.
