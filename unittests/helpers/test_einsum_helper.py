@@ -177,6 +177,11 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         self._check("bcij,bcjk->bcik", (2, 3, 4, 5), (2, 3, 5, 6))
 
     def test_multi_batch_matmul_4d(self):
+        """Multi-batch 4D matmul ``abij,abjk->abik`` (label: multi-batch matmul 4D).
+
+        sym0=('A', 'B', 'I', 'K'), sym1=('A', 'B', 'K', 'N'),
+        sh0=(2, 3, 16, 32), sh1=(2, 3, 32, 8).
+        """
         self._check("abij,abjk->abik", (2, 3, 16, 32), (2, 3, 32, 8))
 
     def test_decompose_einsum_symbolic(self):
@@ -203,7 +208,6 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
         total = sum(f or 0 for _, f, _ in cost_conc)
         self.assertGreater(total, 0)
-
     # ------------------------------------------------------------------
     # Higher-rank contractions
     # ------------------------------------------------------------------
