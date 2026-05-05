@@ -456,6 +456,59 @@ class CustomProxyBool(CustomProxy):
         )
         return self.tracer.proxy(node, cls=CustomProxyBool)
 
+    def __bool__(self) -> bool:
+        """Called by Python's ``and``/``or`` operators to evaluate truthiness.
+
+        When the underlying comparison is a positivity check — ``proxy > 0``
+        or ``proxy >= 1`` — this method propagates the positivity constraint
+        to the :class:`CustomProxyInt` operand (exactly as
+        :func:`_torch_check_for_tracing` does when called with a simple
+        comparison) and returns ``True``.
+
+        This allows ``torch._check(x.shape[0] > 0 and x.shape[2] > 0)`` to
+        work during :class:`CustomTracer` symbolic tracing.  Python evaluates
+        ``bool(x.shape[0] > 0)`` for the left operand of ``and`` *before*
+        :func:`_torch_check_for_tracing` is ever called.  Without this
+        override, the inherited :meth:`torch.fx.proxy.Proxy.__bool__` would
+        raise :exc:`torch.fx.proxy.TraceError`.
+
+        For all other cases the base implementation is invoked, which raises
+        :exc:`~torch.fx.proxy.TraceError` as expected.
+
+        Returns:
+            ``True`` when the node represents ``proxy > 0`` or ``proxy >= 1``.
+        """
+        node = self.node
+        if node.op == "call_function" and len(node.args) == 2:
+            op = node.target
+            lhs_node, rhs = node.args
+            # Normalise: flip operands when the proxy is on the right-hand side.
+            if isinstance(rhs, torch.fx.Node) and not isinstance(lhs_node, torch.fx.Node):
+                lhs_node, rhs = rhs, lhs_node
+                op = {
+                    operator.gt: operator.lt,
+                    operator.lt: operator.gt,
+                    operator.ge: operator.le,
+                    operator.le: operator.ge,
+                }.get(op, op)
+            tracer = self.tracer
+            node_proxy_map: Dict[torch.fx.Node, Any] = getattr(tracer, "_node_proxy_map", {})
+            lhs_proxy = (
+                node_proxy_map.get(lhs_node) if isinstance(lhs_node, torch.fx.Node) else None
+            )
+            if isinstance(lhs_proxy, CustomProxyInt) and isinstance(rhs, (int, float)):
+                if op is operator.gt and rhs == 0:
+                    # proxy > 0 → proxy is strictly positive.
+                    lhs_proxy.only_positive = True
+                    lhs_proxy.can_be_null = False
+                    return True
+                if op is operator.ge and rhs >= 1:
+                    # proxy >= 1 → proxy is strictly positive.
+                    lhs_proxy.only_positive = True
+                    lhs_proxy.can_be_null = False
+                    return True
+        return super().__bool__()
+
     def __eq__(self, other):  # type: ignore[override]
         return self._bool_op(operator.eq, other)
 
