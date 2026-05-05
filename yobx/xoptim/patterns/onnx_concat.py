@@ -8,7 +8,15 @@ from ..patterns_api import MatchResult, PatternOptimization
 
 class ConcatGatherPattern(PatternOptimization):
     """
-    Checks if Gather(Concat) can be replaced by Identity.
+    Simplifies ``Gather(Concat(...), cst_index)`` when the index is a constant.
+
+    The Concat inputs may each have one or more elements along axis 0.  The
+    pattern locates which Concat input contains the element addressed by the
+    constant index and replaces the Gather with:
+
+    * an ``Identity`` node when the located input has exactly one element, or
+    * a ``Gather`` node on that input with an adjusted (local) index when the
+      input has more than one element.
 
     Model with nodes to be fused:
 
@@ -64,6 +72,31 @@ class ConcatGatherPattern(PatternOptimization):
     def __init__(self, verbose: int = 0, priority: int = 0):
         super().__init__(verbose, priority)
 
+    @staticmethod
+    def _concat_input_bucket(
+        g: "GraphBuilderPatternOptimization", concat_node: NodeProto, idx: int  # noqa: F821
+    ) -> Optional[tuple]:
+        """Locates which Concat input holds element at position ``idx``.
+
+        Returns ``(input_name, local_index, input_size)`` where ``input_name``
+        is the Concat input that contains position ``idx``, ``local_index`` is
+        the offset of ``idx`` within that input (``idx - cumulative_offset``),
+        and ``input_size`` is the number of elements in that input.
+
+        Returns ``None`` when any input size is non-concrete (symbolic) or
+        ``idx`` is out of range.
+        """
+        offset = 0
+        for inp in concat_node.input:
+            shape = g.get_shape(inp)
+            n = shape[0]
+            if not isinstance(n, int):
+                return None
+            if offset + n > idx:
+                return inp, idx - offset, n
+            offset += n
+        return None
+
     def match(
         self,
         g: "GraphBuilderPatternOptimization",  # noqa: F821
@@ -82,25 +115,62 @@ class ConcatGatherPattern(PatternOptimization):
             return self.none(node, inspect.currentframe().f_lineno)
         if any(not g.has_shape(i) for i in before.input):
             return self.none(node, inspect.currentframe().f_lineno)
-        if any(g.get_shape(i) != (1,) for i in before.input):
+        # All inputs must be 1D with concrete integer sizes.
+        if any(len(g.get_shape(i)) != 1 for i in before.input):
             return self.none(node, inspect.currentframe().f_lineno)
-        assert cst[0] < len(before.input), (
-            f"Concat concatenates many dimensions into one but "
-            f"cst={cst} and before.input={before.input}"
-        )
+        if self._concat_input_bucket(g, before, int(cst[0])) is None:
+            return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [before, node], self.apply)
 
     def apply(
         self, g: "GraphBuilder", concat_node: NodeProto, gather_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
-        index = g.get_constant_scalar(gather_node.input[1])
-        new_node = g.make_node(
-            "Identity",
-            [concat_node.input[index]],
-            gather_node.output,
-            name=f"{self.__class__.__name__}--{gather_node.name}",
-            doc_string=gather_node.doc_string,
-        )
+        cst = g.get_computed_constant(gather_node.input[1])
+        idx = int(cst[0])
+        inp, local_idx, inp_size = self._concat_input_bucket(g, concat_node, idx)
+        if inp_size == 1:
+            new_node = g.make_node(
+                "Identity",
+                [inp],
+                gather_node.output,
+                name=f"{self.__class__.__name__}--{gather_node.name}",
+                doc_string=gather_node.doc_string,
+            )
+        else:
+            # Multi-element bucket: if the input comes from a ranged Shape node,
+            # emit a narrower Shape directly so downstream patterns (e.g.
+            # ConcatReshapePattern) still see a Shape-derived value.
+            inp_producer = g.node_before(inp)
+            if (
+                inp_producer is not None
+                and inp_producer.op_type == "Shape"
+                and inp_producer.domain == ""
+            ):
+                shape_start = next(
+                    (int(a.i) for a in inp_producer.attribute if a.name == "start"), 0
+                )
+                new_node = g.make_node(
+                    "Shape",
+                    [inp_producer.input[0]],
+                    gather_node.output,
+                    start=shape_start + local_idx,
+                    end=shape_start + local_idx + 1,
+                    name=f"{self.__class__.__name__}--{gather_node.name}",
+                    doc_string=gather_node.doc_string,
+                )
+            else:
+                new_idx_name = g.make_initializer(
+                    "",
+                    np.array([local_idx], dtype=np.int64),
+                    source=f"{self.__class__.__name__}.apply.idx",
+                )
+                new_node = g.make_node(
+                    "Gather",
+                    [inp, new_idx_name],
+                    gather_node.output,
+                    name=f"{self.__class__.__name__}--{gather_node.name}",
+                    doc_string=gather_node.doc_string,
+                )
         return (
             [concat_node, new_node]
             if g.is_used_more_than_once(concat_node.output[0])
