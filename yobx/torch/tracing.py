@@ -476,7 +476,9 @@ class CustomProxyBool(CustomProxy):
         :exc:`~torch.fx.proxy.TraceError` as expected.
 
         Returns:
-            ``True`` when the node represents ``proxy > 0`` or ``proxy >= 1``.
+            Returns ``True`` when the node represents ``proxy > 0`` or
+            ``proxy >= 1``; otherwise propagates the
+            :exc:`~torch.fx.proxy.TraceError` from the base class.
         """
         node = self.node
         if node.op == "call_function" and len(node.args) == 2:

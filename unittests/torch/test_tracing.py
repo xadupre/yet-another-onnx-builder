@@ -1864,7 +1864,7 @@ class TestTorchCheckConstraints(ExtTestCase):
         self.assertIsInstance(proxy > 1, CustomProxyBool)
 
     def test_custom_proxy_bool_bool_positivity_self_registers(self):
-        """CustomProxyBool.__bool__ self-registers positivity when used with ``and``.
+        """Tests that CustomProxyBool.__bool__ self-registers positivity when used with ``and``.
 
         This covers the :class:`ControlFlowNumelZero4
         <yobx.torch.testing._model_eval_cases.ControlFlowNumelZero4>` pattern
@@ -1897,7 +1897,7 @@ class TestTorchCheckConstraints(ExtTestCase):
         self.assertFalse(proxy.can_be_null, "must clear can_be_null after bool()")
 
     def test_custom_proxy_bool_bool_ge_positivity_self_registers(self):
-        """CustomProxyBool.__bool__ handles ``proxy >= 1`` as a positivity check."""
+        """Tests that CustomProxyBool.__bool__ handles ``proxy >= 1`` as a positivity check."""
         from yobx.torch.tracing import CustomTracer, CustomProxyInt, CustomProxyBool
 
         class _M(torch.nn.Module):
