@@ -290,11 +290,21 @@ def plot_dot(
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as fp:
         fp.close()
 
-        draw_graph_graphviz(dot, fp.name, engine=engine)
-        img = np.asarray(Image.open(fp.name))
-        os.remove(fp.name)
+        exc = None
+        try:
+            draw_graph_graphviz(dot, fp.name, engine=engine)
+        except Exception as e:
+            exc = e
 
-        ax.imshow(img)
+        if not exc:
+            img = np.asarray(Image.open(fp.name))
+            os.remove(fp.name)
+            ax.imshow(img)
+        elif os.path.exists(fp.name):
+            os.remove(fp.name)
+            ax.text(
+                0.5, 0.5, f"graphviz not available\n{exc}", ha="center", va="center", fontsize=10
+            )
 
     if clean:
         ax.set_xticks([])

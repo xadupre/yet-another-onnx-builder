@@ -219,6 +219,25 @@ class TestMakeNodeSetTypeShapeConstantReshape(ExtTestCase):
         self.assertEqual(b.get_type("y"), TFLOAT)
         self.assertEqual(b.get_shape("y"), (3, 4, 5))
 
+    def test_reshape_with_zero_rank_increase(self):
+        # Reshape (0, 0) → (1, 0, 0): zeros in the target shape are at positions
+        # 1 and 2, but the input is rank 2 with dynamic dims (stored as 0).
+        # The output rank (3) > input rank (2), so copy-from-input semantics
+        # cannot be satisfied for position 2 — shape inference should gracefully
+        # skip rather than raising AssertionError.
+        b = BasicShapeBuilder()
+        b.set_type("X1", TFLOAT)
+        # Dynamic 2D input — dimensions stored as 0 (unknown).
+        b.set_shape("X1", (0, 0))
+        cst = onh.from_array(np.array([1, 0, 0], dtype=np.int64), name="sh")
+        b.set_constant("sh", cst)
+        node = oh.make_node("Reshape", ["X1", "sh"], ["y"])
+        # Must not raise AssertionError.
+        b._make_node_set_type_shape_constant(node, {})
+        self.assertEqual(b.get_type("y"), TFLOAT)
+        # Shape inference falls back when ranks are incompatible.
+        self.assertFalse(b.has_shape("y"))
+
 
 class TestMakeNodeSetTypeShapeConstantConstantOfShape(ExtTestCase):
     def test_constant_of_shape_static(self):

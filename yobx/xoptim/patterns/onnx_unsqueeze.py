@@ -290,11 +290,12 @@ class UnsqueezeUnsqueezePattern(PatternOptimization):
         rk = g.get_rank(node.input[0])
         existing = [False for i in range(rk)]
         existing = self._unsqueeze(existing, axis1)
-        assert axis1.min() < 0 or [i for i, a in enumerate(existing) if a] == list(axis1), (
-            f"Something is wrong: rk={rk}, axis={axis1}, existing={existing}, shapes:"
-            f"{g.get_shape(node.input[0]) if g.has_shape(node.input[0]) else '?'}, "
-            f"{g.get_shape(node.output[0]) if g.has_shape(node.output[0]) else '?'}"
-        )
+        if len(axis1) > 0:
+            assert axis1.min() < 0 or [i for i, a in enumerate(existing) if a] == list(axis1), (
+                f"Something is wrong: rk={rk}, axis={axis1}, existing={existing}, shapes:"
+                f"{g.get_shape(node.input[0]) if g.has_shape(node.input[0]) else '?'}, "
+                f"{g.get_shape(node.output[0]) if g.has_shape(node.output[0]) else '?'}"
+            )
         existing = self._unsqueeze(existing, axis2)
         new_axes = [i for i, a in enumerate(existing) if a]
         new_axis = g.make_initializer(

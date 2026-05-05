@@ -482,6 +482,46 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_reshape_all_zeros_identity(self):
+        # reshape(X, [0, 0, 0]) should become Identity when rank matches
+        for shape_values in ([0, 0, 0], [0], [0, 0]):
+            n = len(shape_values)
+            input_shape = list(range(2, 2 + n))
+            model = oh.make_model(
+                oh.make_graph(
+                    [oh.make_node("Reshape", ["X", "shape"], ["Y"])],
+                    "dummy",
+                    [_mkv_("X", TFLOAT, input_shape)],
+                    [_mkv_("Y", TFLOAT, input_shape)],
+                    [onh.from_array(np.array(shape_values, dtype=np.int64), name="shape")],
+                ),
+                opset_imports=[oh.make_opsetid("", 18)],
+                ir_version=9,
+            )
+            check_model(model)
+            feeds = {"X": self._range(*input_shape)}
+            ref = ExtendedReferenceEvaluator(model)
+            expected = ref.run(None, feeds)[0]
+
+            gr = GraphBuilder(
+                model,
+                infer_shapes_options=True,
+                optimization_options=OptimizationOptions(patterns=["Identity"], verbose=0),
+            )
+            opt_onx = gr.to_onnx(optimize=True)
+            self.assertEqual(
+                ["Identity"],
+                [n.op_type for n in opt_onx.graph.node],
+                msg=f"shape_values={shape_values}",
+            )
+            self.assertEqual(
+                0, len(opt_onx.graph.initializer), msg=f"shape_values={shape_values}"
+            )
+
+            opt_ref = ExtendedReferenceEvaluator(opt_onx)
+            got = opt_ref.run(None, feeds)[0]
+            self.assertEqualArray(expected, got)
+
     def test_reshape_reshape_zero(self):
         model = oh.make_model(
             oh.make_graph(
