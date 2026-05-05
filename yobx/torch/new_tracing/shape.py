@@ -132,6 +132,62 @@ def _is_positivity_condition(cond: str) -> bool:
     return False
 
 
+def _can_prove_expr_nonzero_from_neq_conditions(expr: str) -> bool:
+    """Checks whether *expr* is provably non-zero from registered ``!=0`` conditions.
+
+    Determines whether *expr* appears as a multiplicative factor in any
+    registered condition of the form ``"P!=0"``.  If ``"P!=0"`` is
+    known-true and *expr* is a factor of P, then *expr* must also be
+    non-zero.
+
+    This handles the :class:`~yobx.torch.testing._model_eval_cases.ControlFlowNumelZero5`
+    pattern::
+
+        torch._check(x.numel() != 0)   # registers "10*d0*d2!=0"
+        if x.shape[0] != 0: ...         # needs to prove "d0!=0"
+
+    Uses :func:`~yobx.xexpressions.evaluate_expression` to evaluate the
+    product with *expr* set to ``0`` and all other symbolic variables set
+    to ``1``.  If the product evaluates to ``0``, *expr* is a factor of
+    the known-nonzero product and therefore cannot be zero.
+
+    :param expr: A simple symbolic expression such as ``"_dyn_0"``.
+
+    Returns:
+        ``True`` if *expr* is a multiplicative factor of a known-nonzero
+        product, ``False`` otherwise.
+    """
+    expr_stripped = expr.strip()
+    for cond in _known_true_conditions:
+        if "!=" not in cond:
+            continue
+        idx = cond.index("!=")
+        lhs = cond[:idx].strip()
+        rhs = cond[idx + 2 :].strip()
+        if rhs != "0":
+            continue
+        # Remove outer parentheses if present.
+        if lhs.startswith("(") and lhs.endswith(")"):
+            lhs = lhs[1:-1]
+        # Build a context: set expr_stripped to 0 so that evaluate_expression
+        # returns 0 iff expr_stripped is a multiplicative factor of lhs.
+        # All other symbolic tokens in the product are set to 1 so they
+        # don't interfere.  Non-symbolic tokens (pure integers) are handled
+        # directly by evaluate_expression without being in the context.
+        ctx: Dict[str, int] = {expr_stripped: 0}
+        for token in lhs.split("*"):
+            token = token.strip().lstrip("(").rstrip(")")
+            if token and not token.lstrip("-").isdigit() and token != expr_stripped:
+                ctx[token] = 1
+        try:
+            val = evaluate_expression(lhs, ctx)
+            if val == 0:
+                return True
+        except (NameError, TypeError, SyntaxError, ValueError):
+            pass
+    return False
+
+
 def _can_prove_expr_nonzero(expr: str) -> bool:
     """Returns True if *expr* is provably non-zero given the known conditions.
 
@@ -247,6 +303,20 @@ class TracingBool:
                 rhs_str = self.value[idx + 2 :].strip()
                 if rhs_str == "0" and _can_prove_expr_nonzero(lhs):
                     return False
+        # Handle ``E != 0`` where E is a factor in a registered ``P!=0``
+        # product condition.  This covers the ControlFlowNumelZero5 pattern:
+        #
+        #     torch._check(x.numel() != 0)   # registers "10*d0*d2!=0"
+        #     if x.shape[0] != 0 and x.shape[2] != 0:  # needs "d0!=0", "d2!=0"
+        #
+        # If the registered "P!=0" has E as one of its multiplicative factors,
+        # then E != 0 must hold.
+        if "!=" in self.value:
+            idx = self.value.index("!=")
+            lhs = self.value[:idx].strip()
+            rhs_str = self.value[idx + 2 :].strip()
+            if rhs_str == "0" and _can_prove_expr_nonzero_from_neq_conditions(lhs):
+                return True
         # Handle simple positivity conditions (e.g. ``"var > 0"`` or ``"var >= 1"``)
         # that arise during Python ``and``/``or`` short-circuit evaluation when
         # such a condition is part of a compound expression passed to

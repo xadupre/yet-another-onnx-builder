@@ -1741,25 +1741,31 @@ class GraphTracer:
         Tracing-aware replacement for ``torch.full`` called via
         :func:`_full_replacement_ctx`.
 
-        It intercepts constructor calls where *size* contains symbolic
-        :class:`TracingInt` values and emits a corresponding FX node without
-        requiring eager execution with concrete Python ``int`` dimensions.
+        Intercepts constructor calls and emits a corresponding FX node so
+        that the result is always a :class:`TracingTensor`, whether *size*
+        contains symbolic :class:`TracingInt` values or plain Python ``int``
+        values.  This ensures that ``torch.full`` calls whose dimensions are
+        fully resolved to concrete integers (e.g. the static branch of a
+        guard like ``if x.shape[0] != 0``) still appear in the FX graph.
+
+        This method is only called for user-level ``torch.full`` invocations.
+        Calls from FakeTensor kernel implementations (during
+        :meth:`dispatch`'s FakeTensorMode context) are intercepted by the
+        ``_full_handler`` closure in :func:`_full_replacement_ctx` before they
+        reach this method.
 
         :param size: Full size argument passed to ``torch.full``.
         :param fill_value: Fill value passed to ``torch.full``.
         :param kwargs: Additional keyword arguments for ``torch.full``.
 
         Returns:
-            A :class:`TracingTensor` when symbolic dimensions are present,
-            otherwise the eager ``torch.full`` result.
+            Returns a :class:`TracingTensor` wrapping an FX node for the call.
         """
         from ._patches import _ORIGINAL_TORCH_FULL
 
         if isinstance(size, torch.Size):
             size = tuple(size)
         if not isinstance(size, (tuple, list)):
-            return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
-        if not any(isinstance(dim, TracingInt) for dim in size):
             return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
 
         traced_size: List[Union[int, torch.SymInt]] = []
