@@ -96,6 +96,7 @@ extensions = [
     "matplotlib.sphinxext.plot_directive",
     "sphinx_runpython.epkg",
     "sphinx_runpython.gdot",
+    "sphinx_runpython.runmermaid",
     "sphinx_runpython.runpython",
 ]
 if shutil.which("latex"):
