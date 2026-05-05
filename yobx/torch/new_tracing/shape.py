@@ -132,6 +132,46 @@ def _is_positivity_condition(cond: str) -> bool:
     return False
 
 
+def _can_prove_expr_nonzero_from_neq_conditions(expr: str) -> bool:
+    """Returns True if *expr* is provably non-zero from registered ``!=0`` conditions.
+
+    Checks whether *expr* appears as a multiplicative factor in any registered
+    condition of the form ``"P!=0"``.  If ``"P!=0"`` is known-true and *expr*
+    is a factor of P, then *expr* must also be non-zero.
+
+    This handles the :class:`~yobx.torch.testing._model_eval_cases.ControlFlowNumelZero5`
+    pattern::
+
+        torch._check(x.numel() != 0)   # registers "10*d0*d2!=0"
+        if x.shape[0] != 0: ...         # needs to prove "d0!=0"
+
+    :param expr: A simple symbolic expression such as ``"_dyn_0"``.
+
+    Returns:
+        ``True`` if *expr* is a multiplicative factor of a known-nonzero
+        product, ``False`` otherwise.
+    """
+    expr_stripped = expr.strip()
+    for cond in _known_true_conditions:
+        if "!=" not in cond:
+            continue
+        idx = cond.index("!=")
+        lhs = cond[:idx].strip()
+        rhs = cond[idx + 2 :].strip()
+        if rhs != "0":
+            continue
+        # Remove outer parentheses if present.
+        if lhs.startswith("(") and lhs.endswith(")"):
+            lhs = lhs[1:-1]
+        # Check whether expr_stripped appears as a multiplicative factor.
+        # Numel expressions are always pure products (no additions), so
+        # splitting on "*" reliably extracts individual factors.
+        factors = [f.strip() for f in lhs.split("*")]
+        if expr_stripped in factors:
+            return True
+    return False
+
+
 def _can_prove_expr_nonzero(expr: str) -> bool:
     """Returns True if *expr* is provably non-zero given the known conditions.
 
@@ -247,6 +287,20 @@ class TracingBool:
                 rhs_str = self.value[idx + 2 :].strip()
                 if rhs_str == "0" and _can_prove_expr_nonzero(lhs):
                     return False
+        # Handle ``E != 0`` where E is a factor in a registered ``P!=0``
+        # product condition.  This covers the ControlFlowNumelZero5 pattern:
+        #
+        #     torch._check(x.numel() != 0)   # registers "10*d0*d2!=0"
+        #     if x.shape[0] != 0 and x.shape[2] != 0:  # needs "d0!=0", "d2!=0"
+        #
+        # If the registered "P!=0" has E as one of its multiplicative factors,
+        # then E != 0 must hold.
+        if "!=" in self.value:
+            idx = self.value.index("!=")
+            lhs = self.value[:idx].strip()
+            rhs_str = self.value[idx + 2 :].strip()
+            if rhs_str == "0" and _can_prove_expr_nonzero_from_neq_conditions(lhs):
+                return True
         # Handle simple positivity conditions (e.g. ``"var > 0"`` or ``"var >= 1"``)
         # that arise during Python ``and``/``or`` short-circuit evaluation when
         # such a condition is part of a compound expression passed to

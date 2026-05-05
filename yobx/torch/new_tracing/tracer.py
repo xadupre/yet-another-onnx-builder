@@ -1760,7 +1760,15 @@ class GraphTracer:
         if not isinstance(size, (tuple, list)):
             return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
         if not any(isinstance(dim, TracingInt) for dim in size):
-            return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
+            # When called from inside a FakeTensorMode kernel invocation
+            # (e.g., fake_impls.constructors creating a meta tensor), fall
+            # back to the original torch.full so we don't recursively enter
+            # the fake mode.  Otherwise emit an FX node so that a concrete
+            # output shape (produced when a traced branch always evaluates to
+            # a static return value) becomes a TracingTensor in the graph.
+            if self._fake_mode.in_kernel_invocation:
+                return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
+            # Concrete size but not in a kernel invocation — emit FX node.
 
         traced_size: List[Union[int, torch.SymInt]] = []
         node_size: List[Any] = []
