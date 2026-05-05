@@ -278,6 +278,28 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         total = sum(f or 0 for _, f, _ in cost_conc)
         self.assertGreater(total, 0)
 
+    def test_cost_inference_symbolic_shapes_decompose_einsum(self):
+        """BasicShapeBuilder.run_model with InferenceMode.COST must succeed for
+        a 4-D multi-batch equation using decompose_einsum (strategy A) with
+        fully symbolic (string) dimension names."""
+        from yobx.xshape import BasicShapeBuilder, InferenceMode
+
+        # abij,abjk->abik: dims (a,b,i,j) and (a,b,j,k); j is contracting.
+        model = decompose_einsum("abij,abjk->abik", ("A", "B", "I", "J"), ("A", "B", "J", "K"))
+        # Verify symbolic dims are preserved in the ONNX model inputs.
+        dim_params_x0 = [d.dim_param for d in model.graph.input[0].type.tensor_type.shape.dim]
+        self.assertEqual(dim_params_x0[0], "A")
+        self.assertEqual(dim_params_x0[1], "B")
+        feeds = {
+            "X0": np.ones((2, 3, 8, 4), dtype=np.float32),
+            "X1": np.ones((2, 3, 4, 6), dtype=np.float32),
+        }
+        builder = BasicShapeBuilder()
+        cost_sym = builder.run_model(model, inference=InferenceMode.COST)
+        cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
+        total = sum(f or 0 for _, f, _ in cost_conc)
+        self.assertGreater(total, 0)
+
     def test_cost_inference_4d_multi_batch_decompose_einsum_2inputs(self):
         """BasicShapeBuilder.run_model with InferenceMode.COST must succeed for
         a 4-D multi-batch equation using decompose_einsum_2inputs (strategy B).
@@ -319,6 +341,53 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
         total = sum(f or 0 for _, f, _ in cost_conc)
         self.assertGreater(total, 0)
+
+    # ------------------------------------------------------------------
+    # Symbolic shapes
+    # ------------------------------------------------------------------
+
+    def test_symbolic_shapes(self):
+        """String dimension names must appear as dim_param in the produced
+        ONNX model, and the model must still execute correctly with concrete
+        inputs."""
+        # bij,bjk->bik: dims (b,i,j) and (b,j,k); j is contracting.
+        model = decompose_einsum_2inputs("bij,bjk->bik", ("batch", "i", "j"), ("batch", "j", "k"))
+        # Shared dims use the user-supplied string; non-shared dims use the
+        # einsum index letter.
+        x0_dims = [d.dim_param for d in model.graph.input[0].type.tensor_type.shape.dim]
+        x1_dims = [d.dim_param for d in model.graph.input[1].type.tensor_type.shape.dim]
+        self.assertEqual(x0_dims[0], "batch")
+        self.assertEqual(x1_dims[0], "batch")
+        # Both inputs must have fully symbolic (non-zero dim_value) shapes.
+        for inp in model.graph.input:
+            for dim in inp.type.tensor_type.shape.dim:
+                self.assertFalse(
+                    dim.HasField("dim_value") and dim.dim_value > 0,
+                    msg=f"Expected dynamic dim, got dim_value={dim.dim_value} in {inp.name}",
+                )
+        # The model must run correctly with any concrete batch size.
+        a = np.random.rand(2, 3, 4).astype(np.float32)
+        b = np.random.rand(2, 4, 5).astype(np.float32)
+        result = self._run(model, {"X0": a, "X1": b})
+        expected = np.einsum("bij,bjk->bik", a, b)
+        self.assertAlmostEqual(result, expected, atol=1e-5)
+
+    def test_none_shapes(self):
+        """None dimension entries must produce fully dynamic ONNX dims (using
+        the einsum index letter as dim_param), and the model must still execute
+        correctly."""
+        model = decompose_einsum_2inputs("bij,bjk->bik", (None, 3, 4), (None, 4, 5))
+        # The first dimension (batch) should be dynamic.
+        dim0_x0 = model.graph.input[0].type.tensor_type.shape.dim[0]
+        self.assertFalse(
+            dim0_x0.HasField("dim_value") and dim0_x0.dim_value > 0,
+            msg=f"Expected dynamic first dim, got {dim0_x0}",
+        )
+        a = np.random.rand(2, 3, 4).astype(np.float32)
+        b = np.random.rand(2, 4, 5).astype(np.float32)
+        result = self._run(model, {"X0": a, "X1": b})
+        expected = np.einsum("bij,bjk->bik", a, b)
+        self.assertAlmostEqual(result, expected, atol=1e-5)
 
 
 if __name__ == "__main__":
