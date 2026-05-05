@@ -181,6 +181,7 @@ def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
         is temporarily replaced, then restores the original implementation on
         exit.
     """
+
     def _full_handler(size: Any, fill_value: Any, **kwargs: Any) -> Any:
         # When tracer._fake_mode has been entered (enter_stack is non-empty) we
         # are inside dispatch()'s `with self._fake_mode:` block — the call
@@ -207,6 +208,20 @@ def _zeros_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
     Temporarily replaces ``torch.zeros`` with a tracing-aware handler so calls
     using symbolic ``TracingInt`` sizes are captured as FX nodes.
 
+    The handler distinguishes two call sites:
+
+    * **User model code** — ``tracer._fake_mode`` has not yet been entered
+      (its ``enter_stack`` is empty); the handler delegates to
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_zeros` which
+      emits an FX node and returns a
+      :class:`~yobx.torch.new_tracing.tensor.TracingTensor`.
+    * **FakeTensor kernel implementations** — these arise during
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.dispatch`'s
+      ``with self._fake_mode:`` block; at that point
+      ``tracer._fake_mode.enter_stack`` is non-empty and the handler delegates
+      to the original ``torch.zeros`` so that FakeTensor kernels get the
+      correct FakeTensor results.
+
     :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
         whose :meth:`_handle_zeros` should be used as the replacement.
 
@@ -217,6 +232,8 @@ def _zeros_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
     """
 
     def _zeros_handler(size: Any, **kwargs: Any) -> Any:
+        if tracer._fake_mode.enter_stack:
+            return _ORIGINAL_TORCH_ZEROS(size, **kwargs)
         return tracer._handle_zeros(size, **kwargs)
 
     torch.zeros = _zeros_handler  # type: ignore[assignment]
@@ -232,6 +249,20 @@ def _ones_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
     Temporarily replaces ``torch.ones`` with a tracing-aware handler so calls
     using symbolic ``TracingInt`` sizes are captured as FX nodes.
 
+    The handler distinguishes two call sites:
+
+    * **User model code** — ``tracer._fake_mode`` has not yet been entered
+      (its ``enter_stack`` is empty); the handler delegates to
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_ones` which
+      emits an FX node and returns a
+      :class:`~yobx.torch.new_tracing.tensor.TracingTensor`.
+    * **FakeTensor kernel implementations** — these arise during
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.dispatch`'s
+      ``with self._fake_mode:`` block; at that point
+      ``tracer._fake_mode.enter_stack`` is non-empty and the handler delegates
+      to the original ``torch.ones`` so that FakeTensor kernels get the
+      correct FakeTensor results.
+
     :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
         whose :meth:`_handle_ones` should be used as the replacement.
 
@@ -242,6 +273,8 @@ def _ones_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
     """
 
     def _ones_handler(size: Any, **kwargs: Any) -> Any:
+        if tracer._fake_mode.enter_stack:
+            return _ORIGINAL_TORCH_ONES(size, **kwargs)
         return tracer._handle_ones(size, **kwargs)
 
     torch.ones = _ones_handler  # type: ignore[assignment]

@@ -1763,7 +1763,7 @@ class GraphTracer:
         """
         from ._patches import _ORIGINAL_TORCH_FULL
 
-        if isinstance(size, torch.Size):
+        if isinstance(size, (torch.Size, TracingShape)):
             size = tuple(size)
         if not isinstance(size, (tuple, list)):
             return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
@@ -1817,24 +1817,29 @@ class GraphTracer:
         Tracing-aware replacement for ``torch.zeros`` called via
         :func:`_zeros_replacement_ctx`.
 
-        Intercepts constructor calls where *size* contains symbolic
-        :class:`TracingInt` values and emits a corresponding FX node without
-        requiring eager execution with concrete Python ``int`` dimensions.
+        Intercepts constructor calls and emits a corresponding FX node so
+        that the result is always a :class:`TracingTensor`, whether *size*
+        contains symbolic :class:`TracingInt` values or plain Python ``int``
+        values.  This ensures that ``torch.zeros`` calls whose dimensions are
+        fully resolved to concrete integers still appear in the FX graph.
+
+        This method is only called for user-level ``torch.zeros`` invocations.
+        Calls from FakeTensor kernel implementations (during
+        :meth:`dispatch`'s FakeTensorMode context) are intercepted by the
+        ``_zeros_handler`` closure in :func:`_zeros_replacement_ctx` before
+        they reach this method.
 
         :param size: Size argument passed to ``torch.zeros``.
         :param kwargs: Additional keyword arguments for ``torch.zeros``.
 
         Returns:
-            Returns a :class:`TracingTensor` when symbolic dimensions are present,
-            otherwise returns the eager ``torch.zeros`` result.
+            Returns a :class:`TracingTensor` wrapping an FX node for the call.
         """
         from ._patches import _ORIGINAL_TORCH_ZEROS
 
-        if isinstance(size, torch.Size):
+        if isinstance(size, (torch.Size, TracingShape)):
             size = tuple(size)
         if not isinstance(size, (tuple, list)):
-            return _ORIGINAL_TORCH_ZEROS(size, **kwargs)
-        if not any(isinstance(dim, TracingInt) for dim in size):
             return _ORIGINAL_TORCH_ZEROS(size, **kwargs)
 
         traced_size: List[Union[int, torch.SymInt]] = []
@@ -1886,24 +1891,29 @@ class GraphTracer:
         Tracing-aware replacement for ``torch.ones`` called via
         :func:`_ones_replacement_ctx`.
 
-        Intercepts constructor calls where *size* contains symbolic
-        :class:`TracingInt` values and emits a corresponding FX node without
-        requiring eager execution with concrete Python ``int`` dimensions.
+        Intercepts constructor calls and emits a corresponding FX node so
+        that the result is always a :class:`TracingTensor`, whether *size*
+        contains symbolic :class:`TracingInt` values or plain Python ``int``
+        values.  This ensures that ``torch.ones`` calls whose dimensions are
+        fully resolved to concrete integers still appear in the FX graph.
+
+        This method is only called for user-level ``torch.ones`` invocations.
+        Calls from FakeTensor kernel implementations (during
+        :meth:`dispatch`'s FakeTensorMode context) are intercepted by the
+        ``_ones_handler`` closure in :func:`_ones_replacement_ctx` before they
+        reach this method.
 
         :param size: Size argument passed to ``torch.ones``.
         :param kwargs: Additional keyword arguments for ``torch.ones``.
 
         Returns:
-            Returns a :class:`TracingTensor` when symbolic dimensions are present,
-            otherwise returns the eager ``torch.ones`` result.
+            Returns a :class:`TracingTensor` wrapping an FX node for the call.
         """
         from ._patches import _ORIGINAL_TORCH_ONES
 
-        if isinstance(size, torch.Size):
+        if isinstance(size, (torch.Size, TracingShape)):
             size = tuple(size)
         if not isinstance(size, (tuple, list)):
-            return _ORIGINAL_TORCH_ONES(size, **kwargs)
-        if not any(isinstance(dim, TracingInt) for dim in size):
             return _ORIGINAL_TORCH_ONES(size, **kwargs)
 
         traced_size: List[Union[int, torch.SymInt]] = []

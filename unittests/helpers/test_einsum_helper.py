@@ -208,6 +208,7 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
         total = sum(f or 0 for _, f, _ in cost_conc)
         self.assertGreater(total, 0)
+
     # ------------------------------------------------------------------
     # Higher-rank contractions
     # ------------------------------------------------------------------
