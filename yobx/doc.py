@@ -306,11 +306,14 @@ def plot_dot(
     return ax
 
 
-def _run_mmdc(filename: str, image: str) -> str:
+def _run_mmdc(mermaid_src: str, image: str) -> str:
     """
     Runs the :epkg:`Mermaid` CLI tool ``mmdc`` to render a diagram.
 
-    :param filename: path to the ``.mmd`` input file
+    The diagram source is passed via stdin (``-i -``), avoiding the need for a
+    temporary ``.mmd`` input file.
+
+    :param mermaid_src: Mermaid diagram source string
     :param image: path to the output image (``.svg`` or ``.png``)
     :return: combined stdout/stderr output from ``mmdc``.
     """
@@ -323,9 +326,18 @@ def _run_mmdc(filename: str, image: str) -> str:
         json.dump({"args": ["--no-sandbox"]}, pup_cfg)
         pup_cfg_path = pup_cfg.name
 
-    cmd = ["mmdc", "-i", filename, "-o", image, "--puppeteerConfigFile", pup_cfg_path]
-    output = _run_subprocess(cmd)
+    cmd = ["mmdc", "-i", "-", "-o", image, "--puppeteerConfigFile", pup_cfg_path]
+    p = subprocess.Popen(
+        cmd,
+        shell=False,
+        env=os.environ,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    stdout_data, stderr_data = p.communicate(input=mermaid_src.encode())
     os.remove(pup_cfg_path)
+    output = stdout_data.decode(errors="ignore") + "\n" + stderr_data.decode(errors="ignore")
     assert os.path.exists(image), (
         f"Unable to find {image!r}, command line is "
         f"{' '.join(cmd)!r}, mmdc failed due to\n{output}"
@@ -341,8 +353,8 @@ def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str) -> str:
     :param image: output image file path (``.svg`` or ``.png``)
     :return: ``mmdc`` console output.
 
-    The function creates a temporary ``.mmd`` file, invokes :func:`_run_mmdc`,
-    and removes the temporary file afterwards.
+    The diagram source is piped directly to ``mmdc`` via stdin; no temporary
+    ``.mmd`` file is created.
     """
     from .helpers.mermaid_helper import to_mermaid
 
@@ -351,17 +363,10 @@ def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str) -> str:
     else:
         smmd = mermaid
 
-    with tempfile.NamedTemporaryFile(suffix=".mmd", delete=False, mode="w") as fp:
-        fp.write(smmd)
-        fp.close()
-        filename = fp.name
-
-    assert os.path.exists(filename), f"File {filename!r} cannot be created to store the diagram."
-    out = _run_mmdc(filename, image)
+    out = _run_mmdc(smmd, image)
     assert os.path.exists(
         image
     ), f"mmdc failed with no reason, {image!r} not found, output is {out}."
-    os.remove(filename)
     return out
 
 
