@@ -389,13 +389,13 @@ def plot_mermaid(
     :param mermaid: Mermaid flowchart string or ModelProto
     :param ax: optional matplotlib axis; if None, a new figure and axis are created
     :param figsize: size of the figure if *ax* is None
-    :param svg: optional path where the intermediate SVG file is saved; if *None*
-        a temporary file is used and deleted afterwards
+    :param svg: optional path where the SVG file is saved; when provided
+        :func:`draw_graph_mermaid` is called twice — once to produce the kept SVG
+        and once to produce a temporary PNG for display
     :return: matplotlib axis containing the rendered graph image.
 
-    The function renders the diagram to an SVG file via :func:`draw_graph_mermaid`,
-    converts the SVG to a raster image with :epkg:`cairosvg`, and displays it
-    using :func:`matplotlib.axes.Axes.imshow`.
+    The function renders the diagram to a PNG file via :func:`draw_graph_mermaid`
+    and displays it using :func:`matplotlib.axes.Axes.imshow`.
 
     .. plot::
 
@@ -425,27 +425,18 @@ def plot_mermaid(
     else:
         clean = False
 
-    import cairosvg
-    import io
-    import numpy as np
-
     from PIL import Image
 
     if svg is not None:
         draw_graph_mermaid(mermaid, svg)
-        png_bytes = cairosvg.svg2png(url=svg)
-        img = np.asarray(Image.open(io.BytesIO(png_bytes)))
-        ax.imshow(img)
-    else:
-        with tempfile.NamedTemporaryFile(suffix=".svg", delete=False) as fp:
-            fp.close()
 
-            draw_graph_mermaid(mermaid, fp.name)
-            png_bytes = cairosvg.svg2png(url=fp.name)
-            img = np.asarray(Image.open(io.BytesIO(png_bytes)))
-            os.remove(fp.name)
+    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as fp:
+        fp.close()
+        draw_graph_mermaid(mermaid, fp.name)
+        img = np.asarray(Image.open(fp.name))
+        os.remove(fp.name)
 
-            ax.imshow(img)
+    ax.imshow(img)
 
     if clean:
         ax.set_xticks([])
