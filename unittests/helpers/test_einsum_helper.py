@@ -1,4 +1,5 @@
 import unittest
+from collections import Counter
 import numpy as np
 import onnxruntime
 from yobx.ext_test_case import ExtTestCase
@@ -176,6 +177,26 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
     def test_multi_batch_matmul(self):
         self._check("bcij,bcjk->bcik", (2, 3, 4, 5), (2, 3, 5, 6))
 
+    def test_pattern_optimization_concat_gather(self):
+        dec = decompose_einsum(
+            "bik,bjk->bij", ("B", "I", "K"), ("B", "J", "K"), patterns="default-GatherShape"
+        )
+        op_types = [n.op_type for n in dec.graph.node]
+        counter = Counter(op_types)
+        self.dump_onnx("test_pattern_optimization_concat_gather.onnx", dec)
+        # ConcatGatherPattern must reduce the number of Concat nodes from 3+
+        # down to at most 1 (some optimizer passes may eliminate it entirely).
+        self.assertLessEqual(counter.get("Concat", 0), 1)
+        # Verify numerical correctness.
+        sess = onnxruntime.InferenceSession(
+            dec.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        x0 = np.random.randn(2, 3, 5).astype(np.float32)
+        x1 = np.random.randn(2, 4, 5).astype(np.float32)
+        expected = np.einsum("bik,bjk->bij", x0, x1)
+        (result,) = sess.run(None, {"X0": x0, "X1": x1})
+        self.assertEqualArray(expected, result, atol=1e-5)
+
     def test_multi_batch_matmul_4d(self):
         """Multi-batch 4D matmul ``abij,abjk->abik`` (label: multi-batch matmul 4D).
 
@@ -208,6 +229,7 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
         total = sum(f or 0 for _, f, _ in cost_conc)
         self.assertGreater(total, 0)
+
     # ------------------------------------------------------------------
     # Higher-rank contractions
     # ------------------------------------------------------------------

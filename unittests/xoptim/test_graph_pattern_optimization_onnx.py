@@ -5853,7 +5853,84 @@ class TestGraphPatternOptimization(ExtTestCase):
         zz = ref.run(None, feeds)[0]
         self.assertEqualArray(z, zz)
 
-    def test_concat_reshape(self):
+    def test_concat_gather_multi_element_identity(self):
+        """Gather index falls in a (1,) bucket inside a Concat with mixed bucket sizes."""
+        # Concat([D1(2), D2(1)], axis=0) -> d(3), Gather(d, [2]) -> Y
+        # Index 2 falls in D2 (size 1, offset 2), so result is Identity(D2).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["D1", "D2"], ["d"], axis=0),
+                    oh.make_node("Gather", ["d", "un"], ["Y"]),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("D1", TensorProto.INT64, [2]),
+                    oh.make_tensor_value_info("D2", TensorProto.INT64, [1]),
+                ],
+                [oh.make_tensor_value_info("Y", TensorProto.INT64, [1])],
+                [onh.from_array(np.array([2], dtype=np.int64), name="un")],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+
+        feeds = {"D1": np.array([5, 6], dtype=np.int64), "D2": np.array([7], dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        z = ref.run(None, feeds)[0]
+        self.assertEqualArray(z, np.array([7], dtype=np.int64))
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=False,
+            optimization_options=OptimizationOptions(patterns="ConcatGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
+        ref = ExtendedReferenceEvaluator(opt_onx)
+        zz = ref.run(None, feeds)[0]
+        self.assertEqualArray(z, zz)
+
+    def test_concat_gather_multi_element_gather(self):
+        """Gather index falls in a (2,) bucket, emits adjusted Gather on that bucket."""
+        # Concat([D1(2), D2(1)], axis=0) -> d(3), Gather(d, [1]) -> Y
+        # Index 1 falls in D1 (size 2, offset 0), local_idx=1 -> Gather(D1, [1]).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["D1", "D2"], ["d"], axis=0),
+                    oh.make_node("Gather", ["d", "un"], ["Y"]),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("D1", TensorProto.INT64, [2]),
+                    oh.make_tensor_value_info("D2", TensorProto.INT64, [1]),
+                ],
+                [oh.make_tensor_value_info("Y", TensorProto.INT64, [1])],
+                [onh.from_array(np.array([1], dtype=np.int64), name="un")],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+
+        feeds = {"D1": np.array([10, 20], dtype=np.int64), "D2": np.array([30], dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        z = ref.run(None, feeds)[0]
+        self.assertEqualArray(z, np.array([20], dtype=np.int64))
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=False,
+            optimization_options=OptimizationOptions(patterns="ConcatGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Concat should be eliminated; a Gather on D1 with index [1] remains.
+        node_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertNotIn("Concat", node_types)
+        ref = ExtendedReferenceEvaluator(opt_onx)
+        zz = ref.run(None, feeds)[0]
+        self.assertEqualArray(z, zz)
+
         model = oh.make_model(
             oh.make_graph(
                 [
