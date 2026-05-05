@@ -5,6 +5,182 @@ from onnx import NodeProto
 from ..patterns_api import MatchResult, PatternOptimization
 
 
+class GatherShapePattern(PatternOptimization):
+    """
+    Simplifies ``Gather(Shape(X), indices)`` into ``Shape(X, start=s, end=e)``
+    when *indices* is a constant 1-D ``int64`` array that forms a contiguous
+    ascending range ``[s, s+1, …, e-1]``.
+
+    This avoids materialising the full shape vector only to slice it immediately
+    afterwards.  The Shape node may already carry ``start`` / ``end`` attributes
+    (ONNX opset ≥ 15); those are taken into account when computing the absolute
+    indices in ``X``'s dimension space.
+
+    Model with nodes to be fused:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef initNode fill:#cccc00,stroke:#333,color:#333
+            classDef constNode fill:#f9f,stroke:#333,stroke-width:2px,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(a, b, c, d)"])
+            C_idx(["idx INT64[3]"])
+
+            Shape_0[["Shape(.)"]]
+            Gather_1[["Gather(., [0, 1, 2])"]]
+
+            I_X -->|"FLOAT(a, b, c, d)"| Shape_0
+            C_idx -->|"INT64(3)"| Gather_1
+            Shape_0 -->|"INT64(4)"| Gather_1
+
+            O_Y(["Y INT64(3)"])
+            Gather_1 --> O_Y
+
+            class I_X,O_Y ioNode
+            class C_idx constNode
+            class Shape_0,Gather_1 opNode
+
+    Outcome of the fusion:
+
+    .. mermaid::
+
+        graph TD
+
+            classDef ioNode fill:#dfd,stroke:#333,color:#333
+            classDef opNode fill:#bbf,stroke:#333,stroke-width:2px,color:#333
+
+            I_X(["X FLOAT(a, b, c, d)"])
+
+            Shape_0[["Shape(., start=0, end=3)"]]
+
+            I_X -->|"FLOAT(a, b, c, d)"| Shape_0
+
+            O_Y(["Y INT64(3)"])
+            Shape_0 --> O_Y
+
+            class I_X,O_Y ioNode
+            class Shape_0 opNode
+    """
+
+    def __init__(self, verbose: int = 0, priority: int = 0):
+        super().__init__(verbose, priority)
+
+    @staticmethod
+    def _get_attr_i(node: NodeProto, name: str, default):
+        """Returns the integer value of a named attribute, or *default* if absent."""
+        for attr in node.attribute:
+            if attr.name == name:
+                return int(attr.i)
+        return default
+
+    def match(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        node: NodeProto,
+        matched: List[MatchResult],
+    ) -> Optional[MatchResult]:
+        if node.op_type != "Gather" or node.domain != "":
+            return self.none()
+
+        # Only axis=0 is meaningful here (Shape outputs a 1-D vector).
+        if self._get_attr_i(node, "axis", 0) != 0:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Indices must be a constant 1-D int64 array.
+        if not g.is_constant(node.input[1]):
+            return self.none(node, inspect.currentframe().f_lineno)
+        indices = g.get_computed_constant(node.input[1])
+        if indices is None or indices.ndim != 1 or len(indices) < 1:
+            return self.none(node, inspect.currentframe().f_lineno)
+        if indices.dtype != np.int64:
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Indices must form a strictly contiguous ascending range.
+        if len(indices) > 1 and not np.all(np.diff(indices) == 1):
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        # Data must come from a Shape node.
+        shape_node = g.node_before(node.input[0])
+        if shape_node is None or shape_node.op_type != "Shape" or shape_node.domain != "":
+            return self.none(node, inspect.currentframe().f_lineno)
+
+        x_name = shape_node.input[0]
+
+        # If the Shape node carries negative start/end attrs, or the gather
+        # indices are negative, we need the rank of X to normalise them.
+        shape_start_raw = self._get_attr_i(shape_node, "start", None)
+        shape_end_raw = self._get_attr_i(shape_node, "end", None)
+        has_negative_shape_attr = (shape_start_raw is not None and shape_start_raw < 0) or (
+            shape_end_raw is not None and shape_end_raw < 0
+        )
+        has_negative_index = bool(indices[0] < 0)
+        if has_negative_shape_attr or has_negative_index:
+            if not g.has_rank(x_name):
+                return self.none(node, inspect.currentframe().f_lineno)
+
+        return MatchResult(self, [shape_node, node], self.apply, insert_at=node)
+
+    def apply(
+        self,
+        g: "GraphBuilderPatternOptimization",  # noqa: F821
+        shape_node: NodeProto,
+        gather_node: NodeProto,
+    ) -> List[NodeProto]:
+        indices = g.get_computed_constant(gather_node.input[1])
+        x_name = shape_node.input[0]
+
+        # Resolve the Shape node's start/end against the rank of X.
+        rank = g.get_rank(x_name) if g.has_rank(x_name) else None
+        shape_start_raw = self._get_attr_i(shape_node, "start", None)
+        shape_end_raw = self._get_attr_i(shape_node, "end", None)
+
+        s0 = shape_start_raw if shape_start_raw is not None else 0
+        if rank is not None:
+            e0 = shape_end_raw if shape_end_raw is not None else rank
+            if s0 < 0:
+                s0 += rank
+            if e0 < 0:
+                e0 += rank
+            s0 = max(0, min(s0, rank))
+            e0 = max(0, min(e0, rank))
+            L = e0 - s0
+        else:
+            # No rank available; shape attrs must be non-negative (guaranteed by match).
+            if shape_end_raw is not None:
+                e0 = shape_end_raw
+                L = e0 - s0
+            else:
+                L = None  # unknown
+
+        # Normalise gather indices (may be negative when rank is known, per match guard).
+        gather_first = int(indices[0])
+        gather_last = int(indices[-1])
+        if gather_first < 0:
+            gather_first += L
+        if gather_last < 0:
+            gather_last += L
+        new_start = s0 + gather_first
+        new_end = s0 + gather_last + 1
+
+        new_shape_node = g.make_node(
+            "Shape",
+            [x_name],
+            gather_node.output,
+            start=new_start,
+            end=new_end,
+            name=f"{self.__class__.__name__}--{gather_node.name}",
+            doc_string=gather_node.doc_string,
+        )
+
+        if g.is_used_more_than_once(shape_node.output[0]):
+            return [shape_node, new_shape_node]
+        return [new_shape_node]
+
+
 class ShapeBasedShapeShapeAddPattern(PatternOptimization):
     """
     Tries to find another way to get a dimension obtained with the addition of two.
