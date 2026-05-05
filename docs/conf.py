@@ -247,8 +247,6 @@ sphinx_gallery_conf = {
     "recommender": {"enable": True, "n_examples": 3, "min_df": 3, "max_df": 0.9},
     # ignore capture for matplotib axes
     "ignore_repr_types": "matplotlib\\.(text|axes)",
-    # capture SVG/HTML repr from the last expression of a code block
-    "capture_repr": ("_repr_html_", "_repr_svg_"),
     # robubstness
     "reset_modules_order": "both",
     "reset_modules": (

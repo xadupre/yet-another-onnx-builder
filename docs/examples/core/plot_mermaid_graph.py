@@ -25,9 +25,6 @@ The output is a plain Mermaid string; it can be embedded directly in Markdown
 or saved to a ``.mmd`` file.
 """
 
-import os
-import tempfile
-
 import numpy as np
 import onnx
 import onnx.helper as oh
@@ -82,6 +79,4 @@ print(mermaid_src)
 # The diagram is rendered by ``mmdc`` to SVG and displayed using
 # :class:`IPython.display.SVG`.
 
-svg_path = os.path.join(tempfile.gettempdir(), "plot_mermaid_graph.svg")
-draw_graph_mermaid(model, svg_path)
-IPythonSVG(filename=svg_path)
+IPythonSVG(draw_graph_mermaid(model))

@@ -316,12 +316,13 @@ def plot_dot(
     return ax
 
 
-def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str) -> None:
+def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str = "") -> Optional[str]:
     """
     Draws a Mermaid flowchart to an image file using the :epkg:`mermaid-py` library.
 
     :param mermaid: Mermaid flowchart string or :class:`onnx.ModelProto`
     :param image: output image file path (``.svg`` or ``.png``)
+    :return: the SVG if image is empty, None otherwise.
 
     The diagram is rendered via the ``mermaid.ink`` online service through
     :class:`mermaid.Mermaid`.
@@ -336,6 +337,12 @@ def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str) -> None
         smmd = mermaid
 
     renderer = Mermaid(smmd)
+    if not image:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "diagram.svg")
+            renderer.to_svg(path)
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
     if image.endswith(".svg"):
         renderer.to_svg(image)
     else:
