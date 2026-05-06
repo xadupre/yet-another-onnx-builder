@@ -219,6 +219,8 @@ sphinx_gallery_conf = {
     "abort_on_example_error": True,
     # recommendation
     "recommender": {"enable": True, "n_examples": 3, "min_df": 3, "max_df": 0.9},
+    # capture IPython SVG/HTML display objects in addition to the defaults
+    "capture_repr": ("_repr_html_", "__repr__", "_repr_svg_"),
     # ignore capture for matplotib axes
     "ignore_repr_types": "matplotlib\\.(text|axes)",
     # robubstness

@@ -78,10 +78,5 @@ print(mermaid_src)
 #
 # The diagram is rendered to SVG via the ``mermaid.ink`` online service (through
 # :epkg:`mermaid-py`) and displayed using :class:`IPython.display.SVG`.
-# When the service is unreachable the raw Mermaid source printed above is
-# shown instead so the example never hard-fails in an offline environment.
 
-try:
-    IPythonSVG(draw_graph_mermaid(model))
-except Exception:
-    print(mermaid_src)
+IPythonSVG(draw_graph_mermaid(model))
