@@ -644,6 +644,32 @@ class GraphTracer:
             return self._emit_sym_size_node(x)
         return x
 
+    def _sym_size_node_or_tracing_int(self, dim: TracingInt, dim_key: str) -> Any:
+        """
+        Returns an FX node or a fallback :class:`TracingInt` for use as a shape size argument.
+
+        When *dim* has its ``_source_node`` set to a node in ``self.graph`` (i.e.
+        the TracingInt was produced by a placeholder in the current sub-graph via
+        :meth:`_handle_scan`), an ``aten.sym_size.int`` FX node is emitted so
+        that the ONNX interpreter receives a proper ONNX tensor name rather than a
+        raw symbolic string.  This is required by
+        :meth:`~yobx.xbuilder.graph_builder.GraphBuilder.make_shape_from_results`
+        for building the ``ConstantOfShape`` input in ``torch.zeros`` / ``torch.full``
+        / ``torch.ones`` with dynamic sizes.
+
+        When ``_source_node`` is not set or belongs to a different graph (e.g. in
+        :meth:`_trace_branch` sub-graphs where TracingInts still reference the parent
+        graph's placeholder), the method falls back to ``TracingInt(dim_key)`` to
+        avoid cross-graph node references.
+
+        :param dim: The symbolic :class:`TracingInt` representing the size dimension.
+        :param dim_key: The dimension key string (used for the fallback TracingInt).
+        :returns: An FX :class:`~torch.fx.Node` or a :class:`TracingInt`.
+        """
+        if dim._source_node is not None and dim._source_node.graph is self.graph:
+            return self._emit_sym_size_node(dim)
+        return TracingInt(dim_key)
+
     def _compute_slice_output_dim(self, input_dim: Any, start: Any, stop: Any) -> Any:
         """
         Compute the output dimension size for ``input[start:stop]`` (step=1).
@@ -1861,16 +1887,9 @@ class GraphTracer:
                     assert isinstance(symd_name, str), "type checking"
                     self._sym_int_to_dynamic_dimension[symd_name] = dim_key
                 traced_size.append(symd)
-                # Emit a sym_size.int FX node so the ONNX interpreter receives
-                # a proper tensor-valued result name (not a raw TracingInt string)
-                # when building the shape for ConstantOfShape.  Only do this when
-                # the source node belongs to the current (sub-)graph; if it points
-                # to a parent graph (e.g. in _trace_branch) we fall back to the
-                # TracingInt path to avoid cross-graph node references.
-                if dim._source_node is not None and dim._source_node.graph is self.graph:
-                    node_size.append(self._emit_sym_size_node(dim))
-                else:
-                    node_size.append(TracingInt(dim_key))
+                # Delegate to helper which emits aten.sym_size.int when the source
+                # node belongs to the current graph, or falls back to TracingInt.
+                node_size.append(self._sym_size_node_or_tracing_int(dim, dim_key))
             else:
                 assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
                 traced_size.append(dim)
@@ -1947,16 +1966,9 @@ class GraphTracer:
                     assert isinstance(symd_name, str), "type checking"
                     self._sym_int_to_dynamic_dimension[symd_name] = dim_key
                 traced_size.append(symd)
-                # Emit a sym_size.int FX node so the ONNX interpreter receives
-                # a proper tensor-valued result name (not a raw TracingInt string)
-                # when building the shape for ConstantOfShape.  Only do this when
-                # the source node belongs to the current (sub-)graph; if it points
-                # to a parent graph (e.g. in _trace_branch) we fall back to the
-                # TracingInt path to avoid cross-graph node references.
-                if dim._source_node is not None and dim._source_node.graph is self.graph:
-                    node_size.append(self._emit_sym_size_node(dim))
-                else:
-                    node_size.append(TracingInt(dim_key))
+                # Delegate to helper which emits aten.sym_size.int when the source
+                # node belongs to the current graph, or falls back to TracingInt.
+                node_size.append(self._sym_size_node_or_tracing_int(dim, dim_key))
             else:
                 assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
                 traced_size.append(dim)
@@ -2033,16 +2045,9 @@ class GraphTracer:
                     assert isinstance(symd_name, str), "type checking"
                     self._sym_int_to_dynamic_dimension[symd_name] = dim_key
                 traced_size.append(symd)
-                # Emit a sym_size.int FX node so the ONNX interpreter receives
-                # a proper tensor-valued result name (not a raw TracingInt string)
-                # when building the shape for ConstantOfShape.  Only do this when
-                # the source node belongs to the current (sub-)graph; if it points
-                # to a parent graph (e.g. in _trace_branch) we fall back to the
-                # TracingInt path to avoid cross-graph node references.
-                if dim._source_node is not None and dim._source_node.graph is self.graph:
-                    node_size.append(self._emit_sym_size_node(dim))
-                else:
-                    node_size.append(TracingInt(dim_key))
+                # Delegate to helper which emits aten.sym_size.int when the source
+                # node belongs to the current graph, or falls back to TracingInt.
+                node_size.append(self._sym_size_node_or_tracing_int(dim, dim_key))
             else:
                 assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
                 traced_size.append(dim)
