@@ -1469,7 +1469,16 @@ class GraphTracer:
         :return: A flat tuple of :class:`TracingTensor` instances
             ``(carry_0_final, ..., scan_out_0_accum, ...)``.
         """
-        from ._patches import _scan_replacement_ctx, _check_replacement_ctx, _ORIGINAL_TORCH_SCAN
+        from ._patches import (
+            _scan_replacement_ctx,
+            _check_replacement_ctx,
+            _full_replacement_ctx,
+            _zeros_replacement_ctx,
+            _ones_replacement_ctx,
+            _arange_replacement_ctx,
+            _tensor_split_replacement_ctx,
+            _ORIGINAL_TORCH_SCAN,
+        )
 
         additional_inputs = list(additional_inputs) if additional_inputs else []
         n_carry = len(init_states)
@@ -1525,7 +1534,15 @@ class GraphTracer:
             else:
                 sub_operands.append(s)
 
-        with _scan_replacement_ctx(sub), _check_replacement_ctx(sub):
+        with (
+            _scan_replacement_ctx(sub),
+            _check_replacement_ctx(sub),
+            _full_replacement_ctx(sub),
+            _zeros_replacement_ctx(sub),
+            _ones_replacement_ctx(sub),
+            _arange_replacement_ctx(sub),
+            _tensor_split_replacement_ctx(sub),
+        ):
             body_out = f(*sub_operands)
 
         body_out_list: List[Any] = (

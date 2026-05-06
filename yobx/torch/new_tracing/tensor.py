@@ -457,9 +457,22 @@ class TracingTensor(torch.Tensor):
         assert tracer is not None, "__setitem__ requires an active tracer"
 
         def _unwrap(idx: Any) -> Any:
-            """Returns the FX node for a TracingTensor index or the index itself."""
+            """Returns the FX node for a TracingTensor/TracingInt index or the index itself."""
             if isinstance(idx, TracingTensor):
                 return idx._node
+            if isinstance(idx, TracingInt):
+                # Symbolic TracingInt (e.g. from .item()) — return its backing
+                # FX node so the ONNX interpreter receives a valid result name.
+                if idx._node is not None:
+                    return idx._node
+                if idx.is_static:
+                    return int(idx)
+                return tracer._emit_sym_size_node(idx)
+            if isinstance(idx, slice):
+                # Recursively unwrap TracingInt start/stop/step so that
+                # symbolic slice endpoints are embedded as FX node references
+                # rather than raw TracingInt objects.
+                return slice(_unwrap(idx.start), _unwrap(idx.stop), _unwrap(idx.step))
             if isinstance(idx, tuple):
                 return tuple(_unwrap(i) for i in idx)
             return idx

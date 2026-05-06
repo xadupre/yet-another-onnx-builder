@@ -62,6 +62,14 @@ _ORIGINAL_TORCH_WHILE_LOOP_OP: Optional[Callable] = getattr(
     getattr(torch.ops, "higher_order", None), "while_loop", None
 )
 
+# Capture the real ``torch.compiler.is_exporting`` at import time so that it
+# can be temporarily replaced during tracing.  Models that call
+# ``torch.compiler.is_exporting()`` to select a scan-based export path need
+# the function to return ``True`` while the new tracer is running.
+_ORIGINAL_IS_EXPORTING: Optional[Callable] = getattr(
+    getattr(torch, "compiler", None), "is_exporting", None
+)
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -480,6 +488,32 @@ def _while_loop_replacement_ctx(
 
 
 @contextlib.contextmanager
+def _is_exporting_replacement_ctx() -> Generator:
+    """
+    Temporarily replaces ``torch.compiler.is_exporting`` with a function that
+    always returns ``True`` so that model code guarded by
+    ``torch.compiler.is_exporting()`` takes the export branch (e.g. choosing a
+    scan-based implementation) while the new tracer is active.
+
+    The original implementation is restored unconditionally on exit.
+
+    Yields:
+        Control while ``torch.compiler.is_exporting`` is temporarily replaced,
+        then restores the original implementation on exit.
+    """
+    _compiler = getattr(torch, "compiler", None)
+    if _ORIGINAL_IS_EXPORTING is None or _compiler is None:
+        yield
+        return
+
+    _compiler.is_exporting = lambda: True  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        _compiler.is_exporting = _ORIGINAL_IS_EXPORTING  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
 def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
     """
     Applies all tracing-time torch replacement context managers at once.
@@ -502,5 +536,6 @@ def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         _scan_replacement_ctx(tracer),
         _tensor_split_replacement_ctx(tracer),
         _while_loop_replacement_ctx(tracer),
+        _is_exporting_replacement_ctx(),
     ):
         yield
