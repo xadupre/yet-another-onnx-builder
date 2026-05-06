@@ -203,6 +203,31 @@ class TracingTensor(torch.Tensor):
 
         return result_node
 
+    def item(self) -> Union[int, float, TracingInt]:  # type: ignore[override]
+        """
+        Intercepts ``.item()`` during tracing to return a symbolic
+        :class:`TracingInt` backed by a graph node instead of raising an
+        error or returning a bare Python scalar.
+
+        When a tracer is active, this method delegates to
+        :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_local_scalar_dense`,
+        which emits an ``aten._local_scalar_dense`` FX node and wraps the
+        result in a :class:`TracingInt`.  The caller can then use the
+        returned :class:`TracingInt` as a dynamic slice endpoint (e.g.
+        ``x[..., :shape.item()]``), which is recognised by
+        :meth:`_index_has_symbolic_tracing_int` and routed through
+        :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_symbolic_getitem`.
+
+        Returns:
+            A :class:`TracingInt` (symbolic) when a tracer is active, or the
+            actual Python scalar when no tracer is present (falls back to
+            :meth:`torch.Tensor.item`).
+        """
+        tracer = self._tracer
+        if tracer is not None:
+            return tracer._handle_local_scalar_dense(self)
+        return super().item()  # type: ignore[misc]
+
     def __repr__(self) -> str:  # type: ignore
         node_name = self._node.name if self._node is not None else "<unregistered>"
         return (

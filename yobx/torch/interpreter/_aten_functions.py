@@ -8175,6 +8175,17 @@ def aten_item(
     return g.op.Identity(x, outputs=outputs, name=name)
 
 
+def aten__local_scalar_dense(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    name: str = "_local_scalar_dense",
+) -> T:
+    """Converts ``aten._local_scalar_dense`` (``tensor.item()``) to ONNX via :func:`aten_item`."""
+    return aten_item(g, sts, outputs, x, name=name)
+
+
 def aten_l1_loss(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
