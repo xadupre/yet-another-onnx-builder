@@ -219,6 +219,9 @@ class GraphTracer:
             return True
         if isinstance(value, torch.device):
             return True
+        # SymInt / SymFloat / SymBool are symbolic scalars, not tensors.
+        if isinstance(value, (torch.SymInt, torch.SymFloat, torch.SymBool)):
+            return True
 
         from ...helpers import string_type
 
@@ -955,6 +958,18 @@ class GraphTracer:
                     )
                 return view_tt
 
+        # Special-case: aten._local_scalar_dense (tensor.item()).
+        # FakeTensorMode returns a SymInt for this op, which the generic result
+        # processing path cannot handle.  Instead, emit the FX node directly and
+        # return a symbolic TracingInt so that the scalar can be used as a
+        # dynamic slice endpoint (e.g. x[..., :shape.item()]).
+        if (
+            func is torch.ops.aten._local_scalar_dense.default
+            and args
+            and isinstance(args[0], TracingTensor)
+        ):
+            return self._handle_local_scalar_dense(args[0])
+
         # running the function
         with self._fake_mode:
             fake_res = func(*fake_args, **fake_kwargs)
@@ -1035,6 +1050,12 @@ class GraphTracer:
         if isinstance(unflat_res, (TracingTensor, int, float, str)):
             return unflat_res
 
+        # SymInt / SymFloat / SymBool results (e.g. from ops that return scalars)
+        # are returned as-is; callers that need a TracingInt should intercept
+        # the op before dispatch() (see _handle_local_scalar_dense).
+        if isinstance(unflat_res, (torch.SymInt, torch.SymFloat, torch.SymBool)):
+            return unflat_res
+
         if isinstance(unflat_res, (list, tuple)):
             results: List[Any] = []
             for i, item in enumerate(unflat_res):
@@ -1050,7 +1071,7 @@ class GraphTracer:
                     )
                 else:
                     assert isinstance(
-                        item, (float, int, str)
+                        item, (float, int, str, torch.SymInt, torch.SymFloat, torch.SymBool)
                     ), f"Unexpected type for one item={item}"
                     results.append(item)
             return type(unflat_res)(results)
@@ -2053,6 +2074,48 @@ class GraphTracer:
         node.meta["fake_val"] = fake_res
         node.meta["stack_trace"] = "".join(traceback.format_stack())
         return res
+
+    def _handle_local_scalar_dense(self, input_tt: TracingTensor) -> TracingInt:
+        """
+        Intercept ``aten._local_scalar_dense`` (i.e. ``tensor.item()``) during
+        tracing and return a symbolic :class:`TracingInt` backed by a graph node.
+
+        When ``.item()`` is called on a :class:`TracingTensor`, the generic
+        :meth:`dispatch` path runs the operation in
+        :class:`~torch._subclasses.fake_tensor.FakeTensorMode` and obtains a
+        :class:`~torch.SymInt`.  Because :meth:`is_not_tensor` previously did
+        not recognise :class:`~torch.SymInt`, this raised :exc:`TypeError`.
+
+        This handler bypasses :class:`~torch._subclasses.fake_tensor.FakeTensorMode`
+        entirely.  It emits an ``aten._local_scalar_dense`` FX node and wraps
+        the result in a symbolic :class:`TracingInt` so that downstream use of
+        the scalar (e.g. ``x[..., :shape.item()]``) is recognised by
+        :meth:`~TracingTensor._index_has_symbolic_tracing_int` and routed
+        through :meth:`_handle_symbolic_getitem`.
+
+        :param input_tt: The :class:`TracingTensor` whose scalar content is
+            extracted.
+        :returns: A symbolic :class:`TracingInt` whose :attr:`~TracingInt._node`
+            points to the ``aten._local_scalar_dense`` FX node.
+        """
+        node = self.graph.call_function(
+            torch.ops.aten._local_scalar_dense.default, args=(input_tt._node,), kwargs={}
+        )
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        # Represent the scalar result as a 0-dim TracingTensor so that the
+        # ONNX interpreter can infer type/rank from node.meta["val"].
+        meta_tt = self._make_tracing_tensor(
+            TracingShape(()), input_tt.dtype, input_tt.device, node
+        )
+        node.meta["val"] = meta_tt
+        # Return a symbolic TracingInt backed by this node so that callers
+        # that use the result as a slice endpoint (e.g. x[..., :shape.item()])
+        # are routed through _handle_symbolic_getitem.
+        ti = TracingInt(f"_item_{node.name}")
+        ti._node = node
+        ti._tracer = self
+        ti._device = str(input_tt.device) if input_tt.device else "cpu"
+        return ti
 
     def _handle_tensor_split(self, input: Any, indices_or_sections: Any, dim: int = 0) -> Any:
         """
