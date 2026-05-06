@@ -15305,12 +15305,31 @@ def aten_tensor(
     outputs: List[str],
     x: T,
     indices: Optional[Tuple[Any, ...]] = None,
+    dtype: Optional[Any] = None,
+    device: Optional[Any] = None,
+    requires_grad: bool = False,
 ) -> T:
     "[..., :, ...]"
     if indices is None:
         # x is some data to convert into a Tensor
+        if isinstance(x, (int, float, bool)):
+            if dtype is not None:
+                onnx_type = dtype_to_tensor_dtype(dtype)
+                np_dtype = tensor_dtype_to_np_dtype(onnx_type)
+            elif isinstance(x, bool):
+                np_dtype = np.bool_
+            elif isinstance(x, int):
+                np_dtype = np.int64
+            else:
+                np_dtype = np.float32
+            cst = np.array(x, dtype=np_dtype)
+            return g.make_initializer(outputs[0], cst, source="aten_tensor.scalar")
         if isinstance(x, list) and all_int_or_float(x):
-            if all_int(x):
+            if dtype is not None:
+                onnx_type = dtype_to_tensor_dtype(dtype)
+                np_dtype = tensor_dtype_to_np_dtype(onnx_type)
+                cst = np.array(x, dtype=np_dtype)
+            elif all_int(x):
                 cst = np.array(x, dtype=np.int64)
             elif all_float(x):
                 cst = np.array(x, dtype=np.float32)
