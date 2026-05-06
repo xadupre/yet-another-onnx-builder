@@ -263,7 +263,13 @@ def make_dynamic_cache(
 
     if (
         key_value_pairs
-        and isinstance(key_value_pairs[0][0], torch._subclasses.fake_tensor.FakeTensor)
+        and (
+            isinstance(key_value_pairs[0][0], torch._subclasses.fake_tensor.FakeTensor)
+            or (
+                isinstance(key_value_pairs[0][0], torch.Tensor)
+                and type(key_value_pairs[0][0]) is not torch.Tensor
+            )
+        )
         and PvVersion(transformers.__version__) >= PvVersion("4.56")
     ):
         cache = transformers.cache_utils.DynamicCache()

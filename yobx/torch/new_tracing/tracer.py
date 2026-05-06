@@ -189,6 +189,9 @@ class GraphTracer:
         Dicts are inspected by their values.
         :class:`~yobx.torch.new_tracing.shape.TracingInt` instances are
         treated as scalar integers (non-tensor).
+        For other types registered in :mod:`torch.utils._pytree` (e.g.
+        :class:`~transformers.cache_utils.DynamicCache`), the value is
+        flattened and the leaves are inspected recursively.
 
         :param value: The value to inspect.  May be a scalar, tensor,
             list, tuple, dict, or ``None``.
@@ -223,12 +226,12 @@ class GraphTracer:
         if isinstance(value, (torch.SymInt, torch.SymFloat, torch.SymBool)):
             return True
 
-        from ...helpers import string_type
-
-        raise TypeError(
-            f"Cannot determine if type {type(value)} "
-            f"is a constant argument {string_type(value)}"
-        )
+        # For pytree-registered types (e.g. DynamicCache), flatten and check
+        # whether any leaf is a tensor.
+        flat, _ = torch.utils._pytree.tree_flatten(value)
+        if flat:
+            return not any(isinstance(v, torch.Tensor) for v in flat)
+        return True
 
     def _tracing_int_to_fake(self, ti: TracingInt) -> Union[int, "torch.SymInt"]:
         """
@@ -2256,24 +2259,26 @@ class GraphTracer:
 
         For a list or tuple *arg*, names are ``"<name>_0"``, ``"<name>_1"``,
         …, ``"<name>_{n-1}"``.  For a dict *arg* whose length equals *n*,
-        names are ``"<name>_<key>"`` for each key.
+        names are ``"<name>_<key>"`` for each key.  For other pytree-registered
+        types (e.g. :class:`~transformers.cache_utils.DynamicCache`), indexed
+        names ``"<name>_0"``, …, ``"<name>_{n-1}"`` are generated.
 
         :param n: Number of names to generate (must equal ``len(arg)``).
         :param name: Base name (typically the parameter name from the function
             signature).
-        :param arg: The original argument (list, tuple, or dict).
+        :param arg: The original argument (list, tuple, dict, or any
+            pytree-registered type).
         :param treespec: The :class:`torch.utils._pytree.TreeSpec` of *arg*;
             included for error messages only.
         :return: A ``list`` of ``str`` names of length *n*.
-        :raises NotImplementedError: If *arg* has an unsupported type.
         """
         if isinstance(arg, (list, tuple)):
             return [f"{name}_{i}" for i in range(n)]
         if isinstance(arg, dict) and len(arg) == n:
             return [f"{name}_{k}" for k in arg]
-        raise NotImplementedError(
-            f"make_names is not implemented for type {type(arg)}, n={n}, {treespec=}"
-        )
+        # Fallback for other pytree-registered types (e.g. DynamicCache):
+        # generate indexed names.
+        return [f"{name}_{i}" for i in range(n)]
 
     def make_tracing_arg(self, arg, dynamic_shapes, name: Union[int, str]):
         if isinstance(name, int):
@@ -2489,7 +2494,30 @@ class GraphTracer:
 
         import torch.utils._pytree as pytree
 
-        output_val = pytree.tree_map(_to_output_node, out)
+        # Flatten the output to a list of tensor leaves, map each to its FX node,
+        # then reconstruct the original structure.  If the output treespec contains
+        # custom pytree-registered types that cannot be reconstructed from FX nodes
+        # (e.g. DynamicCache), fall back to a plain tuple of output nodes so that
+        # the ONNX interpreter can iterate over them directly.
+        output_leaves, output_treespec = pytree.tree_flatten(out)
+        output_nodes = [_to_output_node(x) for x in output_leaves]
+
+        def _treespec_has_only_simple_types(spec) -> bool:
+            """Determines whether *spec* contains only list/tuple/dict/None nodes."""
+            if spec.is_leaf():
+                return True
+            if spec.type not in (list, tuple, dict, type(None)):
+                return False
+            return all(_treespec_has_only_simple_types(child) for child in spec.children())
+
+        if _treespec_has_only_simple_types(output_treespec):
+            output_val = output_treespec.unflatten(output_nodes)
+        else:
+            # The output contains a custom pytree-registered container (e.g.
+            # DynamicCache).  Emit a flat tuple of leaf nodes; the ONNX
+            # interpreter will iterate over them as individual tensor outputs.
+            output_val = tuple(output_nodes)
+
         self.graph.output(output_val)
         self.graph.eliminate_dead_code()
         # Remove placeholder nodes introduced by _collect_and_replace_module_tensor_attrs

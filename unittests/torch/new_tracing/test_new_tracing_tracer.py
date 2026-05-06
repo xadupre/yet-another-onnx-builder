@@ -1154,6 +1154,100 @@ class TestNewTracingTracer(ExtTestCase):
         )
 
 
+class TestNewTracingDynamicCache(ExtTestCase):
+    """Tests for GraphTracer tracing models with DynamicCache inputs/outputs."""
+
+    @staticmethod
+    def _make_cache(bsize, nheads, slen, dim):
+        from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
+
+        return make_dynamic_cache(
+            [
+                (torch.rand((bsize, nheads, slen, dim)), torch.rand((bsize, nheads, slen, dim))),
+                (torch.rand((bsize, nheads, slen, dim)), torch.rand((bsize, nheads, slen, dim))),
+            ]
+        )
+
+    def test_trace_dynamic_cache_input_static(self):
+        """GraphTracer traces DynamicCacheInput with static shapes."""
+        try:
+            import transformers  # noqa: F401
+        except ImportError:
+            raise unittest.SkipTest("transformers not installed")
+        from yobx.pv_version import PvVersion
+
+        if PvVersion(transformers.__version__) < PvVersion("4.57"):
+            raise unittest.SkipTest("test requires transformers>=4.57")
+        from yobx.torch import register_flattening_functions
+        from yobx.torch.testing._model_eval_cases import DynamicCacheInput
+
+        _bsize, _nheads, _slen, _dim = 2, 4, 3, 7
+        model = DynamicCacheInput()
+        inputs = (
+            torch.rand((_bsize, _nheads, _slen, _dim)),
+            self._make_cache(_bsize, _nheads, _slen, _dim),
+        )
+        # GraphTracer must be created before register_flattening_functions to
+        # avoid an optree re-registration conflict on some environments.
+        tracer = GraphTracer()
+        with register_flattening_functions(patch_transformers=True):
+            graph = tracer.trace(model, inputs)
+        graph.lint()
+
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        # x + 4 tensors from the 2-layer DynamicCache (key0, val0, key1, val1)
+        self.assertEqual(len(ph_nodes), 5)
+
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        output_val = output_node.args[0]
+        # Output is flattened: x + 4 mean-reduced cache tensors
+        self.assertIsInstance(output_val, tuple)
+        self.assertEqual(len(output_val), 5)
+
+        call_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertEqual(len(call_nodes), 4, "Expected 4 mean.dim nodes (one per cache tensor)")
+
+    def test_trace_dynamic_cache_input_dynamic(self):
+        """GraphTracer traces DynamicCacheInput with dynamic shapes."""
+        try:
+            import transformers  # noqa: F401
+        except ImportError:
+            raise unittest.SkipTest("transformers not installed")
+        from yobx.pv_version import PvVersion
+
+        if PvVersion(transformers.__version__) < PvVersion("4.57"):
+            raise unittest.SkipTest("test requires transformers>=4.57")
+        from yobx.torch import register_flattening_functions
+        from yobx.torch.testing._model_eval_cases import DynamicCacheInput
+
+        _bsize, _nheads, _slen, _dim = 2, 4, 3, 7
+        model = DynamicCacheInput()
+        inputs = (
+            torch.rand((_bsize, _nheads, _slen, _dim)),
+            self._make_cache(_bsize, _nheads, _slen, _dim),
+        )
+        DYN = torch.export.Dim.DYNAMIC
+        dynamic_shapes = {"x": {0: DYN, 2: DYN}, "cache": [{0: DYN, 2: DYN}] * 4}
+
+        tracer = GraphTracer()
+        with register_flattening_functions(patch_transformers=True):
+            graph = tracer.trace(model, inputs, dynamic_shapes=dynamic_shapes)
+        graph.lint()
+
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(ph_nodes), 5)
+        ph_names = [n.name for n in ph_nodes]
+        self.assertIn("x", ph_names)
+        # cache tensors should be named cache_0 … cache_3
+        for i in range(4):
+            self.assertIn(f"cache_{i}", ph_names)
+
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        output_val = output_node.args[0]
+        self.assertIsInstance(output_val, tuple)
+        self.assertEqual(len(output_val), 5)
+
+
 class TestGraphTracerTorchCheck(ExtTestCase):
     """Tests for torch._check interception in GraphTracer."""
 
