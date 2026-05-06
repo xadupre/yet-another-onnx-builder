@@ -1527,7 +1527,9 @@ class GraphTracer:
 
         sub_operands: List[Any] = []
 
-        def _make_sub_shape(shape: TracingShape, ph: torch.fx.Node, device_str: str) -> TracingShape:
+        def _make_sub_shape(
+            shape: TracingShape, ph: torch.fx.Node, device_str: str
+        ) -> TracingShape:
             """Return a TracingShape whose symbolic TracingInts point to *ph* in the sub-graph.
 
             The TracingInts in *shape* may reference the parent graph's placeholder
@@ -1559,6 +1561,18 @@ class GraphTracer:
                 tt = sub._make_tracing_tensor(fresh_shape, s.dtype, s.device, ph)
                 ph.meta["val"] = tt
                 sub_operands.append(tt)
+            elif isinstance(s, torch.Tensor):
+                # Plain (concrete) tensor used as a carry state: create a
+                # placeholder so that carry operations (e.g. clone) appear as
+                # FX nodes rather than eager calls.  Without a placeholder the
+                # body FX graph has fewer inputs than the scan body function
+                # expects, causing an arity mismatch in the ONNX local function
+                # call and incorrect shape inference in ORT.
+                ph = sub.graph.placeholder(f"carry_{i}")
+                concrete_shape = TracingShape(tuple(int(d) for d in s.shape))
+                tt = sub._make_tracing_tensor(concrete_shape, s.dtype, s.device, ph)
+                ph.meta["val"] = tt
+                sub_operands.append(tt)
             else:
                 sub_operands.append(s)
 
@@ -1582,9 +1596,7 @@ class GraphTracer:
         for i, s in enumerate(additional_inputs):
             if isinstance(s, TracingTensor):
                 ph = sub.graph.placeholder(f"additional_{i}")
-                fresh_shape = _make_sub_shape(
-                    s.shape, ph, str(s.device) if s.device else "cpu"
-                )
+                fresh_shape = _make_sub_shape(s.shape, ph, str(s.device) if s.device else "cpu")
                 tt = sub._make_tracing_tensor(fresh_shape, s.dtype, s.device, ph)
                 ph.meta["val"] = tt
                 sub_operands.append(tt)
@@ -1650,6 +1662,14 @@ class GraphTracer:
             if isinstance(s, TracingTensor):
                 get_node = self.graph.call_function(operator.getitem, args=(node, i), kwargs={})
                 tt = self._make_tracing_tensor(s.shape, s.dtype, s.device, get_node)
+                get_node.meta["val"] = tt
+                results.append(tt)
+            elif isinstance(s, torch.Tensor):
+                # Plain tensor carry: wrap the scan output in a TracingTensor so
+                # that callers that access it get a proper symbolic value.
+                get_node = self.graph.call_function(operator.getitem, args=(node, i), kwargs={})
+                concrete_shape = TracingShape(tuple(int(d) for d in s.shape))
+                tt = self._make_tracing_tensor(concrete_shape, s.dtype, s.device, get_node)
                 get_node.meta["val"] = tt
                 results.append(tt)
             else:
