@@ -225,22 +225,10 @@ class GraphTracer:
 
         # For pytree-registered types (e.g. DynamicCache), flatten and check
         # whether any leaf is a tensor.
-        try:
-            flat, _ = torch.utils._pytree.tree_flatten(value)
-            if flat:
-                return not any(isinstance(v, torch.Tensor) for v in flat)
-            return True
-        except (TypeError, ValueError, AttributeError, NotImplementedError):
-            # Pytree flattening failed: the type is not registered or not
-            # recognised; fall through to raise TypeError below.
-            pass
-
-        from ...helpers import string_type
-
-        raise TypeError(
-            f"Cannot determine if type {type(value)} "
-            f"is a constant argument {string_type(value)}"
-        )
+        flat, _ = torch.utils._pytree.tree_flatten(value)
+        if flat:
+            return not any(isinstance(v, torch.Tensor) for v in flat)
+        return True
 
     def _tracing_int_to_fake(self, ti: TracingInt) -> Union[int, "torch.SymInt"]:
         """
