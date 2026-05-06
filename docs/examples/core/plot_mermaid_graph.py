@@ -29,7 +29,7 @@ import numpy as np
 import onnx
 import onnx.helper as oh
 import onnx.numpy_helper as onh
-from IPython.display import SVG as IPythonSVG
+from IPython.display import HTML
 from yobx.doc import draw_graph_mermaid
 from yobx.helpers.mermaid_helper import to_mermaid
 
@@ -76,7 +76,8 @@ print(mermaid_src)
 # Display the graph
 # ------------------
 #
-# The diagram is rendered by ``mmdc`` to SVG and displayed using
-# :class:`IPython.display.SVG`.
+# The diagram is rendered to SVG via the ``mermaid.ink`` online service (through
+# :epkg:`mermaid-py`) and displayed by wrapping the SVG content in
+# :class:`IPython.display.HTML` so that sphinx-gallery captures and embeds it.
 
-IPythonSVG(draw_graph_mermaid(model))
+HTML(draw_graph_mermaid(model))
