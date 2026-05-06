@@ -152,7 +152,7 @@ share some of them. The common parameters accepted by all backends are:
   has its ``report`` attribute populated with per-pattern optimization
   statistics.
 
-Oother options are specific to every converter and control the way
+Other options are specific to every converter and control the way
 a model is captured or converted. It is possible to output
 the decision path for trees or ensembles in :epkg:`scikit-learn`.
 
