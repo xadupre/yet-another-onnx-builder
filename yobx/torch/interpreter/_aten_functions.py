@@ -8182,7 +8182,7 @@ def aten__local_scalar_dense(
     x: T,
     name: str = "_local_scalar_dense",
 ) -> T:
-    "_local_scalar_dense"
+    """Converts ``aten._local_scalar_dense`` (``tensor.item()``) to ONNX via :func:`aten_item`."""
     return aten_item(g, sts, outputs, x, name=name)
 
 

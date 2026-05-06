@@ -203,7 +203,7 @@ class TracingTensor(torch.Tensor):
 
         return result_node
 
-    def item(self) -> Union[int, float, "TracingInt"]:  # type: ignore[override]
+    def item(self) -> Union[int, float, TracingInt]:  # type: ignore[override]
         """
         Intercepts ``.item()`` during tracing to return a symbolic
         :class:`TracingInt` backed by a graph node instead of raising an
