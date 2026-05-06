@@ -496,10 +496,6 @@ def _is_exporting_replacement_ctx() -> Generator:
     scan-based implementation) while the new tracer is active.
 
     The original implementation is restored unconditionally on exit.
-
-    Yields:
-        Control while ``torch.compiler.is_exporting`` is temporarily replaced,
-        then restores the original implementation on exit.
     """
     _compiler = getattr(torch, "compiler", None)
     if _ORIGINAL_IS_EXPORTING is None or _compiler is None:

@@ -835,7 +835,7 @@ class TestNewTracingTracer(ExtTestCase):
         "torch.ops.higher_order.scan not available",
     )
     def test_trace_scan_decomposition_151564(self):
-        """ControlFlowScanDecomposition_151564 is correctly traced with new tracing.
+        """Traces ControlFlowScanDecomposition_151564 correctly with new tracing.
 
         The model uses ``torch.compiler.is_exporting()`` to select a
         ``torch.ops.higher_order.scan``-based implementation at export time.
