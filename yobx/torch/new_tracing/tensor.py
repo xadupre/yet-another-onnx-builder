@@ -457,7 +457,9 @@ class TracingTensor(torch.Tensor):
         assert tracer is not None, "__setitem__ requires an active tracer"
 
         def _unwrap(idx: Any) -> Any:
-            """Unwraps a TracingTensor/TracingInt index to its FX node or returns the index itself."""
+            """Unwraps a TracingTensor/TracingInt index to its FX node.
+
+            Returns the index itself for any other type."""
             if isinstance(idx, TracingTensor):
                 return idx._node
             if isinstance(idx, TracingInt):

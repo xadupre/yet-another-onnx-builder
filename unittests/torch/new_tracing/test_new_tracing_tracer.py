@@ -849,7 +849,6 @@ class TestNewTracingTracer(ExtTestCase):
         """
         from yobx.torch.testing._model_eval_cases import ControlFlowScanDecomposition_151564
 
-        DYN = torch.export.Dim.DYNAMIC
         model = ControlFlowScanDecomposition_151564()
         inputs = model._inputs[0]
         dynamic_shapes = model._dynamic
