@@ -391,7 +391,7 @@ for fig_idx, (row, extra_title) in enumerate(
     label = row["label"]
     na = row[f"nodes_{sgA}"]
     nb = row[f"nodes_{sgB}"]
-    fig_g, axes_g = plt.subplots(1, 2, figsize=(18, 8))
+    fig_g, axes_g = plt.subplots(2, 1, figsize=(9, 16))
     for ax_g, key, model_key, n_nodes in [
         (axes_g[0], "ML — decompose_einsum", f"model_{sgA}", na),
         (axes_g[1], "Naive2 — decompose_einsum_2inputs", f"model_{sgB}", nb),
@@ -411,20 +411,20 @@ for fig_idx, (row, extra_title) in enumerate(
 # 7. Charts
 # ---------
 #
-# **Top-left** — node count per equation (all three strategies).
-# **Top-right** — concrete FLOPs per equation (A and B; C has no estimator).
-# **Bottom-left** — operator-type distribution for the representative equation.
-# **Bottom-right** — mean inference time per equation (all three strategies).
+# **Row 1** — node count per equation (all three strategies).
+# **Row 2** — concrete FLOPs per equation (A and B; C has no estimator).
+# **Row 3** — operator-type distribution for the representative equation.
+# **Row 4** — mean inference time per equation (all three strategies).
 
 equations_labels = [f"{r['equation']}\n({r['label']})" for r in results]
 x = np.arange(len(results))
 width = 0.25
 colors = {sgA: "#4c72b0", sgB: "#dd8452", sgC: "#55a868"}
 
-fig, axes = plt.subplots(2, 2, figsize=(16, 10))
+fig, axes = plt.subplots(4, 1, figsize=(12, 20))
 
-# Top-left: node count (all three)
-ax = axes[0, 0]
+# Row 1: node count (all three)
+ax = axes[0]
 for offset, key in [(-width, sgA), (0, sgB), (width, sgC)]:
     bars = ax.bar(
         x + offset, [r[f"nodes_{key}"] for r in results], width, label=key, color=colors[key]
@@ -444,8 +444,8 @@ ax.set_ylabel("ONNX node count")
 ax.set_title("Graph complexity (node count)", fontsize=9)
 ax.legend(fontsize=8)
 
-# Top-right: concrete FLOPs — A and B only (C has no estimator)
-ax2 = axes[0, 1]
+# Row 2: concrete FLOPs — A and B only (C has no estimator)
+ax2 = axes[1]
 x_flops = [i for i, r in enumerate(results) if r[f"flops_{sgA}"] is not None]
 fa_vals = [results[i][f"flops_{sgA}"] for i in x_flops]
 fb_vals = [results[i][f"flops_{sgB}"] for i in x_flops]
@@ -459,8 +459,8 @@ ax2.set_ylabel("Total FLOPs")
 ax2.set_title(f"Estimated FLOPs ({sgA} and {sgB}; Einsum omitted — no estimator)", fontsize=9)
 ax2.legend(fontsize=8)
 
-# Bottom-left: op-type distribution for the representative equation
-ax3 = axes[1, 0]
+# Row 3: op-type distribution for the representative equation
+ax3 = axes[2]
 xo = np.arange(len(all_op_types))
 for offset, key, counts in [(-width, sgA, counts_a), (0, sgB, counts_b), (width, sgC, counts_c)]:
     ax3.bar(xo + offset, counts, width, label=key, color=colors[key])
@@ -470,8 +470,8 @@ ax3.set_ylabel("Node count")
 ax3.set_title(f"Operator-type distribution — '{target_eq}'", fontsize=9)
 ax3.legend(fontsize=8)
 
-# Bottom-right: benchmark (ms/inference, all three strategies)
-ax4 = axes[1, 1]
+# Row 4: benchmark (ms/inference, all three strategies)
+ax4 = axes[3]
 for offset, key in [(-width, sgA), (0, sgB), (width, sgC)]:
     ax4.bar(x + offset, [r[f"ms_{key}"] for r in results], width, label=key, color=colors[key])
 ax4.set_xticks(x)
