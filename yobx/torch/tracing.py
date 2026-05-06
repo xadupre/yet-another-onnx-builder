@@ -1054,42 +1054,28 @@ than attempting to execute them immediately.
 
 def _flatten_cache_output(result: Any) -> Any:
     """
-    Flattens any :class:`transformers.cache_utils.DynamicCache` (or
-    ``StaticCache``) found in a model output tuple into individual tensors.
+    Flattens a model output that may contain cache objects into a flat tuple
+    of individual tensors using :mod:`torch.utils._pytree`.
 
     This is used by the :class:`FlatArgWrap` wrapper inside
     :meth:`CustomTracer.make_wrapped_model` to ensure the traced FX graph
     always returns plain tensors rather than opaque cache objects, which the
     ONNX interpreter cannot handle in the output.  Works correctly with both
     real tensors (at evaluation time) and :class:`CustomProxy` objects (at
-    symbolic tracing time).
+    symbolic tracing time), provided the relevant pytree flattening functions
+    are registered (e.g. via
+    :func:`yobx.torch.flatten.register_flattening_functions`).
 
     :param result: the raw return value from the wrapped model forward.
 
     Returns:
-        A tuple (or list) with any cache objects replaced by their
-        constituent key/value tensors.
+        A tuple of leaf tensors obtained by flattening *result* with
+        :func:`torch.utils._pytree.tree_flatten`.
     """
-    if not isinstance(result, (list, tuple)):
-        return (result,)
-    flat = []
-    for item in result:
-        if item is None:
-            flat.append(item)
-        elif item.__class__.__name__ in (
-            "DynamicCache",
-            "StaticCache",
-            "EncoderDecoderCache",
-        ):
-            from .in_transformers.cache_helper import CacheKeyValue
+    import torch.utils._pytree as pytree
 
-            ca = CacheKeyValue(item)
-            flat.extend(ca.aslist())
-        elif isinstance(item, (list, tuple)):
-            flat.extend(_flatten_cache_output(item))
-        else:
-            flat.append(item)
-    return type(result)(flat) if isinstance(result, tuple) else flat
+    leaves, _ = pytree.tree_flatten(result)
+    return tuple(leaves)
 
 
 class CustomTracer(torch.fx.Tracer):
