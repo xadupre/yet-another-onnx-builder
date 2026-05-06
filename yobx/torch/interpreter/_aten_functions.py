@@ -15306,8 +15306,8 @@ def aten_tensor(
     x: T,
     indices: Optional[Tuple[Any, ...]] = None,
     dtype: Optional[Any] = None,
-    device: Optional[Any] = None,
-    requires_grad: bool = False,
+    device: Optional[Any] = None,  # ignored – ONNX device placement is runtime-controlled
+    requires_grad: bool = False,  # ignored – ONNX has no autograd
 ) -> T:
     "[..., :, ...]"
     if indices is None:
