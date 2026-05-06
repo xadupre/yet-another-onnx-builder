@@ -197,6 +197,10 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_vmap_python_yobx(self):
         evaluation(cases="VmapPython", exporters="yobx", quiet=False, dynamic=True)
 
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_vmap_python_new_tracing(self):
+        evaluation(cases="VmapPython", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
     def test_run_exporter_vmap_tracing(self):
         evaluation(cases="Vmap", exporters="yobx-tracing", quiet=False, dynamic=True)
 
