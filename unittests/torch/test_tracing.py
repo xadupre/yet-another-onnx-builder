@@ -1863,6 +1863,60 @@ class TestTorchCheckConstraints(ExtTestCase):
         # value > 1 → still returns proxy (we don't know if value > 1)
         self.assertIsInstance(proxy > 1, CustomProxyBool)
 
+    def test_custom_proxy_bool_bool_positivity_self_registers(self):
+        """Tests that CustomProxyBool.__bool__ self-registers positivity when used with ``and``.
+
+        This covers the :class:`ControlFlowNumelZero4
+        <yobx.torch.testing._model_eval_cases.ControlFlowNumelZero4>` pattern
+        where Python's ``and`` operator evaluates ``bool(proxy > 0)`` for the
+        left operand before ``_torch_check_for_tracing`` is called.
+
+        ``bool(CustomProxyBool_for_proxy_gt_0)`` must propagate
+        ``only_positive=True`` to the underlying :class:`CustomProxyInt` proxy
+        and return ``True`` so that the right operand of ``and`` is evaluated
+        and can be passed to :func:`_torch_check_for_tracing`.
+        """
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt, CustomProxyBool
+
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        tracer = CustomTracer()
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
+        proxy = tracer.proxy(node, cls=CustomProxyInt)
+        self.assertFalse(proxy.only_positive, "should not be registered yet")
+
+        # Simulate: bool(proxy > 0)  ← left operand of `and`
+        bool_proxy = proxy > 0
+        self.assertIsInstance(bool_proxy, CustomProxyBool)
+        result = bool(bool_proxy)
+        self.assertTrue(result, "positivity condition must resolve to True")
+        self.assertTrue(proxy.only_positive, "must be marked only_positive after bool()")
+        self.assertFalse(proxy.can_be_null, "must clear can_be_null after bool()")
+
+    def test_custom_proxy_bool_bool_ge_positivity_self_registers(self):
+        """Tests that CustomProxyBool.__bool__ handles ``proxy >= 1`` as a positivity check."""
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt, CustomProxyBool
+
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        tracer = CustomTracer()
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
+        proxy = tracer.proxy(node, cls=CustomProxyInt)
+        self.assertFalse(proxy.only_positive)
+
+        bool_proxy = proxy >= 1
+        self.assertIsInstance(bool_proxy, CustomProxyBool)
+        result = bool(bool_proxy)
+        self.assertTrue(result)
+        self.assertTrue(proxy.only_positive)
+        self.assertFalse(proxy.can_be_null)
+
     def test_tracing_with_torch_check_and_shape_constraint(self):
         """
         Tracing a model that calls torch._check with a shape comparison

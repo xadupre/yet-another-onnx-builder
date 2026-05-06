@@ -330,6 +330,11 @@ class TestModelEvalCases(ExtTestCase):
             cases="ControlFlowNumelZero3", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_controlflow_numel_zero_4_tracing(self):
+        evaluation(
+            cases="ControlFlowNumelZero4", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
     def test_run_exporter_controlflow_numel_zero_4_new_tracing(self):
         evaluation(
             cases="ControlFlowNumelZero4", exporters="yobx-new-tracing", quiet=False, dynamic=True
