@@ -483,6 +483,11 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    def test_run_exporter_signature_shape_as_index_new_tracing(self):
+        evaluation(
+            cases="SignatureShapeAsIndex", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
     @requires_transformers("5.0")
     def test_run_exporter_tiny_llm_export_nostrict(self):
         evaluation(cases="TinyLLM", exporters="export-nostrict", quiet=False, dynamic=True)
