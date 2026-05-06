@@ -2491,9 +2491,22 @@ class GraphTracer:
         # Expose any registered callables (e.g. scan body functions) as
         # attributes on the traced module so that the downstream interpreter's
         # ``get_attr`` handler can retrieve them.
+        #
+        # For scan body functions (keys starting with ``_cb_scan_``) that have
+        # been traced into a sub-graph, expose the already-traced
+        # ``torch.fx.GraphModule`` instead of the raw Python callable.  This
+        # prevents the interpreter from re-tracing the body with the old
+        # symbolic ``CustomTracer``, which cannot correctly handle
+        # ``TracingInt``-backed slice endpoints (e.g. ``row[:p.item()]``
+        # assignments emit ``CustomProxy`` objects inside FX node slice args).
         if isinstance(func, torch.nn.Module) and self._callables:
             for k, v in self._callables.items():
-                setattr(func, k, v)
+                if k in self._sub_tracers and k.startswith("_cb_scan_"):
+                    sub = self._sub_tracers[k]
+                    gm = torch.fx.GraphModule(torch.nn.Module(), sub.graph)
+                    setattr(func, k, gm)
+                else:
+                    setattr(func, k, v)
 
         def _to_output_node(x: Any) -> Any:
             if isinstance(x, TracingTensor):

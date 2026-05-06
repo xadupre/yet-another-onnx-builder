@@ -639,9 +639,7 @@ class FxGraphInterpreter:
                     # Concrete tensor literal (not a traced FX node) -
                     # extract type/shape info directly from the tensor value.
                     full_shape = tuple(inp_node.shape)
-                    shape = (
-                        full_shape[1:] if strip_first_dim and len(full_shape) > 1 else full_shape
-                    )
+                    shape = full_shape[1:] if strip_first_dim else full_shape
                     onnx_dtype = torch_dtype_to_onnx_dtype(inp_node.dtype)
                     # device.index is None for CPU, int index for CUDA.
                     dev = inp_node.device.index
@@ -652,9 +650,7 @@ class FxGraphInterpreter:
                 dtype = self.builder.get_type(name)
                 if self.builder.has_shape(name):
                     full_shape = self.builder.get_shape(name)
-                    shape = (
-                        full_shape[1:] if strip_first_dim and len(full_shape) > 1 else full_shape
-                    )
+                    shape = full_shape[1:] if strip_first_dim else full_shape
                 elif self.builder.has_rank(name):
                     rank = self.builder.get_rank(name)
                     n = max(0, rank - 1) if strip_first_dim else rank
