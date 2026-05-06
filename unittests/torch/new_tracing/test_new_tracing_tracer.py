@@ -794,6 +794,42 @@ class TestNewTracingTracer(ExtTestCase):
         get_attr_nodes = [n for n in graph.nodes if n.op == "get_attr"]
         self.assertGreater(len(get_attr_nodes), 0, "No get_attr node for scan callable")
 
+    @unittest.skipIf(
+        not hasattr(getattr(torch.ops, "higher_order", None), "scan"),
+        "torch.ops.higher_order.scan not available",
+    )
+    def test_trace_patched_vmap(self):
+        """patched_vmap routes TracingTensor dynamic batch dims to scan."""
+        from yobx.torch.testing._model_eval_cases import patched_vmap
+
+        def _mul_plus_one(a, b):
+            return a * b + 1
+
+        class VmapModel(torch.nn.Module):
+            def forward(self, x, y):
+                return patched_vmap(_mul_plus_one)(x, y)
+
+        DYN = torch.export.Dim.DYNAMIC
+        model = VmapModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            model,
+            (torch.tensor([1.0, 2.0, 3.0]), torch.tensor([0.1, 0.2, 0.3])),
+            dynamic_shapes={"x": {0: DYN}, "y": {0: DYN}},
+        )
+        graph.lint()
+
+        # Exactly one scan call_function node.
+        scan_op = torch.ops.higher_order.scan
+        scan_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is scan_op]
+        self.assertEqual(len(scan_nodes), 1, f"Expected 1 scan node, got: {scan_nodes}")
+
+        # The scan body sub-tracer is registered.
+        self.assertTrue(
+            any("scan" in k for k in tracer._sub_tracers),
+            f"No scan sub-tracer found in {list(tracer._sub_tracers)}",
+        )
+
     # ------------------------------------------------------------------
     # module_leaves support
     # ------------------------------------------------------------------
