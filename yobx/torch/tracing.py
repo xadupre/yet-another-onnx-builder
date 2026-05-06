@@ -1065,7 +1065,9 @@ def _flatten_cache_output(result: Any) -> Any:
     symbolic tracing time).
 
     :param result: the raw return value from the wrapped model forward.
-    :return: a tuple (or list) with any cache objects replaced by their
+
+    Returns:
+        A tuple (or list) with any cache objects replaced by their
         constituent key/value tensors.
     """
     if not isinstance(result, (list, tuple)):
@@ -1378,14 +1380,14 @@ class CustomTracer(torch.fx.Tracer):
             _, cache_context = flatten_dynamic_cache(concrete_args["cache"])
 
             def make_method(args_names):
-                first_arg = args_names[0]
+                input_tensor_name = args_names[0]
                 args_str = ", ".join(args_names)
                 cache_args_str = ", ".join(args_names[1:])
                 src = textwrap.dedent(f"""
                     def f(self, {args_str}):
                         _cache_tensors = [{cache_args_str}]
                         _cache = _unflatten_cache(_cache_tensors, self._cache_context)
-                        _result = self._traced_m1({first_arg}, _cache)
+                        _result = self._traced_m1({input_tensor_name}, _cache)
                         return _flatten_output(_result)
                     """)
                 ns = {
