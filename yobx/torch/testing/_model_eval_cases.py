@@ -76,14 +76,14 @@ def patched_vmap(func, in_dims=0, out_dims=0, use_scan: bool = False):
             # symbolic dimensions from new-tracing (TracingInt) are returned
             # rather than the concrete placeholder integer stored in the
             # underlying tensor wrapper.
-            _bs = arg.shape[in_dim]
-            if batch_size is not None and isinstance(batch_size, int) and isinstance(_bs, int):
-                assert batch_size == _bs, (
+            bs = arg.shape[in_dim]
+            if batch_size is not None and isinstance(batch_size, int) and isinstance(bs, int):
+                assert batch_size == bs, (
                     f"Unable to continue, batch_size={batch_size}, in_dim={in_dim}, "
-                    f"arg.shape[in_dim]={_bs}"
+                    f"arg.shape[in_dim]={bs}"
                 )
             if batch_size is None:
-                batch_size = _bs
+                batch_size = bs
             arg = arg.movedim(in_dim, 0)
             batched_args.append(arg)
 
