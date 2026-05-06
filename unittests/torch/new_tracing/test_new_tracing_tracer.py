@@ -1210,6 +1210,10 @@ class TestNewTracingDynamicCache(ExtTestCase):
             import transformers  # noqa: F401
         except ImportError:
             raise unittest.SkipTest("transformers not installed")
+        from yobx.pv_version import PvVersion
+
+        if PvVersion(transformers.__version__) < PvVersion("4.57"):
+            raise unittest.SkipTest("test requires transformers>=4.57")
         from yobx.torch import register_flattening_functions
         from yobx.torch.testing._model_eval_cases import DynamicCacheInput
 
