@@ -490,12 +490,15 @@ class TestCustomTracer(ExtTestCase):
             wrapped, arg_names = CustomTracer.make_wrapped_model(model, concrete_args)
         self.assertIsInstance(wrapped, torch.nn.Module)
         self.assertTrue(hasattr(wrapped, "_traced_m1"))
+        self.assertTrue(hasattr(wrapped, "_cache_context"))
         self.assertEqual(arg_names[0], "x")
         x = torch.randn(2, 5, 16)
         key = torch.randn(2, 4, 5, 8)
         val = torch.randn(2, 4, 5, 8)
         result = wrapped(x, key, val)
-        self.assertEqual(result.shape, torch.Size([2, 5, 16]))
+        # The wrapper flattens the output to a tuple of individual tensors.
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(result[0].shape, torch.Size([2, 5, 16]))
 
 
 @requires_torch("2.0")
