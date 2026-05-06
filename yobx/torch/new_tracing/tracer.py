@@ -2503,7 +2503,11 @@ class GraphTracer:
             for k, v in self._callables.items():
                 if k in self._sub_tracers and k.startswith("_cb_scan_"):
                     sub = self._sub_tracers[k]
-                    gm = torch.fx.GraphModule(torch.nn.Module(), sub.graph)
+                    # An empty root Module is sufficient: the scan body
+                    # sub-graph has no parameters or buffers, only placeholder
+                    # inputs and pure-function FX nodes.
+                    root_module = torch.nn.Module()
+                    gm = torch.fx.GraphModule(root_module, sub.graph)
                     setattr(func, k, gm)
                 else:
                     setattr(func, k, v)
