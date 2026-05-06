@@ -555,6 +555,18 @@ class TestModelEvalCases(ExtTestCase):
             cases="DynamicCacheInputMixedLayers", exporters="yobx", quiet=False, dynamic=False
         )
 
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_new_tracing(self):
+        evaluation(
+            cases="DynamicCacheInput", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_new_tracing_static(self):
+        evaluation(
+            cases="DynamicCacheInput", exporters="yobx-new-tracing", quiet=False, dynamic=False
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
