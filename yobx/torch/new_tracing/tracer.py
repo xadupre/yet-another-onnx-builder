@@ -1501,11 +1501,36 @@ class GraphTracer:
 
         sub_operands: List[Any] = []
 
+        def _make_sub_shape(shape: TracingShape, ph: torch.fx.Node, device_str: str) -> TracingShape:
+            """Return a TracingShape whose symbolic TracingInts point to *ph* in the sub-graph.
+
+            The TracingInts in *shape* may reference the parent graph's placeholder
+            nodes (via ``_source_node``/``_source_dim``).  To allow the sub-tracer
+            to emit ``aten.sym_size.int`` nodes that correctly reference the
+            sub-graph's placeholder (e.g. in :meth:`_handle_zeros`), we create
+            fresh :class:`TracingInt` objects with ``_source_node = ph`` and
+            ``_source_dim = j`` so that ``_emit_sym_size_node`` uses the correct
+            sub-graph node.
+            """
+            fresh_dims: List[Any] = []
+            for j, d in enumerate(shape.dims):
+                if isinstance(d, TracingInt) and not d.is_static:
+                    fresh_ti = TracingInt(d.value)
+                    fresh_ti._source_node = ph
+                    fresh_ti._source_dim = j
+                    fresh_ti._tracer = sub
+                    fresh_ti._device = device_str
+                    fresh_dims.append(fresh_ti)
+                else:
+                    fresh_dims.append(d)
+            return TracingShape(fresh_dims)
+
         # Carry (init state) inputs: same shape as init_states.
         for i, s in enumerate(init_states):
             if isinstance(s, TracingTensor):
                 ph = sub.graph.placeholder(f"carry_{i}")
-                tt = sub._make_tracing_tensor(s.shape, s.dtype, s.device, ph)
+                fresh_shape = _make_sub_shape(s.shape, ph, str(s.device) if s.device else "cpu")
+                tt = sub._make_tracing_tensor(fresh_shape, s.dtype, s.device, ph)
                 ph.meta["val"] = tt
                 sub_operands.append(tt)
             else:
@@ -1518,7 +1543,10 @@ class GraphTracer:
                     TracingShape(s.shape[1:]) if len(s.shape) > 1 else TracingShape(())
                 )
                 ph = sub.graph.placeholder(f"scan_elem_{i}")
-                tt = sub._make_tracing_tensor(stripped_shape, s.dtype, s.device, ph)
+                fresh_shape = _make_sub_shape(
+                    stripped_shape, ph, str(s.device) if s.device else "cpu"
+                )
+                tt = sub._make_tracing_tensor(fresh_shape, s.dtype, s.device, ph)
                 ph.meta["val"] = tt
                 sub_operands.append(tt)
             else:
@@ -1528,7 +1556,10 @@ class GraphTracer:
         for i, s in enumerate(additional_inputs):
             if isinstance(s, TracingTensor):
                 ph = sub.graph.placeholder(f"additional_{i}")
-                tt = sub._make_tracing_tensor(s.shape, s.dtype, s.device, ph)
+                fresh_shape = _make_sub_shape(
+                    s.shape, ph, str(s.device) if s.device else "cpu"
+                )
+                tt = sub._make_tracing_tensor(fresh_shape, s.dtype, s.device, ph)
                 ph.meta["val"] = tt
                 sub_operands.append(tt)
             else:
@@ -1830,7 +1861,16 @@ class GraphTracer:
                     assert isinstance(symd_name, str), "type checking"
                     self._sym_int_to_dynamic_dimension[symd_name] = dim_key
                 traced_size.append(symd)
-                node_size.append(TracingInt(dim_key))
+                # Emit a sym_size.int FX node so the ONNX interpreter receives
+                # a proper tensor-valued result name (not a raw TracingInt string)
+                # when building the shape for ConstantOfShape.  Only do this when
+                # the source node belongs to the current (sub-)graph; if it points
+                # to a parent graph (e.g. in _trace_branch) we fall back to the
+                # TracingInt path to avoid cross-graph node references.
+                if dim._source_node is not None and dim._source_node.graph is self.graph:
+                    node_size.append(self._emit_sym_size_node(dim))
+                else:
+                    node_size.append(TracingInt(dim_key))
             else:
                 assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
                 traced_size.append(dim)
@@ -1907,7 +1947,16 @@ class GraphTracer:
                     assert isinstance(symd_name, str), "type checking"
                     self._sym_int_to_dynamic_dimension[symd_name] = dim_key
                 traced_size.append(symd)
-                node_size.append(TracingInt(dim_key))
+                # Emit a sym_size.int FX node so the ONNX interpreter receives
+                # a proper tensor-valued result name (not a raw TracingInt string)
+                # when building the shape for ConstantOfShape.  Only do this when
+                # the source node belongs to the current (sub-)graph; if it points
+                # to a parent graph (e.g. in _trace_branch) we fall back to the
+                # TracingInt path to avoid cross-graph node references.
+                if dim._source_node is not None and dim._source_node.graph is self.graph:
+                    node_size.append(self._emit_sym_size_node(dim))
+                else:
+                    node_size.append(TracingInt(dim_key))
             else:
                 assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
                 traced_size.append(dim)
@@ -1984,7 +2033,16 @@ class GraphTracer:
                     assert isinstance(symd_name, str), "type checking"
                     self._sym_int_to_dynamic_dimension[symd_name] = dim_key
                 traced_size.append(symd)
-                node_size.append(TracingInt(dim_key))
+                # Emit a sym_size.int FX node so the ONNX interpreter receives
+                # a proper tensor-valued result name (not a raw TracingInt string)
+                # when building the shape for ConstantOfShape.  Only do this when
+                # the source node belongs to the current (sub-)graph; if it points
+                # to a parent graph (e.g. in _trace_branch) we fall back to the
+                # TracingInt path to avoid cross-graph node references.
+                if dim._source_node is not None and dim._source_node.graph is self.graph:
+                    node_size.append(self._emit_sym_size_node(dim))
+                else:
+                    node_size.append(TracingInt(dim_key))
             else:
                 assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
                 traced_size.append(dim)
