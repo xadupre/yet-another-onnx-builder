@@ -1052,6 +1052,32 @@ than attempting to execute them immediately.
 """
 
 
+def _flatten_model_output(result: Any) -> Any:
+    """
+    Flattens a model output into a flat tuple of leaf tensors using
+    :mod:`torch.utils._pytree`.
+
+    This is used by the :class:`FlatArgWrap` wrapper inside
+    :meth:`CustomTracer.make_wrapped_model` to ensure the traced FX graph
+    always returns plain tensors rather than opaque structured objects
+    (e.g. cache objects), which the ONNX interpreter cannot handle in the
+    output.  Works correctly with both real tensors (at evaluation time)
+    and :class:`CustomProxy` objects (at symbolic tracing time), provided
+    the relevant pytree flattening functions are registered (e.g. via
+    :func:`yobx.torch.flatten.register_flattening_functions`).
+
+    :param result: the raw return value from the wrapped model forward.
+
+    Returns:
+        A tuple of leaf tensors obtained by flattening *result* with
+        :func:`torch.utils._pytree.tree_flatten`.
+    """
+    import torch.utils._pytree as pytree
+
+    leaves, _ = pytree.tree_flatten(result)
+    return tuple(leaves)
+
+
 class CustomTracer(torch.fx.Tracer):
     """
     Defines a custom tracer to trace the execution of a model
@@ -1101,6 +1127,10 @@ class CustomTracer(torch.fx.Tracer):
         # the :class:`CustomProxyInt` associated with the operand of a comparison
         # node so that constraint flags such as ``only_positive`` can be set.
         self._node_proxy_map: Dict[torch.fx.Node, CustomProxy] = {}
+        # Parameter names for the wrapped model (list case). Set by trace() when
+        # make_wrapped_model() is used, so that _proxy_placeholder can populate
+        # node.meta["val"] for flat-arg placeholders.
+        self._new_names: Optional[List[str]] = None
 
     @torch.fx._compatibility.compatibility(is_backward_compatible=True)
     def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
@@ -1247,11 +1277,10 @@ class CustomTracer(torch.fx.Tracer):
     def _proxy_placeholder(self, name, concrete_args, sig, fn_for_analysis):
         res = torch.fx.Tracer._proxy_placeholder(self, name, concrete_args, sig, fn_for_analysis)
         # Pre-populate node meta with the fake tensor so that CustomProxy.__getattr__
-        # can resolve static attributes (dtype, device) to concrete values during
-        # tracing, enabling dtype/device-based control flow without TraceError.
-        # Only handles the dict case; when _traced_concrete_args is a flat list
-        # (pytree-wrapped models), the wrapped parameter names differ from the
-        # originals and the mapping is handled post-trace in the trace() loop.
+        # can resolve static attributes (dtype, device, shape) to concrete values
+        # during tracing, enabling dtype/device-based control flow without TraceError
+        # and providing concrete integer shapes to layer constructors (e.g.
+        # DynamicSlidingWindowLayer(sliding_window=...)).
         if (
             self._traced_concrete_args is not None
             and isinstance(self._traced_concrete_args, dict)
@@ -1260,6 +1289,17 @@ class CustomTracer(torch.fx.Tracer):
             fake = self._traced_concrete_args[name]
             if isinstance(fake, torch.Tensor):
                 res.node.meta["val"] = fake
+        elif (
+            self._traced_concrete_args is not None
+            and isinstance(self._traced_concrete_args, list)
+            and self._new_names is not None
+            and name in self._new_names
+        ):
+            ii = self._new_names.index(name)
+            if ii < len(self._traced_concrete_args):
+                fake = self._traced_concrete_args[ii]
+                if isinstance(fake, torch.Tensor):
+                    res.node.meta["val"] = fake
         return res
 
     def create_args_for_root(self, root_fn, is_module, concrete_args=None):
@@ -1318,31 +1358,41 @@ class CustomTracer(torch.fx.Tracer):
             and isinstance(concrete_args["x"], torch.Tensor)
             and concrete_args["cache"].__class__.__name__ == "DynamicCache"
         ):
-            # this is a not generic case to check one unit test
-            from .in_transformers.cache_helper import make_dynamic_cache
+            from .in_transformers.flatten_class import (
+                flatten_dynamic_cache,
+                unflatten_dynamic_cache,
+            )
+
+            _, cache_context = flatten_dynamic_cache(concrete_args["cache"])
 
             def make_method(args_names):
-                args = ", ".join(args_names)
-                args1 = ", ".join(args_names[1:])
+                input_tensor_name = args_names[0]
+                args_str = ", ".join(args_names)
+                cache_args_str = ", ".join(args_names[1:])
                 src = textwrap.dedent(f"""
-                    def f(self, {args}):
-                        args = [{args1}]
-                        cache = make_dynamic_cache(list(zip(args[::2], args[1::2])))
-                        return self._traced_m1({args[0]}, cache)
+                    def f(self, {args_str}):
+                        _cache_tensors = [{cache_args_str}]
+                        _cache = _unflatten_cache(_cache_tensors, self._cache_context)
+                        _result = self._traced_m1({input_tensor_name}, _cache)
+                        return _flatten_output(_result)
                     """)
-                ns = {"torch": torch, "make_dynamic_cache": make_dynamic_cache}
+                ns = {
+                    "_unflatten_cache": unflatten_dynamic_cache,
+                    "_flatten_output": _flatten_model_output,
+                }
                 exec(src, ns)
                 return ns["f"]
 
             class FlatArgWrap(torch.nn.Module):
-                def __init__(self, m, spec):
+                def __init__(self, m, spec, cache_context):
                     super().__init__()
                     self._traced_m1 = m
                     self._spec = spec
+                    self._cache_context = cache_context
 
                 forward = make_method(args_names)
 
-            return FlatArgWrap(root, spec), args_names
+            return FlatArgWrap(root, spec, cache_context), args_names
 
         # pytree.tree_unflatten does not work on CustomProxy
 
@@ -1426,6 +1476,7 @@ class CustomTracer(torch.fx.Tracer):
                 if verbose > 0:
                     print("[CustomTracer.trace] wraps for serializable args")
                 new_model, new_names = self.make_wrapped_model(root, concrete_args)
+                self._new_names = new_names
                 traced_concrete_args, _ = make_fake_with_dynamic_dimensions(
                     torch_deepcopy(concrete_args), dynamic_shapes
                 )
@@ -1433,6 +1484,7 @@ class CustomTracer(torch.fx.Tracer):
                 traced_model = new_model
             else:
                 new_names = None
+                self._new_names = None
                 self._traced_concrete_args, _ = make_fake_with_dynamic_dimensions(
                     concrete_args, dynamic_shapes
                 )

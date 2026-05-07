@@ -264,7 +264,7 @@ def make_dynamic_cache(
     if (
         key_value_pairs
         and (
-            isinstance(key_value_pairs[0][0], torch._subclasses.fake_tensor.FakeTensor)
+            isinstance(key_value_pairs[0][0], torch.fx.Proxy)
             or (
                 isinstance(key_value_pairs[0][0], torch.Tensor)
                 and type(key_value_pairs[0][0]) is not torch.Tensor
@@ -278,8 +278,9 @@ def make_dynamic_cache(
         )
         for i, layer in enumerate(cache.layers):
             k, v = key_value_pairs[i][0], key_value_pairs[i][1]
-            layer.dtype = k.dtype  # type: ignore
-            layer.device = k.device  # type: ignore
+            if not isinstance(k, torch.fx.Proxy):
+                layer.dtype = k.dtype  # type: ignore
+                layer.device = k.device  # type: ignore
             layer.keys = k  # type: ignore
             layer.values = v  # type: ignore
             layer.is_initialized = True  # type: ignore

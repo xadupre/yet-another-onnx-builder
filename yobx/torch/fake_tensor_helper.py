@@ -183,8 +183,9 @@ class FakeTensorContext:
                 f"Une more recent version of transformers (>=4.55), "
                 f"'layers' not found in class {type(x)}"
             )
-            assert isinstance(dynamic_shapes, list) and (
-                not dynamic_shapes or not isinstance(dynamic_shapes[0], list)
+            assert dynamic_shapes is None or (
+                isinstance(dynamic_shapes, list)
+                and (not dynamic_shapes or not isinstance(dynamic_shapes[0], list))
             ), f"Unexpected dynamic_shapes={dynamic_shapes} for a DynamicCache"
             for il, layer in enumerate(x.layers):
                 assert hasattr(layer, "keys") and hasattr(layer, "values"), (
@@ -192,10 +193,11 @@ class FakeTensorContext:
                     f"not found in class {type(layer)} ({dir(layer)})"
                 )
                 layer.keys = self.make_fake_with_dynamic_dimensions(
-                    layer.keys, dynamic_shapes=dynamic_shapes[il * 2]
+                    layer.keys, dynamic_shapes=dynamic_shapes[il * 2] if dynamic_shapes else None
                 )
                 layer.values = self.make_fake_with_dynamic_dimensions(
-                    layer.values, dynamic_shapes=dynamic_shapes[il * 2 + 1]
+                    layer.values,
+                    dynamic_shapes=dynamic_shapes[il * 2 + 1] if dynamic_shapes else None,
                 )
             return x
         if x.__class__.__name__ == "EncoderDecoderCache":
