@@ -647,6 +647,32 @@ class GraphTracer:
             return self._emit_sym_size_node(x)
         return x
 
+    def _sym_size_node_or_tracing_int(self, dim: TracingInt, dim_key: str) -> Any:
+        """
+        Returns an FX node or a fallback :class:`TracingInt` for use as a shape size argument.
+
+        When *dim* has its ``_source_node`` set to a node in ``self.graph`` (i.e.
+        the TracingInt was produced by a placeholder in the current sub-graph via
+        :meth:`_handle_scan`), an ``aten.sym_size.int`` FX node is emitted so
+        that the ONNX interpreter receives a proper ONNX tensor name rather than a
+        raw symbolic string.  This is required by
+        :meth:`~yobx.xbuilder.graph_builder.GraphBuilder.make_shape_from_results`
+        for building the ``ConstantOfShape`` input in ``torch.zeros`` / ``torch.full``
+        / ``torch.ones`` with dynamic sizes.
+
+        When ``_source_node`` is not set or belongs to a different graph (e.g. in
+        :meth:`_trace_branch` sub-graphs where TracingInts still reference the parent
+        graph's placeholder), the method falls back to ``TracingInt(dim_key)`` to
+        avoid cross-graph node references.
+
+        :param dim: The symbolic :class:`TracingInt` representing the size dimension.
+        :param dim_key: The dimension key string (used for the fallback TracingInt).
+        :returns: An FX :class:`~torch.fx.Node` or a :class:`TracingInt`.
+        """
+        if dim._source_node is not None and dim._source_node.graph is self.graph:
+            return self._emit_sym_size_node(dim)
+        return TracingInt(dim_key)
+
     def _compute_slice_output_dim(self, input_dim: Any, start: Any, stop: Any) -> Any:
         """
         Compute the output dimension size for ``input[start:stop]`` (step=1).
@@ -1472,7 +1498,16 @@ class GraphTracer:
         :return: A flat tuple of :class:`TracingTensor` instances
             ``(carry_0_final, ..., scan_out_0_accum, ...)``.
         """
-        from ._patches import _scan_replacement_ctx, _check_replacement_ctx, _ORIGINAL_TORCH_SCAN
+        from ._patches import (
+            _scan_replacement_ctx,
+            _check_replacement_ctx,
+            _full_replacement_ctx,
+            _zeros_replacement_ctx,
+            _ones_replacement_ctx,
+            _arange_replacement_ctx,
+            _tensor_split_replacement_ctx,
+            _ORIGINAL_TORCH_SCAN,
+        )
 
         additional_inputs = list(additional_inputs) if additional_inputs else []
         n_carry = len(init_states)
@@ -1495,11 +1530,50 @@ class GraphTracer:
 
         sub_operands: List[Any] = []
 
+        def _make_sub_shape(
+            shape: TracingShape, ph: torch.fx.Node, device_str: str
+        ) -> TracingShape:
+            """Return a TracingShape whose symbolic TracingInts point to *ph* in the sub-graph.
+
+            The TracingInts in *shape* may reference the parent graph's placeholder
+            nodes (via ``_source_node``/``_source_dim``).  To allow the sub-tracer
+            to emit ``aten.sym_size.int`` nodes that correctly reference the
+            sub-graph's placeholder (e.g. in :meth:`_handle_zeros`), we create
+            fresh :class:`TracingInt` objects with ``_source_node = ph`` and
+            ``_source_dim = j`` so that ``_emit_sym_size_node`` uses the correct
+            sub-graph node.
+            """
+            fresh_dims: List[Any] = []
+            for j, d in enumerate(shape.dims):
+                if isinstance(d, TracingInt) and not d.is_static:
+                    fresh_ti = TracingInt(d.value)
+                    fresh_ti._source_node = ph
+                    fresh_ti._source_dim = j
+                    fresh_ti._tracer = sub
+                    fresh_ti._device = device_str
+                    fresh_dims.append(fresh_ti)
+                else:
+                    fresh_dims.append(d)
+            return TracingShape(fresh_dims)
+
         # Carry (init state) inputs: same shape as init_states.
         for i, s in enumerate(init_states):
             if isinstance(s, TracingTensor):
                 ph = sub.graph.placeholder(f"carry_{i}")
-                tt = sub._make_tracing_tensor(s.shape, s.dtype, s.device, ph)
+                fresh_shape = _make_sub_shape(s.shape, ph, str(s.device) if s.device else "cpu")
+                tt = sub._make_tracing_tensor(fresh_shape, s.dtype, s.device, ph)
+                ph.meta["val"] = tt
+                sub_operands.append(tt)
+            elif isinstance(s, torch.Tensor):
+                # Plain (concrete) tensor used as a carry state: create a
+                # placeholder so that carry operations (e.g. clone) appear as
+                # FX nodes rather than eager calls.  Without a placeholder the
+                # body FX graph has fewer inputs than the scan body function
+                # expects, causing an arity mismatch in the ONNX local function
+                # call and incorrect shape inference in ORT.
+                ph = sub.graph.placeholder(f"carry_{i}")
+                concrete_shape = TracingShape(tuple(int(d) for d in s.shape))
+                tt = sub._make_tracing_tensor(concrete_shape, s.dtype, s.device, ph)
                 ph.meta["val"] = tt
                 sub_operands.append(tt)
             else:
@@ -1512,7 +1586,10 @@ class GraphTracer:
                     TracingShape(s.shape[1:]) if len(s.shape) > 1 else TracingShape(())
                 )
                 ph = sub.graph.placeholder(f"scan_elem_{i}")
-                tt = sub._make_tracing_tensor(stripped_shape, s.dtype, s.device, ph)
+                fresh_shape = _make_sub_shape(
+                    stripped_shape, ph, str(s.device) if s.device else "cpu"
+                )
+                tt = sub._make_tracing_tensor(fresh_shape, s.dtype, s.device, ph)
                 ph.meta["val"] = tt
                 sub_operands.append(tt)
             else:
@@ -1522,13 +1599,22 @@ class GraphTracer:
         for i, s in enumerate(additional_inputs):
             if isinstance(s, TracingTensor):
                 ph = sub.graph.placeholder(f"additional_{i}")
-                tt = sub._make_tracing_tensor(s.shape, s.dtype, s.device, ph)
+                fresh_shape = _make_sub_shape(s.shape, ph, str(s.device) if s.device else "cpu")
+                tt = sub._make_tracing_tensor(fresh_shape, s.dtype, s.device, ph)
                 ph.meta["val"] = tt
                 sub_operands.append(tt)
             else:
                 sub_operands.append(s)
 
-        with _scan_replacement_ctx(sub), _check_replacement_ctx(sub):
+        with (
+            _scan_replacement_ctx(sub),
+            _check_replacement_ctx(sub),
+            _full_replacement_ctx(sub),
+            _zeros_replacement_ctx(sub),
+            _ones_replacement_ctx(sub),
+            _arange_replacement_ctx(sub),
+            _tensor_split_replacement_ctx(sub),
+        ):
             body_out = f(*sub_operands)
 
         body_out_list: List[Any] = (
@@ -1579,6 +1665,14 @@ class GraphTracer:
             if isinstance(s, TracingTensor):
                 get_node = self.graph.call_function(operator.getitem, args=(node, i), kwargs={})
                 tt = self._make_tracing_tensor(s.shape, s.dtype, s.device, get_node)
+                get_node.meta["val"] = tt
+                results.append(tt)
+            elif isinstance(s, torch.Tensor):
+                # Plain tensor carry: wrap the scan output in a TracingTensor so
+                # that callers that access it get a proper symbolic value.
+                get_node = self.graph.call_function(operator.getitem, args=(node, i), kwargs={})
+                concrete_shape = TracingShape(tuple(int(d) for d in s.shape))
+                tt = self._make_tracing_tensor(concrete_shape, s.dtype, s.device, get_node)
                 get_node.meta["val"] = tt
                 results.append(tt)
             else:
@@ -1816,7 +1910,9 @@ class GraphTracer:
                     assert isinstance(symd_name, str), "type checking"
                     self._sym_int_to_dynamic_dimension[symd_name] = dim_key
                 traced_size.append(symd)
-                node_size.append(TracingInt(dim_key))
+                # Delegate to helper which emits aten.sym_size.int when the source
+                # node belongs to the current graph, or falls back to TracingInt.
+                node_size.append(self._sym_size_node_or_tracing_int(dim, dim_key))
             else:
                 assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
                 traced_size.append(dim)
@@ -1893,7 +1989,9 @@ class GraphTracer:
                     assert isinstance(symd_name, str), "type checking"
                     self._sym_int_to_dynamic_dimension[symd_name] = dim_key
                 traced_size.append(symd)
-                node_size.append(TracingInt(dim_key))
+                # Delegate to helper which emits aten.sym_size.int when the source
+                # node belongs to the current graph, or falls back to TracingInt.
+                node_size.append(self._sym_size_node_or_tracing_int(dim, dim_key))
             else:
                 assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
                 traced_size.append(dim)
@@ -1970,7 +2068,9 @@ class GraphTracer:
                     assert isinstance(symd_name, str), "type checking"
                     self._sym_int_to_dynamic_dimension[symd_name] = dim_key
                 traced_size.append(symd)
-                node_size.append(TracingInt(dim_key))
+                # Delegate to helper which emits aten.sym_size.int when the source
+                # node belongs to the current graph, or falls back to TracingInt.
+                node_size.append(self._sym_size_node_or_tracing_int(dim, dim_key))
             else:
                 assert isinstance(dim, int), f"Unexpected full size element type {type(dim)}"
                 traced_size.append(dim)
@@ -2479,9 +2579,26 @@ class GraphTracer:
         # Expose any registered callables (e.g. scan body functions) as
         # attributes on the traced module so that the downstream interpreter's
         # ``get_attr`` handler can retrieve them.
+        #
+        # For scan body functions (keys starting with ``_cb_scan_``) that have
+        # been traced into a sub-graph, expose the already-traced
+        # ``torch.fx.GraphModule`` instead of the raw Python callable.  This
+        # prevents the interpreter from re-tracing the body with the old
+        # symbolic ``CustomTracer``, which cannot correctly handle
+        # ``TracingInt``-backed slice endpoints (e.g. ``row[:p.item()]``
+        # assignments emit ``CustomProxy`` objects inside FX node slice args).
         if isinstance(func, torch.nn.Module) and self._callables:
             for k, v in self._callables.items():
-                setattr(func, k, v)
+                if k in self._sub_tracers and k.startswith("_cb_scan_"):
+                    sub = self._sub_tracers[k]
+                    # An empty root Module is sufficient: the scan body
+                    # sub-graph has no parameters or buffers, only placeholder
+                    # inputs and pure-function FX nodes.
+                    root_module = torch.nn.Module()
+                    gm = torch.fx.GraphModule(root_module, sub.graph)
+                    setattr(func, k, gm)
+                else:
+                    setattr(func, k, v)
 
         def _to_output_node(x: Any) -> Any:
             if isinstance(x, TracingTensor):

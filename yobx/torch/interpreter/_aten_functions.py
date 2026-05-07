@@ -13027,6 +13027,10 @@ def aten_setitem(
         g.set_type(values, itype)
         g.set_shape(values, tuple())
 
+    # Normalize a bare slice into a list so the len() check below works.
+    if isinstance(indices, slice):
+        indices = [indices]
+
     if g.has_rank(x) and g.get_rank(x) == 1 and g.has_rank(values) and g.get_rank(values) == 1:
         # Uses concat, it might be applicable to other cases. To be improved.
         assert len(indices) == 1 and isinstance(indices[0], slice), (
@@ -13062,7 +13066,7 @@ def aten_setitem(
                 f"{g.get_debug_msg()}"
             )
             stop = g.op.UnsqueezeAnyOpset(index.stop, g.ZERO, name=name)
-        if index.start == 0:
+        if index.start in (0, None):
             res = g.op.Concat(
                 values,
                 g.op.Slice(x, stop, g.op.Shape(x, name=name), g.ZERO, name=name),

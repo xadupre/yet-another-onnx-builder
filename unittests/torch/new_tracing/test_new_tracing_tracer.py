@@ -830,6 +830,60 @@ class TestNewTracingTracer(ExtTestCase):
             f"No scan sub-tracer found in {list(tracer._sub_tracers)}",
         )
 
+    @unittest.skipIf(
+        not hasattr(getattr(torch.ops, "higher_order", None), "scan"),
+        "torch.ops.higher_order.scan not available",
+    )
+    def test_trace_scan_decomposition_151564(self):
+        """Traces ControlFlowScanDecomposition_151564 correctly with new tracing.
+
+        The model uses ``torch.compiler.is_exporting()`` to select a
+        ``torch.ops.higher_order.scan``-based implementation at export time.
+        The scan body performs in-place slice assignment using a dynamic index
+        obtained via ``p.item()``.  Tracing must:
+
+        - patch ``torch.compiler.is_exporting()`` to return ``True`` so the
+          scan code path is selected;
+        - correctly unwrap :class:`TracingInt` objects inside slice endpoints
+          when emitting ``operator.setitem`` FX nodes.
+        """
+        from yobx.torch.testing._model_eval_cases import ControlFlowScanDecomposition_151564
+
+        model = ControlFlowScanDecomposition_151564()
+        inputs = model._inputs[0]
+        dynamic_shapes = model._dynamic
+
+        tracer = GraphTracer()
+        graph = tracer.trace(model, inputs, dynamic_shapes=dynamic_shapes)
+        graph.lint()
+
+        # The scan body must be present as a call_function node.
+        scan_op = torch.ops.higher_order.scan
+        scan_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is scan_op]
+        self.assertGreater(len(scan_nodes), 0, "Expected at least one scan node in the graph")
+
+        # A scan sub-tracer must be registered.
+        self.assertTrue(
+            any("scan" in k for k in tracer._sub_tracers),
+            f"No scan sub-tracer found in {list(tracer._sub_tracers)}",
+        )
+
+        # The setitem node must embed FX nodes for the TracingInt slice stop
+        # (not raw TracingInt objects) so the ONNX interpreter can resolve them.
+        from yobx.torch.new_tracing.shape import TracingInt as _TracingInt
+
+        setitem_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is operator.setitem
+        ]
+        for si in setitem_nodes:
+            idx = si.args[1]
+            if isinstance(idx, slice):
+                self.assertNotIsInstance(
+                    idx.stop,
+                    _TracingInt,
+                    f"setitem slice stop must not be a raw TracingInt, got {idx.stop!r}",
+                )
+
     # ------------------------------------------------------------------
     # module_leaves support
     # ------------------------------------------------------------------

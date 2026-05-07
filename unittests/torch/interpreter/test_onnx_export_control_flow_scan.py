@@ -552,5 +552,40 @@ class TestOnnxExportControlFlow(ExtTestCase):
         self.assertEqualArray(expected, got)
 
 
+    def test_scan_loop_inplace_new_tracing(self):
+        import torch
+        from yobx.torch.export_options import TracingMode
+        from yobx.torch.testing._model_eval_cases import ControlFlowScanDecomposition_151564
+
+        model = ControlFlowScanDecomposition_151564()
+        x, y = model._inputs[0]
+
+        DYN = torch.export.Dim.DYNAMIC
+        onx = to_onnx(
+            model,
+            (x, y),
+            dynamic_shapes={"images": {0: DYN, 1: DYN}, "position": {0: DYN}},
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
+        )
+        self.dump_onnx("test_scan_loop_inplace_new_tracing.onnx", onx)
+        names = [(f.domain, f.name) for f in onx.functions]
+        self.assertEqual(len(names), len(set(names)))
+
+        import onnxruntime
+
+        sess = onnxruntime.InferenceSession(
+            onx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        feeds = {"images": x.numpy(), "position": y.numpy()}
+        got = sess.run(None, feeds)
+        # dummy_loop returns a plain tensor; the scan version wraps the single
+        # accumulated output in a tuple — compare against dummy_loop result.
+        dummy_result = torch.zeros(x.shape)
+        for i in range(y.shape[0]):
+            p = int(y[i].item())
+            dummy_result[i, :p] = x[i, :p]
+        self.assertEqualArray(dummy_result, got[0], atol=1e-5)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
