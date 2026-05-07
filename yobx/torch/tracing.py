@@ -1052,18 +1052,18 @@ than attempting to execute them immediately.
 """
 
 
-def _flatten_cache_output(result: Any) -> Any:
+def _flatten_model_output(result: Any) -> Any:
     """
-    Flattens a model output that may contain cache objects into a flat tuple
-    of individual tensors using :mod:`torch.utils._pytree`.
+    Flattens a model output into a flat tuple of leaf tensors using
+    :mod:`torch.utils._pytree`.
 
     This is used by the :class:`FlatArgWrap` wrapper inside
     :meth:`CustomTracer.make_wrapped_model` to ensure the traced FX graph
-    always returns plain tensors rather than opaque cache objects, which the
-    ONNX interpreter cannot handle in the output.  Works correctly with both
-    real tensors (at evaluation time) and :class:`CustomProxy` objects (at
-    symbolic tracing time), provided the relevant pytree flattening functions
-    are registered (e.g. via
+    always returns plain tensors rather than opaque structured objects
+    (e.g. cache objects), which the ONNX interpreter cannot handle in the
+    output.  Works correctly with both real tensors (at evaluation time)
+    and :class:`CustomProxy` objects (at symbolic tracing time), provided
+    the relevant pytree flattening functions are registered (e.g. via
     :func:`yobx.torch.flatten.register_flattening_functions`).
 
     :param result: the raw return value from the wrapped model forward.
@@ -1378,7 +1378,7 @@ class CustomTracer(torch.fx.Tracer):
                     """)
                 ns = {
                     "_unflatten_cache": unflatten_dynamic_cache,
-                    "_flatten_output": _flatten_cache_output,
+                    "_flatten_output": _flatten_model_output,
                 }
                 exec(src, ns)
                 return ns["f"]
