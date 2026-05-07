@@ -197,6 +197,10 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_vmap_python_yobx(self):
         evaluation(cases="VmapPython", exporters="yobx", quiet=False, dynamic=True)
 
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_vmap_python_new_tracing(self):
+        evaluation(cases="VmapPython", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
     def test_run_exporter_vmap_tracing(self):
         evaluation(cases="Vmap", exporters="yobx-tracing", quiet=False, dynamic=True)
 
@@ -561,6 +565,18 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_dynamic_cache_input_mixed_layers_yobx_static(self):
         evaluation(
             cases="DynamicCacheInputMixedLayers", exporters="yobx", quiet=False, dynamic=False
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_new_tracing(self):
+        evaluation(
+            cases="DynamicCacheInput", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_new_tracing_static(self):
+        evaluation(
+            cases="DynamicCacheInput", exporters="yobx-new-tracing", quiet=False, dynamic=False
         )
 
 

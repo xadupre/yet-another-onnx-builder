@@ -203,6 +203,31 @@ class TracingTensor(torch.Tensor):
 
         return result_node
 
+    def item(self) -> Union[int, float, TracingInt]:  # type: ignore[override]
+        """
+        Intercepts ``.item()`` during tracing to return a symbolic
+        :class:`TracingInt` backed by a graph node instead of raising an
+        error or returning a bare Python scalar.
+
+        When a tracer is active, this method delegates to
+        :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_local_scalar_dense`,
+        which emits an ``aten._local_scalar_dense`` FX node and wraps the
+        result in a :class:`TracingInt`.  The caller can then use the
+        returned :class:`TracingInt` as a dynamic slice endpoint (e.g.
+        ``x[..., :shape.item()]``), which is recognised by
+        :meth:`_index_has_symbolic_tracing_int` and routed through
+        :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_symbolic_getitem`.
+
+        Returns:
+            A :class:`TracingInt` (symbolic) when a tracer is active, or the
+            actual Python scalar when no tracer is present (falls back to
+            :meth:`torch.Tensor.item`).
+        """
+        tracer = self._tracer
+        if tracer is not None:
+            return tracer._handle_local_scalar_dense(self)
+        return super().item()  # type: ignore[misc]
+
     def __repr__(self) -> str:  # type: ignore
         node_name = self._node.name if self._node is not None else "<unregistered>"
         return (
@@ -432,9 +457,24 @@ class TracingTensor(torch.Tensor):
         assert tracer is not None, "__setitem__ requires an active tracer"
 
         def _unwrap(idx: Any) -> Any:
-            """Returns the FX node for a TracingTensor index or the index itself."""
+            """Unwraps a TracingTensor/TracingInt index to its FX node.
+
+            Returns the index itself for any other type."""
             if isinstance(idx, TracingTensor):
                 return idx._node
+            if isinstance(idx, TracingInt):
+                # Symbolic TracingInt (e.g. from .item()) — return its backing
+                # FX node so the ONNX interpreter receives a valid result name.
+                if idx._node is not None:
+                    return idx._node
+                if idx.is_static:
+                    return int(idx)
+                return tracer._emit_sym_size_node(idx)
+            if isinstance(idx, slice):
+                # Recursively unwrap TracingInt start/stop/step so that
+                # symbolic slice endpoints are embedded as FX node references
+                # rather than raw TracingInt objects.
+                return slice(_unwrap(idx.start), _unwrap(idx.stop), _unwrap(idx.step))
             if isinstance(idx, tuple):
                 return tuple(_unwrap(i) for i in idx)
             return idx

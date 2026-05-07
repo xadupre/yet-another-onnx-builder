@@ -72,18 +72,24 @@ def patched_vmap(func, in_dims=0, out_dims=0, use_scan: bool = False):
                 batched_args.append(arg)
                 continue
 
-            assert batch_size is None or batch_size == arg.size(in_dim), (
-                f"Unable to continue, batch_size={batch_size}, in_dim={in_dim}, "
-                f"arg.size(in_dim)={arg.size(in_dim)}"
-            )
+            # Use arg.shape[in_dim] instead of arg.size(in_dim) so that
+            # symbolic dimensions from new-tracing (TracingInt) are returned
+            # rather than the concrete placeholder integer stored in the
+            # underlying tensor wrapper.
+            bs = arg.shape[in_dim]
+            if batch_size is not None and isinstance(batch_size, int) and isinstance(bs, int):
+                assert batch_size == bs, (
+                    f"Unable to continue, batch_size={batch_size}, in_dim={in_dim}, "
+                    f"arg.shape[in_dim]={bs}"
+                )
             if batch_size is None:
-                batch_size = arg.size(in_dim)
+                batch_size = bs
             arg = arg.movedim(in_dim, 0)
             batched_args.append(arg)
 
         if use_scan or (
             all(isinstance(a, torch.Tensor) for a in args)
-            and isinstance(batch_size, torch.SymInt)
+            and not isinstance(batch_size, int)
         ):
             batched_tensors = [
                 (

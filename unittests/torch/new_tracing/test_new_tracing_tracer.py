@@ -794,6 +794,96 @@ class TestNewTracingTracer(ExtTestCase):
         get_attr_nodes = [n for n in graph.nodes if n.op == "get_attr"]
         self.assertGreater(len(get_attr_nodes), 0, "No get_attr node for scan callable")
 
+    @unittest.skipIf(
+        not hasattr(getattr(torch.ops, "higher_order", None), "scan"),
+        "torch.ops.higher_order.scan not available",
+    )
+    def test_trace_patched_vmap(self):
+        """patched_vmap routes TracingTensor dynamic batch dims to scan."""
+        from yobx.torch.testing._model_eval_cases import patched_vmap
+
+        def _mul_plus_one(a, b):
+            return a * b + 1
+
+        class VmapModel(torch.nn.Module):
+            def forward(self, x, y):
+                return patched_vmap(_mul_plus_one)(x, y)
+
+        DYN = torch.export.Dim.DYNAMIC
+        model = VmapModel()
+        tracer = GraphTracer()
+        graph = tracer.trace(
+            model,
+            (torch.tensor([1.0, 2.0, 3.0]), torch.tensor([0.1, 0.2, 0.3])),
+            dynamic_shapes={"x": {0: DYN}, "y": {0: DYN}},
+        )
+        graph.lint()
+
+        # Exactly one scan call_function node.
+        scan_op = torch.ops.higher_order.scan
+        scan_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is scan_op]
+        self.assertEqual(len(scan_nodes), 1, f"Expected 1 scan node, got: {scan_nodes}")
+
+        # The scan body sub-tracer is registered.
+        self.assertTrue(
+            any("scan" in k for k in tracer._sub_tracers),
+            f"No scan sub-tracer found in {list(tracer._sub_tracers)}",
+        )
+
+    @unittest.skipIf(
+        not hasattr(getattr(torch.ops, "higher_order", None), "scan"),
+        "torch.ops.higher_order.scan not available",
+    )
+    def test_trace_scan_decomposition_151564(self):
+        """Traces ControlFlowScanDecomposition_151564 correctly with new tracing.
+
+        The model uses ``torch.compiler.is_exporting()`` to select a
+        ``torch.ops.higher_order.scan``-based implementation at export time.
+        The scan body performs in-place slice assignment using a dynamic index
+        obtained via ``p.item()``.  Tracing must:
+
+        - patch ``torch.compiler.is_exporting()`` to return ``True`` so the
+          scan code path is selected;
+        - correctly unwrap :class:`TracingInt` objects inside slice endpoints
+          when emitting ``operator.setitem`` FX nodes.
+        """
+        from yobx.torch.testing._model_eval_cases import ControlFlowScanDecomposition_151564
+
+        model = ControlFlowScanDecomposition_151564()
+        inputs = model._inputs[0]
+        dynamic_shapes = model._dynamic
+
+        tracer = GraphTracer()
+        graph = tracer.trace(model, inputs, dynamic_shapes=dynamic_shapes)
+        graph.lint()
+
+        # The scan body must be present as a call_function node.
+        scan_op = torch.ops.higher_order.scan
+        scan_nodes = [n for n in graph.nodes if n.op == "call_function" and n.target is scan_op]
+        self.assertGreater(len(scan_nodes), 0, "Expected at least one scan node in the graph")
+
+        # A scan sub-tracer must be registered.
+        self.assertTrue(
+            any("scan" in k for k in tracer._sub_tracers),
+            f"No scan sub-tracer found in {list(tracer._sub_tracers)}",
+        )
+
+        # The setitem node must embed FX nodes for the TracingInt slice stop
+        # (not raw TracingInt objects) so the ONNX interpreter can resolve them.
+        from yobx.torch.new_tracing.shape import TracingInt as _TracingInt
+
+        setitem_nodes = [
+            n for n in graph.nodes if n.op == "call_function" and n.target is operator.setitem
+        ]
+        for si in setitem_nodes:
+            idx = si.args[1]
+            if isinstance(idx, slice):
+                self.assertNotIsInstance(
+                    idx.stop,
+                    _TracingInt,
+                    f"setitem slice stop must not be a raw TracingInt, got {idx.stop!r}",
+                )
+
     # ------------------------------------------------------------------
     # module_leaves support
     # ------------------------------------------------------------------
@@ -1116,6 +1206,100 @@ class TestNewTracingTracer(ExtTestCase):
         self.assertIs(
             result_node, si_node, "Output must reference the setitem node, not the clone node"
         )
+
+
+class TestNewTracingDynamicCache(ExtTestCase):
+    """Tests for GraphTracer tracing models with DynamicCache inputs/outputs."""
+
+    @staticmethod
+    def _make_cache(bsize, nheads, slen, dim):
+        from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
+
+        return make_dynamic_cache(
+            [
+                (torch.rand((bsize, nheads, slen, dim)), torch.rand((bsize, nheads, slen, dim))),
+                (torch.rand((bsize, nheads, slen, dim)), torch.rand((bsize, nheads, slen, dim))),
+            ]
+        )
+
+    def test_trace_dynamic_cache_input_static(self):
+        """GraphTracer traces DynamicCacheInput with static shapes."""
+        try:
+            import transformers  # noqa: F401
+        except ImportError:
+            raise unittest.SkipTest("transformers not installed")
+        from yobx.pv_version import PvVersion
+
+        if PvVersion(transformers.__version__) < PvVersion("4.57"):
+            raise unittest.SkipTest("test requires transformers>=4.57")
+        from yobx.torch import register_flattening_functions
+        from yobx.torch.testing._model_eval_cases import DynamicCacheInput
+
+        _bsize, _nheads, _slen, _dim = 2, 4, 3, 7
+        model = DynamicCacheInput()
+        inputs = (
+            torch.rand((_bsize, _nheads, _slen, _dim)),
+            self._make_cache(_bsize, _nheads, _slen, _dim),
+        )
+        # GraphTracer must be created before register_flattening_functions to
+        # avoid an optree re-registration conflict on some environments.
+        tracer = GraphTracer()
+        with register_flattening_functions(patch_transformers=True):
+            graph = tracer.trace(model, inputs)
+        graph.lint()
+
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        # x + 4 tensors from the 2-layer DynamicCache (key0, val0, key1, val1)
+        self.assertEqual(len(ph_nodes), 5)
+
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        output_val = output_node.args[0]
+        # Output is flattened: x + 4 mean-reduced cache tensors
+        self.assertIsInstance(output_val, tuple)
+        self.assertEqual(len(output_val), 5)
+
+        call_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertEqual(len(call_nodes), 4, "Expected 4 mean.dim nodes (one per cache tensor)")
+
+    def test_trace_dynamic_cache_input_dynamic(self):
+        """GraphTracer traces DynamicCacheInput with dynamic shapes."""
+        try:
+            import transformers  # noqa: F401
+        except ImportError:
+            raise unittest.SkipTest("transformers not installed")
+        from yobx.pv_version import PvVersion
+
+        if PvVersion(transformers.__version__) < PvVersion("4.57"):
+            raise unittest.SkipTest("test requires transformers>=4.57")
+        from yobx.torch import register_flattening_functions
+        from yobx.torch.testing._model_eval_cases import DynamicCacheInput
+
+        _bsize, _nheads, _slen, _dim = 2, 4, 3, 7
+        model = DynamicCacheInput()
+        inputs = (
+            torch.rand((_bsize, _nheads, _slen, _dim)),
+            self._make_cache(_bsize, _nheads, _slen, _dim),
+        )
+        DYN = torch.export.Dim.DYNAMIC
+        dynamic_shapes = {"x": {0: DYN, 2: DYN}, "cache": [{0: DYN, 2: DYN}] * 4}
+
+        tracer = GraphTracer()
+        with register_flattening_functions(patch_transformers=True):
+            graph = tracer.trace(model, inputs, dynamic_shapes=dynamic_shapes)
+        graph.lint()
+
+        ph_nodes = [n for n in graph.nodes if n.op == "placeholder"]
+        self.assertEqual(len(ph_nodes), 5)
+        ph_names = [n.name for n in ph_nodes]
+        self.assertIn("x", ph_names)
+        # cache tensors should be named cache_0 … cache_3
+        for i in range(4):
+            self.assertIn(f"cache_{i}", ph_names)
+
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        output_val = output_node.args[0]
+        self.assertIsInstance(output_val, tuple)
+        self.assertEqual(len(output_val), 5)
 
 
 class TestGraphTracerTorchCheck(ExtTestCase):
