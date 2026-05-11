@@ -2435,6 +2435,26 @@ class CustomTracer(torch.fx.Tracer):
                     set_item_args = {}
                     current_remove = []
                     inplace_functions = []
+                elif aten_name in {"aten::exp_", "aten::sigmoid_"}:
+                    # aten inplace transformation (default-exporter / torch.export path).
+                    # Mirrors the torch.exp_ / torch.sigmoid_ handling in the branch
+                    # below but for OpOverload targets produced by torch.export.export.
+                    if not n.args or n.args[0] not in seen_nodes:
+                        return -1
+                    _aten_to_name = {"aten::exp_": "exp", "aten::sigmoid_": "sigmoid"}
+                    function_name = _aten_to_name[aten_name]
+                    inplace_functions.append((function_name, n.args[1:]))
+                    new_node = _macro_new_node_(
+                        n, current_remove, set_item_args, inplace_functions
+                    )
+                    # next root to use
+                    clone = new_node
+                    # reset
+                    to_remove.extend(current_remove)
+                    seen_nodes = {new_node}
+                    set_item_args = {}
+                    current_remove = []
+                    inplace_functions = []
                 elif aten_name == "aten::masked_fill_.Scalar":
                     return -1
                 else:
@@ -2710,7 +2730,7 @@ class CustomTracer(torch.fx.Tracer):
                 assert (
                     node_target_name in {"aten::copy_", "aten::fill_.Tensor"}
                     and len(node.args) == 2
-                ) or node_target_name in {"aten::sigmoid_"}, (
+                ) or node_target_name in {"aten::sigmoid_", "aten::exp_"}, (
                     f"(inplace) Unsupported target {node.target!r}, target_name="
                     f"{node_target_name!r}, name={node.name!r}, node.args={node.args} "
                     f"at position {pos}/{len(graph.nodes)}"

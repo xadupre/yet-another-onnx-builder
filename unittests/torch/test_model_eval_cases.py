@@ -253,6 +253,9 @@ class TestModelEvalCases(ExtTestCase):
             cases="InplaceSetItemExp", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_inplace_setitem_exp_default(self):
+        evaluation(cases="InplaceSetItemExp", exporters="yobx", quiet=False, dynamic=True)
+
     def test_run_exporter_inplace_setitem_ellipsis_1_tracing(self):
         evaluation(
             cases="InplaceSetItemEllipsis_1", exporters="yobx-tracing", quiet=False, dynamic=True
@@ -545,9 +548,7 @@ class TestModelEvalCases(ExtTestCase):
 
     @requires_transformers("4.57")
     def test_run_exporter_dynamic_cache_input_yobx_tracing(self):
-        evaluation(
-            cases="DynamicCacheInput", exporters="yobx-tracing", quiet=False, dynamic=True
-        )
+        evaluation(cases="DynamicCacheInput", exporters="yobx-tracing", quiet=False, dynamic=True)
 
     @requires_transformers("4.57")
     def test_run_exporter_dynamic_cache_input_yobx_tracing_static(self):
