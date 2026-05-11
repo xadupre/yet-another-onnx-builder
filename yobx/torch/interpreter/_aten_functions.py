@@ -10857,7 +10857,7 @@ def aten_logical_not_(
     """Delegates the inplace logical-not overload to aten_logical_not.
 
     Returns:
-        The ONNX logical-not result for *x*.
+        Returns the ONNX logical-not result for *x*.
     """
     return aten_logical_not(g, sts, outputs, x, name=name)
 
