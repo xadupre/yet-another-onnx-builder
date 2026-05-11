@@ -2389,6 +2389,7 @@ class CustomTracer(torch.fx.Tracer):
         set_item_args = {}
         current_remove = []
         inplace_functions = []
+        _aten_inplace_to_name = {"aten::exp_": "exp", "aten::sigmoid_": "sigmoid"}
         for pos, n in pos_users:
             if n.target == operator.getitem:
                 _macro_assert_index_(True)
@@ -2441,8 +2442,7 @@ class CustomTracer(torch.fx.Tracer):
                     # below but for OpOverload targets produced by torch.export.export.
                     if not n.args or n.args[0] not in seen_nodes:
                         return -1
-                    _aten_to_name = {"aten::exp_": "exp", "aten::sigmoid_": "sigmoid"}
-                    function_name = _aten_to_name[aten_name]
+                    function_name = _aten_inplace_to_name[aten_name]
                     inplace_functions.append((function_name, n.args[1:]))
                     new_node = _macro_new_node_(
                         n, current_remove, set_item_args, inplace_functions
