@@ -597,7 +597,7 @@ class TestExportOptions(ExtTestCase):
 
     @ignore_warnings(UserWarning)
     def test_export_new_tracing_nanmean_to_onnx(self):
-        """Verifies that new tracing exports nanmean."""
+        """Verifies that new tracing correctly exports nanmean operations."""
 
         class NanMeanModel(torch.nn.Module):
             def forward(self, x):
