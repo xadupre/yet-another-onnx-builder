@@ -88,8 +88,7 @@ def patched_vmap(func, in_dims=0, out_dims=0, use_scan: bool = False):
             batched_args.append(arg)
 
         if use_scan or (
-            all(isinstance(a, torch.Tensor) for a in args)
-            and not isinstance(batch_size, int)
+            all(isinstance(a, torch.Tensor) for a in args) and not isinstance(batch_size, int)
         ):
             batched_tensors = [
                 (
