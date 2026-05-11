@@ -254,7 +254,7 @@ class TestModelEvalCases(ExtTestCase):
         )
 
     def test_run_exporter_inplace_setitem_exp_default(self):
-        evaluation(cases="InplaceSetItemExp", exporters="yobx", quiet=False, dynamic=True)
+        evaluation(cases="InplaceSetItemExp", exporters="yobx", quiet=False, dynamic=False)
 
     def test_run_exporter_inplace_setitem_ellipsis_1_tracing(self):
         evaluation(

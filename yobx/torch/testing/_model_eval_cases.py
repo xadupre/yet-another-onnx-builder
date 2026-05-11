@@ -289,7 +289,7 @@ class InplaceSetItemExp(torch.nn.Module):
         ((torch.arange(7 * 9 * 11) + 10).reshape((7, 9, 11)).to(torch.float32),),
         ((torch.arange(8 * 9 * 11) + 10).reshape((8, 9, 11)).to(torch.float32),),
     ]
-    _dynamic = {"x": {0: DIM("batch", min=6)}}
+    _dynamic = {"x": {0: DIM("batch")}}
 
 
 class AtenInterpolate(torch.nn.Module):
