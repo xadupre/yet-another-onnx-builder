@@ -607,7 +607,7 @@ class TestExportOptions(ExtTestCase):
         x = torch.tensor(
             [[1.0, float("nan"), 3.0], [4.0, 5.0, float("nan")]], dtype=torch.float32
         )
-        expected = model(x.clone())
+        expected = model(x)
         artifact = to_onnx(
             model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
         )
