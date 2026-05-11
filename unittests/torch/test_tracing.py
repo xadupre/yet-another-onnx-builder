@@ -369,6 +369,7 @@ class TestCustomTracer(ExtTestCase):
         fn_nodes = [n for n in graph.nodes if n.op == "call_function"]
         self.assertEqual(len(fn_nodes), 1)
         self.assertEqual(fn_nodes[0].target, torch.ops.aten.logical_not.default)
+        self.assertEqual(fn_nodes[0].args, (x,))
         output_node = next(n for n in graph.nodes if n.op == "output")
         self.assertIs(output_node.args[0], fn_nodes[0])
 
