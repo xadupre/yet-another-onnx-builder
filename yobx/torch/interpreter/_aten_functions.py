@@ -10854,7 +10854,7 @@ def aten_logical_not(
 def aten_logical_not_(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name="logical_not_"
 ) -> T:
-    "logical not"
+    """Performs logical not."""
     return aten_logical_not(g, sts, outputs, x, name=name)
 
 
