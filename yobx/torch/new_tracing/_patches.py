@@ -552,17 +552,17 @@ def _bilinear_replacement_ctx() -> Generator:
     ) -> torch.Tensor:
         # weight shape: (out, H1, H2) — all static dims from nn.Parameter
         H1: int = weight.shape[1]
-        out_f: int = weight.shape[0]
+        out_dim: int = weight.shape[0]
         H2: int = weight.shape[2]
         # Reshape weight: (out, H1, H2) -> transpose -> (H1, out, H2)
         # -> reshape -> (H1, out*H2).  All dims are static.
-        weight_r = weight.transpose(0, 1).reshape(H1, out_f * H2)
+        weight_r = weight.transpose(0, 1).reshape(H1, out_dim * H2)
         # x1_w: (..., out*H2)
         x1_w = torch.matmul(input1, weight_r)
         # x1_w_r: (prod_batch, out, H2).
         # Using -1 lets FakeTensorMode infer the dynamic batch size without
         # requiring a TracingInt shape argument.
-        x1_w_r = x1_w.view(-1, out_f, H2)
+        x1_w_r = x1_w.view(-1, out_dim, H2)
         # input2_e: (prod_batch, 1, H2)
         input2_e = input2.view(-1, H2).unsqueeze(-2)
         # element-wise multiply and reduce along H2: (prod_batch, out)
