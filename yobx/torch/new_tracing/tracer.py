@@ -2269,8 +2269,8 @@ class GraphTracer:
         * ``args[2]`` — *input2*, shape ``(*, H2)``
 
         The decomposition uses ``transpose``, ``reshape``, ``matmul``,
-        ``view``, ``unsqueeze``, ``mul``, and ``sum`` — all ops that have
-        correct FakeTensor meta kernels and ONNX converters.
+        ``view``, ``mul``, and ``sum`` — all ops that have correct FakeTensor
+        meta kernels and ONNX converters.
 
         :param args: The positional arguments received by ``dispatch``
             for ``aten._trilinear.default``.
@@ -2291,8 +2291,11 @@ class GraphTracer:
         x1_w = torch.matmul(input1, weight_r)
         # x1_w_r: (prod_batch, out, H2)
         x1_w_r = x1_w.view(-1, out_dim, H2)
-        # input2_e: (prod_batch, 1, H2)
-        input2_e = input2.view(-1, H2).unsqueeze(-2)
+        # input2_e: (prod_batch, 1, H2) — use view directly to avoid
+        # emitting an Unsqueeze ONNX node, which can produce a repeated-axis
+        # error in the ONNX reference evaluator when the axes constant is
+        # misinterpreted (e.g. axes=[1,1] instead of [-2]).
+        input2_e = input2.view(-1, 1, H2)
         # Element-wise multiply x1_w_r and input2_e and sum over H2.
         output = (x1_w_r * input2_e).sum(-1)
         return output

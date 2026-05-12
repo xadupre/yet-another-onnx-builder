@@ -570,8 +570,10 @@ def _bilinear_replacement_ctx() -> Generator:
         # Using -1 lets FakeTensorMode infer the dynamic batch size without
         # requiring a TracingInt shape argument.
         x1_w_r = x1_w.view(-1, out_dim, H2)
-        # input2_e: (prod_batch, 1, H2)
-        input2_e = input2.view(-1, H2).unsqueeze(-2)
+        # input2_e: (prod_batch, 1, H2).
+        # Use view directly to avoid emitting an Unsqueeze ONNX node, which
+        # can produce a repeated-axis error in the ONNX reference evaluator.
+        input2_e = input2.view(-1, 1, H2)
         # element-wise multiply and reduce along H2: (prod_batch, out)
         output = (x1_w_r * input2_e).sum(-1)
         if bias is not None:
