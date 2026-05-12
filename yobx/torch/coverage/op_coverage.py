@@ -246,7 +246,6 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "isclose",
             "isfinite",
             "long",
-            "nanmean",
             "short",
             "std",
             "std_mean",
