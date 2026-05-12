@@ -15,6 +15,17 @@ _ATEN_INPLACE_TO_TRANSFORM_NAME: Dict[Any, str] = {
     torch.ops.aten.sigmoid_.default: "sigmoid",
 }
 
+# The aten._trilinear.default op is dispatched by nn.functional.bilinear when
+# called through its original Python function object (bypassing any
+# module-attribute patch).  Captured at module load time; may be None on
+# PyTorch builds that removed the op.
+_ATEN_TRILINEAR_OP: Any = getattr(
+    getattr(getattr(torch, "ops", None), "aten", None), "_trilinear", None
+)
+_ATEN_TRILINEAR_DEFAULT: Any = (
+    getattr(_ATEN_TRILINEAR_OP, "default", None) if _ATEN_TRILINEAR_OP is not None else None
+)
+
 
 class GraphTracer:
     """
@@ -998,6 +1009,22 @@ class GraphTracer:
             and isinstance(args[0], TracingTensor)
         ):
             return self._handle_local_scalar_dense(args[0])
+
+        # Special-case: aten._trilinear (used internally by nn.functional.bilinear).
+        # When a caller holds a direct reference to the original
+        # torch.nn.functional.bilinear Python function (e.g. _OpWrapper in the
+        # op-db coverage tests), the function bypasses the module-attribute patch
+        # applied by _bilinear_replacement_ctx and calls torch._C._nn.bilinear
+        # which dispatches here as aten._trilinear.default.
+        # Intercept this dispatch and re-route it through the bilinear
+        # decomposition so that the FX graph contains standard ops
+        # (matmul, reshape, …) that all have ONNX converters.
+        if (
+            _ATEN_TRILINEAR_DEFAULT is not None
+            and func is _ATEN_TRILINEAR_DEFAULT
+            and len(args) >= 3
+        ):
+            return self._handle_trilinear(args)
 
         # running the function
         with self._fake_mode:
@@ -2219,6 +2246,59 @@ class GraphTracer:
         ti._tracer = self
         ti._device = str(input_tt.device) if input_tt.device else "cpu"
         return ti
+
+    def _handle_trilinear(self, args: Tuple) -> Any:
+        """
+        Intercepts ``aten._trilinear.default`` dispatched during tracing and
+        decomposes it into a bilinear form using standard ops.
+
+        ``aten._trilinear`` is the low-level op used by
+        ``nn.functional.bilinear``.  When a caller holds a direct reference to
+        the original ``torch.nn.functional.bilinear`` Python function (e.g.
+        ``_OpWrapper._fn`` in the op-db coverage tests), the call bypasses the
+        module-attribute patch applied by
+        :func:`~yobx.torch.new_tracing._patches._bilinear_replacement_ctx` and
+        reaches :meth:`dispatch` as ``aten._trilinear.default``.
+
+        The PyTorch C++ ``bilinear`` function calls ``_trilinear`` with the
+        convention ``_trilinear(input1, weight, input2, expand1, expand2,
+        expand3, sumdim, unroll_dim)``, so:
+
+        * ``args[0]`` — *input1*, shape ``(*, H1)``
+        * ``args[1]`` — *weight*, shape ``(out, H1, H2)``
+        * ``args[2]`` — *input2*, shape ``(*, H2)``
+
+        The decomposition uses ``transpose``, ``reshape``, ``matmul``,
+        ``view``, ``mul``, and ``sum`` — all ops that have correct FakeTensor
+        meta kernels and ONNX converters.
+
+        :param args: The positional arguments received by ``dispatch``
+            for ``aten._trilinear.default``.
+
+        Returns:
+            Returns the bilinear output :class:`TracingTensor`, shape ``(*, out)``.
+        """
+        input1 = args[0]  # (*, H1)
+        weight = args[1]  # (out, H1, H2)
+        input2 = args[2]  # (*, H2)
+        # All static dims come from weight (an nn.Parameter).
+        H1: int = weight.shape[1]
+        out_dim: int = weight.shape[0]
+        H2: int = weight.shape[2]
+        # weight: (out, H1, H2) -> transpose -> (H1, out, H2) -> reshape -> (H1, out*H2)
+        weight_r = weight.transpose(0, 1).reshape(H1, out_dim * H2)
+        # x1_w: (*, out*H2)
+        x1_w = torch.matmul(input1, weight_r)
+        # x1_w_r: (prod_batch, out, H2)
+        x1_w_r = x1_w.view(-1, out_dim, H2)
+        # input2_e: (prod_batch, 1, H2) — use view directly to avoid
+        # emitting an Unsqueeze ONNX node, which can produce a repeated-axis
+        # error in the ONNX reference evaluator when the axes constant is
+        # misinterpreted (e.g. axes=[1,1] instead of [-2]).
+        input2_e = input2.view(-1, 1, H2)
+        # Element-wise multiply x1_w_r and input2_e and sum over H2.
+        output = (x1_w_r * input2_e).sum(-1)
+        return output
 
     def _handle_tensor_split(self, input: Any, indices_or_sections: Any, dim: int = 0) -> Any:
         """

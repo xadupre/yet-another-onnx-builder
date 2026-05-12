@@ -409,6 +409,14 @@ class TestModelEvalCases(ExtTestCase):
             cases="AtenInterpolate", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_aten_nn_functional_bilinear_new_tracing(self):
+        evaluation(
+            cases="AtenNnFunctionalBilinear",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_aten_roll_pos_new_tracing(self):
         evaluation(cases="AtenRollPos", exporters="yobx-new-tracing", quiet=False, dynamic=True)
 
