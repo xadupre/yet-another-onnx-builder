@@ -70,6 +70,15 @@ _ORIGINAL_IS_EXPORTING: Optional[Callable] = getattr(
     getattr(torch, "compiler", None), "is_exporting", None
 )
 
+# Capture the real ``torch.nn.functional.bilinear`` at import time so that
+# calls during new-tracing can be replaced with a pure-Python decomposition.
+# ``nn.functional.bilinear`` dispatches through ``aten::_trilinear``, which
+# lacks a FakeTensor meta kernel for symbolic/dynamic shapes, causing
+# ``GraphTracer.dispatch`` to fail during shape inference.
+_ORIGINAL_NN_FUNCTIONAL_BILINEAR: Optional[Callable] = getattr(
+    torch.nn.functional, "bilinear", None
+)
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -510,6 +519,66 @@ def _is_exporting_replacement_ctx() -> Generator:
 
 
 @contextlib.contextmanager
+def _bilinear_replacement_ctx() -> Generator:
+    """
+    Temporarily replaces ``torch.nn.functional.bilinear`` with a pure-Python
+    decomposition that avoids ``aten::_trilinear``.
+
+    ``nn.functional.bilinear`` forwards to ``torch._C._nn.bilinear``, which
+    dispatches through ``aten::_trilinear``.  That op lacks a FakeTensor meta
+    kernel suitable for dynamic (symbolic) shapes, so
+    :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.dispatch` fails during
+    shape inference when it tries::
+
+        with self._fake_mode:
+            fake_res = func(*fake_args, **fake_kwargs)
+
+    The replacement decomposes the bilinear form into supported ops
+    (``transpose``, ``reshape``/``view``, ``matmul``, ``mul``, ``sum``,
+    optionally ``add``) that all have correct meta kernels and ONNX converters.
+
+    The original ``torch.nn.functional.bilinear`` is restored unconditionally
+    on exit.
+    """
+    if _ORIGINAL_NN_FUNCTIONAL_BILINEAR is None:
+        yield
+        return
+
+    def _bilinear_impl(
+        input1: torch.Tensor,
+        input2: torch.Tensor,
+        weight: torch.Tensor,
+        bias: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        # weight shape: (out, H1, H2) — all static dims from nn.Parameter
+        H1: int = weight.shape[1]
+        out_f: int = weight.shape[0]
+        H2: int = weight.shape[2]
+        # Reshape weight: (out, H1, H2) -> transpose -> (H1, out, H2)
+        # -> reshape -> (H1, out*H2).  All dims are static.
+        weight_r = weight.transpose(0, 1).reshape(H1, out_f * H2)
+        # x1_w: (..., out*H2)
+        x1_w = torch.matmul(input1, weight_r)
+        # x1_w_r: (prod_batch, out, H2).
+        # Using -1 lets FakeTensorMode infer the dynamic batch size without
+        # requiring a TracingInt shape argument.
+        x1_w_r = x1_w.view(-1, out_f, H2)
+        # input2_e: (prod_batch, 1, H2)
+        input2_e = input2.view(-1, H2).unsqueeze(-2)
+        # element-wise multiply and reduce along H2: (prod_batch, out)
+        output = (x1_w_r * input2_e).sum(-1)
+        if bias is not None:
+            output = output + bias
+        return output
+
+    torch.nn.functional.bilinear = _bilinear_impl  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.nn.functional.bilinear = _ORIGINAL_NN_FUNCTIONAL_BILINEAR  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
 def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
     """
     Applies all tracing-time torch replacement context managers at once.
@@ -529,6 +598,7 @@ def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         _ones_replacement_ctx(tracer),
         _arange_replacement_ctx(tracer),
         _roll_dynamic_shape_ctx(),
+        _bilinear_replacement_ctx(),
         _scan_replacement_ctx(tracer),
         _tensor_split_replacement_ctx(tracer),
         _while_loop_replacement_ctx(tracer),
