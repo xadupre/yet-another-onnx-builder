@@ -305,7 +305,9 @@ def _getitem_slice(
         elif expand_axes:
             g.set_rank(output_name, g.get_rank(inputs[0]) + len(expand_axes))
         elif g.has_rank(inputs[0]):
-            # Dynamic slice endpoint: shape unknown but rank is preserved.
+            # concat=True but no squeeze/expand axes: the slice endpoint is
+            # dynamic (e.g. p.item()), so shape is unknown, but the number of
+            # dimensions equals that of the input.
             g.set_rank(output_name, g.get_rank(inputs[0]))
     return res
 

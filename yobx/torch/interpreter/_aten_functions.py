@@ -13037,8 +13037,8 @@ def aten_setitem(
             f"Unexpected type for indices {type(indices)}, value is {indices}"
             f"{g.get_debug_msg()}"
         )
-        # When the slice endpoint is dynamic (e.g. p.item()), aten_slice_Tensor
-        # only records rank, not shape.  Allow that case; if shape IS known, it
+        # When the slice endpoint is dynamic (e.g. p.item()), _getitem_slice
+        # only records rank, not shape. Allow that case; if shape IS known, it
         # must not be (1,) unless x has the same shape (to avoid confusing a
         # single-element assignment with a range assignment).
         assert not g.has_shape(values) or (
