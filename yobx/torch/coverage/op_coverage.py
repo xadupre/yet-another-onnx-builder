@@ -294,7 +294,12 @@ XFAIL_OPS_BFLOAT16: Dict[str, FrozenSet[str]] = {
         }
     ),
     "tracing": frozenset({"float_power"}),
-    "new-tracing": frozenset({"nn_functional_selu"}),
+    "new-tracing": frozenset(
+        {
+            "nn_functional_bilinear",  # FunctionNotFoundError: Unable to interpret function
+            "nn_functional_selu",
+        }
+    ),
 }
 
 # Extra exclusions specific to torch.int32.
