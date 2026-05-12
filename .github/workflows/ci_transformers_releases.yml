@@ -13,8 +13,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect_torch_subfolder:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/common_detect_torch_subfolder.yml
+    permissions:
+      contents: read
+    with:
+      base_sha: ${{ github.event.pull_request.base.sha }}
+      head_sha: ${{ github.event.pull_request.head.sha }}
+
+  torch_targeted_tests:
+    name: tr-releases targeted (${{ needs.detect_torch_subfolder.outputs.subfolder }}, torch-2.11, transformers-5.5)
+    needs: detect_torch_subfolder
+    # Skip if no unique subfolder, or if the subfolder is 'coverage' (excluded from the full run).
+    if: needs.detect_torch_subfolder.outputs.count == '1' && needs.detect_torch_subfolder.outputs.subfolder != 'coverage'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install pytorch 2.11
+        run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install dependencies
+        run: pip install -e ".[dev,torch,transformers]"
+      - name: Install transformers==5.5
+        run: pip install transformers==5.5 && pip freeze
+      - name: Run targeted torch tests
+        run: |
+          pytest --durations=10 unittests/torch/${{ needs.detect_torch_subfolder.outputs.subfolder }}
+
   torch_tests_4:
     name: tr-releases (ubuntu-latest, py3.13, transformers 4.57/4.55/4.49 torch-${{ matrix.torch-version }})
+    needs: torch_targeted_tests
+    # Run when targeted tests succeeded or were skipped (no unique subfolder / not a PR).
+    # Do NOT run when targeted tests failed – that already signals a broken subfolder.
+    if: >-
+      always() && (
+        needs.torch_targeted_tests.result == 'success' ||
+        needs.torch_targeted_tests.result == 'skipped'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -55,7 +96,15 @@ jobs:
         run: pytest unittests/torch --durations=10 --ignore=unittests/torch/coverage
 
   torch_tests_5:
-    name: transformers-releases (ubuntu-latest, py3.13, transformers 5.5/5.2 torch-${{ matrix.torch-version }})
+    name: transformers-releases (ubuntu-latest, py3.13, transformers 5.5/5.2 torch-${{ matrix.torch-version }}, ort-nightly=${{ matrix.ort-nightly }})
+    needs: torch_targeted_tests
+    # Run when targeted tests succeeded or were skipped (no unique subfolder / not a PR).
+    # Do NOT run when targeted tests failed – that already signals a broken subfolder.
+    if: >-
+      always() && (
+        needs.torch_targeted_tests.result == 'success' ||
+        needs.torch_targeted_tests.result == 'skipped'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -63,6 +112,7 @@ jobs:
       fail-fast: false
       matrix:
         torch-version: ["2.11"]
+        ort-nightly: [false, true]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.13
@@ -79,6 +129,12 @@ jobs:
 
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
+
+      - name: Install onnxruntime nightly
+        if: matrix.ort-nightly == true
+        run: |
+          pip uninstall -y onnxruntime || true
+          pip install --pre onnxruntime --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/
 
       - name: install transformers==5.5 and pip freeze
         run: pip install transformers==5.5 && pip freeze

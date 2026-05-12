@@ -178,6 +178,90 @@ class TestOnnxExportControlFlow(ExtTestCase):
                 for e, g in zip(expected, got):
                     self.assertEqualArray(e, g, atol=1e-5)
 
+    @ignore_warnings((UserWarning, FutureWarning))
+    @skipif_ci_windows("while_loop does not work")
+    def test_while_loop_onnx_export_dec_new_tracing(self):
+        import torch
+        from yobx.torch.export_options import TracingMode
+
+        class Simple(torch.nn.Module):
+            def forward(self, ci, a, b):
+                def cond_fn(i, x, y):
+                    return i > 0
+
+                def body_fn(i, x, y):
+                    return i - 1, x + y, y - x
+
+                return torch._higher_order_ops.while_loop(cond_fn, body_fn, [ci, a, b])
+
+        example_inputs = torch.tensor(2), torch.randn(2, 3), torch.randn(2, 3)
+        model = Simple()
+        expected = model(*example_inputs)
+
+        for optimize in [False, True]:
+            with self.subTest(optimize=optimize):
+                onx = to_onnx(
+                    model,
+                    example_inputs,
+                    optimize=optimize,
+                    export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
+                )
+                self.dump_onnx(
+                    f"test_while_loop_onnx_export_dec_new_tracing_{optimize}.onnx", onx
+                )
+
+                ref = ExtendedReferenceEvaluator(onx)
+                feeds = {
+                    "ci": example_inputs[0].detach().numpy(),
+                    "a": example_inputs[1].detach().numpy(),
+                    "b": example_inputs[2].detach().numpy(),
+                }
+                got = ref.run(None, feeds)
+                for e, g in zip(expected, got):
+                    self.assertEqualArray(e, g, atol=1e-5)
+
+    @ignore_warnings((UserWarning, FutureWarning))
+    @skipif_ci_windows("while_loop does not work")
+    def test_while_loop_onnx_export_inc_new_tracing(self):
+        import torch
+        from yobx.torch.export_options import TracingMode
+
+        class Simple(torch.nn.Module):
+            def forward(self, ci, a, b):
+                def cond_fn(i, x, y):
+                    return i < x.size(0)
+
+                def body_fn(i, x, y):
+                    return i + 1, x + y, y - x
+
+                return torch.ops.higher_order.while_loop(cond_fn, body_fn, [ci, a, b], [])
+
+        example_inputs = torch.tensor(0), torch.randn(2, 3), torch.randn(2, 3)
+        model = Simple()
+        expected = model(*example_inputs)
+
+        for optimize in [False, True]:
+            with self.subTest(optimize=optimize):
+                onx = to_onnx(
+                    model,
+                    example_inputs,
+                    optimize=optimize,
+                    export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
+                )
+                self.dump_onnx(
+                    f"test_while_loop_onnx_export_inc_new_tracing_{optimize}.onnx", onx
+                )
+
+                ref = ExtendedReferenceEvaluator(onx)
+                feeds = {
+                    "ci": example_inputs[0].detach().numpy(),
+                    "a": example_inputs[1].detach().numpy(),
+                    "b": example_inputs[2].detach().numpy(),
+                }
+                got = ref.run(None, feeds)
+                for e, g in zip(expected, got):
+                    self.assertEqualArray(e, g, atol=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

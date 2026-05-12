@@ -70,17 +70,12 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "addcdiv",
         "addr",
         "alias_copy",
-        "argwhere",
         "bernoulli",
-        "block_diag",
         "conj_physical",
         "copysign",
-        "count_nonzero",
         "cross",
         "cumulative_trapezoid",
         "deg2rad",
-        "diag",
-        "diag_embed",
         "diagflat",
         "diagonal",
         "diagonal_copy",
@@ -88,15 +83,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "digamma",
         "dot",
         "exp2",
-        "fliplr",
-        "flipud",
-        "float_power",
-        "fmax",
-        "fmin",
-        "fmod",
-        "frac",
-        "frexp",
-        "geqrf",
         "hash_tensor",
         "hypot",
         "i0",
@@ -108,7 +94,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "ldexp",
         "lgamma",
         "linalg_cond",
-        "linalg_cross",
         "linalg_diagonal",
         "linalg_householder_product",
         "linalg_inv",
@@ -117,7 +102,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "linalg_solve",
         "linalg_solve_ex",
         "linalg_svdvals",
-        "linalg_vecdot",
         "lu_solve",
         "lu_unpack",
         "masked_select",
@@ -128,18 +112,10 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "mv",
         "nanmedian",
         "nextafter",
-        "nn_functional_binary_cross_entropy",
-        "nn_functional_binary_cross_entropy_with_logits",
-        "nn_functional_celu",
-        "nn_functional_logsigmoid",
-        "nn_functional_mish",
         "nn_functional_multi_margin_loss",
         "nn_functional_multilabel_margin_loss",
         "nn_functional_multilabel_soft_margin_loss",
-        "nn_functional_pairwise_distance",
         "nn_functional_pdist",
-        "nn_functional_relu6",
-        "nn_functional_soft_margin_loss",
         "pinverse",
         "positive",
         "qr",
@@ -148,7 +124,6 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "resize_as_",
         "resolve_conj",
         "resolve_neg",
-        "rot90",
         "rsub",
         "sgn",
         "sinc",
@@ -189,13 +164,11 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "special_zeta",
         "squeeze_copy",
         "t_copy",
-        "tensor_split",
         "to_sparse",
         "trace",
         "trapezoid",
         "trapz",
         "triangular_solve",
-        "true_divide",
         "var",
         "var_mean",
         "vdot",
@@ -220,15 +193,7 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "jiterator_binary",
             "jiterator_binary_return_by_ref",
             "jiterator_unary",
-            "linalg_det",
-            "linalg_slogdet",
-            "logdet",
             "logical_not",
-            "nn_functional_cross_entropy",
-            "nn_functional_l1_loss",
-            "nn_functional_linear",
-            "nn_functional_mse_loss",
-            "nn_functional_smooth_l1_loss",
             # Data-dependent output shapes (DataDependentOutputException):
             "corrcoef",
             "cov",
@@ -243,41 +208,23 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
     # beyond those already listed under ``"default"``.
     "tracing": frozenset(
         {
-            "T",  # no attr
-            "__radd__",  # not implemented
-            "__rand__",  # not implemented
-            "__rdiv__",  # not implemented
-            "__rmatmul__",  # not implemented
-            "__rmod__",  # not implemented
-            "__rmul__",  # not implemented
-            "__ror__",  # not implemented
-            "__rpow__",  # not implemented
-            "__rsub__",  # not implemented
-            "__rxor__",  # not implemented
-            "aminmax",  # list index out of range
-            "argsort",
+            "__radd__",  # later
+            "__rand__",  # later
+            "__rdiv__",  # later
+            "__rmul__",  # later
+            "__ror__",  # later
+            "__rsub__",  # later
+            "__rxor__",  # no bitwise_xor converter
             "bitwise_and",
             "bitwise_or",
-            "byte",
-            "char",
+            "bitwise_xor",
             "conj",
-            "double",
-            "erfinv",
-            "flatten",
-            "half",
-            "int",
             "logical_and",
             "logical_or",
             "logical_xor",
-            "long",
-            "mH",
-            "mT",
-            "nn_functional_bilinear",
-            "nn_functional_hardsigmoid",
-            "nn_functional_softsign",
-            "nn_functional_tanhshrink",
-            "reshape_as",
-            "short",
+            "flatten",  # tracing-specific failure
+            "nn_functional_bilinear",  # tracing-specific failure
+            "nn_functional_hardsigmoid",  # tracing-specific failure
             "std",
             "std_mean",
         }
@@ -299,11 +246,10 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "isclose",
             "isfinite",
             "long",
-            "nanmean",
-            "nn_functional_bilinear",
             "short",
             "std",
             "std_mean",
+            "tensor_split",
         }
     ),
 }
@@ -322,7 +268,9 @@ XFAIL_OPS_FLOAT16: Dict[str, FrozenSet[str]] = {
         }
     ),
     "tracing": frozenset(),
-    "new-tracing": frozenset(),
+    "new-tracing": frozenset(
+        {"nn_functional_bilinear"}  # FunctionNotFoundError: Unable to interpret function
+    ),
 }
 
 # Extra exclusions specific to torch.bfloat16.
@@ -337,6 +285,7 @@ XFAIL_OPS_BFLOAT16: Dict[str, FrozenSet[str]] = {
             "bmm",  # matmul numerical error exceeds bfloat16 tolerance
             "erfinv",  # bfloat16 precision insufficient for erfinv computation
             "expm1",  # reduced-precision exponential error
+            "frexp",  # reduced-precision exponential error
             "log10",  # bfloat16 precision loss in Log
             "log1p",  # bfloat16 precision loss in Log
             "log2",  # bfloat16 precision loss in Log
@@ -346,8 +295,13 @@ XFAIL_OPS_BFLOAT16: Dict[str, FrozenSet[str]] = {
             "argsort",  # ordering instability due to reduced precision
         }
     ),
-    "tracing": frozenset(),
-    "new-tracing": frozenset({"nn_functional_selu"}),
+    "tracing": frozenset({"float_power"}),
+    "new-tracing": frozenset(
+        {
+            "nn_functional_bilinear",  # FunctionNotFoundError: Unable to interpret function
+            "nn_functional_selu",
+        }
+    ),
 }
 
 # Extra exclusions specific to torch.int32.
@@ -414,10 +368,12 @@ XFAIL_OPS_INT32: Dict[str, FrozenSet[str]] = {
             "prod",  # type mismatch: int32 input produces int64 output
             "sum",  # type mismatch: int32 input produces int64 output
             "xlogy",  # ONNX Log only supports float dtypes
+            "nn_functional_bilinear",  # NOT_IMPLEMENTED: MatMul/ReduceSum not supported for int32
+            "nn_functional_linear",  # NOT_IMPLEMENTED: Gemm not supported for int32
         }
     ),
     "tracing": frozenset(),
-    "new-tracing": frozenset(),
+    "new-tracing": frozenset({"true_divide"}),
 }
 
 # Extra exclusions specific to torch.int64.
@@ -480,12 +436,18 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
             "tanh",  # ONNX op only supports float dtypes
             "trunc",  # InvalidGraph: int64 not supported by Round
             "xlogy",  # ONNX Log only supports float dtypes
+            "nn_functional_bilinear",  # NOT_IMPLEMENTED: MatMul not supported for int64
+            "nn_functional_linear",  # NOT_IMPLEMENTED: Gemm not supported for int64
         }
     ),
-    # short.int64: FX tracing produces call_method[target=short] with no
-    # aten_meth_short converter in the tracing path.
-    "tracing": frozenset({"short"}),  # FunctionNotFoundError: aten_meth_short
-    "new-tracing": frozenset({"short"}),  # FunctionNotFoundError: aten_meth_short
+    # short.int64: aten_meth_short is now implemented; no extra failures for this dtype.
+    "tracing": frozenset(),
+    "new-tracing": frozenset(
+        {
+            "short",  # FunctionNotFoundError: aten_meth_short (new-tracing path)
+            "true_divide",  # true_divide disappears
+        }
+    ),
 }
 
 # Per-op absolute tolerance overrides for torch.float16.
@@ -500,6 +462,8 @@ ATOL_OPS_FLOAT32: Dict[str, float] = {
 # a larger tolerance than the global _ATOL_FLOAT16 = 1e-2.
 ATOL_OPS_FLOAT16: Dict[str, float] = {
     "addr": 0.02,
+    "linalg.cross": 5e-2,  # float16: cross product accumulates rounding error
+    "nn.functional.pairwise_distance": 2e-2,  # float16: distance accumulates rounding error
     "std": 1e-1,  # variance accumulates float16 rounding; sqrt amplifies
     "std_mean": 3e-1,  # same compound error as std
 }
@@ -509,9 +473,88 @@ ATOL_OPS_FLOAT16: Dict[str, float] = {
 # tolerance than the global _ATOL_BFLOAT16 = 2e-2.
 ATOL_OPS_BFLOAT16: Dict[str, float] = {
     "logit": 5e-2,  # bfloat16 log precision compounds across Sub(Log(x), Log(1-x))
+    "nn.functional.pairwise_distance": 1e-1,  # bfloat16: distance accumulates rounding error
+    "nn.functional.smooth_l1_loss": 1.0,  # bfloat16: reduced precision in conditional branch
     "std": 2e-1,  # bfloat16 precision loss is larger than float16
     "std_mean": 2e-1,  # same compound error as std
 }
+
+
+def get_op_coverage_float32_comparison_rst() -> str:
+    """Returns an RST table comparing float32 op support across all export paths.
+
+    Queries ``torch.testing._internal.common_methods_invocations.op_db`` and
+    builds a single grid showing, for every op that supports ``float32``, the
+    export status for three paths side by side:
+
+    * ``✔`` - converter exists and the test passes for ``float32``.
+    * ``⚠ xfail`` - converter exists but the test is a known failure.
+    * ``✘ no converter`` - no ONNX converter has been implemented for this op.
+
+    Returns:
+        RST source string with one ``list-table`` directive, ready to be
+        printed inside a ``.. runpython::`` block with ``:rst:`` enabled.
+    """
+    import warnings
+
+    import torch
+    from torch.testing._internal import common_methods_invocations
+
+    # Xfail sets for float32 for each export path.
+    float32_xfails = {
+        "default": XFAIL_OPS["default"],
+        "tracing": XFAIL_OPS["default"] | XFAIL_OPS["tracing"],
+        "new-tracing": XFAIL_OPS["default"] | XFAIL_OPS["new-tracing"],
+    }
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        ops = [
+            op
+            for op in common_methods_invocations.op_db
+            if not op.variant_test_name
+            and op.name not in NON_DETERMINISTIC_OPS
+            and torch.float32 in op.dtypes
+        ]
+    ops.sort(key=lambda o: o.name)
+
+    paths = ["default", "tracing", "new-tracing"]
+    path_labels = {"default": "Default", "tracing": "Tracing", "new-tracing": "New-tracing"}
+    header = ["Op"] + [path_labels[p] for p in paths]
+
+    rows = []
+    for op in ops:
+        key = op.name.replace(".", "_")
+        row = [f"``{op.name}``"]
+        for path in paths:
+            if key in NO_CONVERTER_OPS:
+                row.append(_NO_CONVERTER)
+            elif key in float32_xfails[path]:
+                row.append(_XFAIL)
+            else:
+                row.append(_SUPPORTED)
+        rows.append(row)
+
+    n_cols = len(header)
+    widths = " ".join(["20"] + ["16"] * (n_cols - 1))
+    title = "Float32 op support: default vs tracing vs new-tracing"
+    lines = [
+        f".. rubric:: {title}",
+        "",
+        ".. list-table::",
+        "    :header-rows: 1",
+        f"    :widths: {widths}",
+        "",
+    ]
+    lines.append("    * - " + header[0])
+    for h in header[1:]:
+        lines.append("      - " + h)
+    for row in rows:
+        lines.append("    * - " + row[0])
+        for cell in row[1:]:
+            lines.append("      - " + cell)
+    lines.append("")
+    return "\n".join(lines)
 
 
 def get_op_coverage_rst(tracing_method: str) -> str:

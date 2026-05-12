@@ -28,9 +28,56 @@ _ORIGINAL_TORCH_SCAN: Optional[Callable] = getattr(
     getattr(torch.ops, "higher_order", None), "scan", None
 )
 
+# Capture the real ``torch.arange`` at import time so calls using a symbolic
+# ``TracingInt`` as the *end* (or *start*/*step*) argument can be redirected
+# during tracing.
+_ORIGINAL_TORCH_ARANGE: Callable = torch.arange
+
 # Capture the real ``torch.full`` at import time so shape-only constructors
 # can be redirected during tracing when they receive TracingInt sizes.
 _ORIGINAL_TORCH_FULL: Callable = torch.full
+
+# Capture the real ``torch.zeros`` and ``torch.ones`` at import time so they
+# can be redirected during tracing when they receive TracingInt sizes.
+_ORIGINAL_TORCH_ZEROS: Callable = torch.zeros
+_ORIGINAL_TORCH_ONES: Callable = torch.ones
+
+# Capture the real ``torch.tensor_split`` at import time so that calls with
+# a :class:`~yobx.torch.new_tracing.tensor.TracingTensor` as
+# ``indices_or_sections`` can be intercepted: the native C++ kernel tries to
+# read concrete values from the indices tensor before dispatching, which fails
+# for :class:`~yobx.torch.new_tracing.tensor.TracingTensor` instances that
+# carry no backing storage.
+_ORIGINAL_TORCH_TENSOR_SPLIT: Callable = torch.tensor_split
+
+# Capture the real ``torch._higher_order_ops.while_loop`` and
+# ``torch.ops.higher_order.while_loop`` at import time so that calls during
+# new-tracing are intercepted and recorded as FX nodes.  Both attributes may
+# refer to the same callable on some PyTorch versions; we patch whichever
+# locations exist.
+_ORIGINAL_TORCH_WHILE_LOOP: Optional[Callable] = getattr(
+    getattr(torch, "_higher_order_ops", None), "while_loop", None
+)
+_ORIGINAL_TORCH_WHILE_LOOP_OP: Optional[Callable] = getattr(
+    getattr(torch.ops, "higher_order", None), "while_loop", None
+)
+
+# Capture the real ``torch.compiler.is_exporting`` at import time so that it
+# can be temporarily replaced during tracing.  Models that call
+# ``torch.compiler.is_exporting()`` to select a scan-based export path need
+# the function to return ``True`` while the new tracer is running.
+_ORIGINAL_IS_EXPORTING: Optional[Callable] = getattr(
+    getattr(torch, "compiler", None), "is_exporting", None
+)
+
+# Capture the real ``torch.nn.functional.bilinear`` at import time so that
+# calls during new-tracing can be replaced with a pure-Python decomposition.
+# ``nn.functional.bilinear`` dispatches through ``aten::_trilinear``, which
+# lacks a FakeTensor meta kernel for symbolic/dynamic shapes, causing
+# ``GraphTracer.dispatch`` to fail during shape inference.
+_ORIGINAL_NN_FUNCTIONAL_BILINEAR: Optional[Callable] = getattr(
+    torch.nn.functional, "bilinear", None
+)
 
 
 @contextlib.contextmanager
@@ -129,6 +176,20 @@ def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
     Temporarily replaces ``torch.full`` with a tracing-aware handler so calls
     using symbolic ``TracingInt`` sizes are captured as FX nodes.
 
+    The handler distinguishes two call sites:
+
+    * **User model code** — ``tracer._fake_mode`` has not yet been entered
+      (its ``enter_stack`` is empty); the handler delegates to
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_full` which
+      emits an FX node and returns a
+      :class:`~yobx.torch.new_tracing.tensor.TracingTensor`.
+    * **FakeTensor kernel implementations** — these arise during
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.dispatch`'s
+      ``with self._fake_mode:`` block; at that point
+      ``tracer._fake_mode.enter_stack`` is non-empty and the handler delegates
+      to the original ``torch.full`` so that FakeTensor kernels get the
+      correct FakeTensor results.
+
     :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
         whose :meth:`_handle_full` should be used as the replacement.
 
@@ -139,6 +200,16 @@ def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
     """
 
     def _full_handler(size: Any, fill_value: Any, **kwargs: Any) -> Any:
+        # When tracer._fake_mode has been entered (enter_stack is non-empty) we
+        # are inside dispatch()'s `with self._fake_mode:` block — the call
+        # originates from a FakeTensor kernel implementation.  Delegate to the
+        # real torch.full so the kernel gets a proper FakeTensor result.
+        #
+        # Note: we cannot use _get_current_dispatch_mode_stack() here because
+        # FakeTensorMode temporarily pops itself from the stack during its own
+        # __torch_dispatch__ invocation to prevent infinite recursion.
+        if tracer._fake_mode.enter_stack:
+            return _ORIGINAL_TORCH_FULL(size, fill_value, **kwargs)
         return tracer._handle_full(size, fill_value, **kwargs)
 
     torch.full = _full_handler  # type: ignore[assignment]
@@ -146,6 +217,149 @@ def _full_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[n
         yield
     finally:
         torch.full = _ORIGINAL_TORCH_FULL  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _zeros_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    Temporarily replaces ``torch.zeros`` with a tracing-aware handler so calls
+    using symbolic ``TracingInt`` sizes are captured as FX nodes.
+
+    The handler distinguishes two call sites:
+
+    * **User model code** — ``tracer._fake_mode`` has not yet been entered
+      (its ``enter_stack`` is empty); the handler delegates to
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_zeros` which
+      emits an FX node and returns a
+      :class:`~yobx.torch.new_tracing.tensor.TracingTensor`.
+    * **FakeTensor kernel implementations** — these arise during
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.dispatch`'s
+      ``with self._fake_mode:`` block; at that point
+      ``tracer._fake_mode.enter_stack`` is non-empty and the handler delegates
+      to the original ``torch.zeros`` so that FakeTensor kernels get the
+      correct FakeTensor results.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_zeros` should be used as the replacement.
+
+    Returns:
+        Returns a context manager that yields control while ``torch.zeros``
+        is temporarily replaced, then restores the original implementation on
+        exit.
+    """
+
+    def _zeros_handler(size: Any, **kwargs: Any) -> Any:
+        if tracer._fake_mode.enter_stack:
+            return _ORIGINAL_TORCH_ZEROS(size, **kwargs)
+        return tracer._handle_zeros(size, **kwargs)
+
+    torch.zeros = _zeros_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.zeros = _ORIGINAL_TORCH_ZEROS  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _ones_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    Temporarily replaces ``torch.ones`` with a tracing-aware handler so calls
+    using symbolic ``TracingInt`` sizes are captured as FX nodes.
+
+    The handler distinguishes two call sites:
+
+    * **User model code** — ``tracer._fake_mode`` has not yet been entered
+      (its ``enter_stack`` is empty); the handler delegates to
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_ones` which
+      emits an FX node and returns a
+      :class:`~yobx.torch.new_tracing.tensor.TracingTensor`.
+    * **FakeTensor kernel implementations** — these arise during
+      :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.dispatch`'s
+      ``with self._fake_mode:`` block; at that point
+      ``tracer._fake_mode.enter_stack`` is non-empty and the handler delegates
+      to the original ``torch.ones`` so that FakeTensor kernels get the
+      correct FakeTensor results.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_ones` should be used as the replacement.
+
+    Returns:
+        Returns a context manager that yields control while ``torch.ones``
+        is temporarily replaced, then restores the original implementation on
+        exit.
+    """
+
+    def _ones_handler(size: Any, **kwargs: Any) -> Any:
+        if tracer._fake_mode.enter_stack:
+            return _ORIGINAL_TORCH_ONES(size, **kwargs)
+        return tracer._handle_ones(size, **kwargs)
+
+    torch.ones = _ones_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.ones = _ORIGINAL_TORCH_ONES  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _arange_replacement_ctx(
+    tracer: "GraphTracer",  # type: ignore[name-defined]  # noqa: F821
+) -> Generator:
+    """
+    Temporarily replaces ``torch.arange`` with a tracing-aware handler so calls
+    using symbolic ``TracingInt`` values as *start*, *end*, or *step* arguments
+    are captured as FX nodes rather than failing when
+    :meth:`~yobx.torch.new_tracing.shape.TracingInt.__int__` is called on a
+    symbolic dimension.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_arange` should be used as the replacement.
+
+    Returns:
+        Yields control while ``torch.arange`` is temporarily replaced, then
+        restores the original implementation on exit.
+    """
+
+    def _arange_handler(*args: Any, **kwargs: Any) -> Any:
+        return tracer._handle_arange(*args, **kwargs)
+
+    torch.arange = _arange_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.arange = _ORIGINAL_TORCH_ARANGE  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _tensor_split_replacement_ctx(
+    tracer: "GraphTracer",  # type: ignore[name-defined]  # noqa: F821
+) -> Generator:
+    """
+    Temporarily replaces ``torch.tensor_split`` with a tracing-aware handler.
+
+    The native C++ kernel for ``aten::tensor_split`` attempts to read the
+    *concrete* values from the ``indices_or_sections`` tensor in order to
+    decide (a) the number of output chunks and (b) their sizes along *dim*.
+    This fails for :class:`~yobx.torch.new_tracing.tensor.TracingTensor`
+    instances because they carry no backing storage.
+
+    The replacement intercepts the call and delegates to
+    :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_tensor_split`
+    which performs shape inference via concrete surrogate tensors and emits
+    the appropriate FX ``call_function`` node.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_tensor_split` should be used as the replacement.
+    """
+
+    def _tensor_split_handler(input: Any, indices_or_sections: Any, dim: int = 0) -> Any:
+        return tracer._handle_tensor_split(input, indices_or_sections, dim)
+
+    torch.tensor_split = _tensor_split_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.tensor_split = _ORIGINAL_TORCH_TENSOR_SPLIT  # type: ignore[assignment]
 
 
 @contextlib.contextmanager
@@ -168,8 +382,8 @@ def _roll_dynamic_shape_ctx() -> Generator:
     from collections.abc import Iterable as _Iterable
 
     import torch._prims_common as _prims_common
-    from torch._decomp import decomposition_table as _decomp_table
     import torch.fx.experimental.symbolic_shapes as _sym_shapes
+    from torch._decomp import decomposition_table as _decomp_table
 
     _roll_op = torch.ops.aten.roll.default
     _orig_decomp = _decomp_table.get(_roll_op)
@@ -229,6 +443,151 @@ def _roll_dynamic_shape_ctx() -> Generator:
 
 
 @contextlib.contextmanager
+def _while_loop_replacement_ctx(
+    tracer: "GraphTracer",  # type: ignore[name-defined]  # noqa: F821
+) -> Generator:
+    """
+    Temporarily replaces ``torch._higher_order_ops.while_loop`` (and
+    ``torch.ops.higher_order.while_loop`` when it is a distinct object) with a
+    tracing-aware handler so that while-loop calls encountered during
+    :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.trace` are captured as
+    FX ``call_function`` nodes instead of being executed eagerly.
+
+    :param tracer: The :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
+        whose :meth:`_handle_while_loop` should be used as the replacement.
+
+    Yields:
+        Control while the while_loop callable is temporarily replaced, then
+        restores all original callables on exit.
+    """
+    if _ORIGINAL_TORCH_WHILE_LOOP is None and _ORIGINAL_TORCH_WHILE_LOOP_OP is None:
+        yield
+        return
+
+    def _while_loop_handler(
+        cond_fn: Callable,
+        body_fn: Callable,
+        carried_inputs: Any,
+        additional_inputs: Optional[List] = None,
+    ) -> Any:
+        return tracer._handle_while_loop(cond_fn, body_fn, carried_inputs, additional_inputs)
+
+    _higher_order_ops = getattr(torch, "_higher_order_ops", None)
+    _higher_order = getattr(torch.ops, "higher_order", None)
+
+    if _ORIGINAL_TORCH_WHILE_LOOP is not None and _higher_order_ops is not None:
+        _higher_order_ops.while_loop = _while_loop_handler  # type: ignore[assignment]
+    if (
+        _ORIGINAL_TORCH_WHILE_LOOP_OP is not None
+        and _higher_order is not None
+        and _ORIGINAL_TORCH_WHILE_LOOP_OP is not _ORIGINAL_TORCH_WHILE_LOOP
+    ):
+        _higher_order.while_loop = _while_loop_handler  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        if _ORIGINAL_TORCH_WHILE_LOOP is not None and _higher_order_ops is not None:
+            _higher_order_ops.while_loop = _ORIGINAL_TORCH_WHILE_LOOP  # type: ignore[assignment]
+        if (
+            _ORIGINAL_TORCH_WHILE_LOOP_OP is not None
+            and _higher_order is not None
+            and _ORIGINAL_TORCH_WHILE_LOOP_OP is not _ORIGINAL_TORCH_WHILE_LOOP
+        ):
+            _higher_order.while_loop = _ORIGINAL_TORCH_WHILE_LOOP_OP  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _is_exporting_replacement_ctx() -> Generator:
+    """
+    Temporarily replaces ``torch.compiler.is_exporting`` with a function that
+    always returns ``True`` so that model code guarded by
+    ``torch.compiler.is_exporting()`` takes the export branch (e.g. choosing a
+    scan-based implementation) while the new tracer is active.
+
+    The original implementation is restored unconditionally on exit.
+    """
+    _compiler = getattr(torch, "compiler", None)
+    if _ORIGINAL_IS_EXPORTING is None or _compiler is None:
+        yield
+        return
+
+    _compiler.is_exporting = lambda: True  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        _compiler.is_exporting = _ORIGINAL_IS_EXPORTING  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
+def _bilinear_replacement_ctx() -> Generator:
+    """
+    Temporarily replaces ``torch.nn.functional.bilinear`` with a pure-Python
+    decomposition that avoids ``aten::_trilinear``.
+
+    ``nn.functional.bilinear`` forwards to ``torch._C._nn.bilinear``, which
+    dispatches through ``aten::_trilinear``.  That op lacks a FakeTensor meta
+    kernel suitable for dynamic (symbolic) shapes, so
+    :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.dispatch` fails during
+    shape inference when it tries::
+
+        with self._fake_mode:
+            fake_res = func(*fake_args, **fake_kwargs)
+
+    The replacement decomposes the bilinear form into supported ops
+    (``transpose``, ``reshape``/``view``, ``matmul``, ``mul``, ``sum``,
+    optionally ``add``) that all have correct meta kernels and ONNX converters.
+
+    Callers that stored a direct reference to the original
+    ``torch.nn.functional.bilinear`` Python function before tracing started
+    (e.g. ``_OpWrapper._fn`` in the op-db coverage tests) bypass this patch,
+    but that case is handled at the dispatch level in
+    :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_trilinear`
+    which intercepts ``aten._trilinear.default`` directly.
+
+    The original ``torch.nn.functional.bilinear`` is restored unconditionally
+    on exit.
+    """
+    if _ORIGINAL_NN_FUNCTIONAL_BILINEAR is None:
+        yield
+        return
+
+    def _bilinear_impl(
+        input1: torch.Tensor,
+        input2: torch.Tensor,
+        weight: torch.Tensor,
+        bias: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
+        # weight shape: (out, H1, H2) — all static dims from nn.Parameter
+        H1: int = weight.shape[1]
+        out_dim: int = weight.shape[0]
+        H2: int = weight.shape[2]
+        # Reshape weight: (out, H1, H2) -> transpose -> (H1, out, H2)
+        # -> reshape -> (H1, out*H2).  All dims are static.
+        weight_r = weight.transpose(0, 1).reshape(H1, out_dim * H2)
+        # x1_w: (..., out*H2)
+        x1_w = torch.matmul(input1, weight_r)
+        # x1_w_r: (prod_batch, out, H2).
+        # Using -1 lets FakeTensorMode infer the dynamic batch size without
+        # requiring a TracingInt shape argument.
+        x1_w_r = x1_w.view(-1, out_dim, H2)
+        # input2_e: (prod_batch, 1, H2).
+        # Use view directly to avoid emitting an Unsqueeze ONNX node, which
+        # can produce a repeated-axis error in the ONNX reference evaluator.
+        input2_e = input2.view(-1, 1, H2)
+        # element-wise multiply and reduce along H2: (prod_batch, out)
+        output = (x1_w_r * input2_e).sum(-1)
+        if bias is not None:
+            output = output + bias
+        return output
+
+    torch.nn.functional.bilinear = _bilinear_impl  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.nn.functional.bilinear = _ORIGINAL_NN_FUNCTIONAL_BILINEAR  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
 def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
     """
     Applies all tracing-time torch replacement context managers at once.
@@ -244,7 +603,14 @@ def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         _cond_replacement_ctx(tracer),
         _check_replacement_ctx(tracer),
         _full_replacement_ctx(tracer),
+        _zeros_replacement_ctx(tracer),
+        _ones_replacement_ctx(tracer),
+        _arange_replacement_ctx(tracer),
         _roll_dynamic_shape_ctx(),
+        _bilinear_replacement_ctx(),
         _scan_replacement_ctx(tracer),
+        _tensor_split_replacement_ctx(tracer),
+        _while_loop_replacement_ctx(tracer),
+        _is_exporting_replacement_ctx(),
     ):
         yield

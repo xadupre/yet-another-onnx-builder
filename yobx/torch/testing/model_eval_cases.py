@@ -126,6 +126,13 @@ def _flatten_inputs(x: Any) -> List["torch.Tensor"]:  # noqa: F821
                 i, (torch.Tensor, torch.SymInt, torch.SymFloat, int, float, TracingInt)
             ):
                 res.append(i)
+            elif i.__class__.__name__ == "DynamicCache":
+                from ..in_transformers.cache_helper import CacheKeyValue
+
+                ca = CacheKeyValue(i)
+                for k, v in zip(ca.key_cache, ca.value_cache):
+                    res.append(k)
+                    res.append(v)
             else:
                 res.extend(_flatten_inputs(i))
         return tuple(res) if isinstance(x, tuple) else res
@@ -154,6 +161,14 @@ def _make_feeds(names, args):
     if len(names) > len(args):
         flats = _flatten_inputs(args)
         return {k: _to_numpy(v) for k, v in zip(names, flats)}
+    # len(names) < len(args): some inputs were embedded as ONNX constants
+    # (e.g. plain Python scalars passed as torch.cond operands).  Filter to
+    # tensor-only inputs so the counts align.
+    import torch
+
+    tensor_args = tuple(a for a in args if isinstance(a, torch.Tensor))
+    if len(names) == len(tensor_args):
+        return {k: _to_numpy(v) for k, v in zip(names, tensor_args)}
     from ...helpers import string_type
 
     raise RuntimeError(f"Unable to handle names={names!r} and args={string_type(args, limit=20)}")
@@ -168,7 +183,10 @@ def _clone(x):
         return [_clone(_) for _ in x]
     if isinstance(x, tuple):
         return tuple(_clone(_) for _ in x)
-    raise TypeError(f"Unable to clone type {type(x)}, x={x} into numpy")
+    # Fall back to torch_deepcopy for custom types such as DynamicCache.
+    from ..torch_helper import torch_deepcopy
+
+    return torch_deepcopy(x)
 
 
 def _wrap_torch_export(*args, backed_size_oblivious=False, **kwargs):
@@ -467,7 +485,7 @@ def _compares_on_one_example(
         return expected, None, res
 
     try:
-        disc = max_diff(expected, got)
+        disc = max_diff(expected, got, flatten=True)
     except Exception as e:
         if not quiet:
             raise
@@ -525,6 +543,27 @@ def run_exporter(
     """
     assert hasattr(cls_model, "_inputs"), f"Attribute '_inputs' is missing from class {cls_model}"
 
+    requires_flattening = getattr(cls_model, "_patch", None) == "flattening"
+    if requires_flattening:
+        from ..flatten import register_flattening_functions
+
+        with register_flattening_functions(patch_transformers=True):
+            return _run_exporter_impl(
+                exporter, cls_model, dynamic=dynamic, quiet=quiet, verbose=verbose
+            )
+    return _run_exporter_impl(exporter, cls_model, dynamic=dynamic, quiet=quiet, verbose=verbose)
+
+
+def _run_exporter_impl(
+    exporter: str, cls_model: type, dynamic: bool = False, quiet: bool = False, verbose: int = 0
+) -> Dict[str, Any]:
+    """
+    Core implementation of :func:`run_exporter`.
+    Called with :func:`yobx.torch.flatten.register_flattening_functions` already
+    active when the model class has ``_patch = "flattening"``.
+
+    :return: results dictionary with export/run metrics.
+    """
     model = cls_model()
     inputs = cls_model._inputs
     valid = getattr(cls_model, "_valid", None)
@@ -589,6 +628,15 @@ def run_exporter(
 
         names = [i.name for i in onx.graph.input]
         flats = _flatten_inputs(inputs[0]) if len(names) > len(inputs[0]) else inputs[0]
+
+        # When scalar inputs (int/float) are embedded as ONNX constants during
+        # new-tracing export (e.g. a plain Python integer passed as a torch.cond
+        # operand), the ONNX graph will have fewer named inputs than the original
+        # model inputs.  Filter out non-tensor scalars so the counts align.
+        import torch
+
+        if len(names) < len(flats if isinstance(flats, (list, tuple)) else [flats]):
+            flats = tuple(f for f in flats if isinstance(f, torch.Tensor))
 
         assert quiet or len(names) == len(flats), (
             f"Input mismatch, inputs[0]={string_type(inputs[0])} "
@@ -688,7 +736,7 @@ def run_exporter(
                 return dict(error=str(e), success=0, error_step=f"run.{index}")
 
             try:
-                d = max_diff(expected, got)
+                d = max_diff(expected, got, flatten=True)
             except Exception as e:
                 if not quiet:
                     raise

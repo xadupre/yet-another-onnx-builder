@@ -144,6 +144,15 @@ class TestMermaidEmitter(ExtTestCase):
         self.assertIn("classDef init", mermaid)
         self.assertIn("classDef op", mermaid)
         self.assertIn("classDef output", mermaid)
+        # Each classDef must include explicit stroke and text colour so that
+        # node borders and labels are visible in both light and dark themes.
+        for cls in ("input", "init", "op", "output"):
+            self.assertIn(f"classDef {cls} fill:#", mermaid)
+            # stroke and color must be present in the same classDef line
+            lines = [line for line in mermaid.splitlines() if f"classDef {cls} " in line]
+            self.assertEqual(len(lines), 1)
+            self.assertIn("stroke:", lines[0])
+            self.assertIn("color:", lines[0])
 
     def test_edge_labels(self):
         TFLOAT = onnx.TensorProto.FLOAT

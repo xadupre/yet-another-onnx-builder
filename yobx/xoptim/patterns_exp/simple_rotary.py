@@ -55,7 +55,7 @@ class SimpleRotaryPattern(PatternOptimization):
             I_splits(["splits INT64(2)"])
             I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
 
-            Rotary_0[["onnx_extended.ortops.optim.cuda.Rotary(., .)"]]
+            Rotary_0[["yaourt.ortops.fused_kernel.cuda.Rotary(., .)"]]
 
             I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| Rotary_0
             I_splits -->|"INT64(2)"| Rotary_0
@@ -144,6 +144,6 @@ class SimpleRotaryPattern(PatternOptimization):
             concat_node.output,
             side=side,
             name=f"{self.__class__.__name__}--{neg_node.name}",
-            domain="onnx_extended.ortops.optim.cuda",
+            domain="yaourt.ortops.fused_kernel.cuda",
         )
         return [new_node]

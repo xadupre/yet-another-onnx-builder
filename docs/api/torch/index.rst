@@ -15,7 +15,6 @@ yobx.torch
     export_options
     fake_tensor_helper
     flatten
-    flatten_helper
     input_observer
     patch
     tiny_models

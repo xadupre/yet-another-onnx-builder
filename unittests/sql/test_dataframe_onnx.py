@@ -546,6 +546,135 @@ class TestMultiDataframe(ExtTestCase):
                 ],
             )
 
+    def test_join_three_consecutive(self):
+        """Three consecutive inner joins across four input frames."""
+
+        def transform(orders, customers, products, warehouses):
+            j1 = orders.join(customers, left_key="customer_id", right_key="cid")
+            j2 = j1.join(products, left_key="product_id", right_key="pid")
+            j3 = j2.join(warehouses, left_key="warehouse_id", right_key="wid")
+            return j3.select(
+                [j3["order_id"], j3["discount"], j3["unit_price"], j3["shipping_cost"]]
+            )
+
+        dtypes_orders = {
+            "order_id": np.int64,
+            "customer_id": np.int64,
+            "product_id": np.int64,
+            "warehouse_id": np.int64,
+        }
+        dtypes_customers = {"cid": np.int64, "discount": np.float32}
+        dtypes_products = {"pid": np.int64, "unit_price": np.float32}
+        dtypes_warehouses = {"wid": np.int64, "shipping_cost": np.float32}
+
+        artifact = dataframe_to_onnx(
+            transform, [dtypes_orders, dtypes_customers, dtypes_products, dtypes_warehouses]
+        )
+        ref = ExtendedReferenceEvaluator(artifact)
+
+        order_id = np.array([1, 2, 3, 4], dtype=np.int64)
+        customer_id = np.array([10, 20, 10, 30], dtype=np.int64)
+        product_id = np.array([100, 200, 300, 100], dtype=np.int64)
+        warehouse_id = np.array([1000, 2000, 1000, 2000], dtype=np.int64)
+
+        cid = np.array([10, 20, 30], dtype=np.int64)
+        discount = np.array([0.1, 0.2, 0.0], dtype=np.float32)
+
+        pid = np.array([100, 200, 300], dtype=np.int64)
+        unit_price = np.array([50.0, 80.0, 60.0], dtype=np.float32)
+
+        wid = np.array([1000, 2000], dtype=np.int64)
+        shipping_cost = np.array([5.0, 8.0], dtype=np.float32)
+
+        feeds = {
+            "order_id": order_id,
+            "customer_id": customer_id,
+            "product_id": product_id,
+            "warehouse_id": warehouse_id,
+            "cid": cid,
+            "discount": discount,
+            "pid": pid,
+            "unit_price": unit_price,
+            "wid": wid,
+            "shipping_cost": shipping_cost,
+        }
+        order_id_out, discount_out, unit_price_out, shipping_cost_out = ref.run(None, feeds)
+        # All four orders must appear in the result (all match every dimension table).
+        np.testing.assert_array_equal(order_id_out, np.array([1, 2, 3, 4]))
+        np.testing.assert_allclose(discount_out, np.array([0.1, 0.2, 0.1, 0.0], dtype=np.float32))
+        np.testing.assert_allclose(
+            unit_price_out, np.array([50.0, 80.0, 60.0, 50.0], dtype=np.float32)
+        )
+        np.testing.assert_allclose(
+            shipping_cost_out, np.array([5.0, 8.0, 5.0, 8.0], dtype=np.float32)
+        )
+
+    def test_join_three_consecutive_with_select(self):
+        """Three consecutive joins followed by a computed SELECT expression."""
+
+        def transform(orders, customers, products, warehouses):
+            j1 = orders.join(customers, left_key="customer_id", right_key="cid")
+            j2 = j1.join(products, left_key="product_id", right_key="pid")
+            j3 = j2.join(warehouses, left_key="warehouse_id", right_key="wid")
+            # total = qty * unit_price * (1 - discount) + shipping_cost
+            total = (
+                j3["qty"] * j3["unit_price"] * (1.0 - j3["discount"]) + j3["shipping_cost"]
+            ).alias("total")
+            return j3.select([total])
+
+        dtypes_orders = {
+            "order_id": np.int64,
+            "customer_id": np.int64,
+            "product_id": np.int64,
+            "warehouse_id": np.int64,
+            "qty": np.float32,
+        }
+        dtypes_customers = {"cid": np.int64, "discount": np.float32}
+        dtypes_products = {"pid": np.int64, "unit_price": np.float32}
+        dtypes_warehouses = {"wid": np.int64, "shipping_cost": np.float32}
+
+        artifact = dataframe_to_onnx(
+            transform, [dtypes_orders, dtypes_customers, dtypes_products, dtypes_warehouses]
+        )
+        ref = ExtendedReferenceEvaluator(artifact)
+
+        order_id = np.array([1, 2, 3, 4], dtype=np.int64)
+        customer_id = np.array([10, 20, 10, 30], dtype=np.int64)
+        product_id = np.array([100, 200, 300, 100], dtype=np.int64)
+        warehouse_id = np.array([1000, 2000, 1000, 2000], dtype=np.int64)
+        qty = np.array([2.0, 1.0, 3.0, 1.0], dtype=np.float32)
+
+        cid = np.array([10, 20, 30], dtype=np.int64)
+        discount = np.array([0.1, 0.2, 0.0], dtype=np.float32)
+
+        pid = np.array([100, 200, 300], dtype=np.int64)
+        unit_price = np.array([50.0, 80.0, 60.0], dtype=np.float32)
+
+        wid = np.array([1000, 2000], dtype=np.int64)
+        shipping_cost = np.array([5.0, 8.0], dtype=np.float32)
+
+        feeds = {
+            "order_id": order_id,
+            "customer_id": customer_id,
+            "product_id": product_id,
+            "warehouse_id": warehouse_id,
+            "qty": qty,
+            "cid": cid,
+            "discount": discount,
+            "pid": pid,
+            "unit_price": unit_price,
+            "wid": wid,
+            "shipping_cost": shipping_cost,
+        }
+        (total_out,) = ref.run(None, feeds)
+        # Manually verified totals:
+        # order 1: 2*50*(1-0.1)+5  = 2*50*0.9+5  = 95
+        # order 2: 1*80*(1-0.2)+8  = 1*80*0.8+8  = 72
+        # order 3: 3*60*(1-0.1)+5  = 3*60*0.9+5  = 167
+        # order 4: 1*50*(1-0.0)+8  = 1*50*1.0+8  = 58
+        expected = np.array([95.0, 72.0, 167.0, 58.0], dtype=np.float32)
+        np.testing.assert_allclose(total_out, expected, rtol=1e-5)
+
     # ------------------------------------------------------------------
     # to_onnx dispatcher (callable path)
     # ------------------------------------------------------------------

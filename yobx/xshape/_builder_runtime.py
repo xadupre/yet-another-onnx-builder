@@ -277,9 +277,10 @@ class _BuilderRuntime:
         new_new_shape = []
         for i, sh in enumerate(new_shape):
             if sh == 0:
-                assert i < len(
-                    input_shape
-                ), f"Unable to apply reshape {new_shape} to input shape {input_shape}"
+                assert i < len(input_shape), (
+                    f"Unable to apply reshape {new_shape} to input shape {input_shape}"
+                    f"{self.get_debug_msg()}"
+                )
                 new_new_shape.append(input_shape[i])
                 continue
             new_new_shape.append(sh)

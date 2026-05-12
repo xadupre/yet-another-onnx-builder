@@ -1,5 +1,5 @@
 import warnings
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 import tensorflow as tf
@@ -12,18 +12,21 @@ from .xla_call_module_helper import (  # noqa: F401
     _extract_balanced_parens,
     _extract_function_body,
 )
+from .xla_call_module_layer import XlaLayer  # noqa: F401
 from .xla_call_module_parsing import (  # noqa: F401
     _get_function_param_ids,
     _get_function_param_info,
     _parse_body,
     _parse_dense_value,
+    _parse_ir_private_function,
     _parse_tensor_type,
+    parse_ir_module,
     parse_mlir,
 )
 
 
 def _process_constant_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
     decoded_module: Optional[str] = None,
@@ -33,7 +36,8 @@ def _process_constant_layer(
     Updates *local_results* in-place, mapping the layer's result id to the
     generated initializer name.
 
-    :param layer: layer dict with keys ``id``, ``shape``, and ``dense_content``.
+    :param layer: :class:`XlaLayer` with fields ``id``, ``shape``, and
+        ``dense_content``.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
     :param decoded_module: unused; present for a uniform handler signature.
@@ -68,7 +72,7 @@ def _process_constant_layer(
 
 
 def _process_broadcast_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: Optional[GraphBuilderExtendedProtocol] = None,
     decoded_module: Optional[str] = None,
@@ -78,7 +82,7 @@ def _process_broadcast_layer(
     ONNX arithmetic ops support implicit broadcasting, so we simply pass the
     operand tensor through unchanged.
 
-    :param layer: layer dict with keys ``id`` and ``operands``.
+    :param layer: :class:`XlaLayer` with fields ``id`` and ``operands``.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: unused; present for a uniform handler signature.
     :param decoded_module: unused; present for a uniform handler signature.
@@ -89,14 +93,15 @@ def _process_broadcast_layer(
 
 
 def _process_dot_general_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
     decoded_module: Optional[str] = None,
 ) -> None:
     """Emit a MatMul ONNX op for a ``dot_general`` StableHLO layer.
 
-    :param layer: layer dict with keys ``id`` and ``operands`` (lhs, rhs).
+    :param layer: :class:`XlaLayer` with fields ``id`` and ``operands``
+        (lhs, rhs).
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
     :param decoded_module: unused; present for a uniform handler signature.
@@ -109,14 +114,15 @@ def _process_dot_general_layer(
 
 
 def _process_reduce_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
     decoded_module: Optional[str] = None,
 ) -> None:
     """Emit a ReduceMax or ReduceSum ONNX op for a ``reduce_*`` StableHLO layer.
 
-    :param layer: layer dict with keys ``id``, ``op``, ``operands``, and ``axes``.
+    :param layer: :class:`XlaLayer` with fields ``id``, ``op``, ``operands``,
+        and ``axes``.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
     :param decoded_module: unused; present for a uniform handler signature.
@@ -134,10 +140,10 @@ def _process_reduce_layer(
 
 
 def _process_call_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
-    decoded_module: str,
+    decoded_module: Union[str, Any],
 ) -> None:
     """Inline a ``call`` StableHLO layer by parsing and executing its body.
 
@@ -145,49 +151,56 @@ def _process_call_layer(
     arguments to the function's parameter IDs (skipping shape-only args), and
     processes the function body recursively via :func:`_process_layers`.
 
-    :param layer: layer dict with keys ``id``, ``operands``, and ``func``.
+    :param layer: :class:`XlaLayer` with fields ``id``, ``operands``, and
+        ``func``.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
-    :param decoded_module: raw MLIR text used to look up the called function.
+    :param decoded_module: either raw MLIR text (``str``) or an ``ir.Module``
+        object (JAX 0.10+).  Both are supported.
     """
     func_name = layer.get("func", "")
     call_args = layer["operands"]
 
-    # Parse and inline the private function.
-    # Use _get_function_param_info to correctly align tensor params
-    # with their corresponding call arguments, skipping shape-only
-    # (integer) parameters that appear in dynamic-shape functions.
-    func_param_info = _get_function_param_info(decoded_module, func_name)
-    func_body = _extract_function_body(decoded_module, func_name)
-    if func_body is None:
-        return
+    if isinstance(decoded_module, str):
+        # Text-based path (JAX 0.9 / string MLIR).
+        func_param_info = _get_function_param_info(decoded_module, func_name)
+        func_body = _extract_function_body(decoded_module, func_name)
+        if func_body is None:
+            return
 
-    # Build a local scope mapping function param IDs to caller args.
-    inline_results: Dict[str, str] = {}
-    for (param_id, is_shape_only), call_arg_id in zip(func_param_info, call_args):
-        # Shape-only parameters (integer scalars injected by jax2tf for dynamic
-        # shapes) are normally skipped because the caller typically does not
-        # have them in local_results.  However, when the caller *does* have the
-        # value available (e.g., an integer constant passed as a computation
-        # argument), we should still map it so that the callee can use it.
-        if is_shape_only and call_arg_id not in local_results:
-            continue
-        if call_arg_id in local_results:
-            inline_results[param_id] = local_results[call_arg_id]
+        # Build a local scope mapping function param IDs to caller args.
+        inline_results: Dict[str, str] = {}
+        for (param_id, is_shape_only), call_arg_id in zip(func_param_info, call_args):
+            if is_shape_only and call_arg_id not in local_results:
+                continue
+            if call_arg_id in local_results:
+                inline_results[param_id] = local_results[call_arg_id]
 
-    # Parse the function body (scan only the body, with no arg alias).
-    func_layers = _parse_body(func_body, {})
+        # Parse the function body (scan only the body, with no arg alias).
+        func_layers = _parse_body(func_body, {})
 
-    # Sort compute layers by their source position so they are processed in
-    # execution order.  (parse_mlir does the same for the top-level body; we
-    # must replicate the sort here for inlined private functions.)
-    from .xla_call_module_parsing import _get_layer_pos
+        # Sort compute layers by their source position so they are processed in
+        # execution order.
+        from .xla_call_module_parsing import _get_layer_pos
 
-    input_layers = [la for la in func_layers if la["op"] == "Input"]
-    compute_layers = [la for la in func_layers if la["op"] not in ("Input", "return")]
-    return_layers = [la for la in func_layers if la["op"] == "return"]
-    compute_layers.sort(key=lambda la: _get_layer_pos(la, func_body))
-    func_layers = input_layers + compute_layers + return_layers
+        input_layers = [la for la in func_layers if la["op"] == "Input"]
+        compute_layers = [la for la in func_layers if la["op"] not in ("Input", "return")]
+        return_layers = [la for la in func_layers if la["op"] == "return"]
+        compute_layers.sort(key=lambda la: _get_layer_pos(la, func_body))
+        func_layers = [*input_layers, *compute_layers, *return_layers]
+    else:
+        # IR-based path (JAX 0.10+: ir.Module object).
+        func_param_info, func_layers = _parse_ir_private_function(decoded_module, func_name)
+        if func_layers is None:
+            return
+
+        # Build a local scope mapping function param IDs to caller args.
+        inline_results = {}
+        for (param_id, is_shape_only), call_arg_id in zip(func_param_info, call_args):
+            if is_shape_only and call_arg_id not in local_results:
+                continue
+            if call_arg_id in local_results:
+                inline_results[param_id] = local_results[call_arg_id]
 
     # Process function body layers (stops at return layer).
     _process_layers(func_layers, inline_results, g, decoded_module)
@@ -206,7 +219,7 @@ def _process_call_layer(
 
 
 def _process_convert_layer(
-    layer: dict,
+    layer: XlaLayer,
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
     decoded_module: Optional[str] = None,
@@ -216,8 +229,8 @@ def _process_convert_layer(
     When the source and target types are identical this is a no-op
     (pass-through).
 
-    :param layer: layer dict with keys ``id``, ``operands``, and ``shape``
-        (the target tensor-type string, e.g. ``"tensor<f32>"``).
+    :param layer: :class:`XlaLayer` with fields ``id``, ``operands``, and
+        ``shape`` (the target tensor-type string, e.g. ``"tensor<f32>"``).
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
     :param decoded_module: unused; present for a uniform handler signature.
@@ -278,10 +291,10 @@ _STRUCTURAL_OPS = {
 
 
 def _process_layers(
-    layer_list: List[dict],
+    layer_list: List[XlaLayer],
     local_results: Dict[str, str],
     g: GraphBuilderExtendedProtocol,
-    decoded_module: str,
+    decoded_module: Union[str, Any],
 ) -> None:
     """Process a list of StableHLO layers, emitting ONNX ops into *g*.
 
@@ -292,10 +305,12 @@ def _process_layers(
     dispatched directly to their handler functions.  All other ops are
     handled via :func:`~yobx.tensorflow.ops.jax_ops.get_jax_cvt`.
 
-    :param layer_list: list of layer dicts produced by :func:`parse_mlir`.
+    :param layer_list: list of :class:`XlaLayer` objects produced by
+        :func:`parse_mlir` or :func:`parse_ir_module`.
     :param local_results: mutable id→tensor-name mapping for the current scope.
     :param g: ONNX graph builder.
-    :param decoded_module: raw MLIR text (needed to inline ``call`` targets).
+    :param decoded_module: either raw MLIR text or an ``ir.Module`` object
+        (needed to inline ``call`` targets).
     """
     for layer in layer_list:
         op_type = layer["op"]
@@ -317,15 +332,19 @@ def _process_layers(
         fct = get_jax_cvt(decoded_module, g, op_type)
         args_list = []
         for a in layer["operands"]:
-            if a not in local_results:
-                break
+            assert a in local_results, (
+                f"Missing argument {a!r} in layer {layer} (local_results="
+                f"{sorted(local_results)})\n---\n{decoded_module}"
+            )
             args_list.append(local_results[a])
-        else:
-            res = fct(*args_list, name="XlaCallModule")
-            if isinstance(res, str):
-                res = (res,)
-            if res:
-                local_results[layer["id"]] = res[0]
+        res = fct(*args_list, name="XlaCallModule")
+        if isinstance(res, str):
+            res = (res,)
+        if res:
+            assert (
+                layer["id"] not in local_results
+            ), f"Existing id={layer['id']}\n---\n{decoded_module}"
+            local_results[layer["id"]] = res[0]
 
 
 @register_tf_op_converter("XlaCallModule")
@@ -342,28 +361,45 @@ def convert_exp(
     """
     import jax.extend.mlir
 
+    # make_ir_context is not exposed in the public jax.extend.mlir namespace;
+    # it lives in jax._src.interpreters.mlir and registers all required dialects
+    # (StableHLO, MHLO, CHLO, …) that deserialize_portable_artifact depends on.
+    from jax._src.interpreters.mlir import make_ir_context
+
     hlo_module = op.get_attr("module")
-    decoded_module = jax.extend.mlir.deserialize_portable_artifact(hlo_module)
-    layers = parse_mlir(decoded_module)
-    results: Dict[str, str] = {}
+    with make_ir_context():
+        decoded_module = jax.extend.mlir.deserialize_portable_artifact(hlo_module)
+        if isinstance(decoded_module, str):
+            # JAX 0.9: string MLIR – use the text-based parser.
+            layers = parse_mlir(decoded_module)
+        else:
+            # JAX 0.10+: ir.Module object – use Python bindings directly,
+            # skipping the text conversion and regex-based parse step.
+            layers = parse_ir_module(decoded_module)
 
-    for layer in layers:
-        if layer["op"] == "Input":
-            if layer["id"] not in results:
-                results[layer["id"]] = op.inputs[len(results)].name
-            continue
+        results: Dict[str, str] = {}
 
-        if layer["op"] == "return":
-            if len(layer["operands"]) == 1:
-                return g.op.Identity(
-                    results[layer["operands"][0]], outputs=outputs, name="XlaCallModule"
+        for layer in layers:
+            if layer["op"] == "Input":
+                if layer["id"] not in results:
+                    results[layer["id"]] = op.inputs[len(results)].name
+                continue
+
+            if layer["op"] == "return":
+                if len(layer["operands"]) == 1:
+                    assert layer["operands"][0] in results, (
+                        f"Issue with {layer=}, unable to find {layer['operands'][0]}, "
+                        f"results={sorted(results)}\n---\n{decoded_module}"
+                    )
+                    return g.op.Identity(
+                        results[layer["operands"][0]], outputs=outputs, name="XlaCallModule"
+                    )
+                return tuple(
+                    g.op.Identity(results[a], outputs=outputs[i : i + 1])
+                    for i, a in enumerate(layer["operands"])
                 )
-            return tuple(
-                g.op.Identity(results[a], outputs=outputs[i : i + 1])
-                for i, a in enumerate(layer["operands"])
-            )
 
-        _process_layers([layer], results, g, decoded_module)
+            _process_layers([layer], results, g, decoded_module)
 
     raise NotImplementedError(
         f"Unable to convert XlaCallModule with the following assembly"

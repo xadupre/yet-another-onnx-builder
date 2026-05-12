@@ -1,7 +1,7 @@
-from typing import Any, Dict, Optional, Tuple, Union
+import operator
+import traceback
+from typing import Any, Dict, List, Optional, Tuple, Union
 import torch
-import torch.fx
-import torch.utils._pytree as _pytree
 from .shape import TracingInt, TracingShape
 
 
@@ -50,7 +50,13 @@ class TracingTensor(torch.Tensor):
                 )
                 for d in size
             )
-            sizes = tuple((i if isinstance(i, int) else 0) for i in sizes)
+            # For symbolic dimensions (still TracingInt objects after the pass
+            # above), use 1 as the stored concrete size.  A stored size of 1
+            # prevents C++-level bounds checks from raising IndexError for
+            # common index-0 access patterns (e.g. ``x[0]``) before
+            # ``__torch_dispatch__`` can intercept.  The actual symbolic size
+            # is tracked separately in ``_tracing_shape``.
+            sizes = tuple((i if isinstance(i, int) else 1) for i in sizes)
         else:
             assert isinstance(size, tuple), f"Unexpected type {type(size)} for size"
             assert not size or all(
@@ -78,11 +84,149 @@ class TracingTensor(torch.Tensor):
             isinstance(i, int) for i in size
         ), f"Unexpected type for shape={size!r}"
         self._tracing_shape = size if isinstance(size, TracingShape) else TracingShape(size)
+        # View-source tracking: set by __getitem__ when a slice-only index is
+        # used, so that inplace ops on the view (e.g. torch.exp_) can be
+        # converted into a setitem_with_transformation node on the source.
+        self._view_source: Optional["TracingTensor"] = None
+        self._view_indices: Optional[Any] = None
 
     @property
     def shape(self) -> TracingShape:  # type: ignore
         """Returns the shape as a TracingShape."""
         return self._tracing_shape
+
+    def numel(self) -> Union[int, TracingInt]:  # type: ignore[override]
+        """Computes the total number of elements from :attr:`_tracing_shape`.
+
+        Concrete integer dimensions contribute their actual value directly.
+        Symbolic (string-valued) :class:`TracingInt` dimensions are folded
+        into the product as symbolic terms, yielding a :class:`TracingInt`
+        return value.
+
+        This ensures that guards of the form ``if x.numel() == 0:`` can be
+        resolved at trace time via the :class:`TracingBool` mechanism: models
+        should use ``torch._check(x.numel() != 0)`` to register the non-empty
+        constraint (as with :class:`~yobx.torch.testing._model_eval_cases.ControlFlowShapeCheck`),
+        after which :meth:`~yobx.torch.new_tracing.shape.TracingBool.__bool__`
+        resolves the equality to ``False`` via its negation lookup.
+
+        A concrete dimension of ``0`` still causes an immediate return of ``0``
+        so that genuinely empty static shapes are identified correctly.
+
+        When a tracer is active and the result is symbolic, FX nodes are
+        emitted for the numel computation and stored on the returned
+        :class:`TracingInt` (see :meth:`_emit_numel_node`).  Subsequent
+        comparisons such as ``numel() > 0`` then also emit comparison FX
+        nodes, allowing the result to serve as a ``torch.cond`` predicate.
+
+        Returns:
+            Union[int, TracingInt]: Plain ``int`` when every dimension is
+            concrete; :class:`TracingInt` when any dimension is symbolic.
+        """
+        result: Union[int, TracingInt] = 1
+        for d in self._tracing_shape.dims:
+            if isinstance(d, TracingInt):
+                if isinstance(d.value, int):
+                    if d.value == 0:
+                        return 0
+                    result = result * d.value
+                else:
+                    # Purely symbolic dim — fold into the product symbolically.
+                    result = d * result
+            else:
+                d_int = int(d)
+                if d_int == 0:
+                    return 0
+                result = result * d_int
+        # When the result is symbolic and a tracer is active, emit FX nodes
+        # so that comparisons such as ``numel() > 0`` can produce a proper
+        # bool tensor node (required for use as a ``torch.cond`` predicate).
+        if isinstance(result, TracingInt) and self._tracer is not None and self._node is not None:
+            numel_node = self._emit_numel_node()
+            if numel_node is not None:
+                result._node = numel_node
+                result._tracer = self._tracer
+                result._device = self.device
+        return result
+
+    def _emit_numel_node(self) -> Optional[torch.fx.Node]:
+        """Emits FX nodes that compute ``numel()`` as a scalar ``int64`` tensor.
+
+        For each dimension of this tensor an ``aten.sym_size.int`` node is
+        emitted.  All per-dimension nodes are then multiplied together via
+        ``aten.mul.Tensor`` dispatch calls.  The final node represents the
+        total element count as a 0-dim ``int64`` :class:`TracingTensor`.
+
+        This follows the same pattern as :meth:`_div_by_tracing_int`: shape
+        dimensions are materialised as proper FX nodes so that the resulting
+        integer value participates correctly in the runtime computation graph.
+
+        Returns:
+            The FX :class:`~torch.fx.Node` whose output is the numel scalar,
+            or ``None`` when no tracer is active or the tensor has no
+            dimensions.
+        """
+        import traceback
+
+        tracer = self._tracer
+        if tracer is None or self._node is None:
+            return None
+
+        dims: List[Any] = list(self._tracing_shape.dims)
+        if not dims:
+            return None
+
+        device = self.device
+
+        def make_sym_size_node(dim_idx: int) -> torch.fx.Node:
+            """Emits ``aten.sym_size.int(self, dim_idx)`` and wraps it."""
+            node = tracer.graph.call_function(
+                torch.ops.aten.sym_size.int, args=(self._node, dim_idx), kwargs={}
+            )
+            # Create a 0-dim int64 TracingTensor for FX node metadata.
+            tt = TracingTensor(TracingShape(()), dtype=torch.int64, device=device, tracer=tracer)
+            tt._node = node
+            node.meta["val"] = tt
+            node.meta["stack_trace"] = "".join(traceback.format_stack())
+            return node
+
+        result_node = make_sym_size_node(0)
+        result_tt: "TracingTensor" = result_node.meta["val"]
+
+        for i in range(1, len(dims)):
+            dim_node = make_sym_size_node(i)
+            dim_tt: "TracingTensor" = dim_node.meta["val"]
+            # aten.mul.Tensor dispatches through __torch_dispatch__ → dispatch(),
+            # creating a proper FX node and returning a new TracingTensor.
+            result_tt = torch.ops.aten.mul.Tensor(result_tt, dim_tt)  # type: ignore
+            result_node = result_tt._node  # type: ignore
+
+        return result_node
+
+    def item(self) -> Union[int, float, TracingInt]:  # type: ignore[override]
+        """
+        Intercepts ``.item()`` during tracing to return a symbolic
+        :class:`TracingInt` backed by a graph node instead of raising an
+        error or returning a bare Python scalar.
+
+        When a tracer is active, this method delegates to
+        :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_local_scalar_dense`,
+        which emits an ``aten._local_scalar_dense`` FX node and wraps the
+        result in a :class:`TracingInt`.  The caller can then use the
+        returned :class:`TracingInt` as a dynamic slice endpoint (e.g.
+        ``x[..., :shape.item()]``), which is recognised by
+        :meth:`_index_has_symbolic_tracing_int` and routed through
+        :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_symbolic_getitem`.
+
+        Returns:
+            A :class:`TracingInt` (symbolic) when a tracer is active, or the
+            actual Python scalar when no tracer is present (falls back to
+            :meth:`torch.Tensor.item`).
+        """
+        tracer = self._tracer
+        if tracer is not None:
+            return tracer._handle_local_scalar_dense(self)
+        return super().item()  # type: ignore[misc]
 
     def __repr__(self) -> str:  # type: ignore
         node_name = self._node.name if self._node is not None else "<unregistered>"
@@ -159,6 +303,8 @@ class TracingTensor(torch.Tensor):
         Intercept every dispatched operation, create an FX graph node, and
         return a new :class:`TracingTensor` (or tuple thereof) for the result.
         """
+        import torch.utils._pytree as _pytree
+
         # Use pytree to find the tracer from any TracingTensor in the
         # (possibly nested) args.  This handles ops like ``aten.cat.default``
         # where the first argument is a *list* of tensors, not a bare tensor.
@@ -255,3 +401,200 @@ class TracingTensor(torch.Tensor):
         if isinstance(other, TracingInt) and not other.is_static:
             return self._div_by_tracing_int(other)
         return super().__truediv__(other)
+
+    def new_zeros(self, size: Any, **kwargs: Any) -> Any:  # type: ignore[override]
+        """
+        Accepts a :class:`~yobx.torch.new_tracing.shape.TracingShape` as the
+        *size* argument in addition to the types accepted by the base class.
+
+        When a module attribute is temporarily replaced with a
+        :class:`TracingTensor` during tracing, ``self.attr.shape`` returns a
+        :class:`~yobx.torch.new_tracing.shape.TracingShape` instead of a
+        ``torch.Size``.  The C++ pybind for ``new_zeros`` does not accept
+        custom sequence types, so this override converts concrete
+        :class:`~yobx.torch.new_tracing.shape.TracingShape` objects to plain
+        ``tuple`` of ``int`` before delegating to the parent implementation
+        (which routes through ``__torch_dispatch__``).
+
+        :param size: The desired output shape.  A
+            :class:`~yobx.torch.new_tracing.shape.TracingShape` with concrete
+            integer dimensions is converted to a plain ``tuple``; all other
+            values are forwarded unchanged.
+        :param kwargs: Additional keyword arguments forwarded to
+            :meth:`torch.Tensor.new_zeros`.
+
+        Returns:
+            A :class:`TracingTensor` representing the zero-filled tensor.
+        """
+        if isinstance(size, TracingShape):
+            size = tuple(int(d) if isinstance(d, TracingInt) else d for d in size)
+        return super().new_zeros(size, **kwargs)
+
+    def __setitem__(self, indices: Any, values: Any) -> None:
+        """
+        Captures inplace index-assignment as an ``operator.setitem`` FX node.
+
+        When Python evaluates ``x[...] = val`` on a :class:`TracingTensor`,
+        this override intercepts the assignment before it reaches the C++
+        dispatcher.  It emits a single ``call_function`` node with target
+        ``operator.setitem`` and updates ``self._node`` to point to that node
+        so that all subsequent uses of this tensor in the graph flow through
+        the setitem result.
+
+        This mirrors the behaviour of
+        :meth:`~yobx.torch.tracing.CustomProxy.__setitem__` in the old
+        symbolic-tracing path, allowing
+        :func:`~yobx.torch.tracing.CustomTracer.remove_inplace` and the
+        ONNX interpreter's ``aten_setitem`` handler to process the node in
+        the same way as the old tracing.
+
+        :param indices: Index expression (slice, tuple of slices,
+            integer, boolean mask, or :class:`TracingTensor`).
+        :param values: Value(s) to assign.  May be a scalar, a
+            :class:`torch.Tensor`, or a :class:`TracingTensor`.
+        """
+        tracer = self._tracer
+        assert tracer is not None, "__setitem__ requires an active tracer"
+
+        def _unwrap(idx: Any) -> Any:
+            """Unwraps a TracingTensor/TracingInt index to its FX node.
+
+            Returns the index itself for any other type."""
+            if isinstance(idx, TracingTensor):
+                return idx._node
+            if isinstance(idx, TracingInt):
+                # Symbolic TracingInt (e.g. from .item()) — return its backing
+                # FX node so the ONNX interpreter receives a valid result name.
+                if idx._node is not None:
+                    return idx._node
+                if idx.is_static:
+                    return int(idx)
+                return tracer._emit_sym_size_node(idx)
+            if isinstance(idx, slice):
+                # Recursively unwrap TracingInt start/stop/step so that
+                # symbolic slice endpoints are embedded as FX node references
+                # rather than raw TracingInt objects.
+                return slice(_unwrap(idx.start), _unwrap(idx.stop), _unwrap(idx.step))
+            if isinstance(idx, tuple):
+                return tuple(_unwrap(i) for i in idx)
+            return idx
+
+        processed_indices = _unwrap(indices)
+        values_arg = values._node if isinstance(values, TracingTensor) else values
+
+        node = tracer.graph.call_function(
+            operator.setitem, args=(self._node, processed_indices, values_arg), kwargs={}
+        )
+        # Store a TracingTensor as node metadata so the FX interpreter can
+        # infer the output dtype/shape (same as the modified tensor).
+        shape, dtype, device = self._tracing_shape, self.dtype, self.device
+        meta_tt = TracingTensor.__new__(TracingTensor, shape, dtype=dtype, device=device)
+        meta_tt._tracing_shape = shape
+        meta_tt._tracer = tracer
+        meta_tt._node = node
+        node.meta["val"] = meta_tt
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        # Redirect self._node so that all subsequent operations on this tensor
+        # in the same forward() call flow through the setitem node rather than
+        # the original placeholder.  This ensures eliminate_dead_code() does
+        # not discard the node and that downstream ops receive the updated
+        # tensor value.
+        self._node = node
+
+    @staticmethod
+    def _index_has_symbolic_tracing_int(index: Any) -> bool:
+        """
+        Return ``True`` if *index* contains a symbolic
+        :class:`~yobx.torch.new_tracing.shape.TracingInt` inside a
+        :class:`slice` start or stop.
+
+        A symbolic :class:`TracingInt` has a non-integer (string) value.
+        Plain integer :class:`TracingInt` instances behave like ``int`` and
+        do not require special handling.
+
+        :param index: Any index expression (int, slice, tuple, Ellipsis, …).
+        :returns: ``True`` when the index contains at least one symbolic
+            :class:`TracingInt` in a slice member.
+        """
+        if isinstance(index, slice):
+            for part in (index.start, index.stop, index.step):
+                if isinstance(part, TracingInt) and not part.is_static:
+                    return True
+            return False
+        if isinstance(index, tuple):
+            return any(TracingTensor._index_has_symbolic_tracing_int(i) for i in index)
+        return False
+
+    @staticmethod
+    def _is_slice_only_index(index: Any) -> bool:
+        """
+        Returns ``True`` if *index* consists solely of :class:`slice` objects
+        (or ``None`` placeholders within a tuple) — i.e. no integer, boolean,
+        :class:`TracingTensor`, or ``Ellipsis`` components.
+
+        A scalar :class:`slice` (e.g. ``slice(2, -2)``) returns ``True``
+        directly.  A ``tuple`` returns ``True`` when every element is either
+        ``None`` or a :class:`slice`.  Any other type (``int``, ``bool``,
+        ``Ellipsis``, standalone ``None``, etc.) returns ``False``.
+
+        This is used to decide whether a view produced by ``__getitem__`` can
+        be tracked for inplace-mutation write-back via
+        :func:`~yobx.torch.tracing.setitem_with_transformation`.
+
+        :param index: Any index expression.
+        :returns: ``True`` when the index is a :class:`slice` or a tuple
+            whose elements are all :class:`slice` or ``None``.
+        """
+        if isinstance(index, slice):
+            return True
+        if isinstance(index, tuple):
+            return all(i is None or isinstance(i, slice) for i in index)
+        return False
+
+    def __getitem__(self, index: Any) -> Any:
+        """
+        Intercepts indexing on a :class:`TracingTensor` for two special cases:
+
+        1. **Single-integer index** (e.g. ``x[0]``): delegates to
+           :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_select_int`
+           to bypass the C++ bounds check that fires before
+           ``__torch_dispatch__`` when symbolic dimensions are stored as
+           size ``1`` internally.
+
+        2. **Slice with symbolic** :class:`~yobx.torch.new_tracing.shape.TracingInt`
+           **endpoint** (e.g. ``x[:, :y.shape[1]]``): delegates to
+           :meth:`~yobx.torch.new_tracing.tracer.GraphTracer._handle_symbolic_getitem`
+           to prevent the C++ dispatcher from calling ``__index__()`` on the
+           symbolic :class:`TracingInt`, which would raise :exc:`ValueError`.
+
+        For all other index types the default ``torch.Tensor.__getitem__``
+        path is used.
+
+        When the result is a :class:`TracingTensor` and *index* consists only
+        of :class:`slice` objects, the view is tagged with
+        :attr:`_view_source` and :attr:`_view_indices` so that downstream
+        inplace operations (e.g. ``torch.exp_(t[...])`` ) can be captured
+        as :func:`~yobx.torch.tracing.setitem_with_transformation` graph
+        nodes by :meth:`~yobx.torch.new_tracing.tracer.GraphTracer.dispatch`.
+
+        :param index: Index expression.
+        :returns: A :class:`TracingTensor` or the result of the default
+            dispatch for other index types.
+        """
+        tracer = self._tracer
+        if tracer is not None:
+            if isinstance(index, int):
+                return tracer._handle_select_int(self, 0, index)
+            if self._index_has_symbolic_tracing_int(index):
+                return tracer._handle_symbolic_getitem(self, index)
+        result = super().__getitem__(index)  # type: ignore
+        # Tag the view so that inplace ops on it can be written back to the
+        # source tensor as setitem_with_transformation nodes.
+        if (
+            tracer is not None
+            and isinstance(result, TracingTensor)
+            and self._is_slice_only_index(index)
+        ):
+            result._view_source = self
+            result._view_indices = index if isinstance(index, tuple) else (index,)
+        return result

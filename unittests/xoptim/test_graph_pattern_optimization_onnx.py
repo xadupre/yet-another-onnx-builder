@@ -39,6 +39,7 @@ TBOOL = TensorProto.BOOL
 TFLOAT = TensorProto.FLOAT
 TINT64 = TensorProto.INT64
 TFLOAT16 = TensorProto.FLOAT16
+TINT32 = TensorProto.INT32
 TINT64 = TensorProto.INT64
 _mkv_ = oh.make_tensor_value_info
 
@@ -481,6 +482,46 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_reshape_all_zeros_identity(self):
+        # reshape(X, [0, 0, 0]) should become Identity when rank matches
+        for shape_values in ([0, 0, 0], [0], [0, 0]):
+            n = len(shape_values)
+            input_shape = list(range(2, 2 + n))
+            model = oh.make_model(
+                oh.make_graph(
+                    [oh.make_node("Reshape", ["X", "shape"], ["Y"])],
+                    "dummy",
+                    [_mkv_("X", TFLOAT, input_shape)],
+                    [_mkv_("Y", TFLOAT, input_shape)],
+                    [onh.from_array(np.array(shape_values, dtype=np.int64), name="shape")],
+                ),
+                opset_imports=[oh.make_opsetid("", 18)],
+                ir_version=9,
+            )
+            check_model(model)
+            feeds = {"X": self._range(*input_shape)}
+            ref = ExtendedReferenceEvaluator(model)
+            expected = ref.run(None, feeds)[0]
+
+            gr = GraphBuilder(
+                model,
+                infer_shapes_options=True,
+                optimization_options=OptimizationOptions(patterns=["Identity"], verbose=0),
+            )
+            opt_onx = gr.to_onnx(optimize=True)
+            self.assertEqual(
+                ["Identity"],
+                [n.op_type for n in opt_onx.graph.node],
+                msg=f"shape_values={shape_values}",
+            )
+            self.assertEqual(
+                0, len(opt_onx.graph.initializer), msg=f"shape_values={shape_values}"
+            )
+
+            opt_ref = ExtendedReferenceEvaluator(opt_onx)
+            got = opt_ref.run(None, feeds)[0]
+            self.assertEqualArray(expected, got)
+
     def test_reshape_reshape_zero(self):
         model = oh.make_model(
             oh.make_graph(
@@ -512,6 +553,41 @@ class TestGraphPatternOptimization(ExtTestCase):
             ["Gather", "Gather", "Concat", "Reshape"], [n.op_type for n in opt_onx.graph.node]
         )
         self.assertEqual(4, len(opt_onx.graph.initializer))
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_reshape_reshape_zero_from_positive(self):
+        # reshape(reshape(., [2, 3, 16, 8, 1]), [0, 0, 0, 1, 8]) should become one Reshape
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Reshape", ["X", "shape1"], ["xr"], name="R1"),
+                    oh.make_node("Reshape", ["xr", "shape2"], ["Y"], name="R2"),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, [2, 3, 16, 8])],
+                [_mkv_("Y", TFLOAT, [2, 3, 16, 1, 8])],
+                [
+                    onh.from_array(np.array([2, 3, 16, 8, 1], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([0, 0, 0, 1, 8], dtype=np.int64), name="shape2"),
+                ],
+            )
+        )
+        check_model(model)
+        feeds = {"X": self._range(2, 3, 16, 8)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReshapeReshape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Reshape"], [n.op_type for n in opt_onx.graph.node])
+        self.assertEqual(1, len(opt_onx.graph.initializer))
 
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)[0]
@@ -3601,8 +3677,8 @@ class TestGraphPatternOptimization(ExtTestCase):
             oh.make_graph(
                 [oh.make_node("Max", ["X", "zero"], ["Y"])],
                 "dummy",
-                [_mkv_("X", TINT64, [3, 3])],
-                [_mkv_("Y", TINT64, [3, 3])],
+                [_mkv_("X", TINT32, [3, 3])],
+                [_mkv_("Y", TINT32, [3, 3])],
                 [onh.from_array(np.array([0], dtype=np.int64), name="zero")],
             ),
             opset_imports=[oh.make_opsetid("", 18)],
@@ -5777,7 +5853,84 @@ class TestGraphPatternOptimization(ExtTestCase):
         zz = ref.run(None, feeds)[0]
         self.assertEqualArray(z, zz)
 
-    def test_concat_reshape(self):
+    def test_concat_gather_multi_element_identity(self):
+        """Gather index falls in a (1,) bucket inside a Concat with mixed bucket sizes."""
+        # Concat([D1(2), D2(1)], axis=0) -> d(3), Gather(d, [2]) -> Y
+        # Index 2 falls in D2 (size 1, offset 2), so result is Identity(D2).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["D1", "D2"], ["d"], axis=0),
+                    oh.make_node("Gather", ["d", "un"], ["Y"]),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("D1", TensorProto.INT64, [2]),
+                    oh.make_tensor_value_info("D2", TensorProto.INT64, [1]),
+                ],
+                [oh.make_tensor_value_info("Y", TensorProto.INT64, [1])],
+                [onh.from_array(np.array([2], dtype=np.int64), name="un")],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+
+        feeds = {"D1": np.array([5, 6], dtype=np.int64), "D2": np.array([7], dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        z = ref.run(None, feeds)[0]
+        self.assertEqualArray(z, np.array([7], dtype=np.int64))
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=False,
+            optimization_options=OptimizationOptions(patterns="ConcatGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Identity"], [n.op_type for n in opt_onx.graph.node])
+        ref = ExtendedReferenceEvaluator(opt_onx)
+        zz = ref.run(None, feeds)[0]
+        self.assertEqualArray(z, zz)
+
+    def test_concat_gather_multi_element_gather(self):
+        """Gather index falls in a (2,) bucket, emits adjusted Gather on that bucket."""
+        # Concat([D1(2), D2(1)], axis=0) -> d(3), Gather(d, [1]) -> Y
+        # Index 1 falls in D1 (size 2, offset 0), local_idx=1 -> Gather(D1, [1]).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["D1", "D2"], ["d"], axis=0),
+                    oh.make_node("Gather", ["d", "un"], ["Y"]),
+                ],
+                "test",
+                [
+                    oh.make_tensor_value_info("D1", TensorProto.INT64, [2]),
+                    oh.make_tensor_value_info("D2", TensorProto.INT64, [1]),
+                ],
+                [oh.make_tensor_value_info("Y", TensorProto.INT64, [1])],
+                [onh.from_array(np.array([1], dtype=np.int64), name="un")],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+
+        feeds = {"D1": np.array([10, 20], dtype=np.int64), "D2": np.array([30], dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        z = ref.run(None, feeds)[0]
+        self.assertEqualArray(z, np.array([20], dtype=np.int64))
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=False,
+            optimization_options=OptimizationOptions(patterns="ConcatGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Concat should be eliminated; a Gather on D1 with index [1] remains.
+        node_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertNotIn("Concat", node_types)
+        ref = ExtendedReferenceEvaluator(opt_onx)
+        zz = ref.run(None, feeds)[0]
+        self.assertEqualArray(z, zz)
+
         model = oh.make_model(
             oh.make_graph(
                 [
@@ -7243,6 +7396,101 @@ class TestGraphPatternOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    def test_reshape_squeeze_basic(self):
+        # squeeze(reshape(X, [0, 0, 0, 1, 8]), [3]) → reshape(X, [0, 0, 0, 8])
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Reshape", ["X", "shape1"], ["xr"]),
+                    oh.make_node("Squeeze", ["xr", "axes"], ["Z"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b", "c", "d"])],
+                [_mkv_("Z", TFLOAT, ["a", "b", "c", 8])],
+                [
+                    onh.from_array(np.array([0, 0, 0, 1, 8], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([3], dtype=np.int64), name="axes"),
+                ],
+            )
+        )
+        check_model(model)
+        feeds = {"X": self._range(2, 3, 4, 8)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReshapeSqueeze"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Reshape"], [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_reshape_squeeze_static_shape(self):
+        # squeeze(reshape(X, [2, 3, 4, 1, 8]), [3]) → reshape(X, [2, 3, 4, 8])
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Reshape", ["X", "shape1"], ["xr"]),
+                    oh.make_node("Squeeze", ["xr", "axes"], ["Z"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, [2, 3, 4, 8])],
+                [_mkv_("Z", TFLOAT, [2, 3, 4, 8])],
+                [
+                    onh.from_array(np.array([2, 3, 4, 1, 8], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([3], dtype=np.int64), name="axes"),
+                ],
+            )
+        )
+        check_model(model)
+        feeds = {"X": self._range(2, 3, 4, 8)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReshapeSqueeze"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Reshape"], [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_reshape_squeeze_zero_after_axis_not_applied(self):
+        # squeeze(reshape(X, [0, 0, 0, 1, 0]), [3]): the 0 at position 4 comes
+        # after the squeezed axis 3, so index-shift would break copy semantics.
+        # The pattern must NOT be applied.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Reshape", ["X", "shape1"], ["xr"]),
+                    oh.make_node("Squeeze", ["xr", "axes"], ["Z"]),
+                ],
+                "dummy",
+                [_mkv_("X", TFLOAT, ["a", "b", "c", "d", "e"])],
+                [_mkv_("Z", TFLOAT, ["a", "b", "c", "e"])],
+                [
+                    onh.from_array(np.array([0, 0, 0, 1, 0], dtype=np.int64), name="shape1"),
+                    onh.from_array(np.array([3], dtype=np.int64), name="axes"),
+                ],
+            )
+        )
+        check_model(model)
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ReshapeSqueeze"]),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Pattern must not fire; Squeeze should still be present.
+        self.assertIn("Squeeze", [n.op_type for n in opt_onx.graph.node])
+
     def test_same_children_many_duplicated(self):
         nodes = [
             oh.make_node("Add", ["X", "one"], ["x1"]),
@@ -8066,6 +8314,891 @@ class TestGraphPatternOptimization(ExtTestCase):
         opt_ref = ExtendedReferenceEvaluator(opt_onx)
         got = opt_ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
+
+    def test_unsqueeze_shape(self):
+        # Pattern: Shape(Unsqueeze(X, [axis])) → Concat(Shape(X) slices, [1], ...)
+        # The output is preserved exactly: [a, 1, b, c] for axis=1 on (a,b,c).
+        for unsq_axis in [0, 1, 2, -1]:
+            with self.subTest(unsq_axis=unsq_axis):
+                # X has shape (a, b, c); Unsqueeze at unsq_axis → rank-4 tensor.
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                            oh.make_node("Shape", ["xu"], ["Y"]),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [4])],
+                        [onh.from_array(np.array([unsq_axis], dtype=np.int64), name="axes")],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                feeds = {"X": self._range(3, 5, 7)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]  # full unsqueezed shape
+
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(
+                        patterns=["UnsqueezeShape"], verbose=0
+                    ),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                self.assertNotIn(
+                    "Unsqueeze",
+                    [n.op_type for n in opt_onx.graph.node],
+                    msg="Unsqueeze should have been eliminated",
+                )
+                self.assertIn("Shape", [n.op_type for n in opt_onx.graph.node])
+                self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
+
+    def test_unsqueeze_shape_multiple_axes(self):
+        # Unsqueeze at axes [0, 3]: shape (a, b) → (1, a, b, 1).
+        # After optimization: Concat([1], Shape(X,0,2), [1]) = [1, a, b, 1].
+        inserted_axes = [0, 3]
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                    oh.make_node("Shape", ["xu"], ["Y"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b"])],
+                [oh.make_tensor_value_info("Y", TINT64, [4])],
+                [onh.from_array(np.array(inserted_axes, dtype=np.int64), name="axes")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        feeds = {"X": self._range(3, 5)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]  # [1, 3, 5, 1]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["UnsqueezeShape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertNotIn("Unsqueeze", [n.op_type for n in opt_onx.graph.node])
+        self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_unsqueeze_shape_multi_consumer(self):
+        # Unsqueeze output consumed by BOTH Shape (→ sh) and the model output
+        # (xu directly).  The pattern MUST fire (Shape consumer is found), and
+        # the Unsqueeze MUST be kept because xu is still needed as a graph output.
+        # sh is preserved exactly (same as original output: the full unsqueeze shape).
+        unsq_axis = 1
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                    oh.make_node("Shape", ["xu"], ["sh"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                [
+                    oh.make_tensor_value_info("xu", TFLOAT, ["a", 1, "b", "c"]),
+                    oh.make_tensor_value_info("sh", TINT64, [4]),
+                ],
+                [onh.from_array(np.array([unsq_axis], dtype=np.int64), name="axes")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(3, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected_xu, expected_sh = ref.run(None, feeds)  # sh = [3, 1, 5, 7]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["UnsqueezeShape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        # Pattern fires: old Shape(xu) is gone, replaced by Shape(X) slices + Concat.
+        self.assertIn("Shape", op_types)
+        self.assertIn("Concat", op_types)
+        # All Shape nodes feed from X (not xu).
+        shape_inputs = [n.input[0] for n in opt_onx.graph.node if n.op_type == "Shape"]
+        self.assertTrue(
+            all(inp != "xu" for inp in shape_inputs), msg="Shape nodes should feed from X, not xu"
+        )
+        # Unsqueeze is kept because xu is still a graph output.
+        self.assertIn("Unsqueeze", op_types)
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got_xu, got_sh = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected_xu, got_xu)
+        self.assertEqualArray(expected_sh, got_sh)
+
+    def test_unsqueeze_shape_with_start_end(self):
+        # Shape(Unsqueeze(X, [1])) with start/end attributes on the Shape node.
+        # X: (a, b, c) → Unsqueeze → (a, 1, b, c), Shape with start=1, end=3 → [1, b].
+        # After optimization: only dimensions in [start:end] are reconstructed.
+        for shape_start, shape_end in [(1, 3), (0, 2), (2, 4), (1, 4)]:
+            with self.subTest(shape_start=shape_start, shape_end=shape_end):
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                            oh.make_node(
+                                "Shape", ["xu"], ["Y"], start=shape_start, end=shape_end
+                            ),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [shape_end - shape_start])],
+                        [onh.from_array(np.array([1], dtype=np.int64), name="axes")],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                feeds = {"X": self._range(3, 5, 7)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]
+
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(
+                        patterns=["UnsqueezeShape"], verbose=0
+                    ),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                self.assertNotIn(
+                    "Unsqueeze",
+                    [n.op_type for n in opt_onx.graph.node],
+                    msg="Unsqueeze should have been eliminated",
+                )
+                self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
+
+    def test_unsqueeze_shape_with_negative_start_end(self):
+        # Shape(Unsqueeze(X, [1])) with negative start/end on the Shape node.
+        # X: (a, b, c) → Unsqueeze → (a, 1, b, c), Shape with start=-3, end=-1 → [1, b].
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Unsqueeze", ["X", "axes"], ["xu"]),
+                    oh.make_node("Shape", ["xu"], ["Y"], start=-3, end=-1),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                [oh.make_tensor_value_info("Y", TINT64, [2])],
+                [onh.from_array(np.array([1], dtype=np.int64), name="axes")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        feeds = {"X": self._range(3, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]  # [1, 5] (positions 1 and 2 of [3,1,5,7])
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["UnsqueezeShape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertNotIn("Unsqueeze", [n.op_type for n in opt_onx.graph.node])
+        self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_shape_transpose(self):
+        # Pattern: Shape(Transpose(X, perm)) → Gather(Shape(X), perm)
+        # X: (a, b, c), perm=[2, 0, 1] → transposed shape is (c, a, b).
+        for perm in [[2, 0, 1], [1, 0, 2], [0, 2, 1], [2, 1, 0]]:
+            with self.subTest(perm=perm):
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Transpose", ["X"], ["xt"], perm=perm),
+                            oh.make_node("Shape", ["xt"], ["Y"]),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [3])],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                feeds = {"X": self._range(3, 5, 7)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]
+
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(
+                        patterns=["ShapeTranspose"], verbose=0
+                    ),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                op_types = [n.op_type for n in opt_onx.graph.node]
+                self.assertNotIn(
+                    "Transpose", op_types, msg="Transpose should have been eliminated"
+                )
+                self.assertIn("Shape", op_types)
+                self.assertIn("Gather", op_types)
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
+
+    def test_shape_transpose_with_start_end(self):
+        # Shape(Transpose(X, perm)) with start/end attributes on the Shape node.
+        # X: (a, b, c, d), perm=[2, 0, 1, 3] → transposed shape (c, a, b, d).
+        # Shape with start=1, end=3 → [a, b].
+        for shape_start, shape_end in [(1, 3), (0, 2), (2, 4), (0, 4)]:
+            with self.subTest(shape_start=shape_start, shape_end=shape_end):
+                perm = [2, 0, 1, 3]
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Transpose", ["X"], ["xt"], perm=perm),
+                            oh.make_node(
+                                "Shape", ["xt"], ["Y"], start=shape_start, end=shape_end
+                            ),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c", "d"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [shape_end - shape_start])],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                feeds = {"X": self._range(3, 5, 7, 11)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]
+
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(
+                        patterns=["ShapeTranspose"], verbose=0
+                    ),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                self.assertNotIn(
+                    "Transpose",
+                    [n.op_type for n in opt_onx.graph.node],
+                    msg="Transpose should have been eliminated",
+                )
+                self.assertIn("Gather", [n.op_type for n in opt_onx.graph.node])
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
+
+    def test_shape_transpose_multi_consumer(self):
+        # Transpose output consumed by BOTH Shape (→ sh) and the model output (xt directly).
+        # Pattern MUST fire but Transpose MUST be kept since xt is still a graph output.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Transpose", ["X"], ["xt"], perm=[2, 0, 1]),
+                    oh.make_node("Shape", ["xt"], ["sh"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c"])],
+                [
+                    oh.make_tensor_value_info("xt", TFLOAT, ["c", "a", "b"]),
+                    oh.make_tensor_value_info("sh", TINT64, [3]),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(3, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected_xt, expected_sh = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["ShapeTranspose"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        # Transpose kept because xt is still a graph output.
+        self.assertIn("Transpose", op_types)
+        # Shape(X) + Gather replaces Shape(xt).
+        self.assertIn("Shape", op_types)
+        self.assertIn("Gather", op_types)
+        shape_inputs = [n.input[0] for n in opt_onx.graph.node if n.op_type == "Shape"]
+        self.assertTrue(
+            all(inp != "xt" for inp in shape_inputs), msg="Shape nodes should feed from X, not xt"
+        )
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got_xt, got_sh = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected_xt, got_xt)
+        self.assertEqualArray(expected_sh, got_sh)
+
+    def test_gather_shape_basic(self):
+        # Gather(Shape(X), [0, 1, 2]) → Shape(X, start=0, end=3)
+        for gather_start, gather_len in [(0, 3), (1, 2), (0, 4), (2, 2)]:
+            with self.subTest(gather_start=gather_start, gather_len=gather_len):
+                indices = np.arange(gather_start, gather_start + gather_len, dtype=np.int64)
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Shape", ["X"], ["shape"]),
+                            oh.make_node("Gather", ["shape", "idx"], ["Y"]),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c", "d"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [gather_len])],
+                        [onh.from_array(indices, name="idx")],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                feeds = {"X": self._range(2, 3, 5, 7)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]
+
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(patterns=["GatherShape"], verbose=0),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                op_types = [n.op_type for n in opt_onx.graph.node]
+                self.assertNotIn("Gather", op_types, msg="Gather should be eliminated")
+                self.assertIn("Shape", op_types)
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
+
+    def test_gather_shape_with_shape_start(self):
+        # Gather(Shape(X, start=2), [0, 1]) → Shape(X, start=2, end=4)
+        # Shape(X, start=2) on rank-4 X gives [d2, d3].
+        # Gather([0, 1]) selects both → Shape(X, start=2, end=4).
+        indices = np.array([0, 1], dtype=np.int64)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["X"], ["shape"], start=2),
+                    oh.make_node("Gather", ["shape", "idx"], ["Y"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c", "d"])],
+                [oh.make_tensor_value_info("Y", TINT64, [2])],
+                [onh.from_array(indices, name="idx")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        feeds = {"X": self._range(2, 3, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["GatherShape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertNotIn("Gather", op_types)
+        self.assertIn("Shape", op_types)
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_shape_multi_consumer(self):
+        # When Shape output is consumed by both Gather and another node,
+        # the Shape node must be kept and only Gather is replaced.
+        indices = np.array([0, 1], dtype=np.int64)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["X"], ["shape"]),
+                    oh.make_node("Gather", ["shape", "idx"], ["Y"]),
+                    oh.make_node("Identity", ["shape"], ["shape_copy"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c", "d"])],
+                [
+                    oh.make_tensor_value_info("Y", TINT64, [2]),
+                    oh.make_tensor_value_info("shape_copy", TINT64, [4]),
+                ],
+                [onh.from_array(indices, name="idx")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        feeds = {"X": self._range(2, 3, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected_y, expected_shape = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["GatherShape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertNotIn("Gather", op_types)
+        # Original Shape (full) must be kept for shape_copy consumer.
+        shape_nodes = [n for n in opt_onx.graph.node if n.op_type == "Shape"]
+        self.assertGreaterEqual(len(shape_nodes), 1)
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got_y, got_shape = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected_y, got_y)
+        self.assertEqualArray(expected_shape, got_shape)
+
+    def test_gather_shape_single_element(self):
+        # Gather(Shape(X), [2]) with a single-element index → Shape(X, start=2, end=3).
+        indices = np.array([2], dtype=np.int64)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["X"], ["shape"]),
+                    oh.make_node("Gather", ["shape", "idx"], ["Y"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c", "d"])],
+                [oh.make_tensor_value_info("Y", TINT64, [1])],
+                [onh.from_array(indices, name="idx")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        feeds = {"X": self._range(2, 3, 5, 7)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["GatherShape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertNotIn("Gather", op_types)
+        self.assertIn("Shape", op_types)
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_shape_non_contiguous_no_match(self):
+        # Non-contiguous indices [0, 2] must NOT trigger the pattern.
+        indices = np.array([0, 2], dtype=np.int64)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Shape", ["X"], ["shape"]),
+                    oh.make_node("Gather", ["shape", "idx"], ["Y"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c", "d"])],
+                [oh.make_tensor_value_info("Y", TINT64, [2])],
+                [onh.from_array(indices, name="idx")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns=["GatherShape"], verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("Gather", op_types, msg="Gather must remain for non-contiguous indices")
+
+    def test_gather_shape_scalar_index(self):
+        # Gather(Shape(X), scalar_idx) where scalar_idx is a 0-D tensor should be
+        # replaced by Shape(X, start=i, end=i+1) + Squeeze(axes=[0]) to preserve
+        # the scalar (0-D) output that Gather with a scalar index produces.
+        for idx in [0, 1, 2, 3]:
+            with self.subTest(idx=idx):
+                scalar_idx = np.array(idx, dtype=np.int64)  # 0-D
+                model = oh.make_model(
+                    oh.make_graph(
+                        [
+                            oh.make_node("Shape", ["X"], ["shape"]),
+                            oh.make_node("Gather", ["shape", "scalar_idx"], ["Y"]),
+                        ],
+                        "test",
+                        [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c", "d"])],
+                        [oh.make_tensor_value_info("Y", TINT64, [])],
+                        [onh.from_array(scalar_idx, name="scalar_idx")],
+                    ),
+                    opset_imports=[oh.make_opsetid("", 18)],
+                    ir_version=10,
+                )
+                feeds = {"X": self._range(2, 3, 5, 7)}
+                ref = ExtendedReferenceEvaluator(model)
+                expected = ref.run(None, feeds)[0]
+
+                gr = GraphBuilder(
+                    model,
+                    infer_shapes_options=True,
+                    optimization_options=OptimizationOptions(patterns=["GatherShape"], verbose=0),
+                )
+                opt_onx = gr.to_onnx(optimize=True)
+                op_types = [n.op_type for n in opt_onx.graph.node]
+                self.assertNotIn("Gather", op_types, msg="Gather should be eliminated")
+                self.assertIn(
+                    "Squeeze", op_types, msg="Squeeze must be present for scalar output"
+                )
+                self.assertIn("Shape", op_types)
+                opt_ref = ExtendedReferenceEvaluator(opt_onx)
+                got = opt_ref.run(None, feeds)[0]
+                self.assertEqualArray(expected, got)
+
+    def test_gather_gather_scalar_index(self):
+        # Gather(Gather(X, cst1, axis=0), scalar_cst2, axis=0) -> Gather(X, cst1[scalar], axis=0)
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Gather", ["X", "cst1"], ["Y"], axis=0),
+                    oh.make_node("Gather", ["Y", "cst2"], ["Z"], axis=0),
+                ],
+                "test",
+                [_mkv_("X", TFLOAT, [5, 4])],
+                [_mkv_("Z", TFLOAT, [4])],
+                [
+                    onh.from_array(np.array([1, 3, 0, 2, 4], dtype=np.int64), name="cst1"),
+                    onh.from_array(np.array(2, dtype=np.int64), name="cst2"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(5, 4)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_gather_1d_index(self):
+        # Gather(Gather(X, cst1, axis=0), cst2, axis=0) -> Gather(X, cst1[cst2], axis=0)
+        # cst2 is a 1-D array.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Gather", ["X", "cst1"], ["Y"], axis=0),
+                    oh.make_node("Gather", ["Y", "cst2"], ["Z"], axis=0),
+                ],
+                "test",
+                [_mkv_("X", TFLOAT, [5, 4])],
+                [_mkv_("Z", TFLOAT, [3, 4])],
+                [
+                    onh.from_array(np.array([1, 3, 0, 2, 4], dtype=np.int64), name="cst1"),
+                    onh.from_array(np.array([2, 0, 1], dtype=np.int64), name="cst2"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(5, 4)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_gather_inner_used_twice(self):
+        # When the intermediate Gather output is used by more than one node,
+        # the inner Gather must be preserved.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Gather", ["X", "cst1"], ["Y"], axis=0),
+                    oh.make_node("Gather", ["Y", "cst2"], ["Z"], axis=0),
+                    oh.make_node("Add", ["Y", "Y"], ["W"]),
+                ],
+                "test",
+                [_mkv_("X", TFLOAT, [5, 4])],
+                [_mkv_("Z", TFLOAT, [4]), _mkv_("W", TFLOAT, [5, 4])],
+                [
+                    onh.from_array(np.array([1, 3, 0, 2, 4], dtype=np.int64), name="cst1"),
+                    onh.from_array(np.array(2, dtype=np.int64), name="cst2"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": self._range(5, 4)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected_z, expected_w = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        # Inner Gather must be kept because Y is still used by Add.
+        self.assertIn("Gather", op_types)
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got_z, got_w = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected_z, got_z)
+        self.assertEqualArray(expected_w, got_w)
+
+    def test_gather_concat_scalar_no_pre(self):
+        # Gather(Concat(X, C, axis=0), scalar) where scalar indexes into X (offset 0).
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["X", "C"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, [])],
+                [
+                    onh.from_array(np.array([10, 20], dtype=np.int64), name="C"),
+                    onh.from_array(np.array(3, dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_concat_scalar_with_pre(self):
+        # Gather(Concat(C, X, axis=0), scalar) where scalar indexes into X.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["C", "X"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, [])],
+                [
+                    onh.from_array(np.array([10, 20, 30], dtype=np.int64), name="C"),
+                    onh.from_array(np.array(4, dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_concat_1d_index_with_pre(self):
+        # Gather(Concat(C, X, axis=0), 1d_indices) where all indices fall into X.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["C", "X"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, [3])],
+                [
+                    onh.from_array(np.array([10, 20, 30], dtype=np.int64), name="C"),
+                    onh.from_array(np.array([3, 5, 4], dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_concat_x_middle_with_post(self):
+        # Gather(Concat(C1, X, C2, axis=0), idx) where idx falls into X.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["C1", "X", "C2"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, [])],
+                [
+                    onh.from_array(np.array([10, 20], dtype=np.int64), name="C1"),
+                    onh.from_array(np.array([30, 40, 50], dtype=np.int64), name="C2"),
+                    onh.from_array(np.array(4, dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather"], [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_concat_no_match_index_outside_x(self):
+        # Index points to the post-X constant region; no optimization should occur.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["C1", "X", "C2"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, [])],
+                [
+                    onh.from_array(np.array([10, 20], dtype=np.int64), name="C1"),
+                    onh.from_array(np.array([30, 40, 50], dtype=np.int64), name="C2"),
+                    # Index 8 = 2 (C1) + 5 (X) + 1 (into C2) → outside X.
+                    onh.from_array(np.array(8, dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Pattern must NOT have fired: Concat + Gather remain.
+        self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got = opt_ref.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
+
+    def test_gather_concat_concat_used_twice(self):
+        # Concat output is consumed by both Gather and another node; Concat must be kept.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Concat", ["C", "X"], ["Z"], axis=0),
+                    oh.make_node("Gather", ["Z", "idx"], ["Y"]),
+                    oh.make_node("Identity", ["Z"], ["W"]),
+                ],
+                "test",
+                [_mkv_("X", TINT64, [5])],
+                [_mkv_("Y", TINT64, []), _mkv_("W", TINT64, [8])],
+                [
+                    onh.from_array(np.array([10, 20, 30], dtype=np.int64), name="C"),
+                    onh.from_array(np.array(4, dtype=np.int64), name="idx"),
+                ],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        check_model(model)
+        feeds = {"X": np.arange(5, dtype=np.int64)}
+        ref = ExtendedReferenceEvaluator(model)
+        expected_y, expected_w = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="GatherConcat", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        # Concat must survive because Z feeds Identity as well.
+        self.assertIn("Concat", [n.op_type for n in opt_onx.graph.node])
+
+        opt_ref = ExtendedReferenceEvaluator(opt_onx)
+        got_y, got_w = opt_ref.run(None, feeds)
+        self.assertEqualArray(expected_y, got_y)
+        self.assertEqualArray(expected_w, got_w)
 
 
 if __name__ == "__main__":

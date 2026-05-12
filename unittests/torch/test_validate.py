@@ -1,5 +1,75 @@
 import unittest
-from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_torch,
+    requires_transformers,
+    skipif_ci_windows,
+)
+
+
+class TestValidateSummaryFields(ExtTestCase):
+    """Tests that do not need torch/transformers — they only inspect dataclass fields."""
+
+    def test_n_nodes_field_exists(self):
+        """ValidateSummary exposes n_nodes and top_op_types fields."""
+        from dataclasses import fields
+        from yobx.torch.validate import ValidateSummary
+
+        names = {f.name for f in fields(ValidateSummary)}
+        self.assertIn("n_nodes", names)
+        self.assertIn("top_op_types", names)
+
+    def test_artifact_field_in_validate_data(self):
+        """ValidateData exposes an artifact field."""
+        from dataclasses import fields
+        from yobx.torch.validate import ValidateData
+
+        names = {f.name for f in fields(ValidateData)}
+        self.assertIn("artifact", names)
+
+    def test_summary_items_includes_n_nodes(self):
+        """ValidateSummary.items() yields n_nodes when set."""
+        from yobx.torch.validate import ValidateSummary
+
+        s = ValidateSummary(model_id="m", prompt="p")
+        s.n_nodes = 42
+        d = dict(s.items())
+        self.assertEqual(d["n_nodes"], 42)
+
+    def test_summary_items_includes_top_op_types(self):
+        """ValidateSummary.items() yields top_op_types when set."""
+        from yobx.torch.validate import ValidateSummary
+
+        s = ValidateSummary(model_id="m", prompt="p")
+        s.top_op_types = "MatMul:5,Add:3"
+        d = dict(s.items())
+        self.assertEqual(d["top_op_types"], "MatMul:5,Add:3")
+
+    def test_discrepancy_stats_fields_exist(self):
+        """ValidateSummary exposes discrepancies_max_abs, atol, ratio_001, and ratio_01 fields."""
+        from dataclasses import fields
+        from yobx.torch.validate import ValidateSummary
+
+        names = {f.name for f in fields(ValidateSummary)}
+        self.assertIn("discrepancies_max_abs", names)
+        self.assertIn("discrepancies_atol", names)
+        self.assertIn("discrepancies_ratio_001", names)
+        self.assertIn("discrepancies_ratio_01", names)
+
+    def test_summary_items_includes_discrepancy_stats(self):
+        """ValidateSummary.items() yields the new discrepancy stat fields when set."""
+        from yobx.torch.validate import ValidateSummary
+
+        s = ValidateSummary(model_id="m", prompt="p")
+        s.discrepancies_max_abs = 0.005
+        s.discrepancies_atol = 1e-4
+        s.discrepancies_ratio_001 = 0.02
+        s.discrepancies_ratio_01 = 0.0
+        d = dict(s.items())
+        self.assertAlmostEqual(d["discrepancies_max_abs"], 0.005)
+        self.assertAlmostEqual(d["discrepancies_atol"], 1e-4)
+        self.assertAlmostEqual(d["discrepancies_ratio_001"], 0.02)
+        self.assertAlmostEqual(d["discrepancies_ratio_01"], 0.0)
 
 
 @requires_torch("2.0")
@@ -87,6 +157,11 @@ class TestValidateModel(ExtTestCase):
         self.assertIsNotNone(data.kwargs)
         self.assertIsNotNone(data.dynamic_shapes)
         self.assertIsNotNone(data.filename)
+        # Node stats should be populated after a successful export.
+        self.assertIsNotNone(summary.n_nodes)
+        self.assertGreater(summary.n_nodes, 0)
+        self.assertIsNotNone(summary.top_op_types)
+        self.assertGreater(len(summary.top_op_types), 0)
 
     def test_validate_model_captures_inputs(self):
         import torch
@@ -222,6 +297,97 @@ class TestValidateModel(ExtTestCase):
         # Verbose >= 3: tensor shape strings should appear when discrepancies exist.
         if data.discrepancies and data.discrepancies[0].get("inputs"):
             self.assertIn("inputs:", output)
+
+    def test_validate_model_node_stats_in_summary(self):
+        """validate_model populates n_nodes and top_op_types in summary after export."""
+        import torch
+        from yobx.torch.validate import validate_model, ValidateSummary
+
+        tokenized = {
+            "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
+            "attention_mask": torch.ones(1, 5, dtype=torch.int64),
+        }
+        summary, _data = validate_model(
+            "arnir0/Tiny-LLM",
+            tokenized_inputs=tokenized,
+            random_weights=True,
+            max_new_tokens=3,
+            do_run=False,
+            quiet=True,
+            verbose=0,
+        )
+        self.assertIsInstance(summary, ValidateSummary)
+        if summary.export == "OK":
+            self.assertIsNotNone(summary.n_nodes)
+            self.assertIsNotNone(summary.top_op_types)
+            # top_op_types should look like "OpType:N,..." with a colon separator.
+            self.assertIn(":", summary.top_op_types)
+
+    def test_validate_model_discrepancies_in_artifact_report(self):
+        """After do_run=True, the artifact report includes the discrepancy rows."""
+        import torch
+        from yobx.container import ExportArtifact
+        from yobx.torch.validate import validate_model
+
+        tokenized = {
+            "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
+            "attention_mask": torch.ones(1, 5, dtype=torch.int64),
+        }
+        _summary, data = validate_model(
+            "arnir0/Tiny-LLM",
+            tokenized_inputs=tokenized,
+            random_weights=True,
+            max_new_tokens=3,
+            do_run=True,
+            quiet=True,
+            verbose=0,
+        )
+        if not isinstance(data.artifact, ExportArtifact):
+            return  # dynamo exporter — skip
+        self.assertIsNotNone(data.artifact.report)
+        # Discrepancies from check_discrepancies should be stored in the report.
+        if data.discrepancies:
+            self.assertEqual(len(data.artifact.report.discrepancies), len(data.discrepancies))
+
+    @skipif_ci_windows("xlsx file locked by another process on Windows")
+    def test_validate_model_artifact_xlsx_has_discrepancies_sheet(self):
+        """The xlsx saved alongside the ONNX contains a 'discrepancies' sheet."""
+        try:
+            import openpyxl  # noqa: F401
+        except ImportError:
+            return
+        import os
+        import tempfile
+        import torch
+        import pandas
+        from yobx.container import ExportArtifact
+        from yobx.torch.validate import validate_model
+
+        tokenized = {
+            "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
+            "attention_mask": torch.ones(1, 5, dtype=torch.int64),
+        }
+        with tempfile.TemporaryDirectory() as tmp:
+            _summary, data = validate_model(
+                "arnir0/Tiny-LLM",
+                tokenized_inputs=tokenized,
+                random_weights=True,
+                max_new_tokens=3,
+                do_run=True,
+                quiet=True,
+                verbose=0,
+                dump_folder=tmp,
+            )
+            if not isinstance(data.artifact, ExportArtifact):
+                return  # dynamo exporter — skip
+            if data.filename is None:
+                return
+            xlsx_path = os.path.splitext(data.filename)[0] + ".xlsx"
+            if not os.path.exists(xlsx_path):
+                return
+            sheets = pandas.ExcelFile(xlsx_path).sheet_names
+            if data.discrepancies:
+                self.assertIn("discrepancies", sheets)
 
 
 if __name__ == "__main__":

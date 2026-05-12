@@ -1,14 +1,17 @@
 from typing import Any, Dict, Optional, Set, Tuple
 import torch
-from torch._subclasses.fake_tensor import FakeTensorMode, FakeTensor
-from torch.fx.experimental.symbolic_shapes import ShapeEnv
 
 
 class FakeTensorContext:
     """Stores information used to reuse same dimension for the same dimension names."""
 
-    def __init__(self, fake_mode: Optional[FakeTensorMode] = None):
+    def __init__(
+        self, fake_mode: Optional["torch._subclasses.fake_tensor.FakeTensorMode"] = None
+    ):
         if fake_mode is None:
+            from torch._subclasses.fake_tensor import FakeTensorMode
+            from torch.fx.experimental.symbolic_shapes import ShapeEnv
+
             shape_env = ShapeEnv()
             self.fake_mode = FakeTensorMode(shape_env=shape_env)
         else:
@@ -42,7 +45,7 @@ class FakeTensorContext:
         self._unique_.add(c)
         return c
 
-    def from_tensor(self, x, static_shapes=False) -> FakeTensor:
+    def from_tensor(self, x, static_shapes=False) -> "torch._subclasses.fake_tensor.FakeTensor":
         """
         Returns a fake tensor.
         ``pytorch`` returns the same name for the same dimension.
@@ -60,8 +63,8 @@ class FakeTensorContext:
         self,
         true_tensor: torch.Tensor,
         sh: Dict[int, Any],
-        fake_tensor: Optional[FakeTensor] = None,
-    ) -> FakeTensor:
+        fake_tensor: Optional["torch._subclasses.fake_tensor.FakeTensor"] = None,
+    ) -> "torch._subclasses.fake_tensor.FakeTensor":
         """
         Changes the shape of a true tensor to make it dynamic.
 
@@ -180,8 +183,9 @@ class FakeTensorContext:
                 f"Une more recent version of transformers (>=4.55), "
                 f"'layers' not found in class {type(x)}"
             )
-            assert isinstance(dynamic_shapes, list) and (
-                not dynamic_shapes or not isinstance(dynamic_shapes[0], list)
+            assert dynamic_shapes is None or (
+                isinstance(dynamic_shapes, list)
+                and (not dynamic_shapes or not isinstance(dynamic_shapes[0], list))
             ), f"Unexpected dynamic_shapes={dynamic_shapes} for a DynamicCache"
             for il, layer in enumerate(x.layers):
                 assert hasattr(layer, "keys") and hasattr(layer, "values"), (
@@ -189,10 +193,11 @@ class FakeTensorContext:
                     f"not found in class {type(layer)} ({dir(layer)})"
                 )
                 layer.keys = self.make_fake_with_dynamic_dimensions(
-                    layer.keys, dynamic_shapes=dynamic_shapes[il * 2]
+                    layer.keys, dynamic_shapes=dynamic_shapes[il * 2] if dynamic_shapes else None
                 )
                 layer.values = self.make_fake_with_dynamic_dimensions(
-                    layer.values, dynamic_shapes=dynamic_shapes[il * 2 + 1]
+                    layer.values,
+                    dynamic_shapes=dynamic_shapes[il * 2 + 1] if dynamic_shapes else None,
                 )
             return x
         if x.__class__.__name__ == "EncoderDecoderCache":
@@ -262,7 +267,9 @@ class FakeTensorContext:
             f"Unexpected type {type(x)} for x, content is {string_type(x, with_shape=True)}"
         )
 
-    def value_info_proto_to_torch(self, vip: Any) -> Tuple["FakeTensor", Dict[int, str]]:
+    def value_info_proto_to_torch(
+        self, vip: Any
+    ) -> Tuple["torch._subclasses.fake_tensor.FakeTensor", Dict[int, str]]:
         """Convert an :class:`onnx.ValueInfoProto` to a fake :class:`torch.Tensor`.
 
         Symbolic dimensions (those with a non-empty ``dim_param``) are assigned
@@ -335,7 +342,7 @@ class FakeTensorContext:
 
 def make_fake(
     x: Any, context: Optional[FakeTensorContext] = None
-) -> Tuple[Optional[FakeTensor], Optional[FakeTensorContext]]:
+) -> Tuple[Optional["torch._subclasses.fake_tensor.FakeTensor"], Optional[FakeTensorContext]]:
     """
     Replaces all tensors by fake tensors.
     This modification happens inplace for caches.
@@ -344,6 +351,7 @@ def make_fake(
 
     .. runpython::
         :showcode:
+        :process:
 
         import pprint
         import torch
@@ -393,6 +401,7 @@ def make_fake_with_dynamic_dimensions(
 
     .. runpython::
         :showcode:
+        :process:
 
         import torch
         from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
@@ -408,6 +417,7 @@ def make_fake_with_dynamic_dimensions(
 
     .. runpython::
         :showcode:
+        :process:
 
         import torch
         from yobx.torch.in_transformers.cache_helper import make_dynamic_cache
@@ -426,6 +436,7 @@ def make_fake_with_dynamic_dimensions(
 
     .. runpython::
         :showcode:
+        :process:
 
         import pprint
         import torch

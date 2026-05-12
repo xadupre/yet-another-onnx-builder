@@ -9,6 +9,7 @@ from yobx.ext_test_case import (
     ExtTestCase,
     is_windows,
     ignore_errors,
+    has_ipython,
     has_jax,
     has_onnx_ir,
     has_onnx_shape_inference,
@@ -97,6 +98,7 @@ class TestDocumentationExamples(ExtTestCase):
                 and name
                 in {
                     "plot_dot_graph.py",
+                    "plot_einsum.py",
                     "plot_dump_intermediate_results.py",
                     "plot_export_report.py",
                     "plot_input_observer_tiny_llm.py",
@@ -150,6 +152,9 @@ class TestDocumentationExamples(ExtTestCase):
             if not reason and not has_sklearn() and "sklearn" in name:
                 reason = "scikit-learn not installed"
 
+            if not reason and not has_sklearn() and name in {"plot_tree_statistics.py"}:
+                reason = "scikit-learn not installed"
+
             if not reason and not has_sklearn("1.8") and name in {"plot_sklearn_pls_float32.py"}:
                 reason = "expected discrepancies with scikit-learn<1.8"
 
@@ -164,6 +169,9 @@ class TestDocumentationExamples(ExtTestCase):
 
             if not reason and not has_jax() and "jax" in name:
                 reason = "jax not installed"
+
+            if not reason and not has_ipython() and "mermaid" in name:
+                reason = "IPython not installed"
 
             if (
                 not reason

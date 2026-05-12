@@ -18,6 +18,8 @@ factory functions that close over the :class:`GraphBuilderExtendedProtocol`
 instance.
 """
 
+from typing import Any, Union
+
 from ...typing import GraphBuilderExtendedProtocol
 
 # ---------------------------------------------------------------------------
@@ -186,10 +188,11 @@ _COMPOSITE_JAX_OPS: dict = {
 # ---------------------------------------------------------------------------
 
 
-def get_jax_cvt(assembly_code: str, g: GraphBuilderExtendedProtocol, jax_type: str):
+def get_jax_cvt(assembly_code: Union[str, Any], g: GraphBuilderExtendedProtocol, jax_type: str):
     """Return an ONNX-emission callable for StableHLO *jax_type*.
 
-    :param assembly_code: full MLIR text (used only in the error message).
+    :param assembly_code: full MLIR text or ``ir.Module`` (used only in the
+        error message).
     :param g: the active :class:`~yobx.typing.GraphBuilderExtendedProtocol`.
     :param jax_type: StableHLO op name with the ``stablehlo.`` prefix already
         stripped (e.g. ``"sine"``, ``"sqrt"``).

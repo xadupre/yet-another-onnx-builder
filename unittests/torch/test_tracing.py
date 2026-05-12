@@ -356,6 +356,23 @@ class TestCustomTracer(ExtTestCase):
         fn_nodes = [n for n in graph.nodes if n.op == "call_function"]
         self.assertEqual(fn_nodes[0].target, torch.ops.aten.add.Scalar)
 
+    def test_replace_inplace_aten_functions_logical_not(self):
+        # Graph with aten.logical_not_.default — it should be rewritten
+        # to aten.logical_not.default and its users preserved.
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        logical_not_node = graph.call_function(torch.ops.aten.logical_not_.default, args=(x,))
+        graph.output(logical_not_node)
+
+        result = CustomTracer.replace_inplace_aten_functions(graph)
+        self.assertEqual(result, 1)
+        fn_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertEqual(len(fn_nodes), 1)
+        self.assertEqual(fn_nodes[0].target, torch.ops.aten.logical_not.default)
+        self.assertEqual(fn_nodes[0].args, (x,))
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        self.assertIs(output_node.args[0], fn_nodes[0])
+
     def test_remove_unnecessary_slices_no_slice(self):
         class Model(torch.nn.Module):
             def forward(self, x, y):
@@ -490,12 +507,15 @@ class TestCustomTracer(ExtTestCase):
             wrapped, arg_names = CustomTracer.make_wrapped_model(model, concrete_args)
         self.assertIsInstance(wrapped, torch.nn.Module)
         self.assertTrue(hasattr(wrapped, "_traced_m1"))
+        self.assertTrue(hasattr(wrapped, "_cache_context"))
         self.assertEqual(arg_names[0], "x")
         x = torch.randn(2, 5, 16)
         key = torch.randn(2, 4, 5, 8)
         val = torch.randn(2, 4, 5, 8)
         result = wrapped(x, key, val)
-        self.assertEqual(result.shape, torch.Size([2, 5, 16]))
+        # The wrapper flattens the output to a tuple of individual tensors.
+        self.assertIsInstance(result, tuple)
+        self.assertEqual(result[0].shape, torch.Size([2, 5, 16]))
 
 
 @requires_torch("2.0")
@@ -1256,9 +1276,9 @@ class TestTracing(ExtTestCase):
                     if "DynamicCache" in t:
                         self.assertEqual(
                             (
-                                "DynamicCache(key_cache=#2[CustomProxy(cat),"
-                                "CustomProxy(cat_2)], "
-                                "value_cache=#2[CustomProxy(cat_1),CustomProxy(cat_3)])"
+                                "DynamicCache(key_cache=#2[CustomProxy(txn3),"
+                                "CustomProxy(txn5)], "
+                                "value_cache=#2[CustomProxy(txn4),CustomProxy(txn6)])"
                             ),
                             t,
                         )
@@ -1862,6 +1882,60 @@ class TestTorchCheckConstraints(ExtTestCase):
         self.assertIs(proxy == 0, False)
         # value > 1 → still returns proxy (we don't know if value > 1)
         self.assertIsInstance(proxy > 1, CustomProxyBool)
+
+    def test_custom_proxy_bool_bool_positivity_self_registers(self):
+        """Tests that CustomProxyBool.__bool__ self-registers positivity when used with ``and``.
+
+        This covers the :class:`ControlFlowNumelZero4
+        <yobx.torch.testing._model_eval_cases.ControlFlowNumelZero4>` pattern
+        where Python's ``and`` operator evaluates ``bool(proxy > 0)`` for the
+        left operand before ``_torch_check_for_tracing`` is called.
+
+        ``bool(CustomProxyBool_for_proxy_gt_0)`` must propagate
+        ``only_positive=True`` to the underlying :class:`CustomProxyInt` proxy
+        and return ``True`` so that the right operand of ``and`` is evaluated
+        and can be passed to :func:`_torch_check_for_tracing`.
+        """
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt, CustomProxyBool
+
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        tracer = CustomTracer()
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
+        proxy = tracer.proxy(node, cls=CustomProxyInt)
+        self.assertFalse(proxy.only_positive, "should not be registered yet")
+
+        # Simulate: bool(proxy > 0)  ← left operand of `and`
+        bool_proxy = proxy > 0
+        self.assertIsInstance(bool_proxy, CustomProxyBool)
+        result = bool(bool_proxy)
+        self.assertTrue(result, "positivity condition must resolve to True")
+        self.assertTrue(proxy.only_positive, "must be marked only_positive after bool()")
+        self.assertFalse(proxy.can_be_null, "must clear can_be_null after bool()")
+
+    def test_custom_proxy_bool_bool_ge_positivity_self_registers(self):
+        """Tests that CustomProxyBool.__bool__ handles ``proxy >= 1`` as a positivity check."""
+        from yobx.torch.tracing import CustomTracer, CustomProxyInt, CustomProxyBool
+
+        class _M(torch.nn.Module):
+            def forward(self, x):
+                return x + 1
+
+        tracer = CustomTracer()
+        graph = tracer.trace(_M())
+        node = next(n for n in graph.nodes if n.op == "placeholder")
+        proxy = tracer.proxy(node, cls=CustomProxyInt)
+        self.assertFalse(proxy.only_positive)
+
+        bool_proxy = proxy >= 1
+        self.assertIsInstance(bool_proxy, CustomProxyBool)
+        result = bool(bool_proxy)
+        self.assertTrue(result)
+        self.assertTrue(proxy.only_positive)
+        self.assertFalse(proxy.can_be_null)
 
     def test_tracing_with_torch_check_and_shape_constraint(self):
         """

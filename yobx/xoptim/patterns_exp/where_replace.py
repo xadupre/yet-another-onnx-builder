@@ -47,7 +47,7 @@ class ReplaceZeroPattern(PatternOptimization):
 
             I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
 
-            ReplaceZero_0[["onnx_extended.ortops.optim.cuda.ReplaceZero(.)"]]
+            ReplaceZero_0[["yaourt.ortops.fused_kernel.cuda.ReplaceZero(.)"]]
 
             I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| ReplaceZero_0
 
@@ -99,6 +99,6 @@ class ReplaceZeroPattern(PatternOptimization):
             by=cst,
             equal=False,
             name=f"{self.__class__.__name__}--{where_node.name}",
-            domain="onnx_extended.ortops.optim.cuda",
+            domain="yaourt.ortops.fused_kernel.cuda",
         )
         return [new_node]

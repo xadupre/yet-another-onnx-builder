@@ -94,8 +94,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
         self.assertEqual(0, len(opt_onx.graph.initializer))
         check_model(opt_onx)
         opsets = {v.domain: v.version for v in opt_onx.opset_import}
-        self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-        self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+        self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+        self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
         ref2 = ExtendedReferenceEvaluator(opt_onx)
         got = ref2.run(None, feeds)
@@ -149,8 +149,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                 opt_onx = gr.to_onnx(optimize=True)
                 self.assertEqual([op_type * 2], [_.op_type for _ in opt_onx.graph.node])
                 opsets = {v.domain: v.version for v in opt_onx.opset_import}
-                self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-                self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+                self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+                self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
                 feeds = {
                     "X": np.array([10, 11], dtype=np.float32),
@@ -193,8 +193,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
         self.assertEqual(0, len(opt_onx.graph.initializer))
         check_model(opt_onx)
         opsets = {v.domain: v.version for v in opt_onx.opset_import}
-        self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-        self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+        self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+        self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
         ref2 = ExtendedReferenceEvaluator(opt_onx)
         got = ref2.run(None, feeds)
@@ -242,8 +242,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
         self.assertEqual(1, len(opt_onx.graph.initializer))
         check_model(opt_onx)
         opsets = {v.domain: v.version for v in opt_onx.opset_import}
-        self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-        self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+        self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+        self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
         ref2 = ExtendedReferenceEvaluator(opt_onx)
         got = ref2.run(None, feeds)
@@ -271,8 +271,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                     [f"{op_type}{other_type}"], [_.op_type for _ in opt_onx.graph.node]
                 )
                 opsets = {v.domain: v.version for v in opt_onx.opset_import}
-                self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-                self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+                self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+                self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
                 feeds = {
                     "X": np.array([10, 11], dtype=np.float32),
@@ -319,8 +319,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
         self.assertEqual(0, len(opt_onx.graph.initializer))
         check_model(opt_onx)
         opsets = {v.domain: v.version for v in opt_onx.opset_import}
-        self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-        self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+        self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+        self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
         ref2 = ExtendedReferenceEvaluator(opt_onx)
         got = ref2.run(None, feeds)
@@ -356,8 +356,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
         self.assertEqual(0, len(opt_onx.graph.initializer))
         check_model(opt_onx)
         opsets = {v.domain: v.version for v in opt_onx.opset_import}
-        self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-        self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+        self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+        self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
         ref2 = ExtendedReferenceEvaluator(opt_onx)
         got = ref2.run(None, feeds)
@@ -415,8 +415,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
         self.assertEqual(2, len(opt_onx.graph.initializer))
         check_model(opt_onx)
         opsets = {v.domain: v.version for v in opt_onx.opset_import}
-        self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-        self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+        self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+        self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
         ref2 = ExtendedReferenceEvaluator(opt_onx)
         got = ref2.run(None, feeds)
@@ -464,8 +464,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
         self.assertEqual(0, len(opt_onx.graph.initializer))
         check_model(opt_onx)
         opsets = {v.domain: v.version for v in opt_onx.opset_import}
-        self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-        self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+        self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+        self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
         ref2 = ExtendedReferenceEvaluator(opt_onx)
         got = ref2.run(None, feeds)
@@ -499,8 +499,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                     [f"{op_type}{other_type}"], [_.op_type for _ in opt_onx.graph.node]
                 )
                 opsets = {v.domain: v.version for v in opt_onx.opset_import}
-                self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-                self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+                self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+                self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
                 feeds = {
                     "X": np.array([10, 11], dtype=np.float32),
@@ -554,8 +554,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                     [f"{op_type}SharedInput"], [_.op_type for _ in opt_onx.graph.node]
                 )
                 opsets = {v.domain: v.version for v in opt_onx.opset_import}
-                self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-                self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+                self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+                self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
                 feeds = {
                     "X": np.array([10, 11], dtype=np.float32),
@@ -578,7 +578,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                         f"{op_type1}{op_type2}",
                         ["X", "Y", "Z"],
                         ["F1"],
-                        domain="onnx_extended.ortops.optim.cuda",
+                        domain="yaourt.ortops.fused_kernel.cuda",
                     ),
                     oh.make_node("Transpose", ["F1"], ["final"], perm=[0, 2, 1, 3]),
                 ],
@@ -592,7 +592,7 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
             ),
             opset_imports=[
                 oh.make_opsetid("", 18),
-                oh.make_opsetid("onnx_extended.ortops.optim.cuda", 1),
+                oh.make_opsetid("yaourt.ortops.fused_kernel.cuda", 1),
             ],
             ir_version=9,
         )
@@ -621,8 +621,8 @@ class TestGraphPatternOptimizationExp(ExtTestCase):
                     [f"{op_type1}{op_type2}"], [_.op_type for _ in opt_onx.graph.node]
                 )
                 opsets = {v.domain: v.version for v in opt_onx.opset_import}
-                self.assertIn("onnx_extended.ortops.optim.cuda", opsets)
-                self.assertEqual(opsets["onnx_extended.ortops.optim.cuda"], 1)
+                self.assertIn("yaourt.ortops.fused_kernel.cuda", opsets)
+                self.assertEqual(opsets["yaourt.ortops.fused_kernel.cuda"], 1)
 
                 feeds = {
                     "X": self._range(2, 3, 4, 5),

@@ -1,8 +1,77 @@
+import json
+import logging
 import os
 import shutil
 import sys
+import time
 from sphinx_runpython.github_link import make_linkcode_resolve
 import yobx
+
+# Suppress TensorFlow C++ and Python logging before any TF import occurs.
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+logging.getLogger("tensorflow").setLevel(logging.ERROR)
+
+# ---------------------------------------------------------------------------
+# Per-page build duration tracking (writes top-5 to a JSON file so that the
+# doc_build_durations.rst page can display it in the generated documentation).
+# ---------------------------------------------------------------------------
+
+_PAGE_TIMINGS_START: dict[str, float] = {}
+_PAGE_DURATIONS: dict[str, float] = {}
+_DOC_BUILD_DURATIONS_JSON = os.path.join(
+    os.path.dirname(__file__), "_static", "doc_build_durations.json"
+)
+os.environ["YOBX_DOC_BUILD_DURATIONS_JSON"] = _DOC_BUILD_DURATIONS_JSON
+
+
+def _on_source_read(app, docname, source):
+    """Records the start time when a source file begins to be read."""
+    _PAGE_TIMINGS_START[docname] = time.monotonic()
+
+
+def _on_doctree_read(app, doctree):
+    """Records the elapsed time after a doctree has been parsed."""
+    docname = app.env.docname
+    start = _PAGE_TIMINGS_START.pop(docname, None)
+    if start is not None:
+        _PAGE_DURATIONS[docname] = time.monotonic() - start
+
+
+def _on_build_finished(app, exception):
+    """Writes the 5 slowest pages (by build duration) to a JSON file."""
+    if exception or not _PAGE_DURATIONS:
+        return
+    top5 = sorted(_PAGE_DURATIONS.items(), key=lambda kv: kv[1], reverse=True)[:5]
+    static_dir = os.path.dirname(_DOC_BUILD_DURATIONS_JSON)
+    if os.path.exists(static_dir) and not os.path.isdir(static_dir):
+        os.remove(static_dir)
+    os.makedirs(static_dir, exist_ok=True)
+    with open(_DOC_BUILD_DURATIONS_JSON, "w", encoding="utf-8") as fh:
+        json.dump(
+            [{"docname": name, "duration_s": round(dur, 3)} for name, dur in top5], fh, indent=2
+        )
+
+
+def _on_builder_inited(app):
+    """Removes any non-directory file named '_static' in the output directory.
+
+    Sphinx 9.1 raises an error when it tries to create the ``_static`` subfolder
+    but finds a plain file with that name instead of a directory.  This hook
+    runs at builder-init time and removes such a stale file so that Sphinx can
+    proceed normally.
+    """
+    outdir_static = os.path.join(str(app.outdir), "_static")
+    if os.path.exists(outdir_static) and not os.path.isdir(outdir_static):
+        os.remove(outdir_static)
+
+
+def setup(app):
+    """Connects duration-tracking hooks to Sphinx events."""
+    app.connect("builder-inited", _on_builder_inited)
+    app.connect("source-read", _on_source_read)
+    app.connect("doctree-read", _on_doctree_read)
+    app.connect("build-finished", _on_build_finished)
+
 
 project = "yet-another-onnx-builder"
 author = "yet-another-onnx-builder contributors"
@@ -27,6 +96,7 @@ extensions = [
     "matplotlib.sphinxext.plot_directive",
     "sphinx_runpython.epkg",
     "sphinx_runpython.gdot",
+    "sphinx_runpython.runmermaid",
     "sphinx_runpython.runpython",
 ]
 if shutil.which("latex"):
@@ -44,10 +114,27 @@ document.addEventListener("DOMContentLoaded", function () {
         return document.documentElement.getAttribute("data-bs-theme") === "dark"
             ? "dark" : "default";
     }
+
+    // Save the original Mermaid source before the first render so that
+    // theme-switch re-renders can start from clean code rather than the
+    // already-rendered SVG (which would otherwise be passed to mermaid.run()
+    // as if it were Mermaid source, producing no output).
+    document.querySelectorAll(".mermaid").forEach(function (el) {
+        if (!el.getAttribute("data-mermaid-src")) {
+            el.setAttribute("data-mermaid-src", el.textContent.trim());
+        }
+    });
+
     mermaid.initialize({ startOnLoad: true, theme: getMermaidTheme() });
     new MutationObserver(function () {
         const theme = getMermaidTheme();
         document.querySelectorAll(".mermaid[data-processed]").forEach(function (el) {
+            // Restore the original Mermaid source so mermaid.run() can
+            // re-render from code instead of from the old SVG.
+            const src = el.getAttribute("data-mermaid-src");
+            if (src) {
+                el.innerHTML = src;
+            }
             el.removeAttribute("data-processed");
         });
         mermaid.initialize({ startOnLoad: false, theme: theme });
@@ -63,6 +150,9 @@ document.addEventListener("DOMContentLoaded", function () {
 exclude_patterns = ["_build"]
 if int(os.environ.get("UNITTEST_GOING", "0")):
     exclude_patterns.append("ci_durations.rst")
+    exclude_patterns.append("commits_per_week.rst")
+    exclude_patterns.append("pypi_downloads.rst")
+    exclude_patterns.append("design/torch/case_coverage.rst")
 html_theme = "pydata_sphinx_theme"
 html_static_path = ["_static"]
 html_css_files = ["custom.css"]
@@ -111,6 +201,11 @@ intersphinx_mapping = {
 }
 
 suppress_warnings = ["intersphinx.external"]
+if int(os.environ.get("UNITTEST_GOING", "0")):
+    # Suppress toctree and cross-reference warnings for pages intentionally
+    # excluded on CI (e.g. case_coverage.rst, ci_durations.rst).
+    suppress_warnings += ["toc.excluded", "ref.ref"]
+
 
 sphinx_gallery_conf = {
     # path to your examples scripts
@@ -145,7 +240,11 @@ sphinx_gallery_conf = {
     "ignore_repr_types": "matplotlib\\.(text|axes)",
     # robubstness
     "reset_modules_order": "both",
-    "reset_modules": ("matplotlib", "yobx.doc.reset_torch_transformers"),
+    "reset_modules": (
+        "matplotlib",
+        "yobx.doc.reset_torch_transformers",
+        "yobx.doc.reset_tensorflow",
+    ),
 }
 
 substring_to_disable = []
@@ -163,6 +262,7 @@ epkg_dictionary = {
     "category_encoders": "https://contrib.scikit-learn.org/category_encoders/",
     "Custom Backends": "https://docs.pytorch.org/docs/stable/torch.compiler_custom_backends.html",
     "diffusers": "https://github.com/huggingface/diffusers",
+    "dot": "https://graphviz.org/doc/info/lang.html",
     "DOT": "https://graphviz.org/doc/info/lang.html",
     "executorch": "https://pytorch.org/executorch/stable/intro-overview.html",
     "ExecuTorch": "https://pytorch.org/executorch/stable/intro-overview.html",
@@ -179,6 +279,7 @@ epkg_dictionary = {
     "ai_edge_litert": "https://pypi.org/project/ai-edge-litert/",
     "flax": "https://flax.readthedocs.io/en/latest/",
     "equinox": "https://docs.kidger.site/equinox/",
+    "IPython": "https://ipython.org/",
     "ir-py": "https://onnx.ai/ir-py/",
     "jax": "https://docs.jax.dev/en/latest/",
     "JAX": "https://docs.jax.dev/en/latest/",
@@ -188,6 +289,7 @@ epkg_dictionary = {
     "LightGBM": "https://lightgbm.readthedocs.io/en/latest/",
     "Linux": "https://www.linux.org/",
     "LiteRT": "https://ai.google.dev/edge/litert/",
+    "mermaid-py": "https://pypi.org/project/mermaid-py/",
     "ml_dtypes": "https://github.com/jax-ml/ml_dtypes",
     "ModelBuilder": "https://onnxruntime.ai/docs/genai/howto/build-model.html",
     "monai": "https://github.com/Project-MONAI/MONAI",
@@ -202,8 +304,6 @@ epkg_dictionary = {
     "onnxruntime-genai": "https://github.com/microsoft/onnxruntime-genai",
     "onnxruntime-training": "https://onnxruntime.ai/docs/get-started/training-on-device.html",
     "onnxruntime kernels": "https://onnxruntime.ai/docs/reference/operators/OperatorKernels.html",
-    "onnx-diagnostic": "https://sdpython.github.io/doc/onnx-diagnostic/dev/",
-    "onnx-extended": "https://sdpython.github.io/doc/onnx-extended/dev/",
     "onnx-script": "https://github.com/microsoft/onnxscript",
     "onnxscript": "https://github.com/microsoft/onnxscript",
     "onnxscript Tutorial": "https://microsoft.github.io/onnxscript/tutorial/index.html",
@@ -249,6 +349,7 @@ epkg_dictionary = {
     "Windows": "https://www.microsoft.com/windows",
     "xgboost": "https://xgboost.readthedocs.io/en/stable/get_started.html",
     "XGBoost": "https://xgboost.readthedocs.io/en/stable/get_started.html",
+    "yet-another-onnxruntime-extensions": "https://sdpython.github.io/doc/yet-another-onnxruntime-extensions/dev/",
 }
 
 # models
