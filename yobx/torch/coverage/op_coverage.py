@@ -361,6 +361,7 @@ XFAIL_OPS_INT32: Dict[str, FrozenSet[str]] = {
             "prod",  # type mismatch: int32 input produces int64 output
             "sum",  # type mismatch: int32 input produces int64 output
             "xlogy",  # ONNX Log only supports float dtypes
+            "nn_functional_bilinear",  # NOT_IMPLEMENTED: MatMul/ReduceSum not supported for int32
             "nn_functional_linear",  # NOT_IMPLEMENTED: Gemm not supported for int32
         }
     ),
@@ -428,6 +429,7 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
             "tanh",  # ONNX op only supports float dtypes
             "trunc",  # InvalidGraph: int64 not supported by Round
             "xlogy",  # ONNX Log only supports float dtypes
+            "nn_functional_bilinear",  # NOT_IMPLEMENTED: MatMul not supported for int64
             "nn_functional_linear",  # NOT_IMPLEMENTED: Gemm not supported for int64
         }
     ),
