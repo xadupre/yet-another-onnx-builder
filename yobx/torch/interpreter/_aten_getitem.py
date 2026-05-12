@@ -304,6 +304,9 @@ def _getitem_slice(
             g.set_rank(output_name, g.get_rank(inputs[0]) - len(squeeze_axes))
         elif expand_axes:
             g.set_rank(output_name, g.get_rank(inputs[0]) + len(expand_axes))
+        elif g.has_rank(inputs[0]):
+            # Dynamic slice endpoint: shape unknown but rank is preserved.
+            g.set_rank(output_name, g.get_rank(inputs[0]))
     return res
 
 

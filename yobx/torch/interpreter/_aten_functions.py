@@ -13033,14 +13033,15 @@ def aten_setitem(
 
     if g.has_rank(x) and g.get_rank(x) == 1 and g.has_rank(values) and g.get_rank(values) == 1:
         # Uses concat, it might be applicable to other cases. To be improved.
-        # Normalize a bare slice to a one-element list so len() works uniformly.
-        if isinstance(indices, slice):
-            indices = [indices]
         assert len(indices) == 1 and isinstance(indices[0], slice), (
             f"Unexpected type for indices {type(indices)}, value is {indices}"
             f"{g.get_debug_msg()}"
         )
-        assert g.has_shape(values) and (
+        # When the slice endpoint is dynamic (e.g. p.item()), aten_slice_Tensor
+        # only records rank, not shape.  Allow that case; if shape IS known, it
+        # must not be (1,) unless x has the same shape (to avoid confusing a
+        # single-element assignment with a range assignment).
+        assert not g.has_shape(values) or (
             g.get_shape(values) != (1,)
             or (g.has_shape(x) and g.get_shape(x) == g.get_shape(values))
         ), (
