@@ -245,6 +245,17 @@ class CustomProxy(torch.fx.proxy.Proxy):
             # objects. Unwrap any CustomProxy elements within the tuple so that
             # FX dependency tracking works correctly.
             indices = tuple(i.node if isinstance(i, CustomProxy) else i for i in indices)
+        elif isinstance(indices, slice):
+            # Unwrap any CustomProxy objects in the slice start/stop/step so
+            # that FX's map_arg can track them as node dependencies. Without
+            # this, a proxy inside a slice (e.g. row[:p.item()] where p.item()
+            # returns a CustomProxy) is not detected as a graph user and gets
+            # removed by dead-code elimination, causing the node to be missing
+            # when the ONNX interpreter tries to reference it.
+            def _unwrap(v):
+                return v.node if isinstance(v, CustomProxy) else v
+
+            indices = slice(_unwrap(indices.start), _unwrap(indices.stop), _unwrap(indices.step))
         node = self.tracer.create_node(
             "call_function",
             operator.setitem,
