@@ -23,7 +23,7 @@ from yobx.ext_test_case import (
 )
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions, InferShapesOptions
 from yobx.xoptim import get_pattern_list
-from yobx.xoptim.patterns_ort.activation import GeluErfPattern
+from yobx.xoptim.patterns_ort.activation import GeluErfPattern, GemmFastGeluPattern
 from yobx.helpers.onnx_helper import choose_consistent_domain_opset, compatible_opsets
 from yobx.reference import ExtendedReferenceEvaluator
 
@@ -1099,7 +1099,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(patterns=["GemmFastGelu"], verbose=0),
+            optimization_options=OptimizationOptions(patterns=[GemmFastGeluPattern()], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(["GemmFastGelu"], [n.op_type for n in opt_onx.graph.node])
@@ -1140,7 +1140,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(patterns=["GemmFastGelu"], verbose=0),
+            optimization_options=OptimizationOptions(patterns=[GemmFastGeluPattern()], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(["GemmFastGelu"], [n.op_type for n in opt_onx.graph.node])
@@ -1187,7 +1187,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         gr = GraphBuilder(
             model,
             infer_shapes_options=True,
-            optimization_options=OptimizationOptions(patterns=["GemmFastGelu"], verbose=0),
+            optimization_options=OptimizationOptions(patterns=[GemmFastGeluPattern()], verbose=0),
         )
         opt_onx = gr.to_onnx(optimize=True)
         self.assertEqual(["GemmFastGelu"], [n.op_type for n in opt_onx.graph.node])
