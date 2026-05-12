@@ -268,7 +268,9 @@ XFAIL_OPS_FLOAT16: Dict[str, FrozenSet[str]] = {
         }
     ),
     "tracing": frozenset(),
-    "new-tracing": frozenset(),
+    "new-tracing": frozenset(
+        {"nn_functional_bilinear"}  # FunctionNotFoundError: Unable to interpret function
+    ),
 }
 
 # Extra exclusions specific to torch.bfloat16.
