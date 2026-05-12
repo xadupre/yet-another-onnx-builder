@@ -2895,6 +2895,7 @@ class CustomTracer(torch.fx.Tracer):
             torch.ops.aten.sub_.Scalar: torch.ops.aten.sub.Scalar,
             torch.ops.aten.div_.Tensor: torch.ops.aten.div.Tensor,
             torch.ops.aten.div_.Scalar: torch.ops.aten.div.Scalar,
+            torch.ops.aten.logical_not_.default: torch.ops.aten.logical_not.default,
         }
         n = 0
         for node in graph.nodes:

@@ -595,6 +595,24 @@ class TestExportOptions(ExtTestCase):
         self.assertEqual(len(onx.graph.input), 1)
         self.assertEqual(len(onx.graph.output), 1)
 
+    @ignore_warnings(UserWarning)
+    def test_export_new_tracing_nanmean_to_onnx(self):
+        """Checks that new tracing correctly exports nanmean operations."""
+
+        class NanMeanModel(torch.nn.Module):
+            def forward(self, x):
+                return x.nanmean(dim=1, keepdim=True)
+
+        model = NanMeanModel()
+        x = torch.tensor(
+            [[1.0, float("nan"), 3.0], [4.0, 5.0, float("nan")]], dtype=torch.float32
+        )
+        expected = model(x)
+        artifact = to_onnx(
+            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
+        self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=1e-5)
+
 
 @requires_torch("2.0")
 class TestApplyDecompositions(ExtTestCase):
