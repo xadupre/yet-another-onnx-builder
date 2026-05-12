@@ -79,6 +79,16 @@ _ORIGINAL_NN_FUNCTIONAL_BILINEAR: Optional[Callable] = getattr(
     torch.nn.functional, "bilinear", None
 )
 
+# Capture the real ``torch._C._nn.bilinear`` at import time so that
+# it can be patched alongside ``torch.nn.functional.bilinear``.
+# ``torch.nn.functional.bilinear`` delegates to ``torch._C._nn.bilinear``
+# at call time (attribute lookup), so patching the C binding ensures that
+# callers who stored a reference to the Python wrapper before the patch
+# (e.g. ``_OpWrapper._fn``) will still use the replacement.
+_ORIGINAL_C_NN_BILINEAR: Optional[Callable] = getattr(
+    getattr(getattr(torch, "_C", None), "_nn", None), "bilinear", None
+)
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -521,8 +531,9 @@ def _is_exporting_replacement_ctx() -> Generator:
 @contextlib.contextmanager
 def _bilinear_replacement_ctx() -> Generator:
     """
-    Temporarily replaces ``torch.nn.functional.bilinear`` with a pure-Python
-    decomposition that avoids ``aten::_trilinear``.
+    Temporarily replaces ``torch.nn.functional.bilinear`` and
+    ``torch._C._nn.bilinear`` with a pure-Python decomposition that avoids
+    ``aten::_trilinear``.
 
     ``nn.functional.bilinear`` forwards to ``torch._C._nn.bilinear``, which
     dispatches through ``aten::_trilinear``.  That op lacks a FakeTensor meta
@@ -537,8 +548,15 @@ def _bilinear_replacement_ctx() -> Generator:
     (``transpose``, ``reshape``/``view``, ``matmul``, ``mul``, ``sum``,
     optionally ``add``) that all have correct meta kernels and ONNX converters.
 
-    The original ``torch.nn.functional.bilinear`` is restored unconditionally
-    on exit.
+    Both ``torch.nn.functional.bilinear`` and ``torch._C._nn.bilinear`` are
+    patched.  The latter is patched so that callers who captured a direct
+    reference to the Python wrapper before tracing started (e.g.
+    ``_OpWrapper._fn`` in the op-db coverage tests) will also use the
+    decomposition — the original Python wrapper calls ``torch._C._nn.bilinear``
+    by attribute lookup at call time, so patching the C binding intercepts
+    those calls too.
+
+    Both originals are restored unconditionally on exit.
     """
     if _ORIGINAL_NN_FUNCTIONAL_BILINEAR is None:
         yield
@@ -572,10 +590,19 @@ def _bilinear_replacement_ctx() -> Generator:
         return output
 
     torch.nn.functional.bilinear = _bilinear_impl  # type: ignore[assignment]
+    _c_nn = getattr(getattr(torch, "_C", None), "_nn", None)
+    _c_nn_patched = False
+    if _ORIGINAL_C_NN_BILINEAR is not None and _c_nn is not None:
+        with contextlib.suppress(AttributeError, TypeError):
+            _c_nn.bilinear = _bilinear_impl  # type: ignore[assignment]
+            _c_nn_patched = True
     try:
         yield
     finally:
         torch.nn.functional.bilinear = _ORIGINAL_NN_FUNCTIONAL_BILINEAR  # type: ignore[assignment]
+        if _c_nn_patched and _c_nn is not None:
+            with contextlib.suppress(AttributeError, TypeError):
+                _c_nn.bilinear = _ORIGINAL_C_NN_BILINEAR  # type: ignore[assignment]
 
 
 @contextlib.contextmanager
