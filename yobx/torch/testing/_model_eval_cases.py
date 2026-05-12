@@ -303,6 +303,19 @@ class AtenInterpolate(torch.nn.Module):
     _dynamic = {"x": {0: DIM("batch")}}
 
 
+class AtenNnFunctionalBilinear(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.weight = torch.nn.Parameter(torch.randn(5, 3, 4))
+        self.bias = torch.nn.Parameter(torch.randn(5))
+
+    def forward(self, x1, x2):
+        return torch.nn.functional.bilinear(x1, x2, self.weight, self.bias)
+
+    _inputs = (torch.randn(2, 3, requires_grad=False), torch.randn(2, 4, requires_grad=False))
+    _dynamic = {"x1": {0: DIM("batch")}, "x2": {0: DIM("batch")}}
+
+
 class AtenNonZero(torch.nn.Module):
     def forward(self, x):
         y = torch.nonzero(x)
