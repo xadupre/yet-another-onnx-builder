@@ -24,6 +24,7 @@ from yobx.ext_test_case import (
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions, InferShapesOptions
 from yobx.xoptim import get_pattern_list
 from yobx.xoptim.patterns_ort.activation import GeluErfPattern, GemmFastGeluPattern
+from yobx.xoptim.patterns_ort.fused_matmul import FusedMatMulActivationPattern
 from yobx.helpers.onnx_helper import choose_consistent_domain_opset, compatible_opsets
 from yobx.reference import ExtendedReferenceEvaluator
 
@@ -4071,7 +4072,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["FusedMatMulActivation"], verbose=0
+                patterns=[FusedMatMulActivationPattern()], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
@@ -4107,7 +4108,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["FusedMatMulActivation"], verbose=0
+                patterns=[FusedMatMulActivationPattern()], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
@@ -4146,7 +4147,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["FusedMatMulActivation"], verbose=0
+                patterns=[FusedMatMulActivationPattern()], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
@@ -4183,7 +4184,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
             model,
             infer_shapes_options=True,
             optimization_options=OptimizationOptions(
-                patterns=["FusedMatMulActivation"], verbose=0
+                patterns=[FusedMatMulActivationPattern()], verbose=0
             ),
         )
         opt_onx = gr.to_onnx(optimize=True)
