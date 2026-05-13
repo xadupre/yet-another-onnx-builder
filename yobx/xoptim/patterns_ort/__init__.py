@@ -36,6 +36,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         FusedMatMulPattern,
         FusedMatMulx2Pattern,
         FusedMatMulTransposePattern,
+        # FusedMatMulActivationPattern,  # not implemented yet
         ReshapeGemmPattern,
         ReshapeGemmReshapePattern,
         TransposeFusedMatMulBPattern,
@@ -90,6 +91,7 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         FastGeluPattern(verbose=verbose),
         LinearAttentionPattern(verbose=verbose),
         FusedMatMulPattern(verbose=verbose),
+        # FusedMatMulActivationPattern(verbose=verbose),  # not implemented yet
         FusedMatMulx2Pattern(verbose=verbose),
         FusedMatMulDivPattern(verbose=verbose),
         FusedMatMulTransposePattern(verbose=verbose),

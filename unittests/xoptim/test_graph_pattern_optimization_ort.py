@@ -43,6 +43,7 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         res = get_pattern_list("onnxruntime")
         names = set(r.__class__.__name__ for r in res)
         self.assertNotIn("ConstantScatterNDPattern", names)
+        self.assertNotIn("FusedMatMulActivationPattern", names)
 
     def test_choose_consistent_domain_opset(self):
         self.assertIsInstance(choose_consistent_domain_opset(""), int)
