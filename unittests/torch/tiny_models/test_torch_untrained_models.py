@@ -350,7 +350,6 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
                 )
 
                 expected = model(**torch_deepcopy(problem))
-                sess = onnxruntime.InferenceSession(filename, providers=["CPUExecutionProvider"])
                 feeds = make_feeds(sess, problem, use_numpy=True)
                 got = sess.run(None, feeds)
                 diff = max_diff(expected, got)
