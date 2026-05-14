@@ -333,23 +333,28 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         diff = max_diff(expected, got)
         assert diff["abs"] <= 1e-5, f"diff={diff}"
 
-        problem = dict(
-            input_ids=torch.tensor([[24320]], dtype=torch.int64),
-            attention_mask=torch.tensor([[1, 1, 1, 0]], dtype=torch.int64),
-            past_key_values=make_dynamic_cache(
-                [
-                    torch.rand((1, 1, 3, 96), dtype=torch.float32),
-                    torch.rand((1, 1, 3, 96), dtype=torch.float32),
-                ]
-            ),
-        )
+        for mask in (
+            torch.tensor([[1, 1, 1, 0]], dtype=torch.int64),
+            torch.tensor([[1, 0, 1, 1]], dtype=torch.int64),
+        ):
+            with self.subTest(attention_mask=mask.tolist()):
+                problem = dict(
+                    input_ids=torch.tensor([[24320]], dtype=torch.int64),
+                    attention_mask=mask,
+                    past_key_values=make_dynamic_cache(
+                        [
+                            torch.rand((1, 1, 3, 96), dtype=torch.float32),
+                            torch.rand((1, 1, 3, 96), dtype=torch.float32),
+                        ]
+                    ),
+                )
 
-        expected = model(**torch_deepcopy(problem))
-        sess = onnxruntime.InferenceSession(filename, providers=["CPUExecutionProvider"])
-        feeds = make_feeds(sess, problem, use_numpy=True)
-        got = sess.run(None, feeds)
-        diff = max_diff(expected, got)
-        assert diff["abs"] <= 1e-5, f"diff={diff}"
+                expected = model(**torch_deepcopy(problem))
+                sess = onnxruntime.InferenceSession(filename, providers=["CPUExecutionProvider"])
+                feeds = make_feeds(sess, problem, use_numpy=True)
+                got = sess.run(None, feeds)
+                diff = max_diff(expected, got)
+                assert diff["abs"] <= 1e-5, f"diff={diff}"
 
         outputs = [o.name for o in onx.graph.output]
         self.assertEqual(
