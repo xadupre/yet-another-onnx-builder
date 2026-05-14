@@ -1166,7 +1166,7 @@ def aten_sort(
     stable: bool = False,
     name: str = "sort",
 ) -> Tuple[T, T]:
-    """Sorts the input tensor along the specified dimension."""
+    """Performs sorting of the input tensor along the specified dimension."""
     return _aten_sort_impl(
         g, sts, outputs, x, dim=dim, descending=descending, stable=stable, name=name
     )
@@ -1182,7 +1182,7 @@ def aten_sort_stable(
     descending: bool = False,
     name: str = "sort_stable",
 ) -> Tuple[T, T]:
-    """Sorts the input tensor along the specified dimension with stable semantics."""
+    """Performs stable sorting of the input tensor along the specified dimension."""
     return _aten_sort_impl(
         g, sts, outputs, x, dim=dim, descending=descending, stable=stable, name=name
     )
