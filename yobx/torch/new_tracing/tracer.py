@@ -2335,6 +2335,8 @@ class GraphTracer:
         Returns:
             A tuple of :class:`TracingTensor` instances, one per output chunk.
         """
+        from ._patches import _ORIGINAL_TORCH_TENSOR_SPLIT
+
         # ------------------------------------------------------------------ #
         # Guard: if the input tensor is NOT a TracingTensor (e.g. it is a   #
         # FakeTensor produced inside FakeTensorMode during dispatch()'s       #
@@ -2343,8 +2345,6 @@ class GraphTracer:
         # calls where the input is a genuine TracingTensor.                   #
         # ------------------------------------------------------------------ #
         if not isinstance(input, TracingTensor):
-            from ._patches import _ORIGINAL_TORCH_TENSOR_SPLIT
-
             return _ORIGINAL_TORCH_TENSOR_SPLIT(input, indices_or_sections, dim)
         # ------------------------------------------------------------------ #
         # Case 1: indices_or_sections is NOT a TracingTensor.                 #
@@ -2355,6 +2355,16 @@ class GraphTracer:
             if isinstance(indices_or_sections, int):
                 return self.dispatch(
                     torch.ops.aten.tensor_split.sections, (input, indices_or_sections, dim), {}
+                )
+            if isinstance(indices_or_sections, TracingInt):
+                assert indices_or_sections.is_static, (
+                    "Dynamic tensor_split sections are not supported in new-tracing mode; "
+                    f"got {indices_or_sections!r}"
+                )
+                return self.dispatch(
+                    torch.ops.aten.tensor_split.sections,
+                    (input, int(indices_or_sections), dim),
+                    {},
                 )
             if isinstance(indices_or_sections, (list, tuple)):
                 return self.dispatch(
