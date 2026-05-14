@@ -613,6 +613,23 @@ class TestExportOptions(ExtTestCase):
         )
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=1e-5)
 
+    @ignore_warnings(UserWarning)
+    def test_export_new_tracing_isclose_isfinite_to_onnx(self):
+        """Checks that new tracing correctly exports isclose and isfinite."""
+
+        class IsCloseIsFiniteModel(torch.nn.Module):
+            def forward(self, x, y):
+                return torch.isclose(x, y), torch.isfinite(x)
+
+        model = IsCloseIsFiniteModel()
+        x = torch.tensor([[1.0, float("nan")], [float("inf"), 3.0]], dtype=torch.float32)
+        y = torch.tensor([[1.0, float("nan")], [0.0, 2.0]], dtype=torch.float32)
+        expected = model(x, y)
+        artifact = to_onnx(
+            model, (x, y), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
+        self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x, y), atol=1e-5)
+
 
 @requires_torch("2.0")
 class TestApplyDecompositions(ExtTestCase):
