@@ -234,13 +234,9 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
     "new-tracing": frozenset(
         {
             "argsort",
-            "bool",
             "bitwise_or_",
-            "byte",
             "char",
-            "double",
             "erfinv",
-            "float",
             "half",
             "int",
             "isclose",
