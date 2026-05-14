@@ -630,6 +630,22 @@ class TestExportOptions(ExtTestCase):
         )
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x, y), atol=1e-5)
 
+    @ignore_warnings(UserWarning)
+    def test_export_new_tracing_argsort_to_onnx(self):
+        """Checks that new tracing correctly exports argsort."""
+
+        class ArgSortModel(torch.nn.Module):
+            def forward(self, x):
+                return torch.argsort(x, dim=-1, descending=True), x.argsort(dim=0)
+
+        model = ArgSortModel()
+        x = torch.tensor([[0.2, 4.0, -1.0], [7.0, -3.0, 2.0]], dtype=torch.float32)
+        expected = model(x)
+        artifact = to_onnx(
+            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
+        self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=0)
+
 
 @requires_torch("2.0")
 class TestApplyDecompositions(ExtTestCase):
