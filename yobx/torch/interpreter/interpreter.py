@@ -1457,7 +1457,7 @@ class FxGraphInterpreter:
             )
         if i is Ellipsis:
             return i
-        if isinstance(i, (self.torch.dtype, self.torch.device)):
+        if isinstance(i, (self.torch.dtype, self.torch.device, self.torch.memory_format)):
             return i
         raise RuntimeError(
             f"Unexpected type (argument {i}) {type(i)} "
@@ -1716,9 +1716,9 @@ class FxGraphInterpreter:
                 f"{self.builder.get_debug_msg()}"
             )
 
-        args = [getattr(node.args[0], "name", node.args[0])]
+        args = [self._process_arg(node, method_name, node.args[0])]
         for i in node.args[1:]:
-            args.append(i.name if hasattr(i, "name") else i)
+            args.append(self._process_arg(node, method_name, i))
 
         kwargs = node.kwargs
         output_names = self._get_output_names(node)
