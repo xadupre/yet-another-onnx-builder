@@ -23,7 +23,7 @@ jobs:
       head_sha: ${{ github.event.pull_request.head.sha }}
 
   torch_targeted_tests:
-    name: tr-releases targeted (${{ needs.detect_torch_subfolder.outputs.subfolder }}, torch-2.11, transformers-5.8.1)
+    name: tr-releases targeted (${{ needs.detect_torch_subfolder.outputs.subfolder }}, torch-2.11, transformers-5.5/5.8.1)
     needs: detect_torch_subfolder
     # Skip if no unique subfolder, or if the subfolder is 'coverage' (excluded from the full run).
     if: needs.detect_torch_subfolder.outputs.count == '1' && needs.detect_torch_subfolder.outputs.subfolder != 'coverage'
@@ -40,9 +40,14 @@ jobs:
         run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
+      - name: Install transformers==5.5
+        run: pip install transformers==5.5 && pip freeze
+      - name: Run targeted torch tests with transformers==5.5
+        run: |
+          pytest --durations=10 unittests/torch/${{ needs.detect_torch_subfolder.outputs.subfolder }}
       - name: Install transformers==5.8.1
         run: pip install transformers==5.8.1 && pip freeze
-      - name: Run targeted torch tests
+      - name: Run targeted torch tests with transformers==5.8.1
         run: |
           pytest --durations=10 unittests/torch/${{ needs.detect_torch_subfolder.outputs.subfolder }}
 
