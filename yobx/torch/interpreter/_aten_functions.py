@@ -1127,6 +1127,73 @@ def aten_argsort(
     return res
 
 
+def _aten_sort_impl(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: int = -1,
+    descending: bool = False,
+    stable: bool = False,
+    name: str = "sort",
+) -> Tuple[T, T]:
+    """This function maps sort to ONNX TopK and returns ``(values, indices)``.
+
+    ONNX TopK has no stable-sort toggle, therefore *stable* is ignored.
+    """
+    del stable
+    if len(outputs) == 1:
+        outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
+    assert len(outputs) == 2, f"sort not implemented for outputs={outputs}{g.get_debug_msg()}"
+    n_elems = (
+        g.op.Shape(x, start=dim, end=dim + 1, name=name)
+        if dim >= 0
+        else g.op.Shape(x, start=dim, name=name)
+    )
+    values, indices = g.op.TopK(
+        x, n_elems, axis=dim, largest=int(descending), sorted=1, outputs=outputs, name=name
+    )
+    if not sts:
+        set_type_shape_unary_op(g, values, x)
+        set_type_shape_unary_op(g, indices, x, itype=TensorProto.INT64)
+    return values, indices
+
+
+def aten_sort(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: int = -1,
+    descending: bool = False,
+    stable: bool = False,
+    name: str = "sort",
+) -> Tuple[T, T]:
+    """Returns ``(values, indices)`` sorted along *dim* via ONNX TopK."""
+    return _aten_sort_impl(
+        g, sts, outputs, x, dim=dim, descending=descending, stable=stable, name=name
+    )
+
+
+def aten_sort_stable(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    stable: bool = False,
+    dim: int = -1,
+    descending: bool = False,
+    name: str = "sort_stable",
+) -> Tuple[T, T]:
+    """This function returns ``(values, indices)`` sorted along *dim* via ONNX TopK.
+
+    The stable flag is accepted for API compatibility but ignored.
+    """
+    return _aten_sort_impl(
+        g, sts, outputs, x, dim=dim, descending=descending, stable=stable, name=name
+    )
+
+
 def aten_argwhere(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
