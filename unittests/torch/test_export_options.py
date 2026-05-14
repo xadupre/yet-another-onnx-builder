@@ -632,7 +632,7 @@ class TestExportOptions(ExtTestCase):
 
     @ignore_warnings(UserWarning)
     def test_export_new_tracing_argsort_to_onnx(self):
-        """Checks that new tracing correctly exports argsort."""
+        """Verifies that new tracing correctly exports argsort."""
 
         class ArgSortModel(torch.nn.Module):
             def forward(self, x):

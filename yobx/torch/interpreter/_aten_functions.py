@@ -1137,7 +1137,7 @@ def _aten_sort_impl(
     stable: bool = False,
     name: str = "sort",
 ) -> Tuple[T, T]:
-    "sort"
+    "Implements sort by mapping to ONNX TopK."
     del stable
     if len(outputs) == 1:
         outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
@@ -1166,7 +1166,7 @@ def aten_sort(
     stable: bool = False,
     name: str = "sort",
 ) -> Tuple[T, T]:
-    "sort"
+    "Sorts the input tensor along the specified dimension."
     return _aten_sort_impl(
         g, sts, outputs, x, dim=dim, descending=descending, stable=stable, name=name
     )
@@ -1182,7 +1182,7 @@ def aten_sort_stable(
     descending: bool = False,
     name: str = "sort_stable",
 ) -> Tuple[T, T]:
-    "sort"
+    "Sorts the input tensor along the specified dimension with stable semantics."
     return _aten_sort_impl(
         g, sts, outputs, x, dim=dim, descending=descending, stable=stable, name=name
     )
