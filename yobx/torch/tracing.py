@@ -245,6 +245,17 @@ class CustomProxy(torch.fx.proxy.Proxy):
             # objects. Unwrap any CustomProxy elements within the tuple so that
             # FX dependency tracking works correctly.
             indices = tuple(i.node if isinstance(i, CustomProxy) else i for i in indices)
+        elif isinstance(indices, slice):
+            # Unwrap any CustomProxy objects in the slice start/stop/step so
+            # that FX's map_arg can track them as node dependencies. Without
+            # this, a proxy inside a slice (e.g. row[:p.item()] where p.item()
+            # returns a CustomProxy) is not detected as a graph user and gets
+            # removed by dead-code elimination, causing the node to be missing
+            # when the ONNX interpreter tries to reference it.
+            def _unwrap(v):
+                return v.node if isinstance(v, CustomProxy) else v
+
+            indices = slice(_unwrap(indices.start), _unwrap(indices.stop), _unwrap(indices.step))
         node = self.tracer.create_node(
             "call_function",
             operator.setitem,
@@ -1021,6 +1032,17 @@ def replace_problematic_function_before_tracing() -> Generator:
     if _scan_op is not None:
         saved[(torch.ops.higher_order, "scan")] = _scan_op
         newf[(torch.ops.higher_order, "scan")] = ScanCCOp()
+    # Models may use ``torch.compiler.is_exporting()`` to branch between a
+    # plain Python loop (for eager execution) and a ``scan``-based path (for
+    # export/tracing).  During ``CustomTracer`` tracing the flag returns
+    # ``False``, so the loop branch is taken, which immediately raises
+    # ``TraceError`` because ``range(proxy_shape)`` is not supported.
+    # Replacing ``is_exporting`` with a function that always returns ``True``
+    # makes the tracer follow the scan branch instead.
+    _is_exporting = getattr(torch.compiler, "is_exporting", None)
+    if _is_exporting is not None:
+        saved[(torch.compiler, "is_exporting")] = _is_exporting
+        newf[(torch.compiler, "is_exporting")] = lambda: True
     for k, v in newf.items():
         if isinstance(k, tuple):
             setattr(k[0], k[1], v)
