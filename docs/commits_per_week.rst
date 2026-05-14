@@ -101,10 +101,14 @@ a bar chart.
         with open(_CACHE_FILE, "r", encoding="utf-8", newline="") as f:
             reader = csv.DictReader(f)
             for row in reader:
+                try:
+                    commit_count = int(row.get("commit_count", 0))
+                except (TypeError, ValueError):
+                    continue
                 rows.append(
                     {
                         "week_start": row.get("week_start", ""),
-                        "commit_count": int(row.get("commit_count", 0)),
+                        "commit_count": commit_count,
                     }
                 )
         return rows
@@ -133,10 +137,12 @@ a bar chart.
         # The participation endpoint returns 52-week totals; use the
         # commit_activity endpoint for per-week timestamps.
         data = _gh_get("stats/commit_activity")
-        if not data:
+        if not data or not isinstance(data, list):
             return []
         rows = []
         for entry in data:
+            if not isinstance(entry, dict):
+                continue
             week_ts = entry.get("week")
             total = entry.get("total", 0)
             if week_ts is None:
