@@ -312,6 +312,79 @@ def _getitem_slice(
     return res
 
 
+def _getitem_advanced(
+    g: GraphBuilderTorchProtocol,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    input_name: str,
+    index_names: List[str],
+    name: str = "_getitem_advanced",
+):
+    """Handles advanced (tensor) indexing via ONNX ``GatherND``.
+
+    Called when every element of the index tuple is the name of an ONNX tensor
+    with rank ``> 0``.  The method broadcasts all index tensors to a common
+    shape, stacks them along a new last axis, and applies ``GatherND``.
+
+    For example, ``padding_mask[batch_idx, kv_idx]`` where *batch_idx* has
+    shape ``[B, 1, 1, 1]`` and *kv_idx* has shape ``[1, 1, 1, K]`` is
+    translated to a ``GatherND`` that produces an output of shape
+    ``[B, 1, 1, K]``.
+
+    :param g: the graph builder
+    :param sts: known shapes and types; when ``None`` the function sets type and
+        shape on the output itself
+    :param outputs: list of output tensor names; ``outputs[0]`` is the result
+    :param input_name: name of the tensor being indexed
+    :param index_names: names of the index tensors (each with rank > 0)
+    :param name: prefix for generated node names
+    :returns: name of the result tensor (or ONNX node)
+    """
+    ranks = [g.get_rank(nm) for nm in index_names]
+    max_rank = max(ranks)
+
+    # Pad shorter index tensors to max_rank by prepending size-1 axes.
+    padded = []
+    for i, (nm, r) in enumerate(zip(index_names, ranks)):
+        curr = nm
+        for _ in range(max_rank - r):
+            curr = g.op.UnsqueezeAnyOpset(
+                curr, np.array([0], dtype=np.int64), name=f"{name}_pad{i}"
+            )
+        padded.append(curr)
+
+    # Compute the broadcast shape = elementwise maximum of all shape vectors.
+    shapes = [g.op.Shape(p, name=f"{name}_s{i}") for i, p in enumerate(padded)]
+    bcast_shape = shapes[0]
+    for s in shapes[1:]:
+        bcast_shape = g.op.Max(bcast_shape, s, name=f"{name}_bcast")
+
+    # Expand each padded index tensor to the broadcast shape.
+    expanded = [g.op.Expand(p, bcast_shape, name=f"{name}_exp{i}") for i, p in enumerate(padded)]
+
+    # Unsqueeze each expanded index at axis -1 → shape [..., 1], then
+    # concatenate along that axis → shape [..., n_indices].
+    unsqueezed = [
+        g.op.UnsqueezeAnyOpset(e, np.array([-1], dtype=np.int64), name=f"{name}_u{i}")
+        for i, e in enumerate(expanded)
+    ]
+    if len(unsqueezed) == 1:
+        indices = unsqueezed[0]
+    else:
+        indices = g.op.Concat(*unsqueezed, axis=-1, name=f"{name}_idx")
+
+    res = g.op.GatherND(input_name, indices, name=name, outputs=[outputs[0]])
+
+    if not sts:
+        if g.has_type(input_name):
+            g.set_type(outputs[0], g.get_type(input_name))
+        if g.has_device(input_name):
+            g.set_device(outputs[0], g.get_device(input_name))
+        # Output rank equals the broadcast rank of the index tensors.
+        g.set_rank(outputs[0], max_rank)
+    return res
+
+
 def getitem(  # noqa: F821
     g: GraphBuilderTorchProtocol,
     sts: Optional[Dict[str, Any]],
@@ -456,6 +529,14 @@ def getitem(  # noqa: F821
 
     if isinstance(index, tuple):
         assert hasattr(g, "torch"), "torch module is added as an attribute to avoid import"
+        # Advanced (all-tensor) indexing: every index element is a Node with rank > 0
+        # (e.g. padding_mask[batch_idx, kv_idx] from LLaMA's _non_vmap_expansion_sdpa).
+        if all(isinstance(x, g.torch.fx.Node) for x in index) and all(
+            g.has_rank(x.name) and g.get_rank(x.name) > 0 for x in index
+        ):
+            return _getitem_advanced(
+                g, sts, outputs, node_output.name, [x.name for x in index], name="_getitem_adv"
+            )
         if all(isinstance(x, (slice, g.torch.fx.Node)) for x in index):
             return _getitem_slice(
                 g,

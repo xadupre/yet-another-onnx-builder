@@ -1347,76 +1347,6 @@ class FxGraphInterpreter:
             f"node.target={node.target}, type is {type(node.target)}."
         )
 
-    def _getitem_advanced(
-        self,
-        node: "torch.fx.Node",  # noqa: F821
-        input_name: str,
-        index_nodes: List["torch.fx.Node"],  # noqa: F821
-        sts: Optional[Dict[str, Any]],
-        name: str = "_getitem_advanced",
-    ):
-        """Handles advanced (tensor) indexing via ONNX ``GatherND``.
-
-        Called when every element of the index tuple is a ``torch.fx.Node``
-        whose ONNX representation has rank ``> 0`` (i.e. a tensor, not a
-        scalar).  The method broadcasts all index tensors to a common shape,
-        stacks them along a new last axis, and applies ``GatherND``.
-
-        For example, ``padding_mask[batch_idx, kv_idx]`` where *batch_idx* has
-        shape ``[B, 1, 1, 1]`` and *kv_idx* has shape ``[1, 1, 1, K]`` is
-        translated to a ``GatherND`` that produces an output of shape
-        ``[B, 1, 1, K]``.
-        """
-        idx_names = [nd.name for nd in index_nodes]
-        ranks = [self.builder.get_rank(nm) for nm in idx_names]
-        max_rank = max(ranks)
-
-        # Pad shorter index tensors to max_rank by prepending size-1 axes.
-        padded = []
-        for i, (nm, r) in enumerate(zip(idx_names, ranks)):
-            curr = nm
-            for _ in range(max_rank - r):
-                curr = self.builder.op.UnsqueezeAnyOpset(
-                    curr, np.array([0], dtype=np.int64), name=f"{name}_pad{i}"
-                )
-            padded.append(curr)
-
-        # Compute the broadcast shape = elementwise maximum of all shape vectors.
-        shapes = [self.builder.op.Shape(p, name=f"{name}_s{i}") for i, p in enumerate(padded)]
-        bcast_shape = shapes[0]
-        for s in shapes[1:]:
-            bcast_shape = self.builder.op.Max(bcast_shape, s, name=f"{name}_bcast")
-
-        # Expand each padded index tensor to the broadcast shape.
-        expanded = [
-            self.builder.op.Expand(p, bcast_shape, name=f"{name}_exp{i}")
-            for i, p in enumerate(padded)
-        ]
-
-        # Unsqueeze each expanded index at axis -1 → shape [..., 1], then
-        # concatenate along that axis → shape [..., n_indices].
-        unsqueezed = [
-            self.builder.op.UnsqueezeAnyOpset(
-                e, np.array([-1], dtype=np.int64), name=f"{name}_u{i}"
-            )
-            for i, e in enumerate(expanded)
-        ]
-        if len(unsqueezed) == 1:
-            indices = unsqueezed[0]
-        else:
-            indices = self.builder.op.Concat(*unsqueezed, axis=-1, name=f"{name}_idx")
-
-        res = self.builder.op.GatherND(input_name, indices, name=name, outputs=[node.name])
-
-        if not sts:
-            if self.builder.has_type(input_name):
-                self.builder.set_type(node.name, self.builder.get_type(input_name))
-            if self.builder.has_device(input_name):
-                self.builder.set_device(node.name, self.builder.get_device(input_name))
-            # Output rank equals the broadcast rank of the index tensors.
-            self.builder.set_rank(node.name, max_rank)
-        return res
-
     def _getitem_slice(
         self,
         node: "torch.fx.Node",  # noqa: F821
@@ -1462,19 +1392,6 @@ class FxGraphInterpreter:
         """
         if self.builder.verbose > 1:
             print(f"[FxGraphInterpreter-{self._hash()}.getitem]")
-        # Check for advanced (tensor) indexing: all index tuple elements are
-        # Nodes with rank > 0 (e.g. padding_mask[batch_idx, kv_idx]).
-        args = node.args
-        if len(args) == 2 and isinstance(args[1], tuple):
-            _index = args[1]
-            if all(isinstance(x, self.torch.fx.Node) for x in _index) and all(
-                self.builder.has_rank(x.name) and self.builder.get_rank(x.name) > 0
-                for x in _index
-            ):
-                sts = self._can_set_shape_and_type(node)
-                return self._getitem_advanced(
-                    node, args[0].name, list(_index), sts=sts, name="_getitem_adv"
-                )
         can_set = self._can_set_shape_and_type(node)
         output_names = self._get_output_names(node)
         return _aten_getitem(self.builder, can_set, output_names, node)
