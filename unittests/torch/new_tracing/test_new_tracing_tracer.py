@@ -68,6 +68,26 @@ class TestNewTracingTracer(ExtTestCase):
         output_node = next(n for n in graph.nodes if n.op == "output")
         self.assertIsInstance(output_node.args[0], (tuple, list))
 
+    def test_trace_tensor_split_sections_tracing_int(self):
+        from yobx.torch.new_tracing.shape import TracingInt
+
+        def split_with_tracing_int(x):
+            return torch.tensor_split(x, TracingInt(3), dim=0)
+
+        tracer = GraphTracer()
+        graph = tracer.trace(split_with_tracing_int, (torch.randn(6, 4),))
+        graph.lint()
+
+        split_nodes = [
+            n
+            for n in graph.nodes
+            if n.op == "call_function" and n.target is torch.ops.aten.tensor_split.sections
+        ]
+        self.assertEqual(
+            len(split_nodes), 1, f"Expected 1 tensor_split.sections node, got {split_nodes}"
+        )
+        self.assertEqual(split_nodes[0].args[1], 3)
+
     def test_trace_nn_linear(self):
         model = torch.nn.Linear(8, 4, bias=True)
         tracer = GraphTracer()
