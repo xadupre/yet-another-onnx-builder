@@ -640,6 +640,71 @@ class TestExportOptions(ExtTestCase):
 
         model = ArgSortModel()
         x = torch.tensor([[0.2, 4.0, -1.0], [7.0, -3.0, 2.0]], dtype=torch.float32)
+
+        expected = model(x)
+        artifact = to_onnx(
+            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
+        self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=0)
+
+    @ignore_warnings(UserWarning)
+    def test_export_new_tracing_cast_double_to_onnx(self):
+        """Checks that new tracing correctly exports .double() (cast to float64)."""
+
+        class CastDoubleModel(torch.nn.Module):
+            def forward(self, x):
+                return x.double()
+
+        model = CastDoubleModel()
+        x = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
+        expected = model(x)
+        artifact = to_onnx(
+            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
+        self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=1e-6)
+
+    @ignore_warnings(UserWarning)
+    def test_export_new_tracing_cast_float_to_onnx(self):
+        """Checks that new tracing correctly exports .float() (cast to float32)."""
+
+        class CastFloatModel(torch.nn.Module):
+            def forward(self, x):
+                return x.float()
+
+        model = CastFloatModel()
+        x = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float64)
+        expected = model(x)
+        artifact = to_onnx(
+            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
+        self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=1e-6)
+
+    @ignore_warnings(UserWarning)
+    def test_export_new_tracing_cast_byte_to_onnx(self):
+        """Checks that new tracing correctly exports .byte() (cast to uint8)."""
+
+        class CastByteModel(torch.nn.Module):
+            def forward(self, x):
+                return x.byte()
+
+        model = CastByteModel()
+        x = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
+        expected = model(x)
+        artifact = to_onnx(
+            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
+        self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=0)
+
+    @ignore_warnings(UserWarning)
+    def test_export_new_tracing_cast_bool_to_onnx(self):
+        """Checks that new tracing correctly exports .bool() (cast to bool)."""
+
+        class CastBoolModel(torch.nn.Module):
+            def forward(self, x):
+                return x.bool()
+
+        model = CastBoolModel()
+        x = torch.tensor([[1.0, 0.0], [3.0, 0.0]], dtype=torch.float32)
         expected = model(x)
         artifact = to_onnx(
             model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
