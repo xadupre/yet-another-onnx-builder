@@ -2360,7 +2360,9 @@ class GraphTracer:
                 if not indices_or_sections.is_static:
                     raise ValueError(
                         "Dynamic tensor_split sections are not supported in new-tracing mode; "
-                        f"got value={indices_or_sections.value!r}"
+                        "TracingInt must be static but got "
+                        f"is_static={indices_or_sections.is_static} "
+                        f"with value={indices_or_sections.value!r}"
                     )
                 return self.dispatch(
                     torch.ops.aten.tensor_split.sections,
