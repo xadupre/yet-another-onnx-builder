@@ -1137,7 +1137,10 @@ def _aten_sort_impl(
     stable: bool = False,
     name: str = "sort",
 ) -> Tuple[T, T]:
-    """Maps sort to ONNX TopK."""
+    """Maps sort to ONNX TopK and returns ``(values, indices)``.
+
+    ONNX TopK has no stable-sort toggle, therefore *stable* is ignored.
+    """
     del stable
     if len(outputs) == 1:
         outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
@@ -1166,7 +1169,7 @@ def aten_sort(
     stable: bool = False,
     name: str = "sort",
 ) -> Tuple[T, T]:
-    """Performs sorting of the input tensor along the specified dimension."""
+    """Returns ``(values, indices)`` sorted along *dim* via ONNX TopK."""
     return _aten_sort_impl(
         g, sts, outputs, x, dim=dim, descending=descending, stable=stable, name=name
     )
@@ -1182,7 +1185,10 @@ def aten_sort_stable(
     descending: bool = False,
     name: str = "sort_stable",
 ) -> Tuple[T, T]:
-    """Performs stable sorting of the input tensor along the specified dimension."""
+    """Returns ``(values, indices)`` sorted along *dim* via ONNX TopK.
+
+    The stable flag is accepted for API compatibility but ignored.
+    """
     return _aten_sort_impl(
         g, sts, outputs, x, dim=dim, descending=descending, stable=stable, name=name
     )
