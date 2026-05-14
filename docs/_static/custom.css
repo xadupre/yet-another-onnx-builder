@@ -67,3 +67,46 @@ html[data-bs-theme=dark] .mermaid .nodeLabel {
 html[data-bs-theme=dark] .mermaid text {
     fill: #ddd !important;
 }
+
+/* Dark-mode overrides for classDef classes emitted by MermaidEmitter
+   (input / init / op / output).  The classDef in the generated diagram sets
+   light-mode fill/stroke/color; these rules replace them for dark mode so
+   that both node fills and text remain readable against the dark canvas. */
+html[data-bs-theme=dark] .mermaid .input rect,
+html[data-bs-theme=dark] .mermaid .input polygon {
+    fill: #1a4a1a !important;
+    stroke: #88cc88 !important;
+}
+
+html[data-bs-theme=dark] .mermaid .init rect,
+html[data-bs-theme=dark] .mermaid .init polygon {
+    fill: #4a4a00 !important;
+    stroke: #cccc44 !important;
+}
+
+html[data-bs-theme=dark] .mermaid .op rect,
+html[data-bs-theme=dark] .mermaid .op polygon {
+    fill: #2a2a2a !important;
+    stroke: #888888 !important;
+}
+
+html[data-bs-theme=dark] .mermaid .output rect,
+html[data-bs-theme=dark] .mermaid .output polygon {
+    fill: #1e2a5e !important;
+    stroke: #8898dd !important;
+}
+
+/* Make Mermaid flowchart edges (arrows) visible in dark mode.
+   Mermaid sets stroke/fill via inline SVG attributes; the !important rules
+   here win over those inline attributes so edges are always visible against
+   the dark canvas.  Both the edge path and the arrowhead marker path are
+   targeted. */
+html[data-bs-theme=dark] .mermaid .flowchart-link {
+    stroke: #cccccc !important;
+}
+
+html[data-bs-theme=dark] .mermaid .marker,
+html[data-bs-theme=dark] .mermaid .marker path {
+    fill: #cccccc !important;
+    stroke: #cccccc !important;
+}

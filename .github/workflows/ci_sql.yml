@@ -13,8 +13,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect_sql_scope:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/common_detect_module_scope.yml
+    permissions:
+      contents: read
+    with:
+      module: sql
+      base_sha: ${{ github.event.pull_request.base.sha }}
+      head_sha: ${{ github.event.pull_request.head.sha }}
+
+  sql_targeted_tests:
+    name: sql targeted
+    needs: detect_sql_scope
+    if: needs.detect_sql_scope.outputs.count == '1'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,polars,sql]"
+
+      - name: pip freeze
+        run: pip freeze
+
+      - name: Run targeted sql tests
+        run: pytest --durations=10 unittests/sql
+
   sql_tests:
     name: sql (ubuntu-latest, py3.12)
+    needs: sql_targeted_tests
+    # Run when targeted tests succeeded or were skipped (not a PR / out-of-scope PR).
+    # Do NOT run when targeted tests failed.
+    if: >-
+      always() && (
+        needs.sql_targeted_tests.result == 'success' ||
+        needs.sql_targeted_tests.result == 'skipped'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read

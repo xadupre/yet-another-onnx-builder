@@ -4,7 +4,6 @@ import time
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 import torch
-from torch.fx._lazy_graph_module import _make_graph_module
 from ..helpers import max_diff, string_diff, string_type
 from ..helpers.helper import string_sig, get_sig_kwargs
 from .torch_helper import torch_deepcopy
@@ -535,6 +534,8 @@ class ExportOptions:
                 save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
                 with open(f"{save_ep}.tracing", "w") as f:
                     f.write(str(graph))
+            from torch.fx._lazy_graph_module import _make_graph_module
+
             gm = _make_graph_module(tracer.root, graph, mod.__class__.__name__)
 
             # from torch.fx.passes.shape_prop import ShapeProp
@@ -574,6 +575,8 @@ class ExportOptions:
                 save_ep = self.save_ep[0] if isinstance(self.save_ep, tuple) else self.save_ep
                 with open(f"{save_ep}.new_tracing", "w") as f:
                     f.write(str(graph))
+
+            from torch.fx._lazy_graph_module import _make_graph_module
 
             gm = _make_graph_module(mod, graph, mod.__class__.__name__)
             return gm

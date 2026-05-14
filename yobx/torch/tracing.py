@@ -108,7 +108,9 @@ class CustomProxy(torch.fx.proxy.Proxy):
     Works with :class:`CustomTracer`.
     """
 
-    def __init__(self, node: Node, tracer: Optional["TracerBase"] = None):
+    def __init__(
+        self, node: "torch.fx.Node", tracer: Optional["torch.fx.TracerBase"] = None
+    ):  # noqa: F821
         super().__init__(node, tracer=tracer)
         assert isinstance(
             self.tracer, CustomTracer
@@ -177,6 +179,12 @@ class CustomProxy(torch.fx.proxy.Proxy):
                 f"The rank of a tensor is always known. "
                 f"k={k!r} - {self=} - {self.node=} - {self.node.meta=}"
             )
+        if k in ("T", "mT", "mH"):
+            # These are tensor properties that transpose dimensions.
+            # Convert them to call_method nodes so the interpreter can
+            # dispatch them to aten_meth_T, aten_meth_mT, aten_meth_mH.
+            node = self.tracer.create_node("call_method", k, args=(self.node,), kwargs={})
+            return self.tracer.proxy(node)
         return CustomAttribute(self, k)
 
     @classmethod
@@ -255,6 +263,22 @@ class CustomProxy(torch.fx.proxy.Proxy):
         indices, values = args
         if isinstance(indices, CustomProxy):
             indices = indices.node
+        elif isinstance(indices, tuple):
+            # create_node expects torch.fx.Node objects in args, not Proxy
+            # objects. Unwrap any CustomProxy elements within the tuple so that
+            # FX dependency tracking works correctly.
+            indices = tuple(i.node if isinstance(i, CustomProxy) else i for i in indices)
+        elif isinstance(indices, slice):
+            # Unwrap any CustomProxy objects in the slice start/stop/step so
+            # that FX's map_arg can track them as node dependencies. Without
+            # this, a proxy inside a slice (e.g. row[:p.item()] where p.item()
+            # returns a CustomProxy) is not detected as a graph user and gets
+            # removed by dead-code elimination, causing the node to be missing
+            # when the ONNX interpreter tries to reference it.
+            def _unwrap(v):
+                return v.node if isinstance(v, CustomProxy) else v
+
+            indices = slice(_unwrap(indices.start), _unwrap(indices.stop), _unwrap(indices.step))
         node = self.tracer.create_node(
             "call_function",
             operator.setitem,
@@ -466,6 +490,61 @@ class CustomProxyBool(CustomProxy):
         )
         return self.tracer.proxy(node, cls=CustomProxyBool)
 
+    def __bool__(self) -> bool:
+        """Called by Python's ``and``/``or`` operators to evaluate truthiness.
+
+        When the underlying comparison is a positivity check — ``proxy > 0``
+        or ``proxy >= 1`` — this method propagates the positivity constraint
+        to the :class:`CustomProxyInt` operand (exactly as
+        :func:`_torch_check_for_tracing` does when called with a simple
+        comparison) and returns ``True``.
+
+        This allows ``torch._check(x.shape[0] > 0 and x.shape[2] > 0)`` to
+        work during :class:`CustomTracer` symbolic tracing.  Python evaluates
+        ``bool(x.shape[0] > 0)`` for the left operand of ``and`` *before*
+        :func:`_torch_check_for_tracing` is ever called.  Without this
+        override, the inherited :meth:`torch.fx.proxy.Proxy.__bool__` would
+        raise :exc:`torch.fx.proxy.TraceError`.
+
+        For all other cases the base implementation is invoked, which raises
+        :exc:`~torch.fx.proxy.TraceError` as expected.
+
+        Returns:
+            Returns ``True`` when the node represents ``proxy > 0`` or
+            ``proxy >= 1``; otherwise propagates the
+            :exc:`~torch.fx.proxy.TraceError` from the base class.
+        """
+        node = self.node
+        if node.op == "call_function" and len(node.args) == 2:
+            op = node.target
+            lhs_node, rhs = node.args
+            # Normalise: flip operands when the proxy is on the right-hand side.
+            if isinstance(rhs, torch.fx.Node) and not isinstance(lhs_node, torch.fx.Node):
+                lhs_node, rhs = rhs, lhs_node
+                op = {
+                    operator.gt: operator.lt,
+                    operator.lt: operator.gt,
+                    operator.ge: operator.le,
+                    operator.le: operator.ge,
+                }.get(op, op)
+            tracer = self.tracer
+            node_proxy_map: Dict[torch.fx.Node, Any] = getattr(tracer, "_node_proxy_map", {})
+            lhs_proxy = (
+                node_proxy_map.get(lhs_node) if isinstance(lhs_node, torch.fx.Node) else None
+            )
+            if isinstance(lhs_proxy, CustomProxyInt) and isinstance(rhs, (int, float)):
+                if op is operator.gt and rhs == 0:
+                    # proxy > 0 → proxy is strictly positive.
+                    lhs_proxy.only_positive = True
+                    lhs_proxy.can_be_null = False
+                    return True
+                if op is operator.ge and rhs >= 1:
+                    # proxy >= 1 → proxy is strictly positive.
+                    lhs_proxy.only_positive = True
+                    lhs_proxy.can_be_null = False
+                    return True
+        return super().__bool__()
+
     def __eq__(self, other):  # type: ignore[override]
         return self._bool_op(operator.eq, other)
 
@@ -507,8 +586,8 @@ class CustomProxyInt(CustomProxy):
 
     def __init__(
         self,
-        node: Node,
-        tracer: Optional["TracerBase"] = None,
+        node: "torch.fx.Node",  # noqa: F821
+        tracer: Optional["torch.fx.TracerBase"] = None,
         concrete_val: Any = _MISSING,
         only_positive: bool = False,
         can_be_null: bool = True,
@@ -604,7 +683,7 @@ class CustomAttribute(CustomProxy):
         self.root = root
         self.attr = attr
         self.tracer = root.tracer
-        self._node: Optional[Node] = None
+        self._node: Optional["torch.fx.Node"] = None  # noqa: F821
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.attr})"
@@ -640,7 +719,10 @@ class CustomProxyShape(CustomProxy):
     """
 
     def __init__(
-        self, node: Node, tracer: Optional["TracerBase"] = None, concrete_val: Any = _MISSING
+        self,
+        node: "torch.fx.Node",  # noqa: F821
+        tracer: Optional["torch.fx.TracerBase"] = None,  # noqa: F821
+        concrete_val: Any = _MISSING,
     ):
         super().__init__(node, tracer=tracer)
         self.values = concrete_val
@@ -774,7 +856,9 @@ class CustomParameterProxy(CustomProxy):
     so that conditional tests on these attributes will not throw exception during tracing.
     """
 
-    def __init__(self, tracer: TracerBase, node: Node, name, param):
+    def __init__(
+        self, tracer: "torch.fx.TracerBase", node: "torch.fx.Node", name, param
+    ):  # noqa: F821
         super().__init__(node, tracer)
         assert isinstance(param, torch.nn.Parameter)
         self.param = param
@@ -804,7 +888,9 @@ class CustomParameterProxy(CustomProxy):
         return self.param.nelement()
 
 
-def tree_unflatten_with_proxy(tree_spec: pytree.PyTree, leaves: Iterable[Any]) -> Any:
+def tree_unflatten_with_proxy(
+    tree_spec: "pytree.PyTree", leaves: Iterable[Any]  # noqa: F821
+) -> Any:
     """
     More robust implementation of ``pytree.tree_unflatten``
     supporting ``DynamicCache``.
@@ -818,6 +904,8 @@ def tree_unflatten_with_proxy(tree_spec: pytree.PyTree, leaves: Iterable[Any]) -
     )
     if tree_spec.is_leaf():
         return leaves[0]
+
+    import torch.utils._pytree as pytree
 
     unflatten_fn = pytree.SUPPORTED_NODES[tree_spec.type].unflatten_fn
 
@@ -998,6 +1086,17 @@ def replace_problematic_function_before_tracing() -> Generator:
     if _scan_op is not None:
         saved[(torch.ops.higher_order, "scan")] = _scan_op
         newf[(torch.ops.higher_order, "scan")] = ScanCCOp()
+    # Models may use ``torch.compiler.is_exporting()`` to branch between a
+    # plain Python loop (for eager execution) and a ``scan``-based path (for
+    # export/tracing).  During ``CustomTracer`` tracing the flag returns
+    # ``False``, so the loop branch is taken, which immediately raises
+    # ``TraceError`` because ``range(proxy_shape)`` is not supported.
+    # Replacing ``is_exporting`` with a function that always returns ``True``
+    # makes the tracer follow the scan branch instead.
+    _is_exporting = getattr(torch.compiler, "is_exporting", None)
+    if _is_exporting is not None:
+        saved[(torch.compiler, "is_exporting")] = _is_exporting
+        newf[(torch.compiler, "is_exporting")] = lambda: True
     for k, v in newf.items():
         if isinstance(k, tuple):
             setattr(k[0], k[1], v)
@@ -1027,6 +1126,32 @@ fail during symbolic tracing when size values are proxy objects.
 By autowrapping them, FX records their calls as traced nodes rather
 than attempting to execute them immediately.
 """
+
+
+def _flatten_model_output(result: Any) -> Any:
+    """
+    Flattens a model output into a flat tuple of leaf tensors using
+    :mod:`torch.utils._pytree`.
+
+    This is used by the :class:`FlatArgWrap` wrapper inside
+    :meth:`CustomTracer.make_wrapped_model` to ensure the traced FX graph
+    always returns plain tensors rather than opaque structured objects
+    (e.g. cache objects), which the ONNX interpreter cannot handle in the
+    output.  Works correctly with both real tensors (at evaluation time)
+    and :class:`CustomProxy` objects (at symbolic tracing time), provided
+    the relevant pytree flattening functions are registered (e.g. via
+    :func:`yobx.torch.flatten.register_flattening_functions`).
+
+    :param result: the raw return value from the wrapped model forward.
+
+    Returns:
+        A tuple of leaf tensors obtained by flattening *result* with
+        :func:`torch.utils._pytree.tree_flatten`.
+    """
+    import torch.utils._pytree as pytree
+
+    leaves, _ = pytree.tree_flatten(result)
+    return tuple(leaves)
 
 
 class CustomTracer(torch.fx.Tracer):
@@ -1078,11 +1203,10 @@ class CustomTracer(torch.fx.Tracer):
         # the :class:`CustomProxyInt` associated with the operand of a comparison
         # node so that constraint flags such as ``only_positive`` can be set.
         self._node_proxy_map: Dict[torch.fx.Node, CustomProxy] = {}
-        # Flat list of parameter names for the wrapped model (set in trace() when the
-        # model is wrapped with FlatArgWrap); used by _proxy_placeholder to pre-populate
-        # node.meta["val"] from _traced_concrete_args so that ndim/dtype/device
-        # comparisons in control flow resolve to concrete values during tracing.
-        self._traced_new_names: Optional[List[str]] = None
+        # Parameter names for the wrapped model (list case). Set by trace() when
+        # make_wrapped_model() is used, so that _proxy_placeholder can populate
+        # node.meta["val"] for flat-arg placeholders.
+        self._new_names: Optional[List[str]] = None
 
     @torch.fx._compatibility.compatibility(is_backward_compatible=True)
     def is_leaf_module(self, m: torch.nn.Module, module_qualified_name: str) -> bool:
@@ -1249,27 +1373,26 @@ class CustomTracer(torch.fx.Tracer):
     def _proxy_placeholder(self, name, concrete_args, sig, fn_for_analysis):
         res = torch.fx.Tracer._proxy_placeholder(self, name, concrete_args, sig, fn_for_analysis)
         # Pre-populate node meta with the fake tensor so that CustomProxy.__getattr__
-        # can resolve static attributes (dtype, device, ndim) to concrete values during
-        # tracing, enabling dtype/device/ndim-based control flow without TraceError.
-        if self._traced_concrete_args is not None:
-            if (
-                isinstance(self._traced_concrete_args, dict)
-                and name in self._traced_concrete_args
-            ):
-                fake = self._traced_concrete_args[name]
-                if isinstance(fake, torch.Tensor):
-                    res.node.meta["val"] = fake
-            elif (
-                isinstance(self._traced_concrete_args, list)
-                and self._traced_new_names is not None
-                and name in self._traced_new_names
-            ):
-                # Flat-list case: model was wrapped with FlatArgWrap.
-                # Use _traced_new_names to map placeholder name to the corresponding
-                # fake tensor so that ndim/dtype/device comparisons in control flow
-                # (e.g. ``if attention_mask.ndim == 2:``) resolve to a concrete value
-                # instead of raising RuntimeError during tracing.
-                ii = self._traced_new_names.index(name)
+        # can resolve static attributes (dtype, device, shape) to concrete values
+        # during tracing, enabling dtype/device-based control flow without TraceError
+        # and providing concrete integer shapes to layer constructors (e.g.
+        # DynamicSlidingWindowLayer(sliding_window=...)).
+        if (
+            self._traced_concrete_args is not None
+            and isinstance(self._traced_concrete_args, dict)
+            and name in self._traced_concrete_args
+        ):
+            fake = self._traced_concrete_args[name]
+            if isinstance(fake, torch.Tensor):
+                res.node.meta["val"] = fake
+        elif (
+            self._traced_concrete_args is not None
+            and isinstance(self._traced_concrete_args, list)
+            and self._new_names is not None
+            and name in self._new_names
+        ):
+            ii = self._new_names.index(name)
+            if ii < len(self._traced_concrete_args):
                 fake = self._traced_concrete_args[ii]
                 if isinstance(fake, torch.Tensor):
                     res.node.meta["val"] = fake
@@ -1319,6 +1442,8 @@ class CustomTracer(torch.fx.Tracer):
 
     @classmethod
     def make_wrapped_model(cls, root, concrete_args):
+        import torch.utils._pytree as pytree
+
         flat_concrete_args, spec = pytree.tree_flatten(concrete_args)
         args_names = cls.make_args_names(concrete_args, flat_concrete_args)
 
@@ -1329,31 +1454,41 @@ class CustomTracer(torch.fx.Tracer):
             and isinstance(concrete_args["x"], torch.Tensor)
             and concrete_args["cache"].__class__.__name__ == "DynamicCache"
         ):
-            # this is a not generic case to check one unit test
-            from .in_transformers.cache_helper import make_dynamic_cache
+            from .in_transformers.flatten_class import (
+                flatten_dynamic_cache,
+                unflatten_dynamic_cache,
+            )
+
+            _, cache_context = flatten_dynamic_cache(concrete_args["cache"])
 
             def make_method(args_names):
-                args = ", ".join(args_names)
-                args1 = ", ".join(args_names[1:])
+                input_tensor_name = args_names[0]
+                args_str = ", ".join(args_names)
+                cache_args_str = ", ".join(args_names[1:])
                 src = textwrap.dedent(f"""
-                    def f(self, {args}):
-                        args = [{args1}]
-                        cache = make_dynamic_cache(list(zip(args[::2], args[1::2])))
-                        return self._traced_m1({args[0]}, cache)
+                    def f(self, {args_str}):
+                        _cache_tensors = [{cache_args_str}]
+                        _cache = _unflatten_cache(_cache_tensors, self._cache_context)
+                        _result = self._traced_m1({input_tensor_name}, _cache)
+                        return _flatten_output(_result)
                     """)
-                ns = {"torch": torch, "make_dynamic_cache": make_dynamic_cache}
+                ns = {
+                    "_unflatten_cache": unflatten_dynamic_cache,
+                    "_flatten_output": _flatten_model_output,
+                }
                 exec(src, ns)
                 return ns["f"]
 
             class FlatArgWrap(torch.nn.Module):
-                def __init__(self, m, spec):
+                def __init__(self, m, spec, cache_context):
                     super().__init__()
                     self._traced_m1 = m
                     self._spec = spec
+                    self._cache_context = cache_context
 
                 forward = make_method(args_names)
 
-            return FlatArgWrap(root, spec), args_names
+            return FlatArgWrap(root, spec, cache_context), args_names
 
         # pytree.tree_unflatten does not work on CustomProxy
 
@@ -1414,6 +1549,8 @@ class CustomTracer(torch.fx.Tracer):
         If the model had to be wrapped before being traced, attribute ``traced_model``
         is added to the tracer.
         """
+        import torch.utils._pytree as pytree
+
         assert concrete_args is None or isinstance(
             concrete_args, dict
         ), f"Unexpected type for concrete_args: {string_type(concrete_args)}"
@@ -1435,6 +1572,7 @@ class CustomTracer(torch.fx.Tracer):
                 if verbose > 0:
                     print("[CustomTracer.trace] wraps for serializable args")
                 new_model, new_names = self.make_wrapped_model(root, concrete_args)
+                self._new_names = new_names
                 traced_concrete_args, _ = make_fake_with_dynamic_dimensions(
                     torch_deepcopy(concrete_args), dynamic_shapes
                 )
@@ -1442,6 +1580,7 @@ class CustomTracer(torch.fx.Tracer):
                 traced_model = new_model
             else:
                 new_names = None
+                self._new_names = None
                 self._traced_concrete_args, _ = make_fake_with_dynamic_dimensions(
                     concrete_args, dynamic_shapes
                 )
@@ -1453,14 +1592,14 @@ class CustomTracer(torch.fx.Tracer):
                 )
             # Store new_names so _proxy_placeholder can pre-populate node.meta["val"]
             # for the flat-list case (wrapped model).
-            self._traced_new_names = new_names
+            self._new_names = new_names
             with replace_problematic_function_before_tracing():
                 # concrete arguments are replaced by constants whatever is given to the function
                 graph = super().trace(new_model)
 
         else:
             self._traced_concrete_args = None
-            self._traced_new_names = None
+            self._new_names = None
             new_names = None
 
             with replace_problematic_function_before_tracing():
@@ -2350,6 +2489,7 @@ class CustomTracer(torch.fx.Tracer):
         set_item_args = {}
         current_remove = []
         inplace_functions = []
+        _aten_inplace_to_name = {"aten::exp_": "exp", "aten::sigmoid_": "sigmoid"}
         for pos, n in pos_users:
             if n.target == operator.getitem:
                 _macro_assert_index_(True)
@@ -2385,6 +2525,25 @@ class CustomTracer(torch.fx.Tracer):
                     seen_nodes = {clone}
                     inplace_functions = []
                 elif aten_name in {"aten::copy_", "aten::fill_.Tensor"}:
+                    new_node = _macro_new_node_(
+                        n, current_remove, set_item_args, inplace_functions
+                    )
+                    # next root to use
+                    clone = new_node
+                    # reset
+                    to_remove.extend(current_remove)
+                    seen_nodes = {new_node}
+                    set_item_args = {}
+                    current_remove = []
+                    inplace_functions = []
+                elif aten_name in {"aten::exp_", "aten::sigmoid_"}:
+                    # aten inplace transformation (default-exporter / torch.export path).
+                    # Mirrors the torch.exp_ / torch.sigmoid_ handling in the branch
+                    # below but for OpOverload targets produced by torch.export.export.
+                    if not n.args or n.args[0] not in seen_nodes:
+                        return -1
+                    function_name = _aten_inplace_to_name[aten_name]
+                    inplace_functions.append((function_name, n.args[1:]))
                     new_node = _macro_new_node_(
                         n, current_remove, set_item_args, inplace_functions
                     )
@@ -2671,7 +2830,7 @@ class CustomTracer(torch.fx.Tracer):
                 assert (
                     node_target_name in {"aten::copy_", "aten::fill_.Tensor"}
                     and len(node.args) == 2
-                ) or node_target_name in {"aten::sigmoid_"}, (
+                ) or node_target_name in {"aten::sigmoid_", "aten::exp_"}, (
                     f"(inplace) Unsupported target {node.target!r}, target_name="
                     f"{node_target_name!r}, name={node.name!r}, node.args={node.args} "
                     f"at position {pos}/{len(graph.nodes)}"
@@ -2830,12 +2989,17 @@ class CustomTracer(torch.fx.Tracer):
         _aten_inplace_to_non_inplace = {
             torch.ops.aten.add_.Tensor: torch.ops.aten.add.Tensor,
             torch.ops.aten.add_.Scalar: torch.ops.aten.add.Scalar,
+            torch.ops.aten.bitwise_and_.Tensor: torch.ops.aten.bitwise_and.Tensor,
+            torch.ops.aten.bitwise_and_.Scalar: torch.ops.aten.bitwise_and.Scalar,
+            torch.ops.aten.bitwise_or_.Tensor: torch.ops.aten.bitwise_or.Tensor,
+            torch.ops.aten.bitwise_or_.Scalar: torch.ops.aten.bitwise_or.Scalar,
             torch.ops.aten.mul_.Tensor: torch.ops.aten.mul.Tensor,
             torch.ops.aten.mul_.Scalar: torch.ops.aten.mul.Scalar,
             torch.ops.aten.sub_.Tensor: torch.ops.aten.sub.Tensor,
             torch.ops.aten.sub_.Scalar: torch.ops.aten.sub.Scalar,
             torch.ops.aten.div_.Tensor: torch.ops.aten.div.Tensor,
             torch.ops.aten.div_.Scalar: torch.ops.aten.div.Scalar,
+            torch.ops.aten.logical_not_.default: torch.ops.aten.logical_not.default,
         }
         n = 0
         for node in graph.nodes:

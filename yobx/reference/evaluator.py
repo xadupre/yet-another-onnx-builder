@@ -25,8 +25,11 @@ from .ops.op__overwrite_gather import Gather
 from .ops.op__overwrite_scatter_elements import ScatterElements
 from .ops.op_attention import Attention
 from .ops.op_bias_softmax import BiasSoftmax
-from .ops.op_complex import ComplexModule, ToComplex
+from .ops.op_complex import ComplexModule, ComplexMul, ComplexMulConj, ToComplex
+from .ops.op_fast_gelu import FastGelu
 from .ops.op_fused_matmul import FusedMatMul
+from .ops.op_fused_matmul_activation import FusedMatMulActivation
+from .ops.op_gemm_fast_gelu import GemmFastGelu
 from .ops.op_memcpy_host import MemcpyFromHost, MemcpyToHost
 from .ops.op_qlinear_average_pool import QLinearAveragePool
 from .ops.op_qlinear_conv import QLinearConv
@@ -160,7 +163,12 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         Attention,
         BiasSoftmax,
         ComplexModule,
+        ComplexMul,
+        ComplexMulConj,
+        FastGelu,
         FusedMatMul,
+        FusedMatMulActivation,
+        GemmFastGelu,
         MemcpyFromHost,
         MemcpyToHost,
         QLinearConv,
@@ -169,7 +177,7 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         SimplifiedLayerNormalization,
         SkipLayerNormalization,
         ToComplex,
-        # onnx_extended.ortops.optim.cuda
+        # yaourt.ortops.fused_kernel.cuda
         AddAdd,
         AddMul,
         AddSharedInput,

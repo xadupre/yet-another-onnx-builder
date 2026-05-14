@@ -16,6 +16,7 @@ yobx.xoptim.patterns
     onnx_equal
     onnx_expand
     onnx_functions
+    onnx_gather
     onnx_layer_normalization
     onnx_matmul
     onnx_mul

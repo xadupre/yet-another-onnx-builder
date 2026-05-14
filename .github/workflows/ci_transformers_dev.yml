@@ -13,8 +13,51 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  detect_torch_subfolder:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/common_detect_torch_subfolder.yml
+    permissions:
+      contents: read
+    with:
+      base_sha: ${{ github.event.pull_request.base.sha }}
+      head_sha: ${{ github.event.pull_request.head.sha }}
+
+  torch_targeted_tests:
+    name: tr-dev targeted (${{ needs.detect_torch_subfolder.outputs.subfolder }})
+    needs: detect_torch_subfolder
+    # Skip if no unique subfolder, or if the subfolder is 'coverage' (excluded from the full run).
+    if: needs.detect_torch_subfolder.outputs.count == '1' && needs.detect_torch_subfolder.outputs.subfolder != 'coverage'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Install nightly pytorch
+        run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+      - name: Install development version of transformers
+        run: pip install git+https://github.com/huggingface/transformers.git
+      - name: Install dependencies
+        run: pip install -e ".[dev,torch,transformers]"
+      - name: pip freeze
+        run: pip freeze
+      - name: Run targeted torch tests
+        run: |
+          pytest --durations=10 unittests/torch/${{ needs.detect_torch_subfolder.outputs.subfolder }}
+
   transformers_dev:
     name: tr-dev (ubuntu-latest, py3.13, transformers-dev, torch-nightly)
+    needs: torch_targeted_tests
+    # Run when targeted tests succeeded or were skipped (no unique subfolder / not a PR).
+    # Do NOT run when targeted tests failed – that already signals a broken subfolder.
+    if: >-
+      always() && (
+        needs.torch_targeted_tests.result == 'success' ||
+        needs.torch_targeted_tests.result == 'skipped'
+      )
     runs-on: ubuntu-latest
     permissions:
       contents: read

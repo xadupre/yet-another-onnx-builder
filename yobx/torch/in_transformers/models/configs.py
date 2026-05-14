@@ -1,19 +1,7 @@
 import os
-import functools
 import pprint
-from typing import Dict, Optional
+from typing import Optional
 import transformers
-from . import _cached_configs
-
-
-@functools.cache
-def _retrieve_cached_configurations() -> Dict[str, transformers.PretrainedConfig]:
-    res = {}
-    for k, v in _cached_configs.__dict__.items():
-        if k.startswith("_ccached_"):
-            doc = v.__doc__
-            res[doc] = v
-    return res
 
 
 def get_cached_configuration(
@@ -26,6 +14,8 @@ def get_cached_configuration(
     the function raises an exception if *name* is not found.
 
     .. runpython::
+        :showcode:
+        :process:
 
         import pprint
         from yobx.torch.in_transformers.models.configs import _retrieve_cached_configurations
@@ -33,6 +23,8 @@ def get_cached_configuration(
         configs = _retrieve_cached_configurations()
         pprint.pprint(sorted(configs))
     """
+    from ._configs import _retrieve_cached_configurations
+
     cached = _retrieve_cached_configurations()
     assert cached, "no cached configuration, which is weird"
     if name in cached:

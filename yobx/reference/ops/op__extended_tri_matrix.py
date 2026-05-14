@@ -3,7 +3,7 @@ from onnx.reference.op_run import OpRun
 
 
 class TriMatrix(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, shape, csts):
         lower, diag, upper = list(csts)

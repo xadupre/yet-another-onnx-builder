@@ -7,7 +7,9 @@ the :ref:`translate <l-design-translate>` utility to export models as Python cod
 :ref:`evaluators <l-design-evaluator>` (reference, OnnxRuntime, Torch), the
 :ref:`ExtendedModelContainer <l-design-container>` for large models,
 :ref:`MiniOnnxBuilder and other helpers <l-design-helpers>`,
-:ref:`CubeLogs <l-cube>` for structured experiment-log analysis, and
+:ref:`CubeLogs <l-cube>` for structured experiment-log analysis,
+:ref:`onnxruntime.SessionOptions <l-design-session-options>` for all
+configurable session options, and
 alternatives following
 :class:`~yobx.typing.GraphBuilderExtendedProtocol` implementation
 (:ref:`l-design-graph-builder-extended-protocol`).
@@ -22,4 +24,5 @@ alternatives following
    light_api
    helpers
    onnx_inspection
+   session_options
    translate

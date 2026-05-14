@@ -47,7 +47,7 @@ class TransposeCastPattern(PatternOptimization):
 
             I_X(["X FLOAT(a, b)"])
 
-            Transpose2DCastFP16_0[["onnx_extended.ortops.optim.cuda.Transpose2DCastFP16(.)"]]
+            Transpose2DCastFP16_0[["yaourt.ortops.fused_kernel.cuda.Transpose2DCastFP16(.)"]]
 
             I_X -->|"FLOAT(a, b)"| Transpose2DCastFP16_0
 
@@ -138,7 +138,7 @@ class TransposeCastPattern(PatternOptimization):
             f"Transpose2DCastFP{suffix}",
             node.input if cast_node_before is None else cast_node_before.input,
             node.output if cast_node_after is None else cast_node_after.output,
-            domain="onnx_extended.ortops.optim.cuda",
+            domain="yaourt.ortops.fused_kernel.cuda",
             name=f"{self.__class__.__name__}--{node.name}",
         )
         return [new_node]

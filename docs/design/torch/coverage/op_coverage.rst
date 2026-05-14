@@ -31,9 +31,11 @@ Default export path
 .. runpython::
     :rst:
     :warningout: UserWarning
+    :process:
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
     print(get_op_coverage_rst("default"))
+    print()
 
 Torch tracing export path
 +++++++++++++++++++++++++
@@ -41,9 +43,11 @@ Torch tracing export path
 .. runpython::
     :rst:
     :warningout: UserWarning
+    :process:
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
     print(get_op_coverage_rst("tracing"))
+    print()
 
 New-tracing export path
 +++++++++++++++++++++++
@@ -51,6 +55,24 @@ New-tracing export path
 .. runpython::
     :rst:
     :warningout: UserWarning
+    :process:
 
     from yobx.torch.coverage.op_coverage import get_op_coverage_rst
     print(get_op_coverage_rst("new-tracing"))
+    print()
+
+Float32 comparison across export paths
++++++++++++++++++++++++++++++++++++++++
+
+This section compares, for every op that supports ``float32``, whether it
+passes, is a known failure (xfail), or has no converter for the three export
+paths side by side.
+
+.. runpython::
+    :rst:
+    :warningout: UserWarning
+    :process:
+
+    from yobx.torch.coverage.op_coverage import get_op_coverage_float32_comparison_rst
+    print(get_op_coverage_float32_comparison_rst())
+    print()

@@ -153,6 +153,11 @@ def _collect_ops(dtype: torch.dtype) -> List[Any]:
                 # Skip ops with non-trivial keyword arguments whose semantics
                 # may not be fully supported by the ONNX exporter.
                 continue
+            if any(isinstance(t, torch.Tensor) and 0 in t.shape for t in (s.input, *s.args)):
+                # Skip ops whose first sample contains a tensor with a zero-sized
+                # dimension.  The ONNX graph builder rejects such inputs by default
+                # (set_shape raises when allow_zero=False and a dimension is 0).
+                continue
             testable.append(op)
     return testable
 
@@ -273,7 +278,7 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
     return _test
 
 
-class TestOnnxExportCommonMethods(ExtTestCase):
+class TestOnnxExportCommonMethodsDefault(ExtTestCase):
     """Tests :func:`yobx.torch.interpreter.to_onnx` against ops from op_db.
 
     One test method is generated automatically for every (op, dtype) pair in
@@ -303,7 +308,7 @@ class TestOnnxExportCommonMethods(ExtTestCase):
                 setattr(cls, method_name, _make_export_test(op, dtype))
 
 
-TestOnnxExportCommonMethods._add_test_methods()
+TestOnnxExportCommonMethodsDefault._add_test_methods()
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

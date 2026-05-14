@@ -127,6 +127,19 @@ class _ShapeRuntime:
                 return True
             if (
                 isinstance(y, tuple)
+                and isinstance(i, np.ndarray)
+                and i.dtype == np.int64
+                and i.ndim == 1
+                and len(i) > 1
+            ):
+                flat = [int(j) for j in i]
+                self.set_value_shape(node.output[0], tuple(y[j] for j in flat))
+                self.set_shape(node.output[0], (len(flat),))
+                self.set_type(node.output[0], self.get_type(node.input[0]))
+                node.doc_string += "#SV-Ga8"
+                return True
+            if (
+                isinstance(y, tuple)
                 and (
                     isinstance(i, np.ndarray)
                     or (
@@ -154,6 +167,33 @@ class _ShapeRuntime:
                 self.set_shape(node.output[0], (1,) if i.shape == (1,) else tuple())
                 self.set_type(node.output[0], self.get_type(node.input[0]))
                 node.doc_string += "#SV-Ga7"
+                return True
+            if (
+                isinstance(y, tuple)
+                and (
+                    isinstance(i, np.ndarray)
+                    or (
+                        hasattr(i, "detach")
+                        and self._has_torch
+                        and isinstance(i, self.torch.Tensor)
+                    )
+                )
+                and (
+                    i.dtype == np.int64
+                    or (hasattr(i, "detach") and self._has_torch and i.dtype == self.torch.int64)
+                )
+                and i.ndim == 1
+                and len(i) > 1
+            ):
+                indices = i.tolist()
+                assert all(0 <= j < len(y) for j in indices), (
+                    f"Index out of bounds in Gather: indices={indices}, "
+                    f"shape(x)={y!r}, inputs={node.input}{self.get_debug_msg()}"
+                )
+                self.set_value_shape(node.output[0], tuple(y[j] for j in indices))
+                self.set_shape(node.output[0], (len(indices),))
+                self.set_type(node.output[0], self.get_type(node.input[0]))
+                node.doc_string += "#SV-Ga8"
                 return True
             raise RuntimeError(
                 f"Not implemented when node Gather(x,i) with inputs={node.input}, "

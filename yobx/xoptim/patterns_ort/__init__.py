@@ -18,36 +18,51 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
     """
     from .activation import (
         BiasGeluPattern,
+        BiasSplitGeluPattern,
         BiasSoftmaxPattern,
         FastGeluPattern,
         GeluOrtPattern,
         GeluErfPattern,
+        # GemmFastGeluPattern,  # not supported yet by onnxruntime
         QuickGeluPattern,
     )
+    from .causal_conv import CausalConvWithStatePattern
+    from .complex_mul import ComplexMulPattern, ComplexMulConjPattern
+    from .decoder_attention import DecoderAttentionPattern
     from .fused_conv import FusedConvPattern
+    from .greedy_search import GreedySearchPattern
     from .fused_matmul import (
         FusedMatMulDivPattern,
         FusedMatMulPattern,
         FusedMatMulx2Pattern,
         FusedMatMulTransposePattern,
+        # FusedMatMulActivationPattern,  # not implemented yet
         ReshapeGemmPattern,
         ReshapeGemmReshapePattern,
         TransposeFusedMatMulBPattern,
     )
     from .llm_optim import (
         Attention3DPattern,
+        ContribGemmaRotaryEmbeddingPattern,
         ContribRotaryEmbeddingPattern,
         ContribRotaryEmbedding3DPattern,
         GroupQueryAttention3DPattern,
         MultiHeadAttention3DPattern,
     )
+    from .linear_attention import LinearAttentionPattern
     from .missing_kernels import (
         MissingCosSinPattern,
         MissingRangePattern,
         MissingReduceMaxPattern,
         MissingTopKPattern,
     )
+    from .moe import MoEPattern
 
+    from .embed_layer_normalization import EmbedLayerNormalizationPattern
+    from .relative_position_bias import (
+        RelativePositionBiasPattern,
+        GatedRelativePositionBiasPattern,
+    )
     from .simplified_layer_normalization import (
         SimplifiedLayerNormalizationPattern,
         SimplifiedLayerNormalizationMulPattern,
@@ -60,25 +75,39 @@ def get_onnxruntime_patterns(verbose: int = 0) -> List["PatternOptimization"]:  
         Attention3DPattern(verbose=verbose),
         BiasGeluPattern(verbose=verbose),
         BiasSoftmaxPattern(verbose=verbose),
+        BiasSplitGeluPattern(verbose=verbose),
+        CausalConvWithStatePattern(verbose=verbose),
+        ComplexMulPattern(verbose=verbose),
+        ComplexMulConjPattern(verbose=verbose),
         ContribRotaryEmbeddingPattern(verbose=verbose),
         ContribRotaryEmbedding3DPattern(verbose=verbose),
+        ContribGemmaRotaryEmbeddingPattern(verbose=verbose),
+        DecoderAttentionPattern(verbose=verbose),
+        EmbedLayerNormalizationPattern(verbose=verbose),
         GeluOrtPattern(verbose=verbose),
         GeluErfPattern(verbose=verbose),
         GroupQueryAttention3DPattern(verbose=verbose),
         FusedConvPattern(verbose=verbose),
         FastGeluPattern(verbose=verbose),
+        LinearAttentionPattern(verbose=verbose),
         FusedMatMulPattern(verbose=verbose),
+        # FusedMatMulActivationPattern(verbose=verbose),  # not implemented yet
         FusedMatMulx2Pattern(verbose=verbose),
         FusedMatMulDivPattern(verbose=verbose),
         FusedMatMulTransposePattern(verbose=verbose),
+        # GemmFastGeluPattern(verbose=verbose),  # not supported yet by onnxruntime
+        GatedRelativePositionBiasPattern(verbose=verbose),
+        GreedySearchPattern(verbose=verbose),
         MissingCosSinPattern(verbose=verbose),
         MissingRangePattern(verbose=verbose),
         MissingReduceMaxPattern(verbose=verbose),
         MissingTopKPattern(verbose=verbose),
+        MoEPattern(verbose=verbose),
         MultiHeadAttention3DPattern(verbose=verbose),
         QuickGeluPattern(verbose=verbose),
         ReshapeGemmPattern(verbose=verbose),
         ReshapeGemmReshapePattern(verbose=verbose),
+        RelativePositionBiasPattern(verbose=verbose),
         SimplifiedLayerNormalizationPattern(verbose=verbose),
         SimplifiedLayerNormalizationMulPattern(verbose=verbose),
         SkipLayerNormalizationPattern(verbose=verbose),

@@ -186,6 +186,98 @@ class TestOpCoverageRst(ExtTestCase):
         with self.assertRaises(ValueError):
             get_op_coverage_rst("other")
 
+    def test_get_op_coverage_float32_comparison_rst(self):
+        """Verifies that get_op_coverage_float32_comparison_rst builds a valid RST table."""
+        from yobx.torch.coverage import op_coverage as cov
+
+        torch_mod = ModuleType("torch")
+        torch_mod.float32 = object()
+        torch_mod.float16 = object()
+        torch_mod.bfloat16 = object()
+        torch_mod.int32 = object()
+        torch_mod.int64 = object()
+        torch_mod.dtype = object
+
+        common_methods_mod = ModuleType("torch.testing._internal.common_methods_invocations")
+        common_methods_mod.op_db = [
+            type(
+                "FakeOp",
+                (),
+                {
+                    "name": "add",
+                    "variant_test_name": "",
+                    "dtypes": {torch_mod.float32, torch_mod.float16},
+                },
+            )(),
+            type(
+                "FakeOp",
+                (),
+                {"name": "diag", "variant_test_name": "", "dtypes": {torch_mod.float32}},
+            )(),
+            type(
+                "FakeOp",
+                (),
+                {"name": "sort", "variant_test_name": "", "dtypes": {torch_mod.float32}},
+            )(),
+        ]
+        internal_mod = ModuleType("torch.testing._internal")
+        internal_mod.common_methods_invocations = common_methods_mod
+        testing_mod = ModuleType("torch.testing")
+        testing_mod._internal = internal_mod
+        torch_mod.testing = testing_mod
+
+        with (
+            patch.dict(
+                "sys.modules",
+                {
+                    "torch": torch_mod,
+                    "torch.testing": testing_mod,
+                    "torch.testing._internal": internal_mod,
+                    "torch.testing._internal.common_methods_invocations": common_methods_mod,
+                },
+            ),
+            patch.object(cov, "NO_CONVERTER_OPS", frozenset({"diag"})),
+            patch.object(cov, "NON_DETERMINISTIC_OPS", frozenset()),
+            patch.object(
+                cov,
+                "XFAIL_OPS",
+                {
+                    "default": frozenset({"add"}),
+                    "tracing": frozenset({"sort"}),
+                    "new-tracing": frozenset(),
+                },
+            ),
+            patch.object(
+                cov, "XFAIL_OPS_FLOAT16", {"default": frozenset(), "tracing": frozenset()}
+            ),
+            patch.object(
+                cov, "XFAIL_OPS_BFLOAT16", {"default": frozenset(), "tracing": frozenset()}
+            ),
+            patch.object(
+                cov, "XFAIL_OPS_INT32", {"default": frozenset(), "tracing": frozenset()}
+            ),
+            patch.object(
+                cov, "XFAIL_OPS_INT64", {"default": frozenset(), "tracing": frozenset()}
+            ),
+        ):
+            rst = cov.get_op_coverage_float32_comparison_rst()
+
+        # The table rubric should mention float32 and all three paths.
+        self.assertIn("Float32 op support", rst)
+        self.assertIn("Default", rst)
+        self.assertIn("Tracing", rst)
+        self.assertIn("New-tracing", rst)
+        # ``add`` is xfail on default (and therefore also tracing), supported on new-tracing.
+        self.assertIn("``add``", rst)
+        # ``diag`` has no converter.
+        self.assertIn("``diag``", rst)
+        self.assertIn("✘ no converter", rst)
+        # ``sort`` is xfail on tracing (default xfail + tracing xfail) but supported on default.
+        self.assertIn("``sort``", rst)
+        # RST list-table structure is present.
+        self.assertIn(".. list-table::", rst)
+        self.assertIn(":header-rows: 1", rst)
+
 
 if __name__ == "__main__":
     unittest.main()

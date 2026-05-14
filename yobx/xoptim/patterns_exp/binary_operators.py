@@ -102,7 +102,7 @@ class AddAddMulMulPattern(PatternOptimization, _common):
             I_Y(["Y FLOAT(d)"])
             I_X(["X FLOAT(d)"])
 
-            AddAdd_0[["onnx_extended.ortops.optim.cuda.AddAdd(., ., .)"]]
+            AddAdd_0[["yaourt.ortops.fused_kernel.cuda.AddAdd(., ., .)"]]
 
             I_X -->|"FLOAT(d)"| AddAdd_0
             I_Y -->|"FLOAT(d)"| AddAdd_0
@@ -170,7 +170,7 @@ class AddAddMulMulPattern(PatternOptimization, _common):
                 node.op_type * 2,
                 [node.input[0], *node_right.input],
                 node.output,
-                domain="onnx_extended.ortops.optim.cuda",
+                domain="yaourt.ortops.fused_kernel.cuda",
                 name=f"{self.__class__.__name__}--{node.name}",
             )
         else:
@@ -178,7 +178,7 @@ class AddAddMulMulPattern(PatternOptimization, _common):
                 node.op_type * 2,
                 [*node_left.input, node.input[1]],
                 node.output,
-                domain="onnx_extended.ortops.optim.cuda",
+                domain="yaourt.ortops.fused_kernel.cuda",
                 name=f"{self.__class__.__name__}--{node.name}",
             )
         return [new_node]
@@ -247,7 +247,7 @@ class AddMulPattern(PatternOptimization, _common):
             I_Y(["Y FLOAT(d)"])
             I_X(["X FLOAT(d)"])
 
-            AddMul_0[["onnx_extended.ortops.optim.cuda.AddMul(., ., .)"]]
+            AddMul_0[["yaourt.ortops.fused_kernel.cuda.AddMul(., ., .)"]]
 
             I_X -->|"FLOAT(d)"| AddMul_0
             I_Y -->|"FLOAT(d)"| AddMul_0
@@ -318,7 +318,7 @@ class AddMulPattern(PatternOptimization, _common):
                 f"{node_right.op_type}{node.op_type}",
                 [*node_right.input, node.input[0]],
                 node.output,
-                domain="onnx_extended.ortops.optim.cuda",
+                domain="yaourt.ortops.fused_kernel.cuda",
                 name=f"{self.__class__.__name__}--{node.name}",
             )
         else:
@@ -326,7 +326,7 @@ class AddMulPattern(PatternOptimization, _common):
                 f"{node_left.op_type}{node.op_type}",
                 [*node_left.input, node.input[1]],
                 node.output,
-                domain="onnx_extended.ortops.optim.cuda",
+                domain="yaourt.ortops.fused_kernel.cuda",
                 name=f"{self.__class__.__name__}--{node.name}",
             )
         return [new_node]
@@ -388,7 +388,7 @@ class MulSigmoidPattern(PatternOptimization):
 
             I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
 
-            MulSigmoid_0[["onnx_extended.ortops.optim.cuda.MulSigmoid(.)"]]
+            MulSigmoid_0[["yaourt.ortops.fused_kernel.cuda.MulSigmoid(.)"]]
 
             I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| MulSigmoid_0
 
@@ -432,7 +432,7 @@ class MulSigmoidPattern(PatternOptimization):
             "MulSigmoid",
             node_sigmoid.input,
             node_mul.output,
-            domain="onnx_extended.ortops.optim.cuda",
+            domain="yaourt.ortops.fused_kernel.cuda",
             name=f"{self.__class__.__name__}--{node_sigmoid.name}",
         )
         return [new_node]
@@ -479,7 +479,7 @@ class NegXplus1Pattern(PatternOptimization):
 
             I_X(["X FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"])
 
-            NegXplus1_0[["onnx_extended.ortops.optim.cuda.NegXplus1(.)"]]
+            NegXplus1_0[["yaourt.ortops.fused_kernel.cuda.NegXplus1(.)"]]
 
             I_X -->|"FLOAT(UNKNOWNDIM, UNKNOWNDIM1)"| NegXplus1_0
 
@@ -518,7 +518,7 @@ class NegXplus1Pattern(PatternOptimization):
             "NegXplus1",
             node.input[1:],
             node.output,
-            domain="onnx_extended.ortops.optim.cuda",
+            domain="yaourt.ortops.fused_kernel.cuda",
             name=f"{self.__class__.__name__}--{node.name}",
         )
         return [new_node]
@@ -575,7 +575,7 @@ class SubMulPattern(PatternOptimization, _common):
             I_Y(["Y FLOAT(d)"])
             I_X(["X FLOAT(d)"])
 
-            SubMul_0[["onnx_extended.ortops.optim.cuda.SubMul(., ., .)"]]
+            SubMul_0[["yaourt.ortops.fused_kernel.cuda.SubMul(., ., .)"]]
 
             I_X -->|"FLOAT(d)"| SubMul_0
             I_Y -->|"FLOAT(d)"| SubMul_0
@@ -648,7 +648,7 @@ class SubMulPattern(PatternOptimization, _common):
                 f"{node_right.op_type}{node.op_type}",
                 [*node_right.input, node.input[0]],
                 node.output,
-                domain="onnx_extended.ortops.optim.cuda",
+                domain="yaourt.ortops.fused_kernel.cuda",
                 name=f"{self.__class__.__name__}--{node.name}",
                 **kwargs,
             )
@@ -658,7 +658,7 @@ class SubMulPattern(PatternOptimization, _common):
                 f"{node_left.op_type}{node.op_type}",
                 [*node_left.input, node.input[1]],
                 node.output,
-                domain="onnx_extended.ortops.optim.cuda",
+                domain="yaourt.ortops.fused_kernel.cuda",
                 name=f"{self.__class__.__name__}--{node.name}",
                 **kwargs,
             )
@@ -731,7 +731,7 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
             I_Y(["Y FLOAT(d)"])
             I_X(["X FLOAT(d)"])
 
-            AddSharedInput_0[["onnx_extended.ortops.optim.cuda.AddSharedInput(., ., .)"]]
+            AddSharedInput_0[["yaourt.ortops.fused_kernel.cuda.AddSharedInput(., ., .)"]]
 
             I_X -->|"FLOAT(d)"| AddSharedInput_0
             I_Y -->|"FLOAT(d)"| AddSharedInput_0
@@ -832,7 +832,7 @@ class AddMulSharedInputPattern(PatternOptimization, _common):
             f"{nodes[0].op_type}SharedInput",
             [common_name, *other_names],
             [nodes[0].output[0], nodes[1].output[0]],
-            domain="onnx_extended.ortops.optim.cuda",
+            domain="yaourt.ortops.fused_kernel.cuda",
             name=f"{self.__class__.__name__}--{nodes[0].name}",
         )
 
@@ -872,7 +872,7 @@ class AddMulTransposePattern(PatternOptimization):
             I_Y(["Y FLOAT(a, b, c, d)"])
             I_X(["X FLOAT(a, b, c, d)"])
 
-            AddMul_0[["onnx_extended.ortops.optim.cuda.AddMul(., ., .)"]]
+            AddMul_0[["yaourt.ortops.fused_kernel.cuda.AddMul(., ., .)"]]
             Transpose_1[["Transpose(., perm=[0, 2, 1, 3])"]]
 
             I_X -->|"FLOAT(a, b, c, d)"| AddMul_0
@@ -901,7 +901,7 @@ class AddMulTransposePattern(PatternOptimization):
             I_Y(["Y FLOAT(a, b, c, d)"])
             I_X(["X FLOAT(a, b, c, d)"])
 
-            AddMul_0[["onnx_extended.ortops.optim.cuda.AddMul(., ., .)"]]
+            AddMul_0[["yaourt.ortops.fused_kernel.cuda.AddMul(., ., .)"]]
 
             I_X -->|"FLOAT(a, b, c, d)"| AddMul_0
             I_Y -->|"FLOAT(a, b, c, d)"| AddMul_0
@@ -922,7 +922,7 @@ class AddMulTransposePattern(PatternOptimization):
     ) -> Optional[MatchResult]:
         if (
             node.op_type not in {"AddMul", "MulAdd"}
-            or node.domain != "onnx_extended.ortops.optim.cuda"
+            or node.domain != "yaourt.ortops.fused_kernel.cuda"
         ):
             return self.none()
         if g.is_used_more_than_once(node.output[0]):

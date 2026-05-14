@@ -12,8 +12,7 @@ from ...container.model_container import _get_type
 from ...helpers import string_type, make_hash, flatten_object
 from ...xbuilder import GraphBuilder, FunctionOptions, GraphBuilderTorchProtocol
 from ...xbuilder._virtual_tensor import VirtualTensor
-from ...xexpressions.rename_expressions import parse_expression_tokens
-from ...xshape._shape_helper import all_int, DYNAMIC_SHAPE
+from ...xshape._shape_helper import DYNAMIC_SHAPE
 from ...helpers.onnx_helper import onnx_dtype_name
 from ..torch_helper import torch_dtype_to_onnx_dtype, onnx_dtype_to_torch_dtype
 from ..export_options import ExportOptions
@@ -22,9 +21,14 @@ from ._exceptions import FunctionNotFoundError
 from .aten_functions import find_function
 from .aten_functions_transformers import find_function as find_transformers_function
 from .aten_methods import find_method
+from ._aten_getitem import (
+    _getitem_verify_new_shape,
+    _getitem_slice as _aten_getitem_slice,
+    getitem as _aten_getitem,
+)
 
 
-class DynamoInterpreter:
+class FxGraphInterpreter:
     """
     Interprets a torch graph into an ONNX graph.
     Dispatches every node to the appropriate converting function.
@@ -114,7 +118,7 @@ class DynamoInterpreter:
 
     def register_named_modules(
         self,
-        parent_interpreter: Optional["DynamoInterpreter"],
+        parent_interpreter: Optional["FxGraphInterpreter"],
         preserved_modules: Optional[Set[Union[type["torch.nn.Module"], str]]],  # noqa: F821
         named_modules: Dict[str, "torch.nn.Module"],  # noqa: F821
     ):
@@ -125,11 +129,11 @@ class DynamoInterpreter:
         :func:`torch.export.unflatten.unflatten`.
         """
         assert parent_interpreter is None or isinstance(
-            parent_interpreter, DynamoInterpreter
+            parent_interpreter, FxGraphInterpreter
         ), f"Unexpected type {type(parent_interpreter)} for the interpreter"
         if self.builder.verbose > 4 and preserved_modules:
             print(
-                f"[DynamoInterpreter-{self._hash()}.register] "
+                f"[FxGraphInterpreter-{self._hash()}.register] "
                 f"{sorted(c.__name__ for c in preserved_modules)}"
             )
         self.named_modules = named_modules
@@ -215,7 +219,7 @@ class DynamoInterpreter:
             a1 = "E" if hasattr(node, "meta") and "example_value" in node.meta else "-"
             a2 = "A" if hasattr(node, "meta") and "val" in node.meta else "-"
             print(
-                f"[DynamoInterpreter-{self._hash()}.run_node][{symbol}{a1}{a2}] "
+                f"[FxGraphInterpreter-{self._hash()}.run_node][{symbol}{a1}{a2}] "
                 f"{node.op}:{node.name}:{exa}:{val}"
             )
 
@@ -360,7 +364,7 @@ class DynamoInterpreter:
     def get_attr(self, node: "torch.fx.Node"):  # noqa: F821
         """Retrieves an attribute."""
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.get_attr][{node.name}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.get_attr][{node.name}]")
         try:
             init = getattr(node.graph.owning_module, node.target)
         except AttributeError as e:
@@ -400,12 +404,14 @@ class DynamoInterpreter:
             else:
                 trace_init = init
 
-            # When the callable is used in a torch.cond or scan call (tracing
-            # exporter path), try to pass input type/shape info so the local
-            # function's outputs are typed.
+            # When the callable is used in a torch.cond, scan, or while_loop
+            # call (tracing exporter path), try to pass input type/shape info
+            # so the local function's outputs are typed.
             sub_args = self._get_cond_input_args_for_callable(node)
             if sub_args is None:
                 sub_args = self._get_scan_input_args_for_callable(node)
+            if sub_args is None:
+                sub_args = self._get_while_loop_input_args_for_callable(node)
 
             builder, _args, _kwargs, output_names = self._interpret_sub_module(
                 trace_init, sub_args, None, source_node=node, local_domain=f"{root}.{n}"
@@ -633,9 +639,7 @@ class DynamoInterpreter:
                     # Concrete tensor literal (not a traced FX node) -
                     # extract type/shape info directly from the tensor value.
                     full_shape = tuple(inp_node.shape)
-                    shape = (
-                        full_shape[1:] if strip_first_dim and len(full_shape) > 1 else full_shape
-                    )
+                    shape = full_shape[1:] if strip_first_dim else full_shape
                     onnx_dtype = torch_dtype_to_onnx_dtype(inp_node.dtype)
                     # device.index is None for CPU, int index for CUDA.
                     dev = inp_node.device.index
@@ -646,9 +650,7 @@ class DynamoInterpreter:
                 dtype = self.builder.get_type(name)
                 if self.builder.has_shape(name):
                     full_shape = self.builder.get_shape(name)
-                    shape = (
-                        full_shape[1:] if strip_first_dim and len(full_shape) > 1 else full_shape
-                    )
+                    shape = full_shape[1:] if strip_first_dim else full_shape
                 elif self.builder.has_rank(name):
                     rank = self.builder.get_rank(name)
                     n = max(0, rank - 1) if strip_first_dim else rank
@@ -678,6 +680,71 @@ class DynamoInterpreter:
 
             for inp_node in add_input_nodes:
                 vt = _node_to_virtual(inp_node, strip_first_dim=False)
+                if vt is None:
+                    sub_args = None
+                    break
+                sub_args.append(vt)
+            if sub_args is not None:
+                return sub_args
+        return None
+
+    def _get_while_loop_input_args_for_callable(
+        self, node: "torch.fx.Node"  # noqa: F821
+    ) -> Optional[List[VirtualTensor]]:
+        """
+        When a callable (get_attr node) is used in a
+        :func:`torch._higher_order_ops.while_loop` call (new-tracing exporter
+        path), build the argument type/shape information for the cond/body
+        function and return it as a list of :class:`VirtualTensor` objects.
+
+        Both *cond_fn* and *body_fn* receive
+        ``(*carried_inputs, *additional_inputs)`` at their full shapes.
+
+        Returns *None* if the info cannot be determined.
+        """
+        for user_node in node.users:
+            if not (
+                user_node.op == "call_function"
+                and hasattr(user_node.target, "__name__")
+                and user_node.target.__name__ == "while_loop"
+                and len(user_node.args) >= 3
+            ):
+                continue
+            # user_node.args = (cond_fn_node, body_fn_node, [carried_nodes], [additional_nodes])
+            carried_nodes = user_node.args[2]
+            additional_nodes = user_node.args[3] if len(user_node.args) > 3 else []
+            sub_args: Optional[List[VirtualTensor]] = []
+
+            def _node_to_virtual(inp_node):
+                if isinstance(inp_node, self.torch.Tensor):
+                    full_shape = tuple(inp_node.shape)
+                    onnx_dtype = torch_dtype_to_onnx_dtype(inp_node.dtype)
+                    dev = inp_node.device.index
+                    return VirtualTensor(name="", dtype=onnx_dtype, shape=full_shape, device=dev)
+                if not hasattr(inp_node, "name") or not self.builder.has_type(inp_node.name):
+                    return None
+                name = inp_node.name
+                dtype = self.builder.get_type(name)
+                if self.builder.has_shape(name):
+                    shape = self.builder.get_shape(name)
+                elif self.builder.has_rank(name):
+                    shape = tuple(None for _ in range(self.builder.get_rank(name)))
+                else:
+                    shape = None
+                device = self.builder.get_device(name) if self.builder.has_device(name) else None
+                return VirtualTensor(name=name, dtype=dtype, shape=shape, device=device)
+
+            for inp_node in carried_nodes:
+                vt = _node_to_virtual(inp_node)
+                if vt is None:
+                    sub_args = None
+                    break
+                sub_args.append(vt)
+            if sub_args is None:
+                continue
+
+            for inp_node in additional_nodes:
+                vt = _node_to_virtual(inp_node)
                 if vt is None:
                     sub_args = None
                     break
@@ -775,7 +842,7 @@ class DynamoInterpreter:
             shape,
             default_initializer=default_initializer,
             device=device,
-            marker="DynamoInterpreter._make_tensor_input",
+            marker="FxGraphInterpreter._make_tensor_input",
         )
 
     def _make_list_input(
@@ -808,7 +875,7 @@ class DynamoInterpreter:
         elem_type = _get_type(example_value[0].dtype)
         self.current_input_ += 1
         return self.builder.make_tensor_sequence_input(
-            name, elem_type, shape[0], marker="DynamoInterpreter._make_list_input"
+            name, elem_type, shape[0], marker="FxGraphInterpreter._make_list_input"
         )
 
     def placeholder(self, node: "torch.fx.Node"):  # noqa: F821
@@ -817,7 +884,7 @@ class DynamoInterpreter:
         between the input names he wants and the name it has in the graph module.
         """
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.placeholder][{node.name}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.placeholder][{node.name}]")
 
         if isinstance(node, VirtualTensor):
             return self._make_tensor_input(
@@ -829,14 +896,14 @@ class DynamoInterpreter:
 
         if self.builder.verbose > 2:
             print(
-                f"[DynamoInterpreter-{self._hash()}.placeholder]"
+                f"[FxGraphInterpreter-{self._hash()}.placeholder]"
                 f"[{node.name}] val={string_type(val, with_shape=True)}"
             )
         if val is None:
             example_value = node.meta.get("example_value", None)
             if self.builder.verbose > 2:
                 print(
-                    f"[DynamoInterpreter-{self._hash()}.placeholder]"
+                    f"[FxGraphInterpreter-{self._hash()}.placeholder]"
                     f"[{node.name}] example_value={string_type(val, with_shape=True)}"
                 )
             # index_input may be wrong because torch.export.export may flatten the inputs.
@@ -975,7 +1042,7 @@ class DynamoInterpreter:
 
             if self.builder.verbose > 2:
                 print(
-                    f"[DynamoInterpreter-{self._hash()}.placeholder]"
+                    f"[FxGraphInterpreter-{self._hash()}.placeholder]"
                     f"[{node.name}] value={string_type(value, with_shape=True)} into initializer"
                 )
 
@@ -1052,7 +1119,7 @@ class DynamoInterpreter:
         """Adds an output to the graph."""
         output_name = node.name
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.output][{output_name}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.output][{output_name}]")
         declared = node.args
         assert len(declared) == 1, (
             f"declared must have one element: {declared}, output_name={output_name}"
@@ -1360,242 +1427,9 @@ class DynamoInterpreter:
         expand_axes: List[int],
         name: str = "_getitem_slice",
     ):
-        assert isinstance(axes, list), f"Unexpected type {type(axes)} for axes"
-        assert all_int(axes), f"Expected only integer axis but got {axes}"
-        assert len(axes) == len(index_slice), f"Length mismatch {len(axes)} != {len(index_slice)}"
-
-        # axes
-        aaxes = np.array(axes, dtype=np.int64)
-        axes_name = self.builder.unique_name(f"{node.name}_axis")
-        self.builder.make_initializer(
-            axes_name, aaxes, source="DynamoInterpreter._getitem_slice.axis.1"
+        return _aten_getitem_slice(
+            self.builder, sts, [node.name], input_name, index_slice, axes, expand_axes, name
         )
-
-        shape_value = None
-        if self.builder.has_shape(input_name):
-            shape_value = self.builder.get_shape(input_name)
-
-        starts = []
-        ends = []
-        steps = []
-        shape_name = None
-        end_name = None
-        concat = False
-        squeeze_axes: List[int] = []
-        for axis_, aslice in zip(axes, index_slice):
-            axis = axis_
-            if isinstance(aslice, int):
-                # integer
-                starts.append(aslice)
-                ends.append(aslice + 1)
-                steps.append(1)
-                continue
-
-            assert isinstance(
-                aslice, (slice, int, self.torch.fx.Node)
-            ), f"Unexpected type {type(aslice)} ({aslice}) in {index_slice}"
-            if isinstance(aslice, self.torch.fx.Node):
-                # Dynamic integer index: treat as i:i+1 slice and squeeze the axis afterwards.
-                starts.append(aslice)
-                slice_end_name = self.builder.unique_name(f"{node.name}_slice_end_{axis_}")
-                self.builder.make_node(
-                    "Add",
-                    [
-                        aslice.name,
-                        self.builder.make_initializer(
-                            "",
-                            np.array(1, dtype=np.int64),
-                            source="DynamoInterpreter._getitem_slice.int_end",
-                        ),
-                    ],
-                    [slice_end_name],
-                    name=f"{name}_int_end",
-                    sts=None,
-                )
-                ends.append(slice_end_name)
-                steps.append(1)
-                concat = True
-                squeeze_axes.append(axis_)
-                continue
-
-            starts.append(aslice.start or 0)
-
-            if aslice.stop is None:
-                if shape_value is None or not isinstance(shape_value[axis], int):
-                    if shape_name is None:
-                        shape_name = self.builder.unique_name(f"{node.name}_shape")
-                        self.builder.make_node(
-                            "Shape", [input_name], [shape_name], name=f"{name}A"
-                        )
-
-                    aaxis = np.array([axis], dtype=np.int64)
-                    axis_name = self.builder.unique_name(f"{node.name}_axis_{axis}")
-                    self.builder.make_initializer(
-                        axis_name, aaxis, source="DynamoInterpreter._getitem_slice.axis.2"
-                    )
-
-                    end_name = self.builder.unique_name(f"{node.name}_end")
-                    self.builder.make_node(
-                        "GatherElements",
-                        [shape_name, axis_name],
-                        [end_name],
-                        name=f"{name}B",
-                        sts=None,
-                    )
-                    ends.append(end_name)
-                    concat = True
-                else:
-                    ends.append(shape_value[axis])
-            else:
-                vstop = aslice.stop.name if hasattr(aslice.stop, "name") else aslice.stop
-                concat |= isinstance(vstop, str)
-                ends.append(vstop)
-
-            steps.append(aslice.step if aslice.step else 1)
-
-        # if concat: one end is coming from a shape
-        if concat:
-            iends = []
-            for i in ends:
-                if isinstance(i, str):
-                    if self.builder.get_rank(i) == 0:
-                        iends.append(
-                            self.builder.op.UnsqueezeAnyOpset(
-                                i, np.array([0], dtype=np.int64), name=f"{name}C"
-                            )
-                        )
-                    else:
-                        assert self.builder.get_rank(i) == 1, (
-                            f"Unexpected rank={self.builder.get_rank(i)} for {i!r}, "
-                            f"ends={ends!r}{self.builder.get_debug_msg()}"
-                        )
-                        iends.append(i)
-                else:
-                    assert isinstance(
-                        i, int
-                    ), f"Unexpected value for end={i!r}{self.builder.get_debug_msg()}"
-                    iends.append(np.array([i], dtype=np.int64))
-            if len(iends) > 1:
-                conc_ends = self.builder.op.Concat(*iends, axis=0, name=f"{name}D")
-            else:
-                conc_ends = self.builder.op.Identity(iends[0], name=f"{name}E")
-        else:
-            assert all_int(ends), (
-                f"Unexpected value for ends={ends}: {[type(_) for _ in ends]}"
-                f"{self.builder.get_debug_msg()}"
-            )
-            conc_ends = self.builder.make_initializer(
-                "", np.array(ends, dtype=np.int64), source="DynamoInterpreter._getitem_slice.1"
-            )
-
-        assert all_int(steps), (
-            f"Not implemented for steps={steps} (types are "
-            f"{[type(c) for c in steps]}){self.builder.get_debug_msg()}"
-        )
-        if all_int(starts):
-            conc_starts = self.builder.make_initializer(
-                self.builder.unique_name(f"{node.name}_start"),
-                np.array(starts, dtype=np.int64),
-                source="DynamoInterpreter._getitem_slice.2",
-            )
-        else:
-            istarts = []
-            for i in starts:
-                si = i.name if hasattr(i, "name") else i
-                if isinstance(si, str):
-                    if self.builder.get_rank(si) == 0:
-                        istarts.append(
-                            self.builder.op.UnsqueezeAnyOpset(
-                                si, np.array([0], dtype=np.int64), name=f"{name}C"
-                            )
-                        )
-                    else:
-                        assert self.builder.get_rank(si) == 1, (
-                            f"Unexpected rank={self.builder.get_rank(si)} for {si!r}, "
-                            f"starts={starts!r}{self.builder.get_debug_msg()}"
-                        )
-                        istarts.append(si)
-                else:
-                    assert isinstance(
-                        si, int
-                    ), f"Unexpected value for end={si!r}{self.builder.get_debug_msg()}"
-                    istarts.append(np.array([si], dtype=np.int64))
-            if len(istarts) > 1:
-                conc_starts = self.builder.op.Concat(*istarts, axis=0, name=f"{name}SD")
-            else:
-                conc_starts = self.builder.op.Identity(istarts[0], name=f"{name}SE")
-
-        inputs = [
-            input_name,
-            conc_starts,
-            conc_ends,
-            axes_name,
-            self.builder.make_initializer(
-                self.builder.unique_name(f"{node.name}_step"),
-                np.array(steps, dtype=np.int64),
-                source="DynamoInterpreter._getitem_slice.3",
-            ),
-        ]
-
-        if expand_axes and squeeze_axes:
-            sliced = self.builder.make_node("Slice", inputs, name=f"{name}F")
-            unsqueezed = self.builder.op.UnsqueezeAnyOpset(
-                sliced, np.array(expand_axes, dtype=np.int64), name=f"{name}F2"
-            )
-            res = self.builder.op.SqueezeAnyOpset(
-                unsqueezed,
-                np.array(squeeze_axes, dtype=np.int64),
-                outputs=[node.name],
-                name=f"{name}H",
-            )
-        elif expand_axes:
-            sliced = self.builder.make_node("Slice", inputs, name=f"{name}F")
-            res = self.builder.op.UnsqueezeAnyOpset(
-                sliced,
-                np.array(expand_axes, dtype=np.int64),
-                outputs=[node.name],
-                name=f"{name}F",
-            )
-        elif squeeze_axes:
-            slice_name = self.builder.unique_name(f"{node.name}_sliced")
-            self.builder.make_node("Slice", inputs, [slice_name], name=f"{name}G_sq")
-            res = self.builder.op.SqueezeAnyOpset(
-                slice_name,
-                np.array(squeeze_axes, dtype=np.int64),
-                outputs=[node.name],
-                name=f"{name}H_sq",
-            )
-        else:
-            res = self.builder.make_node("Slice", inputs, [node.name], name=f"{name}G")
-        if not sts:
-            dtype = self.builder.get_type(inputs[0])
-            self.builder.set_type(node.name, dtype)
-            if not concat and self.builder.has_shape(inputs[0]):
-                shape = self.builder.get_shape(inputs[0])
-                new_shape = self.builder._apply_slice_to_shape(
-                    shape, index_slice, axes=axes, expand_axes=expand_axes
-                )
-                assert not self.builder.has_shape(
-                    node.name
-                ) or new_shape == self.builder.get_shape(node.name), (
-                    f"Shape for node {node.name!r} is already set to "
-                    f"{self.builder.get_shape(node.name)} with type "
-                    f"{self.builder.get_type(node.name)} (expecting {dtype}) "
-                    f"new_shape={new_shape}, shape={shape}, index_slice={index_slice}, "
-                    f"axes={axes}, expand_axes={expand_axes}"
-                    f"{self.builder.get_debug_msg()}"
-                )
-                self.builder.set_shape(node.name, new_shape)
-            elif squeeze_axes and self.builder.has_rank(inputs[0]):
-                # expand_axes is empty here (handled by the first branch above)
-                self.builder.set_rank(
-                    node.name, self.builder.get_rank(inputs[0]) - len(squeeze_axes)
-                )
-            elif expand_axes:
-                self.builder.set_rank(
-                    node.name, self.builder.get_rank(inputs[0]) + len(expand_axes)
-                )
-        return res
 
     def _getitem_int1(
         self,
@@ -1627,240 +1461,26 @@ class DynamoInterpreter:
         a tuple, a list.
         """
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.getitem]")
+            print(f"[FxGraphInterpreter-{self._hash()}.getitem]")
+        # Check for advanced (tensor) indexing: all index tuple elements are
+        # Nodes with rank > 0 (e.g. padding_mask[batch_idx, kv_idx]).
         args = node.args
-        assert len(args) == 2
-        node_output, index = args
-        result_name = node_output.name
-        val = node.meta.get("val", None)
-        sts = None
-        if val is not None:
-            if isinstance(val, self.torch.Tensor):
-                shape = val.shape
-                dtype = _get_type(val.dtype)
-                # the graph could be new if a function produces a results
-                # depending on the result values
-                t_shape = tuple(shape)
-                self._verify_new_shape(shape, node)
-                # Let's set the shape if not null shape
-                if len(t_shape) > 1 and not any(i == 0 for i in t_shape if isinstance(i, int)):
-                    self.builder.set_shape(
-                        node.name, t_shape, allow_zero=all_int(t_shape) and t_shape == (0,)
-                    )
-                else:
-                    self.builder.set_rank(node.name, len(t_shape))
-                self.builder.set_type(node.name, dtype)
-                self.builder.set_device(node.name, val.get_device())
-                sts = {"dtype": val.dtype}
-            elif isinstance(val, self.torch.SymInt):
-                self.builder.set_shape(node.name, tuple())
-                self.builder.set_type(node.name, TensorProto.INT64)
-                self.builder.set_device(node.name, -1)
-                sts = {"dtype": self.torch.int64}
-            else:
-                raise TypeError(
-                    f"Unexpected type {type(val)} in node {node!r}"
-                    f"\n{self.builder.pretty_text(add_fx_graph=True)}"
+        if len(args) == 2 and isinstance(args[1], tuple):
+            _index = args[1]
+            if all(isinstance(x, self.torch.fx.Node) for x in _index) and all(
+                self.builder.has_rank(x.name) and self.builder.get_rank(x.name) > 0
+                for x in _index
+            ):
+                sts = self._can_set_shape_and_type(node)
+                return self._getitem_advanced(
+                    node, args[0].name, list(_index), sts=sts, name="_getitem_adv"
                 )
-
-        if hasattr(index, "name"):
-            # A dynamic index (torch.fx.Node)
-            res = self.builder.make_node(
-                "Gather", [result_name, index.name], [node.name], name="getitemA"
-            )
-            if not sts:
-                self.builder.set_type(node.name, self.builder.get_type(result_name))
-                self.builder.set_rank(
-                    node.name,
-                    self.builder.get_rank(result_name) + self.builder.get_rank(index.name) - 1,
-                )
-            return res
-
-        if isinstance(index, int):
-            name_index = f"{result_name}#{index}"
-            if self.builder.has_name(name_index):
-                # The user to get a tensor a tuple of tensors
-                return self.builder.make_node(
-                    "Identity", [name_index], [node.name], name="getitemB_tuple"
-                )
-            # The user mean to access the first element of a tensor or a sequence
-            if self.builder.is_sequence(result_name):
-                # A sequence
-                tpos = self.builder.make_initializer(
-                    "", np.array(index, dtype=np.int64), source="DynamoInterpreter.getitem.1"
-                )
-                res = self.builder.make_node(
-                    "SequenceAt", [result_name, tpos], [node.name], name="getitemB_tuple"
-                )
-                if not sts:
-                    info = self.builder.get_sequence(result_name)
-                    dtype = info["dtype"]
-                    if isinstance(dtype, tuple):
-                        dtype = dtype[index]
-                    self.builder.set_type(res, dtype)
-                    if info["shapes"] is not None:
-                        self.builder.set_shape(
-                            res, info["shapes"][min(index, len(info["shapes"]) - 1)]
-                        )
-                    elif info["ranks"] is not None:
-                        if isinstance(info["ranks"], int):
-                            self.builder.set_rank(res, info["ranks"])
-                        else:
-                            self.builder.set_rank(
-                                res, info["ranks"][min(index, len(info["ranks"]) - 1)]
-                            )
-                return res
-            else:
-                # A tensor.
-                res = self.builder.op.SqueezeAnyOpset(
-                    self.builder.op.Gather(
-                        result_name, np.array([index], dtype=np.int64), name="getitemB_index"
-                    ),
-                    np.array([0], dtype=np.int64),
-                    name="getitemB_index",
-                    outputs=[node.name],
-                )
-                if not sts:
-                    if self.builder.has_type(result_name):
-                        self.builder.set_type(node.name, self.builder.get_type(result_name))
-                    if self.builder.has_device(result_name):
-                        self.builder.set_device(node.name, self.builder.get_device(result_name))
-                    if self.builder.has_shape(result_name):
-                        self.builder.set_shape(node.name, self.builder.get_shape(result_name)[1:])
-                    elif self.builder.has_rank(result_name):
-                        self.builder.set_rank(node.name, self.builder.get_rank(result_name) - 1)
-                return res
-
-        if isinstance(index, slice):
-            return self._getitem_slice(
-                node,
-                node_output.name,
-                [index],
-                sts=sts,
-                axes=[0],
-                expand_axes=[],
-                name="_getitem_slice1",
-            )
-
-        if isinstance(index, self.torch.fx.immutable_collections.immutable_list):
-            # something like x[[0, 2]]
-            if all_int(index):
-                # something like x[[0, 1]]
-                axes = [0]
-                return self._getitem_int1(
-                    node,
-                    node_output.name,
-                    index,
-                    sts=sts,
-                    axes=axes,
-                    expand_axes=[],
-                    name="_getitem_int1a",
-                )
-
-        if isinstance(index, tuple):
-            if all(isinstance(x, (slice, self.torch.fx.Node)) for x in index):
-                # Check for advanced (tensor) indexing: all elements are Nodes
-                # with rank > 0.  This handles cases like x[idx0, idx1] where
-                # idx0 and idx1 are multi-dimensional tensors (e.g. produced by
-                # _non_vmap_expansion_sdpa in transformers masking code).
-                if all(isinstance(x, self.torch.fx.Node) for x in index) and all(
-                    self.builder.has_rank(x.name) and self.builder.get_rank(x.name) > 0
-                    for x in index
-                ):
-                    return self._getitem_advanced(
-                        node, node_output.name, list(index), sts=sts, name="_getitem_adv"
-                    )
-                return self._getitem_slice(
-                    node,
-                    node_output.name,
-                    list(index),
-                    sts=sts,
-                    axes=list(range(len(index))),
-                    expand_axes=[],
-                    name="_getitem_slicen",
-                )
-
-            if all(x is Ellipsis or x is None or isinstance(x, slice) for x in index):
-                # something like x[3:4]
-                axes = []
-                slices = []
-                expand_axes = []
-                ellipsis = False
-                true_slice = False
-                for i, ind in enumerate(index):
-                    if ind is Ellipsis:
-                        assert not ellipsis, f"Second (...) found in index={index}"
-                        ellipsis = True
-                        continue
-                    if ind is None:
-                        assert (
-                            not ellipsis
-                        ), f"An axis cannot be inserted after (...) in index={index}"
-                        expand_axes.append(i)
-                        continue
-                    axes.append(((i - len(index)) if ellipsis else i) - len(expand_axes))
-                    if (
-                        not isinstance(ind, slice)
-                        or ind.start is not None
-                        or ind.stop is not None
-                        or ind.step is not None
-                    ):
-                        true_slice = True
-                    slices.append(ind)
-                if true_slice:
-                    return self._getitem_slice(
-                        node,
-                        node_output.name,
-                        slices,
-                        sts=sts,
-                        axes=axes,
-                        expand_axes=expand_axes,
-                        name="_getitem_slice2",
-                    )
-                # It is just a node unsqueeze.
-                res = self.builder.op.UnsqueezeAnyOpset(
-                    str(node.args[0]),
-                    np.array(expand_axes, dtype=np.int64),
-                    name="getitem_unsqueeze",
-                    outputs=[node.name],
-                )
-                return res
-
-            raise RuntimeError(
-                f"getitem: unexpected tuple {tuple(type(x) for x in index)} "
-                f"for index={index}, node={node}, args={args}, val={val}, "
-                f"types={string_type(args)}{self.builder.get_debug_msg()}"
-            )
-
-        raise RuntimeError(
-            f"getitem: unexpected type {type(index)} for index={index}, "
-            f"node={node}, args={args}, val={val}, "
-            f"types={string_type(args)}{self.builder.get_debug_msg()}"
-        )
+        can_set = self._can_set_shape_and_type(node)
+        output_names = self._get_output_names(node)
+        return _aten_getitem(self.builder, can_set, output_names, node)
 
     def _verify_new_shape(self, shape, node):
-        for axis, dim in enumerate(shape):
-            if isinstance(dim, (self.torch.SymInt, self.builder.TracingInt)):
-                if isinstance(dim, self.builder.TracingInt):
-                    sdim = dim.value
-                else:
-                    sdim = self.builder._torch_sym_int_to_str(dim)
-                tokens = parse_expression_tokens(sdim)
-                if len(tokens) == 1:
-                    # Only one token, possibly knew
-                    t = tokens.pop()
-                    if t not in self.builder.dynamic_objects:
-                        self.builder.add_dynamic_object(t, t)
-                        input_name = node.name
-                        assert isinstance(input_name, str), (
-                            f"Unexpected type for dim={dim!r}, axis={axis}, shape={shape}, "
-                            f"node.name={node.name!r}, t={t!r}"
-                        )
-                        source = dict(axis=axis, input_name=input_name)
-                        if t in self.builder.dynamic_dimensions_source:
-                            self.builder.dynamic_dimensions_source[t].append(source)
-                        else:
-                            self.builder.dynamic_dimensions_source[t] = [source]
+        _getitem_verify_new_shape(self.builder, None, [node.name], shape)
 
     def _process_arg(self, node, aten_name, i):
         if i is None:
@@ -1964,7 +1584,7 @@ class DynamoInterpreter:
             )
         if self.builder.verbose > 1:
             name = fct.__class__.__name__ if isinstance(fct, GraphBuilder) else fct.__name__
-            print(f"[DynamoInterpreter-{self._hash()}.call_function][{name}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.call_function][{name}]")
 
         args = [self._process_arg(node, aten_name, a) for a in fx_args]
         output_names = self._get_output_names(node)
@@ -2110,6 +1730,22 @@ class DynamoInterpreter:
                     ):
                         if dtype and not self.builder.has_type(out_name):
                             self.builder.set_type(out_name, dtype)
+            # When aten_while_loop created a Loop node in the tracing path,
+            # propagate output dtype and shape from the body-function builder
+            # (stored in get_attr via _store_cond_func_output_info).  The body
+            # function outputs match the loop-variable shapes exactly.
+            if aten_name == "aten_while_loop" and self._cond_func_output_info:
+                # args = [cond_fn_name, body_fn_name, carried_vars, additional_inputs]
+                body_fn_name = args[1] if len(args) > 1 else None
+                if body_fn_name and body_fn_name in self._cond_func_output_info:
+                    res_list = list(res) if isinstance(res, (tuple, list)) else [res]
+                    for out_name, (dtype, shape) in zip(
+                        res_list, self._cond_func_output_info[body_fn_name]
+                    ):
+                        if dtype and not self.builder.has_type(out_name):
+                            self.builder.set_type(out_name, dtype)
+                        if shape is not None and not self.builder.has_shape(out_name):
+                            self.builder.set_shape(out_name, shape)
 
         n_nodes_after = len(self.builder.nodes) + len(self.builder.initializers_dict)
         if res is None:
@@ -2145,7 +1781,7 @@ class DynamoInterpreter:
         """Called for a method."""
         method_name = node.target
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.call_method][{method_name}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.call_method][{method_name}]")
         assert isinstance(node.args, tuple), f"Unexpected type {type(node.args)} for node.args."
 
         fct = None
@@ -2213,7 +1849,7 @@ class DynamoInterpreter:
 
         if self.builder.verbose > 1 or self._debug_aten_as_function:
             print(
-                f"[DynamoInterpreter.add_aten_as_function] {name_fct}"
+                f"[FxGraphInterpreter.add_aten_as_function] {name_fct}"
                 f"({', '.join(input_names)}) -> {', '.join(output_names)}"
             )
 
@@ -2332,7 +1968,15 @@ class DynamoInterpreter:
                 isinstance(res, (tuple, list))
                 and len(res) == 1
                 and str(getattr(node, "target", None))
-                in {"scan", "while_loop", "aten.split_with_sizes.default"}
+                in {
+                    "scan",
+                    "while_loop",
+                    "aten.split_with_sizes.default",
+                    "aten.tensor_split.sections",
+                    "aten.tensor_split.Tensor_sections",
+                    "aten.tensor_split.indices",
+                    "aten.tensor_split.Tensor_indices_or_sections",
+                }
             ):
                 # Scan and while_loop allow that
                 name = output_names[0]
@@ -2482,12 +2126,18 @@ class DynamoInterpreter:
                 if isinstance(v, self.torch.Tensor):
                     self.builder.set_device(r, v.get_device(), keep_this_device=True)
                     dtype = _get_type(v.dtype)
-                    if i >= 1 and node.target.name() in {
-                        "aten::_native_batch_norm_legit.no_stats",
-                        "aten::_native_batch_norm_legit_no_training",
-                        "aten::_scaled_dot_product_efficient_attention",
-                        "aten::_scaled_dot_product_flash_attention",
-                    }:
+                    if (
+                        i >= 1
+                        and hasattr(node.target, "name")
+                        and node.target.name()
+                        in {
+                            "aten::_native_batch_norm_legit.no_stats",
+                            "aten::_native_batch_norm_legit_no_training",
+                            "aten::_scaled_dot_product_efficient_attention",
+                            "aten::_scaled_dot_product_flash_attention",
+                            "aten::_fused_rms_norm",
+                        }
+                    ):
                         # It seems the type is not very consistent
                         # and the output might not be used.
                         self.builder.set_type(r, dtype, exc=False)
@@ -2912,13 +2562,13 @@ class DynamoInterpreter:
         ), f"Not implemented for type {type(sub_module)}.\n{raise_msg()}"
 
         if self.builder.verbose > 1:
-            print(f"[DynamoInterpreter-{self._hash()}.call_module] class [{type(sub_module)}]")
+            print(f"[FxGraphInterpreter-{self._hash()}.call_module] class [{type(sub_module)}]")
             print(
-                f"[DynamoInterpreter-{self._hash()}.call_module] with "
+                f"[FxGraphInterpreter-{self._hash()}.call_module] with "
                 f"node.args={string_type(node.args)}]"
             )
             print(
-                f"[DynamoInterpreter-{self._hash()}.call_module] with "
+                f"[FxGraphInterpreter-{self._hash()}.call_module] with "
                 f"kwargs={string_type(node.kwargs)}]"
             )
 

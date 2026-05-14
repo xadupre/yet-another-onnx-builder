@@ -4,8 +4,8 @@ from typing import Any, Callable, Dict, List, Optional, Set, Union
 
 class Dispatcher:
     """
-    Used to changes the way class :class:`DynamoInterpreter
-    <yobx.torch.interpreter.interpreter.DynamoInterpreter>`
+    Used to changes the way class :class:`FxGraphInterpreter
+    <yobx.torch.interpreter.interpreter.FxGraphInterpreter>`
     selects the function translating aten function or module.
 
     :param registered_functions: registered functions

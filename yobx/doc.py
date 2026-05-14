@@ -42,6 +42,14 @@ def reset_torch_transformers(gallery_conf, fname):  # pragma: no cover
     torch._dynamo.reset()
 
 
+def reset_tensorflow(gallery_conf, fname):  # pragma: no cover
+    """Suppresses TensorFlow logging for :epkg:`sphinx-gallery`."""
+    import logging
+
+    os.environ["TF_CPP_MIN_LOG_LEVEL"] = "3"
+    logging.getLogger("tensorflow").setLevel(logging.ERROR)
+
+
 def plot_legend(
     text: str, text_bottom: str = "", color: str = "green", fontsize: int = 15
 ) -> "matplotlib.axes.Axes":  # noqa: F821
@@ -282,11 +290,21 @@ def plot_dot(
     with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as fp:
         fp.close()
 
-        draw_graph_graphviz(dot, fp.name, engine=engine)
-        img = np.asarray(Image.open(fp.name))
-        os.remove(fp.name)
+        exc = None
+        try:
+            draw_graph_graphviz(dot, fp.name, engine=engine)
+        except Exception as e:
+            exc = e
 
-        ax.imshow(img)
+        if not exc:
+            img = np.asarray(Image.open(fp.name))
+            os.remove(fp.name)
+            ax.imshow(img)
+        elif os.path.exists(fp.name):
+            os.remove(fp.name)
+            ax.text(
+                0.5, 0.5, f"graphviz not available\n{exc}", ha="center", va="center", fontsize=10
+            )
 
     if clean:
         ax.set_xticks([])
@@ -296,6 +314,39 @@ def plot_dot(
         ax.set_axis_off()
         ax.get_figure().tight_layout()
     return ax
+
+
+def draw_graph_mermaid(mermaid: Union[str, onnx.ModelProto], image: str = "") -> Optional[str]:
+    """
+    Draws a Mermaid flowchart to an image file using the :epkg:`mermaid-py` library.
+
+    :param mermaid: Mermaid flowchart string or :class:`onnx.ModelProto`
+    :param image: output image file path (``.svg`` or ``.png``)
+    :return: the SVG if image is empty, None otherwise.
+
+    The diagram is rendered via the ``mermaid.ink`` online service through
+    :class:`mermaid.Mermaid`.
+    """
+    from mermaid import Mermaid
+
+    from .helpers.mermaid_helper import to_mermaid
+
+    if isinstance(mermaid, onnx.ModelProto):
+        smmd = to_mermaid(mermaid)
+    else:
+        smmd = mermaid
+
+    renderer = Mermaid(smmd)
+    if not image:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = os.path.join(tmpdir, "diagram.svg")
+            renderer.to_svg(path)
+            with open(path, "r", encoding="utf-8") as f:
+                return f.read()
+    if image.endswith(".svg"):
+        renderer.to_svg(image)
+    else:
+        renderer.to_png(image)
 
 
 def plot_text(

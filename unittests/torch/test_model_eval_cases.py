@@ -5,6 +5,7 @@ from yobx.torch.testing.model_eval_cases import discover, evaluation
 
 class TestModelEvalCases(ExtTestCase):
     @requires_torch("2.7", "scan")
+    @requires_transformers("4.55")
     @ignore_warnings(FutureWarning)
     def test_discover(self):
         res = discover()
@@ -170,12 +171,22 @@ class TestModelEvalCases(ExtTestCase):
             verbose=0,
         )
 
+    def test_run_exporter_dimension0_new_tracing(self):
+        evaluation(
+            cases="ExportWithDimension0", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
     def test_run_exporter_dimension1(self):
         evaluation(
             cases="ExportWithDimension1",
             exporters="export-nostrict-oblivious",
             quiet=False,
             dynamic=True,
+        )
+
+    def test_run_exporter_dimension1_new_tracing(self):
+        evaluation(
+            cases="ExportWithDimension1", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
     @requires_torch("2.7", "scan")
@@ -185,6 +196,10 @@ class TestModelEvalCases(ExtTestCase):
     @requires_torch("2.7", "scan")
     def test_run_exporter_vmap_python_yobx(self):
         evaluation(cases="VmapPython", exporters="yobx", quiet=False, dynamic=True)
+
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_vmap_python_new_tracing(self):
+        evaluation(cases="VmapPython", exporters="yobx-new-tracing", quiet=False, dynamic=True)
 
     def test_run_exporter_vmap_tracing(self):
         evaluation(cases="Vmap", exporters="yobx-tracing", quiet=False, dynamic=True)
@@ -233,14 +248,59 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_inplace_setitem_exp_tracing(self):
         evaluation(cases="InplaceSetItemExp", exporters="yobx-tracing", quiet=False, dynamic=True)
 
+    def test_run_exporter_inplace_setitem_exp_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemExp", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_inplace_setitem_exp_default(self):
+        evaluation(cases="InplaceSetItemExp", exporters="yobx", quiet=False, dynamic=False)
+
     def test_run_exporter_inplace_setitem_ellipsis_1_tracing(self):
         evaluation(
             cases="InplaceSetItemEllipsis_1", exporters="yobx-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_inplace_setitem_ellipsis_1_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemEllipsis_1",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
+    def test_run_exporter_inplace_setitem_square_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemSquare", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_inplace_setitem_square_add_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemSquareAdd",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
+    def test_run_exporter_inplace_setitem_square_add2_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemSquareAdd2",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_inplace_setitem_ellipsis_2_tracing(self):
         evaluation(
             cases="InplaceSetItemEllipsis_2", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_inplace_setitem_ellipsis_2_new_tracing(self):
+        evaluation(
+            cases="InplaceSetItemEllipsis_2",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
         )
 
     def test_run_exporter_aten_as_strided_tracing(self):
@@ -267,6 +327,31 @@ class TestModelEvalCases(ExtTestCase):
             cases="ControlFlowNumelZero2", exporters="yobx-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_controlflow_numel_zero_2_new_tracing(self):
+        evaluation(
+            cases="ControlFlowNumelZero2", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_numel_zero_3_new_tracing(self):
+        evaluation(
+            cases="ControlFlowNumelZero3", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_numel_zero_4_tracing(self):
+        evaluation(
+            cases="ControlFlowNumelZero4", exporters="yobx-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_numel_zero_4_new_tracing(self):
+        evaluation(
+            cases="ControlFlowNumelZero4", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_numel_zero_5_new_tracing(self):
+        evaluation(
+            cases="ControlFlowNumelZero5", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
     def test_run_exporter_controlflow_numel_zero_export_1_tracing(self):
         evaluation(
             cases="ControlFlowNumelZero1", exporters="export-tracing", quiet=False, dynamic=True
@@ -290,14 +375,46 @@ class TestModelEvalCases(ExtTestCase):
             dynamic=True,
         )
 
+    def test_run_exporter_controlflow_indirect_ranks_cat_new_tracing(self):
+        evaluation(
+            cases="ControlFlowIndirectRanksCat",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_controlflow_shape_check_new_tracing(self):
         evaluation(
             cases="ControlFlowShapeCheck", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_controlflow_cond_nonzero_new_tracing(self):
+        evaluation(
+            cases="ControlFlowCondNonZero",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
+    def test_run_exporter_controlflow_cond_constant_new_tracing(self):
+        evaluation(
+            cases="ControlFlowCondConstant",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
     def test_run_exporter_aten_interpolate_new_tracing(self):
         evaluation(
             cases="AtenInterpolate", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_aten_nn_functional_bilinear_new_tracing(self):
+        evaluation(
+            cases="AtenNnFunctionalBilinear",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
         )
 
     def test_run_exporter_aten_roll_pos_new_tracing(self):
@@ -324,6 +441,30 @@ class TestModelEvalCases(ExtTestCase):
             cases="ControlFlowScanCDist2", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
+    @requires_torch("2.7", "scan")
+    def test_run_exporter_yobx_scan_2_carried_new_tracing(self):
+        evaluation(
+            cases="ControlFlowScan2Carried",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
+    def test_run_exporter_controlflow_while_dec_new_tracing(self):
+        evaluation(
+            cases="ControlFlowWhileDec", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_while_inc_new_tracing(self):
+        evaluation(
+            cases="ControlFlowWhileInc", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_controlflow_while_new_tracing(self):
+        evaluation(
+            cases="ControlFlowWhile", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
     def test_run_exporter_layer_norm_tracing(self):
         evaluation(cases="LayerNorm", exporters="yobx-tracing", quiet=False, dynamic=True)
 
@@ -335,6 +476,38 @@ class TestModelEvalCases(ExtTestCase):
             cases="BuildInIsInstance", exporters="yobx-new-tracing", quiet=False, dynamic=True
         )
 
+    def test_run_exporter_shape_based_new_tracing(self):
+        evaluation(cases="ShapeBased", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
+    def test_run_exporter_shape_and_type_based_tracing(self):
+        evaluation(cases="ShapeAndTypeBased", exporters="yobx-tracing", quiet=False, dynamic=True)
+
+    def test_run_exporter_shape_and_type_and_device_based_tracing(self):
+        evaluation(
+            cases="ShapeAndTypeAndDeviceBased",
+            exporters="yobx-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
+    def test_run_exporter_create_from_shape_new_tracing(self):
+        evaluation(
+            cases="CreateFromShape", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    def test_run_exporter_create_from_shape_through_function_new_tracing(self):
+        evaluation(
+            cases="CreateFromShapeThroughFunction",
+            exporters="yobx-new-tracing",
+            quiet=False,
+            dynamic=True,
+        )
+
+    def test_run_exporter_signature_shape_as_index_new_tracing(self):
+        evaluation(
+            cases="SignatureShapeAsIndex", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
     @requires_transformers("5.0")
     def test_run_exporter_tiny_llm_export_nostrict(self):
         evaluation(cases="TinyLLM", exporters="export-nostrict", quiet=False, dynamic=True)
@@ -342,6 +515,78 @@ class TestModelEvalCases(ExtTestCase):
     @requires_transformers("5.0")
     def test_run_exporter_tiny_llm_yobx(self):
         evaluation(cases="TinyLLM", exporters="yobx", quiet=False, dynamic=True)
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_export_nostrict(self):
+        evaluation(
+            cases="DynamicCacheInput", exporters="export-nostrict", quiet=False, dynamic=True
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_export_nostrict_static(self):
+        evaluation(
+            cases="DynamicCacheInput", exporters="export-nostrict", quiet=False, dynamic=False
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_mixed_layers_export_nostrict(self):
+        evaluation(
+            cases="DynamicCacheInputMixedLayers",
+            exporters="export-nostrict",
+            quiet=False,
+            dynamic=True,
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_mixed_layers_export_nostrict_static(self):
+        evaluation(
+            cases="DynamicCacheInputMixedLayers",
+            exporters="export-nostrict",
+            quiet=False,
+            dynamic=False,
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_yobx(self):
+        evaluation(cases="DynamicCacheInput", exporters="yobx", quiet=False, dynamic=True)
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_yobx_static(self):
+        evaluation(cases="DynamicCacheInput", exporters="yobx", quiet=False, dynamic=False)
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_yobx_tracing(self):
+        evaluation(cases="DynamicCacheInput", exporters="yobx-tracing", quiet=False, dynamic=True)
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_yobx_tracing_static(self):
+        evaluation(
+            cases="DynamicCacheInput", exporters="yobx-tracing", quiet=False, dynamic=False
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_mixed_layers_yobx(self):
+        evaluation(
+            cases="DynamicCacheInputMixedLayers", exporters="yobx", quiet=False, dynamic=True
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_mixed_layers_yobx_static(self):
+        evaluation(
+            cases="DynamicCacheInputMixedLayers", exporters="yobx", quiet=False, dynamic=False
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_new_tracing(self):
+        evaluation(
+            cases="DynamicCacheInput", exporters="yobx-new-tracing", quiet=False, dynamic=True
+        )
+
+    @requires_transformers("4.57")
+    def test_run_exporter_dynamic_cache_input_new_tracing_static(self):
+        evaluation(
+            cases="DynamicCacheInput", exporters="yobx-new-tracing", quiet=False, dynamic=False
+        )
 
 
 if __name__ == "__main__":

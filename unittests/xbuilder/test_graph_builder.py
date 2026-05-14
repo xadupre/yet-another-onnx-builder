@@ -3312,6 +3312,63 @@ class TestPositionMsg(ExtTestCase):
         self.assertEqual(g.get_shape_renamed("X"), ("batch", "seq"))
         self.assertEqual(g.get_shape_renamed("Y"), ("batch", "seq"))
 
+    def test_no_duplicate_batch_names_multiple_outputs(self):
+        """DYN dimensions at axis 0 that are all constrained equal to the
+        user-defined 'batch' name must not generate 'batch_1', 'batch_2', etc.
+        This covers the arnir0/Tiny-LLM case where multiple outputs share the
+        same batch dimension but are tracked under separate DYN names."""
+        g = GraphBuilder(18, ir_version=9)
+
+        # One input with a user-visible 'batch' dimension.
+        g.make_tensor_input("X", TFLOAT, ("batch", 4))
+
+        # Three outputs sharing the same batch dimension, recorded under
+        # separate internal DYN names.
+        g.make_node("Relu", ["X"], ["Y0"], name="relu0")
+        g.make_node("Relu", ["X"], ["Y1"], name="relu1")
+        g.make_node("Relu", ["X"], ["Y2"], name="relu2")
+        g.set_shape("Y0", ("DYN0", 4))
+        g.set_shape("Y1", ("DYN1", 4))
+        g.set_shape("Y2", ("DYN2", 4))
+        g.set_type("Y0", TFLOAT)
+        g.set_type("Y1", TFLOAT)
+        g.set_type("Y2", TFLOAT)
+        g.make_tensor_output("Y0", TFLOAT, ("DYN0", 4), indexed=False)
+        g.make_tensor_output("Y1", TFLOAT, ("DYN1", 4), indexed=False)
+        g.make_tensor_output("Y2", TFLOAT, ("DYN2", 4), indexed=False)
+
+        # Declare all names in dynamic_dimensions_source.
+        g.dynamic_dimensions_source["batch"] = [{"input_name": "X", "axis": 0}]
+        g.dynamic_dimensions_source["DYN0"] = [{"input_name": "Y0", "axis": 0}]
+        g.dynamic_dimensions_source["DYN1"] = [{"input_name": "Y1", "axis": 0}]
+        g.dynamic_dimensions_source["DYN2"] = [{"input_name": "Y2", "axis": 0}]
+
+        # Register bidirectional constraints: DYN0, DYN1, DYN2 all equal to batch.
+        for dyn in ("DYN0", "DYN1", "DYN2"):
+            g.add_to_constraints("batch", dyn)
+            g.add_to_constraints(dyn, "batch")
+
+        replacements = g._improves_dynamic_dimension_naming()
+
+        # Each DYN dimension must be renamed to "batch", never to "batch_1" etc.
+        for dyn in ("DYN0", "DYN1", "DYN2"):
+            got = replacements.get(dyn)
+            self.assertEqual(
+                got,
+                "batch",
+                f"Expected {dyn!r} → 'batch' but got {got!r}. "
+                "Redundant 'batch_N' aliases were created.",
+            )
+
+        # Output shapes must show "batch" at axis 0.
+        for out_name in ("Y0", "Y1", "Y2"):
+            renamed = g.get_shape_renamed(out_name)
+            self.assertEqual(
+                renamed[0],
+                "batch",
+                f"Output {out_name!r} axis-0 dim should be 'batch', got {renamed[0]!r}",
+            )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

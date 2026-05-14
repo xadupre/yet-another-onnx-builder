@@ -269,10 +269,10 @@ class MermaidEmitter(BaseEmitter):
 
         # ---- class definitions ----
         rows += [
-            "    classDef input fill:#aaeeaa",
-            "    classDef init fill:#cccc00",
-            "    classDef op fill:#cccccc",
-            "    classDef output fill:#aaaaee",
+            "    classDef input fill:#aaeeaa,stroke:#00aa00,color:#000",
+            "    classDef init fill:#cccc00,stroke:#888800,color:#000",
+            "    classDef op fill:#cccccc,stroke:#666666,color:#000",
+            "    classDef output fill:#aaaaee,stroke:#0000aa,color:#000",
         ]
         return rows
 

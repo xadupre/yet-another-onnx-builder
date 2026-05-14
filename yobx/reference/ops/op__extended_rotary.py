@@ -2,7 +2,7 @@ from onnx.reference.op_run import OpRun
 
 
 class Rotary(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, X, splits=None, side=None):
         assert splits is None or (

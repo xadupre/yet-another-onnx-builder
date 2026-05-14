@@ -53,7 +53,7 @@ class ConstantOfShapeScatterNDPattern(PatternOptimization):
             I_shape(["shape INT64(DIM)"])
             I_masked_updates(["masked_updates FLOAT(DIM1^DIM3, DIM2^DIM4, DIM5)"])
 
-            ScatterNDOfShape_0[["onnx_extended.ortops.optim.cuda.ScatterNDOfShape(., ., .)"]]
+            ScatterNDOfShape_0[["yaourt.ortops.fused_kernel.cuda.ScatterNDOfShape(., ., .)"]]
 
             I_shape -->|"INT64(DIM)"| ScatterNDOfShape_0
             I_indices -->|"INT64(DIM1, DIM2, 1)"| ScatterNDOfShape_0
@@ -110,7 +110,7 @@ class ConstantOfShapeScatterNDPattern(PatternOptimization):
             node.output,
             strategy="optimize",
             name=f"{self.__class__.__name__}--{node.name}",
-            domain="onnx_extended.ortops.optim.cuda",
+            domain="yaourt.ortops.fused_kernel.cuda",
         )
         new_node.attribute.append(reduction)
         return [new_node]
@@ -135,7 +135,7 @@ class MaskedShapeScatterNDPattern(PatternOptimization):
             I_indices(["indices INT64(DIM1, DIM2, 1)"])
             I_shape(["shape INT64(DIM)"])
 
-            ScatterNDOfShape_0[["onnx_extended.ortops.optim.cuda.ScatterNDOfShape(., ., .)"]]
+            ScatterNDOfShape_0[["yaourt.ortops.fused_kernel.cuda.ScatterNDOfShape(., ., .)"]]
             Where_1[["Where(., [0.0], .)"]]
             Equal_2[["Equal(., [-1])"]]
 
@@ -167,7 +167,7 @@ class MaskedShapeScatterNDPattern(PatternOptimization):
             I_indices(["indices INT64(DIM1, DIM2, 1)"])
             I_shape(["shape INT64(DIM)"])
 
-            MaskedScatterNDOfShape_0[["onnx_extended.ortops.optim.cuda.MaskedScatterNDOfShape(
+            MaskedScatterNDOfShape_0[["yaourt.ortops.fused_kernel.cuda.MaskedScatterNDOfShape(
             ., ., .)"]]
 
             I_shape -->|"INT64(DIM)"| MaskedScatterNDOfShape_0
@@ -256,6 +256,6 @@ class MaskedShapeScatterNDPattern(PatternOptimization):
             reduction="add",
             maskedValue=int(mask),
             name=f"{self.__class__.__name__}--{scatter_node.name}",
-            domain="onnx_extended.ortops.optim.cuda",
+            domain="yaourt.ortops.fused_kernel.cuda",
         )
         return [new_node]

@@ -4,7 +4,7 @@ from onnx.reference.ops.op_scatternd import _scatter_nd_impl
 
 
 class ScatterNDOfShape(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, shape, indices, updates, reduction=None, strategy=None):
         data = np.zeros(shape, dtype=updates.dtype)
@@ -13,7 +13,7 @@ class ScatterNDOfShape(OpRun):
 
 
 class MaskedScatterNDOfShape(OpRun):
-    op_domain = "onnx_extended.ortops.optim.cuda"
+    op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, shape, indices, updates, reduction=None, maskedValue=None):
         data = np.zeros(shape, dtype=updates.dtype)

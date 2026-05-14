@@ -203,6 +203,7 @@ We consider the following simple model:
 
 .. runpython::
     :showcode:
+    :process:
 
     import torch
     from yobx.helpers.onnx_helper import pretty_onnx

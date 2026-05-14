@@ -3079,6 +3079,51 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertIn("Split", [n.op_type for n in onx.graph.node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
 
+    def test_aten_tensor_split_sections(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.tensor_split(x, 3, dim=0)
+
+        model = Model()
+        x = torch.arange(12, dtype=torch.float32).reshape((6, 2))
+        expected = model(x)
+        onx = to_onnx(model, (x,))
+        self.dump_onnx("test_aten_tensor_split_sections.onnx", onx)
+        self.assertIn("Split", [n.op_type for n in onx.graph.node])
+        self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
+
+    def test_aten_tensor_split_sections_unequal(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.tensor_split(x, 3, dim=0)
+
+        model = Model()
+        x = torch.arange(21, dtype=torch.float32).reshape((7, 3))
+        expected = model(x)
+        onx = to_onnx(model, (x,))
+        self.dump_onnx("test_aten_tensor_split_sections_unequal.onnx", onx)
+        self.assertIn("Split", [n.op_type for n in onx.graph.node])
+        self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
+
+    def test_aten_tensor_split_indices(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.tensor_split(x, [1, 4], dim=0)
+
+        model = Model()
+        x = torch.arange(18, dtype=torch.float32).reshape((6, 3))
+        expected = model(x)
+        onx = to_onnx(model, (x,))
+        self.dump_onnx("test_aten_tensor_split_indices.onnx", onx)
+        self.assertIn("Split", [n.op_type for n in onx.graph.node])
+        self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
+
     @skipif_ci_windows("does not work on windows")
     def test_aten_bucketize_right(self):
         import torch
@@ -3310,6 +3355,33 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model()
         expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
+
+    def test_aten_fused_rms_none_float16_rstd_output(self):
+        # Regression test for a type conflict in _aten_getitem when accessing
+        # a named tuple element whose ONNX type (float32, for numerical
+        # stability in the rstd computation) differs from the FX metadata
+        # dtype (float16, following the float16 input).  Previously, getitem
+        # pre-registered outputs[0] as float16 from FX metadata, then the
+        # Identity node propagation tried to set it to float32 (the
+        # established ONNX type of the source), raising:
+        #   AssertionError: Type for name 'rsqrt' already exists and it is
+        #   different, known is 1 != 10 (new)
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                _out, rstd = torch.ops.aten._fused_rms_norm(x, [4], None, None)
+                return rstd
+
+        inputs = (torch.rand((3, 4), dtype=torch.float16),)
+        DYN = torch.export.Dim.DYNAMIC
+        dynamic = ({0: DYN},)
+
+        model = Model()
+        expected = model(*torch_deepcopy(inputs))
+        # to_onnx raises AssertionError without the _aten_getitem fix
         onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 

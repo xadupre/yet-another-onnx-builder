@@ -211,6 +211,7 @@ plot*.onnx
 plot*.png
 docs/_static/require.js
 docs/_static/viz.js
+docs/_static/doc_build_durations.json
 docs/auto*
 docs/sg_execution_times.rst
 

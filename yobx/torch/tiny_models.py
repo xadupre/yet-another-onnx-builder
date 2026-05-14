@@ -63,6 +63,7 @@ class TinyBroadcastAddModel(torch.nn.Module):
 
     .. runpython::
         :showcode:
+        :process:
 
         import torch
         from yobx.helpers import string_type

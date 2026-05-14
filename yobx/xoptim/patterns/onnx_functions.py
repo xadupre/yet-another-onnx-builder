@@ -426,6 +426,13 @@ class MaxReluPattern(PatternOptimization):
             return self.none()
         if len(node.input) != 2:
             return self.none(node, inspect.currentframe().f_lineno)
+        if not g.has_type(node.input[0]) or g.get_type(node.input[0]) not in {
+            TensorProto.FLOAT,
+            TensorProto.FLOAT16,
+            TensorProto.INT16,
+            TensorProto.INT32,
+        }:
+            return self.none(node, inspect.currentframe().f_lineno)
 
         # Require exactly one zero-valued constant input among the two inputs.
         zero_const_inputs = [
