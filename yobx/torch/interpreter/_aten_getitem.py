@@ -332,7 +332,7 @@ def _getitem_advanced(
     ``[B, 1, 1, K]``.
 
     :param g: the graph builder
-    :param sts: known shapes and types; when ``None`` the function sets type and
+    :param sts: known shapes and types; when falsy the function sets type and
         shape on the output itself
     :param outputs: list of output tensor names; ``outputs[0]`` is the result
     :param input_name: name of the tensor being indexed
