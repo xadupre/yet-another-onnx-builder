@@ -2335,8 +2335,6 @@ class GraphTracer:
         Returns:
             A tuple of :class:`TracingTensor` instances, one per output chunk.
         """
-        from ._patches import _ORIGINAL_TORCH_TENSOR_SPLIT
-
         # ------------------------------------------------------------------ #
         # Guard: if the input tensor is NOT a TracingTensor (e.g. it is a   #
         # FakeTensor produced inside FakeTensorMode during dispatch()'s       #
@@ -2345,6 +2343,8 @@ class GraphTracer:
         # calls where the input is a genuine TracingTensor.                   #
         # ------------------------------------------------------------------ #
         if not isinstance(input, TracingTensor):
+            from ._patches import _ORIGINAL_TORCH_TENSOR_SPLIT
+
             return _ORIGINAL_TORCH_TENSOR_SPLIT(input, indices_or_sections, dim)
         # ------------------------------------------------------------------ #
         # Case 1: indices_or_sections is NOT a TracingTensor.                 #
@@ -2386,6 +2386,8 @@ class GraphTracer:
                     {},
                 )
             # Fall back to original for anything else (should not normally occur).
+            from ._patches import _ORIGINAL_TORCH_TENSOR_SPLIT
+
             return _ORIGINAL_TORCH_TENSOR_SPLIT(input, indices_or_sections, dim)  # type: ignore
 
         # ------------------------------------------------------------------ #
