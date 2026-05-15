@@ -272,6 +272,12 @@ def make_dynamic_cache(
         )
         and PvVersion(transformers.__version__) >= PvVersion("4.56")
     ):
+
+        def _get_seq_length_without_numel(layer: Any):
+            if layer.keys is None:
+                return 0
+            return layer.keys.shape[-2]
+
         cache = transformers.cache_utils.DynamicCache()
         cache.layers.extend(
             [cls_layer(**kws) for cls_layer, kws in zip(cls_layers, cls_kwargs)]  # type: ignore[operator, arg-type]
@@ -284,6 +290,10 @@ def make_dynamic_cache(
             layer.keys = k  # type: ignore
             layer.values = v  # type: ignore
             layer.is_initialized = True  # type: ignore
+            if hasattr(layer, "get_seq_length"):
+                layer.get_seq_length = (  # type: ignore[method-assign]
+                    lambda layer=layer: _get_seq_length_without_numel(layer)
+                )
         assert not hasattr(cache, "layers") or len(key_value_pairs) == len(cache.layers), (
             f"Unexpected number of layers in the cache ({len(cache.layers)}), "
             f"{len(key_value_pairs)} expected."
