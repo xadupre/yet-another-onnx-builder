@@ -1,5 +1,5 @@
 import unittest
-import unittest.mock
+from unittest import mock
 import torch
 import transformers
 from yobx.ext_test_case import (
@@ -128,9 +128,7 @@ class TestPatchTransformerHelper(ExtTestCase):
             del past_key_values, position_ids, or_mask_function, and_mask_function
             return "ok"
 
-        with unittest.mock.patch.object(
-            patches, "_ORIGINAL_CREATE_CAUSAL_MASK", fake_create_causal_mask
-        ):
+        with mock.patch.object(patches, "_ORIGINAL_CREATE_CAUSAL_MASK", fake_create_causal_mask):
             got = patches.patched_create_causal_mask(
                 config=object(),
                 inputs_embeds=torch.randn((1, 2, 3)),
