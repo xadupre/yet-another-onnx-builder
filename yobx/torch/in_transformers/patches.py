@@ -211,13 +211,20 @@ def patched_llama_attention_forward(
 
 
 def patched_dynamic_layer_get_seq_length(self) -> int:
-    """Returns the sequence length without symbolic ``numel()==0`` checks when tracing."""
+    """Returns a tracing-safe sequence length or delegates to the original implementation.
+
+    During new-tracing, ``keys.numel() == 0`` may involve symbolic dimensions and
+    trigger a Python-bool conversion error. This implementation uses the shape
+    directly for tracing-oriented tensor representations, while preserving the
+    original transformers behavior for regular eager tensors.
+    """
     keys = getattr(self, "keys", None)
     if keys is None:
         return 0
     if (
-        type(keys).__name__ == "TracingTensor"
+        hasattr(keys, "_tracer")
         or isinstance(keys, torch.fx.Proxy)
+        # Handles FakeTensor and other tensor subclasses carrying symbolic shapes.
         or (isinstance(keys, torch.Tensor) and type(keys) is not torch.Tensor)
     ):
         return keys.shape[-2]
