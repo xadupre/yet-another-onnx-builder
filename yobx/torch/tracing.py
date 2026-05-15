@@ -6,6 +6,10 @@ import textwrap
 import types
 from typing import Any, Callable, Dict, Generator, Iterable, List, Optional, Tuple, Union
 import torch
+import torch.utils._pytree as pytree
+from torch.fx import Node
+from torch.fx.proxy import TracerBase
+from transformers.cache_utils import DynamicCache
 from ..helpers import flatten_object, string_type
 from .fake_tensor_helper import make_fake_with_dynamic_dimensions
 from .torch_helper import torch_deepcopy
@@ -27,6 +31,9 @@ def _infer_ndim_from_node(node: "torch.fx.Node", _visited: Optional[set] = None)
     operands have different numbers of dimensions the result always has at least
     as many dimensions as the largest input.
 
+    For ``call_module`` nodes backed by ``torch.nn.Embedding``, the output rank
+    equals the first-argument rank plus one (embedding adds a trailing dimension).
+
     :param node: The FX node whose rank we want to determine.
     :param _visited: Internal set used to avoid infinite loops in cyclic graphs.
     :return: The inferred rank as an :class:`int`, or ``None`` if it cannot be
@@ -42,6 +49,22 @@ def _infer_ndim_from_node(node: "torch.fx.Node", _visited: Optional[set] = None)
         val = node.meta["val"]
         if isinstance(val, torch.Tensor):
             return val.ndim
+
+    # Special case: nn.Embedding increases the input rank by 1.
+    if node.op == "call_module" and node.args:
+        owning_module = node.graph.owning_module
+        if owning_module is not None:
+            submod: Optional[torch.nn.Module] = owning_module
+            for part in str(node.target).split("."):
+                submod = submod._modules.get(part) if hasattr(submod, "_modules") else None
+                if submod is None:
+                    break
+            if isinstance(submod, torch.nn.Embedding):
+                first_arg = node.args[0]
+                if isinstance(first_arg, torch.fx.Node):
+                    input_ndim = _infer_ndim_from_node(first_arg, _visited)
+                    if input_ndim is not None:
+                        return input_ndim + 1
 
     # For intermediate nodes, propagate from tensor-valued arguments.
     # We need to handle list/tuple args (e.g. torch.cat's first argument is a
@@ -361,7 +384,7 @@ class CustomProxy(torch.fx.proxy.Proxy):
         assert out is None, "Tracing is not implementing is out is not None."
         if axis is not None and dim == 0:
             dim = axis
-        if isinstance(tensors, list):
+        if isinstance(tensors, (list, tuple)):
             if any(isinstance(t, CustomProxy) for t in tensors):
                 proxy = next(t for t in tensors if isinstance(t, CustomProxy))
                 new_tensors = []
@@ -713,8 +736,18 @@ class CustomProxyShape(CustomProxy):
     def __repr__(self):
         return f"{self.__class__.__name__}({self.values})"
 
+    def _infer_ndim(self) -> Optional[int]:
+        """Try to infer ndim from the underlying tensor node."""
+        tensor_node = self.node.args[0] if self.node.args else None
+        if isinstance(tensor_node, torch.fx.Node):
+            return _infer_ndim_from_node(tensor_node)
+        return None
+
     def __len__(self) -> int:
         if self.values is _MISSING:
+            ndim = self._infer_ndim()
+            if ndim is not None:
+                return ndim
             raise NotImplementedError(
                 "Cannot compute the length of a CustomProxyShape without concrete values. "
                 "Ensure concrete shape metadata is available, or use the proxy node directly."
@@ -723,17 +756,27 @@ class CustomProxyShape(CustomProxy):
 
     def length(self) -> int:
         if self.values is _MISSING:
+            ndim = self._infer_ndim()
+            if ndim is not None:
+                return ndim
             raise NotImplementedError(
-                "Cannot compute the length of a CustomProxyShape without concrete values. "
-                "Ensure concrete shape metadata is available, or use the proxy node directly."
+                f"Cannot compute the length of a CustomProxyShape without concrete values. "
+                f"Ensure concrete shape metadata is available, or use the proxy node directly. "
+                f"values={self.values}, node={self.node}, args={self.node.args}"
             )
         return len(self.values)
 
     def __iter__(self):
         if self.values is _MISSING:
+            ndim = self._infer_ndim()
+            if ndim is not None:
+                for i in range(ndim):
+                    yield self[i]
+                return
             raise NotImplementedError(
-                "Cannot iterate a CustomProxyShape without concrete values. "
-                "Ensure concrete shape metadata is available."
+                f"Cannot iterate a CustomProxyShape without concrete values. "
+                f"Ensure concrete shape metadata is available. "
+                f"values={self.values}, node={self.node}, args={self.node.args}"
             )
         yield from self.values
 
@@ -748,6 +791,17 @@ class CustomProxyShape(CustomProxy):
             return self.values[index]
         if isinstance(index, slice):
             if self.values is _MISSING:
+                # Try to infer the rank from the tensor node that owns this shape.
+                # self.node is the size() call; self.node.args[0] is the tensor node.
+                tensor_node = self.node.args[0] if self.node.args else None
+                ndim = (
+                    _infer_ndim_from_node(tensor_node)
+                    if isinstance(tensor_node, torch.fx.Node)
+                    else None
+                )
+                if ndim is not None:
+                    indices = list(range(*index.indices(ndim)))
+                    return [self[i] for i in indices]
                 raise NotImplementedError(
                     "Slicing a CustomProxyShape requires concrete values. "
                     "Ensure concrete shape metadata is available."
@@ -1256,6 +1310,26 @@ class CustomTracer(torch.fx.Tracer):
             return torch.float32
         if a is complex:
             return torch.complex64
+        # Handle DynamicCache instances.  torch.fx.Tracer.create_arg does not know
+        # about DynamicCache so we serialize it as a call_function node that calls
+        # make_dynamic_cache with the flattened tensor list as its sole argument.
+        # The flat format is [k0, v0, k1, v1, ...] which make_dynamic_cache
+        # reconstructs via _preprocess_key_value_pairs.  Passing cls_layers as a
+        # kwarg is intentionally avoided: it would embed Python class objects
+        # (e.g. <class 'transformers.cache_utils.DynamicLayer'>) directly into the
+        # generated graph source code, producing a SyntaxError when that code is
+        # later compiled by _make_graph_module.
+        if isinstance(a, DynamicCache):
+            from .in_transformers.cache_helper import CacheKeyValue, make_dynamic_cache
+
+            capi = CacheKeyValue(a)
+            if capi.key_cache is not None and capi.value_cache is not None:
+                # Flatten into [k0, v0, k1, v1, ...] — each element is already a
+                # CustomProxy so create_arg returns its node directly.
+                flat_args = self.create_arg(capi.aslist())
+                return self.create_node(
+                    "call_function", make_dynamic_cache, args=(flat_args,), kwargs={}
+                )
         res = super().create_arg(a)
         return res
 
@@ -1516,12 +1590,16 @@ class CustomTracer(torch.fx.Tracer):
                     f"[CustomTracer.trace] _traced_concrete_args="
                     f"{string_type(self._traced_concrete_args, with_shape=True)}"
                 )
+            # Store new_names so _proxy_placeholder can pre-populate node.meta["val"]
+            # for the flat-list case (wrapped model).
+            self._new_names = new_names
             with replace_problematic_function_before_tracing():
                 # concrete arguments are replaced by constants whatever is given to the function
                 graph = super().trace(new_model)
 
         else:
             self._traced_concrete_args = None
+            self._new_names = None
             new_names = None
 
             with replace_problematic_function_before_tracing():

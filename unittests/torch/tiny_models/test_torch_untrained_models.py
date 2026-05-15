@@ -511,7 +511,6 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
     @hide_stdout()
     @requires_transformers("5.2")
-    @unittest.skip("tracing not ready yet")
     def test_tiny_llm_tracing_to_onnx_22(self):
         import onnxruntime
 
@@ -527,7 +526,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
         with (
             register_flattening_functions(patch_transformers=True),
-            apply_patches_for_model(patch_transformers=True, model=model),
+            apply_patches_for_model(patch_transformers=True, model=model, tracing=True),
         ):
             onx = to_onnx(
                 model,

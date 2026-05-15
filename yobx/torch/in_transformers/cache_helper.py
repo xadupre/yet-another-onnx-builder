@@ -261,6 +261,9 @@ def make_dynamic_cache(
 
     from ...pv_version import PvVersion
 
+    _first_key = key_value_pairs[0][0] if key_value_pairs else None
+    _is_proxy = isinstance(_first_key, torch.fx.proxy.Proxy)
+
     if (
         key_value_pairs
         and (
