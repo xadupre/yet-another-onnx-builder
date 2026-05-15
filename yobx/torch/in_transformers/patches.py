@@ -218,10 +218,12 @@ def patched_dynamic_layer_get_seq_length(self) -> int:
     if keys is None:
         return 0
     if (
+        # TracingTensor instances expose a tracer handle on this attribute.
         hasattr(keys, "_tracer")
         or isinstance(keys, torch.fx.Proxy)
         # Handles FakeTensor and other tensor subclasses carrying symbolic shapes.
-        # ``type(keys) is not torch.Tensor`` intentionally detects subclasses.
+        # ``isinstance(keys, torch.Tensor)`` stays True for subclasses, therefore
+        # ``type(keys) is not torch.Tensor`` is used to detect subclass instances.
         or (isinstance(keys, torch.Tensor) and type(keys) is not torch.Tensor)
     ):
         return keys.shape[-2]
