@@ -114,7 +114,7 @@ def patched_sdpa_mask(*args, **kwargs):
 
 
 def _call_original_create_causal_mask(**kwargs):
-    """Filters kwargs to match the signature and invokes ``create_causal_mask``."""
+    """Filters the kwargs to match the signature and invokes ``create_causal_mask``."""
     accepted = inspect.signature(_ORIGINAL_CREATE_CAUSAL_MASK).parameters
     filtered = {k: v for k, v in kwargs.items() if k in accepted}
     return _ORIGINAL_CREATE_CAUSAL_MASK(**filtered)

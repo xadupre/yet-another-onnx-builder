@@ -124,6 +124,7 @@ class TestPatchTransformerHelper(ExtTestCase):
             or_mask_function=None,
             and_mask_function=None,
         ):
+            """Acts as a test double for the upstream causal-mask helper."""
             return "ok"
 
         with mock.patch.object(patches, "_ORIGINAL_CREATE_CAUSAL_MASK", fake_create_causal_mask):
