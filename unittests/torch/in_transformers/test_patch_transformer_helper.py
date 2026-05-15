@@ -124,8 +124,6 @@ class TestPatchTransformerHelper(ExtTestCase):
             or_mask_function=None,
             and_mask_function=None,
         ):
-            del config, inputs_embeds, attention_mask
-            del past_key_values, position_ids, or_mask_function, and_mask_function
             return "ok"
 
         with mock.patch.object(patches, "_ORIGINAL_CREATE_CAUSAL_MASK", fake_create_causal_mask):
