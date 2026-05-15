@@ -14,6 +14,11 @@ _ORIGINAL_LLAMA_ATTENTION_FORWARD = (
     transformers.models.llama.modeling_llama.LlamaAttention.forward
 )
 _DEFAULT_MASK_FUNCTION = transformers.masking_utils.causal_mask_function
+_ORIGINAL_DYNAMIC_LAYER_GET_SEQ_LENGTH = (
+    transformers.cache_utils.DynamicLayer.get_seq_length
+    if hasattr(transformers.cache_utils, "DynamicLayer")
+    else None
+)
 
 
 def patched_ignore_causal_mask_sdpa(
@@ -205,6 +210,21 @@ def patched_llama_attention_forward(
     return attn_output, attn_weights
 
 
+def patched_dynamic_layer_get_seq_length(self) -> int:
+    """Returns sequence length without symbolic ``numel()==0`` checks when tracing."""
+    keys = getattr(self, "keys", None)
+    if keys is None:
+        return 0
+    if (
+        type(keys).__name__ == "TracingTensor"
+        or isinstance(keys, torch.fx.Proxy)
+        or (isinstance(keys, torch.Tensor) and type(keys) is not torch.Tensor)
+    ):
+        return keys.shape[-2]
+    assert _ORIGINAL_DYNAMIC_LAYER_GET_SEQ_LENGTH is not None
+    return _ORIGINAL_DYNAMIC_LAYER_GET_SEQ_LENGTH(self)
+
+
 def _make_patch_info_for_rotary(submodule_class):
     patch = PatchInfo.make(
         # patched_dynamic_rope_update(submodule.forward.__wrapped__.__wrapped__),
@@ -251,6 +271,19 @@ def _make_masking_patch_infos() -> List[PatchInfo]:
     ]
 
 
+def _make_cache_patch_infos() -> List[PatchInfo]:
+    if not hasattr(transformers.cache_utils, "DynamicLayer"):
+        return []
+    return [
+        PatchInfo.make(
+            patched_dynamic_layer_get_seq_length,
+            transformers.cache_utils.DynamicLayer,
+            "get_seq_length",
+            family="transformers",
+        )
+    ]
+
+
 def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
     """
     Returns the list of patches for a specific model.
@@ -271,6 +304,7 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
         patches = [
             _make_patch_info_for_rotary(LlamaRotaryEmbedding),
             *_make_masking_patch_infos(),
+            *_make_cache_patch_infos(),
             PatchInfo.make(
                 patched_create_causal_mask,
                 transformers.models.llama.modeling_llama,
@@ -288,7 +322,7 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
                 )
             )
         return patches
-    patches = [*_make_masking_patch_infos()]
+    patches = [*_make_masking_patch_infos(), *_make_cache_patch_infos()]
     for _name, submodule in model.named_modules():
         if (
             hasattr(submodule.forward, "__wrapped__")
