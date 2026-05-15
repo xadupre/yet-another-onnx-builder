@@ -12,16 +12,19 @@ They all returns an instance of :class:`~yobx.container.ExportArtifact`.
    :maxdepth: 1
    :caption: Common Pieces
 
+   design/to_onnx
    design/export_artifact
    coverage
    debug
-   main_to_onnx
+
+Converters all share the same way to create and optimize onnx models,
+but they all trace the model to convert in different ways unique
+to each library the model is implemented with.
 
 .. toctree::
    :maxdepth: 1
    :caption: Converters
 
-   design/to_onnx
    design/litert/index
    design/sklearn/index
    design/sql/index
