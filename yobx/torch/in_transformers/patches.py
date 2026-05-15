@@ -227,7 +227,9 @@ def patched_dynamic_layer_get_seq_length(self) -> int:
         or (isinstance(keys, torch.Tensor) and type(keys) is not torch.Tensor)
     ):
         return keys.shape[-2]
-    assert _ORIGINAL_DYNAMIC_LAYER_GET_SEQ_LENGTH is not None
+    assert (
+        _ORIGINAL_DYNAMIC_LAYER_GET_SEQ_LENGTH is not None
+    ), "Expected transformers.cache_utils.DynamicLayer.get_seq_length to be available."
     return _ORIGINAL_DYNAMIC_LAYER_GET_SEQ_LENGTH(self)
 
 
