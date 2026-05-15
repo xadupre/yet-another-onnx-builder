@@ -1,3 +1,4 @@
+import inspect
 import sys
 import warnings
 from typing import List, Optional
@@ -112,6 +113,13 @@ def patched_sdpa_mask(*args, **kwargs):
     return built_mask
 
 
+def _call_original_create_causal_mask(**kwargs):
+    """Calls ``create_causal_mask`` with kwargs filtered to the current signature."""
+    accepted = inspect.signature(_ORIGINAL_CREATE_CAUSAL_MASK).parameters
+    filtered = {k: v for k, v in kwargs.items() if k in accepted}
+    return _ORIGINAL_CREATE_CAUSAL_MASK(**filtered)
+
+
 def patched_create_causal_mask(
     config,
     inputs_embeds: torch.Tensor,
@@ -124,28 +132,20 @@ def patched_create_causal_mask(
     and_mask_function=None,
 ):
     """Builds tracing-safe causal masks and delegates to the original otherwise."""
+    original_kwargs = dict(
+        config=config,
+        inputs_embeds=inputs_embeds,
+        attention_mask=attention_mask,
+        cache_position=cache_position,
+        past_key_values=past_key_values,
+        position_ids=position_ids,
+        or_mask_function=or_mask_function,
+        and_mask_function=and_mask_function,
+    )
     if type(inputs_embeds).__name__ != "TracingTensor":
-        return _ORIGINAL_CREATE_CAUSAL_MASK(
-            config=config,
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            cache_position=cache_position,
-            past_key_values=past_key_values,
-            position_ids=position_ids,
-            or_mask_function=or_mask_function,
-            and_mask_function=and_mask_function,
-        )
+        return _call_original_create_causal_mask(**original_kwargs)
     if position_ids is None:
-        return _ORIGINAL_CREATE_CAUSAL_MASK(
-            config=config,
-            inputs_embeds=inputs_embeds,
-            attention_mask=attention_mask,
-            cache_position=cache_position,
-            past_key_values=past_key_values,
-            position_ids=position_ids,
-            or_mask_function=or_mask_function,
-            and_mask_function=and_mask_function,
-        )
+        return _call_original_create_causal_mask(**original_kwargs)
     if attention_mask is not None:
         kv_length = attention_mask.shape[-1]
     elif past_key_values is not None:

@@ -1,4 +1,5 @@
 import unittest
+import unittest.mock
 import torch
 import transformers
 from yobx.ext_test_case import (
@@ -109,6 +110,38 @@ class TestPatchTransformerHelper(ExtTestCase):
                 self.assertIn("def longrope_frequency_update", report)
             got = ep.module()(**inputs)
             self.assertEqualAny(expected, got)
+
+    def test_patched_create_causal_mask_ignores_unsupported_kwargs(self):
+        from yobx.torch.in_transformers import patches
+
+        def fake_create_causal_mask(
+            *,
+            config,
+            inputs_embeds,
+            attention_mask,
+            past_key_values=None,
+            position_ids=None,
+            or_mask_function=None,
+            and_mask_function=None,
+        ):
+            del config, inputs_embeds, attention_mask
+            del past_key_values, position_ids, or_mask_function, and_mask_function
+            return "ok"
+
+        with unittest.mock.patch.object(
+            patches, "_ORIGINAL_CREATE_CAUSAL_MASK", fake_create_causal_mask
+        ):
+            got = patches.patched_create_causal_mask(
+                config=object(),
+                inputs_embeds=torch.randn((1, 2, 3)),
+                attention_mask=None,
+                cache_position=torch.tensor([0]),
+                past_key_values=None,
+                position_ids=None,
+                or_mask_function=None,
+                and_mask_function=None,
+            )
+        self.assertEqual(got, "ok")
 
 
 if __name__ == "__main__":
