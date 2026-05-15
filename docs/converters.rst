@@ -19,9 +19,14 @@ They all returns an instance of :class:`~yobx.container.ExportArtifact`.
 
 .. toctree::
    :maxdepth: 1
-   :caption: Converters
+   :caption: Main to_onnx function
 
    design/to_onnx
+
+.. toctree::
+   :maxdepth: 1
+   :caption: Converters
+
    design/litert/index
    design/sklearn/index
    design/sql/index
