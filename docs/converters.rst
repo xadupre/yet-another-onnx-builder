@@ -18,7 +18,7 @@ They all returns an instance of :class:`~yobx.container.ExportArtifact`.
    debug
 
 Converters all share the same way to create and optimize onnx models,
-but they all trace the model to convert in different ways unqiue
+but they all trace the model to convert in different ways unique
 to each library the model is implemented with.
 
 .. toctree::
