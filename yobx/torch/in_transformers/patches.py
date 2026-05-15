@@ -23,7 +23,7 @@ def patched_ignore_causal_mask_sdpa(
     kv_offset: int,
     local_attention_size: Optional[int] = None,
 ) -> bool:
-    """Returns False when dynamic shapes prevent eager bool evaluation."""
+    """Wraps the original function and returns False on symbolic-bool conversion errors."""
     try:
         return _ORIGINAL_IGNORE_CAUSAL_MASK_SDPA(
             padding_mask, query_length, kv_length, kv_offset, local_attention_size
@@ -53,7 +53,7 @@ def patched_prepare_padding_mask(
 
 
 def patched_sdpa_mask(*args, **kwargs):
-    """Creates SDPA masks for tracing from positional/keyword SDPA arguments."""
+    """Creates a broadcastable SDPA mask without symbolic ``expand`` calls."""
     use_vmap = kwargs.get("use_vmap", False)
     if use_vmap:
         return _ORIGINAL_SDPA_MASK(*args, **kwargs)
@@ -118,7 +118,7 @@ def patched_create_causal_mask(
     or_mask_function=None,
     and_mask_function=None,
 ):
-    """Builds a causal mask without symbolic bool checks from masking_utils."""
+    """Builds tracing-safe causal masks and delegates to the original otherwise."""
     if type(inputs_embeds).__name__ != "TracingTensor":
         return _ORIGINAL_CREATE_CAUSAL_MASK(
             config=config,
@@ -164,7 +164,7 @@ def patched_llama_attention_forward(
     past_key_values=None,
     **kwargs,
 ):
-    """Uses eager attention for TracingTensor inputs to avoid SDPA tracing guards."""
+    """Reimplements Llama attention with eager ops for TracingTensor inputs only."""
     if type(hidden_states).__name__ != "TracingTensor":
         return _ORIGINAL_LLAMA_ATTENTION_FORWARD(
             self,
@@ -225,64 +225,8 @@ def _make_patch_info_for_rotary(submodule_class):
     return patch
 
 
-def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
-    """
-    Returns the list of patches for a specific model.
-    if model is None, patches everything it can.
-
-    .. note::
-        The function detects that ``RotaryEmbedding.forward`` is wrapped by checking
-        if can find substring ``transformers/modeling_rope_utils.py`` in
-        ``RotaryEmbedding.forward.__wrapped__``. It does not seem to be the case
-        with Python 3.10.
-    """
-    if model is None:
-        from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
-        from ...pv_version import PvVersion
-
-        use_llama_attention_patch = PvVersion(transformers.__version__) >= PvVersion("5.8")
-
-        patches = [
-            _make_patch_info_for_rotary(LlamaRotaryEmbedding),
-            PatchInfo.make(
-                patched_ignore_causal_mask_sdpa,
-                transformers.masking_utils,
-                "_ignore_causal_mask_sdpa",
-                family="transformers",
-            ),
-            PatchInfo.make(
-                patched_prepare_padding_mask,
-                transformers.masking_utils,
-                "prepare_padding_mask",
-                family="transformers",
-            ),
-            PatchInfo.make(
-                patched_sdpa_mask, transformers.masking_utils, "sdpa_mask", family="transformers"
-            ),
-            PatchInfo.make(
-                patched_create_causal_mask,
-                transformers.masking_utils,
-                "create_causal_mask",
-                family="transformers",
-            ),
-            PatchInfo.make(
-                patched_create_causal_mask,
-                transformers.models.llama.modeling_llama,
-                "create_causal_mask",
-                family="transformers",
-            ),
-        ]
-        if use_llama_attention_patch:
-            patches.append(
-                PatchInfo.make(
-                    patched_llama_attention_forward,
-                    transformers.models.llama.modeling_llama.LlamaAttention,
-                    "forward",
-                    family="transformers",
-                )
-            )
-        return patches
-    patches = [
+def _make_masking_patch_infos() -> List[PatchInfo]:
+    return [
         PatchInfo.make(
             patched_ignore_causal_mask_sdpa,
             transformers.masking_utils,
@@ -305,6 +249,46 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
             family="transformers",
         ),
     ]
+
+
+def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
+    """
+    Returns the list of patches for a specific model.
+    if model is None, patches everything it can.
+
+    .. note::
+        The function detects that ``RotaryEmbedding.forward`` is wrapped by checking
+        if can find substring ``transformers/modeling_rope_utils.py`` in
+        ``RotaryEmbedding.forward.__wrapped__``. It does not seem to be the case
+        with Python 3.10.
+    """
+    if model is None:
+        from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
+        from ...pv_version import PvVersion
+
+        use_llama_attention_patch = PvVersion(transformers.__version__) >= PvVersion("5.8")
+
+        patches = [
+            _make_patch_info_for_rotary(LlamaRotaryEmbedding),
+            *_make_masking_patch_infos(),
+            PatchInfo.make(
+                patched_create_causal_mask,
+                transformers.models.llama.modeling_llama,
+                "create_causal_mask",
+                family="transformers",
+            ),
+        ]
+        if use_llama_attention_patch:
+            patches.append(
+                PatchInfo.make(
+                    patched_llama_attention_forward,
+                    transformers.models.llama.modeling_llama.LlamaAttention,
+                    "forward",
+                    family="transformers",
+                )
+            )
+        return patches
+    patches = [*_make_masking_patch_infos()]
     for _name, submodule in model.named_modules():
         if (
             hasattr(submodule.forward, "__wrapped__")
