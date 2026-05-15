@@ -211,7 +211,7 @@ def patched_llama_attention_forward(
 
 
 def patched_dynamic_layer_get_seq_length(self) -> int:
-    """Returns a tracing-safe sequence length or delegates to the original implementation.
+    """Creates a tracing-safe sequence length or delegates to the original implementation.
 
     During new-tracing, ``keys.numel() == 0`` may involve symbolic dimensions and
     trigger a Python-bool conversion error. This implementation uses the shape
@@ -279,7 +279,7 @@ def _make_masking_patch_infos() -> List[PatchInfo]:
 
 
 def _make_cache_patch_infos() -> List[PatchInfo]:
-    """Returns cache-layer patch metadata when DynamicLayer is available."""
+    """Creates cache-layer patch metadata when DynamicLayer is available."""
     if not hasattr(transformers.cache_utils, "DynamicLayer"):
         return []
     return [
