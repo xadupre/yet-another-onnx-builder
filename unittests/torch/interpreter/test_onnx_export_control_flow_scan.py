@@ -575,7 +575,6 @@ class TestOnnxExportControlFlow(ExtTestCase):
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
-
     def test_scan_loop_inplace_new_tracing(self):
         import torch
         from yobx.torch.export_options import TracingMode
