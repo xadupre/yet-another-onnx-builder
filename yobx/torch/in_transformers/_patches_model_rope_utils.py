@@ -318,9 +318,7 @@ class common_RotaryEmbedding(torch.nn.Module):
             inv_freq = self.inv_freq
             attention_scaling = self.attention_scaling
 
-        inv_freq_expanded = (
-            inv_freq[None, :, None].float().expand((position_ids.shape[0], -1, 1)).to(x.device)
-        )
+        inv_freq_expanded = inv_freq[None, :, None].float().to(x.device)
         position_ids_expanded = position_ids[:, None, :].float()
 
         device_type = (
