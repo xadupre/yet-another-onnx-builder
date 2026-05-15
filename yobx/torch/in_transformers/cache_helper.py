@@ -274,6 +274,7 @@ def make_dynamic_cache(
     ):
 
         def _get_seq_length_without_numel(layer: Any):
+            """Returns cache sequence length without symbolic numel()-based checks."""
             if layer.keys is None:
                 return 0
             return layer.keys.shape[-2]

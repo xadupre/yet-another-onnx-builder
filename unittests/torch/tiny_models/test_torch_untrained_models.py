@@ -621,6 +621,8 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         feeds = make_feeds(sess, eval_inputs, use_numpy=True)
         got = sess.run(None, feeds)
         diff = max_diff(expected_eval, got)
+        # transformers>=5.8 follows a patched eager-attention tracing path
+        # which is numerically close but not bit-identical to eager inference.
         tolerance = 2.0 if is_transformers_58_or_newer else 1e-5
         assert diff["abs"] <= tolerance, f"diff={diff}"
 

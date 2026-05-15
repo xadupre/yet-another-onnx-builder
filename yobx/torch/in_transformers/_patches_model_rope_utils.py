@@ -319,7 +319,10 @@ class common_RotaryEmbedding(torch.nn.Module):
             attention_scaling = self.attention_scaling
 
         inv_freq_expanded = (
-            inv_freq[None, :, None].float() + position_ids[:, None, :1].float() * 0
+            # Uses arithmetic broadcasting instead of expand(..., TracingInt, ...)
+            # because Tensor.expand expects concrete Python ints.
+            inv_freq[None, :, None].float()
+            + position_ids[:, None, :1].float() * 0
         ).to(x.device)
         position_ids_expanded = position_ids[:, None, :].float()
 

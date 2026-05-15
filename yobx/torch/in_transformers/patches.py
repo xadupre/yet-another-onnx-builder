@@ -13,6 +13,7 @@ _ORIGINAL_CREATE_CAUSAL_MASK = transformers.masking_utils.create_causal_mask
 _ORIGINAL_LLAMA_ATTENTION_FORWARD = (
     transformers.models.llama.modeling_llama.LlamaAttention.forward
 )
+_DEFAULT_MASK_FUNCTION = transformers.masking_utils.causal_mask_function
 
 
 def patched_ignore_causal_mask_sdpa(
@@ -52,7 +53,7 @@ def patched_prepare_padding_mask(
 
 
 def patched_sdpa_mask(*args, **kwargs):
-    """Creates SDPA mask without requiring symbolic ``expand`` shape arguments."""
+    """Creates SDPA masks for tracing from positional/keyword SDPA arguments."""
     use_vmap = kwargs.get("use_vmap", False)
     if use_vmap:
         return _ORIGINAL_SDPA_MASK(*args, **kwargs)
@@ -62,7 +63,7 @@ def patched_sdpa_mask(*args, **kwargs):
     kv_length = kwargs.get("kv_length", args[2] if len(args) > 2 else None)
     q_offset = kwargs.get("q_offset", 0)
     kv_offset = kwargs.get("kv_offset", 0)
-    mask_function = kwargs.get("mask_function", transformers.masking_utils.causal_mask_function)
+    mask_function = kwargs.get("mask_function", _DEFAULT_MASK_FUNCTION)
     attention_mask = kwargs.get("attention_mask", None)
     local_size = kwargs.get("local_size", None)
     allow_is_causal_skip = kwargs.get("allow_is_causal_skip", True)
@@ -163,7 +164,7 @@ def patched_llama_attention_forward(
     past_key_values=None,
     **kwargs,
 ):
-    """Uses eager attention in transformers>=5.8 to avoid SDPA tracing guard issues."""
+    """Uses eager attention for TracingTensor inputs to avoid SDPA tracing guards."""
     if type(hidden_states).__name__ != "TracingTensor":
         return _ORIGINAL_LLAMA_ATTENTION_FORWARD(
             self,
