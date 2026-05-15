@@ -2,7 +2,7 @@
 ========================================================================
 
 The command converts an onnx model into a
-`Mermaid <https://mermaid.js.org/>`_ flowchart string that can be embedded
+:epkg:`Mermaid` flowchart string that can be embedded
 in Markdown, GitHub READMEs, or any tool that renders Mermaid diagrams.
 
 Description

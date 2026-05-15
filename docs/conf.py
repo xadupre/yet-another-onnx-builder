@@ -290,6 +290,7 @@ epkg_dictionary = {
     "Linux": "https://www.linux.org/",
     "LiteRT": "https://ai.google.dev/edge/litert/",
     "mermaid-py": "https://pypi.org/project/mermaid-py/",
+    "Mermaid": "https://mermaid.js.org/",
     "ml_dtypes": "https://github.com/jax-ml/ml_dtypes",
     "ModelBuilder": "https://onnxruntime.ai/docs/genai/howto/build-model.html",
     "monai": "https://github.com/Project-MONAI/MONAI",
