@@ -15,12 +15,6 @@ They all returns an instance of :class:`~yobx.container.ExportArtifact`.
    design/export_artifact
    coverage
    debug
-   main_to_onnx
-
-.. toctree::
-   :maxdepth: 1
-   :caption: Main to_onnx function
-
    design/to_onnx
 
 .. toctree::
