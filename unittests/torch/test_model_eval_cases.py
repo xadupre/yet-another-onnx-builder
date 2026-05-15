@@ -516,6 +516,10 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_tiny_llm_yobx(self):
         evaluation(cases="TinyLLM", exporters="yobx", quiet=False, dynamic=True)
 
+    @requires_transformers("5.0")
+    def test_run_exporter_tiny_llm_yobx_float16(self):
+        evaluation(cases="TinyLLMfp16", exporters="yobx", quiet=False, dynamic=True)
+
     @requires_transformers("4.57")
     def test_run_exporter_dynamic_cache_input_export_nostrict(self):
         evaluation(
