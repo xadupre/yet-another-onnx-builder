@@ -579,7 +579,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         # self._chech_shape(onx.get_proto(include_weights=False))
 
     @hide_stdout()
-    @requires_transformers("5.2")
+    @requires_transformers("5.2", or_older_than="5.7")
     def test_tiny_llm_new_tracing_to_onnx_22(self):
         import onnxruntime
 
