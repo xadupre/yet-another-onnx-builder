@@ -211,7 +211,7 @@ def patched_llama_attention_forward(
 
 
 def patched_dynamic_layer_get_seq_length(self) -> int:
-    """Returns sequence length without symbolic ``numel()==0`` checks when tracing."""
+    """Returns the sequence length without symbolic ``numel()==0`` checks when tracing."""
     keys = getattr(self, "keys", None)
     if keys is None:
         return 0
@@ -272,6 +272,7 @@ def _make_masking_patch_infos() -> List[PatchInfo]:
 
 
 def _make_cache_patch_infos() -> List[PatchInfo]:
+    """Returns cache-layer patch metadata when DynamicLayer is available."""
     if not hasattr(transformers.cache_utils, "DynamicLayer"):
         return []
     return [
