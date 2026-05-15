@@ -19,7 +19,10 @@ The library implements a couple of command lines.
     agg
     dot
     find
+    mermaid
     partition
     print
     render_gallery
     run_doc_examples
+    stats
+    validate
