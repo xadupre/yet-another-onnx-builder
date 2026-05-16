@@ -155,14 +155,39 @@ Decomposition strategies
 Two strategies are available via the *strategy* parameter of
 :func:`decompose_einsum_equation <yobx.helpers._einsum.einsum_impl.decompose_einsum_equation>`:
 
-* ``"simple"`` — contractions between two aligned operands are emitted as a
-  single ``matmul`` node which is still evaluated with ``numpy.einsum``
-  internally.
+* ``"simple"`` — **simplified approach**. Contractions between two aligned
+  operands are emitted as a single ``matmul`` node which is still evaluated
+  with ``numpy.einsum`` internally.
 * ``"numpy"`` — contractions are fully expanded into ``Transpose`` +
   ``Reshape`` + ``batch_dot`` nodes so that no ``numpy.einsum`` call remains.
   This is the default used by
   :func:`decompose_einsum <yobx.helpers.einsum_helper.decompose_einsum>` when
   generating ONNX models.
+
+The simplified approach is useful to understand or debug the contraction plan:
+the intermediate graph is typically shorter and closer to the original equation.
+The ``"numpy"`` strategy is more explicit and is the one intended for ONNX
+export because each contraction is rewritten into standard tensor primitives.
+
+The main differences are summarized below:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 24 38 38
+
+   * - Aspect
+     - ``"simple"`` (simplified)
+     - ``"numpy"``
+   * - Contraction implementation
+     - ``matmul`` sub-op may still rely on an internal ``numpy.einsum`` call
+     - contractions are expanded into ``Transpose`` + ``Reshape`` +
+       ``batch_dot``-style steps
+   * - Graph structure
+     - shorter and easier to read when inspecting decomposition logic
+     - more explicit, with additional layout and reshape nodes
+   * - Intended use
+     - introspection, teaching, debugging decomposition behavior
+     - robust ONNX model generation without remaining ``einsum`` semantics
 
 Printing the operation sequence
 --------------------------------
