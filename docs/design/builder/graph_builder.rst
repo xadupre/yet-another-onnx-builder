@@ -37,6 +37,47 @@ Two helper classes round out the public API:
   which optimization passes run inside :meth:`to_onnx
   <yobx.xbuilder.GraphBuilder.to_onnx>`.
 
+Protocol API
+============
+
+:class:`GraphBuilder <yobx.xbuilder.GraphBuilder>` satisfies a hierarchy of
+protocols defined in :mod:`yobx.typing`.  Callers that do not need the
+full concrete class should type-annotate against the narrowest protocol that
+covers the methods they actually use:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 40 60
+
+   * - Protocol
+     - Scope
+   * - :class:`GraphBuilderProtocol <yobx.typing.GraphBuilderProtocol>`
+     - Core construction API: inputs, outputs, initializers, nodes,
+       opset registration, type/shape/sequence accessors, and
+       :meth:`~yobx.typing.GraphBuilderProtocol.to_onnx`.
+   * - :class:`GraphBuilderExtendedProtocol <yobx.typing.GraphBuilderExtendedProtocol>`
+     - Extends the core protocol with ``main_opset``,
+       :attr:`~yobx.typing.GraphBuilderExtendedProtocol.op` (the
+       :class:`~yobx.typing.OpsetProtocol` helper),
+       :meth:`~yobx.typing.GraphBuilderExtendedProtocol.set_type_shape_unary_op`,
+       constant queries, and :meth:`~yobx.typing.GraphBuilderExtendedProtocol.get_debug_msg`.
+       Required by the :mod:`yobx.sklearn` converters.
+   * - :class:`GraphBuilderTorchProtocol <yobx.typing.GraphBuilderTorchProtocol>`
+     - Extends :class:`~yobx.typing.GraphBuilderExtendedProtocol` with the
+       full torch-exporter surface: rank helpers, device helpers, dynamic-shape
+       helpers, sub-builder / local-function support, and miscellaneous
+       utilities used by :class:`~yobx.torch.interpreter.FxGraphInterpreter`.
+   * - :class:`GraphBuilderPatternOptimizationProtocol <yobx.typing.GraphBuilderPatternOptimizationProtocol>`
+     - The read-only view of the graph exposed to pattern-optimization authors
+       inside :meth:`~yobx.xoptim.PatternOptimization.match`.  Satisfied by
+       :class:`~yobx.xoptim.GraphBuilderPatternOptimization`, not by
+       :class:`~yobx.xbuilder.GraphBuilder` directly.
+
+The :attr:`~yobx.typing.GraphBuilderExtendedProtocol.op` property returns an
+object that satisfies :class:`OpsetProtocol <yobx.typing.OpsetProtocol>`,
+which resolves ``g.op.Add(x, y)``-style attribute-access dispatch to ONNX
+node creation.
+
 .. _builder-api-make:
 
 Building a graph from scratch
@@ -490,3 +531,22 @@ outputs) and is useful for quick visual inspection:
 
     g = GraphBuilder(model)
     print(g.pretty_text())
+
+.. seealso::
+
+    :class:`GraphBuilderProtocol <yobx.typing.GraphBuilderProtocol>`,
+    :class:`GraphBuilderExtendedProtocol <yobx.typing.GraphBuilderExtendedProtocol>`,
+    :class:`GraphBuilderTorchProtocol <yobx.typing.GraphBuilderTorchProtocol>`,
+    :class:`OpsetProtocol <yobx.typing.OpsetProtocol>` —
+    formal protocol interfaces satisfied by
+    :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>`.
+
+    :class:`GraphBuilderPatternOptimizationProtocol <yobx.typing.GraphBuilderPatternOptimizationProtocol>`
+    — the read-only API exposed to pattern authors; satisfied by
+    :class:`GraphBuilderPatternOptimization <yobx.xoptim.GraphBuilderPatternOptimization>`.
+
+    :ref:`l-design-expected-api` — the full list of methods and attributes
+    every graph builder must expose for use with :func:`~yobx.sklearn.to_onnx`.
+
+    :ref:`l-design-pattern-optimizer` — how the pattern optimizer uses
+    :class:`GraphBuilderPatternOptimization <yobx.xoptim.GraphBuilderPatternOptimization>`.
