@@ -9,7 +9,6 @@ scikit-learn Export to ONNX
    expected_api
    sklearn_converter
    sklearn_like_converter
-   supported_converters
    custom_converter
    contrib_ops
    dataframe_pipeline
