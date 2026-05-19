@@ -316,6 +316,21 @@ class AtenNnFunctionalBilinear(torch.nn.Module):
     _dynamic = {"x1": {0: DIM("batch")}, "x2": {0: DIM("batch")}}
 
 
+class AtenNnFunctionalSoftMarginLoss(torch.nn.Module):
+    def forward(self, x, target):
+        return torch.nn.functional.soft_margin_loss(x, target, reduction="none")
+
+    _inputs = (
+        torch.randn(2, 3, requires_grad=False),
+        torch.where(
+            torch.randn(2, 3, requires_grad=False) >= 0,
+            torch.tensor(1.0, dtype=torch.float32),
+            torch.tensor(-1.0, dtype=torch.float32),
+        ),
+    )
+    _dynamic = {"x": {0: DIM("batch")}, "target": {0: DIM("batch")}}
+
+
 class AtenNonZero(torch.nn.Module):
     def forward(self, x):
         y = torch.nonzero(x)
