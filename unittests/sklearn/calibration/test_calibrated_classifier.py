@@ -6,9 +6,11 @@ import unittest
 
 import numpy as np
 from sklearn.calibration import CalibratedClassifierCV
+from sklearn.datasets import make_classification
+from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import FunctionTransformer, StandardScaler
 
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
@@ -89,6 +91,38 @@ class TestSklearnCalibratedClassifierCV(ExtTestCase):
         sess = self.check_ort(onx)
         ort_labels = sess.run(None, {"X": X})[0]
         self.assertEqualArray(pipe.predict(X), ort_labels)
+
+    def test_sigmoid_with_pipeline_base_estimator_ensemble_false(self):
+        X, y = make_classification(n_samples=600, n_features=20, random_state=42)
+        X = np.abs(X).astype(np.float32)
+        X_train, X_test = X[:450], X[450:]
+        y_train = y[:450]
+
+        gb = GradientBoostingClassifier(n_estimators=50, random_state=42)
+        base = Pipeline([("id", FunctionTransformer()), ("clf", gb)])
+        clf = CalibratedClassifierCV(base, method="sigmoid", ensemble=False).fit(X_train, y_train)
+
+        expected = clf.predict_proba(X_test).astype(X_test.dtype)
+        onx = to_onnx(clf, (X_test,))
+        got = self.check_ort(onx).run(None, {"X": X_test})[1]
+
+        self.assertEqualArray(expected, got, atol=1e-5)
+
+    def test_sigmoid_with_pipeline_base_estimator_ensemble_true(self):
+        X, y = make_classification(n_samples=600, n_features=20, random_state=42)
+        X = np.abs(X).astype(np.float32)
+        X_train, X_test = X[:450], X[450:]
+        y_train = y[:450]
+
+        gb = GradientBoostingClassifier(n_estimators=50, random_state=42)
+        base = Pipeline([("id", FunctionTransformer()), ("clf", gb)])
+        clf = CalibratedClassifierCV(base, method="sigmoid", ensemble=True).fit(X_train, y_train)
+
+        expected = clf.predict_proba(X_test).astype(X_test.dtype)
+        onx = to_onnx(clf, (X_test,))
+        got = self.check_ort(onx).run(None, {"X": X_test})[1]
+
+        self.assertEqualArray(expected, got, atol=1e-5)
 
 
 if __name__ == "__main__":
