@@ -15,6 +15,7 @@ from ._aten_functions import (
     # aten_add__Tensor,
     aten_abs,
     aten_add,
+    aten_addcmul,
     aten_aminmax,
     aten_argsort,
     aten_bitwise_and,
@@ -55,6 +56,20 @@ from ._aten_functions import (
 )
 
 T = str
+
+
+def aten_meth_addcmul(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    t1: T,
+    t2: T,
+    value: float = 1.0,
+    name: str = "meth_addcmul",
+) -> T:
+    "addcmul."
+    return aten_addcmul(g, sts, outputs, x, t1, t2, value=value, name=name)
 
 
 def aten_meth_abs(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
