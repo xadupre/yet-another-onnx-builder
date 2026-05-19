@@ -614,6 +614,26 @@ class TestExportOptions(ExtTestCase):
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=1e-5)
 
     @ignore_warnings(UserWarning)
+    def test_export_new_tracing_addcmul_inplace_to_onnx(self):
+        """Checks that new tracing correctly exports inplace addcmul."""
+
+        class AddcmulInplaceModel(torch.nn.Module):
+            def forward(self, x, y, z):
+                xc = x.clone()
+                xc.addcmul_(y, z, value=0.25)
+                return xc
+
+        model = AddcmulInplaceModel()
+        x = torch.rand(2, 3, dtype=torch.float32)
+        y = torch.rand(2, 3, dtype=torch.float32)
+        z = torch.rand(2, 3, dtype=torch.float32)
+        expected = model(x, y, z)
+        artifact = to_onnx(
+            model, (x, y, z), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
+        self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x, y, z), atol=1e-5)
+
+    @ignore_warnings(UserWarning)
     def test_export_new_tracing_isclose_isfinite_to_onnx(self):
         """Checks that new tracing correctly exports isclose and isfinite."""
 

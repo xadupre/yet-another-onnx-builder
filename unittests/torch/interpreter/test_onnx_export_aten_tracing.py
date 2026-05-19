@@ -91,6 +91,30 @@ class TestOnnxExportAtenTracing(ExtTestCase):
         onx = self._to_onnx_tracing(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
+    def test_aten_addcmul_method_tracing(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y, z):
+                return x.addcmul(y, z, value=0.25)
+
+        model = Model()
+        inputs = (torch.rand(3, 4), torch.rand(3, 4), torch.rand(3, 4))
+        expected = model(*torch_deepcopy(inputs))
+        onx = self._to_onnx_tracing(model, inputs)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_addcmul_inplace_method_tracing(self):
+        class Model(torch.nn.Module):
+            def forward(self, x, y, z):
+                xc = x.clone()
+                xc.addcmul_(y, z, value=0.25)
+                return xc
+
+        model = Model()
+        inputs = (torch.rand(3, 4), torch.rand(3, 4), torch.rand(3, 4))
+        expected = model(*torch_deepcopy(inputs))
+        onx = self._to_onnx_tracing(model, inputs)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
     # ------------------------------------------------------------------
     # Unary ops
     # ------------------------------------------------------------------
