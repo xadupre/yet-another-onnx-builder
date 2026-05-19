@@ -315,13 +315,13 @@ def onnx_dtype_name(itype: int, exc: bool = True) -> str:
         import onnx
         from yobx.helpers.onnx_helper import onnx_dtype_name
 
-        itype = onnx.onnx.TensorProto.BFLOAT16
+        itype = onnx.TensorProto.BFLOAT16
         print(onnx_dtype_name(itype))
         print(onnx_dtype_name(7))
     """
-    for k in dir(onnx.onnx.TensorProto):
+    for k in dir(onnx.TensorProto):
         if k.upper() == k and k not in {"DESCRIPTOR", "EXTERNAL", "DEFAULT"}:
-            v = getattr(onnx.onnx.TensorProto, k)
+            v = getattr(onnx.TensorProto, k)
             if v == itype:
                 return k
     if exc:
