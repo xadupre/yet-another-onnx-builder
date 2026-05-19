@@ -13,10 +13,10 @@ a bar chart.
 
    This page queries the public GitHub REST API.  No authentication token is
    required for a public repository, but anonymous requests are subject to
-   rate-limiting (60 requests/hour per IP).  When the API cannot be reached
-   (offline build, rate-limit exceeded, …) the chart will be empty and a
-   warning is printed to the console.  Retrieved data is cached as a CSV file
-   and refreshed when the cache is older than two weeks.
+   rate-limiting (60 requests/hour per IP).  Retrieved data is cached as a CSV
+   file and refreshed when the cache is older than two weeks.  If an API
+   request fails, cached data is displayed when available.  The chart also
+   indicates when the data was last fetched.
 
 .. runpython::
     :rst:
@@ -89,6 +89,21 @@ a bar chart.
         return age <= datetime.timedelta(days=_CACHE_MAX_AGE_DAYS)
 
 
+    def _cache_last_fetched():
+        """Returns the cache fetch timestamp.
+
+        Returns:
+            datetime.datetime | None: Cache file modification timestamp in UTC.
+        """
+        if not os.path.exists(_CACHE_FILE):
+            return None
+        try:
+            fetched_ts = os.path.getmtime(_CACHE_FILE)
+        except OSError:
+            return None
+        return datetime.datetime.fromtimestamp(fetched_ts, tz=datetime.timezone.utc)
+
+
     def _load_cached_data():
         """Loads cached commit counts from the CSV file.
 
@@ -158,20 +173,23 @@ a bar chart.
         """Collects commit-per-week data from the cache or the GitHub API.
 
         Returns:
-            list[dict]: Rows with keys ``week_start`` and ``commit_count``.
+            tuple: ``(rows, source, fetched_at)`` with rows keys
+            ``week_start`` and ``commit_count``.
         """
         now = datetime.datetime.now(datetime.timezone.utc)
+        cached_rows = _load_cached_data()
+        cached_fetched_at = _cache_last_fetched()
         if _cache_is_recent(now):
-            return _load_cached_data()
+            return cached_rows, "cache", cached_fetched_at
         rows = _fetch_commits_per_week()
         if rows:
             _save_cached_data(rows)
-            return rows
+            return rows, "api", _cache_last_fetched()
         # Fall back to cached data when the API is unreachable.
-        return _load_cached_data()
+        return cached_rows, "cache_fallback", cached_fetched_at
 
 
-    rows = _collect_data()
+    rows, source, fetched_at = _collect_data()
 
     if not rows:
         fig, ax = plt.subplots(figsize=(8, 2))
@@ -197,5 +215,12 @@ a bar chart.
         ax.set_ylabel("Number of commits", fontsize=10)
         ax.set_xlabel("Week starting", fontsize=10)
         ax.grid(True, axis="y", linestyle="--", alpha=0.4)
+        if fetched_at is not None:
+            source_name = "GitHub API" if source == "api" else "cache"
+            ax.text(
+                0.99, 1.02,
+                f"Source: {source_name} | Last fetched: {fetched_at.strftime('%Y-%m-%d %H:%M UTC')}",
+                ha="right", va="bottom", transform=ax.transAxes, fontsize=8, color="dimgray",
+            )
         fig.autofmt_xdate()
         plt.tight_layout()
