@@ -7,8 +7,6 @@ LiteRT / TFLite Export to ONNX
 .. toctree::
    :maxdepth: 1
 
-   supported_ops
-
 :func:`yobx.litert.to_onnx` converts a :epkg:`TFLite`/:epkg:`LiteRT`
 ``.tflite`` model into an :class:`onnx.ModelProto`.  The implementation is
 a **proof-of-concept** that parses the binary

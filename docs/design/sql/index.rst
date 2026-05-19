@@ -13,5 +13,4 @@ SQL-to-ONNX Converter Design
     sql
     dataframe
     polars
-    coverage
 

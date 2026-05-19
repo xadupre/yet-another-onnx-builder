@@ -14,7 +14,7 @@ They all returns an instance of :class:`~yobx.container.ExportArtifact`.
 
    design/to_onnx
    design/export_artifact
-   coverage
+   coverage/index
    debug
 
 Converters all share the same way to create and optimize onnx models,
