@@ -79,6 +79,13 @@ _ORIGINAL_NN_FUNCTIONAL_BILINEAR: Optional[Callable] = getattr(
     torch.nn.functional, "bilinear", None
 )
 
+# Capture the real ``torch.nn.functional.soft_margin_loss`` at import time so
+# calls during new-tracing can be normalized to a stable ATen op call across
+# PyTorch versions.
+_ORIGINAL_NN_FUNCTIONAL_SOFT_MARGIN_LOSS: Optional[Callable] = getattr(
+    torch.nn.functional, "soft_margin_loss", None
+)
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -588,6 +595,52 @@ def _bilinear_replacement_ctx() -> Generator:
 
 
 @contextlib.contextmanager
+def _soft_margin_loss_replacement_ctx() -> Generator:
+    """
+    Temporarily replaces ``torch.nn.functional.soft_margin_loss`` with a thin
+    wrapper that dispatches to ``aten.soft_margin_loss``.
+
+    The wrapper keeps support for legacy ``size_average`` and ``reduce`` kwargs
+    by mapping them to the ATen reduction enum.
+    """
+    if _ORIGINAL_NN_FUNCTIONAL_SOFT_MARGIN_LOSS is None:
+        yield
+        return
+
+    _reduction_map = {"none": 0, "mean": 1, "sum": 2}
+
+    def _soft_margin_loss_impl(
+        input: torch.Tensor,
+        target: torch.Tensor,
+        size_average: Optional[bool] = None,
+        reduce: Optional[bool] = None,
+        reduction: Union[str, int] = "mean",
+    ) -> torch.Tensor:
+        if size_average is not None or reduce is not None:
+            _size_average = True if size_average is None else size_average
+            _reduce = True if reduce is None else reduce
+            if not _reduce:
+                reduction_enum = 0
+            elif _size_average:
+                reduction_enum = 1
+            else:
+                reduction_enum = 2
+        elif isinstance(reduction, str):
+            if reduction not in _reduction_map:
+                raise ValueError(f"Unsupported reduction={reduction!r}.")
+            reduction_enum = _reduction_map[reduction]
+        else:
+            reduction_enum = int(reduction)
+        return torch.ops.aten.soft_margin_loss.default(input, target, reduction_enum)
+
+    torch.nn.functional.soft_margin_loss = _soft_margin_loss_impl  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.nn.functional.soft_margin_loss = _ORIGINAL_NN_FUNCTIONAL_SOFT_MARGIN_LOSS  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
 def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
     """
     Applies all tracing-time torch replacement context managers at once.
@@ -607,6 +660,7 @@ def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         _ones_replacement_ctx(tracer),
         _arange_replacement_ctx(tracer),
         _roll_dynamic_shape_ctx(),
+        _soft_margin_loss_replacement_ctx(),
         _bilinear_replacement_ctx(),
         _scan_replacement_ctx(tracer),
         _tensor_split_replacement_ctx(tracer),
