@@ -215,16 +215,41 @@ def _get_base_predictions(
                     decision, np.array([-1], dtype=np.int64), name=f"{name}_decision_sq"
                 )
             return decision, is_binary
-        else:
+        if hasattr(base_est, "predict_proba"):
+            # For non-linear estimators exposing both decision_function and
+            # predict_proba (for example GradientBoostingClassifier), rebuild a
+            # binary decision score from probabilities so calibration still
+            # follows sklearn's decision-function path.
+            fct = get_sklearn_converter(type(base_est))
+            sub_label = g.unique_name(f"{name}_label")
+            sub_proba = g.unique_name(f"{name}_proba")
+            fct(g, sts, [sub_label, sub_proba], base_est, X, name=name)
+            if not g.has_type(sub_proba):
+                g.set_type(sub_proba, itype)
+            if is_binary:
+                p1 = g.op.Gather(
+                    sub_proba, np.array(1, dtype=np.int64), axis=1, name=f"{name}_pos_prob"
+                )
+                eps = np.array([1e-7], dtype=dtype)
+                one_minus_eps = np.array([1 - 1e-7], dtype=dtype)
+                p1_clip = g.op.Clip(p1, eps, one_minus_eps, name=f"{name}_pos_prob_clip")
+                one = np.array([1], dtype=dtype)
+                p0_clip = g.op.Sub(one, p1_clip, name=f"{name}_neg_prob")
+                log_p1 = g.op.Log(p1_clip, name=f"{name}_log_p1")
+                log_p0 = g.op.Log(p0_clip, name=f"{name}_log_p0")
+                return g.op.Sub(log_p1, log_p0, name=f"{name}_decision_from_proba"), is_binary
             raise NotImplementedError(
                 f"Base estimator {type(base_est).__name__!r} has "
                 "decision_function but is not a linear model with coef_ / "
-                "intercept_ attributes. Direct ONNX decision-function "
-                "computation is currently only supported for linear models "
-                "(LogisticRegression, LinearSVC, SGDClassifier, etc.). "
-                "For estimators like SVC(probability=False) or "
-                "GradientBoostingClassifier, wrap them in a pipeline or use "
-                "a linear base estimator."
+                "intercept_ attributes. For multiclass estimators in this "
+                "category, direct ONNX decision-function computation is "
+                "currently unsupported."
+            )
+        else:
+            raise NotImplementedError(
+                f"Base estimator {type(base_est).__name__!r} has "
+                "decision_function but has neither linear coefficients nor "
+                "predict_proba to recover comparable decision scores."
             )
     else:
         # Fall back to predict_proba (e.g. RandomForestClassifier).

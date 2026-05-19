@@ -2849,6 +2849,7 @@ class CustomTracer(torch.fx.Tracer):
         """
         _method_to_aten = {
             "add_": torch.ops.aten.add.Tensor,
+            "addcmul_": torch.ops.aten.addcmul.default,
             "mul_": torch.ops.aten.mul.Tensor,
             "sub_": torch.ops.aten.sub.Tensor,
             "div_": torch.ops.aten.div.Tensor,
@@ -2911,6 +2912,7 @@ class CustomTracer(torch.fx.Tracer):
         _aten_inplace_to_non_inplace = {
             torch.ops.aten.add_.Tensor: torch.ops.aten.add.Tensor,
             torch.ops.aten.add_.Scalar: torch.ops.aten.add.Scalar,
+            torch.ops.aten.addcmul_.default: torch.ops.aten.addcmul.default,
             torch.ops.aten.bitwise_and_.Tensor: torch.ops.aten.bitwise_and.Tensor,
             torch.ops.aten.bitwise_and_.Scalar: torch.ops.aten.bitwise_and.Scalar,
             torch.ops.aten.bitwise_or_.Tensor: torch.ops.aten.bitwise_or.Tensor,

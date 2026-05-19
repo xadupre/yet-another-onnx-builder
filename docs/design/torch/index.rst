@@ -20,9 +20,6 @@ on basic examples.
    patches
    patches_list
    input_observer
-   supported_aten_functions
-   case_coverage
-   coverage/op_coverage
 
 .. note::
     :func:`yobx.torch.interpreter.to_onnx` is **not** :func:`torch.onnx.export`.

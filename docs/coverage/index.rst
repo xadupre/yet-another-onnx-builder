@@ -54,3 +54,16 @@ through multiple exporters and reports which ones succeed.
 :ref:`l-design-torch-op-coverage` shows which ``op_db`` ops and data types
 are covered by the op-db export tests, distinguishing between ops with a
 working converter, known failures, and ops missing a converter.
+
+.. toctree::
+   :maxdepth: 1
+   :hidden:
+
+   sklearn/supported_converters
+   sql/coverage
+   torch/case_coverage
+   torch/op_coverage
+   torch/supported_aten_functions
+   litert/supported_ops
+   tensorflow/supported_ops
+   tensorflow/supported_jax_ops
