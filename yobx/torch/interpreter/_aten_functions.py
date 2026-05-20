@@ -46,6 +46,12 @@ from ..torch_helper import onnx_dtype_to_torch_dtype, torch_dtype_to_onnx_dtype
 from ...xbuilder.graph_builder import GraphBuilder
 from ._exceptions import FunctionNotFoundError
 
+_FLOAT8_TYPES = {
+    getattr(TensorProto, name)
+    for name in ("FLOAT8E4M3FN", "FLOAT8E4M3FNUZ", "FLOAT8E5M2", "FLOAT8E5M2FNUZ")
+    if hasattr(TensorProto, name)
+}
+
 
 def _get_input_type(g: GraphBuilder, x: Any, python_default: bool) -> int:
     if isinstance(x, int):
@@ -64,6 +70,89 @@ def _get_input_type(g: GraphBuilder, x: Any, python_default: bool) -> int:
     if hasattr(x, "dtype"):
         return torch_dtype_to_onnx_dtype(x.dtype)
     raise RuntimeError(f"Unable to guess type from {type(x)}.")
+
+
+def _scaled_mm_compute_output_types(
+    g: GraphBuilder, x: Any, out_dtype: Optional["dtype"]  # noqa: F821
+) -> Tuple[int, int]:
+    output_type = g.get_type(x) if out_dtype is None else torch_dtype_to_onnx_dtype(out_dtype)
+    compute_type = TensorProto.FLOAT if output_type in _FLOAT8_TYPES else output_type
+    if compute_type == TensorProto.BFLOAT16:
+        compute_type = TensorProto.FLOAT
+    return output_type, compute_type
+
+
+def _scaled_mm_maybe_cast(g: GraphBuilder, value: Any, to: int, name: str) -> Any:
+    if isinstance(value, str) and g.has_type(value) and g.get_type(value) == to:
+        return value
+    return g.op.Cast(value, to=to, name=name)
+
+
+def _scaled_mm_set_shape_type(
+    g: GraphBuilder, output_name: str, x: Any, y: Any, dtype: int
+) -> None:
+    g.set_type(output_name, dtype)
+    if g.has_shape(x) and g.has_shape(y):
+        sx, sy = g.get_shape(x), g.get_shape(y)
+        if len(sx) == 2 and len(sy) == 2:
+            g.set_shape(output_name, (sx[0], sy[1]))
+            return
+    g.set_rank(output_name, 2)
+
+
+def _scaled_mm_normalize_scale(scale: Any, name: str) -> Any:
+    if isinstance(scale, list):
+        if len(scale) != 1:
+            raise NotImplementedError(
+                f"{name} expects a single scale tensor, got {len(scale)} values."
+            )
+        return scale[0]
+    return scale
+
+
+def _scaled_mm_impl(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: Any,
+    y: Any,
+    scale_a: Any,
+    scale_b: Any,
+    bias: Optional[Any] = None,
+    scale_result: Optional[Any] = None,
+    out_dtype: Optional["dtype"] = None,  # noqa: F821
+    name: str = "scaled_mm",
+) -> Any:
+    "scaled mm"
+    output_type, compute_type = _scaled_mm_compute_output_types(g, x, out_dtype)
+    scale_a = _scaled_mm_normalize_scale(scale_a, "scale_a")
+    scale_b = _scaled_mm_normalize_scale(scale_b, "scale_b")
+
+    x_cast = _scaled_mm_maybe_cast(g, x, compute_type, name=name)
+    y_cast = _scaled_mm_maybe_cast(g, y, compute_type, name=name)
+    scale_a_cast = _scaled_mm_maybe_cast(g, scale_a, compute_type, name=name)
+    scale_b_cast = _scaled_mm_maybe_cast(g, scale_b, compute_type, name=name)
+    res = g.op.MatMul(
+        g.op.Mul(x_cast, scale_a_cast, name=name),
+        g.op.Mul(y_cast, scale_b_cast, name=name),
+        name=name,
+    )
+
+    if bias is not None:
+        res = g.op.Add(res, _scaled_mm_maybe_cast(g, bias, compute_type, name=name), name=name)
+    if scale_result is not None:
+        res = g.op.Mul(
+            res, _scaled_mm_maybe_cast(g, scale_result, compute_type, name=name), name=name
+        )
+
+    if output_type != compute_type:
+        res = g.op.Cast(res, to=output_type, outputs=outputs, name=name)
+    else:
+        res = g.op.Identity(res, outputs=outputs, name=name)
+
+    if not sts:
+        _scaled_mm_set_shape_type(g, outputs[0], x, y, output_type)
+    return res
 
 
 def _get_compute_type(dtypes: Set[int]) -> int:
@@ -6196,6 +6285,62 @@ def aten__grouped_mm(
         else:
             g.set_rank(res, g.get_rank(mat_a) + 1)
     return res
+
+
+def aten__scaled_mm(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    scale_a: T,
+    scale_b: T,
+    bias: Optional[T] = None,
+    scale_result: Optional[T] = None,
+    out_dtype: Optional["dtype"] = None,  # noqa: F821
+    use_fast_accum: bool = False,
+    name: str = "aten_scaled_mm",
+) -> T:
+    "scaled mm"
+    del use_fast_accum
+    return _scaled_mm_impl(
+        g,
+        sts,
+        outputs,
+        x,
+        y,
+        scale_a,
+        scale_b,
+        bias=bias,
+        scale_result=scale_result,
+        out_dtype=out_dtype,
+        name=name,
+    )
+
+
+def aten__scaled_mm_v2(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    scale_a: List[T],
+    recipe_a: Sequence[int],
+    swizzle_a: Sequence[int],
+    scale_b: List[T],
+    recipe_b: Sequence[int],
+    swizzle_b: Sequence[int],
+    bias: Optional[T] = None,
+    out_dtype: Optional["dtype"] = None,  # noqa: F821
+    contraction_dim: Sequence[int] = (),
+    use_fast_accum: bool = False,
+    name: str = "aten_scaled_mm_v2",
+) -> T:
+    "scaled mm v2"
+    del recipe_a, swizzle_a, recipe_b, swizzle_b, contraction_dim, use_fast_accum
+    return _scaled_mm_impl(
+        g, sts, outputs, x, y, scale_a, scale_b, bias=bias, out_dtype=out_dtype, name=name
+    )
 
 
 def aten_gt(

@@ -79,8 +79,11 @@ def find_function(name: Any) -> Tuple[Optional[Callable], List[str], List[str]]:
     for att in lookup_names:
         if hasattr(name, att):
             v = getattr(name, att).replace(".", "_")
-            lookup.append(v)
-            if v in registered_functions:
-                return registered_functions[v], lookup, lookup_names
+            for candidate in (v, f"aten_{v}"):
+                if candidate in lookup:
+                    continue
+                lookup.append(candidate)
+                if candidate in registered_functions:
+                    return registered_functions[candidate], lookup, lookup_names
 
     return None, lookup, lookup_names

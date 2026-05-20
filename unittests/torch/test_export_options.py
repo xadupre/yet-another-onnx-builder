@@ -769,6 +769,71 @@ class TestPostProcessExportedProgram(ExtTestCase):
         result = opts.post_process_exported_program(ep)
         self.assertIsInstance(result, torch.export.ExportedProgram)
 
+    def _scaled_mm_inputs(self):
+        x = torch.randn((2, 3), dtype=torch.float32).to(torch.float8_e4m3fn)
+        y = torch.randn((3, 4), dtype=torch.float32).to(torch.float8_e4m3fn)
+        return (
+            x,
+            y,
+            torch.tensor(0.5, dtype=torch.float32),
+            torch.tensor(2.0, dtype=torch.float32),
+        )
+
+    def _assert_reference_conversion(self, onx, expected, inputs, atol=0, rtol=0):
+        sess = ExtendedReferenceEvaluator(onx)
+        feeds = dict(zip(sess.input_names, [self.to_numpy(x) for x in inputs]))
+        got = sess.run(None, feeds)
+        self.assertEqual(len(got), 1)
+        self.assertEqualArray(expected, got[0], atol=atol, rtol=rtol)
+
+    def _check_scaled_mm_model(self, model):
+        inputs = self._scaled_mm_inputs()
+        expected = model(*inputs)
+        for tracing in (None, TracingMode.TRACING, TracingMode.NEW_TRACING):
+            with self.subTest(tracing=tracing):
+                export_options = (
+                    ExportOptions() if tracing is None else ExportOptions(tracing=tracing)
+                )
+                artifact = to_onnx(model, inputs, export_options=export_options)
+                self._assert_reference_conversion(artifact.proto, expected, inputs, atol=1e-2)
+
+    @requires_torch("2.11")
+    @ignore_warnings(UserWarning)
+    def test_export_scaled_mm_to_onnx(self):
+        """Checks that torch._scaled_mm exports in all tracing modes."""
+
+        class ScaledMMModel(torch.nn.Module):
+            def forward(self, x, y, scale_a, scale_b):
+                return torch._scaled_mm(
+                    x, y, scale_a=scale_a, scale_b=scale_b, out_dtype=torch.float16
+                )
+
+        self._check_scaled_mm_model(ScaledMMModel())
+
+    @requires_torch("2.11")
+    @ignore_warnings(UserWarning)
+    def test_export_scaled_mm_v2_to_onnx(self):
+        """Checks that torch._scaled_mm_v2 exports in all tracing modes."""
+
+        class ScaledMMV2Model(torch.nn.Module):
+            def forward(self, x, y, scale_a, scale_b):
+                return torch._scaled_mm_v2(
+                    x,
+                    y,
+                    [scale_a],
+                    [int(torch.nn.functional.ScalingType.TensorWise)],
+                    [],
+                    [scale_b],
+                    [int(torch.nn.functional.ScalingType.TensorWise)],
+                    [],
+                    None,
+                    torch.float16,
+                    (),
+                    False,
+                )
+
+        self._check_scaled_mm_model(ScaledMMV2Model())
+
 
 @requires_torch("2.0")
 class TestInsertContiguous(ExtTestCase):

@@ -1439,6 +1439,14 @@ class ExtTestCase(unittest.TestCase):
         import torch
 
         conv = {torch.bfloat16: ml_dtypes.bfloat16}
+        if hasattr(torch, "float8_e4m3fn"):
+            conv[torch.float8_e4m3fn] = ml_dtypes.float8_e4m3fn
+        if hasattr(torch, "float8_e4m3fnuz"):
+            conv[torch.float8_e4m3fnuz] = ml_dtypes.float8_e4m3fnuz
+        if hasattr(torch, "float8_e5m2"):
+            conv[torch.float8_e5m2] = ml_dtypes.float8_e5m2
+        if hasattr(torch, "float8_e5m2fnuz"):
+            conv[torch.float8_e5m2fnuz] = ml_dtypes.float8_e5m2fnuz
         assert tensor.dtype in conv, f"Unsupported type {tensor.dtype}, not in {conv}"
         return tensor.detach().to(torch.float32).cpu().numpy().astype(conv[tensor.dtype])
 
@@ -1834,13 +1842,16 @@ class ExtTestCase(unittest.TestCase):
 
         if use_python:
             sess = ExtendedReferenceEvaluator(onx, verbose=10)
-            feeds = dict(zip(sess.input_names, [x.detach().numpy() for x in inputs]))
+            feeds = dict(zip(sess.input_names, [self.to_numpy(x.detach()) for x in inputs]))
         else:
             sess = onnxruntime.InferenceSession(
                 onx.SerializeToString(), providers=["CPUExecutionProvider"]
             )
             feeds = dict(
-                zip([i.name for i in sess.get_inputs()], [x.detach().numpy() for x in inputs])
+                zip(
+                    [i.name for i in sess.get_inputs()],
+                    [self.to_numpy(x.detach()) for x in inputs],
+                )
             )
         got = sess.run(None, feeds)
         if len(got) == 1 and hasattr(expected, "shape"):
