@@ -3445,6 +3445,19 @@ class TestOnnxExportAten(ExtTestCase):
                 got = sess.run(None, {"x": inputs[0].detach().numpy()})
                 self.assertEqualArray(expected, got[0])
 
+    def test_aten_bincount(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.bincount(x, minlength=5)
+
+        inputs = (torch.tensor([0, 1, 1, 3, 2, 1], dtype=torch.int64),)
+        model = Model()
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs, dynamic_shapes=({0: "length"},))
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
     def test_aten_histc_float_bigger(self):
         import torch
 
