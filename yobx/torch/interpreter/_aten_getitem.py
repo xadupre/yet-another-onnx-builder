@@ -360,11 +360,12 @@ def getitem(  # noqa: F821
                 if g.has_type(_name_index):
                     dtype = g.get_type(_name_index)
                 elif g.has_name(_name_index):
-                    # The source exists but its type is not known yet (for
-                    # example when local-function outputs are typed later).
-                    # Avoid pre-registering an FX-derived dtype that may
-                    # conflict with the future ONNX-propagated type.
-                    skip_set_type = True
+                    # _fused_rms_norm may expose a tuple element whose
+                    # ONNX type is resolved later and can differ from FX
+                    # metadata. Defer type registration in that case only.
+                    source_target = getattr(node_output, "target", None)
+                    if source_target is g.torch.ops.aten._fused_rms_norm.default:
+                        skip_set_type = True
             if not skip_set_type:
                 g.set_type(outputs[0], dtype)
             g.set_device(outputs[0], val.get_device())
