@@ -266,6 +266,17 @@ class TestOnnxExportAtenTracing(ExtTestCase):
         onx = self._to_onnx_tracing(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
+    def test_aten_bincount_tracing(self):
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.bincount(x, minlength=7)
+
+        model = Model()
+        inputs = (torch.tensor([0, 1, 1, 3, 2, 1], dtype=torch.int64),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = self._to_onnx_tracing(model, inputs)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=0)
+
     def test_aten_mean_dim_tracing(self):
         class Model(torch.nn.Module):
             def forward(self, x):

@@ -651,6 +651,22 @@ class TestExportOptions(ExtTestCase):
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x, y), atol=1e-5)
 
     @ignore_warnings(UserWarning)
+    def test_export_new_tracing_bincount_to_onnx(self):
+        """Checks that new tracing correctly exports bincount."""
+
+        class BinCountModel(torch.nn.Module):
+            def forward(self, x):
+                return torch.bincount(x, minlength=8)
+
+        model = BinCountModel()
+        x = torch.tensor([0, 1, 1, 3, 2, 1], dtype=torch.int64)
+        expected = model(x)
+        artifact = to_onnx(
+            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+        )
+        self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=0)
+
+    @ignore_warnings(UserWarning)
     def test_export_new_tracing_argsort_to_onnx(self):
         """Verifies that new tracing correctly exports argsort."""
 

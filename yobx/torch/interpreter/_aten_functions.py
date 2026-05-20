@@ -2373,6 +2373,47 @@ def aten_bucketize_Tensor(
     return res
 
 
+def aten_bincount(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    weights: Optional[T] = None,
+    minlength: int = 0,
+    name: str = "bincount",
+) -> T:
+    """Converts ``aten.bincount`` to ONNX."""
+    assert (
+        isinstance(minlength, int) and minlength >= 0
+    ), f"minlength must be a non-negative integer, got {minlength!r}{g.get_debug_msg()}"
+    assert weights is None, f"weights is not supported for bincount{g.get_debug_msg()}"
+    assert g.has_type(x), f"Type must be known for {x!r}{g.get_debug_msg()}"
+    x64 = (
+        x if g.get_type(x) == TensorProto.INT64 else g.op.Cast(x, to=TensorProto.INT64, name=name)
+    )
+    flat = g.op.Reshape(x64, g.MINUS_ONE, name=name)
+    # Adds a sentinel ``-1`` so ReduceMax works even for an empty input.
+    max_x = g.op.ReduceMax(
+        g.op.Concat(flat, np.array([-1], dtype=np.int64), axis=0, name=name),
+        keepdims=0,
+        name=name,
+    )
+    depth = g.op.Max(
+        g.op.Add(max_x, np.array(1, dtype=np.int64), name=name),
+        np.array(minlength, dtype=np.int64),
+        name=name,
+    )
+    values = np.array([0, 1], dtype=np.int64)
+    one_hot = g.op.OneHot(flat, depth, values, axis=-1, name=name)
+    res = g.op.ReduceSumAnyOpset(
+        one_hot, np.array([0], dtype=np.int64), keepdims=0, outputs=outputs, name=name
+    )
+    if not sts:
+        g.set_type(res, TensorProto.INT64)
+        g.set_rank(res, 1)
+    return res
+
+
 def aten_cartesian_prod(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
