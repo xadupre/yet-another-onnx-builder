@@ -834,6 +834,38 @@ class TestPostProcessExportedProgram(ExtTestCase):
 
         self._check_scaled_mm_model(ScaledMMV2Model())
 
+    @requires_torch("2.11")
+    @ignore_warnings(UserWarning)
+    def test_export_scaled_mm_v2_rejects_non_tensorwise_recipe(self):
+        """Checks that scaled_mm_v2 rejects recipe values the lowering ignores."""
+
+        class ScaledMMV2RowWiseModel(torch.nn.Module):
+            def forward(self, x, y, scale_a, scale_b):
+                return torch._scaled_mm_v2(
+                    x,
+                    y,
+                    [scale_a],
+                    [int(torch.nn.functional.ScalingType.RowWise)],
+                    [],
+                    [scale_b],
+                    [int(torch.nn.functional.ScalingType.RowWise)],
+                    [],
+                    None,
+                    torch.float16,
+                    (),
+                    False,
+                )
+
+        model = ScaledMMV2RowWiseModel()
+        inputs = (
+            torch.randn((2, 3), dtype=torch.float32).to(torch.float8_e4m3fn),
+            torch.randn((3, 4), dtype=torch.float32).to(torch.float8_e4m3fn),
+            torch.ones((2, 1), dtype=torch.float32),
+            torch.ones((1, 4), dtype=torch.float32),
+        )
+        with self.assertRaises(AssertionError):
+            to_onnx(model, inputs, export_options=ExportOptions())
+
 
 @requires_torch("2.0")
 class TestInsertContiguous(ExtTestCase):

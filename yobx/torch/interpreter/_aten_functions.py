@@ -6302,7 +6302,7 @@ def aten__scaled_mm(
     name: str = "aten_scaled_mm",
 ) -> T:
     "scaled mm"
-    del use_fast_accum
+    assert not use_fast_accum, f"Not implemented when use_fast_accum={use_fast_accum!r}."
     return _scaled_mm_impl(
         g,
         sts,
@@ -6337,7 +6337,21 @@ def aten__scaled_mm_v2(
     name: str = "aten_scaled_mm_v2",
 ) -> T:
     "scaled mm v2"
-    del recipe_a, swizzle_a, recipe_b, swizzle_b, contraction_dim, use_fast_accum
+    import torch
+
+    tensorwise = int(torch.nn.functional.ScalingType.TensorWise)
+    assert (
+        len(recipe_a) == 1 and recipe_a[0] == tensorwise
+    ), f"Not implemented for recipe_a={recipe_a!r}{g.get_debug_msg()}"
+    assert (
+        len(recipe_b) == 1 and recipe_b[0] == tensorwise
+    ), f"Not implemented for recipe_b={recipe_b!r}{g.get_debug_msg()}"
+    assert len(swizzle_a) == 0, f"Not implemented for swizzle_a={swizzle_a!r}{g.get_debug_msg()}"
+    assert len(swizzle_b) == 0, f"Not implemented for swizzle_b={swizzle_b!r}{g.get_debug_msg()}"
+    assert (
+        len(contraction_dim) == 0
+    ), f"Not implemented for contraction_dim={contraction_dim!r}{g.get_debug_msg()}"
+    assert not use_fast_accum, f"Not implemented when use_fast_accum={use_fast_accum!r}."
     return _scaled_mm_impl(
         g, sts, outputs, x, y, scale_a, scale_b, bias=bias, out_dtype=out_dtype, name=name
     )
