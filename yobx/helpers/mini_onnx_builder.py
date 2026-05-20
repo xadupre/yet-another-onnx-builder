@@ -40,19 +40,7 @@ def proto_from_array(
     numel = torch.numel(arr_cpu)
     element_size = arr_cpu.element_size()
 
-    if arr_cpu.dtype in {
-        torch.bfloat16,
-        *(
-            dt
-            for dt in [
-                getattr(torch, "float8_e4m3fn", None),
-                getattr(torch, "float8_e4m3fnuz", None),
-                getattr(torch, "float8_e5m2", None),
-                getattr(torch, "float8_e5m2fnuz", None),
-            ]
-            if dt is not None
-        ),
-    }:
+    if arr_cpu.dtype in {torch.bfloat16}:
         np_arr = arr_cpu
     elif arr_cpu.data_ptr() == arr.data_ptr():
         copy = arr_cpu.clone().detach().requires_grad_(False)
