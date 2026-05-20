@@ -522,7 +522,7 @@ class GraphTracer:
 
     def make_fake(self, a: Union[TracingTensor, torch.Tensor]) -> "FakeTensor":  # type: ignore # noqa: F821
         """
-        Convert *a* into a ``torch._subclasses.fake_tensor.FakeTensor``
+        Convert *a* into a :class:`~torch._subclasses.fake_tensor.FakeTensor`
         for shape/dtype inference inside :meth:`dispatch`.
 
         For a :class:`TracingTensor`, each symbolic (string) dimension is
@@ -536,7 +536,7 @@ class GraphTracer:
 
         :param a: Either a :class:`TracingTensor` (possibly with symbolic
             dimensions) or a plain :class:`torch.Tensor`.
-        :return: A ``torch._subclasses.fake_tensor.FakeTensor`` suitable
+        :return: A :class:`~torch._subclasses.fake_tensor.FakeTensor` suitable
             for passing to ATen operations in ``FakeTensorMode``.
         """
         if isinstance(a, TracingTensor):
@@ -566,7 +566,7 @@ class GraphTracer:
     def _handle_select_int(self, x: TracingTensor, dim: int, index: int) -> TracingTensor:
         """
         Handle ``aten.select.int(x, dim, index)`` without calling
-        :meth:`dispatch` or ``torch._subclasses.fake_tensor.FakeTensor``.
+        :meth:`dispatch` or :class:`~torch._subclasses.fake_tensor.FakeTensorMode`.
 
         When *x* has a symbolic (dynamic) dimension at *dim*, the fake-mode
         meta kernel for ``aten.select.int`` would try to prove the bounds check
@@ -749,7 +749,7 @@ class GraphTracer:
         an ``aten.sym_size.int`` FX node emitted via
         :meth:`_emit_sym_size_node`.  Output shapes are computed directly
         from :attr:`~TracingTensor._tracing_shape` without
-        ``torch._subclasses.fake_tensor.FakeTensor``.
+        :class:`~torch._subclasses.fake_tensor.FakeTensorMode`.
 
         :param tensor: The input :class:`TracingTensor`.
         :param index: The index expression (single slice or tuple of slices /
@@ -1147,8 +1147,8 @@ class GraphTracer:
         When the leaf-forward wrapper is called during tracing the input
         arguments are :class:`TracingTensor` instances.  The wrapper:
 
-        1. Creates fresh ``torch._subclasses.fake_tensor.FakeTensor``
-           inputs inside a new ``torch._subclasses.fake_tensor.FakeTensor``
+        1. Creates fresh :class:`~torch._subclasses.fake_tensor.FakeTensor`
+           inputs inside a new :class:`~torch._subclasses.fake_tensor.FakeTensorMode`
            (sharing the tracer's :class:`~torch.fx.experimental.symbolic_shapes.ShapeEnv`
            so that symbolic dimensions are consistent).
         2. Runs the **original** ``forward`` in that mode with
@@ -2212,11 +2212,11 @@ class GraphTracer:
 
         When ``.item()`` is called on a :class:`TracingTensor`, the generic
         :meth:`dispatch` path runs the operation in
-        ``torch._subclasses.fake_tensor.FakeTensor`` and obtains a
+        :class:`~torch._subclasses.fake_tensor.FakeTensorMode` and obtains a
         :class:`~torch.SymInt`.  Because :meth:`is_not_tensor` previously did
         not recognise :class:`~torch.SymInt`, this raised :exc:`TypeError`.
 
-        This handler bypasses ``torch._subclasses.fake_tensor.FakeTensor``
+        This handler bypasses :class:`~torch._subclasses.fake_tensor.FakeTensorMode`
         entirely.  It emits an ``aten._local_scalar_dense`` FX node and wraps
         the result in a symbolic :class:`TracingInt` so that downstream use of
         the scalar (e.g. ``x[..., :shape.item()]``) is recognised by
