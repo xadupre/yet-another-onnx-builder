@@ -1,8 +1,8 @@
 """
-Direct ONNX converter for :class:`transformers.models.llama.modeling_llama.LlamaAttention`.
+Direct ONNX converter for `transformers.models.llama.modeling_llama.LlamaAttention`.
 
 This converter appends ONNX nodes to an existing :class:`~yobx.xbuilder.GraphBuilder`
-from a fitted :class:`transformers.models.llama.modeling_llama.LlamaAttention` module,
+from a fitted `transformers.models.llama.modeling_llama.LlamaAttention` module,
 without going through :func:`torch.export.export`.
 
 Three computation backends are supported, selected automatically based on
@@ -44,7 +44,9 @@ Output returned by the converter:
 * tensor name ``(batch, seq, hidden_size)`` — the caller must register it as
   a graph output via ``g.make_tensor_output``
 
-Example::
+Example:
+
+.. code-block:: python
 
     import torch
     from onnx import TensorProto
@@ -89,7 +91,7 @@ Example::
 from typing import Optional
 import numpy as np
 from onnx import TensorProto
-from transformers.models.llama.modeling_llama import LlamaAttention
+import transformers
 
 from ....helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ....typing import GraphBuilderExtendedProtocol
@@ -424,7 +426,7 @@ def _apply_rope_ms_op(
     )
 
 
-@register_transformer_converter(LlamaAttention)
+@register_transformer_converter(transformers.models.llama.modeling_llama.LlamaAttention)
 def llama_attention_to_onnx(
     g: GraphBuilderExtendedProtocol,
     attn: "LlamaAttention",  # noqa: F821
@@ -436,7 +438,7 @@ def llama_attention_to_onnx(
 ) -> str:
     """
     Appends ONNX nodes implementing
-    :class:`transformers.models.llama.modeling_llama.LlamaAttention` to *g*.
+    `transformers.models.llama.modeling_llama.LlamaAttention` to *g*.
 
     The output dtype (``float32``, ``float16``, or ``bfloat16``) is inferred
     from the registered type of *hidden_states* in *g*.  Model weights are cast
@@ -463,7 +465,7 @@ def llama_attention_to_onnx(
         The ``cos`` and ``sin`` inputs are expected to carry *symmetric*
         values, i.e. ``cos[..., :head_dim//2] == cos[..., head_dim//2:]``
         (and likewise for ``sin``).  This matches what
-        :class:`transformers.models.llama.modeling_llama.LlamaRotaryEmbedding`
+        `transformers.models.llama.modeling_llama.LlamaRotaryEmbedding`
         produces.  The dedicated ONNX/ORT ``RotaryEmbedding`` ops use only
         the first half of the last dimension; the plain-op fallback uses
         the full tensor unchanged.

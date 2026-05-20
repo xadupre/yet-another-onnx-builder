@@ -206,13 +206,13 @@ available:
    * - ``"decall"``
      - full decomposition table, default strict setting
    * - ``"fake"``
-     - use :class:`~torch._subclasses.fake_tensor.FakeTensor` inputs instead of real tensors
+     - use ``torch._subclasses.fake_tensor.FakeTensor`` inputs instead of real tensors
 
 Fake tensors
 ~~~~~~~~~~~~
 
 When ``fake=True`` (or ``strategy="fake"``), the export stage replaces every
-real input tensor with a :class:`~torch._subclasses.fake_tensor.FakeTensor`
+real input tensor with a ``torch._subclasses.fake_tensor.FakeTensor``
 — a lightweight stand-in that carries dtype, shape, and device metadata but
 holds no actual data.  This is useful when loading model weights into memory
 just to trace the graph would be prohibitively expensive (e.g. very large
@@ -223,7 +223,7 @@ The conversion from real tensors to fake tensors is handled by
 also ensures that dimensions sharing the same name in ``dynamic_shapes`` are
 mapped to the same symbolic integer.  The
 :class:`~yobx.torch.fake_tensor_helper.FakeTensorContext` manages the
-underlying :class:`~torch._subclasses.fake_tensor.FakeTensorMode` and the
+underlying ``torch._subclasses.fake_tensor.FakeTensor`` and the
 mapping between concrete dimension values and their symbolic counterparts.
 
 FxGraphInterpreter
