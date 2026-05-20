@@ -1,11 +1,13 @@
 from typing import Any, Dict, Optional, Set, Tuple
+import torch
 
 
 class FakeTensorContext:
     """Stores information used to reuse same dimension for the same dimension names."""
 
-    def __init__(self, fake_mode: Optional["FakeTensorMode"] = None):  # noqa: F821
-        # FakeTensorMode = torch._subclasses.fake_tensor.FakeTensorMode
+    def __init__(
+        self, fake_mode: Optional["torch._subclasses.fake_tensor.FakeTensorMode"] = None
+    ):
         if fake_mode is None:
             from torch._subclasses.fake_tensor import FakeTensorMode
             from torch.fx.experimental.symbolic_shapes import ShapeEnv
@@ -43,12 +45,11 @@ class FakeTensorContext:
         self._unique_.add(c)
         return c
 
-    def from_tensor(self, x, static_shapes=False) -> "FakeTensor":  # noqa: F821
+    def from_tensor(self, x, static_shapes=False) -> "torch._subclasses.fake_tensor.FakeTensor":
         """
         Returns a fake tensor.
         ``pytorch`` returns the same name for the same dimension.
         """
-        # FakeTensor = torch._subclasses.fake_tensor.FakeTensor
         fake = self.fake_mode.from_tensor(x, static_shapes=static_shapes)
         for i, s in zip(x.shape, fake.shape):
             assert i not in self._mapping_int or self._mapping_int[i] == s, (
@@ -60,10 +61,10 @@ class FakeTensorContext:
 
     def fake_reshape(
         self,
-        true_tensor: "torch.Tensor",  # noqa: F821
+        true_tensor: torch.Tensor,
         sh: Dict[int, Any],
-        fake_tensor: Optional["FakeTensor"] = None,  # noqa: F821
-    ) -> "FakeTensor":  # noqa: F821
+        fake_tensor: Optional["torch._subclasses.fake_tensor.FakeTensor"] = None,
+    ) -> "torch._subclasses.fake_tensor.FakeTensor":
         """
         Changes the shape of a true tensor to make it dynamic.
 
@@ -72,7 +73,6 @@ class FakeTensorContext:
         :param fake_tensor: fake tensor, if None, make a fake one
         :return: fake tensor
         """
-        # FakeTensor = torch._subclasses.fake_tensor.FakeTensor
         import torch
 
         # deal with 0/1
@@ -269,7 +269,7 @@ class FakeTensorContext:
 
     def value_info_proto_to_torch(
         self, vip: Any
-    ) -> Tuple["FakeTensor", Dict[int, str]]:  # noqa: F821
+    ) -> Tuple["torch._subclasses.fake_tensor.FakeTensor", Dict[int, str]]:
         """Convert an :class:`onnx.ValueInfoProto` to a fake :class:`torch.Tensor`.
 
         Symbolic dimensions (those with a non-empty ``dim_param``) are assigned
@@ -290,9 +290,7 @@ class FakeTensorContext:
         :raises ValueError: if the shape is missing or a dimension is
             unresolvable
         """
-        # FakeTensor = torch._subclasses.fake_tensor.FakeTensor
         from onnx import TensorProto as _TensorProto
-        import torch
         from .torch_helper import onnx_dtype_to_torch_dtype
 
         tt = vip.type.tensor_type
@@ -344,7 +342,7 @@ class FakeTensorContext:
 
 def make_fake(
     x: Any, context: Optional[FakeTensorContext] = None
-) -> Tuple[Optional["FakeTensor"], Optional[FakeTensorContext]]:  # noqa: F821
+) -> Tuple[Optional["torch._subclasses.fake_tensor.FakeTensor"], Optional[FakeTensorContext]]:
     """
     Replaces all tensors by fake tensors.
     This modification happens inplace for caches.
@@ -381,7 +379,6 @@ def make_fake(
         )
         pprint.pprint(inputs)
     """
-    # FakeTensor = torch._subclasses.fake_tensor.FakeTensor
     if x is None:
         return None, None
     if context is None:
