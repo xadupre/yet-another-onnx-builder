@@ -354,11 +354,19 @@ def getitem(  # noqa: F821
             # the rstd output of _fused_rms_norm for numerical stability). Use the
             # already-established ONNX type to stay consistent with the Identity
             # node that will propagate the source type to this output.
+            skip_set_type = False
             if isinstance(index, int):
                 _name_index = f"{result_name}#{index}"
                 if g.has_type(_name_index):
                     dtype = g.get_type(_name_index)
-            g.set_type(outputs[0], dtype)
+                elif g.has_name(_name_index):
+                    # The source exists but its type is not known yet (for
+                    # example when local-function outputs are typed later).
+                    # Avoid pre-registering an FX-derived dtype that may
+                    # conflict with the future ONNX-propagated type.
+                    skip_set_type = True
+            if not skip_set_type:
+                g.set_type(outputs[0], dtype)
             g.set_device(outputs[0], val.get_device())
         elif isinstance(val, g.torch.SymInt):
             g.set_shape(outputs[0], tuple())

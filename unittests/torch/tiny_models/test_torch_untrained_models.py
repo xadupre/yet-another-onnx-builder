@@ -735,7 +735,15 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     def test_tiny_llm_to_onnx_autocast_float16_default(self):
         self.common_test_tiny_llm_to_onnx_autocast_float16("default")
 
-    def common_test_tiny_llm_to_onnx_autocast_float16(self, patterns):
+    @hide_stdout()
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
+    @ignore_warnings(FutureWarning)
+    def test_tiny_llm_to_onnx_autocast_float16_default_onnxruntime(self):
+        self.common_test_tiny_llm_to_onnx_autocast_float16("default+onnxruntime", opset=22)
+
+    def common_test_tiny_llm_to_onnx_autocast_float16(self, patterns, opset=24):
         """Exports ``arnir0/Tiny-LLM`` wrapped in ``torch.autocast(float16)``
         and verifies that the ONNX model is valid and produces finite results.
 
@@ -806,7 +814,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
                 verbose=0,
                 large_model=True,
                 options=OptimizationOptions(patterns=patterns),
-                target_opset=24,
+                target_opset=opset,
             )
 
         # Validate that the exported model is a well-formed ONNX proto.
