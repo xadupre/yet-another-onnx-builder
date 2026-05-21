@@ -40,20 +40,6 @@ class _LinearModel(torch.nn.Module):
         return self.linear(x)
 
 
-class _BitwiseXorModel(torch.nn.Module):
-    """Dummy model used to test bitwise XOR export across tracing modes."""
-
-    def forward(self, x, y):
-        return x.bitwise_xor(y)
-
-
-class _BitwiseOperatorXorModel(torch.nn.Module):
-    """Dummy model used to test operator XOR export across tracing modes."""
-
-    def forward(self, x, y):
-        return x ^ y
-
-
 @requires_torch("2.0")
 class TestExportOptions(ExtTestCase):
     def test_default_init(self):
@@ -1408,9 +1394,6 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
 class TestTracingModeCombinationsBitwiseXor(ExtTestCase):
     """Tests bitwise XOR export across the supported tracing modes."""
 
-    def _make_model(self) -> _BitwiseXorModel:
-        return _BitwiseXorModel()
-
     def _make_inputs(self):
         return (
             torch.tensor([1, 2, 7], dtype=torch.int64),
@@ -1418,7 +1401,11 @@ class TestTracingModeCombinationsBitwiseXor(ExtTestCase):
         )
 
     def _assert_export(self, tracing_mode: TracingMode):
-        model = self._make_model()
+        class BitwiseXorModel(torch.nn.Module):
+            def forward(self, x, y):
+                return x.bitwise_xor(y)
+
+        model = BitwiseXorModel()
         inputs = self._make_inputs()
         expected = model(*inputs).detach().numpy()
         artifact = to_onnx(model, inputs, export_options=ExportOptions(tracing=tracing_mode))
@@ -1440,7 +1427,11 @@ class TestTracingModeCombinationsBitwiseXor(ExtTestCase):
 
     @ignore_warnings(UserWarning)
     def test_operator_xor_all_default_libraries(self):
-        model = _BitwiseOperatorXorModel()
+        class BitwiseOperatorXorModel(torch.nn.Module):
+            def forward(self, x, y):
+                return x ^ y
+
+        model = BitwiseOperatorXorModel()
         inputs = self._make_inputs()
         expected = model(*inputs).detach().numpy()
         for tracing_mode in (TracingMode.DEFAULT, TracingMode.TRACING, TracingMode.NEW_TRACING):
