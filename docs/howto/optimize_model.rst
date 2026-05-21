@@ -308,12 +308,16 @@ same template, with richer guards on shapes, dtypes and attributes.
 
 Main differences:
 
-* **Out-of-the-box catalog** — ``yobx`` ships a curated list of patterns
-  enabled by ``patterns="default"`` (constant folding, transpose
-  simplification, MatMul/Gemm fusions, …). Equivalent rules with
-  :epkg:`onnxscript` must be assembled by the user from the rewriter
-  tutorial. The list of patterns shipped with ``yobx`` is in
-  :ref:`l-design-pattern-optimizer-patterns`.
+* **Out-of-the-box catalog** — both libraries ship a predefined set of
+  rules. ``yobx`` exposes its catalogue through ``patterns="default"``
+  (constant folding, transpose simplification, MatMul/Gemm fusions, …)
+  with the full list documented in
+  :ref:`l-design-pattern-optimizer-patterns`. :epkg:`onnxscript` ships
+  an equivalent collection accessible through
+  ``onnxscript.rewriter.rewrite(model)`` and
+  ``onnxscript.optimizer.optimize(model)``. The two catalogues do not
+  cover exactly the same rewrites, so they tend to be complementary
+  rather than interchangeable.
 * **Granularity of the API** — :epkg:`onnxscript` rewrite rules are
   expressed as two ONNX functions (match + replacement). ``yobx``
   also supports this style through
