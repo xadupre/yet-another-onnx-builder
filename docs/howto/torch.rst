@@ -100,9 +100,11 @@ If ``filename="model.onnx"`` is passed, the converter also writes
 How this differs from torch.onnx.export
 ---------------------------------------
 
-By default, :func:`yobx.torch.interpreter.to_onnx` does **not** decompose the
-captured graph, so ATen operators stay close to the original graph and are
-translated directly by yobx converters.
+By default, :func:`yobx.torch.interpreter.to_onnx` does **not** apply an
+explicit decomposition table, so ATen operators stay close to the original
+graph and are translated directly by yobx converters. A decomposition pass may
+still run if needed to eliminate inplace operations that could not be removed
+directly.
 
 The official exporter path is more decomposition-oriented. To align behaviors,
 set decomposition options explicitly in yobx:
