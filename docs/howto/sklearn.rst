@@ -370,8 +370,9 @@ folds them into the ONNX graph as initializers:
 
 **Identity transformer (func=None)**
 
-When ``func=None`` the transformer is a no-op; the converter emits a single
-``Identity`` node:
+When ``func=None`` the transformer is a pass-through — the input is forwarded
+to the output unchanged.  The optimizer removes redundant intermediate nodes,
+so the resulting graph is minimal:
 
 .. runpython::
     :showcode:
@@ -383,7 +384,9 @@ When ``func=None`` the transformer is a no-op; the converter emits a single
     X = np.ones((5, 3), dtype=np.float32)
     identity_tf = FunctionTransformer(func=None).fit(X)
     onx = to_onnx(identity_tf, (X[:1],))
-    print(f"Nodes: {[n.op_type for n in onx.graph.node]}")
+    print(f"Inputs : {[i.name for i in onx.graph.input]}")
+    print(f"Outputs: {[o.name for o in onx.graph.output]}")
+    print(f"Nodes  : {[n.op_type for n in onx.graph.node]}")
 
 .. seealso::
 
