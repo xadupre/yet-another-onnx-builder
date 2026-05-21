@@ -769,14 +769,14 @@ class TestPostProcessExportedProgram(ExtTestCase):
         result = opts.post_process_exported_program(ep)
         self.assertIsInstance(result, torch.export.ExportedProgram)
 
-    def _scaled_mm_inputs(self):
-        x = torch.randn((2, 3), dtype=torch.float32).to(torch.float8_e4m3fn)
-        y = torch.randn((3, 4), dtype=torch.float32).to(torch.float8_e4m3fn)
+    def _scaled_mm_inputs(self, device: str = "cpu"):
+        x = torch.randn((2, 3), dtype=torch.float32, device=device).to(torch.float8_e4m3fn)
+        y = torch.randn((3, 4), dtype=torch.float32, device=device).to(torch.float8_e4m3fn)
         return (
             x,
             y,
-            torch.tensor(0.5, dtype=torch.float32),
-            torch.tensor(2.0, dtype=torch.float32),
+            torch.tensor(0.5, dtype=torch.float32, device=device),
+            torch.tensor(2.0, dtype=torch.float32, device=device),
         )
 
     def _assert_reference_conversion(self, onx, expected, inputs, atol=0, rtol=0):
@@ -786,9 +786,16 @@ class TestPostProcessExportedProgram(ExtTestCase):
         self.assertEqual(len(got), 1)
         self.assertEqualArray(expected, got[0], atol=atol, rtol=rtol)
 
-    def _check_scaled_mm_model(self, model):
-        inputs = self._scaled_mm_inputs()
-        expected = model(*inputs)
+    def _scaled_mm_reference(self, inputs, out_dtype=torch.float16):
+        x, y, scale_a, scale_b = inputs
+        return torch.matmul(
+            x.to(torch.float32) * scale_a.to(torch.float32),
+            y.to(torch.float32) * scale_b.to(torch.float32),
+        ).to(out_dtype)
+
+    def _check_scaled_mm_model(self, model, inputs=None, expected=None):
+        inputs = self._scaled_mm_inputs() if inputs is None else inputs
+        expected = model(*inputs) if expected is None else expected
         for tracing in (None, TracingMode.TRACING, TracingMode.NEW_TRACING):
             with self.subTest(tracing=tracing):
                 export_options = (
@@ -812,6 +819,9 @@ class TestPostProcessExportedProgram(ExtTestCase):
 
     @requires_torch("2.11")
     @ignore_warnings(UserWarning)
+    @unittest.skipIf(
+        not torch.cuda.is_available(), "torch._scaled_mm_v2 is not implemented on CPU"
+    )
     def test_export_scaled_mm_v2_to_onnx(self):
         """Checks that torch._scaled_mm_v2 exports in all tracing modes."""
 
@@ -832,7 +842,46 @@ class TestPostProcessExportedProgram(ExtTestCase):
                     False,
                 )
 
-        self._check_scaled_mm_model(ScaledMMV2Model())
+        self._check_scaled_mm_model(ScaledMMV2Model(), inputs=self._scaled_mm_inputs("cuda"))
+
+    @requires_torch("2.11")
+    @ignore_warnings(UserWarning)
+    def test_export_scaled_mm_v2_to_onnx_cpu_alternative(self):
+        """Checks that scaled_mm_v2 lowering still works on CPU without executing the op."""
+
+        from yobx.torch.interpreter._aten_functions import aten__scaled_mm_v2
+        from yobx.torch.torch_helper import torch_dtype_to_onnx_dtype
+        from yobx.xbuilder import GraphBuilder
+
+        inputs = self._scaled_mm_inputs()
+        x, y, scale_a, scale_b = inputs
+        g = GraphBuilder({"": 19}, verbose=0)
+        g.make_tensor_input("x", torch_dtype_to_onnx_dtype(x.dtype), x.shape)
+        g.make_tensor_input("y", torch_dtype_to_onnx_dtype(y.dtype), y.shape)
+        g.make_tensor_input("scale_a", torch_dtype_to_onnx_dtype(scale_a.dtype), scale_a.shape)
+        g.make_tensor_input("scale_b", torch_dtype_to_onnx_dtype(scale_b.dtype), scale_b.shape)
+        tensorwise = int(torch.nn.functional.ScalingType.TensorWise)
+        output = aten__scaled_mm_v2(
+            g,
+            None,
+            ["scaled_mm_v2"],
+            "x",
+            "y",
+            ["scale_a"],
+            [tensorwise],
+            [],
+            ["scale_b"],
+            [tensorwise],
+            [],
+            None,
+            torch.float16,
+            (),
+            False,
+        )
+        g.make_tensor_output(output, torch_dtype_to_onnx_dtype(torch.float16), (2, 4))
+        self._assert_reference_conversion(
+            g.to_onnx(optimize=False), self._scaled_mm_reference(inputs), inputs, atol=1e-2
+        )
 
     @requires_torch("2.11")
     @ignore_warnings(UserWarning)
