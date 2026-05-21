@@ -163,6 +163,7 @@ the decision path for trees or ensembles in :epkg:`scikit-learn`.
    converters
    core
    galleries
+   howto/index
    cmds/index
    install
    getting_started
