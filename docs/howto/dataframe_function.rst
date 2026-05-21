@@ -48,10 +48,18 @@ one traced frame per input DataFrame.
     from yobx.sql import to_onnx
 
     def join_like(left, right):
-        return left.select([(left["a"] + right["b"]).alias("total")])
+        if hasattr(left, "join"):
+            merged = left.join(right, left_key="id", right_key="id")
+            return merged.select([(merged["a"] + merged["b"]).alias("total")])
+        merged = pd.merge(left, right, on="id")
+        return (merged["a"] + merged["b"]).to_frame(name="total")
 
-    left = pd.DataFrame({"a": np.array([1.0, 2.0], dtype=np.float32)})
-    right = pd.DataFrame({"b": np.array([10.0, 20.0], dtype=np.float32)})
+    left = pd.DataFrame(
+        {"id": np.array([0, 1], dtype=np.int64), "a": np.array([1.0, 2.0], dtype=np.float32)}
+    )
+    right = pd.DataFrame(
+        {"id": np.array([0, 1], dtype=np.int64), "b": np.array([10.0, 20.0], dtype=np.float32)}
+    )
     onx = to_onnx(join_like, (left, right))
     print(pretty_onnx(onx))
 
