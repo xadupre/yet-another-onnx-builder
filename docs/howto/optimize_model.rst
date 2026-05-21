@@ -254,6 +254,22 @@ Main differences:
   shapes and dtypes through the ``g`` argument of ``match``. The
   :epkg:`onnxscript` rewriter relies on a ``check`` callback for
   similar purposes.
+* **Variable-arity patterns** — because ``match`` and ``apply`` of
+  :class:`PatternOptimization <yobx.xoptim.PatternOptimization>` are
+  arbitrary Python methods, a single ``yobx`` pattern can match a node
+  whose number of inputs (or outputs) is not known at authoring time
+  — typical examples are ``Concat``, ``Sum``, ``Min``/``Max``, the
+  variadic ``Slice`` (3-to-5 inputs), or ``Dropout`` (with optional
+  ``ratio`` / ``training_mode``). See for instance
+  :class:`ConcatGatherPattern
+  <yobx.xoptim.patterns.onnx_concat.ConcatGatherPattern>`,
+  :class:`SliceSlicePattern
+  <yobx.xoptim.patterns.onnx_slice.SliceSlicePattern>` and
+  :class:`DropoutPattern
+  <yobx.xoptim.patterns.onnx_dropout.DropoutPattern>`. The
+  :epkg:`onnxscript` rewriter, in contrast, expresses the match graph
+  as a fixed ONNX function, so a separate rule has to be written for
+  each input arity.
 * **Diagnostics** — every iteration records statistics
   (``added`` / ``removed`` nodes, ``time_in`` per pattern), which makes
   it easy to spot which patterns actually fire and which ones are
