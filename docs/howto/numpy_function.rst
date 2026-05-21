@@ -18,6 +18,7 @@ Only the input dtype and shape are used during export.
     :showcode:
 
     import numpy as np
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sql import trace_numpy_to_onnx
 
     def normalize_rows(X):
@@ -27,10 +28,36 @@ Only the input dtype and shape are used during export.
 
     X_sample = np.zeros((3, 4), dtype=np.float32)
     onx = trace_numpy_to_onnx(normalize_rows, X_sample)
+    print(pretty_onnx(onx))
 
-    print(f"Inputs : {[i.name for i in onx.graph.input]}")
-    print(f"Outputs: {[o.name for o in onx.graph.output]}")
-    print(f"Nodes  : {[n.op_type for n in onx.graph.node]}")
+----
+
+How to export a function with multiple inputs and outputs
+---------------------------------------------------------
+
+Use ``input_names`` and ``output_names`` when your function takes more than one
+input array and returns multiple arrays.
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from yobx.helpers.onnx_helper import pretty_onnx
+    from yobx.sql import trace_numpy_to_onnx
+
+    def combine(A, B):
+        return A + B, A - B
+
+    A = np.random.randn(2, 3).astype(np.float32)
+    B = np.random.randn(2, 3).astype(np.float32)
+    onx = trace_numpy_to_onnx(
+        combine,
+        A,
+        B,
+        input_names=["A", "B"],
+        output_names=["sum", "diff"],
+    )
+    print(pretty_onnx(onx))
 
 ----
 
