@@ -19,7 +19,9 @@ from ._aten_functions import (
     aten_aminmax,
     aten_argsort,
     aten_bitwise_and,
+    aten_bitwise_left_shift,
     aten_bitwise_or,
+    aten_bitwise_right_shift,
     aten_bitwise_xor,
     aten_clamp_max,
     aten_clamp_min,
@@ -929,6 +931,20 @@ def aten_meth_bitwise_xor(
 ) -> T:
     "Computes bitwise XOR."
     return aten_bitwise_xor(g, sts, outputs, x, y, name=".bitwise_xor")
+
+
+def aten_meth_bitwise_left_shift(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes bitwise left shift."
+    return aten_bitwise_left_shift(g, sts, outputs, x, y, name=".bitwise_left_shift")
+
+
+def aten_meth_bitwise_right_shift(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes bitwise right shift."
+    return aten_bitwise_right_shift(g, sts, outputs, x, y, name=".bitwise_right_shift")
 
 
 def _to_bool(g: GraphBuilder, x: T, name: str) -> T:

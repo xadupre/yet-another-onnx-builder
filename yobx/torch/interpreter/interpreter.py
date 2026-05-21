@@ -1316,7 +1316,14 @@ class FxGraphInterpreter:
         return complete_args, complete_kwargs
 
     def _get_aten_name(self, node: "torch.fx.Node") -> str:  # noqa: F821
-        if node.target in {operator.getitem, operator.or_, operator.and_, operator.xor}:
+        if node.target in {
+            operator.getitem,
+            operator.or_,
+            operator.and_,
+            operator.xor,
+            operator.lshift,
+            operator.rshift,
+        }:
             if node.target == operator.getitem:
                 return "getitem"
             if node.target == operator.or_:
@@ -1325,6 +1332,10 @@ class FxGraphInterpreter:
                 return "aten_bitwise_and"
             if node.target == operator.xor:
                 return "aten_bitwise_xor"
+            if node.target == operator.lshift:
+                return "aten_bitwise_left_shift"
+            if node.target == operator.rshift:
+                return "aten_bitwise_right_shift"
         if isinstance(node.target, self.torch._ops.OpOverloadPacket):
             if node.target != self.torch.ops.aten.sym_size:
                 raise RuntimeError(f"Unsupported function {node!r}.")
@@ -1528,9 +1539,13 @@ class FxGraphInterpreter:
                 operator.or_,
                 operator.and_,
                 operator.xor,
+                operator.lshift,
+                operator.rshift,
                 "aten_bitwise_or",
                 "aten_bitwise_and",
                 "aten_bitwise_xor",
+                "aten_bitwise_left_shift",
+                "aten_bitwise_right_shift",
             }
             or (
                 hasattr(aten_name, "_opname")
