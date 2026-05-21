@@ -148,24 +148,39 @@ The four arguments to :meth:`~yobx.helpers.patch_helper.PatchInfo.make` are:
 * **family** — a free-form category label (e.g. ``"torch"`` or
   ``"transformers"``) used in diffs and reports.
 
-To add the custom patch alongside the built-in ones, pass a
-:class:`~yobx.helpers.patch_helper.PatchDetails` or call
-:meth:`~yobx.helpers.patch_helper.PatchDetails.append` before entering the
-context:
+To add the custom patch alongside the built-in ones, pass it via the
+``extra_patches`` argument of
+:func:`~yobx.torch.patch.apply_patches_for_model`:
 
-.. code-block:: python
+.. runpython::
+    :showcode:
 
-    from yobx.helpers.patch_helper import PatchInfo, PatchDetails
+    import torch
+    import torch._refs
+    from yobx.helpers.patch_helper import PatchInfo
     from yobx.torch import apply_patches_for_model
 
-    my_patch = PatchInfo.make(my_fn, some_module, "fn_name", family="custom")
+    def my_broadcast_shapes(*_shapes):
+        """Minimal stand-in that returns the first non-empty shape."""
+        for s in _shapes:
+            if s:
+                return list(s)
+        return []
 
-    with apply_patches_for_model(patch_torch=True) as details:
-        my_patch.do()
-        try:
-            ep = torch.export.export(model, ...)
-        finally:
-            my_patch.undo()
+    my_patch = PatchInfo.make(
+        my_broadcast_shapes,
+        torch._refs,
+        "_broadcast_shapes",
+        family="custom",
+    )
+
+    with apply_patches_for_model(extra_patches=[my_patch]) as details:
+        print(f"Total patches: {details.n_patches}")
+        for p in details:
+            print(f"  [{p.family}] {p.name}")
+        print("patched function:", torch._refs._broadcast_shapes.__name__)
+
+    print("after context, function restored:", torch._refs._broadcast_shapes.__name__)
 
 ----
 
