@@ -222,14 +222,89 @@ The ``patterns`` argument of
 :class:`OptimizationOptions <yobx.xbuilder.OptimizationOptions>`
 accepts a list mixing predefined names and user-defined instances —
 e.g. ``patterns=["default", MatMulAddToFusedGemmPattern()]`` to combine
-a custom rewrite with the built-in catalogue. When the applicability
-of the fusion depends on shapes, dtypes or attributes (for example
-``FusedGemm`` only being valid for 2-D inputs), subclass
-:class:`PatternOptimization <yobx.xoptim.PatternOptimization>`
-directly and check those conditions in ``match`` — see the worked
-*NotNot* example in :ref:`l-design-pattern-optimizer` and the real
-custom-op fusions in :mod:`yobx.xoptim.patterns_ort`
-(``com.microsoft.FusedMatMul``, ``com.microsoft.Gelu``, …).
+a custom rewrite with the built-in catalogue.
+
+When the applicability of the fusion depends on shapes, dtypes or
+attributes (for example ``FusedGemm`` only being valid for 2-D
+inputs), subclass :class:`PatternOptimization
+<yobx.xoptim.PatternOptimization>` directly and implement ``match``
+and ``apply`` as plain Python methods. The example below rewrites the
+same ``MatMul + Add`` into ``com.example.FusedGemm`` but only when
+both ``MatMul`` operands are rank 2 and the bias is rank 1 — a guard
+that cannot be expressed in the declarative ``EasyPatternOptimization``
+API:
+
+.. runpython::
+    :showcode:
+
+    import inspect
+    from typing import List, Optional
+    from onnx import NodeProto
+    from yobx.helpers.onnx_helper import pretty_onnx
+    from yobx.xbuilder import GraphBuilder, OptimizationOptions
+    from yobx.xoptim import MatchResult, PatternOptimization
+    from yobx.doc import demo_mlp_model
+
+
+    class MatMulAddToFusedGemmManualPattern(PatternOptimization):
+        """Fuses ``Add(MatMul(x, w), b)`` into ``com.example.FusedGemm``
+        when ``x`` and ``w`` are 2-D and ``b`` is 1-D."""
+
+        def match(
+            self,
+            g: "GraphBuilderPatternOptimization",
+            node: NodeProto,
+            matched: List[MatchResult],
+        ) -> Optional[MatchResult]:
+            if node.op_type != "Add" or node.domain != "":
+                return self.none()
+            matmul = g.node_before(node.input[0])
+            if matmul is None or matmul.op_type != "MatMul" or matmul.domain != "":
+                return self.none(node, inspect.currentframe().f_lineno)
+            if g.is_used_more_than_once(matmul.output[0]):
+                return self.none(node, inspect.currentframe().f_lineno)
+            x, w = matmul.input
+            b = node.input[1]
+            if not all(g.has_rank(i) for i in (x, w, b)):
+                return self.none(node, inspect.currentframe().f_lineno)
+            if g.get_rank(x) != 2 or g.get_rank(w) != 2 or g.get_rank(b) != 1:
+                return self.none(node, inspect.currentframe().f_lineno)
+            return MatchResult(self, [matmul, node], self.apply)
+
+        def apply(
+            self,
+            g: "GraphBuilder",
+            matmul_node: NodeProto,
+            add_node: NodeProto,
+        ) -> List[NodeProto]:
+            x, w = matmul_node.input
+            b = add_node.input[1]
+            new_node = g.make_node(
+                "FusedGemm",
+                [x, w, b],
+                add_node.output,
+                domain="com.example",
+                name=f"{self.__class__.__name__}--{add_node.name}",
+                doc_string=add_node.doc_string,
+            )
+            return [new_node]
+
+
+    onx = demo_mlp_model("temp_doc_optimize_mlp_manual.onnx")
+
+    gr = GraphBuilder(
+        onx,
+        infer_shapes_options=True,
+        optimization_options=OptimizationOptions(
+            patterns=[MatMulAddToFusedGemmManualPattern()],
+        ),
+    )
+    opt_onx = gr.to_onnx(optimize=True)
+    print(pretty_onnx(opt_onx))
+
+The real custom-op fusions in :mod:`yobx.xoptim.patterns_ort`
+(``com.microsoft.FusedMatMul``, ``com.microsoft.Gelu``, …) follow the
+same template, with richer guards on shapes, dtypes and attributes.
 
 Main differences:
 
