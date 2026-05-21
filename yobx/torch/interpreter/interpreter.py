@@ -1346,6 +1346,8 @@ class FxGraphInterpreter:
                 # We need to distinguish between match.ceil and torch.ceil.
                 # The output type is different.
                 return "math_ceil"
+            if node.target is self.torch.istft:
+                return "aten_istft"
             return node.target
 
         if isinstance(node.target, self.torch._ops.OpOverload):

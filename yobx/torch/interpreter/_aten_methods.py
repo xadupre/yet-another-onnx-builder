@@ -32,6 +32,7 @@ from ._aten_functions import (
     aten_expand,
     aten_eq,
     aten_flatten,
+    aten_istft,
     aten_log,
     aten_matmul,
     aten_max,
@@ -995,6 +996,40 @@ def aten_meth_erfinv(
 ) -> T:
     "Computes the inverse error function."
     return aten_erfinv(g, sts, outputs, x, name=".erfinv")
+
+
+def aten_meth_istft(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    n_fft: int,
+    hop_length: Optional[int] = None,
+    win_length: Optional[int] = None,
+    window: Optional[T] = None,
+    center: bool = True,
+    normalized: bool = False,
+    onesided: Optional[bool] = None,
+    length: Optional[int] = None,
+    return_complex: bool = False,
+) -> T:
+    "Computes inverse STFT."
+    return aten_istft(
+        g,
+        sts,
+        outputs,
+        x,
+        n_fft=n_fft,
+        hop_length=hop_length,
+        win_length=win_length,
+        window=window,
+        center=center,
+        normalized=normalized,
+        onesided=onesided,
+        length=length,
+        return_complex=return_complex,
+        name=".istft",
+    )
 
 
 def aten_meth_conj(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:

@@ -2613,6 +2613,42 @@ def set_type_shape_complex_module(self: ShapeBuilder, node: NodeProto):
     return True
 
 
+def set_type_shape_istft(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for node type Istft."""
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_type(node.input[0]):
+        dtype = self.get_type(node.input[0])
+        if dtype == TensorProto.COMPLEX64:
+            self.set_type(node.output[0], TensorProto.FLOAT)
+        elif dtype == TensorProto.COMPLEX128:
+            self.set_type(node.output[0], TensorProto.DOUBLE)
+        else:
+            self.set_type(node.output[0], dtype)
+
+    length = None
+    if len(node.input) > 7:
+        cst = self.get_constant(node.input[7], computed_value=True)
+        if cst is not None:
+            value = np.asarray(cst).reshape((-1,))
+            if value.size > 0:
+                iv = int(value[0])
+                if iv >= 0:
+                    length = iv
+
+    if self.has_shape(node.input[0]):
+        shape = self.get_shape(node.input[0])
+        if len(shape) >= 2:
+            self.set_shape(node.output[0], (*tuple(shape[:-2]), length))
+        elif len(shape) == 1:
+            self.set_shape(node.output[0], (length,))
+        else:
+            self.set_rank(node.output[0], 0)
+    elif self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]) - 1)
+    return True
+
+
 def set_type_shape_shared_input(self: ShapeBuilder, node: NodeProto):
     """Sets the output shapes for nodes with two outputs sharing the same inputs."""
     r1 = set_type_shape_binary_op(self, node.output[0], *node.input[:2])
@@ -2760,6 +2796,7 @@ set_shape_type_op_any_custom = {
     "Gelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "GemmFastGelu": lambda g, node: set_type_shape_matmul(g, node.output[0], *node.input[:2]),
     "GemmaRotaryEmbedding": set_shape_type_op_any_gemma_rotary_embedding,
+    "Istft": set_type_shape_istft,
     "MaskedScatterNDOfShape": set_type_shape_scatter_nd_of_shape,
     "MulAdd": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
     "MulMul": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),

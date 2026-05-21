@@ -86,6 +86,10 @@ _ORIGINAL_NN_FUNCTIONAL_SOFT_MARGIN_LOSS: Optional[Callable] = getattr(
     torch.nn.functional, "soft_margin_loss", None
 )
 
+# Capture the real ``torch.istft`` at import time so calls during new-tracing
+# can be normalized to a direct ``aten.istft`` invocation.
+_ORIGINAL_TORCH_ISTFT: Callable = torch.istft
+
 
 @contextlib.contextmanager
 def _cond_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
@@ -641,6 +645,45 @@ def _soft_margin_loss_replacement_ctx() -> Generator:
 
 
 @contextlib.contextmanager
+def _istft_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
+    """
+    Temporarily replaces ``torch.istft`` with a wrapper that calls
+    ``aten.istft.default`` directly.
+    """
+
+    def _istft_impl(
+        input: torch.Tensor,
+        n_fft: int,
+        hop_length: Optional[int] = None,
+        win_length: Optional[int] = None,
+        window: Optional[torch.Tensor] = None,
+        center: bool = True,
+        normalized: bool = False,
+        onesided: Optional[bool] = None,
+        length: Optional[int] = None,
+        return_complex: bool = False,
+    ) -> torch.Tensor:
+        return tracer._handle_istft_call(
+            input=input,
+            n_fft=n_fft,
+            hop_length=hop_length,
+            win_length=win_length,
+            window=window,
+            center=center,
+            normalized=normalized,
+            onesided=onesided,
+            length=length,
+            return_complex=return_complex,
+        )
+
+    torch.istft = _istft_impl  # type: ignore[assignment]
+    try:
+        yield
+    finally:
+        torch.istft = _ORIGINAL_TORCH_ISTFT  # type: ignore[assignment]
+
+
+@contextlib.contextmanager
 def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[name-defined]  # noqa: F821
     """
     Applies all tracing-time torch replacement context managers at once.
@@ -661,6 +704,7 @@ def _trace_replacement_ctx(tracer: "GraphTracer") -> Generator:  # type: ignore[
         _arange_replacement_ctx(tracer),
         _roll_dynamic_shape_ctx(),
         _soft_margin_loss_replacement_ctx(),
+        _istft_replacement_ctx(tracer),
         _bilinear_replacement_ctx(),
         _scan_replacement_ctx(tracer),
         _tensor_split_replacement_ctx(tracer),
