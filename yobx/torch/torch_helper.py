@@ -17,7 +17,7 @@ _TYPENAME = dict(
 
 
 def _float8_onnx_to_torch() -> dict[int, "torch.dtype"]:
-    mapping = {}
+    mapping: dict[int, "torch.dtype"] = {}
     if hasattr(torch, "float8_e4m3fn") and hasattr(onnx.TensorProto, "FLOAT8E4M3FN"):
         mapping[onnx.TensorProto.FLOAT8E4M3FN] = torch.float8_e4m3fn
     if hasattr(torch, "float8_e4m3fnuz") and hasattr(onnx.TensorProto, "FLOAT8E4M3FNUZ"):
