@@ -13,4 +13,6 @@ Each guide is self-contained and focuses on a single practical goal.
    numpy_function
    optimize_model
    sql
+   shape_inference
    sklearn
+   tensorflow
