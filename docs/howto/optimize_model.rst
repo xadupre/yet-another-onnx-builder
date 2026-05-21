@@ -169,6 +169,58 @@ already shipped with the optimizer:
     )
     new_onx = gr.to_onnx(optimize=True)
 
+A user-defined rewrite is written as a subclass of
+:class:`EasyPatternOptimization <yobx.xoptim.EasyPatternOptimization>`
+(declarative match + apply) or
+:class:`PatternOptimization <yobx.xoptim.PatternOptimization>` (manual
+``match`` / ``apply``). The example below re-implements the same
+``MatMul + Add → Gemm`` rewrite with the declarative API and plugs it
+into the optimizer alongside the default patterns:
+
+.. runpython::
+    :showcode:
+
+    from yobx.helpers.onnx_helper import pretty_onnx
+    from yobx.xbuilder import GraphBuilder, OptimizationOptions
+    from yobx.xoptim import EasyPatternOptimization
+    from yobx.doc import demo_mlp_model
+
+
+    class MatMulAddToGemmPattern(EasyPatternOptimization):
+        """Fuses ``Add(MatMul(x, w), b)`` into ``Gemm(x, w, b)``."""
+
+        def match_pattern(self, g: "GraphBuilder", x, w, b):
+            t = g.op.MatMul(x, w)
+            return g.op.Add(t, b)
+
+        def apply_pattern(self, g: "GraphBuilder", x, w, b):
+            return g.op.Gemm(x, w, b)
+
+
+    onx = demo_mlp_model("temp_doc_optimize_mlp.onnx")
+
+    gr = GraphBuilder(
+        onx,
+        infer_shapes_options=True,
+        optimization_options=OptimizationOptions(
+            patterns=[MatMulAddToGemmPattern()],
+        ),
+    )
+    opt_onx = gr.to_onnx(optimize=True)
+    print(pretty_onnx(opt_onx))
+
+The ``patterns`` argument of
+:class:`OptimizationOptions <yobx.xbuilder.OptimizationOptions>`
+accepts a list mixing predefined names and user-defined instances —
+e.g. ``patterns=["default", MatMulAddToGemmPattern()]`` to combine a
+custom rewrite with the built-in catalogue. For rewrites whose
+applicability depends on shapes, dtypes or attributes (a typical
+*"custom op"* fusion that targets ``com.microsoft`` or another
+domain), subclass
+:class:`PatternOptimization <yobx.xoptim.PatternOptimization>`
+directly: see the worked *NotNot* example in
+:ref:`l-design-pattern-optimizer`.
+
 Main differences:
 
 * **Out-of-the-box catalog** — ``yobx`` ships a curated list of patterns
