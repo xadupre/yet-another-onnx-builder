@@ -332,10 +332,12 @@ def string_type(
                         return (
                             f"{s}[{nob.abs().min()},{nob.abs().max():A{nob.mean()}N{n_nan}nans}]"
                         )
-                    return f"{s}[{obj.min()},{obj.max()}:A{obj.to(float).mean()}N{n_nan}nans]"
+                    nobf = nob.to(float)
+                    return f"{s}[{nobf.min()},{nobf.max()}:A{obj.to(float).mean()}N{n_nan}nans]"
                 if obj.dtype in {torch.complex64, torch.complex128}:
                     return f"{s}[{obj.abs().min()},{obj.abs().max()}:A{obj.abs().mean()}]"
-                return f"{s}[{obj.min()},{obj.max()}:A{obj.to(float).mean()}]"
+                objf = obj.to(float)
+                return f"{s}[{objf.min()},{objf.max()}:A{objf.mean()}]"
             i = torch_dtype_to_onnx_dtype(obj.dtype)
             prefix = ("G" if obj.get_device() >= 0 else "C") if with_device else ""
             if not with_shape:

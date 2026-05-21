@@ -16,6 +16,23 @@ _TYPENAME = dict(
 )
 
 
+def _float8_onnx_to_torch() -> dict[int, "torch.dtype"]:
+    mapping: dict[int, "torch.dtype"] = {}
+    if hasattr(torch, "float8_e4m3fn") and hasattr(onnx.TensorProto, "FLOAT8E4M3FN"):
+        mapping[onnx.TensorProto.FLOAT8E4M3FN] = torch.float8_e4m3fn
+    if hasattr(torch, "float8_e4m3fnuz") and hasattr(onnx.TensorProto, "FLOAT8E4M3FNUZ"):
+        mapping[onnx.TensorProto.FLOAT8E4M3FNUZ] = torch.float8_e4m3fnuz
+    if hasattr(torch, "float8_e5m2") and hasattr(onnx.TensorProto, "FLOAT8E5M2"):
+        mapping[onnx.TensorProto.FLOAT8E5M2] = torch.float8_e5m2
+    if hasattr(torch, "float8_e5m2fnuz") and hasattr(onnx.TensorProto, "FLOAT8E5M2FNUZ"):
+        mapping[onnx.TensorProto.FLOAT8E5M2FNUZ] = torch.float8_e5m2fnuz
+    return mapping
+
+
+def _float8_torch_to_onnx() -> dict["torch.dtype", int]:
+    return {v: k for k, v in _float8_onnx_to_torch().items()}
+
+
 # keeps quotes, pytest is not happy otherwise
 def onnx_dtype_to_torch_dtype(itype: int) -> "torch.dtype":
     """
@@ -54,6 +71,9 @@ def onnx_dtype_to_torch_dtype(itype: int) -> "torch.dtype":
         return torch.complex64
     if itype == onnx.TensorProto.COMPLEX128:
         return torch.complex128
+    float8 = _float8_onnx_to_torch()
+    if itype in float8:
+        return float8[itype]
     raise NotImplementedError(
         f"Unable to convert onnx type {onnx_dtype_name(itype)} to torch.type."
     )
@@ -102,6 +122,9 @@ def torch_dtype_to_onnx_dtype(to: "torch.dtype") -> int:
         return onnx.TensorProto.COMPLEX64
     if to == torch.complex128:
         return onnx.TensorProto.COMPLEX128
+    float8 = _float8_torch_to_onnx()
+    if to in float8:
+        return float8[to]
     # SymbolicTensor
     sto = str(to)
     if sto in _TYPENAME:
@@ -120,6 +143,14 @@ def to_numpy(tensor: "torch.Tensor") -> np.ndarray:
     import ml_dtypes
 
     conv = {torch.bfloat16: ml_dtypes.bfloat16}
+    if hasattr(torch, "float8_e4m3fn"):
+        conv[torch.float8_e4m3fn] = ml_dtypes.float8_e4m3fn
+    if hasattr(torch, "float8_e4m3fnuz"):
+        conv[torch.float8_e4m3fnuz] = ml_dtypes.float8_e4m3fnuz
+    if hasattr(torch, "float8_e5m2"):
+        conv[torch.float8_e5m2] = ml_dtypes.float8_e5m2
+    if hasattr(torch, "float8_e5m2fnuz"):
+        conv[torch.float8_e5m2fnuz] = ml_dtypes.float8_e5m2fnuz
     assert tensor.dtype in conv, f"Unsupported type {tensor.dtype}, not in {conv}"
     return tensor.detach().to(torch.float32).cpu().numpy().astype(conv[tensor.dtype])
 

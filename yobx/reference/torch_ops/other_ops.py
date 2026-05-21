@@ -3,6 +3,19 @@ import onnx
 import torch
 from . import OpRunKernel, OpRunTensor
 
+_FLOAT8_DTYPES = tuple(
+    getattr(torch, name)
+    for name in ("float8_e4m3fn", "float8_e4m3fnuz", "float8_e5m2", "float8_e5m2fnuz")
+    if hasattr(torch, name)
+)
+
+
+def _cast_tensor(data: torch.Tensor, to: torch.dtype) -> torch.Tensor:
+    if to in _FLOAT8_DTYPES:
+        finfo = torch.finfo(to)
+        data = torch.clamp(data, min=finfo.min, max=finfo.max)
+    return data.to(to)
+
 
 class Cast_6(OpRunKernel):
     "Cast"
@@ -18,7 +31,7 @@ class Cast_6(OpRunKernel):
         assert self.saturate == 1, f"saturate={self.saturate} not implemented for Cast"
 
     def run(self, data: OpRunTensor) -> OpRunTensor:
-        return OpRunTensor(data.tensor.to(self.to))
+        return OpRunTensor(_cast_tensor(data.tensor, self.to))
 
 
 class CastLike_15(OpRunKernel):
@@ -30,7 +43,7 @@ class CastLike_15(OpRunKernel):
         assert self.saturate == 1, f"saturate={self.saturate} not implemented for CastLike"
 
     def run(self, data: OpRunTensor, like: OpRunTensor) -> OpRunTensor:
-        return OpRunTensor(data.tensor.to(like.tensor.dtype))
+        return OpRunTensor(_cast_tensor(data.tensor, like.tensor.dtype))
 
 
 class Concat_1(OpRunKernel):
