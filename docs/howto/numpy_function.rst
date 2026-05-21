@@ -6,10 +6,6 @@ NumPy function
 This page answers common *"how do I…"* questions for exporting a Python
 function that processes :epkg:`numpy` arrays into ONNX.
 
-.. contents:: On this page
-   :local:
-   :depth: 2
-
 ----
 
 How to export a function processing numpy arrays
