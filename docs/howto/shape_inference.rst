@@ -66,8 +66,12 @@ How to compare shape inference approaches
 Three tools are commonly used for ONNX shape inference:
 
 1. :func:`onnx.shape_inference.infer_shapes` — the standard ONNX tool. It
-   propagates shapes only when every dimension is a known integer; symbolic
-   (dynamic) dimensions typically become ``None``.
+   propagates both integer and named symbolic dimensions (``dim_param``) through
+   the graph.  When an output dimension cannot be determined from its inputs —
+   for example the result of concatenating two ``d_model``-wide axes — it
+   assigns a freshly generated symbol (e.g. ``unk__0``) rather than computing
+   the arithmetic relationship ``2*d_model``.  Truly data-dependent dimensions
+   (such as the number of non-zero elements) remain ``None``.
 
 2. `onnx-shape-inference <https://pypi.org/project/onnx-shape-inference/>`_ — a
    third-party package that uses `SymPy <https://www.sympy.org>`_ to track
@@ -154,16 +158,19 @@ dimensions:
 
 **Key observations:**
 
-- For the ``added`` and ``concat_out`` intermediate results,
-  :func:`onnx.shape_inference.infer_shapes` returns ``None`` for every
-  dynamic dimension, whereas :class:`~yobx.xshape.BasicShapeBuilder` keeps
-  the symbolic name and derives the doubled axis automatically.
+- For ``added = Add(X, Y)``, all three tools correctly propagate the input
+  shape ``('batch', 'seq', 'd_model')`` to the output.
+- For ``concat_out = Concat(added, X, axis=2)``, :func:`onnx.shape_inference.infer_shapes`
+  cannot compute ``d_model + d_model`` symbolically and assigns a fresh
+  placeholder (``unk__0``), while :class:`~yobx.xshape.BasicShapeBuilder`
+  derives ``2*d_model`` exactly.  ``onnx-shape-inference`` reaches the same
+  conclusion as :class:`~yobx.xshape.BasicShapeBuilder` here.
 - For the ``Reshape`` output ``Z``, the constant ``reshape_shape``
   tensor (``[0, 0, -1]``) allows :class:`~yobx.xshape.BasicShapeBuilder` to
-  evaluate the flattening and express ``Z`` in terms of the input dimensions.
-- ``onnx-shape-inference`` reaches the same conclusions for ``added`` and
-  ``concat_out`` but may assign a fresh symbol to ``Z`` because it does not
-  always evaluate constant-shape tensors.
+  evaluate the flattening and express ``Z`` as ``('batch', 'seq', '2*d_model')``.
+  ``onnx-shape-inference`` may assign a fresh symbol to ``Z`` because it does
+  not always evaluate constant-shape tensors, and ``onnx.shape_inference``
+  likewise cannot resolve the result.
 
 ----
 
