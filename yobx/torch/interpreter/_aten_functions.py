@@ -2260,6 +2260,165 @@ def aten_bitwise_xor__Tensor(
     return aten_bitwise_xor_Tensor(g, sts, outputs, x, y, name=name)
 
 
+def _is_signed_integer_type(itype: int) -> bool:
+    return itype in {TensorProto.INT8, TensorProto.INT16, TensorProto.INT32, TensorProto.INT64}
+
+
+def _make_shift_factor(g: GraphBuilder, x: T, y: T, name: str) -> Tuple[T, int]:
+    itype = g.get_type(x)
+    dtype = tensor_dtype_to_np_dtype(itype)
+    factor = g.op.Pow(np.array(2, dtype=dtype), y, name=name)
+    if g.has_shape(y):
+        g.set_shape(factor, g.get_shape(y), allow_zero=0 in g.get_shape(y))
+    elif g.has_rank(y):
+        g.set_rank(factor, g.get_rank(y))
+    g.set_type(factor, itype)
+    return factor, itype
+
+
+def aten_bitwise_left_shift(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_left_shift",
+) -> T:
+    "bitwise left shift"
+    x, y = prepare_inputs_homogeneous_operator(g, x, y, name=name)
+    if _is_signed_integer_type(g.get_type(x)):
+        factor, _ = _make_shift_factor(g, x, y, name=name)
+        res = g.op.Mul(x, factor, outputs=outputs, name=name)
+    else:
+        res = g.op.BitShift(x, y, direction="LEFT", outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_binary_op(g, outputs[0], x, y)
+    return res
+
+
+def aten_bitwise_left_shift_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_left_shift_Tensor",
+) -> T:
+    "bitwise left shift"
+    return aten_bitwise_left_shift(g, sts, outputs, x, y, name=name)
+
+
+def aten_bitwise_left_shift_Tensor_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_left_shift_Tensor_Scalar",
+) -> T:
+    "bitwise left shift"
+    return aten_bitwise_left_shift(g, sts, outputs, x, y, name=name)
+
+
+def aten_bitwise_right_shift(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_right_shift",
+) -> T:
+    "bitwise right shift"
+    x, y = prepare_inputs_homogeneous_operator(g, x, y, name=name)
+    if _is_signed_integer_type(g.get_type(x)):
+        factor, itype = _make_shift_factor(g, x, y, name=name)
+        div = g.op.Div(x, factor, name=name)
+        prod = g.op.Mul(div, factor, name=name)
+        rem = g.op.Sub(x, prod, name=name)
+        zero = np.array(0, dtype=tensor_dtype_to_np_dtype(itype))
+        neg = g.op.Less(x, zero, name=name)
+        rem_nz = g.op.Not(g.op.Equal(rem, zero, name=name), name=name)
+        correction = g.op.Cast(g.op.And(neg, rem_nz, name=name), to=itype, name=name)
+        res = g.op.Sub(div, correction, outputs=outputs, name=name)
+    else:
+        res = g.op.BitShift(x, y, direction="RIGHT", outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_binary_op(g, outputs[0], x, y)
+    return res
+
+
+def aten_bitwise_right_shift_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_right_shift_Tensor",
+) -> T:
+    "bitwise right shift"
+    return aten_bitwise_right_shift(g, sts, outputs, x, y, name=name)
+
+
+def aten_bitwise_right_shift_Tensor_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_right_shift_Tensor_Scalar",
+) -> T:
+    "bitwise right shift"
+    return aten_bitwise_right_shift(g, sts, outputs, x, y, name=name)
+
+
+def aten___lshift___Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "__lshift___Tensor",
+) -> T:
+    "left shift"
+    return aten_bitwise_left_shift(g, sts, outputs, x, y, name=name)
+
+
+def aten___lshift___Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "__lshift___Scalar",
+) -> T:
+    "left shift"
+    return aten_bitwise_left_shift(g, sts, outputs, x, y, name=name)
+
+
+def aten___rshift___Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "__rshift___Tensor",
+) -> T:
+    "right shift"
+    return aten_bitwise_right_shift(g, sts, outputs, x, y, name=name)
+
+
+def aten___rshift___Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "__rshift___Scalar",
+) -> T:
+    "right shift"
+    return aten_bitwise_right_shift(g, sts, outputs, x, y, name=name)
+
+
 def aten_block_diag(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], *tensors: T
 ) -> T:

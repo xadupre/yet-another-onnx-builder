@@ -1479,5 +1479,53 @@ class TestTracingModeCombinationsBitwiseXor(ExtTestCase):
                 self.assertEqualArray(expected, got)
 
 
+@requires_torch("2.0")
+class TestTracingModeCombinationsBitwiseShifts(ExtTestCase):
+    """Tests bitwise shift export across the supported tracing modes."""
+
+    def _make_inputs(self):
+        return (
+            torch.tensor([1, 2, 7], dtype=torch.int64),
+            torch.tensor([3, 1, 4], dtype=torch.int64),
+        )
+
+    def _assert_export(self, model: torch.nn.Module, tracing_mode: TracingMode):
+        inputs = self._make_inputs()
+        expected = tuple(output.detach().numpy() for output in model(*inputs))
+        artifact = to_onnx(model, inputs, export_options=ExportOptions(tracing=tracing_mode))
+        ref = ExtendedReferenceEvaluator(artifact.proto)
+        got = ref.run(None, {name: value.numpy() for name, value in zip(("x", "y"), inputs)})
+        self.assertEqual(len(expected), len(got))
+        for exp, res in zip(expected, got):
+            self.assertEqualArray(exp, res)
+
+    @ignore_warnings(UserWarning)
+    def test_bitwise_shift_methods_all_default_libraries(self):
+        class BitwiseShiftMethodsModel(torch.nn.Module):
+            def forward(self, x, y):
+                return (
+                    x.bitwise_left_shift(y),
+                    x.bitwise_right_shift(y),
+                    x.bitwise_left_shift(1),
+                    x.bitwise_right_shift(1),
+                )
+
+        model = BitwiseShiftMethodsModel()
+        for tracing_mode in (TracingMode.DEFAULT, TracingMode.TRACING, TracingMode.NEW_TRACING):
+            with self.subTest(tracing_mode=tracing_mode):
+                self._assert_export(model, tracing_mode)
+
+    @ignore_warnings(UserWarning)
+    def test_operator_shift_all_default_libraries(self):
+        class BitwiseOperatorShiftModel(torch.nn.Module):
+            def forward(self, x, y):
+                return x << y, x >> y, x << 1, x >> 1
+
+        model = BitwiseOperatorShiftModel()
+        for tracing_mode in (TracingMode.DEFAULT, TracingMode.TRACING, TracingMode.NEW_TRACING):
+            with self.subTest(tracing_mode=tracing_mode):
+                self._assert_export(model, tracing_mode)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

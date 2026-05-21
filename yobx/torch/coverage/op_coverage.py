@@ -321,8 +321,6 @@ XFAIL_OPS_INT32: Dict[str, FrozenSet[str]] = {
             "atan",  # ONNX op only supports float dtypes
             "atan2",  # ONNX Atan not supported for integer dtypes
             "atanh",  # ONNX op only supports float dtypes
-            "bitwise_left_shift",  # FunctionNotFoundError
-            "bitwise_right_shift",  # FunctionNotFoundError
             "ceil",  # InvalidGraph: int32 not supported by Ceil
             "cos",  # ONNX op only supports float dtypes
             "cosh",  # ONNX op only supports float dtypes
@@ -392,8 +390,6 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
             "atan",  # ONNX op only supports float dtypes
             "atan2",  # ONNX Atan not supported for integer dtypes
             "atanh",  # ONNX op only supports float dtypes
-            "bitwise_left_shift",  # FunctionNotFoundError
-            "bitwise_right_shift",  # FunctionNotFoundError
             "ceil",  # InvalidGraph: int64 not supported by Ceil
             "cos",  # ONNX op only supports float dtypes
             "cosh",  # ONNX op only supports float dtypes
