@@ -190,6 +190,81 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         )
         self._finalize_test(model, torch.rand((4, 5, 6, 7), dtype=torch.float32))
 
+    @unittest.skipIf(not hasattr(torch, "float8_e4m3fn"), reason="float8 not available")
+    def test_op_cast_float8_saturates(self):
+        values = np.array(
+            [
+                [0.46875, 0.46875, 0.5, 0.8125, 0.46875],
+                [0.75, 1000, 0, np.nan, 1000],
+                [1000, -1000, 0, 0, -1000],
+            ],
+            dtype=np.float32,
+        )
+        float8_types = [
+            onnx.TensorProto.FLOAT8E4M3FN,
+            onnx.TensorProto.FLOAT8E4M3FNUZ,
+            onnx.TensorProto.FLOAT8E5M2,
+            onnx.TensorProto.FLOAT8E5M2FNUZ,
+        ]
+        for input_dtype in (np.float32, np.float16):
+            input_tensor_type = TFLOAT if input_dtype == np.float32 else TFLOAT16
+            for tensor_type in float8_types:
+                with self.subTest(input_dtype=input_dtype, tensor_type=tensor_type):
+                    model = oh.make_model(
+                        oh.make_graph(
+                            [oh.make_node("Cast", ["X"], ["Y"], to=tensor_type)],
+                            "dummy",
+                            [oh.make_tensor_value_info("X", input_tensor_type, ["a", "b"])],
+                            [oh.make_tensor_value_info("Y", tensor_type, ["a", "b"])],
+                        ),
+                        ir_version=9,
+                        opset_imports=[oh.make_opsetid("", 19)],
+                    )
+                    feeds_numpy = {"X": values.astype(input_dtype)}
+                    expected = ExtendedReferenceEvaluator(model).run(None, feeds_numpy)
+                    rt = TorchReferenceEvaluator(model)
+                    got = rt.run(None, {"X": torch.from_numpy(feeds_numpy["X"])})
+                    self.assertEqualAny(expected, [self.to_numpy(g) for g in got])
+
+    @unittest.skipIf(not hasattr(torch, "float8_e4m3fn"), reason="float8 not available")
+    def test_op_castlike_float8_saturates(self):
+        values = np.array([[0.75, 1000, 0, np.nan, -1000]], dtype=np.float32)
+        for like_dtype in (torch.float8_e4m3fnuz, torch.float8_e5m2):
+            with self.subTest(like_dtype=like_dtype):
+                like_onnx_type = {
+                    torch.float8_e4m3fnuz: onnx.TensorProto.FLOAT8E4M3FNUZ,
+                    torch.float8_e5m2: onnx.TensorProto.FLOAT8E5M2,
+                }[like_dtype]
+                model = oh.make_model(
+                    oh.make_graph(
+                        [oh.make_node("CastLike", ["X", "Like"], ["Y"])],
+                        "dummy",
+                        [
+                            oh.make_tensor_value_info("X", TFLOAT, ["a", "b"]),
+                            oh.make_tensor_value_info("Like", like_onnx_type, ["a", "b"]),
+                        ],
+                        [oh.make_tensor_value_info("Y", like_onnx_type, ["a", "b"])],
+                    ),
+                    ir_version=9,
+                    opset_imports=[oh.make_opsetid("", 19)],
+                )
+                feeds_numpy = {
+                    "X": values,
+                    "Like": np.zeros(
+                        values.shape, dtype=self.to_numpy(torch.zeros((), dtype=like_dtype)).dtype
+                    ),
+                }
+                expected = ExtendedReferenceEvaluator(model).run(None, feeds_numpy)
+                rt = TorchReferenceEvaluator(model)
+                got = rt.run(
+                    None,
+                    {
+                        "X": torch.from_numpy(values),
+                        "Like": torch.zeros(values.shape, dtype=like_dtype),
+                    },
+                )
+                self.assertEqualAny(expected, [self.to_numpy(g) for g in got])
+
     def test_op_transpose(self):
         model = oh.make_model(
             oh.make_graph(
