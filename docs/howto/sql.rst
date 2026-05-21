@@ -26,6 +26,27 @@ Pass the SQL query and the input dtypes to :func:`yobx.sql.to_onnx`.
 
 ----
 
+How to convert a SQL JOIN query
+-------------------------------
+
+Use :func:`yobx.sql.sql_to_onnx` and pass the right-table dtypes through
+``right_input_dtypes``.
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from yobx.helpers.onnx_helper import pretty_onnx
+    from yobx.sql import sql_to_onnx
+
+    query = "SELECT a.x, b.y FROM a JOIN b ON a.id = b.rid"
+    left_dtypes = {"id": np.int64, "x": np.float32}
+    right_dtypes = {"rid": np.int64, "y": np.float32}
+    onx = sql_to_onnx(query, left_dtypes, right_input_dtypes=right_dtypes)
+    print(pretty_onnx(onx))
+
+----
+
 How to convert a polars LazyFrame
 ---------------------------------
 
