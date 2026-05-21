@@ -44,27 +44,46 @@ Use ``strategy="new-tracing"``:
 Quick summary
 ^^^^^^^^^^^^^
 
+The table below summarizes not only capture/backend routing, but also how
+decomposition is handled and when each option is usually the most practical.
+
 .. list-table::
     :header-rows: 1
 
     * - Option
       - FX graph capture
       - ONNX conversion backend
+      - Decomposition behavior
+      - Typical use
     * - ``strategy="nostrict"`` / ``"strict"``
       - :func:`torch.export.export`
       - yobx converter
+      - no explicit decomposition table by default; may still decompose only if
+        inplace nodes cannot be removed directly
+      - preferred default when you want yobx ATen-level conversion coverage
     * - ``strategy="tracing"``
       - symbolic :class:`~yobx.torch.tracing.CustomTracer`
       - yobx converter
+      - no explicit decomposition table by default; tracing normalizes many
+        inplace patterns up front
+      - useful when ``torch.export.export`` fails on a model but FX tracing works
     * - ``strategy="new-tracing"``
       - dispatch-based tracing
       - yobx converter
+      - no explicit decomposition table by default; relies on new-tracing
+        rewrites/patches for operator coverage
+      - useful for models/operators better captured through dispatch-level tracing
     * - ``strategy="onnxscript"`` or ``tracing=TracingMode.ONNXSCRIPT``
       - handled by :func:`torch.onnx.export`
       - official exporter
+      - decomposition behavior follows the official exporter pipeline
+      - use when you want direct parity with :func:`torch.onnx.export`
     * - ``converting_library=ConvertingLibrary.ONNXSCRIPT`` (+ chosen strategy)
       - chosen strategy still captures the graph first
       - official exporter on that captured graph
+      - decomposition depends on the selected capture strategy used before
+        calling :func:`torch.onnx.export`
+      - use when you want strategy-controlled capture plus official ONNX lowering
 
 ----
 
