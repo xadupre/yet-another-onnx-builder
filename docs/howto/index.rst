@@ -9,4 +9,5 @@ Each guide is self-contained and focuses on a single practical goal.
 .. toctree::
    :maxdepth: 1
 
+   numpy_function
    sklearn
