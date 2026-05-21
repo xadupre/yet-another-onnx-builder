@@ -23,7 +23,7 @@ The function is traced through the DataFrame API and compiled into ONNX.
     from yobx.sql import to_onnx
 
     def add_total(df):
-        return df.assign(total=df["a"] + df["b"])[["total"]]
+        return df.select([(df["a"] + df["b"]).alias("total")])
 
     df = pd.DataFrame(
         {"a": np.array([1.0, 2.0], dtype=np.float32), "b": np.array([3.0, 4.0], dtype=np.float32)}
@@ -48,7 +48,7 @@ one traced frame per input DataFrame.
     from yobx.sql import to_onnx
 
     def join_like(left, right):
-        return left.assign(total=left["a"] + right["b"])[["total"]]
+        return left.select([(left["a"] + right["b"]).alias("total")])
 
     left = pd.DataFrame({"a": np.array([1.0, 2.0], dtype=np.float32)})
     right = pd.DataFrame({"b": np.array([10.0, 20.0], dtype=np.float32)})
@@ -81,7 +81,9 @@ Wrap the DataFrame logic in a custom transformer inheriting from
             return self
 
         def transform(self, df):
-            return df.assign(total=df["a"] + df["b"])[["total"]]
+            if hasattr(df, "select"):
+                return df.select([(df["a"] + df["b"]).alias("total")])
+            return (df["a"] + df["b"]).to_frame(name="total")
 
     rng = np.random.default_rng(0)
     train_df = pd.DataFrame(
