@@ -697,7 +697,19 @@ def aten___and___Tensor(
     name: str = "__and___Tensor",
 ) -> T:
     "inplace and, we assume inplace modifications were removed"
-    return aten_and(g, sts, outputs, x, y, name=name)
+    return aten_bitwise_and(g, sts, outputs, x, y, name=name)
+
+
+def aten___and___Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "__and___Scalar",
+) -> T:
+    "inplace and, we assume inplace modifications were removed"
+    return aten_bitwise_and(g, sts, outputs, x, y, name=name)
 
 
 def aten___or___Tensor(
@@ -709,7 +721,19 @@ def aten___or___Tensor(
     name: str = "__or___Tensor",
 ) -> T:
     "inplace `or`, we assume inplace modifications were removed"
-    return aten_or(g, sts, outputs, x, y, name=name)
+    return aten_bitwise_or(g, sts, outputs, x, y, name=name)
+
+
+def aten___or___Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "__or___Scalar",
+) -> T:
+    "inplace `or`, we assume inplace modifications were removed"
+    return aten_bitwise_or(g, sts, outputs, x, y, name=name)
 
 
 def aten___xor___Tensor(
@@ -2148,7 +2172,7 @@ def aten_bitwise_and(
     x, y = prepare_inputs_homogeneous_operator(g, x, y, name=name)
     res = g.op.BitwiseAnd(x, y, outputs=outputs, name=name)
     if not sts:
-        set_type_shape_binary_op(g, outputs[0], x, y, cmp_op=True)
+        set_type_shape_binary_op(g, outputs[0], x, y)
     return res
 
 
@@ -2162,6 +2186,31 @@ def aten_bitwise_and_Tensor(
 ) -> T:
     "bitwise and"
     return aten_bitwise_and(g, sts, outputs, x, y, name=name)
+
+
+def aten_bitwise_and_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_and_Scalar",
+) -> T:
+    "bitwise and"
+    return aten_bitwise_and(g, sts, outputs, x, y, name=name)
+
+
+def aten_bitwise_and__Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_and__Tensor",
+) -> T:
+    "bitwise and"
+    # The fx graph is using the output, the modified inplace input.
+    return aten_bitwise_and_Tensor(g, sts, outputs, x, y, name=name)
 
 
 def aten_bitwise_or(
@@ -2183,7 +2232,7 @@ def aten_bitwise_or(
     x, y = prepare_inputs_homogeneous_operator(g, x, y, name=name)
     res = g.op.BitwiseOr(x, y, outputs=outputs, name=name)
     if not sts:
-        set_type_shape_binary_op(g, outputs[0], x, y, cmp_op=True)
+        set_type_shape_binary_op(g, outputs[0], x, y)
     return res
 
 
@@ -2194,6 +2243,18 @@ def aten_bitwise_or_Tensor(
     x: T,
     y: T,
     name: str = "bitwise_or_Tensor",
+) -> T:
+    "bitwise or"
+    return aten_bitwise_or(g, sts, outputs, x, y, name=name)
+
+
+def aten_bitwise_or_Scalar(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_or_Scalar",
 ) -> T:
     "bitwise or"
     return aten_bitwise_or(g, sts, outputs, x, y, name=name)
