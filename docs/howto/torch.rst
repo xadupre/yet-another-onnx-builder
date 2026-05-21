@@ -73,17 +73,11 @@ decomposition is handled and when each option is usually the most practical.
       - no explicit decomposition table by default; relies on new-tracing
         rewrites/patches for operator coverage
       - useful for models/operators better captured through dispatch-level tracing
-    * - ``strategy="onnxscript"`` or ``tracing=TracingMode.ONNXSCRIPT``
+    * - ``strategy="onnxscript"``
       - handled by :func:`torch.onnx.export`
       - official exporter
       - decomposition behavior follows the official exporter pipeline
       - use when you want direct parity with :func:`torch.onnx.export`
-    * - ``converting_library=ConvertingLibrary.ONNXSCRIPT`` (+ chosen strategy)
-      - chosen strategy still captures the graph first
-      - official exporter on that captured graph
-      - decomposition depends on the selected capture strategy used before
-        calling :func:`torch.onnx.export`
-      - use when you want strategy-controlled capture plus official ONNX lowering
 
 ----
 
@@ -95,22 +89,11 @@ through :class:`~yobx.torch.export_options.ExportOptions`:
 
 .. code-block:: python
 
-    from yobx.torch.export_options import ExportOptions, TracingMode, ConvertingLibrary
+    from yobx.torch.export_options import ExportOptions
     from yobx.torch.interpreter import to_onnx
 
     # direct torch.onnx.export(..., dynamo=True)
-    a1 = to_onnx(model, (x,), export_options=ExportOptions(strategy="onnxscript"))
-    a2 = to_onnx(model, (x,), export_options=ExportOptions(tracing=TracingMode.ONNXSCRIPT))
-
-    # first capture with the selected strategy, then call torch.onnx.export
-    a3 = to_onnx(
-        model,
-        (x,),
-        export_options=ExportOptions(
-            strategy="new-tracing",
-            converting_library=ConvertingLibrary.ONNXSCRIPT,
-        ),
-    )
+    artifact = to_onnx(model, (x,), export_options=ExportOptions(strategy="onnxscript"))
 
 ----
 
@@ -120,7 +103,18 @@ How to read export and optimization statistics
 The returned :class:`~yobx.container.ExportArtifact` carries an
 :class:`~yobx.container.ExportReport` in ``artifact.report``.
 
-.. code-block:: python
+.. runpython::
+    :showcode:
+
+    import torch
+    from yobx.torch.interpreter import to_onnx
+
+    model = torch.nn.Sequential(
+        torch.nn.Linear(4, 8),
+        torch.nn.ReLU(),
+        torch.nn.Linear(8, 2),
+    ).eval()
+    x = torch.randn(3, 4)
 
     artifact = to_onnx(model, (x,), return_optimize_report=True)
     print(artifact.report)
@@ -149,21 +143,3 @@ explicit decomposition table, so ATen operators stay close to the original
 graph and are translated directly by yobx converters. A decomposition pass may
 still run if needed to eliminate inplace operations that could not be removed
 directly.
-
-The official exporter path is more decomposition-oriented. To align behaviors,
-set decomposition options explicitly in yobx:
-
-.. code-block:: python
-
-    # run default decomposition table
-    artifact_dec = to_onnx(model, (x,), export_options="nostrict-dec")
-
-    # run full decomposition table
-    artifact_decall = to_onnx(model, (x,), export_options="nostrict-decall")
-
-When you need the official behavior directly, use one of the
-``onnxscript`` options shown above.
-
-.. seealso::
-
-    :ref:`l-not-torch-onnx-export` for the full design-level comparison.
