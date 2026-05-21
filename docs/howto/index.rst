@@ -11,5 +11,6 @@ Each guide is self-contained and focuses on a single practical goal.
 
    dataframe_function
    numpy_function
+   optimize_model
    shape_inference
    sklearn
