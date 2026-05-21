@@ -25,6 +25,10 @@ _ATEN_TRILINEAR_OP: Any = getattr(
 _ATEN_TRILINEAR_DEFAULT: Any = (
     getattr(_ATEN_TRILINEAR_OP, "default", None) if _ATEN_TRILINEAR_OP is not None else None
 )
+_ATEN_ISTFT_OP: Any = getattr(getattr(getattr(torch, "ops", None), "aten", None), "istft", None)
+_ATEN_ISTFT_DEFAULT: Any = (
+    getattr(_ATEN_ISTFT_OP, "default", None) if _ATEN_ISTFT_OP is not None else None
+)
 
 
 class GraphTracer:
@@ -1025,6 +1029,8 @@ class GraphTracer:
             and len(args) >= 3
         ):
             return self._handle_trilinear(args)
+        if _ATEN_ISTFT_DEFAULT is not None and func is _ATEN_ISTFT_DEFAULT and args:
+            return self._handle_istft(func, treespec, combined_args, args, kwargs)
 
         # running the function
         with self._fake_mode:
@@ -2299,6 +2305,98 @@ class GraphTracer:
         # Element-wise multiply x1_w_r and input2_e and sum over H2.
         output = (x1_w_r * input2_e).sum(-1)
         return output
+
+    def _handle_istft(
+        self,
+        func: Any,
+        treespec: Any,
+        combined_args: List[Any],
+        args: Tuple[Any, ...],
+        kwargs: Dict[str, Any],
+    ) -> Any:
+        """Intercepts ``aten.istft.default`` and emits the FX node without fake execution."""
+        node_combined = [
+            (
+                self._tracing_int_to_const(a)
+                if isinstance(a, TracingInt)
+                else (a if self.is_not_tensor(a) else self._get_node(a))
+            )
+            for a in combined_args
+        ]
+        node_args, node_kwargs = torch.utils._pytree.tree_unflatten(node_combined, treespec)
+        node = self.graph.call_function(func, args=node_args, kwargs=node_kwargs)
+        res = self._make_istft_tracing_tensor(args, kwargs, node)
+        node.meta["val"] = res
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return res
+
+    def _make_istft_tracing_tensor(
+        self, args: Tuple[Any, ...], kwargs: Dict[str, Any], node: torch.fx.Node
+    ) -> TracingTensor:
+        input_tt = args[0]
+        assert isinstance(
+            input_tt, TracingTensor
+        ), f"Unexpected type {type(input_tt)} for aten.istft input."
+
+        length = kwargs.get("length", args[8] if len(args) > 8 else None)
+        if isinstance(length, TracingInt):
+            out_last = length.value
+        elif isinstance(length, int):
+            out_last = length
+        else:
+            out_last = input_tt.shape[-1]
+        out_shape = TracingShape((*input_tt._tracing_shape[:-2], out_last))
+
+        return_complex = kwargs.get("return_complex", args[9] if len(args) > 9 else False)
+        if return_complex:
+            out_dtype = input_tt.dtype
+        elif input_tt.dtype == torch.complex64:
+            out_dtype = torch.float32
+        elif input_tt.dtype == torch.complex128:
+            out_dtype = torch.float64
+        else:
+            out_dtype = input_tt.dtype
+        return self._make_tracing_tensor(out_shape, out_dtype, input_tt.device, node)
+
+    def _handle_istft_call(
+        self,
+        input: Any,
+        n_fft: int,
+        hop_length: Optional[int] = None,
+        win_length: Optional[int] = None,
+        window: Optional[torch.Tensor] = None,
+        center: bool = True,
+        normalized: bool = False,
+        onesided: Optional[bool] = None,
+        length: Optional[int] = None,
+        return_complex: bool = False,
+    ) -> Any:
+        """Creates an ``aten.istft.default`` FX node directly from ``torch.istft``."""
+        args = (
+            input,
+            n_fft,
+            hop_length,
+            win_length,
+            window,
+            center,
+            normalized,
+            onesided,
+            length,
+        )
+        kwargs = {"return_complex": return_complex}
+        if not isinstance(input, TracingTensor):
+            return torch.ops.aten.istft.default(*args, **kwargs)
+        node_args = tuple(a if self.is_not_tensor(a) else self._get_node(a) for a in args)
+        node_kwargs = {
+            k: (v if self.is_not_tensor(v) else self._get_node(v)) for k, v in kwargs.items()
+        }
+        node = self.graph.call_function(
+            torch.ops.aten.istft.default, args=node_args, kwargs=node_kwargs
+        )
+        res = self._make_istft_tracing_tensor(args, kwargs, node)
+        node.meta["val"] = res
+        node.meta["stack_trace"] = "".join(traceback.format_stack())
+        return res
 
     def _handle_tensor_split(self, input: Any, indices_or_sections: Any, dim: int = 0) -> Any:
         """

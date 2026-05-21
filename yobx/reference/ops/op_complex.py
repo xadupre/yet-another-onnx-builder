@@ -65,3 +65,52 @@ class ComplexMulConj(OpRun):
         c_r = a_r * b_r + a_i * b_i
         c_i = a_i * b_r - a_r * b_i
         return (np.stack([c_r, c_i], axis=-1),)
+
+
+class Istft(OpRun):
+    op_domain = "ai.onnx.complex"
+
+    def _run(
+        self,
+        x,
+        n_fft,
+        hop_length,
+        win_length,
+        center,
+        normalized,
+        onesided,
+        length,
+        return_complex,
+        window=None,
+    ):
+        import torch
+
+        def _to_int(value):
+            if isinstance(value, np.ndarray):
+                return int(value.reshape((-1,))[0])
+            return int(value)
+
+        n_fft_i = _to_int(n_fft)
+        hop_length_i = _to_int(hop_length)
+        win_length_i = _to_int(win_length)
+        center_b = bool(_to_int(center))
+        normalized_b = bool(_to_int(normalized))
+        onesided_i = _to_int(onesided)
+        length_i = _to_int(length)
+        return_complex_b = bool(_to_int(return_complex))
+
+        tx = torch.from_numpy(x)
+        twindow = torch.from_numpy(np.array(window, copy=True)) if window is not None else None
+        output = torch.istft(
+            tx,
+            n_fft=n_fft_i,
+            hop_length=hop_length_i,
+            win_length=win_length_i,
+            window=twindow,
+            center=center_b,
+            normalized=normalized_b,
+            onesided=None if onesided_i < 0 else bool(onesided_i),
+            length=None if length_i < 0 else length_i,
+            return_complex=return_complex_b,
+        )
+        return (output.detach().cpu().numpy(),)
