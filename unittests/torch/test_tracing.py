@@ -380,15 +380,17 @@ class TestCustomTracer(ExtTestCase):
         y = graph.placeholder("y")
         and_node = graph.call_function(torch.ops.aten.bitwise_and_.Tensor, args=(x, y))
         or_node = graph.call_function(torch.ops.aten.bitwise_or_.Tensor, args=(x, and_node))
-        graph.output(or_node)
+        xor_node = graph.call_function(torch.ops.aten.bitwise_xor_.Tensor, args=(or_node, y))
+        graph.output(xor_node)
 
         result = CustomTracer.replace_inplace_aten_functions(graph)
-        self.assertEqual(result, 2)
+        self.assertEqual(result, 3)
         fn_nodes = [n for n in graph.nodes if n.op == "call_function"]
         self.assertEqual(fn_nodes[0].target, torch.ops.aten.bitwise_and.Tensor)
         self.assertEqual(fn_nodes[1].target, torch.ops.aten.bitwise_or.Tensor)
+        self.assertEqual(fn_nodes[2].target, torch.ops.aten.bitwise_xor.Tensor)
         output_node = next(n for n in graph.nodes if n.op == "output")
-        self.assertIs(output_node.args[0], fn_nodes[1])
+        self.assertIs(output_node.args[0], fn_nodes[2])
 
     def test_remove_unnecessary_slices_no_slice(self):
         class Model(torch.nn.Module):

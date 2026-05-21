@@ -20,6 +20,7 @@ from ._aten_functions import (
     aten_argsort,
     aten_bitwise_and,
     aten_bitwise_or,
+    aten_bitwise_xor,
     aten_clamp_max,
     aten_clamp_min,
     aten_cos,
@@ -923,6 +924,13 @@ def aten_meth_bitwise_or(
     return aten_bitwise_or(g, sts, outputs, x, y, name=".bitwise_or")
 
 
+def aten_meth_bitwise_xor(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes bitwise XOR."
+    return aten_bitwise_xor(g, sts, outputs, x, y, name=".bitwise_xor")
+
+
 def _to_bool(g: GraphBuilder, x: T, name: str) -> T:
     """Casts tensor to BOOL if it is not already BOOL."""
     if g.has_type(x) and g.get_type(x) == TensorProto.BOOL:
@@ -1046,6 +1054,13 @@ def aten_meth___ror__(
 ) -> T:
     "Computes reversed bitwise OR: y | x."
     return aten_bitwise_or(g, sts, outputs, y, x, name="__ror__")
+
+
+def aten_meth___rxor__(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, y: T
+) -> T:
+    "Computes reversed bitwise XOR: y ^ x."
+    return aten_bitwise_xor(g, sts, outputs, y, x, name="__rxor__")
 
 
 def aten_meth___rmod__(
