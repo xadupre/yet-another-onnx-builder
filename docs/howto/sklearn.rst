@@ -7,10 +7,6 @@ This page answers common *"how do I…"* questions for converting
 :epkg:`scikit-learn` estimators and pipelines to ONNX with
 :func:`yobx.sklearn.to_onnx`.
 
-.. contents:: On this page
-   :local:
-   :depth: 2
-
 ----
 
 How to convert a single estimator
@@ -25,6 +21,7 @@ representative dummy input (one row is enough) to
 
     import numpy as np
     from sklearn.preprocessing import StandardScaler
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sklearn import to_onnx
 
     rng = np.random.default_rng(0)
@@ -32,8 +29,7 @@ representative dummy input (one row is enough) to
 
     scaler = StandardScaler().fit(X)
     onx = to_onnx(scaler, (X[:1],))
-    print(f"Inputs : {[i.name for i in onx.graph.input]}")
-    print(f"Outputs: {[o.name for o in onx.graph.output]}")
+    print(pretty_onnx(onx))
 
 The dummy input controls the **dtype** and the **number of features** of
 the generated ONNX graph; its batch dimension is replaced by a symbolic
@@ -55,6 +51,7 @@ in sequence and the resulting ONNX nodes are chained together:
     from sklearn.linear_model import LogisticRegression
     from sklearn.pipeline import Pipeline
     from sklearn.preprocessing import StandardScaler
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sklearn import to_onnx
 
     rng = np.random.default_rng(0)
@@ -67,7 +64,7 @@ in sequence and the resulting ONNX nodes are chained together:
 
     onx = to_onnx(pipe, (X[:1],))
     print(f"ONNX opset : {onx.opset_import[0].version}")
-    print(f"Node types : {[n.op_type for n in onx.graph.node]}")
+    print(pretty_onnx(onx))
 
 .. seealso::
 
@@ -229,6 +226,7 @@ converter function is needed:
 
     import numpy as np
     from sklearn.base import BaseEstimator, TransformerMixin
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sklearn import to_onnx, TraceableMixin
 
     class LogNormTransformer(BaseEstimator, TransformerMixin, TraceableMixin):
@@ -243,7 +241,7 @@ converter function is needed:
     X = rng.standard_normal((20, 4)).astype(np.float32)
     est = LogNormTransformer().fit(X)
     onx = to_onnx(est, (X[:1],))
-    print(f"Nodes: {[n.op_type for n in onx.graph.node]}")
+    print(pretty_onnx(onx))
 
 **Option 2 — extra_converters (full control)**
 
@@ -257,6 +255,7 @@ function and pass it via ``extra_converters``:
     import numpy as np
     import onnxruntime
     from sklearn.base import BaseEstimator, TransformerMixin
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sklearn import to_onnx
     from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
 
@@ -287,7 +286,7 @@ function and pass it via ``extra_converters``:
         (X[:1],),
         extra_converters={ClipTransformer: convert_clip},
     )
-    print(f"Nodes: {[n.op_type for n in onx.graph.node]}")
+    print(pretty_onnx(onx))
 
     sess = onnxruntime.InferenceSession(
         onx.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -324,6 +323,7 @@ custom converter is required.
     import numpy as np
     import onnxruntime
     from sklearn.preprocessing import FunctionTransformer
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sklearn import to_onnx
 
     def log1p_abs(X):
@@ -333,7 +333,7 @@ custom converter is required.
     X = rng.standard_normal((20, 4)).astype(np.float32)
     transformer = FunctionTransformer(func=log1p_abs).fit(X)
     onx = to_onnx(transformer, (X[:1],))
-    print(f"Nodes: {[n.op_type for n in onx.graph.node]}")
+    print(pretty_onnx(onx))
 
     sess = onnxruntime.InferenceSession(
         onx.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -354,6 +354,7 @@ folds them into the ONNX graph as initializers:
 
     import numpy as np
     from sklearn.preprocessing import FunctionTransformer
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sklearn import to_onnx
 
     def scale_shift(X, scale=np.float32(1), shift=np.float32(0)):
@@ -366,7 +367,7 @@ folds them into the ONNX graph as initializers:
         kw_args={"scale": np.float32(2.0), "shift": np.float32(1.0)},
     ).fit(X)
     onx = to_onnx(transformer, (X[:1],))
-    print(f"Nodes: {[n.op_type for n in onx.graph.node]}")
+    print(pretty_onnx(onx))
 
 **Identity transformer (func=None)**
 
@@ -379,14 +380,13 @@ so the resulting graph is minimal:
 
     import numpy as np
     from sklearn.preprocessing import FunctionTransformer
+    from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.sklearn import to_onnx
 
     X = np.ones((5, 3), dtype=np.float32)
     identity_tf = FunctionTransformer(func=None).fit(X)
     onx = to_onnx(identity_tf, (X[:1],))
-    print(f"Inputs : {[i.name for i in onx.graph.input]}")
-    print(f"Outputs: {[o.name for o in onx.graph.output]}")
-    print(f"Nodes  : {[n.op_type for n in onx.graph.node]}")
+    print(pretty_onnx(onx))
 
 .. seealso::
 
