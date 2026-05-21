@@ -208,3 +208,187 @@ loaded again later:
 
     :ref:`l-plot-sklearn-function-options` — exporting each pipeline step
     as a separate ONNX local function.
+
+----
+
+How to export a custom estimator
+----------------------------------
+
+There are two ways to make :func:`~yobx.sklearn.to_onnx` work with an
+estimator that has no built-in converter.
+
+**Option 1 — TraceableMixin (numpy-based transformers)**
+
+If the ``transform`` method uses only standard :epkg:`numpy` operations,
+inherit from :class:`~yobx.sklearn.TraceableMixin` together with the usual
+sklearn base classes.  The framework traces the method automatically — no
+converter function is needed:
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from sklearn.base import BaseEstimator, TransformerMixin
+    from yobx.sklearn import to_onnx, TraceableMixin
+
+    class LogNormTransformer(BaseEstimator, TransformerMixin, TraceableMixin):
+        def fit(self, X, y=None):
+            self.scale_ = np.abs(X).mean(axis=0, keepdims=True).astype(np.float32)
+            return self
+
+        def transform(self, X):
+            return np.log(np.abs(X) / self.scale_ + np.float32(1))
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((20, 4)).astype(np.float32)
+    est = LogNormTransformer().fit(X)
+    onx = to_onnx(est, (X[:1],))
+    print(f"Nodes: {[n.op_type for n in onx.graph.node]}")
+
+**Option 2 — extra_converters (full control)**
+
+For estimators whose logic cannot be expressed as plain numpy ops — or when
+you need fine-grained control over the ONNX graph — write a converter
+function and pass it via ``extra_converters``:
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    import onnxruntime
+    from sklearn.base import BaseEstimator, TransformerMixin
+    from yobx.sklearn import to_onnx
+    from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
+
+    class ClipTransformer(BaseEstimator, TransformerMixin):
+        def __init__(self, clip_min=0.0, clip_max=1.0):
+            self.clip_min = clip_min
+            self.clip_max = clip_max
+
+        def fit(self, X, y=None):
+            return self
+
+        def transform(self, X):
+            return np.clip(X, self.clip_min, self.clip_max)
+
+    def convert_clip(g, sts, outputs, estimator, X, name="clip"):
+        dtype = tensor_dtype_to_np_dtype(g.get_type(X))
+        low = np.array(estimator.clip_min, dtype=dtype)
+        high = np.array(estimator.clip_max, dtype=dtype)
+        res = g.op.Clip(X, low, high, outputs=outputs, name=name)
+        g.set_type_shape_unary_op(res, X)
+        return res
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((20, 4)).astype(np.float32)
+    transformer = ClipTransformer(clip_min=-0.5, clip_max=0.5).fit(X)
+    onx = to_onnx(
+        transformer,
+        (X[:1],),
+        extra_converters={ClipTransformer: convert_clip},
+    )
+    print(f"Nodes: {[n.op_type for n in onx.graph.node]}")
+
+    sess = onnxruntime.InferenceSession(
+        onx.SerializeToString(), providers=["CPUExecutionProvider"]
+    )
+    X_test = rng.standard_normal((5, 4)).astype(np.float32)
+    (clipped,) = sess.run(None, {"X": X_test})
+    expected = transformer.transform(X_test)
+    assert np.allclose(clipped, expected, atol=1e-6)
+    print("Results match ✓")
+
+.. seealso::
+
+    :ref:`l-plot-sklearn-custom-converter-options` — a full gallery example
+    showing a custom converter with optional extra outputs.
+
+    :ref:`l-sklearn-converter` — converter registry and how to write a
+    converter for any estimator.
+
+----
+
+How to export with FunctionTransformer
+----------------------------------------
+
+:class:`~sklearn.preprocessing.FunctionTransformer` wraps any numpy function
+as a scikit-learn transformer.  Because its ``func`` is a plain numpy
+function, :func:`~yobx.sklearn.to_onnx` converts it via numpy tracing — no
+custom converter is required.
+
+**Basic usage**
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    import onnxruntime
+    from sklearn.preprocessing import FunctionTransformer
+    from yobx.sklearn import to_onnx
+
+    def log1p_abs(X):
+        return np.log1p(np.abs(X))
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((20, 4)).astype(np.float32)
+    transformer = FunctionTransformer(func=log1p_abs).fit(X)
+    onx = to_onnx(transformer, (X[:1],))
+    print(f"Nodes: {[n.op_type for n in onx.graph.node]}")
+
+    sess = onnxruntime.InferenceSession(
+        onx.SerializeToString(), providers=["CPUExecutionProvider"]
+    )
+    X_test = rng.standard_normal((5, 4)).astype(np.float32)
+    (onnx_out,) = sess.run(None, {"X": X_test})
+    expected = transformer.transform(X_test).astype(np.float32)
+    assert np.allclose(onnx_out, expected, atol=1e-5)
+    print("Results match ✓")
+
+**Passing keyword arguments with kw_args**
+
+Constants can be forwarded to the function via ``kw_args``; the converter
+folds them into the ONNX graph as initializers:
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from sklearn.preprocessing import FunctionTransformer
+    from yobx.sklearn import to_onnx
+
+    def scale_shift(X, scale=np.float32(1), shift=np.float32(0)):
+        return X * scale + shift
+
+    rng = np.random.default_rng(0)
+    X = rng.standard_normal((20, 4)).astype(np.float32)
+    transformer = FunctionTransformer(
+        func=scale_shift,
+        kw_args={"scale": np.float32(2.0), "shift": np.float32(1.0)},
+    ).fit(X)
+    onx = to_onnx(transformer, (X[:1],))
+    print(f"Nodes: {[n.op_type for n in onx.graph.node]}")
+
+**Identity transformer (func=None)**
+
+When ``func=None`` the transformer is a no-op; the converter emits a single
+``Identity`` node:
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from sklearn.preprocessing import FunctionTransformer
+    from yobx.sklearn import to_onnx
+
+    X = np.ones((5, 3), dtype=np.float32)
+    identity_tf = FunctionTransformer(func=None).fit(X)
+    onx = to_onnx(identity_tf, (X[:1],))
+    print(f"Nodes: {[n.op_type for n in onx.graph.node]}")
+
+.. seealso::
+
+    :ref:`l-plot-sklearn-function-transformer` — a full gallery example that
+    also shows standalone numpy tracing and pipeline embedding.
+
+    :ref:`l-design-function-transformer-tracing` — design doc explaining the
+    numpy tracing mechanism.
