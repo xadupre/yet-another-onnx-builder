@@ -23,7 +23,9 @@ The function is traced through the DataFrame API and compiled into ONNX.
     from yobx.sql import to_onnx
 
     def add_total(df):
-        return df.select([(df["a"] + df["b"]).alias("total")])
+        if hasattr(df, "select"):
+            return df.select({"total": df["a"] + df["b"]})
+        return (df["a"] + df["b"]).to_frame(name="total")
 
     df = pd.DataFrame(
         {"a": np.array([1.0, 2.0], dtype=np.float32), "b": np.array([3.0, 4.0], dtype=np.float32)}
@@ -50,7 +52,7 @@ one traced frame per input DataFrame.
     def join_like(left, right):
         if hasattr(left, "join"):
             merged = left.join(right, left_key="id", right_key="id")
-            return merged.select([(merged["a"] + merged["b"]).alias("total")])
+            return merged.select({"total": merged["a"] + merged["b"]})
         merged = pd.merge(left, right, on="id")
         return (merged["a"] + merged["b"]).to_frame(name="total")
 
@@ -90,7 +92,7 @@ Wrap the DataFrame logic in a custom transformer inheriting from
 
         def transform(self, df):
             if hasattr(df, "select"):
-                return df.select([(df["a"] + df["b"]).alias("total")])
+                return df.select({"total": df["a"] + df["b"]})
             return (df["a"] + df["b"]).to_frame(name="total")
 
     rng = np.random.default_rng(0)
