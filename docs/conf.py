@@ -159,11 +159,11 @@ intersphinx_mapping = {
     "torch": ("https://docs.pytorch.org/docs/stable/", None),
 }
 
-suppress_warnings = ["intersphinx.external"]
+suppress_warnings = ["intersphinx.external", "toc.excluded"]
 if int(os.environ.get("UNITTEST_GOING", "0")):
     # Suppress toctree and cross-reference warnings for pages intentionally
     # excluded on CI (e.g. case_coverage.rst, ci_durations.rst).
-    suppress_warnings += ["toc.excluded", "ref.ref"]
+    suppress_warnings += ["ref.ref"]
 
 
 sphinx_gallery_conf = {
