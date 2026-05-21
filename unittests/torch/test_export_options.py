@@ -1423,5 +1423,61 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
         self.assertTrue(call_args.kwargs.get("dynamo", False))
 
 
+@requires_torch("2.0")
+class TestTracingModeCombinationsBitwiseXor(ExtTestCase):
+    """Tests bitwise XOR export across the supported tracing modes."""
+
+    def _make_inputs(self):
+        return (
+            torch.tensor([1, 2, 7], dtype=torch.int64),
+            torch.tensor([3, 1, 4], dtype=torch.int64),
+        )
+
+    def _assert_export(self, tracing_mode: TracingMode):
+        class BitwiseXorModel(torch.nn.Module):
+            def forward(self, x, y):
+                return x.bitwise_xor(y)
+
+        model = BitwiseXorModel()
+        inputs = self._make_inputs()
+        expected = model(*inputs).detach().numpy()
+        artifact = to_onnx(model, inputs, export_options=ExportOptions(tracing=tracing_mode))
+        ref = ExtendedReferenceEvaluator(artifact.proto)
+        got = ref.run(None, {name: value.numpy() for name, value in zip(("x", "y"), inputs)})[0]
+        self.assertEqualArray(expected, got)
+
+    @ignore_warnings(UserWarning)
+    def test_bitwise_xor_default_default(self):
+        self._assert_export(TracingMode.DEFAULT)
+
+    @ignore_warnings(UserWarning)
+    def test_bitwise_xor_tracing_default(self):
+        self._assert_export(TracingMode.TRACING)
+
+    @ignore_warnings(UserWarning)
+    def test_bitwise_xor_new_tracing_default(self):
+        self._assert_export(TracingMode.NEW_TRACING)
+
+    @ignore_warnings(UserWarning)
+    def test_operator_xor_all_default_libraries(self):
+        class BitwiseOperatorXorModel(torch.nn.Module):
+            def forward(self, x, y):
+                return x ^ y
+
+        model = BitwiseOperatorXorModel()
+        inputs = self._make_inputs()
+        expected = model(*inputs).detach().numpy()
+        for tracing_mode in (TracingMode.DEFAULT, TracingMode.TRACING, TracingMode.NEW_TRACING):
+            with self.subTest(tracing_mode=tracing_mode):
+                artifact = to_onnx(
+                    model, inputs, export_options=ExportOptions(tracing=tracing_mode)
+                )
+                ref = ExtendedReferenceEvaluator(artifact.proto)
+                got = ref.run(
+                    None, {name: value.numpy() for name, value in zip(("x", "y"), inputs)}
+                )[0]
+                self.assertEqualArray(expected, got)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

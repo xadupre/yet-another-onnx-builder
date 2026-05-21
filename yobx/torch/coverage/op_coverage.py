@@ -214,10 +214,9 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "__rmul__",  # later
             "__ror__",  # later
             "__rsub__",  # later
-            "__rxor__",  # no bitwise_xor converter
+            "__rxor__",  # later
             "bitwise_and",
             "bitwise_or",
-            "bitwise_xor",
             "conj",
             "logical_and",
             "logical_or",
@@ -313,7 +312,7 @@ XFAIL_OPS_INT32: Dict[str, FrozenSet[str]] = {
             # fails or ONNX model is invalid because the op only supports float:
             "__rdiv__",  # reciprocal node type mismatch
             "__rpow__",  # negative integer powers not allowed
-            "__rxor__",  # FunctionNotFoundError: bitwise_xor
+            "__rxor__",  # FunctionNotFoundError: bitwise_xor scalar overload
             "acos",  # ONNX op only supports float dtypes
             "acosh",  # ONNX op only supports float dtypes
             "asin",  # ONNX op only supports float dtypes
@@ -324,7 +323,6 @@ XFAIL_OPS_INT32: Dict[str, FrozenSet[str]] = {
             "atanh",  # ONNX op only supports float dtypes
             "bitwise_left_shift",  # FunctionNotFoundError
             "bitwise_right_shift",  # FunctionNotFoundError
-            "bitwise_xor",  # FunctionNotFoundError
             "ceil",  # InvalidGraph: int32 not supported by Ceil
             "cos",  # ONNX op only supports float dtypes
             "cosh",  # ONNX op only supports float dtypes
@@ -385,7 +383,7 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
             # fails or ONNX model is invalid because the op only supports float:
             "__rdiv__",  # reciprocal node type mismatch
             "__rpow__",  # negative integer powers not allowed
-            "__rxor__",  # FunctionNotFoundError: bitwise_xor
+            "__rxor__",  # FunctionNotFoundError: bitwise_xor scalar overload
             "acos",  # ONNX op only supports float dtypes
             "acosh",  # ONNX op only supports float dtypes
             "asin",  # ONNX op only supports float dtypes
@@ -396,7 +394,6 @@ XFAIL_OPS_INT64: Dict[str, FrozenSet[str]] = {
             "atanh",  # ONNX op only supports float dtypes
             "bitwise_left_shift",  # FunctionNotFoundError
             "bitwise_right_shift",  # FunctionNotFoundError
-            "bitwise_xor",  # FunctionNotFoundError
             "ceil",  # InvalidGraph: int64 not supported by Ceil
             "cos",  # ONNX op only supports float dtypes
             "cosh",  # ONNX op only supports float dtypes

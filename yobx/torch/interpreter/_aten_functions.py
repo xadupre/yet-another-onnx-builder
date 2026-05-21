@@ -712,6 +712,18 @@ def aten___or___Tensor(
     return aten_or(g, sts, outputs, x, y, name=name)
 
 
+def aten___xor___Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "__xor___Tensor",
+) -> T:
+    "inplace xor, we assume inplace modifications were removed"
+    return aten_bitwise_xor(g, sts, outputs, x, y, name=name)
+
+
 def aten_one_hot(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -2198,6 +2210,54 @@ def aten_bitwise_or__Tensor(
     "bitwise or"
     # The fx graph is using the output, the modified inplace input.
     return aten_bitwise_or_Tensor(g, sts, outputs, x, y, name=name)
+
+
+def aten_bitwise_xor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_xor",
+) -> T:
+    "bitwise xor"
+    if g.get_type(x) == TensorProto.BOOL and g.get_type(y) == TensorProto.BOOL:
+        x, y = prepare_inputs_homogeneous_operator(g, x, y, name=name)
+        res = g.op.Xor(x, y, outputs=outputs, name=name)
+        if not sts:
+            set_type_shape_binary_op(g, outputs[0], x, y)
+        return res
+
+    x, y = prepare_inputs_homogeneous_operator(g, x, y, name=name)
+    res = g.op.BitwiseXor(x, y, outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_binary_op(g, outputs[0], x, y)
+    return res
+
+
+def aten_bitwise_xor_Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_xor_Tensor",
+) -> T:
+    "bitwise xor"
+    return aten_bitwise_xor(g, sts, outputs, x, y, name=name)
+
+
+def aten_bitwise_xor__Tensor(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    y: T,
+    name: str = "bitwise_xor__Tensor",
+) -> T:
+    "bitwise xor"
+    # The fx graph is using the output, the modified inplace input.
+    return aten_bitwise_xor_Tensor(g, sts, outputs, x, y, name=name)
 
 
 def aten_block_diag(

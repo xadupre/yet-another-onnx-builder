@@ -1316,13 +1316,15 @@ class FxGraphInterpreter:
         return complete_args, complete_kwargs
 
     def _get_aten_name(self, node: "torch.fx.Node") -> str:  # noqa: F821
-        if node.target in {operator.getitem, operator.or_, operator.and_}:
+        if node.target in {operator.getitem, operator.or_, operator.and_, operator.xor}:
             if node.target == operator.getitem:
                 return "getitem"
             if node.target == operator.or_:
                 return "aten_bitwise_or"
             if node.target == operator.and_:
                 return "aten_bitwise_and"
+            if node.target == operator.xor:
+                return "aten_bitwise_xor"
         if isinstance(node.target, self.torch._ops.OpOverloadPacket):
             if node.target != self.torch.ops.aten.sym_size:
                 raise RuntimeError(f"Unsupported function {node!r}.")
@@ -1525,8 +1527,10 @@ class FxGraphInterpreter:
                 # ending with '_' but not inplace
                 operator.or_,
                 operator.and_,
+                operator.xor,
                 "aten_bitwise_or",
                 "aten_bitwise_and",
+                "aten_bitwise_xor",
             }
             or (
                 hasattr(aten_name, "_opname")
