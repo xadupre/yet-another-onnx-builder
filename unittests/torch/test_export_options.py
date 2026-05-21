@@ -1480,6 +1480,49 @@ class TestTracingModeCombinationsBitwiseXor(ExtTestCase):
 
 
 @requires_torch("2.0")
+class TestTracingModeCombinationsBitwiseAndOr(ExtTestCase):
+    """Tests bitwise AND/OR export across the supported tracing modes."""
+
+    def _make_inputs(self):
+        return (
+            torch.tensor([1, 2, 7], dtype=torch.int64),
+            torch.tensor([3, 1, 4], dtype=torch.int64),
+        )
+
+    def _assert_export(self, model: torch.nn.Module, tracing_mode: TracingMode):
+        inputs = self._make_inputs()
+        expected = tuple(output.detach().numpy() for output in model(*inputs))
+        artifact = to_onnx(model, inputs, export_options=ExportOptions(tracing=tracing_mode))
+        ref = ExtendedReferenceEvaluator(artifact.proto)
+        got = ref.run(None, {name: value.numpy() for name, value in zip(("x", "y"), inputs)})
+        self.assertEqual(len(expected), len(got))
+        for exp, res in zip(expected, got):
+            self.assertEqualArray(exp, res)
+
+    @ignore_warnings(UserWarning)
+    def test_bitwise_and_or_methods_all_default_libraries(self):
+        class BitwiseMethodsModel(torch.nn.Module):
+            def forward(self, x, y):
+                return x.bitwise_and(y), x.bitwise_or(y), x.bitwise_and(1), x.bitwise_or(1)
+
+        model = BitwiseMethodsModel()
+        for tracing_mode in (TracingMode.DEFAULT, TracingMode.TRACING, TracingMode.NEW_TRACING):
+            with self.subTest(tracing_mode=tracing_mode):
+                self._assert_export(model, tracing_mode)
+
+    @ignore_warnings(UserWarning)
+    def test_operator_and_or_all_default_libraries(self):
+        class BitwiseOperatorModel(torch.nn.Module):
+            def forward(self, x, y):
+                return x & y, x | y, x & 1, x | 1
+
+        model = BitwiseOperatorModel()
+        for tracing_mode in (TracingMode.DEFAULT, TracingMode.TRACING, TracingMode.NEW_TRACING):
+            with self.subTest(tracing_mode=tracing_mode):
+                self._assert_export(model, tracing_mode)
+
+
+@requires_torch("2.0")
 class TestTracingModeCombinationsBitwiseShifts(ExtTestCase):
     """Tests bitwise shift export across the supported tracing modes."""
 
