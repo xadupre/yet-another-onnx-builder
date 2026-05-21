@@ -173,9 +173,13 @@ A user-defined rewrite is written as a subclass of
 :class:`EasyPatternOptimization <yobx.xoptim.EasyPatternOptimization>`
 (declarative match + apply) or
 :class:`PatternOptimization <yobx.xoptim.PatternOptimization>` (manual
-``match`` / ``apply``). The example below re-implements the same
-``MatMul + Add → Gemm`` rewrite with the declarative API and plugs it
-into the optimizer alongside the default patterns:
+``match`` / ``apply``). The example below rewrites ``MatMul + Add``
+into a **custom op** ``com.example.FusedGemm`` — the typical use-case
+when a fused kernel is provided by a runtime extension. The new node
+is created with ``g.anyop.<OpType>(..., domain=...)``, which is how
+``yobx`` emits non-standard ONNX operators (the same mechanism used
+internally by the patterns in :mod:`yobx.xoptim.patterns_ort` to
+target ``com.microsoft``):
 
 .. runpython::
     :showcode:
@@ -186,15 +190,16 @@ into the optimizer alongside the default patterns:
     from yobx.doc import demo_mlp_model
 
 
-    class MatMulAddToGemmPattern(EasyPatternOptimization):
-        """Fuses ``Add(MatMul(x, w), b)`` into ``Gemm(x, w, b)``."""
+    class MatMulAddToFusedGemmPattern(EasyPatternOptimization):
+        """Fuses ``Add(MatMul(x, w), b)`` into a custom op
+        ``com.example.FusedGemm(x, w, b)``."""
 
         def match_pattern(self, g: "GraphBuilder", x, w, b):
             t = g.op.MatMul(x, w)
             return g.op.Add(t, b)
 
         def apply_pattern(self, g: "GraphBuilder", x, w, b):
-            return g.op.Gemm(x, w, b)
+            return g.anyop.FusedGemm(x, w, b, domain="com.example")
 
 
     onx = demo_mlp_model("temp_doc_optimize_mlp.onnx")
@@ -203,23 +208,28 @@ into the optimizer alongside the default patterns:
         onx,
         infer_shapes_options=True,
         optimization_options=OptimizationOptions(
-            patterns=[MatMulAddToGemmPattern()],
+            patterns=[MatMulAddToFusedGemmPattern()],
         ),
     )
     opt_onx = gr.to_onnx(optimize=True)
     print(pretty_onnx(opt_onx))
 
+The resulting model contains ``com.example.FusedGemm`` nodes in place
+of every ``MatMul + Add`` pair, and the corresponding opset import
+(``com.example``) is added automatically by the builder.
+
 The ``patterns`` argument of
 :class:`OptimizationOptions <yobx.xbuilder.OptimizationOptions>`
 accepts a list mixing predefined names and user-defined instances —
-e.g. ``patterns=["default", MatMulAddToGemmPattern()]`` to combine a
-custom rewrite with the built-in catalogue. For rewrites whose
-applicability depends on shapes, dtypes or attributes (a typical
-*"custom op"* fusion that targets ``com.microsoft`` or another
-domain), subclass
+e.g. ``patterns=["default", MatMulAddToFusedGemmPattern()]`` to combine
+a custom rewrite with the built-in catalogue. When the applicability
+of the fusion depends on shapes, dtypes or attributes (for example
+``FusedGemm`` only being valid for 2-D inputs), subclass
 :class:`PatternOptimization <yobx.xoptim.PatternOptimization>`
-directly: see the worked *NotNot* example in
-:ref:`l-design-pattern-optimizer`.
+directly and check those conditions in ``match`` — see the worked
+*NotNot* example in :ref:`l-design-pattern-optimizer` and the real
+custom-op fusions in :mod:`yobx.xoptim.patterns_ort`
+(``com.microsoft.FusedMatMul``, ``com.microsoft.Gelu``, …).
 
 Main differences:
 
