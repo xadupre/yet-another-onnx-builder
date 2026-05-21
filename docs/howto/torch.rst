@@ -41,6 +41,31 @@ Use ``strategy="new-tracing"``:
 
     artifact = to_onnx(model, (x,), export_options=ExportOptions(strategy="new-tracing"))
 
+Quick summary
+^^^^^^^^^^^^^
+
+.. list-table::
+    :header-rows: 1
+
+    * - Option
+      - FX graph capture
+      - ONNX conversion backend
+    * - ``strategy="nostrict"`` / ``"strict"``
+      - :func:`torch.export.export`
+      - yobx converter
+    * - ``strategy="tracing"``
+      - symbolic :class:`~yobx.torch.tracing.CustomTracer`
+      - yobx converter
+    * - ``strategy="new-tracing"``
+      - dispatch-based tracing
+      - yobx converter
+    * - ``strategy="onnxscript"`` or ``tracing=TracingMode.ONNXSCRIPT``
+      - handled by :func:`torch.onnx.export`
+      - official exporter
+    * - ``converting_library=ConvertingLibrary.ONNXSCRIPT`` (+ chosen strategy)
+      - chosen strategy still captures the graph first
+      - official exporter on that captured graph
+
 ----
 
 How to trigger the official exporter
@@ -58,7 +83,7 @@ through :class:`~yobx.torch.export_options.ExportOptions`:
     a1 = to_onnx(model, (x,), export_options=ExportOptions(strategy="onnxscript"))
     a2 = to_onnx(model, (x,), export_options=ExportOptions(tracing=TracingMode.ONNXSCRIPT))
 
-    # first build an ExportedProgram with the selected strategy, then call torch.onnx.export
+    # first capture with the selected strategy, then call torch.onnx.export
     a3 = to_onnx(
         model,
         (x,),
