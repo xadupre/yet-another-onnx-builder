@@ -1267,6 +1267,23 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
     def _make_input(self) -> torch.Tensor:
         return torch.randn(3, 4)
 
+    def _assert_bitwise_not_export(
+        self, x: torch.Tensor, tracing_mode: TracingMode, expected_op_type: str
+    ) -> None:
+        class Model(torch.nn.Module):
+            def forward(self, y):
+                return ~y
+
+        model = Model()
+        expected = model(x).detach().numpy()
+        artifact = to_onnx(model, (x,), export_options=ExportOptions(tracing=tracing_mode))
+        onx = artifact.proto
+        self.assertIsInstance(onx, onnx.ModelProto)
+        self.assertEqual([node.op_type for node in onx.graph.node], [expected_op_type])
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, {"y": x.numpy()})
+        self.assertEqualArray(expected, got[0])
+
     # ------------------------------------------------------------------ ConvertingLibrary.DEFAULT
 
     @ignore_warnings(UserWarning)
@@ -1315,6 +1332,22 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, {"x": x.numpy()})
         self.assertEqualArray(expected, got[0], atol=1e-5)
+
+    @ignore_warnings(UserWarning)
+    def test_bitwise_not_all_default_exporters(self):
+        """Verifies that unary invert exports through all tracing modes."""
+        cases = (
+            (torch.tensor([[True, False], [False, True]]), "Not"),
+            (torch.tensor([[1, 2], [3, 4]], dtype=torch.int64), "BitwiseNot"),
+        )
+        for x, expected_op_type in cases:
+            for tracing_mode in (
+                TracingMode.DEFAULT,
+                TracingMode.TRACING,
+                TracingMode.NEW_TRACING,
+            ):
+                with self.subTest(dtype=x.dtype, tracing_mode=tracing_mode):
+                    self._assert_bitwise_not_export(x, tracing_mode, expected_op_type)
 
     # --------------------------------------------------------------- ConvertingLibrary.ONNXSCRIPT
 

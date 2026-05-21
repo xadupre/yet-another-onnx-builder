@@ -2015,6 +2015,13 @@ def aten_bitwise_not(
     return res
 
 
+def aten_invert(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name: str = "invert"
+) -> T:
+    "bitwise invert"
+    return aten_bitwise_not(g, sts, outputs, x, name=name)
+
+
 def aten_adaptive_avg_pool1d(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
