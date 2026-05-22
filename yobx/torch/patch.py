@@ -1,8 +1,8 @@
 import contextlib
 import traceback
-from typing import Generator, Optional
+from typing import Generator, Iterable, Optional
 import torch
-from ..helpers.patch_helper import PatchDetails
+from ..helpers.patch_helper import PatchDetails, PatchInfo
 
 
 def retrieve_stacktrace():
@@ -25,6 +25,7 @@ def apply_patches_for_model(
     patch_transformers: bool = False,
     verbose: int = 0,
     model: Optional[torch.nn.Module] = None,
+    extra_patches: Optional[Iterable[PatchInfo]] = None,
 ) -> Generator[PatchDetails, None, None]:
     """
     The context manager apply patches, usually before exporting a model.
@@ -41,6 +42,9 @@ def apply_patches_for_model(
     :param verbose: prints out which patch is applies
     :param model: modifies the list of patches for a particular model,
         it is recommended to fill it the used rope is not the default one
+    :param extra_patches: additional :class:`~yobx.helpers.patch_helper.PatchInfo`
+        objects to apply alongside the built-in patches.
+        Each patch is applied in order after the built-in ones and removed on exit.
 
     The following shows how to use the output of this function to display
     information about the patches applied to the model.
@@ -54,6 +58,19 @@ def apply_patches_for_model(
                 diff = patch.make_diff()
                 print(f"-- patch {patch!r}")
                 print(diff)
+
+    Custom patches can be passed directly via *extra_patches* without any
+    manual ``do``/``undo`` bookkeeping:
+
+    .. code-block:: python
+
+        from yobx.helpers.patch_helper import PatchInfo
+        from yobx.torch import apply_patches_for_model
+
+        my_patch = PatchInfo.make(my_fn, some_module, "fn_name", family="custom")
+
+        with apply_patches_for_model(patch_torch=True, extra_patches=[my_patch]) as details:
+            ep = torch.export.export(model, ...)
     """
     patches = PatchDetails()
     if patch_torch:
@@ -64,6 +81,8 @@ def apply_patches_for_model(
         from .in_transformers.patches import get_patches_for
 
         patches.extend(get_patches_for(model))
+    if extra_patches is not None:
+        patches.extend(extra_patches)
     for patch in patches:
         if verbose:
             print(f"[register_patch_functions] apply {patch}")
