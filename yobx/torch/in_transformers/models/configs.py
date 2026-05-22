@@ -5,7 +5,7 @@ from typing import Optional
 
 def get_cached_configuration(
     name: str, exc: bool = False, **kwargs
-) -> Optional["transformers.PretrainedConfig"]:  # noqa: F821
+) -> Optional["transformers.PretrainedConfig"]:  # type: ignore # noqa: F821
     """
     Returns cached configuration to avoid having to many accesses to internet.
     It returns None if not Cache. The list of cached models follows.
