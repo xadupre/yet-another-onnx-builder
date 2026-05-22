@@ -35,6 +35,7 @@ successfully:
 
 .. runpython::
     :showcode:
+    :process:
 
     import torch
     from yobx.torch import apply_patches_for_model, use_dyn_not_str
@@ -67,6 +68,7 @@ object.  Iterate over it to see the name and family of every
 
 .. runpython::
     :showcode:
+    :process:
 
     from yobx.torch import apply_patches_for_model
 
@@ -86,6 +88,7 @@ doing and for debugging unexpected behaviour.
 
 .. runpython::
     :showcode:
+    :process:
 
     from yobx.torch import apply_patches_for_model
 
@@ -114,6 +117,7 @@ in a module for the duration of the export:
 
 .. runpython::
     :showcode:
+    :process:
 
     import torch
     import torch._refs
@@ -154,6 +158,7 @@ To add the custom patch alongside the built-in ones, pass it via the
 
 .. runpython::
     :showcode:
+    :process:
 
     import torch
     import torch._refs
@@ -196,6 +201,7 @@ registered patch and returns ``(PatchInfo, [node, …])`` pairs.
 
 .. runpython::
     :showcode:
+    :process:
 
     import torch
     from yobx.torch import apply_patches_for_model, use_dyn_not_str

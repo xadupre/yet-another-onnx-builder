@@ -30,7 +30,7 @@ Control flow is the primary source of failures
 -----------------------------------------------
 
 The most fundamental issue is **Python control flow** inside traced functions.
-During symbolic tracing, dimension values are :class:`torch.SymInt` objects
+During symbolic tracing, dimension values are `torch.SymInt` objects
 rather than plain integers.  Any code written as:
 
 .. code-block:: python
@@ -39,16 +39,16 @@ rather than plain integers.  Any code written as:
         raise SomeError(...)
 
 will crash the exporter because evaluating the ``if`` forces the symbolic
-integer to a concrete boolean — a :class:`~torch.SymBool` — which cannot be
+integer to a concrete boolean — a `torch.SymBool` — which cannot be
 resolved at trace time, raising ``GuardOnDataDependentSymNode``.
 
-The fix is to replace such guards with :func:`torch._check`:
+The fix is to replace such guards with `torch._check`:
 
 .. code-block:: python
 
     torch._check(condition_on_size)
 
-:func:`torch._check` is understood by the exporter and recorded as a
+`torch._check` is understood by the exporter and recorded as a
 constraint on the symbolic value instead of executing a branch.  The patches
 shipped with this library systematically replace ``if ... : raise`` patterns
 in torch and transformers internals with ``torch._check(...)`` equivalents so
@@ -258,13 +258,12 @@ The recommended entry point is the context manager
 Parameters:
 
 * **patch_torch** — applies the four patches in
-  :mod:`yobx.torch.in_torch.patches` that fix symbolic-shape handling inside
-  :mod:`torch`.
+  :mod:`yobx.torch.in_torch.patches` that fix symbolic-shape handling inside `torch`.
 * **patch_transformers** — applies the ``RotaryEmbedding`` patches from
   :mod:`yobx.torch.in_transformers.patches`.  When *model* is provided, the
   function inspects each sub-module for wrapped ``RotaryEmbedding.forward``
   implementations and adds a model-specific patch automatically.
-* **model** — the :class:`torch.nn.Module` being exported.  Supplying it
+* **model** — the `torch.nn.Module` being exported.  Supplying it
   enables automatic detection of non-standard ``RotaryEmbedding`` variants.
 * **verbose** — print each patch name as it is applied or removed.
 

@@ -105,6 +105,7 @@ The returned :class:`~yobx.container.ExportArtifact` carries an
 
 .. runpython::
     :showcode:
+    :process:
 
     import torch
     from yobx.torch.interpreter import to_onnx
