@@ -17,7 +17,7 @@ on basic examples.
    converter
    flatten
    flatten_list
-   patches
+   patches_idea
    patches_list
    input_observer
 

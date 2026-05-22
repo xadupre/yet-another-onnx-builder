@@ -13,9 +13,9 @@ Each guide is self-contained and focuses on a single practical goal.
    jax_model
    numpy_function
    optimize_model
-   patches
-   sql
+   patches_how
+   sql_how
    shape_inference
-   sklearn
-   tensorflow
-   torch
+   sklearn_how
+   tensorflow_how
+   torch_how
