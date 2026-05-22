@@ -50,6 +50,28 @@ class TestPatchHelper(ExtTestCase):
         patches = details.patches_involved_in_graph(ep.graph)
         self.assertEqual(len(patches), 0)
 
+    def test_involved_patches_tiny_broadcast_add(self):
+        from yobx.torch.tiny_models import TinyBroadcastAddModel
+
+        model = TinyBroadcastAddModel()
+        inputs = TinyBroadcastAddModel._export_inputs()
+        dynamic_shapes = use_dyn_not_str(TinyBroadcastAddModel._dynamic_shapes())
+
+        with (
+            torch.fx.experimental._config.patch(backed_size_oblivious=True),
+            apply_patches_for_model(patch_torch=True) as details,
+        ):
+            ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=dynamic_shapes)
+
+        # The graph contains nodes traced from yobx.torch.tiny_models, but none
+        # of them come from a registered patch.  Previously this raised
+        # ``AssertionError: One node was patched but no patch was found``.
+        patches = details.patches_involved_in_graph(ep.graph)
+        self.assertIsInstance(patches, list)
+        for _patch_info, nodes in patches:
+            self.assertIsInstance(nodes, list)
+            self.assertGreater(len(nodes), 0)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
