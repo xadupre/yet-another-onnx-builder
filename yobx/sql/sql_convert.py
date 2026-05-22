@@ -82,6 +82,10 @@ def _np_dtype_to_onnx(dt: Union[np.dtype, type, str]) -> int:
     dt = np.dtype(dt)
     if dt in _NP_TO_ONNX:
         return _NP_TO_ONNX[dt]
+    # numpy string dtypes (e.g. ``np.str_`` -> ``<U0``, ``np.bytes_`` -> ``|S0``)
+    # are represented as ONNX STRING tensors.
+    if dt.kind in ("U", "S"):
+        return TensorProto.STRING
     raise ValueError(f"Unsupported numpy dtype for SQL conversion: {dt}")
 
 
