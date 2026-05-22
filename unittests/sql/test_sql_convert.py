@@ -327,6 +327,19 @@ class TestSqlToOnnxGroupBy(ExtTestCase):
         )
         self.assertEqualArray(s[order], np.array([6.0, 3.0, 6.0], dtype=np.float32), atol=1e-5)
 
+    def test_group_by_string_key(self):
+        # Regression test for an unsupported numpy dtype error when a string
+        # column (``np.str_``) is used as a GROUP BY key.
+        dtypes = {"city": np.str_, "sales": np.float32}
+        city = np.array(["a", "b", "a"], dtype=object)
+        sales = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+        onx = sql_to_onnx("SELECT city, SUM(sales) AS total_sales FROM t GROUP BY city", dtypes)
+        ref = ExtendedReferenceEvaluator(onx)
+        city_out, total = ref.run(None, {"city": city, "sales": sales})
+        order = np.argsort(city_out)
+        self.assertEqual(list(np.asarray(city_out)[order]), ["a", "b"])
+        self.assertEqualArray(total[order], np.array([4.0, 2.0], dtype=np.float32), atol=1e-5)
+
 
 class TestSqlToOnnxReturnedModel(ExtTestCase):
     """Tests verifying properties of the returned ONNX model."""
