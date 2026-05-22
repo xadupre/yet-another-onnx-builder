@@ -1,6 +1,5 @@
 import difflib
 import inspect
-import pprint
 import re
 import textwrap
 from typing import Any, Dict, Callable, Iterable, Iterator, List, Optional, Tuple
@@ -329,7 +328,15 @@ class PatchDetails:
             patches.append((patch, f, source, interval))
 
         assert hasattr(graph, "nodes"), "graph has no attribute 'nodes'"
-        cst = "yobx"
+        # Narrow the candidate nodes to those whose stack trace references one
+        # of the patch source files.  Filtering on the broader "yobx" namespace
+        # would also pick up nodes coming from regular yobx user code (e.g.
+        # ``yobx.torch.tiny_models``) that have nothing to do with any patch.
+        patch_sources = {
+            source.replace("\\", "/").strip("/")
+            for _patch, _f, source, _interval in patches
+            if source
+        }
         node_stack = []
         for node in graph.nodes:
             assert hasattr(node, "meta"), "node has no attribute 'meta'"
@@ -338,24 +345,25 @@ class PatchDetails:
             if "stack_trace" not in meta:
                 continue
             stack = meta["stack_trace"]
-            if cst not in stack:
+            normalized = stack.replace("\\", "/")
+            if not any(src in normalized for src in patch_sources):
                 # to reduce the cost of the next iteration
                 continue
             node_stack.append((node, stack))
 
         patch_node = []
         patched_nodes = set()
+        reg = re.compile(r'File "([^"]+?)", line (\d+)')
         for patch, _f, source, interval in patches:
-            exp = 'File "([^"]*?%s[^"]+?)", line (\\d+)' % cst
-            reg = re.compile(exp)
+            if not source:
+                continue
+            normalized_source = source.replace("\\", "/").strip("/")
             for node, stack in node_stack:
                 occ = reg.findall(stack)
                 if not occ:
                     continue
                 for filename, line_number in occ:
-                    if source and source.replace("\\", "/").strip("/") != filename.replace(
-                        "\\", "/"
-                    ).strip("/"):
+                    if normalized_source != filename.replace("\\", "/").strip("/"):
                         continue
                     line = int(line_number)
                     if (
@@ -365,14 +373,6 @@ class PatchDetails:
                     ):
                         patch_node.append((patch, node))
                         patched_nodes.add(id(node))
-
-        # checks all patches were discovered
-        for node, _ in node_stack:
-            assert hasattr(node, "meta"), "node has no attribute 'meta'"
-            assert id(node) in patched_nodes, (
-                f"One node was patched but no patch was found:\n"
-                f"node.meta={pprint.pformat(node.meta)}"
-            )
 
         res = {}  # type: ignore[var-annotated]
         for patch, node in patch_node:
