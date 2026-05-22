@@ -105,6 +105,8 @@ _KNOWN_EXCLUSIONS = frozenset(
         "yobx.reference.torch_ops.sequence_ops",
         "yobx.reference.torch_ops.shape_ops",
         "yobx.reference.torch_ops.unary_ops",
+        "yobx.torch.in_transformers.models",
+        "yobx.torch.in_transformers.models.configs",
     }
 )
 
