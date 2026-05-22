@@ -13,6 +13,7 @@ Each guide is self-contained and focuses on a single practical goal.
    jax_model
    numpy_function
    optimize_model
+   patches
    shape_inference
    sklearn
    tensorflow
