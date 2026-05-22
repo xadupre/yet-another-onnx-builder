@@ -26,6 +26,26 @@ Pass the SQL query and the input dtypes to :func:`yobx.sql.to_onnx`.
 
 ----
 
+How to convert a SQL WHERE query
+--------------------------------
+
+Use the ``WHERE`` clause directly in the SQL query passed to
+:func:`yobx.sql.to_onnx`.
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from yobx.helpers.onnx_helper import pretty_onnx
+    from yobx.sql import to_onnx
+
+    dtypes = {"a": np.float32, "b": np.float32}
+    query = "SELECT a, b FROM t WHERE b >= 5"
+    onx = to_onnx(query, dtypes)
+    print(pretty_onnx(onx))
+
+----
+
 How to convert a SQL JOIN query
 -------------------------------
 
@@ -43,6 +63,25 @@ Use :func:`yobx.sql.sql_to_onnx` and pass the right-table dtypes through
     left_dtypes = {"id": np.int64, "x": np.float32}
     right_dtypes = {"rid": np.int64, "y": np.float32}
     onx = sql_to_onnx(query, left_dtypes, right_input_dtypes=right_dtypes)
+    print(pretty_onnx(onx))
+
+----
+
+How to convert a SQL GROUP BY query
+-----------------------------------
+
+Use aggregate functions with ``GROUP BY`` in the SQL query.
+
+.. runpython::
+    :showcode:
+
+    import numpy as np
+    from yobx.helpers.onnx_helper import pretty_onnx
+    from yobx.sql import to_onnx
+
+    dtypes = {"city": np.str_, "sales": np.float32}
+    query = "SELECT city, SUM(sales) AS total_sales FROM t GROUP BY city"
+    onx = to_onnx(query, dtypes)
     print(pretty_onnx(onx))
 
 ----
