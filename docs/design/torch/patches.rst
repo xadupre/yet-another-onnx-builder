@@ -101,6 +101,7 @@ covers the common pattern of replacing an attribute on a module or class:
 
 .. runpython::
     :showcode:
+    :process:
 
     import torch
     import torch._refs

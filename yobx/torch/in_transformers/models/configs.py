@@ -1,12 +1,11 @@
 import os
 import pprint
 from typing import Optional
-import transformers
 
 
 def get_cached_configuration(
     name: str, exc: bool = False, **kwargs
-) -> Optional[transformers.PretrainedConfig]:
+) -> Optional["transformers.PretrainedConfig"]:  # noqa: F821
     """
     Returns cached configuration to avoid having to many accesses to internet.
     It returns None if not Cache. The list of cached models follows.
@@ -18,7 +17,7 @@ def get_cached_configuration(
         :process:
 
         import pprint
-        from yobx.torch.in_transformers.models.configs import _retrieve_cached_configurations
+        from yobx.torch.in_transformers.models._configs import _retrieve_cached_configurations
 
         configs = _retrieve_cached_configurations()
         pprint.pprint(sorted(configs))
