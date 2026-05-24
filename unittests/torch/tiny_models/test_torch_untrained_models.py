@@ -579,6 +579,91 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         # self._chech_shape(onx.get_proto(include_weights=False))
 
     @hide_stdout()
+    @requires_transformers("5.2")
+    def test_tiny_llm_new_tracing_to_onnx_22(self):
+        import onnxruntime
+        import transformers
+        from yobx.pv_version import PvVersion
+
+        data = get_tiny_model("arnir0/Tiny-LLM")
+        model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
+        b1 = data.inputs_batch1
+        is_transformers_58_or_newer = PvVersion(transformers.__version__) >= PvVersion("5.8")
+        filename = self.get_dump_file("test_tiny_llm_new_tracing_to_onnx_22.onnx")
+        # del inputs["position_ids"]
+        # del ds["position_ids"]
+        # del b1["position_ids"]
+
+        eval_inputs = inputs if is_transformers_58_or_newer else b1
+        expected_eval = None
+
+        with (
+            register_flattening_functions(patch_transformers=True),
+            apply_patches_for_model(patch_transformers=True, model=model),
+        ):
+            if is_transformers_58_or_newer:
+                expected_eval = model(**torch_deepcopy(eval_inputs))
+            onx = to_onnx(
+                model,
+                kwargs=inputs,
+                dynamic_shapes=None if is_transformers_58_or_newer else ds,
+                filename=filename,
+                verbose=1,
+                large_model=True,
+                optimize=True,
+                target_opset=22,
+                export_options=ExportOptions(tracing="new-tracing"),
+            )
+        if expected_eval is None:
+            expected_eval = model(**torch_deepcopy(eval_inputs))
+
+        sess = onnxruntime.InferenceSession(filename, providers=["CPUExecutionProvider"])
+        feeds = make_feeds(sess, eval_inputs, use_numpy=True)
+        got = sess.run(None, feeds)
+        diff = max_diff(expected_eval, got)
+        # transformers>=5.8 follows a patched eager-attention tracing path
+        # which is numerically close but not bit-identical to eager inference.
+        tolerance = 2.0 if is_transformers_58_or_newer else 1e-5
+        assert diff["abs"] <= tolerance, f"diff={diff}"
+
+        if not is_transformers_58_or_newer:
+            problem = dict(
+                input_ids=torch.tensor([[24320]], dtype=torch.int64),
+                attention_mask=torch.tensor([[1, 1, 1, 0]], dtype=torch.int64),
+                past_key_values=make_dynamic_cache(
+                    [
+                        torch.rand((1, 1, 3, 96), dtype=torch.float32),
+                        torch.rand((1, 1, 3, 96), dtype=torch.float32),
+                    ]
+                ),
+            )
+
+            expected = model(**torch_deepcopy(problem))
+            feeds = make_feeds(sess, problem, use_numpy=True)
+            got = sess.run(None, feeds)
+            diff = max_diff(expected, got)
+            assert diff["abs"] <= 1e-5, f"diff={diff}"
+
+        outputs = [o.name for o in onx.graph.output]
+        self.assertIn(
+            outputs,
+            [
+                ["output_0", "present_key_values_key_0", "present_key_values_value_0"],
+                ["output_0", "present_key_values_0", "present_key_values_1"],
+            ],
+        )
+        unique_ops = {n.op_type for n in onx.graph.node}
+        if not is_transformers_58_or_newer:
+            self.assertNotIn("HalfRotaryEmbedding", unique_ops)
+        self.assertNotIn("RotaryEmbedding", unique_ops)
+        self.assertNotIn("SimplifiedLayerNormalization", unique_ops)
+        self.assertNotIn("SkipSimplifiedLayerNormalization", unique_ops)
+        self.assertNotIn("CausalMaskMulAdd", unique_ops)
+        self.assertNotIn("CausalMask", unique_ops)
+        self.assertNotIn("GroupQueryAttention", unique_ops)
+        # self._chech_shape(onx.get_proto(include_weights=False))
+
+    @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")

@@ -316,6 +316,49 @@ class TracingTensor(torch.Tensor):
         ), f"Missing tracer for func={func}, types={types}, {args}, {kwargs=}"
         return tracer.dispatch(func, args, kwargs)
 
+    def _normalize_shape_args(
+        self, shape: Union[Tuple[Any, ...], List[Any]]
+    ) -> Tuple[Union[int, "torch.SymInt"], ...]:
+        """Converts TracingInt dimensions to ints or SymInt values for shape ops."""
+        tracer = self._tracer
+        normalized: List[Union[int, "torch.SymInt"]] = []
+        for dim in shape:
+            if isinstance(dim, TracingInt):
+                if tracer is None:
+                    if dim.is_static:
+                        normalized.append(int(dim))
+                    else:
+                        raise ValueError(
+                            "Cannot normalize symbolic TracingInt "
+                            f"{dim!r} without an active tracer."
+                        )
+                else:
+                    normalized.append(tracer._tracing_int_to_fake(dim))
+            else:
+                normalized.append(dim)
+        return tuple(normalized)
+
+    def view(self, *shape: Any) -> "TracingTensor":  # type: ignore[override]
+        """Supports tuple/list shape arguments containing TracingInt values."""
+        if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
+            shape = tuple(shape[0])
+        normalized = self._normalize_shape_args(shape)
+        return super().view(normalized)  # type: ignore[misc]
+
+    def reshape(self, *shape: Any) -> "TracingTensor":  # type: ignore[override]
+        """Supports tuple/list shape arguments containing TracingInt values."""
+        if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
+            shape = tuple(shape[0])
+        normalized = self._normalize_shape_args(shape)
+        return super().reshape(normalized)  # type: ignore[misc]
+
+    def expand(self, *sizes: Any) -> "TracingTensor":  # type: ignore[override]
+        """Accepts positional and tuple/list size forms with TracingInt values."""
+        if len(sizes) == 1 and isinstance(sizes[0], (tuple, list)):
+            sizes = tuple(sizes[0])
+        normalized = self._normalize_shape_args(sizes)
+        return super().expand(normalized)  # type: ignore[misc]
+
     def _div_by_tracing_int(self, dim: "TracingInt") -> "TracingTensor":
         """
         Handles division of this tensor by a symbolic :class:`TracingInt`
