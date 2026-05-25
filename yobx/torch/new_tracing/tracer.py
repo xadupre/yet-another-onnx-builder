@@ -2340,11 +2340,11 @@ class GraphTracer:
 
         length = kwargs.get("length", args[8] if len(args) > 8 else None)
         if isinstance(length, TracingInt):
-            out_last = length.value
+            out_last: Union[TracingInt, int] = length
         elif isinstance(length, int):
             out_last = length
         else:
-            out_last = input_tt.shape[-1]
+            out_last = input_tt._tracing_shape[-1]
         out_shape = TracingShape((*input_tt._tracing_shape[:-2], out_last))
 
         return_complex = kwargs.get("return_complex", args[9] if len(args) > 9 else False)
@@ -2382,14 +2382,19 @@ class GraphTracer:
             normalized,
             onesided,
             length,
+            return_complex,
         )
-        kwargs = {"return_complex": return_complex}
+        kwargs: Dict[str, Any] = {}
         if not isinstance(input, TracingTensor):
             return torch.ops.aten.istft.default(*args, **kwargs)
-        node_args = tuple(a if self.is_not_tensor(a) else self._get_node(a) for a in args)
-        node_kwargs = {
-            k: (v if self.is_not_tensor(v) else self._get_node(v)) for k, v in kwargs.items()
-        }
+
+        def _to_node(a: Any) -> Any:
+            if isinstance(a, (TracingTensor, torch.Tensor)):
+                return self._get_node(a)
+            return a
+
+        node_args = tuple(_to_node(a) for a in args)
+        node_kwargs = {k: _to_node(v) for k, v in kwargs.items()}
         node = self.graph.call_function(
             torch.ops.aten.istft.default, args=node_args, kwargs=node_kwargs
         )
