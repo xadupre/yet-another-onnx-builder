@@ -229,7 +229,7 @@ def to_tensor(tensor: onnx.TensorProto, base_dir: str = "") -> "torch.Tensor":
     assert tensor.data_type != onnx.TensorProto.STRING, "to_tensor not implemented for strings"
 
     tensor_dtype = tensor.data_type
-    torch_dtype = onnx_dtype_to_torch_dtype(tensor_dtype)
+    dtype = onnx_dtype_to_torch_dtype(tensor_dtype)
     dims = tuple(tensor.dims)
     if onnx.external_data_helper.uses_external_data(tensor):
         # Load raw data from external tensor if it exists
@@ -238,7 +238,7 @@ def to_tensor(tensor: onnx.TensorProto, base_dir: str = "") -> "torch.Tensor":
     if tensor.HasField("raw_data"):
         raw_data = tensor.raw_data
         if len(raw_data) == 0:
-            return torch.tensor([], dtype=torch_dtype).reshape(dims)
+            return torch.tensor([], dtype=dtype).reshape(dims)
         if sys.byteorder == "big":
             # Convert endian from little to big
             raw_data = (
@@ -248,7 +248,7 @@ def to_tensor(tensor: onnx.TensorProto, base_dir: str = "") -> "torch.Tensor":
             )
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            return torch.frombuffer(raw_data, dtype=torch_dtype).reshape(dims)
+            return torch.frombuffer(raw_data, dtype=dtype).reshape(dims)
 
     # Other cases, it should be small tensor. We use numpy.
     np_tensor = onh.to_array(tensor)

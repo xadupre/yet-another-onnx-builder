@@ -15623,10 +15623,10 @@ def aten_sum_dim_IntList(
 ) -> T:
     "reducesum, sum_dim_IntList"
     if dtype is None:
-        torch_dtype = g.get_type_known(outputs[0])
-        if torch_dtype != g.get_type(x):
+        itype = g.get_type_known(outputs[0])
+        if itype != g.get_type(x):
             # torch sometimes cast the results into in64
-            x = g.op.Cast(x, to=torch_dtype, name=name)
+            x = g.op.Cast(x, to=itype, name=name)
         return aten_sum(g, sts, outputs, x, dim, keepdim)
 
     res = aten_sum(g, sts, None, x, dim, keepdim)

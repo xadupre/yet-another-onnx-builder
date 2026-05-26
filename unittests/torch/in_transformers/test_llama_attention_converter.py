@@ -76,16 +76,14 @@ def _to_model(attn, hs, cos, sin, mask=None, target_opset=22):
 class TestLlamaAttentionConverter(ExtTestCase):
     """Unit tests for :func:`llama_attention_to_onnx`."""
 
-    def _get_inputs(
-        self, batch=2, seq=10, hidden_size=64, head_dim=16, torch_dtype=torch.float32
-    ):
-        hs = torch.randn(batch, seq, hidden_size, dtype=torch_dtype)
-        cos = torch.randn(batch, seq, head_dim, dtype=torch_dtype)
-        sin = torch.randn(batch, seq, head_dim, dtype=torch_dtype)
+    def _get_inputs(self, batch=2, seq=10, hidden_size=64, head_dim=16, dtype=torch.float32):
+        hs = torch.randn(batch, seq, hidden_size, dtype=dtype)
+        cos = torch.randn(batch, seq, head_dim, dtype=dtype)
+        sin = torch.randn(batch, seq, head_dim, dtype=dtype)
         return hs, cos, sin
 
     def _get_inputs_symmetric(
-        self, batch=2, seq=10, hidden_size=64, head_dim=16, torch_dtype=torch.float32
+        self, batch=2, seq=10, hidden_size=64, head_dim=16, dtype=torch.float32
     ):
         """
         Like :meth:`_get_inputs` but generates *symmetric* ``cos``/``sin``
@@ -106,10 +104,10 @@ class TestLlamaAttentionConverter(ExtTestCase):
            element 0 produces the correct values for all elements.
         """
         half = head_dim // 2
-        hs = torch.randn(batch, seq, hidden_size, dtype=torch_dtype)
+        hs = torch.randn(batch, seq, hidden_size, dtype=dtype)
         # Generate a single set of positional embeddings and replicate across batch
-        cos_half_base = torch.randn(1, seq, half, dtype=torch_dtype)
-        sin_half_base = torch.randn(1, seq, half, dtype=torch_dtype)
+        cos_half_base = torch.randn(1, seq, half, dtype=dtype)
+        sin_half_base = torch.randn(1, seq, half, dtype=dtype)
         cos_half = cos_half_base.repeat(batch, 1, 1)
         sin_half = sin_half_base.repeat(batch, 1, 1)
         cos = torch.cat([cos_half, cos_half], dim=-1)
@@ -152,7 +150,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
     def test_opset22_float16(self):
         """Standard ONNX ops path, float16 — ref evaluator and OnnxRuntime."""
         attn = _make_llama_attention().to(torch.float16).eval()
-        hs, cos, sin = self._get_inputs(torch_dtype=torch.float16)
+        hs, cos, sin = self._get_inputs(dtype=torch.float16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset=22)
@@ -212,7 +210,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
     def test_opset22_bfloat16(self):
         """Standard ONNX ops path, bfloat16 — model dtype check + ref/ORT validation."""
         attn = _make_llama_attention().to(torch.bfloat16).eval()
-        hs, cos, sin = self._get_inputs(torch_dtype=torch.bfloat16)
+        hs, cos, sin = self._get_inputs(dtype=torch.bfloat16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset=22)
@@ -276,7 +274,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
     def test_opset24_float16(self):
         """ONNX RotaryEmbedding + Attention op path (opset 24), float16."""
         attn = _make_llama_attention().to(torch.float16).eval()
-        hs, cos, sin = self._get_inputs_symmetric(torch_dtype=torch.float16)
+        hs, cos, sin = self._get_inputs_symmetric(dtype=torch.float16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset=24)
@@ -304,7 +302,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
         """ONNX RotaryEmbedding + Attention op path (opset 24), bfloat16 —
         model dtype check + ref/ORT validation."""
         attn = _make_llama_attention().to(torch.bfloat16).eval()
-        hs, cos, sin = self._get_inputs_symmetric(torch_dtype=torch.bfloat16)
+        hs, cos, sin = self._get_inputs_symmetric(dtype=torch.bfloat16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset=24)
@@ -360,7 +358,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
     def test_opset23_float16(self):
         """ONNX RotaryEmbedding op + plain attention (opset 23), float16."""
         attn = _make_llama_attention().to(torch.float16).eval()
-        hs, cos, sin = self._get_inputs_symmetric(torch_dtype=torch.float16)
+        hs, cos, sin = self._get_inputs_symmetric(dtype=torch.float16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset=23)
@@ -412,7 +410,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
     def test_com_microsoft_float16(self):
         """com.microsoft.RotaryEmbedding + MultiHeadAttention path, float16."""
         attn = _make_llama_attention().to(torch.float16).eval()
-        hs, cos, sin = self._get_inputs_symmetric(torch_dtype=torch.float16)
+        hs, cos, sin = self._get_inputs_symmetric(dtype=torch.float16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
@@ -433,7 +431,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
         """com.microsoft.RotaryEmbedding + MultiHeadAttention path, bfloat16 —
         model dtype check + ORT validation."""
         attn = _make_llama_attention().to(torch.bfloat16).eval()
-        hs, cos, sin = self._get_inputs_symmetric(torch_dtype=torch.bfloat16)
+        hs, cos, sin = self._get_inputs_symmetric(dtype=torch.bfloat16)
         expected = self._torch_expected(attn, hs, cos, sin)
 
         model = _to_model(attn, hs, cos, sin, target_opset={"": 22, "com.microsoft": 1})
