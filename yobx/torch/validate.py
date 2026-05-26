@@ -347,7 +347,16 @@ def _load_model(
         else:
             print(f"[validate_model] loading model for {model_id!r}")
 
-    dtype_kwargs: Dict[str, Any] = {"torch_dtype": torch_dtype} if torch_dtype is not None else {}
+    dtype_kwargs: Dict[str, Any] = {}
+    if torch_dtype is not None:
+        # transformers>=4.56 renamed the ``torch_dtype`` argument to ``dtype``.
+        import transformers as _transformers
+        from packaging.version import Version
+
+        if Version(_transformers.__version__.split("+")[0]) >= Version("4.56"):
+            dtype_kwargs["dtype"] = torch_dtype
+        else:
+            dtype_kwargs["torch_dtype"] = torch_dtype
     try:
         if random_weights:
             model: torch.nn.Module = AutoModelForCausalLM.from_config(config, **dtype_kwargs)
