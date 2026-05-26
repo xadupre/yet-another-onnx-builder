@@ -839,6 +839,10 @@ def get_parser_validate() -> ArgumentParser:
         dest="config_override",
         help="Override a config attribute before creating the model, "
         "e.g. --config-override num_hidden_layers=2. "
+        "Dotted paths such as text_config.num_hidden_layers=2 are also "
+        "supported to target nested sub-configs of multimodal models. "
+        "Plain keys are propagated to any nested sub-config (text_config, "
+        "vision_config, ...) that exposes the same attribute. "
         "Can be repeated for multiple overrides.",
     )
     return parser

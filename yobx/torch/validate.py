@@ -260,6 +260,55 @@ def _to_onnx(*args, exporter: str = "yobx", **kwargs):
     raise NotImplementedError(f"exporter={exporter!r} not implemented.")
 
 
+def _apply_config_override(config: Any, key: str, value: Any) -> None:
+    """Apply a single config override, with support for dotted paths and
+    automatic propagation to nested sub-configs.
+
+    Multimodal HuggingFace configs (e.g. ``Gemma3Config``) keep text-model
+    attributes such as ``num_hidden_layers`` on a nested ``text_config`` and
+    expose nothing at the top level.  A bare ``setattr(config, key, value)``
+    would silently create an unused attribute, leaving the actual model size
+    untouched and frequently triggering opaque downstream failures (for
+    instance ``"upper bound and lower bound inconsistent with step sign"``
+    raised by ``torch.arange`` inside generation).
+
+    Behaviour:
+
+    * Dotted keys (``"text_config.num_hidden_layers"``) walk the attribute
+      chain and set the value on the final object.
+    * Plain keys are always set on the top-level ``config``.  In addition,
+      every nested sub-config (any attribute that is itself an instance of
+      ``PretrainedConfig`` / ``PreTrainedConfig``) that already exposes the
+      same attribute receives the same value, so a single
+      ``num_hidden_layers=2`` reaches ``text_config`` (and ``vision_config``
+      when relevant).
+    """
+    if "." in key:
+        parts = key.split(".")
+        obj = config
+        for part in parts[:-1]:
+            obj = getattr(obj, part)
+        setattr(obj, parts[-1], value)
+        return
+
+    setattr(config, key, value)
+
+    try:
+        try:
+            from transformers import PreTrainedConfig as _BaseConfig  # type: ignore
+        except ImportError:  # pragma: no cover - older transformers
+            from transformers import PretrainedConfig as _BaseConfig  # type: ignore
+    except Exception:  # pragma: no cover - transformers not installed
+        return
+
+    for attr_name in list(vars(config)):
+        if attr_name == key:
+            continue
+        sub = getattr(config, attr_name, None)
+        if isinstance(sub, _BaseConfig) and hasattr(sub, key):
+            setattr(sub, key, value)
+
+
 def _load_config(
     model_id: str,
     config_overrides: Optional[Dict[str, Any]],
@@ -296,7 +345,7 @@ def _load_config(
 
     if config_overrides:
         for k, v in config_overrides.items():
-            setattr(config, k, v)
+            _apply_config_override(config, k, v)
         summary.config_overrides = str(config_overrides)
 
     collected_data.config = config

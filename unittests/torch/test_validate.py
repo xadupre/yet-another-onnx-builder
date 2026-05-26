@@ -96,6 +96,36 @@ class TestValidateModel(ExtTestCase):
         self.assertIn("random_weights", sig.parameters)
         self.assertFalse(sig.parameters["random_weights"].default)
 
+    def test_apply_config_override_nested(self):
+        """_apply_config_override propagates to nested sub-configs (multimodal)."""
+        from transformers import Gemma3Config
+        from yobx.torch.validate import _apply_config_override
+
+        config = Gemma3Config()
+        original = config.text_config.num_hidden_layers
+        self.assertNotEqual(original, 2)
+        _apply_config_override(config, "num_hidden_layers", 2)
+        self.assertEqual(config.text_config.num_hidden_layers, 2)
+        self.assertEqual(config.num_hidden_layers, 2)
+
+    def test_apply_config_override_dotted_path(self):
+        """_apply_config_override supports dotted paths into sub-configs."""
+        from transformers import Gemma3Config
+        from yobx.torch.validate import _apply_config_override
+
+        config = Gemma3Config()
+        _apply_config_override(config, "text_config.num_hidden_layers", 3)
+        self.assertEqual(config.text_config.num_hidden_layers, 3)
+
+    def test_apply_config_override_plain_attribute(self):
+        """_apply_config_override sets attributes on flat (non-multimodal) configs."""
+        from transformers import LlamaConfig
+        from yobx.torch.validate import _apply_config_override
+
+        config = LlamaConfig()
+        _apply_config_override(config, "num_hidden_layers", 2)
+        self.assertEqual(config.num_hidden_layers, 2)
+
     def test_cmd_validate_has_random_weights(self):
         """CLI parser exposes --random-weights and --config-override flags."""
         from yobx._command_lines_parser import get_parser_validate
