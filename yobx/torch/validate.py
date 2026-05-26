@@ -399,9 +399,29 @@ def _load_model(
             print(f"[validate_model] loading model for {model_id!r}")
 
     dtype_kwargs: Dict[str, Any] = {"torch_dtype": torch_dtype} if torch_dtype is not None else {}
+    # Multimodal configs (e.g. Gemma3Config) instantiate a *ForConditionalGeneration
+    # wrapper with vision/audio towers when fed to AutoModelForCausalLM. Validating
+    # the text-only causal LM is what we actually want here, so when the config
+    # exposes a text sub-config we instantiate from it directly. This also avoids
+    # tracing the vision tower whose symbolic conv shapes can produce confusing
+    # "negative output size" errors during export.
+    causal_config = config
+    if random_weights:
+        for sub_name in ("text_config", "language_config"):
+            sub = getattr(config, sub_name, None)
+            if sub is not None and hasattr(sub, "num_hidden_layers"):
+                causal_config = sub
+                if verbose:
+                    print(
+                        f"[validate_model] using {sub_name} from {type(config).__name__} "
+                        f"for text-only causal LM instantiation"
+                    )
+                break
     try:
         if random_weights:
-            model: torch.nn.Module = AutoModelForCausalLM.from_config(config, **dtype_kwargs)
+            model: torch.nn.Module = AutoModelForCausalLM.from_config(
+                causal_config, **dtype_kwargs
+            )
         else:
             try:
                 model = AutoModelForCausalLM.from_pretrained(

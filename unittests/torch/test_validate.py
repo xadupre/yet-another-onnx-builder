@@ -135,6 +135,38 @@ class TestValidateModel(ExtTestCase):
         _apply_config_override(config, "num_hidden_layers", 2)
         self.assertEqual(config.num_hidden_layers, 2)
 
+    def test_load_model_uses_text_config_for_multimodal(self):
+        """_load_model picks the text sub-config to instantiate a text-only causal LM."""
+        import torch
+        from transformers import Gemma3Config
+        from yobx.torch.validate import _load_model, ValidateSummary, ValidateData
+
+        config = Gemma3Config()
+        config.text_config.num_hidden_layers = 2
+        config.text_config.hidden_size = 32
+        config.text_config.intermediate_size = 64
+        config.text_config.num_attention_heads = 4
+        config.text_config.num_key_value_heads = 2
+        config.text_config.head_dim = 8
+
+        summary = ValidateSummary(model_id="google/gemma-3-4b-it", prompt="p")
+        data = ValidateData()
+        model = _load_model(
+            "google/gemma-3-4b-it",
+            config,
+            random_weights=True,
+            torch_dtype=torch.float32,
+            torch_device="cpu",
+            verbose=0,
+            quiet=False,
+            summary=summary,
+            collected_data=data,
+        )
+        # Must be the text-only causal LM, not the full multimodal wrapper.
+        self.assertEqual(type(model).__name__, "Gemma3ForCausalLM")
+        self.assertFalse(hasattr(model, "vision_tower"))
+        self.assertFalse(hasattr(getattr(model, "model", None), "vision_tower"))
+
     def test_cmd_validate_has_random_weights(self):
         """CLI parser exposes --random-weights and --config-override flags."""
         from yobx._command_lines_parser import get_parser_validate
