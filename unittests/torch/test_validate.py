@@ -389,6 +389,46 @@ class TestValidateModel(ExtTestCase):
             if data.discrepancies:
                 self.assertIn("discrepancies", sheets)
 
+    def test_validate_model_gemma_cli_equivalent(self):
+        """Python API equivalent of the CLI command:
+
+        ``python -m yobx validate -m google/gemma-3-4b-it -e yobx --opt default
+        --opset 22 --device cpu --dtype float32 --patch -r -o dump_test -v 1
+        --random-weights --config-override num_hidden_layers=2``
+
+        The model is gated on the HuggingFace Hub, so the test is skipped when
+        the config download fails (no network, no token, or gated access).
+        """
+        import tempfile
+
+        from yobx.torch.validate import validate_model, ValidateSummary, ValidateData
+
+        try:
+            with tempfile.TemporaryDirectory() as dump_folder:
+                summary, data = validate_model(
+                    model_id="google/gemma-3-4b-it",
+                    exporter="yobx",
+                    optimization="default",
+                    opset=22,
+                    device="cpu",
+                    dtype="float32",
+                    patch=True,
+                    do_run=True,
+                    dump_folder=dump_folder,
+                    verbose=1,
+                    random_weights=True,
+                    config_overrides={"num_hidden_layers": 2},
+                    quiet=True,
+                )
+        except Exception as e:  # gated repo, no network, missing token, ...
+            raise unittest.SkipTest(  # noqa: B904
+                f"cannot validate google/gemma-3-4b-it: {type(e).__name__}: {e}"
+            )
+
+        self.assertIsInstance(summary, ValidateSummary)
+        self.assertIsInstance(data, ValidateData)
+        self.assertEqual(summary.model_id, "google/gemma-3-4b-it")
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
