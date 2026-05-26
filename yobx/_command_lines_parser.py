@@ -839,11 +839,12 @@ def get_parser_validate() -> ArgumentParser:
         dest="config_override",
         help="Override a config attribute before creating the model, "
         "e.g. --config-override num_hidden_layers=2. "
-        "Dotted paths such as text_config.num_hidden_layers=2 are also "
-        "supported to target nested sub-configs of multimodal models. "
-        "Plain keys are propagated to any nested sub-config (text_config, "
-        "vision_config, ...) that exposes the same attribute. "
-        "Can be repeated for multiple overrides.",
+        "For multimodal configs (Gemma3, ...), plain keys that are not on "
+        "the top-level config are forwarded to text_config / language_config "
+        "only; vision/audio sub-configs are left untouched to avoid breaking "
+        "the corresponding tower. Use a dotted path "
+        "(--config-override vision_config.num_hidden_layers=2) to target a "
+        "specific sub-config. Can be repeated for multiple overrides.",
     )
     return parser
 

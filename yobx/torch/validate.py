@@ -276,12 +276,16 @@ def _apply_config_override(config: Any, key: str, value: Any) -> None:
 
     * Dotted keys (``"text_config.num_hidden_layers"``) walk the attribute
       chain and set the value on the final object.
-    * Plain keys are always set on the top-level ``config``.  In addition,
-      every nested sub-config (any attribute that is itself an instance of
-      ``PretrainedConfig`` / ``PreTrainedConfig``) that already exposes the
-      same attribute receives the same value, so a single
-      ``num_hidden_layers=2`` reaches ``text_config`` (and ``vision_config``
-      when relevant).
+    * Plain keys are set on the top-level ``config`` only when the attribute
+      is already defined there.  Otherwise, the value is forwarded to the
+      first conventional language-model sub-config that exposes the
+      attribute (``text_config`` then ``language_config``), which matches
+      the user intent for multimodal models such as ``Gemma3Config`` where
+      ``num_hidden_layers`` lives on ``text_config``.  Vision/audio/image
+      sub-configs are intentionally **not** touched, since reducing e.g.
+      ``vision_config.num_hidden_layers`` produces a broken vision tower
+      whose conv shapes no longer line up.  Use the dotted form to target
+      them explicitly.
     """
     if "." in key:
         parts = key.split(".")
@@ -291,22 +295,20 @@ def _apply_config_override(config: Any, key: str, value: Any) -> None:
         setattr(obj, parts[-1], value)
         return
 
-    setattr(config, key, value)
-
-    try:
-        try:
-            from transformers import PreTrainedConfig as _BaseConfig  # type: ignore
-        except ImportError:  # pragma: no cover - older transformers
-            from transformers import PretrainedConfig as _BaseConfig  # type: ignore
-    except Exception:  # pragma: no cover - transformers not installed
+    # Top-level config already owns the attribute → set in place.
+    if key in vars(config):
+        setattr(config, key, value)
         return
 
-    for attr_name in list(vars(config)):
-        if attr_name == key:
-            continue
-        sub = getattr(config, attr_name, None)
-        if isinstance(sub, _BaseConfig) and hasattr(sub, key):
+    # Multimodal configs: forward to the conventional language sub-config.
+    for sub_name in ("text_config", "language_config"):
+        sub = getattr(config, sub_name, None)
+        if sub is not None and hasattr(sub, key):
             setattr(sub, key, value)
+            return
+
+    # Fallback: set at the top level (creates a new attribute if missing).
+    setattr(config, key, value)
 
 
 def _load_config(

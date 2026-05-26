@@ -97,16 +97,22 @@ class TestValidateModel(ExtTestCase):
         self.assertFalse(sig.parameters["random_weights"].default)
 
     def test_apply_config_override_nested(self):
-        """_apply_config_override propagates to nested sub-configs (multimodal)."""
+        """_apply_config_override forwards to text_config (multimodal)."""
         from transformers import Gemma3Config
         from yobx.torch.validate import _apply_config_override
 
         config = Gemma3Config()
-        original = config.text_config.num_hidden_layers
-        self.assertNotEqual(original, 2)
+        original_text = config.text_config.num_hidden_layers
+        original_vision = config.vision_config.num_hidden_layers
+        self.assertNotEqual(original_text, 2)
         _apply_config_override(config, "num_hidden_layers", 2)
+        # text_config (the conventional language sub-config) receives it.
         self.assertEqual(config.text_config.num_hidden_layers, 2)
-        self.assertEqual(config.num_hidden_layers, 2)
+        # vision_config must NOT be touched: reducing its layer count would
+        # break the conv-based vision tower (negative output sizes).
+        self.assertEqual(config.vision_config.num_hidden_layers, original_vision)
+        # No spurious top-level attribute is created either.
+        self.assertNotIn("num_hidden_layers", vars(config))
 
     def test_apply_config_override_dotted_path(self):
         """_apply_config_override supports dotted paths into sub-configs."""
@@ -116,6 +122,9 @@ class TestValidateModel(ExtTestCase):
         config = Gemma3Config()
         _apply_config_override(config, "text_config.num_hidden_layers", 3)
         self.assertEqual(config.text_config.num_hidden_layers, 3)
+        # Dotted form can also target the vision tower explicitly.
+        _apply_config_override(config, "vision_config.num_hidden_layers", 4)
+        self.assertEqual(config.vision_config.num_hidden_layers, 4)
 
     def test_apply_config_override_plain_attribute(self):
         """_apply_config_override sets attributes on flat (non-multimodal) configs."""
