@@ -1430,6 +1430,37 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
         got = ref.run(None, {"y": x.numpy()})
         self.assertEqualArray(expected, got[0])
 
+    def _assert_istft_export(self, tracing_mode: TracingMode) -> None:
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.window = torch.hann_window(8)
+
+            def forward(self, y):
+                return torch.istft(
+                    y,
+                    n_fft=8,
+                    hop_length=4,
+                    win_length=8,
+                    window=self.window,
+                    center=True,
+                    normalized=False,
+                    onesided=True,
+                    length=16,
+                    return_complex=False,
+                )
+
+        model = Model()
+        x = torch.randn((2, 5, 5), dtype=torch.complex64)
+        expected = model(x).detach().numpy()
+        artifact = to_onnx(model, (x,), export_options=ExportOptions(tracing=tracing_mode))
+        onx = artifact.proto
+        self.assertIsInstance(onx, onnx.ModelProto)
+        self.assertIn("Istft", [node.op_type for node in onx.graph.node])
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, {"y": x.numpy()})
+        self.assertEqualArray(expected, got[0], atol=1e-5)
+
     # ------------------------------------------------------------------ ConvertingLibrary.DEFAULT
 
     @ignore_warnings(UserWarning)
@@ -1494,6 +1525,13 @@ class TestTracingModeCombinationsLinear(ExtTestCase):
             ):
                 with self.subTest(dtype=x.dtype, tracing_mode=tracing_mode):
                     self._assert_bitwise_not_export(x, tracing_mode, expected_op_type)
+
+    @ignore_warnings(UserWarning)
+    def test_istft_all_default_exporters(self):
+        """Verifies that istft exports through all tracing modes."""
+        for tracing_mode in (TracingMode.DEFAULT, TracingMode.TRACING, TracingMode.NEW_TRACING):
+            with self.subTest(tracing_mode=tracing_mode):
+                self._assert_istft_export(tracing_mode)
 
     # --------------------------------------------------------------- ConvertingLibrary.ONNXSCRIPT
 

@@ -5238,6 +5238,92 @@ def aten_fft_ifft2(
     )
 
 
+def aten_istft(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    n_fft: int,
+    hop_length: Optional[int] = None,
+    win_length: Optional[int] = None,
+    window: Optional[T] = None,
+    center: bool = True,
+    normalized: bool = False,
+    onesided: Optional[bool] = None,
+    length: Optional[int] = None,
+    return_complex: bool = False,
+    name: str = "istft",
+) -> T:
+    """istft"""
+    assert isinstance(n_fft, int), f"Unexpected type {type(n_fft)} for n_fft{g.get_debug_msg()}"
+    if hop_length is None:
+        hop_length = n_fft // 4
+    if win_length is None:
+        win_length = n_fft
+
+    n_fft_name = g.make_initializer("", np.array(n_fft, dtype=np.int64), source=f"{name}.n_fft")
+    hop_length_name = g.make_initializer(
+        "", np.array(hop_length, dtype=np.int64), source=f"{name}.hop_length"
+    )
+    win_length_name = g.make_initializer(
+        "", np.array(win_length, dtype=np.int64), source=f"{name}.win_length"
+    )
+    center_name = g.make_initializer(
+        "", np.array(int(center), dtype=np.int64), source=f"{name}.center"
+    )
+    normalized_name = g.make_initializer(
+        "", np.array(int(normalized), dtype=np.int64), source=f"{name}.normalized"
+    )
+    onesided_name = g.make_initializer(
+        "",
+        np.array(-1 if onesided is None else int(onesided), dtype=np.int64),
+        source=f"{name}.onesided",
+    )
+    length_name = g.make_initializer(
+        "",
+        np.array(-1 if length is None else int(length), dtype=np.int64),
+        source=f"{name}.length",
+    )
+    return_complex_name = g.make_initializer(
+        "", np.array(int(return_complex), dtype=np.int64), source=f"{name}.return_complex"
+    )
+
+    inputs = [
+        x,
+        n_fft_name,
+        hop_length_name,
+        win_length_name,
+        center_name,
+        normalized_name,
+        onesided_name,
+        length_name,
+        return_complex_name,
+    ]
+    if window is not None:
+        inputs.append(window)
+
+    g.add_domain("ai.onnx.complex", 1)
+    res = g.make_node("Istft", inputs, outputs=outputs, domain="ai.onnx.complex", name=name)
+    if not sts and g.has_type(x):
+        itype = g.get_type(x)
+        if return_complex:
+            otype = itype
+        elif itype == TensorProto.COMPLEX64:
+            otype = TensorProto.FLOAT
+        elif itype == TensorProto.COMPLEX128:
+            otype = TensorProto.DOUBLE
+        else:
+            otype = itype
+        g.set_type(res, otype)
+        if g.has_shape(x):
+            shape_x = g.get_shape(x)
+            out_shape = (*tuple(shape_x[:-2]), length if length is not None else None)
+            g.set_shape(res, out_shape)
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x) - 1)
+    return res
+
+
 def aten_fft_fftshift(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
