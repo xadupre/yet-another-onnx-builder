@@ -406,17 +406,16 @@ def _load_model(
     # tracing the vision tower whose symbolic conv shapes can produce confusing
     # "negative output size" errors during export.
     causal_config = config
-    if random_weights:
-        for sub_name in ("text_config", "language_config"):
-            sub = getattr(config, sub_name, None)
-            if sub is not None and hasattr(sub, "num_hidden_layers"):
-                causal_config = sub
-                if verbose:
-                    print(
-                        f"[validate_model] using {sub_name} from {type(config).__name__} "
-                        f"for text-only causal LM instantiation"
-                    )
-                break
+    for sub_name in ("text_config", "language_config"):
+        sub = getattr(config, sub_name, None)
+        if sub is not None and hasattr(sub, "num_hidden_layers"):
+            causal_config = sub
+            if verbose:
+                print(
+                    f"[validate_model] using {sub_name} from {type(config).__name__} "
+                    f"for text-only causal LM instantiation"
+                )
+            break
     try:
         if random_weights:
             model: torch.nn.Module = AutoModelForCausalLM.from_config(
@@ -425,12 +424,12 @@ def _load_model(
         else:
             try:
                 model = AutoModelForCausalLM.from_pretrained(
-                    model_id, config=config, local_files_only=True, **dtype_kwargs
+                    model_id, config=causal_config, local_files_only=True, **dtype_kwargs
                 )
                 summary.model_from_cache = True
             except OSError:
                 model = AutoModelForCausalLM.from_pretrained(
-                    model_id, config=config, **dtype_kwargs
+                    model_id, config=causal_config, **dtype_kwargs
                 )
                 summary.model_from_cache = False
         model = model.to(torch_device)
