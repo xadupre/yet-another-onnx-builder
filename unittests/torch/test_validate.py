@@ -401,18 +401,17 @@ class TestValidateModel(ExtTestCase):
         """
         import tempfile
         from huggingface_hub.errors import HfHubHTTPError, OfflineModeIsEnabled
-        from requests.exceptions import ConnectionError as RequestsConnectionError
-        from requests.exceptions import HTTPError, Timeout
 
         from yobx.torch.validate import validate_model, ValidateSummary, ValidateData
 
-        http_errors = (
-            HfHubHTTPError,
-            OfflineModeIsEnabled,
-            HTTPError,
-            RequestsConnectionError,
-            Timeout,
-        )
+        http_errors: tuple = (HfHubHTTPError, OfflineModeIsEnabled)
+        try:
+            from requests.exceptions import ConnectionError as RequestsConnectionError
+            from requests.exceptions import HTTPError, Timeout
+
+            http_errors = (*http_errors, HTTPError, RequestsConnectionError, Timeout)
+        except ImportError:
+            pass
         try:
             with tempfile.TemporaryDirectory() as dump_folder:
                 summary, data = validate_model(
