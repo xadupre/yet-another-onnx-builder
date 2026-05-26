@@ -400,9 +400,19 @@ class TestValidateModel(ExtTestCase):
         the config download fails (no network, no token, or gated access).
         """
         import tempfile
+        from huggingface_hub.errors import HfHubHTTPError, OfflineModeIsEnabled
+        from requests.exceptions import ConnectionError as RequestsConnectionError
+        from requests.exceptions import HTTPError, Timeout
 
         from yobx.torch.validate import validate_model, ValidateSummary, ValidateData
 
+        http_errors = (
+            HfHubHTTPError,
+            OfflineModeIsEnabled,
+            HTTPError,
+            RequestsConnectionError,
+            Timeout,
+        )
         try:
             with tempfile.TemporaryDirectory() as dump_folder:
                 summary, data = validate_model(
@@ -420,7 +430,7 @@ class TestValidateModel(ExtTestCase):
                     config_overrides={"num_hidden_layers": 2},
                     quiet=True,
                 )
-        except Exception as e:  # gated repo, no network, missing token, ...
+        except http_errors as e:  # gated repo, no network, missing token, ...
             raise unittest.SkipTest(  # noqa: B904
                 f"cannot validate google/gemma-3-4b-it: {type(e).__name__}: {e}"
             )
