@@ -431,6 +431,9 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_aten_roll_relu_new_tracing(self):
         evaluation(cases="AtenRollRelu", exporters="yobx-new-tracing", quiet=False, dynamic=True)
 
+    def test_run_exporter_aten_cumprod_new_tracing(self):
+        evaluation(cases="AtenCumprod", exporters="yobx-new-tracing", quiet=False, dynamic=True)
+
     @requires_torch("2.7", "scan")
     def test_run_exporter_yobx_scan_new_tracing(self):
         evaluation(

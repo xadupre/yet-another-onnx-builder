@@ -116,6 +116,25 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected.to(int), got.astype(int))
 
+    @skipif_ci_windows("not working on windows")
+    def test_aten_cumprod(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.cumprod(x, dim=-1)
+
+        model = Model()
+        x = torch.randn(2, 3, 5).to(torch.float32)
+        expected = model(x)
+        model_path = self._call_exporter("test_aten_cumprod", "custom", model, (x,))
+        check_model(model_path)
+
+        sess = ExtendedReferenceEvaluator(model_path)
+        feeds = dict(zip(sess.input_names, [x.numpy()]))
+        got = sess.run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=1e-5)
+
     @skipif_ci_windows("broken")
     def test_aten_index_put_3d_nd_case_1(self):
         import torch
@@ -210,6 +229,68 @@ class TestOnnxExportAten(ExtTestCase):
         feeds = dict(zip([i.name for i in sess.get_inputs()], [x.detach().numpy()]))
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
+
+    def test_aten_interpolate_bilinear_antialias(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.nn.functional.interpolate(
+                    x, size=(8, 8), mode="bilinear", antialias=True
+                )
+
+        model = Model()
+        x = torch.randn(1, 2, 16, 16, requires_grad=False)
+        expected = model(x)
+        model_path = self._call_exporter(
+            "test_aten_interpolate_bilinear_antialias", "custom", model, (x,)
+        )
+        check_model(model_path)
+        onx = onnx.load(model_path)
+        resizes = [n for n in onx.graph.node if n.op_type == "Resize"]
+        self.assertEqual(len(resizes), 1)
+        attrs = {a.name: a for a in resizes[0].attribute}
+        self.assertIn("antialias", attrs)
+        self.assertEqual(attrs["antialias"].i, 1)
+
+        import onnxruntime
+
+        sess = onnxruntime.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        feeds = dict(zip([i.name for i in sess.get_inputs()], [x.detach().numpy()]))
+        got = sess.run(None, feeds)[0]
+        # ONNX Resize antialias and PyTorch _upsample_bilinear2d_aa
+        # implement compatible but not bit-identical antialiased downsampling.
+        self.assertEqualArray(expected, got, atol=0.3)
+
+    def test_aten_interpolate_bicubic_antialias(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.nn.functional.interpolate(
+                    x, size=(8, 8), mode="bicubic", antialias=True
+                )
+
+        model = Model()
+        x = torch.randn(1, 2, 16, 16, requires_grad=False)
+        expected = model(x)
+        model_path = self._call_exporter(
+            "test_aten_interpolate_bicubic_antialias", "custom", model, (x,)
+        )
+        check_model(model_path)
+        onx = onnx.load(model_path)
+        resizes = [n for n in onx.graph.node if n.op_type == "Resize"]
+        self.assertEqual(len(resizes), 1)
+        attrs = {a.name: a for a in resizes[0].attribute}
+        self.assertIn("antialias", attrs)
+        self.assertEqual(attrs["antialias"].i, 1)
+
+        import onnxruntime
+
+        sess = onnxruntime.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        feeds = dict(zip([i.name for i in sess.get_inputs()], [x.detach().numpy()]))
+        got = sess.run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=0.3)
 
     def test_aten_nn_functional_bilinear(self):
         import torch
@@ -1457,6 +1538,61 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(names, ["CustomSymOp"])
         domains = [d.domain for d in onx.opset_import]
         self.assertEqual(domains, ["", "custom_domain"])
+
+    @ignore_warnings(UserWarning)
+    @requires_torch("2.8")
+    def test_symbolic_quantize_dequantize_linear(self):
+        # Inspired by pytorch PR #185090: export a model that uses
+        # ``torch.onnx.ops.symbolic`` to emit ``QuantizeLinear``/``DequantizeLinear``
+        # nodes around regular aten operations (QDQ pattern).
+        import torch
+
+        def qdq(x, scale, zero_point):
+            q = torch.onnx.ops.symbolic(
+                "QuantizeLinear",
+                (x, scale, zero_point),
+                attrs={},
+                dtype=zero_point.dtype,
+                shape=x.shape,
+            )
+            return torch.onnx.ops.symbolic(
+                "DequantizeLinear",
+                (q, scale, zero_point),
+                attrs={},
+                dtype=scale.dtype,
+                shape=x.shape,
+            )
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("scale", torch.tensor(0.1, dtype=torch.float32))
+                self.register_buffer("zero_point", torch.tensor(128, dtype=torch.uint8))
+
+            def forward(self, x):
+                x = qdq(x, self.scale, self.zero_point)
+                y = torch.relu(x + x)
+                return qdq(y, self.scale, self.zero_point)
+
+        model = Model().eval()
+        inputs = (torch.randn(2, 3),)
+        onx = to_onnx(model, inputs, export_options=ExportOptions(strict=False))
+        names = [n.op_type for n in onx.graph.node]
+        self.assertEqual(
+            names,
+            [
+                "QuantizeLinear",
+                "DequantizeLinear",
+                "Add",
+                "Relu",
+                "QuantizeLinear",
+                "DequantizeLinear",
+            ],
+        )
+        domains = [d.domain for d in onx.opset_import]
+        # No custom domain should be registered for the default ONNX QDQ ops.
+        self.assertEqual(domains, [""])
+        check_model(onx)
 
     @ignore_warnings(UserWarning)
     def test_aten_index_tensor_rk2_rk4_rk4(self):
@@ -3822,6 +3958,35 @@ class TestOnnxExportAten(ExtTestCase):
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_avg_pool2d_ceil_count_include_pad_opset18(self):
+        # Regression test: with target_opset<19 and both ceil_mode and
+        # count_include_pad enabled, ONNX AveragePool would include the extra
+        # padding inserted by ceil_mode in the average, while PyTorch does not.
+        import torch
+
+        class Model(torch.nn.Module):
+            def __init__(self, ceil_mode):
+                super().__init__()
+                self.ceil_mode = ceil_mode
+
+            def forward(self, x):
+                return torch.nn.functional.avg_pool2d(
+                    x,
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    ceil_mode=self.ceil_mode,
+                    count_include_pad=True,
+                )
+
+        x = torch.arange(1, 17, dtype=torch.float32).reshape(1, 1, 4, 4)
+        for ceil_mode in (False, True):
+            with self.subTest(ceil_mode=ceil_mode):
+                model = Model(ceil_mode=ceil_mode).eval()
+                expected = model(x)
+                onx = to_onnx(model, (x,), target_opset=18)
+                self.assert_conversion_with_ort_on_cpu(onx, expected, (x,), atol=1e-5)
 
     def test_aten_addmm(self):
         import torch

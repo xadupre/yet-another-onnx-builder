@@ -310,6 +310,69 @@ class TestOnnxExportAtenTracing(ExtTestCase):
         onx = self._to_onnx_tracing(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
+    def test_aten_max_dim_keepdim_tracing(self):
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                top_probs, top = x.max(1, keepdim=True)
+                return top_probs, top
+
+        model = Model()
+        inputs = (torch.rand(3, 4),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = self._to_onnx_tracing(model, inputs)
+        op_types = {n.op_type for n in onx.graph.node}
+        self.assertNotIn("ReduceMax", op_types)
+        self.assertNotIn("ArgMax", op_types)
+        self.assertIn("TopK", op_types)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_max_dim_no_keepdim_tracing(self):
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                top_probs, top = x.max(1)
+                return top_probs, top
+
+        model = Model()
+        inputs = (torch.rand(3, 4),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = self._to_onnx_tracing(model, inputs)
+        op_types = {n.op_type for n in onx.graph.node}
+        self.assertNotIn("ReduceMax", op_types)
+        self.assertNotIn("ArgMax", op_types)
+        self.assertIn("TopK", op_types)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_min_dim_keepdim_tracing(self):
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                bot_probs, bot = x.min(1, keepdim=True)
+                return bot_probs, bot
+
+        model = Model()
+        inputs = (torch.rand(3, 4),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = self._to_onnx_tracing(model, inputs)
+        op_types = {n.op_type for n in onx.graph.node}
+        self.assertNotIn("ReduceMin", op_types)
+        self.assertNotIn("ArgMin", op_types)
+        self.assertIn("TopK", op_types)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_topk_tracing(self):
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                top_probs, top = x.topk(1, dim=1)
+                return top_probs, top
+
+        model = Model()
+        inputs = (torch.rand(3, 4),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = self._to_onnx_tracing(model, inputs)
+        op_types = {n.op_type for n in onx.graph.node}
+        self.assertNotIn("ReduceMax", op_types)
+        self.assertIn("TopK", op_types)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
     # ------------------------------------------------------------------
     # Matrix / linear algebra ops
     # ------------------------------------------------------------------

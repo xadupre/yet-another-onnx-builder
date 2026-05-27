@@ -39,6 +39,7 @@ from ._aten_functions import (
     aten_max_dim,
     aten_mH,
     aten_min,
+    aten_min_dim,
     aten_mT,
     aten_mul,
     aten_neg,
@@ -57,6 +58,7 @@ from ._aten_functions import (
     aten_sub,
     aten_t,
     aten_tanh,
+    aten_topk,
 )
 
 T = str
@@ -367,6 +369,14 @@ def aten_meth_max(
     "max."
     if dim is None:
         return aten_max(g, sts, outputs, x, name=".max")
+    if len(outputs) == 1:
+        # Tracing path: ``x.max(dim, keepdim)`` returns a named tuple
+        # ``(values, indices)`` but the FX tracer records the call as a
+        # single node and unpacks it via ``getitem`` later.  Expose the
+        # two outputs under ``<name>#0`` / ``<name>#1`` so the subsequent
+        # ``getitem`` nodes resolve to the proper TopK outputs (avoiding
+        # an emission of ReduceMax followed by Gather/Squeeze).
+        outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
     return aten_max_dim(g, sts, outputs, x, dim=dim, keepdim=keepdim, name=".max_dim")
 
 
@@ -415,20 +425,29 @@ def aten_meth_min(
     "min."
     if dim is None:
         return aten_min(g, sts, outputs, x, name=".min")
-    axes = np.array([dim], dtype=np.int64)
-    res = g.op.ReduceMin(
-        x, axes, name=".min_dim", outputs=outputs[:1], keepdims=1 if keepdim else 0
-    )
-    if not sts:
-        set_type_shape_reduce_op(g, outputs[0], x, keepdim=keepdim, axes=(dim,))
     if len(outputs) == 1:
-        return res
-    indices = g.op.ArgMin(
-        x, axis=dim, keepdims=1 if keepdim else 0, name=".min_dim", outputs=outputs[1:]
+        # See :func:`aten_meth_max` for why we expand the output names.
+        outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
+    return aten_min_dim(g, sts, outputs, x, dim=dim, keepdim=keepdim, name=".min_dim")
+
+
+def aten_meth_topk(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    k: int,
+    dim: int = -1,
+    largest: bool = True,
+    sorted: bool = True,
+) -> Tuple[T, T]:
+    "topk."
+    if len(outputs) == 1:
+        # See :func:`aten_meth_max` for why we expand the output names.
+        outputs = [f"{outputs[0]}#0", f"{outputs[0]}#1"]
+    return aten_topk(
+        g, sts, outputs, x, k=k, dim=dim, largest=largest, sorted=sorted, name=".topk"
     )
-    if not sts:
-        g.set_type(indices, TensorProto.INT64)
-    return res, indices
 
 
 def aten_meth_numel(

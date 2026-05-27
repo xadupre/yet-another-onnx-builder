@@ -170,7 +170,7 @@ def set_is_shape(
     if node.op_type in ("Shape", "Size") and node.domain == "":
         values[node.output[0]].is_shape = True
         return [node.output[0]]
-    is_shapes = [values[i].is_shape for i in node.input if i not in drop]
+    is_shapes = [values[i].is_shape for i in node.input if i and i not in drop]
     if any(is_shapes):
         if is_shapes[0] and len(node.output) == 1:
             values[node.output[0]].is_shape = True
@@ -229,6 +229,9 @@ def first_used_last_used(
     drop = set()
     for it, node in enumerate(_node):
         for i in node.input:
+            if not i:
+                # Optional/missing input represented by an empty string.
+                continue
             if i not in values:
                 assert allow_unknown, f"Input {i!r} is unknown."
                 # This input comes from a context and the model is a GraphProto

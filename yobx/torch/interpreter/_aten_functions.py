@@ -1720,6 +1720,117 @@ def _adjust_attributes_of_avg_pool(
     return (kernel_shape, strides, pads)
 
 
+def _make_avg_pool(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    expand_size: int,
+    kernel_shape: Sequence[int],
+    strides: Sequence[int],
+    pads: Sequence[int],
+    ceil_mode: bool,
+    count_include_pad: bool,
+    name: str,
+) -> T:
+    """Emit an ONNX AveragePool, working around the opset<19 mismatch where
+    AveragePool with ``ceil_mode=1`` and ``count_include_pad=1`` includes the
+    extra padding inserted by ``ceil_mode`` in the averaging denominator,
+    while PyTorch ``avg_poolNd`` does not.
+
+    For opset<19 with both flags enabled, we replace the AveragePool by
+
+        data_avg = AveragePool(Pad(x, pads, 0), pads=0, cip=1, ceil_mode=1)
+        mask_avg = AveragePool(OnesLike(padded_x),  pads=0, cip=1, ceil_mode=1)
+        result   = data_avg / mask_avg
+
+    The two ``AveragePool`` operators share the same denominator (``k**N``) at
+    every position, so the ratio reduces to ``sum_of_values / count_of_cells``,
+    where ``count_of_cells`` is the number of in-input-plus-original-padding
+    cells inside each window (ceil-induced padding contributes zero to both
+    numerator and the mask, so it is correctly excluded). This matches the
+    PyTorch semantics regardless of any ``Pad`` + ``AveragePool`` fusion ORT
+    may perform, because the fusion is mathematically a no-op when
+    ``count_include_pad=1``.
+    """
+    needs_workaround = ceil_mode and count_include_pad and g.main_opset < 19
+
+    if not needs_workaround:
+        result = g.op.AveragePool(
+            x,
+            ceil_mode=1 if ceil_mode else 0,
+            count_include_pad=1 if count_include_pad else 0,
+            kernel_shape=list(kernel_shape),
+            pads=list(pads),
+            strides=list(strides),
+            outputs=outputs,
+            name=name,
+        )
+        if not sts:
+            g.set_type(result, g.get_type(x))
+            g.set_rank(result, g.get_rank(x))
+        return result
+
+    # Pre-pad the data with zeros if the user requested any padding, so that
+    # the original padding becomes part of the input (always counted) and
+    # only the ceil-induced padding remains as "real" pads for AveragePool.
+    has_orig_pads = any(p != 0 for p in pads)
+    if has_orig_pads:
+        rank = expand_size + 2
+        onnx_pads = [0] * rank * 2
+        for i in range(expand_size):
+            onnx_pads[2 + i] = pads[i]
+            onnx_pads[rank + 2 + i] = pads[expand_size + i]
+        padded_x = g.op.Pad(x, np.array(onnx_pads, dtype=np.int64), name=name)
+    else:
+        padded_x = x
+
+    avg_pads = [0] * (expand_size * 2)
+    data_avg = g.op.AveragePool(
+        padded_x,
+        ceil_mode=1,
+        count_include_pad=1,
+        kernel_shape=list(kernel_shape),
+        pads=avg_pads,
+        strides=list(strides),
+        name=name,
+    )
+    g.set_type(data_avg, g.get_type(x))
+    g.set_rank(data_avg, g.get_rank(x))
+
+    # Build a mask with the same shape as ``padded_x`` whose values are 1.0
+    # over the in-input-plus-original-padding region. ``ConstantOfShape``
+    # cannot be fused with AveragePool, so the denominator path is robust.
+    itype = g.get_type(x)
+    np_dtype = tensor_dtype_to_np_dtype(itype) if itype else np.float32
+    one_tensor = onh.from_array(np.array([1], dtype=np_dtype))
+    shape_padded = g.op.Shape(padded_x, name=name)
+    g.set_type(shape_padded, TensorProto.INT64)
+    g.set_rank(shape_padded, 1)
+    mask = g.op.ConstantOfShape(shape_padded, value=one_tensor, name=name)
+    g.set_type(mask, itype or TensorProto.FLOAT)
+    g.set_rank(mask, g.get_rank(x))
+    mask_avg = g.op.AveragePool(
+        mask,
+        ceil_mode=1,
+        count_include_pad=1,
+        kernel_shape=list(kernel_shape),
+        pads=avg_pads,
+        strides=list(strides),
+        name=name,
+    )
+    g.set_type(mask_avg, itype or TensorProto.FLOAT)
+    g.set_rank(mask_avg, g.get_rank(x))
+
+    result = g.op.Div(data_avg, mask_avg, outputs=outputs, name=name)
+
+    if not sts:
+        g.set_type(result, g.get_type(x))
+        g.set_rank(result, g.get_rank(x))
+
+    return result
+
+
 def aten_avg_pool2d(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -1745,22 +1856,19 @@ def aten_avg_pool2d(
         expand_size, kernel_size, stride, padding
     )
 
-    result = g.op.AveragePool(
+    return _make_avg_pool(
+        g,
+        sts,
+        outputs,
         x,
-        ceil_mode=1 if ceil_mode else 0,
-        count_include_pad=1 if count_include_pad else 0,
-        kernel_shape=kernel_shape,
-        pads=pads,
-        strides=strides,
-        outputs=outputs,
-        name=name,
+        expand_size,
+        kernel_shape,
+        strides,
+        pads,
+        ceil_mode,
+        count_include_pad,
+        name,
     )
-
-    if not sts:
-        g.set_type(result, g.get_type(x))
-        g.set_rank(result, g.get_rank(x))
-
-    return result
 
 
 def aten_avg_pool3d(
@@ -1788,22 +1896,19 @@ def aten_avg_pool3d(
         expand_size, kernel_size, stride, padding
     )
 
-    result = g.op.AveragePool(
+    return _make_avg_pool(
+        g,
+        sts,
+        outputs,
         x,
-        ceil_mode=1 if ceil_mode else 0,
-        count_include_pad=1 if count_include_pad else 0,
-        kernel_shape=kernel_shape,
-        pads=pads,
-        strides=strides,
-        outputs=outputs,
-        name=name,
+        expand_size,
+        kernel_shape,
+        strides,
+        pads,
+        ceil_mode,
+        count_include_pad,
+        name,
     )
-
-    if not sts:
-        g.set_type(result, g.get_type(x))
-        g.set_rank(result, g.get_rank(x))
-
-    return result
 
 
 def aten_avg_pool2d_backward(
@@ -3862,6 +3967,103 @@ def aten_cumsum(
         xi = g.op.Cast(x, to=itype, name=name)
 
     res = g.op.CumSum(xi, np.array([dim], dtype=np.int64), outputs=outputs, name=name)
+    if not sts:
+        set_type_shape_unary_op(g, res, x, itype=itype)
+    return res
+
+
+def aten_cumprod(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: int,
+    dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    name: str = "cumprod",
+) -> T:
+    """cumprod
+
+    ONNX has no native ``CumProd`` op. For floating-point dtypes we lower
+    to ``Exp(CumSum(Log(|x|))) * sign`` where the cumulative sign is
+    computed in O(n) memory via the parity of the running count of
+    negative elements. For integer/bool dtypes we fall back to a
+    lower-triangular masked :func:`ReduceProd`: ``vals[..., i, j] = x[..., j]``
+    if ``j <= i`` and ``1`` otherwise, then ``ReduceProd`` along ``j``.
+    """
+    assert isinstance(dim, int), f"Not implemented for dim={dim!r}{g.get_debug_msg()}"
+
+    if dtype is None:
+        itype = g.get_type(x)
+        if itype == TensorProto.INT32 or itype == TensorProto.BOOL:
+            itype = TensorProto.INT64
+            xi = g.op.Cast(x, to=itype, name=name)
+        else:
+            xi = x
+    else:
+        itype = dtype if isinstance(dtype, int) else torch_dtype_to_onnx_dtype(dtype)
+        xi = g.op.Cast(x, to=itype, name=name)
+
+    rank = g.get_rank(xi)
+    pdim = dim + rank if dim < 0 else dim
+    np_dtype = tensor_dtype_to_np_dtype(itype)
+
+    float_types = {
+        TensorProto.FLOAT,
+        TensorProto.FLOAT16,
+        TensorProto.BFLOAT16,
+        TensorProto.DOUBLE,
+    }
+    if itype in float_types:
+        # Float path: exp(cumsum(log|x|)) * sign, with sign tracked as
+        # 1 - 2 * (cumsum(x<0) % 2). log(0) -> -inf -> exp(-inf) = 0, so
+        # once a zero appears the cumulative product stays 0, matching torch.
+        axes = np.array(pdim, dtype=np.int64)
+        log_abs = g.op.Log(g.op.Abs(xi, name=name), name=name)
+        cum_log = g.op.CumSum(log_abs, axes, name=name)
+        # Count negatives along dim using Relu(-Sign(x)) -> 1 if x<0 else 0.
+        neg_indicator = g.op.Relu(g.op.Neg(g.op.Sign(xi, name=name), name=name), name=name)
+        cum_neg = g.op.CumSum(neg_indicator, axes, name=name)
+        two = np.array([2], dtype=np_dtype)
+        parity = g.op.Mod(cum_neg, two, fmod=1, name=name)
+        sign = g.op.Sub(
+            np.array([1], dtype=np_dtype), g.op.Mul(parity, two, name=name), name=name
+        )
+        res = g.op.Mul(g.op.Exp(cum_log, name=name), sign, outputs=outputs, name=name)
+        if not sts:
+            set_type_shape_unary_op(g, res, x, itype=itype)
+        return res
+
+    # n = size of axis `pdim`, shape (1,)
+    n_dim = g.op.Gather(
+        g.op.Shape(xi, name=name), np.array([pdim], dtype=np.int64), axis=0, name=name
+    )
+
+    # lower triangular mask of shape (n, n), as bool
+    nn_shape = g.op.Concat(n_dim, n_dim, axis=0, name=name)
+    ones_nn = g.op.ConstantOfShape(
+        nn_shape, value=onh.from_array(np.array([1], dtype=np.int64)), name=name
+    )
+    mask_int = g.op.Trilu(ones_nn, upper=0, name=name)
+    mask_bool = g.op.Cast(mask_int, to=TensorProto.BOOL, name=name)
+
+    # Reshape mask to (1,...,1, n, n, 1,...,1) so it broadcasts with the
+    # input unsqueezed at axis `pdim` (which introduces the "i" axis).
+    parts = [g.ONE] * pdim + [n_dim, n_dim] + [g.ONE] * (rank - pdim - 1)
+    new_shape = g.op.Concat(*parts, axis=0, name=name)
+    mask_reshaped = g.op.Reshape(mask_bool, new_shape, name=name)
+
+    x_unsq = g.op.UnsqueezeAnyOpset(xi, np.array([pdim], dtype=np.int64), name=name)
+
+    one_val = g.op.ConstantOfShape(
+        np.array([1], dtype=np.int64),
+        value=onh.from_array(np.array([1], dtype=np_dtype)),
+        name=name,
+    )
+
+    vals = g.op.Where(mask_reshaped, x_unsq, one_val, name=name)
+    res = g.op.ReduceProdAnyOpset(
+        vals, np.array([pdim + 1], dtype=np.int64), keepdims=0, outputs=outputs, name=name
+    )
     if not sts:
         set_type_shape_unary_op(g, res, x, itype=itype)
     return res
@@ -9725,20 +9927,107 @@ def aten_max_dim(
     keepdim: bool = False,
     name: str = "max_dim",
 ) -> T:
-    """maximum"""
+    """maximum along a dimension, returning ``(values, indices)``.
+
+    When both outputs are requested this lowers to a single ``TopK`` (k=1)
+    rather than a ``ReduceMax`` + ``ArgMax`` pair.
+    """
+    if len(outputs) == 2:
+        return _aten_topk_dim(
+            g, sts, outputs, x, k=1, dim=dim, keepdim=keepdim, largest=True, name=name
+        )
+
     axes = np.array([dim], dtype=np.int64)
     res = g.op.ReduceMax(x, axes, name=name, outputs=outputs[:1], keepdims=1 if keepdim else 0)
     if not sts:
-        set_type_shape_unary_op(g, res, x)
-    if len(outputs) == 1:
-        return res
+        set_type_shape_reduce_op(g, res, x, keepdim=1 if keepdim else 0, axes=(dim,))
+    return res
 
-    indices = g.op.ArgMax(
-        x, axis=dim, keepdims=1 if keepdim else 0, name=name, outputs=outputs[1:]
-    )
+
+def _aten_topk_dim(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    k: int,
+    dim: int,
+    keepdim: bool,
+    largest: bool,
+    name: str,
+) -> Tuple[T, T]:
+    """Helper emitting a single ``TopK`` op for ``max(dim)``/``min(dim)``/``topk``.
+
+    When ``keepdim`` is False, the ``k``-sized axis is squeezed away to match
+    the expected output rank of ``aten.max.dim``/``aten.min.dim``.
+    """
+    assert (
+        len(outputs) == 2
+    ), f"_aten_topk_dim expects 2 outputs, got {outputs}{g.get_debug_msg()}"
+    k_const = np.array([k], dtype=np.int64)
+    if keepdim or k != 1:
+        values, indices = g.op.TopK(
+            x,
+            k_const,
+            axis=dim,
+            largest=1 if largest else 0,
+            sorted=1,
+            name=name,
+            outputs=outputs,
+        )
+    else:
+        tmp_v = g.unique_name(f"{outputs[0]}_tk")
+        tmp_i = g.unique_name(f"{outputs[1]}_tk")
+        g.op.TopK(
+            x,
+            k_const,
+            axis=dim,
+            largest=1 if largest else 0,
+            sorted=1,
+            name=name,
+            outputs=[tmp_v, tmp_i],
+        )
+        axes_sq = np.array([dim], dtype=np.int64)
+        values = g.op.Squeeze(tmp_v, axes_sq, name=name, outputs=outputs[:1])
+        indices = g.op.Squeeze(tmp_i, axes_sq, name=name, outputs=outputs[1:])
     if not sts:
-        g.get_type(indices, TensorProto.INT64)
-    return res, indices
+        set_type_shape_reduce_op(
+            g, values, x, keepdim=1 if (keepdim or k != 1) else 0, axes=(dim,)
+        )
+        # Indices share the same shape as values but TopK already fixes their
+        # ONNX type to INT64; avoid overriding that with x's float type.
+        if g.has_shape(values):
+            g.set_shape(indices, g.get_shape(values), allow_zero=True)
+        elif g.has_rank(values):
+            g.set_rank(indices, g.get_rank(values))
+        if not g.has_type(indices):
+            g.set_type(indices, TensorProto.INT64)
+    return values, indices
+
+
+def aten_min_dim(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: int,
+    keepdim: bool = False,
+    name: str = "min_dim",
+) -> T:
+    """minimum along a dimension, returning ``(values, indices)``.
+
+    Same lowering strategy as :func:`aten_max_dim`: a single ``TopK`` op
+    (with ``largest=0``) when both outputs are needed.
+    """
+    if len(outputs) == 2:
+        return _aten_topk_dim(
+            g, sts, outputs, x, k=1, dim=dim, keepdim=keepdim, largest=False, name=name
+        )
+
+    axes = np.array([dim], dtype=np.int64)
+    res = g.op.ReduceMin(x, axes, name=name, outputs=outputs[:1], keepdims=1 if keepdim else 0)
+    if not sts:
+        set_type_shape_reduce_op(g, res, x, keepdim=1 if keepdim else 0, axes=(dim,))
+    return res
 
 
 def aten_max_other(
@@ -16686,6 +16975,7 @@ def _aten_upsample_output_size(
     coordinate_transformation_mode: str,
     d: int,
     name: str = "upsample_output_size",
+    antialias: bool = False,
 ) -> T:
     batch_channel = None
     if g.has_shape(x):
@@ -16724,17 +17014,17 @@ def _aten_upsample_output_size(
         ), f"Unexpected type {type(output_size)} for output_size"
         rsize = output_size
     new_output_size = g.op.Concat(batch_channel, rsize, axis=0, name=name)
-    res = g.op.Resize(
-        x,
-        None,
-        None,
-        new_output_size,
+    resize_kwargs: Dict[str, Any] = dict(
         mode=mode,
         coordinate_transformation_mode=coordinate_transformation_mode,
         nearest_mode="floor",
         outputs=outputs,
         name=name,
     )
+    if antialias:
+        # ONNX Resize supports antialias since opset 18.
+        resize_kwargs["antialias"] = 1
+    res = g.op.Resize(x, None, None, new_output_size, **resize_kwargs)
     if not sts:
         g.set_type(res, g.get_type(x))
         g.set_rank(res, g.get_rank(x))
@@ -16945,6 +17235,118 @@ def aten_upsample_bilinear2d_vec(
         osize,
         scale_d=None,
         scale_h=None,
+        align_corners=align_corners,
+        name=name,
+    )
+
+
+def aten__upsample_bilinear2d_aa(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    output_size: T,
+    align_corners: bool,
+    scales_h: Optional[float] = None,
+    scales_w: Optional[float] = None,
+    name: str = "_upsample_bilinear2d_aa",
+) -> T:
+    """resize with antialias"""
+    assert output_size is not None, "Not implemented when size is None"
+
+    return _aten_upsample_output_size(
+        g,
+        sts,
+        outputs,
+        x,
+        output_size,
+        mode="linear",
+        coordinate_transformation_mode=(
+            "align_corners" if align_corners else "pytorch_half_pixel"
+        ),
+        d=2,
+        name=name,
+        antialias=True,
+    )
+
+
+def aten__upsample_bilinear2d_aa_vec(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    output_size: T,
+    align_corners: bool,
+    scale_factors: Optional[Sequence[float]] = None,
+    name: str = "_upsample_bilinear2d_aa_vec",
+) -> T:
+    """resize with antialias"""
+    assert g.has_shape(x), f"Not implemented when {x!r} has no shape{g.get_debug_msg()}"
+    osize = _upsample_compute_output_size(g.get_shape(x), output_size, scale_factors)
+    return aten__upsample_bilinear2d_aa(
+        g,
+        sts,
+        outputs,
+        x,
+        osize,
+        scales_h=None,
+        scales_w=None,
+        align_corners=align_corners,
+        name=name,
+    )
+
+
+def aten__upsample_bicubic2d_aa(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    output_size: T,
+    align_corners: bool,
+    scales_h: Optional[float] = None,
+    scales_w: Optional[float] = None,
+    name: str = "_upsample_bicubic2d_aa",
+) -> T:
+    """resize with antialias"""
+    assert output_size is not None, "Not implemented when size is None"
+
+    return _aten_upsample_output_size(
+        g,
+        sts,
+        outputs,
+        x,
+        output_size,
+        mode="cubic",
+        coordinate_transformation_mode=(
+            "align_corners" if align_corners else "pytorch_half_pixel"
+        ),
+        d=2,
+        name=name,
+        antialias=True,
+    )
+
+
+def aten__upsample_bicubic2d_aa_vec(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    output_size: T,
+    align_corners: bool,
+    scale_factors: Optional[Sequence[float]] = None,
+    name: str = "_upsample_bicubic2d_aa_vec",
+) -> T:
+    """resize with antialias"""
+    assert g.has_shape(x), f"Not implemented when {x!r} has no shape{g.get_debug_msg()}"
+    osize = _upsample_compute_output_size(g.get_shape(x), output_size, scale_factors)
+    return aten__upsample_bicubic2d_aa(
+        g,
+        sts,
+        outputs,
+        x,
+        osize,
+        scales_h=None,
+        scales_w=None,
         align_corners=align_corners,
         name=name,
     )

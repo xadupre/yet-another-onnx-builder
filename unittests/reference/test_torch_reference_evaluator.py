@@ -1389,6 +1389,114 @@ class TestTorchReferenceEvaluator(ExtTestCase):
             ),
         )
 
+    def test_resize_bilinear_size(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "Resize",
+                        ["X", "", "", "sizes"],
+                        ["Y"],
+                        mode="linear",
+                        coordinate_transformation_mode="half_pixel",
+                    )
+                ],
+                "ut",
+                [oh.make_tensor_value_info("X", TFLOAT, [1, 2, 6, 4])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [1, 2, 3, 5])],
+                [onh.from_array(np.array([1, 2, 3, 5], dtype=np.int64), name="sizes")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        self._finalize_test(
+            model,
+            (torch.arange(2 * 6 * 4, dtype=torch.float32) / 10.0).reshape(1, 2, 6, 4),
+            atol=1e-5,
+            use_ort=True,
+        )
+
+    def test_resize_bilinear_antialias(self):
+        # ONNXRuntime's antialias differs from PyTorch's; compare against
+        # torch.nn.functional.interpolate directly instead.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "Resize",
+                        ["X", "", "", "sizes"],
+                        ["Y"],
+                        mode="linear",
+                        antialias=1,
+                        coordinate_transformation_mode="half_pixel",
+                    )
+                ],
+                "ut",
+                [oh.make_tensor_value_info("X", TFLOAT, [1, 2, 6, 4])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [1, 2, 3, 5])],
+                [onh.from_array(np.array([1, 2, 3, 5], dtype=np.int64), name="sizes")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        x = (torch.arange(2 * 6 * 4, dtype=torch.float32) / 10.0).reshape(1, 2, 6, 4)
+        expected = torch.nn.functional.interpolate(
+            x, size=(3, 5), mode="bilinear", align_corners=False, antialias=True
+        )
+        rt = TorchReferenceEvaluator(model)
+        got = rt.run(None, {"X": x})
+        self.assertEqualAny([expected.numpy()], [g.detach().numpy() for g in got], atol=1e-6)
+
+    def test_resize_bilinear_scales(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "Resize",
+                        ["X", "", "scales"],
+                        ["Y"],
+                        mode="linear",
+                        coordinate_transformation_mode="align_corners",
+                    )
+                ],
+                "ut",
+                [oh.make_tensor_value_info("X", TFLOAT, [1, 2, 4, 4])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [1, 2, 8, 8])],
+                [onh.from_array(np.array([1.0, 1.0, 2.0, 2.0], dtype=np.float32), name="scales")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        self._finalize_test(
+            model, torch.rand((1, 2, 4, 4), dtype=torch.float32), atol=1e-5, use_ort=True
+        )
+
+    def test_resize_nearest_axes(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "Resize",
+                        ["X", "", "", "sizes"],
+                        ["Y"],
+                        mode="nearest",
+                        axes=[2, 3],
+                        coordinate_transformation_mode="asymmetric",
+                        nearest_mode="floor",
+                    )
+                ],
+                "ut",
+                [oh.make_tensor_value_info("X", TFLOAT, [1, 2, 3, 4])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [1, 2, 6, 8])],
+                [onh.from_array(np.array([6, 8], dtype=np.int64), name="sizes")],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        self._finalize_test(
+            model, torch.arange(2 * 3 * 4, dtype=torch.float32).reshape(1, 2, 3, 4), use_ort=True
+        )
+
     def test_tile(self):
         model = oh.make_model(
             oh.make_graph(
