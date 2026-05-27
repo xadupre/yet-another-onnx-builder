@@ -1720,6 +1720,117 @@ def _adjust_attributes_of_avg_pool(
     return (kernel_shape, strides, pads)
 
 
+def _make_avg_pool(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    expand_size: int,
+    kernel_shape: Sequence[int],
+    strides: Sequence[int],
+    pads: Sequence[int],
+    ceil_mode: bool,
+    count_include_pad: bool,
+    name: str,
+) -> T:
+    """Emit an ONNX AveragePool, working around the opset<19 mismatch where
+    AveragePool with ``ceil_mode=1`` and ``count_include_pad=1`` includes the
+    extra padding inserted by ``ceil_mode`` in the averaging denominator,
+    while PyTorch ``avg_poolNd`` does not.
+
+    For opset<19 with both flags enabled, we replace the AveragePool by
+
+        data_avg = AveragePool(Pad(x, pads, 0), pads=0, cip=1, ceil_mode=1)
+        mask_avg = AveragePool(OnesLike(padded_x),  pads=0, cip=1, ceil_mode=1)
+        result   = data_avg / mask_avg
+
+    The two ``AveragePool`` operators share the same denominator (``k**N``) at
+    every position, so the ratio reduces to ``sum_of_values / count_of_cells``,
+    where ``count_of_cells`` is the number of in-input-plus-original-padding
+    cells inside each window (ceil-induced padding contributes zero to both
+    numerator and the mask, so it is correctly excluded). This matches the
+    PyTorch semantics regardless of any ``Pad`` + ``AveragePool`` fusion ORT
+    may perform, because the fusion is mathematically a no-op when
+    ``count_include_pad=1``.
+    """
+    needs_workaround = ceil_mode and count_include_pad and g.main_opset < 19
+
+    if not needs_workaround:
+        result = g.op.AveragePool(
+            x,
+            ceil_mode=1 if ceil_mode else 0,
+            count_include_pad=1 if count_include_pad else 0,
+            kernel_shape=list(kernel_shape),
+            pads=list(pads),
+            strides=list(strides),
+            outputs=outputs,
+            name=name,
+        )
+        if not sts:
+            g.set_type(result, g.get_type(x))
+            g.set_rank(result, g.get_rank(x))
+        return result
+
+    # Pre-pad the data with zeros if the user requested any padding, so that
+    # the original padding becomes part of the input (always counted) and
+    # only the ceil-induced padding remains as "real" pads for AveragePool.
+    has_orig_pads = any(p != 0 for p in pads)
+    if has_orig_pads:
+        rank = expand_size + 2
+        onnx_pads = [0] * rank * 2
+        for i in range(expand_size):
+            onnx_pads[2 + i] = pads[i]
+            onnx_pads[rank + 2 + i] = pads[expand_size + i]
+        padded_x = g.op.Pad(x, np.array(onnx_pads, dtype=np.int64), name=name)
+    else:
+        padded_x = x
+
+    avg_pads = [0] * (expand_size * 2)
+    data_avg = g.op.AveragePool(
+        padded_x,
+        ceil_mode=1,
+        count_include_pad=1,
+        kernel_shape=list(kernel_shape),
+        pads=avg_pads,
+        strides=list(strides),
+        name=name,
+    )
+    g.set_type(data_avg, g.get_type(x))
+    g.set_rank(data_avg, g.get_rank(x))
+
+    # Build a mask with the same shape as ``padded_x`` whose values are 1.0
+    # over the in-input-plus-original-padding region. ``ConstantOfShape``
+    # cannot be fused with AveragePool, so the denominator path is robust.
+    itype = g.get_type(x)
+    np_dtype = tensor_dtype_to_np_dtype(itype) if itype else np.float32
+    one_tensor = onh.from_array(np.array([1], dtype=np_dtype))
+    shape_padded = g.op.Shape(padded_x, name=name)
+    g.set_type(shape_padded, TensorProto.INT64)
+    g.set_rank(shape_padded, 1)
+    mask = g.op.ConstantOfShape(shape_padded, value=one_tensor, name=name)
+    g.set_type(mask, itype or TensorProto.FLOAT)
+    g.set_rank(mask, g.get_rank(x))
+    mask_avg = g.op.AveragePool(
+        mask,
+        ceil_mode=1,
+        count_include_pad=1,
+        kernel_shape=list(kernel_shape),
+        pads=avg_pads,
+        strides=list(strides),
+        name=name,
+    )
+    g.set_type(mask_avg, itype or TensorProto.FLOAT)
+    g.set_rank(mask_avg, g.get_rank(x))
+
+    result = g.op.Div(data_avg, mask_avg, outputs=outputs, name=name)
+
+    if not sts:
+        g.set_type(result, g.get_type(x))
+        g.set_rank(result, g.get_rank(x))
+
+    return result
+
+
 def aten_avg_pool2d(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
@@ -1745,22 +1856,19 @@ def aten_avg_pool2d(
         expand_size, kernel_size, stride, padding
     )
 
-    result = g.op.AveragePool(
+    return _make_avg_pool(
+        g,
+        sts,
+        outputs,
         x,
-        ceil_mode=1 if ceil_mode else 0,
-        count_include_pad=1 if count_include_pad else 0,
-        kernel_shape=kernel_shape,
-        pads=pads,
-        strides=strides,
-        outputs=outputs,
-        name=name,
+        expand_size,
+        kernel_shape,
+        strides,
+        pads,
+        ceil_mode,
+        count_include_pad,
+        name,
     )
-
-    if not sts:
-        g.set_type(result, g.get_type(x))
-        g.set_rank(result, g.get_rank(x))
-
-    return result
 
 
 def aten_avg_pool3d(
@@ -1788,22 +1896,19 @@ def aten_avg_pool3d(
         expand_size, kernel_size, stride, padding
     )
 
-    result = g.op.AveragePool(
+    return _make_avg_pool(
+        g,
+        sts,
+        outputs,
         x,
-        ceil_mode=1 if ceil_mode else 0,
-        count_include_pad=1 if count_include_pad else 0,
-        kernel_shape=kernel_shape,
-        pads=pads,
-        strides=strides,
-        outputs=outputs,
-        name=name,
+        expand_size,
+        kernel_shape,
+        strides,
+        pads,
+        ceil_mode,
+        count_include_pad,
+        name,
     )
-
-    if not sts:
-        g.set_type(result, g.get_type(x))
-        g.set_rank(result, g.get_rank(x))
-
-    return result
 
 
 def aten_avg_pool2d_backward(

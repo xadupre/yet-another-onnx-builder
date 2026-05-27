@@ -3823,6 +3823,35 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
+    def test_aten_avg_pool2d_ceil_count_include_pad_opset18(self):
+        # Regression test: with target_opset<19 and both ceil_mode and
+        # count_include_pad enabled, ONNX AveragePool would include the extra
+        # padding inserted by ceil_mode in the average, while PyTorch does not.
+        import torch
+
+        class Model(torch.nn.Module):
+            def __init__(self, ceil_mode):
+                super().__init__()
+                self.ceil_mode = ceil_mode
+
+            def forward(self, x):
+                return torch.nn.functional.avg_pool2d(
+                    x,
+                    kernel_size=3,
+                    stride=2,
+                    padding=1,
+                    ceil_mode=self.ceil_mode,
+                    count_include_pad=True,
+                )
+
+        x = torch.arange(1, 17, dtype=torch.float32).reshape(1, 1, 4, 4)
+        for ceil_mode in (False, True):
+            with self.subTest(ceil_mode=ceil_mode):
+                model = Model(ceil_mode=ceil_mode).eval()
+                expected = model(x)
+                onx = to_onnx(model, (x,), target_opset=18)
+                self.assert_conversion_with_ort_on_cpu(onx, expected, (x,), atol=1e-5)
+
     def test_aten_addmm(self):
         import torch
 
