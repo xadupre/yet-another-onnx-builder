@@ -23,7 +23,7 @@ jobs:
       head_sha: ${{ github.event.pull_request.head.sha }}
 
   torch_targeted_tests:
-    name: tr-releases targeted (${{ needs.detect_torch_subfolder.outputs.subfolder }}, torch-2.11, transformers-5.5/5.8.1)
+    name: tr-releases targeted (${{ needs.detect_torch_subfolder.outputs.subfolder }}, torch-2.11, transformers-5.5/5.9.0)
     needs: detect_torch_subfolder
     # Skip if no unique subfolder, or if the subfolder is 'coverage' (excluded from the full run).
     if: needs.detect_torch_subfolder.outputs.count == '1' && needs.detect_torch_subfolder.outputs.subfolder != 'coverage'
@@ -45,9 +45,9 @@ jobs:
       - name: Run targeted torch tests with transformers==5.5
         run: |
           pytest --durations=10 unittests/torch/${{ needs.detect_torch_subfolder.outputs.subfolder }}
-      - name: Install transformers==5.8.1
-        run: pip install transformers==5.8.1 && pip freeze
-      - name: Run targeted torch tests with transformers==5.8.1
+      - name: Install transformers==5.9.0
+        run: pip install transformers==5.9.0 && pip freeze
+      - name: Run targeted torch tests with transformers==5.9.0
         run: |
           pytest --durations=10 unittests/torch/${{ needs.detect_torch_subfolder.outputs.subfolder }}
 
@@ -101,7 +101,7 @@ jobs:
         run: pytest unittests/torch --durations=10 --ignore=unittests/torch/coverage
 
   torch_tests_5:
-    name: transformers-releases (ubuntu-latest, py3.13, transformers 5.8.1/5.5/5.2 torch-${{ matrix.torch-version }}, ort-nightly=${{ matrix.ort-nightly }})
+    name: transformers-releases (ubuntu-latest, py3.13, transformers 5.9.0/5.5/5.2 torch-${{ matrix.torch-version }}, ort-nightly=${{ matrix.ort-nightly }})
     needs: torch_targeted_tests
     # Run when targeted tests succeeded or were skipped (no unique subfolder / not a PR).
     # Do NOT run when targeted tests failed – that already signals a broken subfolder.
@@ -141,9 +141,9 @@ jobs:
           pip uninstall -y onnxruntime || true
           pip install --pre onnxruntime --index-url https://aiinfra.pkgs.visualstudio.com/PublicPackages/_packaging/ORT-Nightly/pypi/simple/
 
-      - name: install transformers==5.8.1 and pip freeze
-        run: pip install transformers==5.8.1 && pip freeze
-      - name: Run tests with transformers==5.8.1
+      - name: install transformers==5.9.0 and pip freeze
+        run: pip install transformers==5.9.0 && pip freeze
+      - name: Run tests with transformers==5.9.0
         run: pytest unittests/torch --durations=10 --ignore=unittests/torch/coverage
 
       - name: install transformers==5.5 and pip freeze

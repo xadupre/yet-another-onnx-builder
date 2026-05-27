@@ -379,7 +379,7 @@ def _load_model(
     model_id: str,
     config,
     random_weights: bool,
-    torch_dtype,
+    dtype,
     torch_device,
     verbose: int,
     quiet: bool,
@@ -398,7 +398,7 @@ def _load_model(
         else:
             print(f"[validate_model] loading model for {model_id!r}")
 
-    dtype_kwargs: Dict[str, Any] = {"torch_dtype": torch_dtype} if torch_dtype is not None else {}
+    dtype_kwargs: Dict[str, Any] = {"dtype": dtype} if dtype is not None else {}
     # Multimodal configs (e.g. Gemma3Config) instantiate a *ForConditionalGeneration
     # wrapper with vision/audio towers when fed to AutoModelForCausalLM. Validating
     # the text-only causal LM is what we actually want here, so when the config
@@ -762,9 +762,8 @@ def validate_model(
 
     # ------------------------------------------------------------------ device / dtype
     torch_device = torch.device(device or "cpu")
-    torch_dtype: Optional[torch.dtype] = None
     if dtype is not None:
-        torch_dtype = getattr(torch, dtype)
+        dtype = getattr(torch, dtype)
 
     # ----------------------------------------------------------------- config
     config = _load_config(model_id, config_overrides, verbose, quiet, summary, collected_data)
@@ -784,7 +783,7 @@ def validate_model(
         model_id,
         config,
         random_weights,
-        torch_dtype,
+        dtype,
         torch_device,
         verbose,
         quiet,
