@@ -14,7 +14,7 @@
 
 Yet another onnx builder, patches, flattening functions...
 
-**[Documentation](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/index.html)**
+**[Documentation](https://xadupre.github.io/docs/yet-another-onnx-builder/index.html)**
 
 **yet-another-onnx-builder** (`yobx`) proposes a unique API and a unique function
 ``yobx.to_onnx`` to convert machine learning models and other pipelines
@@ -42,7 +42,7 @@ choose your own names.
 This is work in progress.
 Many packages produce SQL queries. It starts by converting a SQL
 query into ONNX. A lightweight **DataFrame function tracer**
-([`dataframe_to_onnx`](https://sdpython.github.io/doc/yet-another-onnx-builder/dev/api/sql/dataframe_to_onnx.html))
+([`dataframe_to_onnx`](https://xadupre.github.io/docs/yet-another-onnx-builder/api/sql/dataframe_to_onnx.html))
 records pandas-inspired operations on a virtual DataFrame and compiles them to ONNX:
 
 * [SQL](https://fr.wikipedia.org/wiki/Structured_Query_Language)
