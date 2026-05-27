@@ -142,6 +142,11 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
     * ``"local/BroadcastAdd"`` — a minimal two-input model whose output has the
       symbolic shape ``(batch, max(d1, d2))`` due to broadcasting,
       see :class:`yobx.torch.tiny_models.TinyBroadcastAddModel`.
+    * ``"local/GraniteMoeHybrid"`` — a minimal
+      :class:`transformers.GraniteMoeHybridForCausalLM` mixing one ``mamba``
+      and one ``attention`` layer, intended to test
+      :func:`yobx.to_onnx` on the granitemoehybrid architecture
+      (see https://huggingface.co/docs/transformers/model_doc/granitemoehybrid).
 
     :param model_id: model id, see the list of supported values above
     :param config_updates: modification to add to the configuration before creating the model
@@ -170,6 +175,52 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
             model=TinyBroadcastAddModel(),
             export_inputs=TinyBroadcastAddModel._export_inputs(),
             dynamic_shapes=TinyBroadcastAddModel._dynamic_shapes(),
+        )
+
+    if model_id == "local/GraniteMoeHybrid":
+        from transformers import GraniteMoeHybridForCausalLM
+        from .in_transformers.models import get_cached_configuration
+
+        config = get_cached_configuration(model_id)
+        assert config is not None, f"No cached configuration for {model_id!r}"
+        if config_updates:
+            config = copy.deepcopy(config)
+            _update_config(config, config_updates)
+
+        # Prevent the mamba layer ``__init__`` from attempting to download the
+        # ``causal-conv1d`` and ``mamba-ssm`` Hub kernels (only useful on GPU
+        # anyway): pre-register empty stub modules so ``lazy_load_kernel``
+        # returns them immediately and the fixture stays offline. The mamba
+        # layer only does ``getattr(kernel, "...", None)`` on the result, which
+        # falls back to the naive implementation when the symbols are missing.
+        try:
+            import types
+
+            from transformers.integrations.hub_kernels import _KERNEL_MODULE_MAPPING
+
+            for _kernel_name in ("causal-conv1d", "mamba-ssm"):
+                if not isinstance(_KERNEL_MODULE_MAPPING.get(_kernel_name), types.ModuleType):
+                    _KERNEL_MODULE_MAPPING[_kernel_name] = types.ModuleType(
+                        f"_yobx_stub_{_kernel_name.replace('-', '_')}"
+                    )
+        except ImportError:
+            pass
+
+        return ModelData(
+            model_id=model_id,
+            model=GraniteMoeHybridForCausalLM(config),
+            export_inputs=dict(
+                input_ids=torch.randint(15, size=(2, 8), dtype=torch.int64),
+                attention_mask=torch.ones((2, 8), dtype=torch.int64),
+            ),
+            dynamic_shapes=dict(
+                input_ids={0: "batch", 1: "seq_length"},
+                attention_mask={0: "batch", 1: "seq_length"},
+            ),
+            inputs_batch1=dict(
+                input_ids=torch.randint(15, size=(1, 8), dtype=torch.int64),
+                attention_mask=torch.ones((1, 8), dtype=torch.int64),
+            ),
         )
 
     if model_id == "arnir0/Tiny-LLM":
