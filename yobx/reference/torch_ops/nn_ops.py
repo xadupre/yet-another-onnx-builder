@@ -151,6 +151,168 @@ class LayerNormalization_17(OpRunKernel):
         )
 
 
+class Resize_18(OpRunKernel):
+    "Resize (opset 18, with antialias / axes support)."
+
+    _MODE_MAP = {1: "linear", 2: "bilinear", 3: "trilinear"}
+
+    def __init__(self, node: onnx.NodeProto, version: Optional[int] = None, verbose: int = 0):
+        super().__init__(node, version, verbose=verbose)
+        self.antialias = bool(self.get_attribute_int(node, "antialias", 0))
+        self.axes = self.get_attribute_ints(node, "axes", None)
+        self.coordinate_transformation_mode = self.get_attribute_string(
+            node, "coordinate_transformation_mode", "half_pixel"
+        )
+        self.cubic_coeff_a = self.get_attribute_float(node, "cubic_coeff_a", -0.75)
+        self.exclude_outside = bool(self.get_attribute_int(node, "exclude_outside", 0))
+        self.extrapolation_value = self.get_attribute_float(node, "extrapolation_value", 0.0)
+        self.keep_aspect_ratio_policy = self.get_attribute_string(
+            node, "keep_aspect_ratio_policy", "stretch"
+        )
+        self.mode = self.get_attribute_string(node, "mode", "nearest")
+        self.nearest_mode = self.get_attribute_string(node, "nearest_mode", "round_prefer_floor")
+        assert self.keep_aspect_ratio_policy == "stretch", (
+            f"Resize not implemented for "
+            f"keep_aspect_ratio_policy={self.keep_aspect_ratio_policy!r}"
+        )
+        assert not self.exclude_outside, "Resize not implemented for exclude_outside=1"
+        assert self.mode in {
+            "nearest",
+            "linear",
+            "cubic",
+        }, f"Resize unsupported mode={self.mode!r}"
+        if self.mode == "nearest":
+            # torch.nn.functional.interpolate(mode='nearest') uses
+            # asymmetric coordinates with floor rounding.
+            assert self.nearest_mode == "floor" and (
+                self.coordinate_transformation_mode == "asymmetric"
+            ), (
+                f"Resize nearest only implemented for nearest_mode='floor' and "
+                f"coordinate_transformation_mode='asymmetric', got "
+                f"nearest_mode={self.nearest_mode!r}, "
+                f"coordinate_transformation_mode="
+                f"{self.coordinate_transformation_mode!r}"
+            )
+        else:
+            assert self.coordinate_transformation_mode in {"half_pixel", "align_corners"}, (
+                f"Resize {self.mode!r} only implemented for "
+                f"coordinate_transformation_mode in (half_pixel, align_corners), "
+                f"got {self.coordinate_transformation_mode!r}"
+            )
+
+    def run(self, x, roi=None, scales=None, sizes=None):  # type: ignore[override]
+        rank = x.tensor.dim()
+        has_scales = (
+            scales is not None and scales.tensor is not None and scales.tensor.numel() > 0
+        )
+        has_sizes = sizes is not None and sizes.tensor is not None and sizes.tensor.numel() > 0
+        if has_scales == has_sizes:
+            raise NotImplementedError("Resize requires exactly one of scales or sizes.")
+
+        # Determine which axes are being resized.
+        if self.axes is None:
+            axes: Tuple[int, ...] = tuple(range(rank))
+        else:
+            axes = tuple(a if a >= 0 else a + rank for a in self.axes)
+
+        if has_sizes:
+            provided = [int(v) for v in sizes.tensor.tolist()]
+            if self.axes is None:
+                full_sizes = provided
+            else:
+                full_sizes = list(x.tensor.shape)
+                for a, s in zip(axes, provided):
+                    full_sizes[a] = s
+            assert len(full_sizes) == rank
+            spatial_axes = [a for a in range(rank) if full_sizes[a] != x.tensor.shape[a]]
+            non_spatial = [a for a in range(rank) if a not in spatial_axes]
+            for a in non_spatial:
+                if full_sizes[a] != x.tensor.shape[a]:
+                    raise NotImplementedError(
+                        f"Resize only supports identity on non-resized dims, "
+                        f"got sizes={full_sizes} for shape={tuple(x.tensor.shape)}"
+                    )
+            if not spatial_axes:
+                # Nothing to resize.
+                return OpRunTensor(x.tensor.clone())
+            if spatial_axes != list(range(spatial_axes[0], spatial_axes[0] + len(spatial_axes))):
+                raise NotImplementedError(
+                    f"Resize only supports contiguous spatial axes, got {spatial_axes}"
+                )
+            if not (spatial_axes[-1] == rank - 1 and spatial_axes[0] >= 2):
+                raise NotImplementedError(
+                    f"Resize only supports trailing spatial axes (NCHW-like layout), "
+                    f"got {spatial_axes} for shape={tuple(x.tensor.shape)}"
+                )
+            target = [full_sizes[a] for a in spatial_axes]
+            scale_arg = None
+        else:
+            provided_f = [float(v) for v in scales.tensor.tolist()]
+            if self.axes is None:
+                full_scales = provided_f
+            else:
+                full_scales = [1.0] * rank
+                for a, s in zip(axes, provided_f):
+                    full_scales[a] = s
+            assert len(full_scales) == rank
+            spatial_axes = [a for a in range(rank) if full_scales[a] != 1.0]
+            for a in range(rank):
+                if a not in spatial_axes and full_scales[a] != 1.0:
+                    raise NotImplementedError(
+                        f"Resize only supports identity on non-resized dims, "
+                        f"got scales={full_scales}"
+                    )
+            if not spatial_axes:
+                return OpRunTensor(x.tensor.clone())
+            if spatial_axes != list(range(spatial_axes[0], spatial_axes[0] + len(spatial_axes))):
+                raise NotImplementedError(
+                    f"Resize only supports contiguous spatial axes, got {spatial_axes}"
+                )
+            if not (spatial_axes[-1] == rank - 1 and spatial_axes[0] >= 2):
+                raise NotImplementedError(
+                    f"Resize only supports trailing spatial axes (NCHW-like layout), "
+                    f"got {spatial_axes} for shape={tuple(x.tensor.shape)}"
+                )
+            target = None
+            scale_arg = [full_scales[a] for a in spatial_axes]
+
+        spatial_dims = len(spatial_axes)
+
+        if self.mode == "nearest":
+            torch_mode = "nearest"
+            align_corners: Optional[bool] = None
+        elif self.mode == "linear":
+            torch_mode = self._MODE_MAP.get(spatial_dims)
+            if torch_mode is None:
+                raise NotImplementedError(
+                    f"Resize linear not implemented for {spatial_dims} spatial dims"
+                )
+            align_corners = self.coordinate_transformation_mode == "align_corners"
+        else:  # cubic
+            if spatial_dims != 2:
+                raise NotImplementedError(
+                    f"Resize cubic not implemented for {spatial_dims} spatial dims"
+                )
+            torch_mode = "bicubic"
+            align_corners = self.coordinate_transformation_mode == "align_corners"
+
+        kwargs: dict = {"mode": torch_mode}
+        if target is not None:
+            kwargs["size"] = target
+        else:
+            kwargs["scale_factor"] = scale_arg
+            kwargs["recompute_scale_factor"] = False
+        if align_corners is not None:
+            kwargs["align_corners"] = align_corners
+        if self.antialias:
+            if self.mode not in {"linear", "cubic"}:
+                raise NotImplementedError(
+                    f"Resize antialias requires mode in (linear, cubic), got {self.mode!r}"
+                )
+            kwargs["antialias"] = True
+        return OpRunTensor(torch.nn.functional.interpolate(x.tensor, **kwargs))
+
+
 class Softmax_13(OpRunKernel):
     "Softmax"
 

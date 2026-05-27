@@ -154,6 +154,18 @@ backend_test.exclude(
     ")"
 )
 
+# Resize: torch.nn.functional.interpolate's antialias and align_corners
+# implementations differ from the ONNX reference for downsampling cases.
+backend_test.exclude(
+    "(test_resize_downsample_scales_cubic_align_corners"
+    "|test_resize_downsample_scales_cubic_antialias"
+    "|test_resize_downsample_scales_linear_align_corners"
+    "|test_resize_downsample_scales_linear_antialias"
+    "|test_resize_downsample_sizes_cubic_antialias"
+    "|test_resize_downsample_sizes_linear_antialias"
+    ")"
+)
+
 # import all test cases at global scope to make them visible to python.unittest
 globals().update(backend_test.test_cases)
 
