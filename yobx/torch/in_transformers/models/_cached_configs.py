@@ -87,3 +87,9 @@ def _ccached_arnir0_tiny_LLM():
             "vocab_size": 32000,
         }
     )
+
+
+if not hasattr(transformers, "GraniteMoeHybridConfig"):
+    # Older versions of transformers do not ship GraniteMoeHybridConfig; drop
+    # the registration so _retrieve_cached_configurations does not expose it.
+    del _ccached_local_GraniteMoeHybrid
