@@ -295,7 +295,7 @@ class FakeTensorContext:
 
         tt = vip.type.tensor_type
         elem_type = tt.elem_type if tt.elem_type else _TensorProto.FLOAT
-        torch_dtype = onnx_dtype_to_torch_dtype(elem_type)
+        dtype = onnx_dtype_to_torch_dtype(elem_type)
 
         dynamic_axes: Dict[int, str] = {}
         if tt.HasField("shape"):
@@ -327,14 +327,14 @@ class FakeTensorContext:
             )
 
         if shape:
-            real_tensor = torch.empty(tuple(shape), dtype=torch_dtype)
+            real_tensor = torch.empty(tuple(shape), dtype=dtype)
             if dynamic_axes:
                 fake_tensor = self.fake_reshape(real_tensor, dynamic_axes)
             else:
                 fake_tensor = self.from_tensor(real_tensor, static_shapes=True)
         else:
             # Scalar tensor (0-D).
-            real_tensor = torch.empty((), dtype=torch_dtype)
+            real_tensor = torch.empty((), dtype=dtype)
             fake_tensor = self.from_tensor(real_tensor, static_shapes=True)
 
         return fake_tensor, dynamic_axes

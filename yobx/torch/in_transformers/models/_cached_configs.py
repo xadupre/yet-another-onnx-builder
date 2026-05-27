@@ -30,7 +30,7 @@ def _ccached_arnir0_tiny_LLM():
             "rope_scaling": null,
             "rope_theta": 10000.0,
             "tie_word_embeddings": false,
-            "torch_dtype": "float32",
+            "dtype": "float32",
             "transformers_version": "4.51.0.dev0",
             "use_cache": true,
             "vocab_size": 32000,
