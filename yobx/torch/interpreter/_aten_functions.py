@@ -9830,20 +9830,107 @@ def aten_max_dim(
     keepdim: bool = False,
     name: str = "max_dim",
 ) -> T:
-    """maximum"""
+    """maximum along a dimension, returning ``(values, indices)``.
+
+    When both outputs are requested this lowers to a single ``TopK`` (k=1)
+    rather than a ``ReduceMax`` + ``ArgMax`` pair.
+    """
+    if len(outputs) == 2:
+        return _aten_topk_dim(
+            g, sts, outputs, x, k=1, dim=dim, keepdim=keepdim, largest=True, name=name
+        )
+
     axes = np.array([dim], dtype=np.int64)
     res = g.op.ReduceMax(x, axes, name=name, outputs=outputs[:1], keepdims=1 if keepdim else 0)
     if not sts:
-        set_type_shape_unary_op(g, res, x)
-    if len(outputs) == 1:
-        return res
+        set_type_shape_reduce_op(g, res, x, keepdim=1 if keepdim else 0, axes=(dim,))
+    return res
 
-    indices = g.op.ArgMax(
-        x, axis=dim, keepdims=1 if keepdim else 0, name=name, outputs=outputs[1:]
-    )
+
+def _aten_topk_dim(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    k: int,
+    dim: int,
+    keepdim: bool,
+    largest: bool,
+    name: str,
+) -> Tuple[T, T]:
+    """Helper emitting a single ``TopK`` op for ``max(dim)``/``min(dim)``/``topk``.
+
+    When ``keepdim`` is False, the ``k``-sized axis is squeezed away to match
+    the expected output rank of ``aten.max.dim``/``aten.min.dim``.
+    """
+    assert (
+        len(outputs) == 2
+    ), f"_aten_topk_dim expects 2 outputs, got {outputs}{g.get_debug_msg()}"
+    k_const = np.array([k], dtype=np.int64)
+    if keepdim or k != 1:
+        values, indices = g.op.TopK(
+            x,
+            k_const,
+            axis=dim,
+            largest=1 if largest else 0,
+            sorted=1,
+            name=name,
+            outputs=outputs,
+        )
+    else:
+        tmp_v = g.unique_name(f"{outputs[0]}_tk")
+        tmp_i = g.unique_name(f"{outputs[1]}_tk")
+        g.op.TopK(
+            x,
+            k_const,
+            axis=dim,
+            largest=1 if largest else 0,
+            sorted=1,
+            name=name,
+            outputs=[tmp_v, tmp_i],
+        )
+        axes_sq = np.array([dim], dtype=np.int64)
+        values = g.op.Squeeze(tmp_v, axes_sq, name=name, outputs=outputs[:1])
+        indices = g.op.Squeeze(tmp_i, axes_sq, name=name, outputs=outputs[1:])
     if not sts:
-        g.get_type(indices, TensorProto.INT64)
-    return res, indices
+        set_type_shape_reduce_op(
+            g, values, x, keepdim=1 if (keepdim or k != 1) else 0, axes=(dim,)
+        )
+        # Indices share the same shape as values but TopK already fixes their
+        # ONNX type to INT64; avoid overriding that with x's float type.
+        if g.has_shape(values):
+            g.set_shape(indices, g.get_shape(values), allow_zero=True)
+        elif g.has_rank(values):
+            g.set_rank(indices, g.get_rank(values))
+        if not g.has_type(indices):
+            g.set_type(indices, TensorProto.INT64)
+    return values, indices
+
+
+def aten_min_dim(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: int,
+    keepdim: bool = False,
+    name: str = "min_dim",
+) -> T:
+    """minimum along a dimension, returning ``(values, indices)``.
+
+    Same lowering strategy as :func:`aten_max_dim`: a single ``TopK`` op
+    (with ``largest=0``) when both outputs are needed.
+    """
+    if len(outputs) == 2:
+        return _aten_topk_dim(
+            g, sts, outputs, x, k=1, dim=dim, keepdim=keepdim, largest=False, name=name
+        )
+
+    axes = np.array([dim], dtype=np.int64)
+    res = g.op.ReduceMin(x, axes, name=name, outputs=outputs[:1], keepdims=1 if keepdim else 0)
+    if not sts:
+        set_type_shape_reduce_op(g, res, x, keepdim=1 if keepdim else 0, axes=(dim,))
+    return res
 
 
 def aten_max_other(
