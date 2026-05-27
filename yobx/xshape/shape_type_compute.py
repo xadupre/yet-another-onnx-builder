@@ -540,6 +540,38 @@ def set_shape_type_op_any_castlike(self: ShapeBuilder, node: NodeProto):
     )
 
 
+def set_shape_type_op_any_quantize_linear(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for node type QuantizeLinear.
+
+    The output type matches the *y_zero_point* input when provided, otherwise the
+    ``output_dtype`` attribute, otherwise defaults to ``UINT8`` (the ONNX default).
+    """
+    itype: Optional[int] = None
+    if len(node.input) >= 3 and node.input[2]:
+        if self.has_type(node.input[2]):
+            itype = self.get_type(node.input[2])
+    if itype is None:
+        att = self.get_attribute(node, "output_dtype", exc=False)
+        if att is not None:
+            itype = att.i
+    if itype is None:
+        itype = TensorProto.UINT8
+    return set_type_shape_unary_op(self, node.output[0], node.input[0], itype=itype)
+
+
+def set_shape_type_op_any_dequantize_linear(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for node type DequantizeLinear.
+
+    The output type matches the *x_scale* input (input[1]); defaults to ``FLOAT``.
+    """
+    itype: Optional[int] = None
+    if len(node.input) >= 2 and node.input[1] and self.has_type(node.input[1]):
+        itype = self.get_type(node.input[1])
+    if itype is None:
+        itype = TensorProto.FLOAT
+    return set_type_shape_unary_op(self, node.output[0], node.input[0], itype=itype)
+
+
 def set_shape_type_op_any_compress(self: ShapeBuilder, node: NodeProto):
     "Sets the output shape for node type Compress."
     if self.has_device(node.input[0]):
@@ -2385,6 +2417,8 @@ set_shape_type_op_any_known = {
     "OneHot": set_shape_type_op_any_onehot,
     "Pad": set_shape_type_op_any_pad,
     "QLinearMatMul": set_shape_type_op_any_qlinear_matmul,
+    "QuantizeLinear": set_shape_type_op_any_quantize_linear,
+    "DequantizeLinear": set_shape_type_op_any_dequantize_linear,
     "Range": set_shape_type_op_any_range,
     "Reshape": set_shape_type_op_any_reshape,
     "Resize": set_shape_type_op_any_resize,
@@ -2438,7 +2472,7 @@ def set_shape_type_op_any(self: ShapeBuilder, node: NodeProto, exc: bool = False
             f"\nnode is {self.pretty_node(node)}{self.get_debug_msg()}"
         )
         return r
-    if node.op_type in {"DequantizeLinear", "DynamicQuantizeLinear"}:
+    if node.op_type in {"DynamicQuantizeLinear"}:
         raise AssertionError(
             f"set_shape_type_op_any not implemented for "
             f"{node.op_type!r}{self.get_debug_msg()}"

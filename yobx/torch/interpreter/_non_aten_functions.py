@@ -21,7 +21,7 @@ def onnx_symbolic__symbolic_default(
     metadata_props_keys: Optional[List[str]] = None,
     metadata_props_values: Optional[List[str]] = None,
     domain: str = "",
-    version: int = 1,
+    version: Optional[int] = None,
     name: str = "onnx_symbolic",
 ):
     "onnx_symbolic::_symbolic"
@@ -41,11 +41,14 @@ def onnx_symbolic__symbolic_default(
         isinstance(a, str) for a in args
     ), f"not implemented with args={args!r}{g.get_debug_msg()}"
 
-    g.add_domain(domain, version)
+    if domain and version is not None:
+        # Only register custom domains; the default ONNX domain ("") is already
+        # registered by the exporter with the target opset version.
+        g.add_domain(domain, version)
     res = g.make_node(op_name, args, outputs, domain=domain, name=f"onnx_symbolic_{op_name}")
     if not sts:
         if isinstance(dtype, int):
-            g.get_type(res, dtype)
+            g.set_type(res, dtype)
         if shape is not None:
             assert all(isinstance(s, (int, str)) for s in shape), (
                 f"unexpected shape={shape!r}, types are {[type(s) for s in shape]}"
