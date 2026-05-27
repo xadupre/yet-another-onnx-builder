@@ -142,6 +142,11 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
     * ``"local/BroadcastAdd"`` — a minimal two-input model whose output has the
       symbolic shape ``(batch, max(d1, d2))`` due to broadcasting,
       see :class:`yobx.torch.tiny_models.TinyBroadcastAddModel`.
+    * ``"local/GraniteMoeHybrid"`` — a minimal
+      :class:`transformers.GraniteMoeHybridForCausalLM` mixing one ``mamba``
+      and one ``attention`` layer, intended to test
+      :func:`yobx.to_onnx` on the granitemoehybrid architecture
+      (see https://huggingface.co/docs/transformers/model_doc/granitemoehybrid).
 
     :param model_id: model id, see the list of supported values above
     :param config_updates: modification to add to the configuration before creating the model
@@ -170,6 +175,32 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
             model=TinyBroadcastAddModel(),
             export_inputs=TinyBroadcastAddModel._export_inputs(),
             dynamic_shapes=TinyBroadcastAddModel._dynamic_shapes(),
+        )
+
+    if model_id == "local/GraniteMoeHybrid":
+        from transformers import GraniteMoeHybridForCausalLM
+        from .in_transformers.models import get_cached_configuration
+
+        config = get_cached_configuration(model_id)
+        if config_updates:
+            config = copy.deepcopy(config)
+            _update_config(config, config_updates)
+
+        return ModelData(
+            model_id=model_id,
+            model=GraniteMoeHybridForCausalLM(config),
+            export_inputs=dict(
+                input_ids=torch.randint(15, size=(2, 8), dtype=torch.int64),
+                attention_mask=torch.ones((2, 8), dtype=torch.int64),
+            ),
+            dynamic_shapes=dict(
+                input_ids={0: "batch", 1: "seq_length"},
+                attention_mask={0: "batch", 1: "seq_length"},
+            ),
+            inputs_batch1=dict(
+                input_ids=torch.randint(15, size=(1, 8), dtype=torch.int64),
+                attention_mask=torch.ones((1, 8), dtype=torch.int64),
+            ),
         )
 
     if model_id == "arnir0/Tiny-LLM":

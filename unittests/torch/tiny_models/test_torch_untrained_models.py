@@ -823,5 +823,43 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertGreater(len(proto.graph.node), 0)
 
 
+class TestTinyGraniteMoeHybridModel(ExtTestCase):
+    """Tests around the ``local/GraniteMoeHybrid`` tiny model added to support
+    https://huggingface.co/docs/transformers/model_doc/granitemoehybrid.
+
+    See the issue *"try to convert a model with to_onnx"* — these tests exercise
+    the registration of the tiny model and document the current state of
+    ``to_onnx`` for the GraniteMoeHybrid architecture.
+    """
+
+    @requires_transformers("5.2")
+    def test_tiny_granitemoehybrid_get_tiny_model(self):
+        data = get_tiny_model("local/GraniteMoeHybrid")
+        self.assertEqual(data.model_id, "local/GraniteMoeHybrid")
+        self.assertIn("input_ids", data.export_inputs)
+        self.assertIn("attention_mask", data.export_inputs)
+        # The model forward pass must succeed on the tiny configuration.
+        out = data.model(**torch_deepcopy(data.export_inputs))
+        self.assertEqual(out.logits.shape[0], data.export_inputs["input_ids"].shape[0])
+        self.assertEqual(out.logits.shape[1], data.export_inputs["input_ids"].shape[1])
+
+    @requires_transformers("5.2")
+    def test_tiny_granitemoehybrid_to_onnx_not_supported_yet(self):
+        """``to_onnx`` on a GraniteMoeHybrid model is not supported yet.
+
+        This test pins the current behavior so any future improvement that
+        makes the export succeed will fail this test and prompt removing the
+        ``assertRaises``.
+        """
+        data = get_tiny_model("local/GraniteMoeHybrid")
+        model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
+        with (
+            register_flattening_functions(patch_transformers=True),
+            apply_patches_for_model(patch_transformers=True, model=model),
+            self.assertRaises(AttributeError),
+        ):
+            to_onnx(model, kwargs=inputs, dynamic_shapes=ds, verbose=0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
