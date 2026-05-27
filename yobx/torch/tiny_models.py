@@ -187,6 +187,25 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
             config = copy.deepcopy(config)
             _update_config(config, config_updates)
 
+        # Prevent the mamba layer ``__init__`` from attempting to download the
+        # ``causal-conv1d`` and ``mamba-ssm`` Hub kernels (only useful on GPU
+        # anyway): pre-register empty stub modules so ``lazy_load_kernel``
+        # returns them immediately and the fixture stays offline. The mamba
+        # layer only does ``getattr(kernel, "...", None)`` on the result, which
+        # falls back to the naive implementation when the symbols are missing.
+        try:
+            import types
+
+            from transformers.integrations.hub_kernels import _KERNEL_MODULE_MAPPING
+
+            for _kernel_name in ("causal-conv1d", "mamba-ssm"):
+                if not isinstance(_KERNEL_MODULE_MAPPING.get(_kernel_name), types.ModuleType):
+                    _KERNEL_MODULE_MAPPING[_kernel_name] = types.ModuleType(
+                        f"_yobx_stub_{_kernel_name.replace('-', '_')}"
+                    )
+        except ImportError:
+            pass
+
         return ModelData(
             model_id=model_id,
             model=GraniteMoeHybridForCausalLM(config),
