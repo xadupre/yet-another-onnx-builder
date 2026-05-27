@@ -155,6 +155,14 @@ class AtenRollPos(torch.nn.Module):
     _dynamic = {"x": {0: DIM("batch")}}
 
 
+class AtenCumprod(torch.nn.Module):
+    def forward(self, x):
+        return torch.cumprod(x, dim=-1)
+
+    _inputs = (torch.randn(1, 1, 8, 5).to(torch.float32),)
+    _dynamic = {"x": {0: DIM("batch")}}
+
+
 class InplaceAdd(torch.nn.Module):
     def __init__(self):
         super().__init__()

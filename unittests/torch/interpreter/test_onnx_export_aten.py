@@ -116,6 +116,25 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected.to(int), got.astype(int))
 
+    @skipif_ci_windows("not working on windows")
+    def test_aten_cumprod(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.cumprod(x, dim=-1)
+
+        model = Model()
+        x = torch.randn(2, 3, 5).to(torch.float32)
+        expected = model(x)
+        model_path = self._call_exporter("test_aten_cumprod", "custom", model, (x,))
+        check_model(model_path)
+
+        sess = ExtendedReferenceEvaluator(model_path)
+        feeds = dict(zip(sess.input_names, [x.numpy()]))
+        got = sess.run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=1e-5)
+
     @skipif_ci_windows("broken")
     def test_aten_index_put_3d_nd_case_1(self):
         import torch

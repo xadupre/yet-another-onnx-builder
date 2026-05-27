@@ -3867,6 +3867,74 @@ def aten_cumsum(
     return res
 
 
+def aten_cumprod(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: int,
+    dtype: Optional["torch.dtype"] = None,  # noqa: F821
+    name: str = "cumprod",
+) -> T:
+    """cumprod
+
+    ONNX has no native ``CumProd`` op so we lower it to a lower-triangular
+    masked :func:`ReduceProd`. ``vals[..., i, j] = x[..., j]`` if ``j <= i``
+    and ``1`` otherwise; the output is ``ReduceProd(vals, axis=j)``.
+    """
+    assert isinstance(dim, int), f"Not implemented for dim={dim!r}{g.get_debug_msg()}"
+
+    if dtype is None:
+        itype = g.get_type(x)
+        if itype == TensorProto.INT32 or itype == TensorProto.BOOL:
+            itype = TensorProto.INT64
+            xi = g.op.Cast(x, to=itype, name=name)
+        else:
+            xi = x
+    else:
+        itype = dtype if isinstance(dtype, int) else torch_dtype_to_onnx_dtype(dtype)
+        xi = g.op.Cast(x, to=itype, name=name)
+
+    rank = g.get_rank(xi)
+    pdim = dim + rank if dim < 0 else dim
+    np_dtype = tensor_dtype_to_np_dtype(itype)
+
+    # n = size of axis `pdim`, shape (1,)
+    n_dim = g.op.Gather(
+        g.op.Shape(xi, name=name), np.array([pdim], dtype=np.int64), axis=0, name=name
+    )
+
+    # lower triangular mask of shape (n, n), as bool
+    nn_shape = g.op.Concat(n_dim, n_dim, axis=0, name=name)
+    ones_nn = g.op.ConstantOfShape(
+        nn_shape, value=onh.from_array(np.array([1], dtype=np.int64)), name=name
+    )
+    mask_int = g.op.Trilu(ones_nn, upper=0, name=name)
+    mask_bool = g.op.Cast(mask_int, to=TensorProto.BOOL, name=name)
+
+    # Reshape mask to (1,...,1, n, n, 1,...,1) so it broadcasts with the
+    # input unsqueezed at axis `pdim` (which introduces the "i" axis).
+    parts = [g.ONE] * pdim + [n_dim, n_dim] + [g.ONE] * (rank - pdim - 1)
+    new_shape = g.op.Concat(*parts, axis=0, name=name)
+    mask_reshaped = g.op.Reshape(mask_bool, new_shape, name=name)
+
+    x_unsq = g.op.UnsqueezeAnyOpset(xi, np.array([pdim], dtype=np.int64), name=name)
+
+    one_val = g.op.ConstantOfShape(
+        np.array([1], dtype=np.int64),
+        value=onh.from_array(np.array([1], dtype=np_dtype)),
+        name=name,
+    )
+
+    vals = g.op.Where(mask_reshaped, x_unsq, one_val, name=name)
+    res = g.op.ReduceProdAnyOpset(
+        vals, np.array([pdim + 1], dtype=np.int64), keepdims=0, outputs=outputs, name=name
+    )
+    if not sts:
+        set_type_shape_unary_op(g, res, x, itype=itype)
+    return res
+
+
 def aten_detach(g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T) -> T:
     "identity"
     return g.make_node("Identity", [x], outputs, name="detach")
