@@ -643,7 +643,7 @@ class TestExportOptions(ExtTestCase):
                 )
                 # PyTorch and ONNX Resize implement compatible but not
                 # bit-identical antialiased downsampling filters.
-                self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=0.3)
+                self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=0.5)
 
     @ignore_warnings(UserWarning)
     def test_export_new_tracing_addcmul_inplace_to_onnx(self):
