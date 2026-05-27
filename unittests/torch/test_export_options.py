@@ -614,6 +614,38 @@ class TestExportOptions(ExtTestCase):
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=1e-5)
 
     @ignore_warnings(UserWarning)
+    def test_export_new_tracing_interpolate_antialias_to_onnx(self):
+        """Checks that new tracing exports torch.nn.functional.interpolate
+        with antialias=True (aten._upsample_bilinear2d_aa and
+        aten._upsample_bicubic2d_aa). This pattern arises when exporting
+        torchvision v2 pipelines that use ``v2.Resize(..., antialias=True)``.
+        """
+
+        class BilinearAA(torch.nn.Module):
+            def forward(self, x):
+                return torch.nn.functional.interpolate(
+                    x, size=(8, 8), mode="bilinear", antialias=True
+                )
+
+        class BicubicAA(torch.nn.Module):
+            def forward(self, x):
+                return torch.nn.functional.interpolate(
+                    x, size=(8, 8), mode="bicubic", antialias=True
+                )
+
+        x = torch.randn(1, 2, 16, 16, dtype=torch.float32)
+        for model_cls in (BilinearAA, BicubicAA):
+            with self.subTest(model=model_cls.__name__):
+                model = model_cls()
+                expected = model(x)
+                artifact = to_onnx(
+                    model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+                )
+                # PyTorch and ONNX Resize implement compatible but not
+                # bit-identical antialiased downsampling filters.
+                self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=0.3)
+
+    @ignore_warnings(UserWarning)
     def test_export_new_tracing_addcmul_inplace_to_onnx(self):
         """Checks that new tracing correctly exports inplace addcmul."""
 

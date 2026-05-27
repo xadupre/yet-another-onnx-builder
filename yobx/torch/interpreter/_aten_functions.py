@@ -16686,6 +16686,7 @@ def _aten_upsample_output_size(
     coordinate_transformation_mode: str,
     d: int,
     name: str = "upsample_output_size",
+    antialias: bool = False,
 ) -> T:
     batch_channel = None
     if g.has_shape(x):
@@ -16724,17 +16725,17 @@ def _aten_upsample_output_size(
         ), f"Unexpected type {type(output_size)} for output_size"
         rsize = output_size
     new_output_size = g.op.Concat(batch_channel, rsize, axis=0, name=name)
-    res = g.op.Resize(
-        x,
-        None,
-        None,
-        new_output_size,
+    resize_kwargs: Dict[str, Any] = dict(
         mode=mode,
         coordinate_transformation_mode=coordinate_transformation_mode,
         nearest_mode="floor",
         outputs=outputs,
         name=name,
     )
+    if antialias:
+        # ONNX Resize supports antialias since opset 18.
+        resize_kwargs["antialias"] = 1
+    res = g.op.Resize(x, None, None, new_output_size, **resize_kwargs)
     if not sts:
         g.set_type(res, g.get_type(x))
         g.set_rank(res, g.get_rank(x))
@@ -16945,6 +16946,118 @@ def aten_upsample_bilinear2d_vec(
         osize,
         scale_d=None,
         scale_h=None,
+        align_corners=align_corners,
+        name=name,
+    )
+
+
+def aten__upsample_bilinear2d_aa(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    output_size: T,
+    align_corners: bool,
+    scales_h: Optional[float] = None,
+    scales_w: Optional[float] = None,
+    name: str = "_upsample_bilinear2d_aa",
+) -> T:
+    """resize with antialias"""
+    assert output_size is not None, "Not implemented when size is None"
+
+    return _aten_upsample_output_size(
+        g,
+        sts,
+        outputs,
+        x,
+        output_size,
+        mode="linear",
+        coordinate_transformation_mode=(
+            "align_corners" if align_corners else "pytorch_half_pixel"
+        ),
+        d=2,
+        name=name,
+        antialias=True,
+    )
+
+
+def aten__upsample_bilinear2d_aa_vec(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    output_size: T,
+    align_corners: bool,
+    scale_factors: Optional[Sequence[float]] = None,
+    name: str = "_upsample_bilinear2d_aa_vec",
+) -> T:
+    """resize with antialias"""
+    assert g.has_shape(x), f"Not implemented when {x!r} has no shape{g.get_debug_msg()}"
+    osize = _upsample_compute_output_size(g.get_shape(x), output_size, scale_factors)
+    return aten__upsample_bilinear2d_aa(
+        g,
+        sts,
+        outputs,
+        x,
+        osize,
+        scales_h=None,
+        scales_w=None,
+        align_corners=align_corners,
+        name=name,
+    )
+
+
+def aten__upsample_bicubic2d_aa(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    output_size: T,
+    align_corners: bool,
+    scales_h: Optional[float] = None,
+    scales_w: Optional[float] = None,
+    name: str = "_upsample_bicubic2d_aa",
+) -> T:
+    """resize with antialias"""
+    assert output_size is not None, "Not implemented when size is None"
+
+    return _aten_upsample_output_size(
+        g,
+        sts,
+        outputs,
+        x,
+        output_size,
+        mode="cubic",
+        coordinate_transformation_mode=(
+            "align_corners" if align_corners else "pytorch_half_pixel"
+        ),
+        d=2,
+        name=name,
+        antialias=True,
+    )
+
+
+def aten__upsample_bicubic2d_aa_vec(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    output_size: T,
+    align_corners: bool,
+    scale_factors: Optional[Sequence[float]] = None,
+    name: str = "_upsample_bicubic2d_aa_vec",
+) -> T:
+    """resize with antialias"""
+    assert g.has_shape(x), f"Not implemented when {x!r} has no shape{g.get_debug_msg()}"
+    osize = _upsample_compute_output_size(g.get_shape(x), output_size, scale_factors)
+    return aten__upsample_bicubic2d_aa(
+        g,
+        sts,
+        outputs,
+        x,
+        osize,
+        scales_h=None,
+        scales_w=None,
         align_corners=align_corners,
         name=name,
     )

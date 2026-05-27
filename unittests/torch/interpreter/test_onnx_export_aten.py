@@ -211,6 +211,68 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    def test_aten_interpolate_bilinear_antialias(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.nn.functional.interpolate(
+                    x, size=(8, 8), mode="bilinear", antialias=True
+                )
+
+        model = Model()
+        x = torch.randn(1, 2, 16, 16, requires_grad=False)
+        expected = model(x)
+        model_path = self._call_exporter(
+            "test_aten_interpolate_bilinear_antialias", "custom", model, (x,)
+        )
+        check_model(model_path)
+        onx = onnx.load(model_path)
+        resizes = [n for n in onx.graph.node if n.op_type == "Resize"]
+        self.assertEqual(len(resizes), 1)
+        attrs = {a.name: a for a in resizes[0].attribute}
+        self.assertIn("antialias", attrs)
+        self.assertEqual(attrs["antialias"].i, 1)
+
+        import onnxruntime
+
+        sess = onnxruntime.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        feeds = dict(zip([i.name for i in sess.get_inputs()], [x.detach().numpy()]))
+        got = sess.run(None, feeds)[0]
+        # ONNX Resize antialias and PyTorch _upsample_bilinear2d_aa
+        # implement compatible but not bit-identical antialiased downsampling.
+        self.assertEqualArray(expected, got, atol=0.3)
+
+    def test_aten_interpolate_bicubic_antialias(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.nn.functional.interpolate(
+                    x, size=(8, 8), mode="bicubic", antialias=True
+                )
+
+        model = Model()
+        x = torch.randn(1, 2, 16, 16, requires_grad=False)
+        expected = model(x)
+        model_path = self._call_exporter(
+            "test_aten_interpolate_bicubic_antialias", "custom", model, (x,)
+        )
+        check_model(model_path)
+        onx = onnx.load(model_path)
+        resizes = [n for n in onx.graph.node if n.op_type == "Resize"]
+        self.assertEqual(len(resizes), 1)
+        attrs = {a.name: a for a in resizes[0].attribute}
+        self.assertIn("antialias", attrs)
+        self.assertEqual(attrs["antialias"].i, 1)
+
+        import onnxruntime
+
+        sess = onnxruntime.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        feeds = dict(zip([i.name for i in sess.get_inputs()], [x.detach().numpy()]))
+        got = sess.run(None, feeds)[0]
+        self.assertEqualArray(expected, got, atol=0.3)
+
     def test_aten_nn_functional_bilinear(self):
         import torch
 
