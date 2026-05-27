@@ -56,8 +56,10 @@ time-series charts — one chart per CI workflow.
         _USER_CACHE_DIR, "yet-another-onnx-builder", "ci_durations_workflows"
     )
 
-    # Workflows that are NOT CI (skip documentation / style / spelling workflows)
-    _SKIP_PATTERNS = ("docs", "style", "spelling", "pyrefly", "mypy", "doc_")
+    # Workflows that are NOT CI (skip reusable and PR-management workflows).
+    # Documentation, style, spelling, mypy and pyrefly workflows are kept
+    # because they run on every PR / push to ``main`` as part of CI.
+    _SKIP_PATTERNS = ("common_", "pr_")
 
 
     def _gh_get(path, params=""):
