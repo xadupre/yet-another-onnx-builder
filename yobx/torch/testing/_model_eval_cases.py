@@ -297,7 +297,11 @@ class InplaceSetItemExp(torch.nn.Module):
         ((torch.arange(7 * 9 * 11) + 10).reshape((7, 9, 11)).to(torch.float32),),
         ((torch.arange(8 * 9 * 11) + 10).reshape((8, 9, 11)).to(torch.float32),),
     ]
-    _dynamic = {"x": {0: DIM("batch")}}
+    # The slice ``[2:-2, 2:-2, :-1]`` requires the first dimension to contain at
+    # least 5 elements; torch.export deduces a tighter ``>= 6`` guard, so the
+    # dynamic dimension must declare ``min=6`` for the default (torch.export)
+    # exporter path to succeed.
+    _dynamic = {"x": {0: DIM("batch", min=6)}}
 
 
 class AtenInterpolate(torch.nn.Module):
