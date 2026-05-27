@@ -12,5 +12,4 @@ Additional statistics and metadata about the documentation build.
    ci_durations
    commits_per_week
    comparison
-   weekly_progress
    pypi_downloads
