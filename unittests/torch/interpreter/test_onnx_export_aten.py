@@ -1521,6 +1521,61 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(domains, ["", "custom_domain"])
 
     @ignore_warnings(UserWarning)
+    @requires_torch("2.8")
+    def test_symbolic_quantize_dequantize_linear(self):
+        # Inspired by pytorch PR #185090: export a model that uses
+        # ``torch.onnx.ops.symbolic`` to emit ``QuantizeLinear``/``DequantizeLinear``
+        # nodes around regular aten operations (QDQ pattern).
+        import torch
+
+        def qdq(x, scale, zero_point):
+            q = torch.onnx.ops.symbolic(
+                "QuantizeLinear",
+                (x, scale, zero_point),
+                attrs={},
+                dtype=zero_point.dtype,
+                shape=x.shape,
+            )
+            return torch.onnx.ops.symbolic(
+                "DequantizeLinear",
+                (q, scale, zero_point),
+                attrs={},
+                dtype=scale.dtype,
+                shape=x.shape,
+            )
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.register_buffer("scale", torch.tensor(0.1, dtype=torch.float32))
+                self.register_buffer("zero_point", torch.tensor(128, dtype=torch.uint8))
+
+            def forward(self, x):
+                x = qdq(x, self.scale, self.zero_point)
+                y = torch.relu(x + x)
+                return qdq(y, self.scale, self.zero_point)
+
+        model = Model().eval()
+        inputs = (torch.randn(2, 3),)
+        onx = to_onnx(model, inputs, export_options=ExportOptions(strict=False))
+        names = [n.op_type for n in onx.graph.node]
+        self.assertEqual(
+            names,
+            [
+                "QuantizeLinear",
+                "DequantizeLinear",
+                "Add",
+                "Relu",
+                "QuantizeLinear",
+                "DequantizeLinear",
+            ],
+        )
+        domains = [d.domain for d in onx.opset_import]
+        # No custom domain should be registered for the default ONNX QDQ ops.
+        self.assertEqual(domains, [""])
+        check_model(onx)
+
+    @ignore_warnings(UserWarning)
     def test_aten_index_tensor_rk2_rk4_rk4(self):
         import torch
 
