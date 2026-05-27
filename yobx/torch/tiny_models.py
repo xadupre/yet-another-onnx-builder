@@ -182,6 +182,7 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
         from .in_transformers.models import get_cached_configuration
 
         config = get_cached_configuration(model_id)
+        assert config is not None, f"No cached configuration for {model_id!r}"
         if config_updates:
             config = copy.deepcopy(config)
             _update_config(config, config_updates)
