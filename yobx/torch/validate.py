@@ -260,6 +260,57 @@ def _to_onnx(*args, exporter: str = "yobx", **kwargs):
     raise NotImplementedError(f"exporter={exporter!r} not implemented.")
 
 
+def _apply_config_override(config: Any, key: str, value: Any) -> None:
+    """Apply a single config override, with support for dotted paths and
+    automatic propagation to nested sub-configs.
+
+    Multimodal HuggingFace configs (e.g. ``Gemma3Config``) keep text-model
+    attributes such as ``num_hidden_layers`` on a nested ``text_config`` and
+    expose nothing at the top level.  A bare ``setattr(config, key, value)``
+    would silently create an unused attribute, leaving the actual model size
+    untouched and frequently triggering opaque downstream failures (for
+    instance ``"upper bound and lower bound inconsistent with step sign"``
+    raised by ``torch.arange`` inside generation).
+
+    Behaviour:
+
+    * Dotted keys (``"text_config.num_hidden_layers"``) walk the attribute
+      chain and set the value on the final object.
+    * Plain keys are set on the top-level ``config`` only when the attribute
+      is already defined there.  Otherwise, the value is forwarded to the
+      first conventional language-model sub-config that exposes the
+      attribute (``text_config`` then ``language_config``), which matches
+      the user intent for multimodal models such as ``Gemma3Config`` where
+      ``num_hidden_layers`` lives on ``text_config``.  Vision/audio/image
+      sub-configs are intentionally **not** touched, since reducing e.g.
+      ``vision_config.num_hidden_layers`` produces a broken vision tower
+      whose conv shapes no longer line up.  Use the dotted form to target
+      them explicitly.
+    """
+    if "." in key:
+        parts = key.split(".")
+        obj = config
+        for part in parts[:-1]:
+            obj = getattr(obj, part)
+        setattr(obj, parts[-1], value)
+        return
+
+    # Top-level config already owns the attribute → set in place.
+    if key in vars(config):
+        setattr(config, key, value)
+        return
+
+    # Multimodal configs: forward to the conventional language sub-config.
+    for sub_name in ("text_config", "language_config"):
+        sub = getattr(config, sub_name, None)
+        if sub is not None and hasattr(sub, key):
+            setattr(sub, key, value)
+            return
+
+    # Fallback: set at the top level (creates a new attribute if missing).
+    setattr(config, key, value)
+
+
 def _load_config(
     model_id: str,
     config_overrides: Optional[Dict[str, Any]],
@@ -296,7 +347,7 @@ def _load_config(
 
     if config_overrides:
         for k, v in config_overrides.items():
-            setattr(config, k, v)
+            _apply_config_override(config, k, v)
         summary.config_overrides = str(config_overrides)
 
     collected_data.config = config
@@ -348,18 +399,37 @@ def _load_model(
             print(f"[validate_model] loading model for {model_id!r}")
 
     dtype_kwargs: Dict[str, Any] = {"dtype": dtype} if dtype is not None else {}
+    # Multimodal configs (e.g. Gemma3Config) instantiate a *ForConditionalGeneration
+    # wrapper with vision/audio towers when fed to AutoModelForCausalLM. Validating
+    # the text-only causal LM is what we actually want here, so when the config
+    # exposes a text sub-config we instantiate from it directly. This also avoids
+    # tracing the vision tower whose symbolic conv shapes can produce confusing
+    # "negative output size" errors during export.
+    causal_config = config
+    for sub_name in ("text_config", "language_config"):
+        sub = getattr(config, sub_name, None)
+        if sub is not None and hasattr(sub, "num_hidden_layers"):
+            causal_config = sub
+            if verbose:
+                print(
+                    f"[validate_model] using {sub_name} from {type(config).__name__} "
+                    f"for text-only causal LM instantiation"
+                )
+            break
     try:
         if random_weights:
-            model: torch.nn.Module = AutoModelForCausalLM.from_config(config, **dtype_kwargs)
+            model: torch.nn.Module = AutoModelForCausalLM.from_config(
+                causal_config, **dtype_kwargs
+            )
         else:
             try:
                 model = AutoModelForCausalLM.from_pretrained(
-                    model_id, config=config, local_files_only=True, **dtype_kwargs
+                    model_id, config=causal_config, local_files_only=True, **dtype_kwargs
                 )
                 summary.model_from_cache = True
             except OSError:
                 model = AutoModelForCausalLM.from_pretrained(
-                    model_id, config=config, **dtype_kwargs
+                    model_id, config=causal_config, **dtype_kwargs
                 )
                 summary.model_from_cache = False
         model = model.to(torch_device)

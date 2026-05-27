@@ -96,6 +96,77 @@ class TestValidateModel(ExtTestCase):
         self.assertIn("random_weights", sig.parameters)
         self.assertFalse(sig.parameters["random_weights"].default)
 
+    def test_apply_config_override_nested(self):
+        """_apply_config_override forwards to text_config (multimodal)."""
+        from transformers import Gemma3Config
+        from yobx.torch.validate import _apply_config_override
+
+        config = Gemma3Config()
+        original_text = config.text_config.num_hidden_layers
+        original_vision = config.vision_config.num_hidden_layers
+        self.assertNotEqual(original_text, 2)
+        _apply_config_override(config, "num_hidden_layers", 2)
+        # text_config (the conventional language sub-config) receives it.
+        self.assertEqual(config.text_config.num_hidden_layers, 2)
+        # vision_config must NOT be touched: reducing its layer count would
+        # break the conv-based vision tower (negative output sizes).
+        self.assertEqual(config.vision_config.num_hidden_layers, original_vision)
+        # No spurious top-level attribute is created either.
+        self.assertNotIn("num_hidden_layers", vars(config))
+
+    def test_apply_config_override_dotted_path(self):
+        """_apply_config_override supports dotted paths into sub-configs."""
+        from transformers import Gemma3Config
+        from yobx.torch.validate import _apply_config_override
+
+        config = Gemma3Config()
+        _apply_config_override(config, "text_config.num_hidden_layers", 3)
+        self.assertEqual(config.text_config.num_hidden_layers, 3)
+        # Dotted form can also target the vision tower explicitly.
+        _apply_config_override(config, "vision_config.num_hidden_layers", 4)
+        self.assertEqual(config.vision_config.num_hidden_layers, 4)
+
+    def test_apply_config_override_plain_attribute(self):
+        """_apply_config_override sets attributes on flat (non-multimodal) configs."""
+        from transformers import LlamaConfig
+        from yobx.torch.validate import _apply_config_override
+
+        config = LlamaConfig()
+        _apply_config_override(config, "num_hidden_layers", 2)
+        self.assertEqual(config.num_hidden_layers, 2)
+
+    def test_load_model_uses_text_config_for_multimodal(self):
+        """_load_model picks the text sub-config to instantiate a text-only causal LM."""
+        import torch
+        from transformers import Gemma3Config
+        from yobx.torch.validate import _load_model, ValidateSummary, ValidateData
+
+        config = Gemma3Config()
+        config.text_config.num_hidden_layers = 2
+        config.text_config.hidden_size = 32
+        config.text_config.intermediate_size = 64
+        config.text_config.num_attention_heads = 4
+        config.text_config.num_key_value_heads = 2
+        config.text_config.head_dim = 8
+
+        summary = ValidateSummary(model_id="google/gemma-3-4b-it", prompt="p")
+        data = ValidateData()
+        model = _load_model(
+            "google/gemma-3-4b-it",
+            config,
+            random_weights=True,
+            dtype=torch.float32,
+            torch_device="cpu",
+            verbose=0,
+            quiet=False,
+            summary=summary,
+            collected_data=data,
+        )
+        # Must be the text-only causal LM, not the full multimodal wrapper.
+        self.assertEqual(type(model).__name__, "Gemma3ForCausalLM")
+        self.assertFalse(hasattr(model, "vision_tower"))
+        self.assertFalse(hasattr(getattr(model, "model", None), "vision_tower"))
+
     def test_cmd_validate_has_random_weights(self):
         """CLI parser exposes --random-weights and --config-override flags."""
         from yobx._command_lines_parser import get_parser_validate
