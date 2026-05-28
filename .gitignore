@@ -226,3 +226,4 @@ onnxruntime_profile*
 *.ep
 *.ep.graph
 .path
+onnx_export_*.md

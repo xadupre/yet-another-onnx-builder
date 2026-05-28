@@ -311,6 +311,37 @@ def _apply_config_override(config: Any, key: str, value: Any) -> None:
     setattr(config, key, value)
 
 
+def _detect_task(config: Any) -> str:
+    """Detect the validation task from a HuggingFace config.
+
+    Returns one of:
+
+    * ``"image-classification"`` for vision classifiers such as
+      ``BeitForImageClassification`` / ``ViTForImageClassification``.
+    * ``"causal-lm"`` (default) for text-generation models.
+
+    Detection prefers the config ``architectures`` attribute when present, and
+    falls back to the ``model_type`` membership in the corresponding
+    ``transformers`` auto mappings. This keeps the heuristic robust both for
+    hub configs (which set ``architectures``) and for configs instantiated
+    directly from Python.
+    """
+    from transformers.models.auto.modeling_auto import (
+        MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES,
+    )
+
+    archs = getattr(config, "architectures", None) or []
+    for arch in archs:
+        if isinstance(arch, str) and "ForImageClassification" in arch:
+            return "image-classification"
+
+    model_type = getattr(config, "model_type", None)
+    if model_type and model_type in MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES:
+        return "image-classification"
+
+    return "causal-lm"
+
+
 def _load_config(
     model_id: str,
     config_overrides: Optional[Dict[str, Any]],
@@ -375,6 +406,61 @@ def _load_tokenizer(model_id: str, verbose: int, quiet: bool, summary: "Validate
     return tokenizer
 
 
+def _load_auto_model(
+    auto_cls,
+    model_id: str,
+    config,
+    random_weights: bool,
+    dtype,
+    torch_device,
+    verbose: int,
+    quiet: bool,
+    summary: "ValidateSummary",
+    collected_data: "ValidateData",
+    label: str = "model",
+):
+    """Load (or instantiate with random weights) a model via *auto_cls*.
+
+    *auto_cls* is a HuggingFace ``AutoModelFor*`` class. *label* is a short
+    human-readable tag inserted into verbose log lines (e.g. ``"model"`` or
+    ``"image model"``).
+    """
+    import torch
+
+    if verbose:
+        if random_weights:
+            print(
+                f"[validate_model] creating {label} from config (random weights) "
+                f"for {model_id!r}"
+            )
+        else:
+            print(f"[validate_model] loading {label} for {model_id!r}")
+
+    dtype_kwargs: Dict[str, Any] = {"dtype": dtype} if dtype is not None else {}
+    try:
+        if random_weights:
+            model: torch.nn.Module = auto_cls.from_config(config, **dtype_kwargs)
+        else:
+            try:
+                model = auto_cls.from_pretrained(
+                    model_id, config=config, local_files_only=True, **dtype_kwargs
+                )
+                summary.model_from_cache = True
+            except OSError:
+                model = auto_cls.from_pretrained(model_id, config=config, **dtype_kwargs)
+                summary.model_from_cache = False
+        model = model.to(torch_device)
+        model.eval()
+    except Exception as exc:
+        summary.error_model = str(exc)
+        if not quiet:
+            raise
+        return None
+
+    collected_data.model = model
+    return model
+
+
 def _load_model(
     model_id: str,
     config,
@@ -387,18 +473,8 @@ def _load_model(
     collected_data: "ValidateData",
 ):
     """Load (or instantiate with random weights) the CausalLM model."""
-    import torch
     from transformers import AutoModelForCausalLM
 
-    if verbose:
-        if random_weights:
-            print(
-                f"[validate_model] creating model from config (random weights) for {model_id!r}"
-            )
-        else:
-            print(f"[validate_model] loading model for {model_id!r}")
-
-    dtype_kwargs: Dict[str, Any] = {"dtype": dtype} if dtype is not None else {}
     # Multimodal configs (e.g. Gemma3Config) instantiate a *ForConditionalGeneration
     # wrapper with vision/audio towers when fed to AutoModelForCausalLM. Validating
     # the text-only causal LM is what we actually want here, so when the config
@@ -416,32 +492,112 @@ def _load_model(
                     f"for text-only causal LM instantiation"
                 )
             break
-    try:
-        if random_weights:
-            model: torch.nn.Module = AutoModelForCausalLM.from_config(
-                causal_config, **dtype_kwargs
-            )
-        else:
-            try:
-                model = AutoModelForCausalLM.from_pretrained(
-                    model_id, config=causal_config, local_files_only=True, **dtype_kwargs
-                )
-                summary.model_from_cache = True
-            except OSError:
-                model = AutoModelForCausalLM.from_pretrained(
-                    model_id, config=causal_config, **dtype_kwargs
-                )
-                summary.model_from_cache = False
-        model = model.to(torch_device)
-        model.eval()
-    except Exception as exc:
-        summary.error_model = str(exc)
-        if not quiet:
-            raise
-        return None
 
-    collected_data.model = model
-    return model
+    return _load_auto_model(
+        AutoModelForCausalLM,
+        model_id,
+        causal_config,
+        random_weights,
+        dtype,
+        torch_device,
+        verbose,
+        quiet,
+        summary,
+        collected_data,
+        label="model",
+    )
+
+
+def _load_image_model(
+    model_id: str,
+    config,
+    random_weights: bool,
+    dtype,
+    torch_device,
+    verbose: int,
+    quiet: bool,
+    summary: "ValidateSummary",
+    collected_data: "ValidateData",
+):
+    """Load (or instantiate with random weights) an image-classification model."""
+    from transformers import AutoModelForImageClassification
+
+    return _load_auto_model(
+        AutoModelForImageClassification,
+        model_id,
+        config,
+        random_weights,
+        dtype,
+        torch_device,
+        verbose,
+        quiet,
+        summary,
+        collected_data,
+        label="image model",
+    )
+
+
+def _build_image_inputs(config, dtype, torch_device) -> Dict[str, Any]:
+    """Build random ``pixel_values`` inputs sized from the model config."""
+    import torch
+
+    image_size = getattr(config, "image_size", 224)
+    if isinstance(image_size, (list, tuple)):
+        height, width = int(image_size[0]), int(image_size[1])
+    else:
+        height = width = int(image_size)
+    num_channels = int(getattr(config, "num_channels", 3))
+    torch_dtype = dtype if dtype is not None else torch.float32
+    pixel_values = torch.randn(
+        1, num_channels, height, width, dtype=torch_dtype, device=torch_device
+    )
+    return {"pixel_values": pixel_values}
+
+
+def _capture_inputs_forward(
+    model,
+    forward_kwargs: Dict[str, Any],
+    patch: bool,
+    verbose: int,
+    quiet: bool,
+    summary: "ValidateSummary",
+    collected_data: "ValidateData",
+):
+    """Run ``model(**forward_kwargs)`` under an InputObserver to capture real inputs.
+
+    Used for non-generative models (e.g. image classification) that do not
+    expose ``model.generate``.
+    """
+    from .flatten import register_flattening_functions
+    from .input_observer import InputObserver
+    from .patch import apply_patches_for_model
+
+    if verbose:
+        print(
+            f"[validate_model] capturing inputs with InputObserver "
+            f"(forward kwargs: {sorted(forward_kwargs)})"
+        )
+
+    observer = InputObserver()
+
+    with (
+        register_flattening_functions(patch_transformers=patch),
+        (
+            apply_patches_for_model(patch_transformers=patch, model=model)
+            if patch
+            else contextlib.nullcontext()
+        ),
+        observer(model),
+    ):
+        model(**forward_kwargs)
+
+    collected_data.observer = observer
+    summary.n_captured = len(observer.info or [])
+
+    if verbose:
+        print(f"[validate_model] captured {len(observer.info or [])} input set(s)")
+
+    return observer
 
 
 def _capture_inputs(
@@ -768,6 +924,78 @@ def validate_model(
     # ----------------------------------------------------------------- config
     config = _load_config(model_id, config_overrides, verbose, quiet, summary, collected_data)
     if config is None:
+        return summary, collected_data
+
+    task = _detect_task(config)
+    if verbose:
+        print(f"[validate_model] detected task: {task!r}")
+
+    if task == "image-classification":
+        # Image classifiers do not use a tokenizer; build pixel_values from config.
+        model = _load_image_model(
+            model_id,
+            config,
+            random_weights,
+            dtype,
+            torch_device,
+            verbose,
+            quiet,
+            summary,
+            collected_data,
+        )
+        if model is None:
+            return summary, collected_data
+
+        forward_kwargs = _build_image_inputs(config, dtype, torch_device)
+        observer = _capture_inputs_forward(
+            model, forward_kwargs, patch, verbose, quiet, summary, collected_data
+        )
+        if observer is None:
+            return summary, collected_data
+
+        kwargs, dynamic_shapes = _infer_shapes(observer, patch, verbose, collected_data)
+
+        ok = _export(
+            model,
+            model_id,
+            kwargs,
+            dynamic_shapes,
+            exporter,
+            opset,
+            optimization,
+            patch,
+            dump_folder,
+            verbose,
+            quiet,
+            summary,
+            collected_data,
+        )
+        if not ok:
+            return summary, collected_data
+
+        if do_run:
+            assert (
+                collected_data.filename
+            ), "No filename, this is needed to check for discrepancies."
+            assert os.path.exists(
+                collected_data.filename
+            ), f"{collected_data.filename!r} is missing"
+            _check_discrepancies(
+                observer, collected_data.filename, verbose, quiet, summary, collected_data
+            )
+
+        from ..container import ExportArtifact
+
+        if isinstance(collected_data.artifact, ExportArtifact) and collected_data.filename:
+            artifact = collected_data.artifact
+            if artifact.report is None:
+                from ..container import ExportReport
+
+                artifact.report = ExportReport()
+            if collected_data.discrepancies is not None:
+                artifact.report.discrepancies = collected_data.discrepancies
+            artifact.save_report(collected_data.filename)
+
         return summary, collected_data
 
     # --------------------------------------------------------------- tokenizer
