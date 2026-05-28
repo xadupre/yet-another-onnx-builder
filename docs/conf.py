@@ -104,7 +104,6 @@ document.addEventListener("DOMContentLoaded", function () {
 # templates_path = ["_templates"]
 exclude_patterns = ["_build"]
 if int(os.environ.get("UNITTEST_GOING", "0")):
-    exclude_patterns.append("ci_durations.rst")
     exclude_patterns.append("commits_per_week.rst")
     exclude_patterns.append("pypi_downloads.rst")
     exclude_patterns.append("design/torch/case_coverage.rst")
@@ -162,7 +161,7 @@ intersphinx_mapping = {
 suppress_warnings = ["intersphinx.external", "toc.excluded"]
 if int(os.environ.get("UNITTEST_GOING", "0")):
     # Suppress toctree and cross-reference warnings for pages intentionally
-    # excluded on CI (e.g. case_coverage.rst, ci_durations.rst).
+    # excluded on CI (e.g. case_coverage.rst).
     suppress_warnings += ["ref.ref"]
 
 
