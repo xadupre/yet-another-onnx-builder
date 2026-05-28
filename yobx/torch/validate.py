@@ -406,6 +406,61 @@ def _load_tokenizer(model_id: str, verbose: int, quiet: bool, summary: "Validate
     return tokenizer
 
 
+def _load_auto_model(
+    auto_cls,
+    model_id: str,
+    config,
+    random_weights: bool,
+    dtype,
+    torch_device,
+    verbose: int,
+    quiet: bool,
+    summary: "ValidateSummary",
+    collected_data: "ValidateData",
+    label: str = "model",
+):
+    """Load (or instantiate with random weights) a model via *auto_cls*.
+
+    *auto_cls* is a HuggingFace ``AutoModelFor*`` class. *label* is a short
+    human-readable tag inserted into verbose log lines (e.g. ``"model"`` or
+    ``"image model"``).
+    """
+    import torch
+
+    if verbose:
+        if random_weights:
+            print(
+                f"[validate_model] creating {label} from config (random weights) "
+                f"for {model_id!r}"
+            )
+        else:
+            print(f"[validate_model] loading {label} for {model_id!r}")
+
+    dtype_kwargs: Dict[str, Any] = {"dtype": dtype} if dtype is not None else {}
+    try:
+        if random_weights:
+            model: torch.nn.Module = auto_cls.from_config(config, **dtype_kwargs)
+        else:
+            try:
+                model = auto_cls.from_pretrained(
+                    model_id, config=config, local_files_only=True, **dtype_kwargs
+                )
+                summary.model_from_cache = True
+            except OSError:
+                model = auto_cls.from_pretrained(model_id, config=config, **dtype_kwargs)
+                summary.model_from_cache = False
+        model = model.to(torch_device)
+        model.eval()
+    except Exception as exc:
+        summary.error_model = str(exc)
+        if not quiet:
+            raise
+        return None
+
+    collected_data.model = model
+    return model
+
+
 def _load_model(
     model_id: str,
     config,
@@ -418,18 +473,8 @@ def _load_model(
     collected_data: "ValidateData",
 ):
     """Load (or instantiate with random weights) the CausalLM model."""
-    import torch
     from transformers import AutoModelForCausalLM
 
-    if verbose:
-        if random_weights:
-            print(
-                f"[validate_model] creating model from config (random weights) for {model_id!r}"
-            )
-        else:
-            print(f"[validate_model] loading model for {model_id!r}")
-
-    dtype_kwargs: Dict[str, Any] = {"dtype": dtype} if dtype is not None else {}
     # Multimodal configs (e.g. Gemma3Config) instantiate a *ForConditionalGeneration
     # wrapper with vision/audio towers when fed to AutoModelForCausalLM. Validating
     # the text-only causal LM is what we actually want here, so when the config
@@ -447,32 +492,20 @@ def _load_model(
                     f"for text-only causal LM instantiation"
                 )
             break
-    try:
-        if random_weights:
-            model: torch.nn.Module = AutoModelForCausalLM.from_config(
-                causal_config, **dtype_kwargs
-            )
-        else:
-            try:
-                model = AutoModelForCausalLM.from_pretrained(
-                    model_id, config=causal_config, local_files_only=True, **dtype_kwargs
-                )
-                summary.model_from_cache = True
-            except OSError:
-                model = AutoModelForCausalLM.from_pretrained(
-                    model_id, config=causal_config, **dtype_kwargs
-                )
-                summary.model_from_cache = False
-        model = model.to(torch_device)
-        model.eval()
-    except Exception as exc:
-        summary.error_model = str(exc)
-        if not quiet:
-            raise
-        return None
 
-    collected_data.model = model
-    return model
+    return _load_auto_model(
+        AutoModelForCausalLM,
+        model_id,
+        causal_config,
+        random_weights,
+        dtype,
+        torch_device,
+        verbose,
+        quiet,
+        summary,
+        collected_data,
+        label="model",
+    )
 
 
 def _load_image_model(
@@ -487,45 +520,21 @@ def _load_image_model(
     collected_data: "ValidateData",
 ):
     """Load (or instantiate with random weights) an image-classification model."""
-    import torch
     from transformers import AutoModelForImageClassification
 
-    if verbose:
-        if random_weights:
-            print(
-                f"[validate_model] creating image model from config (random weights) "
-                f"for {model_id!r}"
-            )
-        else:
-            print(f"[validate_model] loading image model for {model_id!r}")
-
-    dtype_kwargs: Dict[str, Any] = {"dtype": dtype} if dtype is not None else {}
-    try:
-        if random_weights:
-            model: torch.nn.Module = AutoModelForImageClassification.from_config(
-                config, **dtype_kwargs
-            )
-        else:
-            try:
-                model = AutoModelForImageClassification.from_pretrained(
-                    model_id, config=config, local_files_only=True, **dtype_kwargs
-                )
-                summary.model_from_cache = True
-            except OSError:
-                model = AutoModelForImageClassification.from_pretrained(
-                    model_id, config=config, **dtype_kwargs
-                )
-                summary.model_from_cache = False
-        model = model.to(torch_device)
-        model.eval()
-    except Exception as exc:
-        summary.error_model = str(exc)
-        if not quiet:
-            raise
-        return None
-
-    collected_data.model = model
-    return model
+    return _load_auto_model(
+        AutoModelForImageClassification,
+        model_id,
+        config,
+        random_weights,
+        dtype,
+        torch_device,
+        verbose,
+        quiet,
+        summary,
+        collected_data,
+        label="image model",
+    )
 
 
 def _build_image_inputs(config, dtype, torch_device) -> Dict[str, Any]:
