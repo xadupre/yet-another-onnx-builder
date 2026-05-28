@@ -326,12 +326,9 @@ def _detect_task(config: Any) -> str:
     hub configs (which set ``architectures``) and for configs instantiated
     directly from Python.
     """
-    try:
-        from transformers.models.auto.modeling_auto import (
-            MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES,
-        )
-    except Exception:  # pragma: no cover - transformers always present here
-        MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES = {}  # type: ignore[assignment]
+    from transformers.models.auto.modeling_auto import (
+        MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES,
+    )
 
     archs = getattr(config, "architectures", None) or []
     for arch in archs:
