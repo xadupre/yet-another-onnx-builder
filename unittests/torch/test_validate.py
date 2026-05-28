@@ -509,6 +509,55 @@ class TestValidateModel(ExtTestCase):
         self.assertIsInstance(data, ValidateData)
         self.assertEqual(summary.model_id, "google/gemma-3-4b-it")
 
+    @requires_torch()
+    @requires_transformers("4.0")
+    def test_detect_task_image_classification(self):
+        """_detect_task returns 'image-classification' for vision classifiers."""
+        from transformers import BeitConfig, LlamaConfig
+        from yobx.torch.validate import _detect_task
+
+        self.assertEqual(_detect_task(BeitConfig()), "image-classification")
+        self.assertEqual(_detect_task(LlamaConfig()), "causal-lm")
+
+    @requires_torch()
+    @requires_transformers("4.0")
+    @skipif_ci_windows("file paths")
+    def test_validate_model_image_classification_random_weights(self):
+        """validate_model exports a tiny Beit image classifier end-to-end."""
+        import os
+        import tempfile
+
+        from transformers import BeitConfig, BeitForImageClassification
+        from yobx.torch.validate import validate_model, ValidateSummary, ValidateData
+
+        with tempfile.TemporaryDirectory() as tmp:
+            config = BeitConfig(
+                num_hidden_layers=2,
+                hidden_size=32,
+                num_attention_heads=2,
+                intermediate_size=37,
+                image_size=30,
+                patch_size=2,
+            )
+            BeitForImageClassification(config).save_pretrained(tmp)
+
+            summary, data = validate_model(
+                tmp,
+                random_weights=True,
+                do_run=False,
+                dump_folder=os.path.join(tmp, "dump"),
+                verbose=0,
+            )
+
+        self.assertIsInstance(summary, ValidateSummary)
+        self.assertIsInstance(data, ValidateData)
+        self.assertEqual(summary.export, "OK")
+        self.assertIsNotNone(data.observer)
+        self.assertIsNotNone(data.kwargs)
+        self.assertIn("pixel_values", data.kwargs)
+        self.assertIsNotNone(data.filename)
+        self.assertIsNone(summary.error_tokenizer)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
