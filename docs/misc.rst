@@ -9,7 +9,6 @@ Additional statistics and metadata about the documentation build.
    :maxdepth: 2
 
    index_stats
-   ci_durations
    commits_per_week
    comparison
    pypi_downloads
