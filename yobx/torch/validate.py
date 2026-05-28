@@ -571,22 +571,16 @@ def _capture_inputs_forward(
 
     observer = InputObserver()
 
-    try:
-        with (
-            register_flattening_functions(patch_transformers=patch),
-            (
-                apply_patches_for_model(patch_transformers=patch, model=model)
-                if patch
-                else contextlib.nullcontext()
-            ),
-            observer(model),
-        ):
-            model(**forward_kwargs)
-    except Exception as exc:
-        summary.error_observer = str(exc)
-        if not quiet:
-            raise
-        return None
+    with (
+        register_flattening_functions(patch_transformers=patch),
+        (
+            apply_patches_for_model(patch_transformers=patch, model=model)
+            if patch
+            else contextlib.nullcontext()
+        ),
+        observer(model),
+    ):
+        model(**forward_kwargs)
 
     collected_data.observer = observer
     summary.n_captured = len(observer.info or [])
