@@ -87,8 +87,16 @@ def apply_patches_for_model(
         if verbose:
             print(f"[register_patch_functions] apply {patch}")
         patch.do()
+
+    onnx_flags_cm: contextlib.AbstractContextManager = contextlib.nullcontext()
+    if patch_transformers and model is not None:
+        from .in_transformers.patches import enable_transformers_onnx_export_flags
+
+        onnx_flags_cm = enable_transformers_onnx_export_flags(model=model, verbose=verbose)
+
     try:
-        yield patches
+        with onnx_flags_cm:
+            yield patches
     finally:
         for patch in patches:
             if verbose:
