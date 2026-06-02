@@ -392,6 +392,23 @@ class TestCustomTracer(ExtTestCase):
         output_node = next(n for n in graph.nodes if n.op == "output")
         self.assertIs(output_node.args[0], fn_nodes[2])
 
+    def test_replace_inplace_aten_functions_clamp(self):
+        # Graph with aten.clamp_.default — it should be rewritten
+        # to aten.clamp.default.
+        graph = torch.fx.Graph()
+        x = graph.placeholder("x")
+        clamp_node = graph.call_function(torch.ops.aten.clamp_.default, args=(x, None, 127))
+        graph.output(clamp_node)
+
+        result = CustomTracer.replace_inplace_aten_functions(graph)
+        self.assertEqual(result, 1)
+        fn_nodes = [n for n in graph.nodes if n.op == "call_function"]
+        self.assertEqual(len(fn_nodes), 1)
+        self.assertEqual(fn_nodes[0].target, torch.ops.aten.clamp.default)
+        self.assertEqual(fn_nodes[0].args, (x, None, 127))
+        output_node = next(n for n in graph.nodes if n.op == "output")
+        self.assertIs(output_node.args[0], fn_nodes[0])
+
     def test_remove_unnecessary_slices_no_slice(self):
         class Model(torch.nn.Module):
             def forward(self, x, y):
