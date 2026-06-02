@@ -3494,6 +3494,41 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
+    def test_aten_rms_norm_float16_ort_optim(self):
+        # Regression test for a type conflict triggered by the
+        # SimplifiedLayerNormalization/RMSNormalization pattern when the model
+        # uses an upcast-to-float32 RMSNorm pattern on float16 inputs. The
+        # ``rsqrt`` intermediate is computed in float32 (stash_type=FLOAT) but
+        # the fused-pattern shape inference previously used the scale input
+        # (float16) for ``InvStdDev``, raising:
+        #   AssertionError: Type for name 'rsqrt' already exists and it is
+        #   different, known is 1 != 10 (new)
+        import torch
+
+        class RMS(torch.nn.Module):
+            def __init__(self, hidden_size=4, eps=1e-6):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.ones(hidden_size))
+                self.variance_epsilon = eps
+
+            def forward(self, hidden_states):
+                input_dtype = hidden_states.dtype
+                hidden_states = hidden_states.to(torch.float32)
+                variance = hidden_states.pow(2).mean(-1, keepdim=True)
+                hidden_states = hidden_states * torch.rsqrt(variance + self.variance_epsilon)
+                return self.weight * hidden_states.to(input_dtype)
+
+        model = RMS(4).eval().to(torch.float16)
+        inputs = (torch.randn(2, 4, dtype=torch.float16),)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(
+            model,
+            inputs,
+            options=OptimizationOptions(patterns="default+onnxruntime", verbose=0),
+            target_opset=22,
+        )
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-2)
+
     def test_aten_fused_rms_none_float16_rstd_output(self):
         # Regression test for a type conflict in _aten_getitem when accessing
         # a named tuple element whose ONNX type (float32, for numerical
