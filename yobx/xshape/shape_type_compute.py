@@ -479,10 +479,15 @@ def set_shape_type_op_any_layer_normalization(self: ShapeBuilder, node: NodeProt
     "Sets the output shape for node type LayerNormalization."
     res = []
     res.append(set_type_shape_unary_op(self, node.output[0], node.input[0]))
-    if len(node.output) > 1:
-        res.append(set_type_shape_unary_op(self, node.output[1], node.input[1]))
-    if len(node.output) > 2:
-        res.append(set_type_shape_unary_op(self, node.output[2], node.input[2]))
+    # For LayerNormalization, SimplifiedLayerNormalization and RMSNormalization,
+    # the auxiliary outputs (Mean/InvStdDev) are of type ``stash_type`` (the
+    # accumulation/compute precision), not the type of the scale input. The
+    # default value of ``stash_type`` is ``TensorProto.FLOAT`` for all of them.
+    stash_type = self.get_attribute_with_default(node, "stash_type", TensorProto.FLOAT)
+    if len(node.output) > 1 and node.output[1]:
+        res.append(set_type_shape_unary_op(self, node.output[1], node.input[1], itype=stash_type))
+    if len(node.output) > 2 and node.output[2]:
+        res.append(set_type_shape_unary_op(self, node.output[2], node.input[2], itype=stash_type))
     return None if set(res) == {None} else res
 
 
