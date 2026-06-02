@@ -590,38 +590,37 @@ class TestValidateModel(ExtTestCase):
         inputs (i.e. ``summary.n_captured >= 1`` and no tokenizer/model error).
         """
         import os
-        import tempfile
 
         import torch
         from transformers import FunnelConfig, FunnelBaseModel
         from yobx.torch.validate import validate_model, ValidateSummary, ValidateData
 
-        with tempfile.TemporaryDirectory() as tmp:
-            config = FunnelConfig(
-                vocab_size=64,
-                block_sizes=[1, 1, 1],
-                d_model=32,
-                n_head=2,
-                d_head=16,
-                d_inner=32,
-                max_position_embeddings=64,
-            )
-            config.architectures = ["FunnelBaseModel"]
-            FunnelBaseModel(config).save_pretrained(tmp)
+        tmp = self.get_dump_folder("test_validate_model_funnel_base_random_weights")
+        config = FunnelConfig(
+            vocab_size=64,
+            block_sizes=[1, 1, 1],
+            d_model=32,
+            n_head=2,
+            d_head=16,
+            d_inner=32,
+            max_position_embeddings=64,
+        )
+        config.architectures = ["FunnelBaseModel"]
+        FunnelBaseModel(config).save_pretrained(tmp)
 
-            tokenized = {
-                "input_ids": torch.tensor([[1, 2, 3, 4, 5, 6]], dtype=torch.long),
-                "attention_mask": torch.tensor([[1, 1, 1, 1, 1, 1]], dtype=torch.long),
-            }
-            summary, data = validate_model(
-                tmp,
-                random_weights=True,
-                do_run=False,
-                dump_folder=os.path.join(tmp, "dump"),
-                verbose=0,
-                tokenized_inputs=tokenized,
-                quiet=True,
-            )
+        tokenized = {
+            "input_ids": torch.tensor([[1, 2, 3, 4, 5, 6]], dtype=torch.long),
+            "attention_mask": torch.tensor([[1, 1, 1, 1, 1, 1]], dtype=torch.long),
+        }
+        summary, data = validate_model(
+            tmp,
+            random_weights=True,
+            do_run=False,
+            dump_folder=os.path.join(tmp, "dump"),
+            verbose=0,
+            tokenized_inputs=tokenized,
+            quiet=True,
+        )
 
         self.assertIsInstance(summary, ValidateSummary)
         self.assertIsInstance(data, ValidateData)
@@ -631,6 +630,7 @@ class TestValidateModel(ExtTestCase):
         self.assertIsNotNone(data.observer)
         self.assertIsNotNone(data.kwargs)
         self.assertIn("input_ids", data.kwargs)
+        self.clean_dump()
 
 
 if __name__ == "__main__":
