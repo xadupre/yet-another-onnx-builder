@@ -318,6 +318,9 @@ def _detect_task(config: Any) -> str:
 
     * ``"image-classification"`` for vision classifiers such as
       ``BeitForImageClassification`` / ``ViTForImageClassification``.
+    * ``"feature-extraction"`` for encoder-only "base" text models such as
+      ``FunnelBaseModel`` / ``FunnelModel`` / ``BertModel`` that do not expose
+      a ``generate`` method and have no task-specific head.
     * ``"causal-lm"`` (default) for text-generation models.
 
     Detection prefers the config ``architectures`` attribute when present, and
@@ -328,12 +331,28 @@ def _detect_task(config: Any) -> str:
     """
     from transformers.models.auto.modeling_auto import (
         MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES,
+        MODEL_MAPPING_NAMES,
     )
 
     archs = getattr(config, "architectures", None) or []
     for arch in archs:
         if isinstance(arch, str) and "ForImageClassification" in arch:
             return "image-classification"
+
+    # Bare encoder architectures (no task head) such as ``FunnelBaseModel``,
+    # ``FunnelModel`` or ``BertModel`` are listed as the values of
+    # ``MODEL_MAPPING_NAMES`` (some entries are tuples to cover ``*Base``
+    # variants). When the config declares one of those architectures we treat
+    # it as a feature-extraction task and load it via ``AutoModel``.
+    base_arch_names: set = set()
+    for value in MODEL_MAPPING_NAMES.values():
+        if isinstance(value, str):
+            base_arch_names.add(value)
+        else:
+            base_arch_names.update(v for v in value if isinstance(v, str))
+    for arch in archs:
+        if isinstance(arch, str) and arch in base_arch_names:
+            return "feature-extraction"
 
     model_type = getattr(config, "model_type", None)
     if model_type and model_type in MODEL_FOR_IMAGE_CLASSIFICATION_MAPPING_NAMES:
@@ -534,6 +553,40 @@ def _load_image_model(
         summary,
         collected_data,
         label="image model",
+    )
+
+
+def _load_feature_extraction_model(
+    model_id: str,
+    config,
+    random_weights: bool,
+    dtype,
+    torch_device,
+    verbose: int,
+    quiet: bool,
+    summary: "ValidateSummary",
+    collected_data: "ValidateData",
+):
+    """Load (or instantiate with random weights) a bare encoder model via ``AutoModel``.
+
+    Used for "feature-extraction" tasks: encoder-only models such as
+    ``FunnelBaseModel`` / ``BertModel`` that have no task head and do not
+    expose a ``generate`` method.
+    """
+    from transformers import AutoModel
+
+    return _load_auto_model(
+        AutoModel,
+        model_id,
+        config,
+        random_weights,
+        dtype,
+        torch_device,
+        verbose,
+        quiet,
+        summary,
+        collected_data,
+        label="encoder model",
     )
 
 
@@ -947,6 +1000,94 @@ def validate_model(
             return summary, collected_data
 
         forward_kwargs = _build_image_inputs(config, dtype, torch_device)
+        observer = _capture_inputs_forward(
+            model, forward_kwargs, patch, verbose, quiet, summary, collected_data
+        )
+        if observer is None:
+            return summary, collected_data
+
+        kwargs, dynamic_shapes = _infer_shapes(observer, patch, verbose, collected_data)
+
+        ok = _export(
+            model,
+            model_id,
+            kwargs,
+            dynamic_shapes,
+            exporter,
+            opset,
+            optimization,
+            patch,
+            dump_folder,
+            verbose,
+            quiet,
+            summary,
+            collected_data,
+        )
+        if not ok:
+            return summary, collected_data
+
+        if do_run:
+            assert (
+                collected_data.filename
+            ), "No filename, this is needed to check for discrepancies."
+            assert os.path.exists(
+                collected_data.filename
+            ), f"{collected_data.filename!r} is missing"
+            _check_discrepancies(
+                observer, collected_data.filename, verbose, quiet, summary, collected_data
+            )
+
+        from ..container import ExportArtifact
+
+        if isinstance(collected_data.artifact, ExportArtifact) and collected_data.filename:
+            artifact = collected_data.artifact
+            if artifact.report is None:
+                from ..container import ExportReport
+
+                artifact.report = ExportReport()
+            if collected_data.discrepancies is not None:
+                artifact.report.discrepancies = collected_data.discrepancies
+            artifact.save_report(collected_data.filename)
+
+        return summary, collected_data
+
+    if task == "feature-extraction":
+        # Encoder-only "base" models (e.g. FunnelBaseModel) use a tokenizer
+        # but do not expose ``generate``. Capture inputs via a plain forward
+        # pass on the tokenized prompt.
+        if tokenized_inputs is None:
+            tokenizer = _load_tokenizer(model_id, verbose, quiet, summary)
+            if tokenizer is None:
+                return summary, collected_data
+        else:
+            tokenizer = None
+
+        model = _load_feature_extraction_model(
+            model_id,
+            config,
+            random_weights,
+            dtype,
+            torch_device,
+            verbose,
+            quiet,
+            summary,
+            collected_data,
+        )
+        if model is None:
+            return summary, collected_data
+
+        if tokenized_inputs is not None:
+            forward_kwargs = {
+                k: (v.to(torch_device) if hasattr(v, "to") else v)
+                for k, v in tokenized_inputs.items()
+            }
+        else:
+            tokenized = tokenizer(prompt, return_tensors="pt")  # type: ignore
+            forward_kwargs = {k: v.to(torch_device) for k, v in tokenized.items()}
+
+        collected_data.input_ids = forward_kwargs.get("input_ids")
+        collected_data.attention_mask = forward_kwargs.get("attention_mask")
+
         observer = _capture_inputs_forward(
             model, forward_kwargs, patch, verbose, quiet, summary, collected_data
         )

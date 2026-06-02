@@ -558,6 +558,80 @@ class TestValidateModel(ExtTestCase):
         self.assertIsNotNone(data.filename)
         self.assertIsNone(summary.error_tokenizer)
 
+    @requires_torch()
+    @requires_transformers("4.0")
+    def test_detect_task_feature_extraction(self):
+        """_detect_task returns 'feature-extraction' for bare encoder models (e.g. Funnel)."""
+        from transformers import FunnelConfig, LlamaConfig
+        from yobx.torch.validate import _detect_task
+
+        c = FunnelConfig()
+        c.architectures = ["FunnelBaseModel"]
+        self.assertEqual(_detect_task(c), "feature-extraction")
+        c.architectures = ["FunnelModel"]
+        self.assertEqual(_detect_task(c), "feature-extraction")
+        # Task-specific heads keep the default causal-lm fallback (not a base model).
+        c.architectures = ["FunnelForMaskedLM"]
+        self.assertEqual(_detect_task(c), "causal-lm")
+        self.assertEqual(_detect_task(LlamaConfig()), "causal-lm")
+
+    @requires_torch()
+    @requires_transformers("4.0")
+    @skipif_ci_windows("file paths")
+    def test_validate_model_funnel_base_random_weights(self):
+        """validate_model routes a tiny ``FunnelBaseModel`` through feature-extraction.
+
+        Mirrors ``python -m yobx validate -m funnel-transformer/small-base ...`` with a
+        locally instantiated tiny model so the test does not need network access.
+
+        The downstream ONNX export may itself fail on funnel attention shapes;
+        the test only asserts that the validate routing correctly detects the
+        feature-extraction task, loads the model via ``AutoModel`` and captures
+        inputs (i.e. ``summary.n_captured >= 1`` and no tokenizer/model error).
+        """
+        import os
+
+        import torch
+        from transformers import FunnelConfig, FunnelBaseModel
+        from yobx.torch.validate import validate_model, ValidateSummary, ValidateData
+
+        tmp = self.get_dump_folder("test_validate_model_funnel_base_random_weights")
+        config = FunnelConfig(
+            vocab_size=64,
+            block_sizes=[1, 1, 1],
+            d_model=32,
+            n_head=2,
+            d_head=16,
+            d_inner=32,
+            max_position_embeddings=64,
+        )
+        config.architectures = ["FunnelBaseModel"]
+        FunnelBaseModel(config).save_pretrained(tmp)
+
+        tokenized = {
+            "input_ids": torch.tensor([[1, 2, 3, 4, 5, 6]], dtype=torch.long),
+            "attention_mask": torch.tensor([[1, 1, 1, 1, 1, 1]], dtype=torch.long),
+        }
+        summary, data = validate_model(
+            tmp,
+            random_weights=True,
+            do_run=False,
+            dump_folder=os.path.join(tmp, "dump"),
+            verbose=0,
+            tokenized_inputs=tokenized,
+            quiet=True,
+        )
+
+        self.assertIsInstance(summary, ValidateSummary)
+        self.assertIsInstance(data, ValidateData)
+        self.assertIsNone(summary.error_tokenizer)
+        self.assertIsNone(summary.error_model)
+        self.assertGreaterEqual(summary.n_captured or 0, 1)
+        self.assertIsNotNone(data.observer)
+        self.assertIsNotNone(data.kwargs)
+        self.assertIn("input_ids", data.kwargs)
+        self.clean_dump()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
