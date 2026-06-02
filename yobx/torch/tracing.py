@@ -2920,6 +2920,8 @@ class CustomTracer(torch.fx.Tracer):
             torch.ops.aten.bitwise_or_.Scalar: torch.ops.aten.bitwise_or.Scalar,
             torch.ops.aten.bitwise_xor_.Tensor: torch.ops.aten.bitwise_xor.Tensor,
             torch.ops.aten.bitwise_xor_.Scalar: torch.ops.aten.bitwise_xor.Scalar,
+            torch.ops.aten.clamp_.default: torch.ops.aten.clamp.default,
+            torch.ops.aten.clamp_.Tensor: torch.ops.aten.clamp.Tensor,
             torch.ops.aten.mul_.Tensor: torch.ops.aten.mul.Tensor,
             torch.ops.aten.mul_.Scalar: torch.ops.aten.mul.Scalar,
             torch.ops.aten.sub_.Tensor: torch.ops.aten.sub.Tensor,
