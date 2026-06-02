@@ -780,10 +780,23 @@ def get_parser_validate() -> ArgumentParser:
     )
     parser.add_argument(
         "--patch",
-        default=True,
-        action=BooleanOptionalAction,
-        help="Apply apply_patches_for_model and register_flattening_functions "
-        "during input capture and export (default: True).",
+        default="all",
+        type=str,
+        choices=["none", "yobx", "transformers", "all"],
+        help="Patches to apply during input capture and export: "
+        "'none' disables all patches, 'yobx' applies only yobx's transformers "
+        "patches (rotary embedding, flattening), 'transformers' applies only "
+        "the transformers built-in ONNX-export flag toggles "
+        "(config.onnx_export, prepare_for_onnx_export_()), 'all' applies both "
+        "(default). For backward compatibility, --no-patch is accepted as an "
+        "alias for --patch none.",
+    )
+    parser.add_argument(
+        "--no-patch",
+        dest="patch",
+        action="store_const",
+        const="none",
+        help="Alias for --patch none (kept for backward compatibility).",
     )
     parser.add_argument(
         "-q",
@@ -852,10 +865,19 @@ def get_parser_validate() -> ArgumentParser:
 def _cmd_validate(argv: List[Any]):
     import ast
 
+    from .torch import TransformersPatch
     from .torch.validate import validate_model
 
     parser = get_parser_validate()
     args = parser.parse_args(argv[1:])
+
+    patch_map = {
+        "none": TransformersPatch.NONE,
+        "yobx": TransformersPatch.YOBX_PATCH,
+        "transformers": TransformersPatch.TRANSFORMERS_PATCH,
+        "all": TransformersPatch.ALL,
+    }
+    patch_flag = patch_map[args.patch]
 
     config_overrides: Optional[Dict[str, Any]] = None
     if args.config_override:
@@ -879,7 +901,7 @@ def _cmd_validate(argv: List[Any]):
         device=args.device,
         max_new_tokens=args.max_new_tokens,
         do_run=args.run,
-        patch=args.patch,
+        patch=patch_flag,
         quiet=args.quiet,
         config_overrides=config_overrides,
         random_weights=args.random_weights,
