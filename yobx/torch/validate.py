@@ -406,18 +406,30 @@ def _load_config(
     return config
 
 
-def _load_tokenizer(model_id: str, verbose: int, quiet: bool, summary: "ValidateSummary"):
+def _load_tokenizer(
+    model_id: str,
+    verbose: int,
+    quiet: bool,
+    summary: "ValidateSummary",
+    config: Optional[Any] = None,
+):
     """Load the tokenizer (local HF cache first, then network)."""
     from transformers import AutoTokenizer
 
     if verbose:
         print(f"[validate_model] loading tokenizer for {model_id!r}")
 
+    tokenizer_kwargs: Dict[str, Any] = {}
+    if os.environ.get("UNITTEST_GOING", "0") in ("1", "True", "true") and config is not None:
+        tokenizer_kwargs["config"] = config
+
     try:
         try:
-            tokenizer = AutoTokenizer.from_pretrained(model_id, local_files_only=True)
+            tokenizer = AutoTokenizer.from_pretrained(
+                model_id, local_files_only=True, **tokenizer_kwargs
+            )
         except OSError:
-            tokenizer = AutoTokenizer.from_pretrained(model_id)
+            tokenizer = AutoTokenizer.from_pretrained(model_id, **tokenizer_kwargs)
     except Exception as exc:
         summary.error_tokenizer = str(exc)
         if not quiet:
@@ -1083,7 +1095,7 @@ def validate_model(
         # but do not expose ``generate``. Capture inputs via a plain forward
         # pass on the tokenized prompt.
         if tokenized_inputs is None:
-            tokenizer = _load_tokenizer(model_id, verbose, quiet, summary)
+            tokenizer = _load_tokenizer(model_id, verbose, quiet, summary, config=config)
             if tokenizer is None:
                 return summary, collected_data
         else:
@@ -1168,7 +1180,7 @@ def validate_model(
 
     # --------------------------------------------------------------- tokenizer
     if tokenized_inputs is None:
-        tokenizer = _load_tokenizer(model_id, verbose, quiet, summary)
+        tokenizer = _load_tokenizer(model_id, verbose, quiet, summary, config=config)
         if tokenizer is None:
             return summary, collected_data
     else:
