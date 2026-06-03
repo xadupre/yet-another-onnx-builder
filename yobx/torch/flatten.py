@@ -1,11 +1,12 @@
 import contextlib
 import pprint
 import re
-from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Union
 import optree
 import torch.utils._pytree as pytree
 from ..pv_version import PvVersion
 from ..helpers import string_type
+from .patch_enum import TransformersPatchEnum, coerce_transformers_patch
 
 PATCH_OF_PATCHES: Set[Any] = set()
 
@@ -106,7 +107,9 @@ def register_class_flattening(
 
 
 def flattening_functions(
-    patch_transformers: bool = False, patch_diffusers: bool = False, verbose: int = 0
+    patch_transformers: TransformersPatchEnum = TransformersPatchEnum.NONE,
+    patch_diffusers: bool = False,
+    verbose: int = 0,
 ) -> Dict[type, Callable[[], bool]]:
     """Returns the list of flattening functions."""
 
@@ -114,7 +117,7 @@ def flattening_functions(
     classes: Dict[type, Callable[[], bool]] = {}
     all_functions: Dict[type, Optional[str]] = {}
 
-    if patch_transformers:
+    if patch_transformers & TransformersPatchEnum.YOBX_PATCH:
         from .in_transformers.flatten_class import (  # type: ignore[attr-defined]
             __dict__ as dtr,
             SUPPORTED_DATACLASSES,
@@ -161,7 +164,7 @@ def replacement_before_exporting(args: Any) -> Any:
 
 
 def register_cache_flattening(
-    patch_transformers: bool = False, verbose: int = 0
+    patch_transformers: TransformersPatchEnum = TransformersPatchEnum.NONE, verbose: int = 0
 ) -> Dict[type, bool]:
     """
     Registers many classes with
@@ -177,7 +180,7 @@ def register_cache_flattening(
     """
     wrong: Dict[type, Optional[str]] = {}
     transformers_version = None
-    if patch_transformers:
+    if patch_transformers & TransformersPatchEnum.YOBX_PATCH:
         import transformers
         from .in_transformers.flatten_class import WRONG_REGISTRATIONS
 
@@ -262,7 +265,7 @@ def unregister_cache_flattening(undo: Dict[type, bool], verbose: int = 0):
 
 @contextlib.contextmanager
 def register_flattening_functions(
-    patch_transformers: bool = False, verbose: int = 0
+    patch_transformers: Union[bool, str, TransformersPatchEnum] = False, verbose: int = 0
 ) -> Generator[Callable, None, None]:
     """
     The context manager registers flattening functions
@@ -277,7 +280,12 @@ def register_flattening_functions(
         with register_flattening_functions(patch_transformers=True):
             # ...
     """
-    fct_callable = replacement_before_exporting if patch_transformers else (lambda x: x)  # type: ignore
+    patch_transformers = coerce_transformers_patch(patch_transformers)
+    fct_callable = (  # type: ignore
+        replacement_before_exporting
+        if (patch_transformers & TransformersPatchEnum.YOBX_PATCH)
+        else (lambda x: x)
+    )
     done = register_cache_flattening(patch_transformers=patch_transformers, verbose=verbose)
     try:
         yield fct_callable

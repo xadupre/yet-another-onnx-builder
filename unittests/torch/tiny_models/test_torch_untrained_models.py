@@ -371,21 +371,34 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertInOr(("CosSinCache_p1", "CosSinCacheWithRange"), unique_ops)
         self._chech_shape(onx.get_proto(include_weights=False))
 
-    def _export_tiny_llm(self, opset: int, patterns: str, return_builder: bool = False):
+    def _export_tiny_llm(
+        self,
+        opset: int,
+        patterns: str,
+        return_builder: bool = False,
+        dtype: str = "float32",
+        patch: str = "yobx",
+        n_layers: int | None = None,
+    ):
         """
         Export ``arnir0/Tiny-LLM`` and return the main ``ModelProto``.
 
         Inputs ``position_ids`` and their dynamic-shape entry are removed
         so that the export matches the form used in the rest of the test suite.
         """
-        data = get_tiny_model("arnir0/Tiny-LLM")
+        config_updates = {}
+        if n_layers:
+            config_updates["num_hidden_layers"] = n_layers
+        data = get_tiny_model("arnir0/Tiny-LLM", dtype=dtype, config_updates=config_updates)
         model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
         del inputs["position_ids"]
         del ds["position_ids"]
 
         with (
-            register_flattening_functions(patch_transformers=True),
-            apply_patches_for_model(patch_transformers=True, patch_torch=True, model=model),
+            register_flattening_functions(patch_transformers=patch),
+            apply_patches_for_model(
+                patch_transformers=patch, patch_torch=patch != "transformers", model=model
+            ),
         ):
             onx = to_onnx(
                 model,
@@ -821,6 +834,98 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         proto = onnx.load(filename)
         self.assertIsNotNone(proto)
         self.assertGreater(len(proto.graph.node), 0)
+
+    @hide_stdout()
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
+    @ignore_warnings(FutureWarning)
+    def test_tiny_llm_shape_ort_opset_22_fp16_patch_yobx(self):
+        proto = self._export_tiny_llm(
+            opset=22, patterns="default+onnxruntime", patch="yobx", dtype="float16"
+        )
+        missing = self._get_missing_shapes(proto)
+        self.assertEqual(
+            [],
+            missing,
+            f"Some node outputs are missing shape info at opset 22 / default+onnxruntime:"
+            f" {missing}",
+        )
+        unique_ops = {n.op_type for n in proto.graph.node}
+        self.assertInOr(
+            ("Attention", "GroupQueryAttention"),
+            unique_ops,
+            "default+onnxruntime should produce an Attention op at opset 22",
+        )
+
+    @hide_stdout()
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
+    @ignore_warnings(FutureWarning)
+    def test_tiny_llm_shape_ort_opset_22_fp16_patch_transformers(self):
+        proto = self._export_tiny_llm(
+            opset=22, patterns="default+onnxruntime", patch="transformers", dtype="float16"
+        )
+        missing = self._get_missing_shapes(proto)
+        self.assertEqual(
+            [],
+            missing,
+            f"Some node outputs are missing shape info at opset 22 / default+onnxruntime:"
+            f" {missing}",
+        )
+        unique_ops = {n.op_type for n in proto.graph.node}
+        self.assertInOr(
+            ("Attention", "GroupQueryAttention"),
+            unique_ops,
+            "default+onnxruntime should produce an Attention op at opset 22",
+        )
+
+    @hide_stdout()
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
+    @ignore_warnings(FutureWarning)
+    def test_tiny_llm_shape_ort_opset_22_fp16_patch_yobx_2(self):
+        proto = self._export_tiny_llm(
+            opset=22, patterns="default+onnxruntime", patch="yobx", dtype="float16"
+        )
+        missing = self._get_missing_shapes(proto)
+        self.assertEqual(
+            [],
+            missing,
+            f"Some node outputs are missing shape info at opset 22 / default+onnxruntime:"
+            f" {missing}",
+        )
+        unique_ops = {n.op_type for n in proto.graph.node}
+        self.assertInOr(
+            ("Attention", "GroupQueryAttention"),
+            unique_ops,
+            "default+onnxruntime should produce an Attention op at opset 22",
+        )
+
+    @hide_stdout()
+    @skipif_ci_windows("not available on windows")
+    @requires_torch("2.10")
+    @requires_transformers("5.2")
+    @ignore_warnings(FutureWarning)
+    def test_tiny_llm_shape_ort_opset_22_fp16_patch_transformers_2(self):
+        proto = self._export_tiny_llm(
+            opset=22, patterns="default+onnxruntime", patch="transformers", dtype="float16"
+        )
+        missing = self._get_missing_shapes(proto)
+        self.assertEqual(
+            [],
+            missing,
+            f"Some node outputs are missing shape info at opset 22 / default+onnxruntime:"
+            f" {missing}",
+        )
+        unique_ops = {n.op_type for n in proto.graph.node}
+        self.assertInOr(
+            ("Attention", "GroupQueryAttention"),
+            unique_ops,
+            "default+onnxruntime should produce an Attention op at opset 22",
+        )
 
 
 class TestTinyGraniteMoeHybridModel(ExtTestCase):

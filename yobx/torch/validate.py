@@ -12,7 +12,7 @@ from dataclasses import dataclass, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
 import os
 
-from .patch import TransformersPatch, _coerce_transformers_patch
+from .patch import TransformersPatchEnum, coerce_transformers_patch
 
 DEFAULT_PROMPT = "Continue: it rains, what should I do?"
 """Default text prompt used when validating text-generation models."""
@@ -612,7 +612,7 @@ def _build_image_inputs(config, dtype, torch_device) -> Dict[str, Any]:
 def _capture_inputs_forward(
     model,
     forward_kwargs: Dict[str, Any],
-    patch: Union[bool, TransformersPatch],
+    patch: Union[bool, TransformersPatchEnum],
     verbose: int,
     quiet: bool,
     summary: "ValidateSummary",
@@ -627,8 +627,8 @@ def _capture_inputs_forward(
     from .input_observer import InputObserver
     from .patch import apply_patches_for_model
 
-    patch_flag = _coerce_transformers_patch(patch)
-    flatten_patch = bool(TransformersPatch.YOBX_PATCH in patch_flag)
+    patch_flag = coerce_transformers_patch(patch)
+    flatten_patch = bool(TransformersPatchEnum.YOBX_PATCH in patch_flag)
 
     if verbose:
         print(
@@ -642,7 +642,7 @@ def _capture_inputs_forward(
         register_flattening_functions(patch_transformers=flatten_patch),
         (
             apply_patches_for_model(patch_transformers=patch_flag, model=model)
-            if patch_flag != TransformersPatch.NONE
+            if patch_flag != TransformersPatchEnum.NONE
             else contextlib.nullcontext()
         ),
         observer(model),
@@ -663,7 +663,7 @@ def _capture_inputs(
     input_ids,
     attention_mask,
     max_new_tokens: int,
-    patch: Union[bool, TransformersPatch],
+    patch: Union[bool, TransformersPatchEnum],
     prompt: str,
     verbose: int,
     quiet: bool,
@@ -675,8 +675,8 @@ def _capture_inputs(
     from .input_observer import InputObserver
     from .patch import apply_patches_for_model
 
-    patch_flag = _coerce_transformers_patch(patch)
-    flatten_patch = bool(TransformersPatch.YOBX_PATCH in patch_flag)
+    patch_flag = coerce_transformers_patch(patch)
+    flatten_patch = bool(TransformersPatchEnum.YOBX_PATCH in patch_flag)
 
     if verbose:
         print(f"[validate_model] capturing inputs with InputObserver (prompt={prompt!r})")
@@ -688,7 +688,7 @@ def _capture_inputs(
             register_flattening_functions(patch_transformers=flatten_patch),
             (
                 apply_patches_for_model(patch_transformers=patch_flag, model=model)
-                if patch_flag != TransformersPatch.NONE
+                if patch_flag != TransformersPatchEnum.NONE
                 else contextlib.nullcontext()
             ),
             observer(model),
@@ -715,13 +715,16 @@ def _capture_inputs(
 
 
 def _infer_shapes(
-    observer, patch: Union[bool, TransformersPatch], verbose: int, collected_data: "ValidateData"
+    observer,
+    patch: Union[bool, TransformersPatchEnum],
+    verbose: int,
+    collected_data: "ValidateData",
 ):
     """Infer export kwargs and dynamic shapes from the captured observer."""
     from .flatten import register_flattening_functions
 
-    patch_flag = _coerce_transformers_patch(patch)
-    flatten_patch = bool(TransformersPatch.YOBX_PATCH in patch_flag)
+    patch_flag = coerce_transformers_patch(patch)
+    flatten_patch = bool(TransformersPatchEnum.YOBX_PATCH in patch_flag)
 
     with register_flattening_functions(patch_transformers=flatten_patch):
         kwargs = observer.infer_arguments()
@@ -747,7 +750,7 @@ def _export(
     exporter: str,
     opset: int,
     optimization: Optional[str],
-    patch: Union[bool, TransformersPatch],
+    patch: Union[bool, TransformersPatchEnum],
     dump_folder: Optional[str],
     verbose: int,
     quiet: bool,
@@ -758,9 +761,9 @@ def _export(
     from .flatten import register_flattening_functions
     from .patch import apply_patches_for_model
 
-    patch_flag = _coerce_transformers_patch(patch)
-    patching_enabled = patch_flag != TransformersPatch.NONE
-    flatten_patch = bool(TransformersPatch.YOBX_PATCH in patch_flag)
+    patch_flag = coerce_transformers_patch(patch)
+    patching_enabled = patch_flag != TransformersPatchEnum.NONE
+    flatten_patch = bool(TransformersPatchEnum.YOBX_PATCH in patch_flag)
 
     model_name = model_id.replace("/", "-")
     suffix = ".".join(
@@ -904,7 +907,7 @@ def validate_model(
     device: Optional[str] = None,
     max_new_tokens: int = 10,
     do_run: bool = True,
-    patch: Union[bool, TransformersPatch] = True,
+    patch: Union[bool, TransformersPatchEnum] = True,
     quiet: bool = False,
     tokenized_inputs: Optional[Dict[str, Any]] = None,
     config_overrides: Optional[Dict[str, Any]] = None,
@@ -956,10 +959,10 @@ def validate_model(
     :param do_run: When ``True`` (default), checks that the ONNX model can be
         run after export and computes discrepancies.
     :param patch: Controls which patches are applied during input capture and
-        export. Accepts a :class:`~yobx.torch.TransformersPatch` flag
+        export. Accepts a :class:`~yobx.torch.TransformersPatchEnum` flag
         (``NONE``, ``YOBX_PATCH``, ``TRANSFORMERS_PATCH`` or ``ALL``); ``True``
-        is equivalent to ``TransformersPatch.ALL`` (default) and ``False`` to
-        ``TransformersPatch.NONE``.
+        is equivalent to ``TransformersPatchEnum.ALL`` (default) and ``False`` to
+        ``TransformersPatchEnum.NONE``.
     :param quiet: When ``True``, exceptions are caught and reported in the
         returned summary dictionary rather than re-raised.
     :param tokenized_inputs: Optional pre-tokenized inputs to use instead of

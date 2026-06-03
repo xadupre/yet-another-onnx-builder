@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 import copy
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Union
 import torch
 
 
@@ -129,7 +129,11 @@ class TinyBroadcastAddModel(torch.nn.Module):
         return x + y
 
 
-def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) -> ModelData:
+def get_tiny_model(
+    model_id,
+    config_updates: Optional[Dict[str, Any]] = None,
+    dtype: Union[torch.dtype, str] = "float32",
+) -> ModelData:
     """
     Creates a tiny models, usually untrained to write tests.
     The `model_id` refers to what exists on HuggingFace.
@@ -169,7 +173,12 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
             dynamic_shapes=model_data.dynamic_shapes,
         )
     """
+    if isinstance(dtype, str):
+        dtype = getattr(torch, dtype)
     if model_id == "local/BroadcastAdd":
+        assert (
+            dtype == torch.float32
+        ), f"model_id={model_id!r} not implemented when dtype={dtype!r}"
         return ModelData(
             model_id=model_id,
             model=TinyBroadcastAddModel(),
@@ -180,6 +189,10 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
     if model_id == "local/GraniteMoeHybrid":
         from transformers import GraniteMoeHybridForCausalLM
         from .in_transformers.models import get_cached_configuration
+
+        assert (
+            dtype == torch.float32
+        ), f"model_id={model_id!r} not implemented when dtype={dtype!r}"
 
         config = get_cached_configuration(model_id)
         assert config is not None, f"No cached configuration for {model_id!r}"
@@ -234,9 +247,10 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
             _update_config(config, config_updates)
 
         bsize, nheads, slen, dim = 2, 1, 30, 96
+        n_layers = config.num_hidden_layers
         return ModelData(
             model_id=model_id,
-            model=AutoModelForCausalLM.from_config(config),
+            model=AutoModelForCausalLM.from_config(config).to(dtype),
             export_inputs=dict(
                 input_ids=torch.randint(15, size=(2, 3), dtype=torch.int64),
                 attention_mask=torch.randint(1, size=(2, 33), dtype=torch.int64),
@@ -244,9 +258,10 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
                 past_key_values=make_dynamic_cache(
                     [
                         (
-                            torch.randn(bsize, nheads, slen, dim),
-                            torch.randn(bsize, nheads, slen, dim),
+                            torch.randn(bsize, nheads, slen, dim, dtype=dtype),
+                            torch.randn(bsize, nheads, slen, dim, dtype=dtype),
                         )
+                        for i in range(n_layers)
                     ]
                 ),
             ),
@@ -254,16 +269,22 @@ def get_tiny_model(model_id, config_updates: Optional[Dict[str, Any]] = None) ->
                 input_ids={0: "batch", 1: "seq_length"},
                 attention_mask={0: "batch", 1: "past_length+seq_length"},
                 position_ids={0: "batch", 1: "seq_length"},
-                past_key_values=[{0: "batch", 2: "past_length"} for _ in range(2)],
+                past_key_values=[{0: "batch", 2: "past_length"} for _ in range(2 * n_layers)],
             ),
             inputs_batch1=dict(
                 input_ids=torch.randint(15, size=(1, 3), dtype=torch.int64),
                 attention_mask=torch.randint(1, size=(1, 33), dtype=torch.int64),
                 position_ids=torch.arange(3, dtype=torch.int64).unsqueeze(0),
                 past_key_values=make_dynamic_cache(
-                    [(torch.randn(1, nheads, slen, dim), torch.randn(1, nheads, slen, dim))]
+                    [
+                        (
+                            torch.randn(1, nheads, slen, dim, dtype=dtype),
+                            torch.randn(1, nheads, slen, dim, dtype=dtype),
+                        )
+                        for i in range(n_layers)
+                    ]
                 ),
             ),
         )
 
-    raise ValueError(f"Model {model_id} is not supported yet.")
+    raise ValueError(f"Model {model_id!r} is not supported yet.")

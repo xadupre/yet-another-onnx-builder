@@ -1,7 +1,7 @@
 import unittest
 import torch
 from yobx.ext_test_case import ExtTestCase, requires_torch, hide_stdout
-from yobx.torch import apply_patches_for_model, TransformersPatch
+from yobx.torch import apply_patches_for_model, TransformersPatchEnum
 from yobx.torch.in_transformers.patches import enable_transformers_onnx_export_flags
 from yobx.helpers.patch_helper import PatchDetails
 
@@ -81,12 +81,12 @@ class TestPatch(ExtTestCase):
 
     def test_transformers_patch_flag_combinations(self):
         self.assertEqual(
-            TransformersPatch.YOBX_PATCH | TransformersPatch.TRANSFORMERS_PATCH,
-            TransformersPatch.ALL,
+            TransformersPatchEnum.YOBX_PATCH | TransformersPatchEnum.TRANSFORMERS_PATCH,
+            TransformersPatchEnum.ALL,
         )
-        self.assertIn(TransformersPatch.YOBX_PATCH, TransformersPatch.ALL)
-        self.assertIn(TransformersPatch.TRANSFORMERS_PATCH, TransformersPatch.ALL)
-        self.assertNotIn(TransformersPatch.YOBX_PATCH, TransformersPatch.NONE)
+        self.assertIn(TransformersPatchEnum.YOBX_PATCH, TransformersPatchEnum.ALL)
+        self.assertIn(TransformersPatchEnum.TRANSFORMERS_PATCH, TransformersPatchEnum.ALL)
+        self.assertNotIn(TransformersPatchEnum.YOBX_PATCH, TransformersPatchEnum.NONE)
 
     def test_apply_patches_for_model_transformers_patch_only(self):
         class FakeConfig:
@@ -109,7 +109,7 @@ class TestPatch(ExtTestCase):
         model = FakeModel()
         # Only TRANSFORMERS_PATCH toggles the flags; YOBX_PATCH is skipped.
         with apply_patches_for_model(
-            patch_transformers=TransformersPatch.TRANSFORMERS_PATCH, model=model
+            patch_transformers=TransformersPatchEnum.TRANSFORMERS_PATCH, model=model
         ):
             self.assertTrue(model.config.onnx_export)
             self.assertTrue(model.sub.onnx_trace)
@@ -126,7 +126,7 @@ class TestPatch(ExtTestCase):
                 self.config = FakeConfig()
 
         model = FakeModel()
-        with apply_patches_for_model(patch_transformers=TransformersPatch.NONE, model=model):
+        with apply_patches_for_model(patch_transformers=TransformersPatchEnum.NONE, model=model):
             self.assertFalse(model.config.onnx_export)
 
 

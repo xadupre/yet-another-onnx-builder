@@ -1,40 +1,9 @@
 import contextlib
-import enum
 import traceback
 from typing import Generator, Iterable, Optional, Union
 import torch
 from ..helpers.patch_helper import PatchDetails, PatchInfo
-
-
-class TransformersPatch(enum.Flag):
-    """
-    Selects which transformers-related patches :func:`apply_patches_for_model`
-    should apply. Members can be combined with ``|``.
-
-    * :attr:`NONE` — no transformers patches are applied.
-    * :attr:`YOBX_PATCH` — applies yobx's own transformers patches
-      (rotary embedding wrappers, flattening helpers, ...).
-    * :attr:`TRANSFORMERS_PATCH` — toggles the ONNX-export switches that
-      :epkg:`transformers` itself ships (``config.onnx_export``,
-      ``module.prepare_for_onnx_export_()``).
-    * :attr:`ALL` — shortcut for ``YOBX_PATCH | TRANSFORMERS_PATCH``.
-    """
-
-    NONE = 0
-    YOBX_PATCH = enum.auto()
-    TRANSFORMERS_PATCH = enum.auto()
-    ALL = YOBX_PATCH | TRANSFORMERS_PATCH
-
-
-def _coerce_transformers_patch(value: Union[bool, TransformersPatch]) -> TransformersPatch:
-    """Backward-compat conversion: ``True`` -> ``ALL``, ``False`` -> ``NONE``."""
-    if isinstance(value, TransformersPatch):
-        return value
-    if isinstance(value, bool):
-        return TransformersPatch.ALL if value else TransformersPatch.NONE
-    raise TypeError(
-        f"patch_transformers must be a bool or TransformersPatch, got {type(value).__name__}"
-    )
+from .patch_enum import TransformersPatchEnum, coerce_transformers_patch
 
 
 def retrieve_stacktrace():
@@ -54,7 +23,7 @@ def retrieve_stacktrace():
 @contextlib.contextmanager  # type: ignore
 def apply_patches_for_model(
     patch_torch: bool = False,
-    patch_transformers: Union[bool, TransformersPatch] = False,
+    patch_transformers: Union[bool, TransformersPatchEnum] = False,
     verbose: int = 0,
     model: Optional[torch.nn.Module] = None,
     extra_patches: Optional[Iterable[PatchInfo]] = None,
@@ -64,19 +33,19 @@ def apply_patches_for_model(
 
     .. code-block:: python
 
-        from yobx.torch import apply_patches_for_model, TransformersPatch
+        from yobx.torch import apply_patches_for_model, TransformersPatchEnum
 
         with apply_patches_for_model(
-            patch_transformers=TransformersPatch.ALL, model=model
+            patch_transformers=TransformersPatchEnum.ALL, model=model
         ):
             # ...
 
     :param patch_torch: applies patches for :epkg:`torch`
     :param patch_transformers: applies patches for transformers. Accepts a
-        :class:`TransformersPatch` flag (``NONE``, ``YOBX_PATCH``,
+        :class:`TransformersPatchEnum` flag (``NONE``, ``YOBX_PATCH``,
         ``TRANSFORMERS_PATCH`` or ``YOBX_PATCH | TRANSFORMERS_PATCH``).
         For backward compatibility, ``True`` is mapped to
-        ``TransformersPatch.ALL`` and ``False`` to ``TransformersPatch.NONE``.
+        ``TransformersPatchEnum.ALL`` and ``False`` to ``TransformersPatchEnum.NONE``.
     :param verbose: prints out which patch is applies
     :param model: modifies the list of patches for a particular model,
         it is recommended to fill it the used rope is not the default one
@@ -111,12 +80,12 @@ def apply_patches_for_model(
             ep = torch.export.export(model, ...)
     """
     patches = PatchDetails()
-    transformers_patch = _coerce_transformers_patch(patch_transformers)
+    transformers_patch = coerce_transformers_patch(patch_transformers)
     if patch_torch:
         from .in_torch.patches import get_patches
 
         patches.extend(get_patches())
-    if TransformersPatch.YOBX_PATCH in transformers_patch:
+    if TransformersPatchEnum.YOBX_PATCH in transformers_patch:
         from .in_transformers.patches import get_patches_for
 
         patches.extend(get_patches_for(model))
@@ -128,7 +97,7 @@ def apply_patches_for_model(
         patch.do()
 
     onnx_flags_cm: contextlib.AbstractContextManager = contextlib.nullcontext()
-    if TransformersPatch.TRANSFORMERS_PATCH in transformers_patch and model is not None:
+    if TransformersPatchEnum.TRANSFORMERS_PATCH in transformers_patch and model is not None:
         from .in_transformers.patches import enable_transformers_onnx_export_flags
 
         onnx_flags_cm = enable_transformers_onnx_export_flags(model=model, verbose=verbose)

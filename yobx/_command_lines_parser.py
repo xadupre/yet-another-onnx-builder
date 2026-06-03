@@ -865,17 +865,17 @@ def get_parser_validate() -> ArgumentParser:
 def _cmd_validate(argv: List[Any]):
     import ast
 
-    from .torch import TransformersPatch
+    from .torch import TransformersPatchEnum
     from .torch.validate import validate_model
 
     parser = get_parser_validate()
     args = parser.parse_args(argv[1:])
 
     patch_map = {
-        "none": TransformersPatch.NONE,
-        "yobx": TransformersPatch.YOBX_PATCH,
-        "transformers": TransformersPatch.TRANSFORMERS_PATCH,
-        "all": TransformersPatch.ALL,
+        "none": TransformersPatchEnum.NONE,
+        "yobx": TransformersPatchEnum.YOBX_PATCH,
+        "transformers": TransformersPatchEnum.TRANSFORMERS_PATCH,
+        "all": TransformersPatchEnum.ALL,
     }
     patch_flag = patch_map[args.patch]
 
