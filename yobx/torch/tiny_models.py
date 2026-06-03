@@ -248,7 +248,7 @@ def get_tiny_model(
             _update_config(config, config_updates)
 
         bsize, nheads, slen, dim = 2, 1, 30, 96
-        n_layers = config.num_hidden_layers if hasattr(config, "num_hidden_layers") else 1
+        n_layers = config.num_hidden_layers if hasattr(config, "num_hidden_layers") else 1  # type: ignore
         return ModelData(
             model_id=model_id,
             model=AutoModelForCausalLM.from_config(config).to(dtype),
