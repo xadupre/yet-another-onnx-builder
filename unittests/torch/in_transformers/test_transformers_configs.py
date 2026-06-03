@@ -65,6 +65,12 @@ class TestCachedConfigs(ExtTestCase):
         self.assertIn("arnir0/Tiny-LLM", tokenizers)
         tok = get_cached_tokenizer("arnir0/Tiny-LLM")
         self.assertIsNotNone(tok)
+        feeds = tok("small prompt", return_tensors="pt")
+        self.assertIn("input_ids", feeds)
+        self.assertIn("attention_mask", feeds)
+        self.assertEqual(tuple(feeds["input_ids"].shape), (1, 2))
+        self.assertTrue((feeds["input_ids"] >= 0).all().item())
+        self.assertTrue((feeds["input_ids"] < 32000).all().item())
 
 
 if __name__ == "__main__":
