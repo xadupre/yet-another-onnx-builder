@@ -419,6 +419,7 @@ def pretty_onnx(
     with_attributes: bool = False,
     highlight: Optional[Set[str]] = None,
     shape_inference: bool = False,
+    width: Optional[int] = None,
 ) -> str:
     """
     Displays an onnx proto in a better way.
@@ -426,6 +427,9 @@ def pretty_onnx(
     :param with_attributes: displays attributes as well, if only a node is printed
     :param highlight: to highlight some names
     :param shape_inference: run shape inference before printing the model
+    :param width: if set (number of columns), pads section header lines such
+        as ``----- input ----`` with trailing dashes up to that width so they
+        align with the terminal window size
     :return: text
     """
     assert onx is not None, "onx cannot be None"
@@ -514,9 +518,11 @@ def pretty_onnx(
     if isinstance(onx, onnx.FunctionProto):
         return (
             f"function: {onx.name}[{onx.domain}]\n"
-            f"{onnx_simple_text_plot(onx, recursive=True)}"  # pyrefly: ignore[bad-argument-type]
+            f"{onnx_simple_text_plot(onx, recursive=True, width=width)}"  # pyrefly: ignore[bad-argument-type]
         )
-    return onnx_simple_text_plot(onx, recursive=True)  # pyrefly: ignore[bad-argument-type]
+    return onnx_simple_text_plot(
+        onx, recursive=True, width=width
+    )  # pyrefly: ignore[bad-argument-type]
 
 
 def enumerate_results(

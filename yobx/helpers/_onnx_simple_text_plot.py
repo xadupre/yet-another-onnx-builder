@@ -412,6 +412,7 @@ def onnx_simple_text_plot(
     sub_graphs_names: Optional[Sequence[str]] = None,
     level: int = 1,
     indent: int = True,
+    width: Optional[int] = None,
 ) -> str:
     """
     Displays an ONNX graph into text.
@@ -428,6 +429,9 @@ def onnx_simple_text_plot(
     :param sub_graphs_names: list of sub-graphs names
     :param level: sub-graph level
     :param indent: use indentation or not
+    :param width: if set (number of columns), pads section header lines such
+        as ``----- input ----`` with trailing dashes up to that width so they
+        align with the terminal window size
     :return: str
 
     An ONNX graph is printed the following way:
@@ -490,6 +494,14 @@ def onnx_simple_text_plot(
         print("DOT-SECTION", to_dot(model_onnx))
     """
     use_indentation = indent
+
+    def _pad_header(line: str) -> str:
+        if width is None or width <= 0:
+            return line
+        if len(line) >= width:
+            return line
+        return line + "-" * (width - len(line))
+
     if att_display is None:
         att_display = [
             "activations",
@@ -727,7 +739,7 @@ def onnx_simple_text_plot(
     line_name_new = {}
     line_name_in = {}  # type: ignore[var-annotated]
     if level == 0:
-        rows.append("----- input ----")
+        rows.append(_pad_header("----- input ----"))
     for inp in model.input:
         if isinstance(inp, str):
             rows.append(f"input: {inp!r}")
@@ -746,7 +758,7 @@ def onnx_simple_text_plot(
     # initializer
     if hasattr(model, "initializer"):
         if len(model.initializer) and level == 0:
-            rows.append("----- initializer ----")
+            rows.append(_pad_header("----- initializer ----"))
         for init in model.initializer:
             if np.prod(_get_shape(init)) < 5:
                 content = f" -- {onh.to_array(init).ravel()!r}"
@@ -765,7 +777,7 @@ def onnx_simple_text_plot(
                 f"shape={_get_shape(init)}{content}"
             )
     if level == 0:
-        rows.append("----- main graph ----")
+        rows.append(_pad_header("----- main graph ----"))
 
     # successors, predecessors, it needs to support subgraphs
     subgraphs = graph_predecessors_and_successors(model)[0]
@@ -849,7 +861,7 @@ def onnx_simple_text_plot(
 
     # outputs
     if level == 0:
-        rows.append("----- output ----")
+        rows.append(_pad_header("----- output ----"))
     assert hasattr(model, "output"), "type checking"
     for out in model.output:
         if isinstance(out, str):
@@ -917,15 +929,17 @@ def onnx_simple_text_plot(
     if recursive:
         for node, name, g in subgraphs:
             rows.append(
-                "----- subgraph ---- %s - %s - att.%s=%s -- level=%d -- %s -> %s"
-                % (
-                    node.op_type,
-                    node.name,
-                    name,
-                    _get_subgraph_name(id(g)),
-                    level,
-                    ",".join(i.name for i in g.input),
-                    ",".join(i.name for i in g.output),
+                _pad_header(
+                    "----- subgraph ---- %s - %s - att.%s=%s -- level=%d -- %s -> %s"
+                    % (
+                        node.op_type,
+                        node.name,
+                        name,
+                        _get_subgraph_name(id(g)),
+                        level,
+                        ",".join(i.name for i in g.input),
+                        ",".join(i.name for i in g.output),
+                    )
                 )
             )
             res = onnx_simple_text_plot(
@@ -937,18 +951,19 @@ def onnx_simple_text_plot(
                 sub_graphs_names=sub_graphs_names,
                 level=level + 1,
                 raise_exc=raise_exc,
+                width=width,
             )
             rows.append(res)
 
     # functions
     if functions and main_model is not None:
         for fct in main_model.functions:
-            rows.append(f"----- function name={fct.name} domain={fct.domain}")
+            rows.append(_pad_header(f"----- function name={fct.name} domain={fct.domain}"))
             if fct.doc_string:
                 if len(fct.doc_string) < 55:
-                    rows.append(f"----- doc_string: {fct.doc_string}")
+                    rows.append(_pad_header(f"----- doc_string: {fct.doc_string}"))
                 else:
-                    rows.append(f"----- doc_string: {fct.doc_string[:55]}...")
+                    rows.append(_pad_header(f"----- doc_string: {fct.doc_string[:55]}..."))
             res = onnx_simple_text_plot(
                 fct,
                 verbose=verbose,
@@ -958,6 +973,7 @@ def onnx_simple_text_plot(
                 functions=False,
                 sub_graphs_names=sub_graphs_names,
                 level=1,
+                width=width,
             )
             rows.append(res)
 

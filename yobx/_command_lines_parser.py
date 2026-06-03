@@ -497,9 +497,11 @@ def _cmd_print(argv: List[Any]):
     elif args.fmt == "raw":
         print(onx)
     elif args.fmt == "pretty":
-        from .helpers.onnx_helper import pretty_onnx
+        import shutil
+        from .helpers._onnx_simple_text_plot import onnx_simple_text_plot
 
-        print(pretty_onnx(onx))
+        width = shutil.get_terminal_size(fallback=(80, 24)).columns
+        print(onnx_simple_text_plot(onx, recursive=True, level=0, width=width))
     elif args.fmt == "printer":
         print(onnx.printer.to_text(onx))
     elif args.fmt == "shape":

@@ -105,6 +105,28 @@ class TestOnnxHelper(ExtTestCase):
         text = pretty_onnx(model)
         self.assertIn("Reshape(concat_out, reshape_shape) -> Z", text)
 
+    def test_pretty_onnx_width(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Add", ["X", "Y"], ["Z"])],
+                "g",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [1, 3]),
+                    oh.make_tensor_value_info("Y", TFLOAT, [1, 3]),
+                ],
+                [oh.make_tensor_value_info("Z", TFLOAT, [1, 3])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        text = onnx_simple_text_plot(model, recursive=True, level=0, width=60)
+        header_lines = [line for line in text.splitlines() if line.startswith("-----")]
+        self.assertTrue(header_lines)
+        for line in header_lines:
+            self.assertEqual(len(line), 60)
+        default = onnx_simple_text_plot(model, recursive=True, level=0)
+        self.assertIn("----- input ----\n", default + "\n")
+
     def test_pretty_onnx_value_info_proto(self):
         vi = oh.make_tensor_value_info("X", TFLOAT, ["batch", "seq"])
         text = pretty_onnx(vi)
