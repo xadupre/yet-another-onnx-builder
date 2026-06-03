@@ -117,7 +117,7 @@ def flattening_functions(
     classes: Dict[type, Callable[[], bool]] = {}
     all_functions: Dict[type, Optional[str]] = {}
 
-    if patch_transformers & TransformersPatchEnum.YOBX_PATCH:
+    if patch_transformers != TransformersPatchEnum.NONE:
         from .in_transformers.flatten_class import (  # type: ignore[attr-defined]
             __dict__ as dtr,
             SUPPORTED_DATACLASSES,
@@ -180,7 +180,7 @@ def register_cache_flattening(
     """
     wrong: Dict[type, Optional[str]] = {}
     transformers_version = None
-    if patch_transformers & TransformersPatchEnum.YOBX_PATCH:
+    if patch_transformers != TransformersPatchEnum.NONE:
         import transformers
         from .in_transformers.flatten_class import WRONG_REGISTRATIONS
 
@@ -283,7 +283,7 @@ def register_flattening_functions(
     patch_transformers = coerce_transformers_patch(patch_transformers)
     fct_callable = (  # type: ignore
         replacement_before_exporting
-        if (patch_transformers & TransformersPatchEnum.YOBX_PATCH)
+        if patch_transformers != TransformersPatchEnum.NONE
         else (lambda x: x)
     )
     done = register_cache_flattening(patch_transformers=patch_transformers, verbose=verbose)
