@@ -424,6 +424,13 @@ def _load_tokenizer(
 
     use_bundled_cache_fallback = unittest_going or summary.config_from_cache == "bundled"
 
+    if use_bundled_cache_fallback:
+        from .in_transformers.models import get_cached_tokenizer
+
+        cached_tokenizer = get_cached_tokenizer(model_id)
+        if cached_tokenizer is not None:
+            return cached_tokenizer
+
     if use_bundled_cache_fallback and config is None:
         from .in_transformers.models import get_cached_configuration
 

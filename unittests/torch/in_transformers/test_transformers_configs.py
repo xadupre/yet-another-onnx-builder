@@ -1,8 +1,14 @@
 import os
 import unittest
 from yobx.ext_test_case import ExtTestCase, requires_transformers
-from yobx.torch.in_transformers.models._configs import _retrieve_cached_configurations
-from yobx.torch.in_transformers.models.configs import get_cached_configuration
+from yobx.torch.in_transformers.models._configs import (
+    _retrieve_cached_configurations,
+    _retrieve_cached_tokenizers,
+)
+from yobx.torch.in_transformers.models.configs import (
+    get_cached_configuration,
+    get_cached_tokenizer,
+)
 
 
 class TestCachedConfigs(ExtTestCase):
@@ -52,6 +58,13 @@ class TestCachedConfigs(ExtTestCase):
         self.assertEqual(conf.hidden_size, 192)
         self.assertEqual(conf.num_hidden_layers, 1)
         self.assertEqual(conf.num_attention_heads, 2)
+
+    @requires_transformers("")
+    def test_get_cached_tokenizer_arnir0_tiny_llm(self):
+        tokenizers = _retrieve_cached_tokenizers()
+        self.assertIn("arnir0/Tiny-LLM", tokenizers)
+        tok = get_cached_tokenizer("arnir0/Tiny-LLM")
+        self.assertIsNotNone(tok)
 
 
 if __name__ == "__main__":

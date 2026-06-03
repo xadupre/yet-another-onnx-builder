@@ -89,6 +89,22 @@ def _ccached_arnir0_tiny_LLM():
     )
 
 
+def _tcached_arnir0_tiny_LLM():
+    "arnir0/Tiny-LLM"
+    import torch
+
+    vocab_size = 32000
+    seq_len = 8
+    input_ids = torch.arange(seq_len, dtype=torch.int64).unsqueeze(0) % vocab_size
+    attention_mask = torch.ones_like(input_ids)
+
+    def _tokenizer(_prompt: str, return_tensors: str = "pt"):
+        assert return_tensors == "pt", f"Unexpected value {return_tensors!r}"
+        return {"input_ids": input_ids.clone(), "attention_mask": attention_mask.clone()}
+
+    return _tokenizer
+
+
 if not hasattr(transformers, "GraniteMoeHybridConfig"):
     # Older versions of transformers do not ship GraniteMoeHybridConfig; drop
     # the registration so _retrieve_cached_configurations does not expose it.
