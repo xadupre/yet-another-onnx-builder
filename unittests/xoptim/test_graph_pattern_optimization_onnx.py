@@ -7167,6 +7167,83 @@ class TestGraphPatternOptimization(ExtTestCase):
         zz = ref.run(None, feeds)[0]
         self.assertEqualArray(z, zz)
 
+    def test_transpose_gather_switch(self):
+        # perm_less = [2, 0, 1] is not sorted: Transpose is moved after
+        # Gather and applied to the smaller tensor.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Transpose", ["X"], ["xt"], perm=[2, 0, 3, 1]),
+                    oh.make_node("Gather", ["xt", "ind"], ["Y"], axis=2),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c", "d"])],
+                [oh.make_tensor_value_info("Y", TFLOAT, ["c", "a", "b"])],
+                [onh.from_array(np.array(1, dtype=np.int64), name="ind")],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        feeds = dict(X=np.random.randn(4, 3, 5, 7).astype(np.float32))
+        ref = ExtendedReferenceEvaluator(model, verbose=0)
+        z = ref.run(None, feeds)[0]
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="TransposeGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        self.assertEqual(["Gather", "Transpose"], [n.op_type for n in opt_onx.graph.node])
+        gather = opt_onx.graph.node[0]
+        self.assertEqual(gather.attribute[0].i, 3)
+        transpose = opt_onx.graph.node[1]
+        self.assertEqual(list(transpose.attribute[0].ints), [2, 0, 1])
+        ref = ExtendedReferenceEvaluator(opt_onx, verbose=0)
+        zz = ref.run(None, feeds)[0]
+        self.assertEqualArray(z, zz)
+
+    def test_transpose_gather_reused(self):
+        # Transpose has two consumers, so it must stay; Gather is rewritten
+        # to operate on the original input plus a small Transpose after it.
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Transpose", ["X"], ["xt"], perm=[2, 0, 3, 1]),
+                    oh.make_node("Gather", ["xt", "ind"], ["Y"], axis=2),
+                    oh.make_node("Identity", ["xt"], ["Z"]),
+                ],
+                "test",
+                [oh.make_tensor_value_info("X", TFLOAT, ["a", "b", "c", "d"])],
+                [
+                    oh.make_tensor_value_info("Y", TFLOAT, ["c", "a", "b"]),
+                    oh.make_tensor_value_info("Z", TFLOAT, ["c", "a", "d", "b"]),
+                ],
+                [onh.from_array(np.array(1, dtype=np.int64), name="ind")],
+            ),
+            opset_imports=[oh.make_operatorsetid("", 18)],
+            ir_version=10,
+        )
+        feeds = dict(X=np.random.randn(4, 3, 5, 7).astype(np.float32))
+        ref = ExtendedReferenceEvaluator(model, verbose=0)
+        expected = ref.run(None, feeds)
+
+        gr = GraphBuilder(
+            model,
+            infer_shapes_options=True,
+            optimization_options=OptimizationOptions(patterns="TransposeGather", verbose=0),
+        )
+        opt_onx = gr.to_onnx(optimize=True)
+        op_types = [n.op_type for n in opt_onx.graph.node]
+        self.assertIn("Transpose", op_types)
+        self.assertIn("Gather", op_types)
+        # Original Transpose is kept, plus the new Gather and small Transpose.
+        self.assertEqual(op_types.count("Transpose"), 2)
+        ref = ExtendedReferenceEvaluator(opt_onx, verbose=0)
+        got = ref.run(None, feeds)
+        for a, b in zip(expected, got):
+            self.assertEqualArray(a, b)
+
     def test_swap_unsqueeze_transpose(self):
         for axis in [0, 1, 2, -1]:
             with self.subTest(axis=axis):

@@ -610,30 +610,50 @@ class TransposeGatherPattern(PatternOptimization):
         rank = g.get_rank(node.input[1])
         if rank != 0:
             return self.none(node, inspect.currentframe().f_lineno)
-        perm = tr_node.attribute[0].ints
-        axis = node.attribute[0].i if node.attribute else 0
-        perm_less = [p for i, p in enumerate(perm) if i != axis]
-        if sorted(perm_less) != perm_less:
-            return self.none(node, inspect.currentframe().f_lineno)
         return MatchResult(self, [tr_node, node], self.apply, insert_at=node)
 
     def apply(
         self, g: "GraphBuilder", transpose_node: NodeProto, gather_node: NodeProto  # noqa: F821
     ) -> List[NodeProto]:
-        perm = transpose_node.attribute[0].ints
+        perm = list(transpose_node.attribute[0].ints)
         axis = gather_node.attribute[0].i if gather_node.attribute else 0
         new_axis = perm[axis]
-        new_node = g.make_node(
-            "Gather",
-            [transpose_node.input[0], gather_node.input[1]],
-            gather_node.output,
-            axis=new_axis,
-            name=f"{self.__class__.__name__}--{gather_node.name}",
-            doc_string=gather_node.doc_string,
-        )
-        if g.is_used_more_than_once(transpose_node.output[0]):
-            return [transpose_node, new_node]
-        return [new_node]
+        perm_less = [p for i, p in enumerate(perm) if i != axis]
+        keep_transpose = g.is_used_more_than_once(transpose_node.output[0])
+        if sorted(perm_less) == perm_less:
+            new_gather = g.make_node(
+                "Gather",
+                [transpose_node.input[0], gather_node.input[1]],
+                gather_node.output,
+                axis=new_axis,
+                name=f"{self.__class__.__name__}--{gather_node.name}",
+                doc_string=gather_node.doc_string,
+            )
+            new_nodes = [new_gather]
+        else:
+            # Switch transpose and gather so that the transpose runs on
+            # a smaller tensor produced by Gather on the original input.
+            new_perm = [(p - 1) if p > new_axis else p for p in perm_less]
+            gather_out = g.unique_name(f"{gather_node.output[0]}_gathered")
+            new_gather = g.make_node(
+                "Gather",
+                [transpose_node.input[0], gather_node.input[1]],
+                [gather_out],
+                axis=new_axis,
+                name=f"{self.__class__.__name__}--{gather_node.name}",
+                doc_string=gather_node.doc_string,
+            )
+            new_transpose = g.make_node(
+                "Transpose",
+                [gather_out],
+                gather_node.output,
+                perm=new_perm,
+                name=f"{self.__class__.__name__}--T--{gather_node.name}",
+            )
+            new_nodes = [new_gather, new_transpose]
+        if keep_transpose:
+            return [transpose_node, *new_nodes]
+        return new_nodes
 
 
 class SwapUnsqueezeTransposePattern(PatternOptimization):
