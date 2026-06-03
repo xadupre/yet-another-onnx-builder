@@ -357,9 +357,12 @@ def set_type_shape_matmul(g: ShapeBuilder, name: str, x: str, y: str) -> bool:
     # device
     if g.has_device(x) and g.has_device(y) and g.get_device(x) == g.get_device(y):
         g.set_device(name, g.get_device(x))
-    if not g.has_type(x):
+    if g.has_type(x):
+        g.set_type(name, g.get_type(x))
+    elif g.has_type(y):
+        g.set_type(name, g.get_type(y))
+    else:
         return
-    g.set_type(name, g.get_type(x))
     if g.has_shape(x) and g.has_shape(y):
         sh1 = g.get_shape(x)
         sh2 = g.get_shape(y)

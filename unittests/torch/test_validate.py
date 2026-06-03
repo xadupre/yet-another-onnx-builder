@@ -498,7 +498,6 @@ class TestValidateModel(ExtTestCase):
                 "--random-weights",
                 "--config-override",
                 "num_hidden_layers=2",
-                "--quiet",
             ]
             st = StringIO()
             with redirect_stdout(st):
