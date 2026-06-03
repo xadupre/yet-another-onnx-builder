@@ -1,8 +1,9 @@
 import contextlib
 import traceback
-from typing import Generator, Iterable, Optional
+from typing import Generator, Iterable, Optional, Union
 import torch
 from ..helpers.patch_helper import PatchDetails, PatchInfo
+from .patch_enum import TransformersPatchEnum, coerce_transformers_patch
 
 
 def retrieve_stacktrace():
@@ -22,7 +23,7 @@ def retrieve_stacktrace():
 @contextlib.contextmanager  # type: ignore
 def apply_patches_for_model(
     patch_torch: bool = False,
-    patch_transformers: bool = False,
+    patch_transformers: Union[bool, TransformersPatchEnum] = False,
     verbose: int = 0,
     model: Optional[torch.nn.Module] = None,
     extra_patches: Optional[Iterable[PatchInfo]] = None,
@@ -32,13 +33,19 @@ def apply_patches_for_model(
 
     .. code-block:: python
 
-        from yobx.torch import apply_patches_for_model
+        from yobx.torch import apply_patches_for_model, TransformersPatchEnum
 
-        with apply_patches_for_model(patch_transformers=True, model=model):
+        with apply_patches_for_model(
+            patch_transformers=TransformersPatchEnum.ALL, model=model
+        ):
             # ...
 
     :param patch_torch: applies patches for :epkg:`torch`
-    :param patch_transformers: applies patch for transformers
+    :param patch_transformers: applies patches for transformers. Accepts a
+        :class:`TransformersPatchEnum` flag (``NONE``, ``YOBX_PATCH``,
+        ``TRANSFORMERS_PATCH`` or ``YOBX_PATCH | TRANSFORMERS_PATCH``).
+        For backward compatibility, ``True`` is mapped to
+        ``TransformersPatchEnum.ALL`` and ``False`` to ``TransformersPatchEnum.NONE``.
     :param verbose: prints out which patch is applies
     :param model: modifies the list of patches for a particular model,
         it is recommended to fill it the used rope is not the default one
@@ -73,11 +80,12 @@ def apply_patches_for_model(
             ep = torch.export.export(model, ...)
     """
     patches = PatchDetails()
+    transformers_patch = coerce_transformers_patch(patch_transformers)
     if patch_torch:
         from .in_torch.patches import get_patches
 
         patches.extend(get_patches())
-    if patch_transformers:
+    if TransformersPatchEnum.YOBX_PATCH in transformers_patch:
         from .in_transformers.patches import get_patches_for
 
         patches.extend(get_patches_for(model))
@@ -87,8 +95,16 @@ def apply_patches_for_model(
         if verbose:
             print(f"[register_patch_functions] apply {patch}")
         patch.do()
+
+    onnx_flags_cm: contextlib.AbstractContextManager = contextlib.nullcontext()
+    if TransformersPatchEnum.TRANSFORMERS_PATCH in transformers_patch and model is not None:
+        from .in_transformers.patches import enable_transformers_onnx_export_flags
+
+        onnx_flags_cm = enable_transformers_onnx_export_flags(model=model, verbose=verbose)
+
     try:
-        yield patches
+        with onnx_flags_cm:
+            yield patches
     finally:
         for patch in patches:
             if verbose:

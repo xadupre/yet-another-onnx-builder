@@ -308,7 +308,7 @@ def set_type_shape_binary_op(
             if g.has_type(input_name):
                 dtype = g.get_type(input_name)
                 break
-        if not dtype and g.as_function:
+        if not dtype and hasattr(g, "as_function") and g.as_function:
             return
         assert dtype, f"Unable to guess type for {name!r} from {input_names}{g.get_debug_msg()}"
         g.set_type(name, dtype)

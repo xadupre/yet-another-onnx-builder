@@ -460,6 +460,54 @@ class TestValidateModel(ExtTestCase):
             if data.discrepancies:
                 self.assertIn("discrepancies", sheets)
 
+    def test_cmd_validate_tiny_llm_patch_yobx(self):
+        """End-to-end CLI invocation equivalent to:
+
+        ``python -m yobx validate -m arnir0/Tiny-LLM -e yobx
+        --opt default+onnxruntime --opset 22 --device cpu --dtype float16
+        --patch yobx -r -o dump_test -v 1 --random-weights
+        --config-override num_hidden_layers=2``
+        """
+        import tempfile
+        from contextlib import redirect_stdout
+        from io import StringIO
+        from yobx._command_lines_parser import main
+
+        with tempfile.TemporaryDirectory() as dump_folder:
+            argv = [
+                "validate",
+                "-m",
+                "arnir0/Tiny-LLM",
+                "-e",
+                "yobx",
+                "--opt",
+                "default+onnxruntime",
+                "--opset",
+                "22",
+                "--device",
+                "cpu",
+                "--dtype",
+                "float16",
+                "--patch",
+                "yobx",
+                "-r",
+                "-o",
+                dump_folder,
+                "-v",
+                "1",
+                "--random-weights",
+                "--config-override",
+                "num_hidden_layers=2",
+                "--quiet",
+            ]
+            st = StringIO()
+            with redirect_stdout(st):
+                main(argv)
+            text = st.getvalue()
+        # The CLI prints a ":key,value;" summary block; sanity-check it ran.
+        self.assertIn("-- summary --", text)
+        self.assertIn(":model_id,arnir0/Tiny-LLM;", text)
+
     def test_validate_model_gemma_cli_equivalent(self):
         """Python API equivalent of the CLI command:
 
