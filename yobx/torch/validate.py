@@ -422,24 +422,31 @@ def _load_tokenizer(
     if verbose:
         print(f"[validate_model] loading tokenizer for {model_id!r}")
 
-    if unittest_going and config is None:
+    use_bundled_cache_fallback = unittest_going or summary.config_from_cache == "bundled"
+
+    if use_bundled_cache_fallback and config is None:
         from .in_transformers.models import get_cached_configuration
 
         config = get_cached_configuration(model_id)
 
     tokenizer_kwargs: Dict[str, Any] = {}
-    if unittest_going and config is not None:
+    if use_bundled_cache_fallback and config is not None:
         tokenizer_kwargs["config"] = config
 
     try:
-        try:
+        if use_bundled_cache_fallback:
             tokenizer = AutoTokenizer.from_pretrained(
                 model_id, local_files_only=True, **tokenizer_kwargs
             )
-        except OSError:
-            tokenizer = AutoTokenizer.from_pretrained(model_id, **tokenizer_kwargs)
+        else:
+            try:
+                tokenizer = AutoTokenizer.from_pretrained(
+                    model_id, local_files_only=True, **tokenizer_kwargs
+                )
+            except OSError:
+                tokenizer = AutoTokenizer.from_pretrained(model_id, **tokenizer_kwargs)
     except Exception as exc:
-        if unittest_going and config is not None:
+        if use_bundled_cache_fallback and config is not None:
             vocab_size = getattr(config, "vocab_size", 32000)
             seq_len = 8
             input_ids = torch.arange(seq_len, dtype=torch.int64).unsqueeze(0) % max(
