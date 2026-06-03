@@ -888,7 +888,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_yobx_2(self):
         proto = self._export_tiny_llm(
-            opset=22, patterns="default+onnxruntime", patch="yobx", dtype="float16"
+            opset=22, patterns="default+onnxruntime", patch="yobx", dtype="float16", n_layers=2
         )
         missing = self._get_missing_shapes(proto)
         self.assertEqual(
@@ -911,7 +911,11 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_transformers_2(self):
         proto = self._export_tiny_llm(
-            opset=22, patterns="default+onnxruntime", patch="transformers", dtype="float16"
+            opset=22,
+            patterns="default+onnxruntime",
+            patch="transformers",
+            dtype="float16",
+            n_layers=2,
         )
         missing = self._get_missing_shapes(proto)
         self.assertEqual(

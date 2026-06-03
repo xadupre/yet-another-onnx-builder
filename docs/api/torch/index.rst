@@ -17,6 +17,7 @@ yobx.torch
     flatten
     input_observer
     patch
+    patch_enum
     tiny_models
     torch_helper
     tracing

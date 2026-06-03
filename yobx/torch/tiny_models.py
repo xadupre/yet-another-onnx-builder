@@ -175,6 +175,7 @@ def get_tiny_model(
     """
     if isinstance(dtype, str):
         dtype = getattr(torch, dtype)
+    assert isinstance(dtype, torch.dtype), f"Unexpected type for dtype={type(dtype)}, {dtype=}"
     if model_id == "local/BroadcastAdd":
         assert (
             dtype == torch.float32
@@ -247,7 +248,7 @@ def get_tiny_model(
             _update_config(config, config_updates)
 
         bsize, nheads, slen, dim = 2, 1, 30, 96
-        n_layers = config.num_hidden_layers
+        n_layers = 1 if hasattr(config, "num_hidden_layers") else config.num_hidden_layers
         return ModelData(
             model_id=model_id,
             model=AutoModelForCausalLM.from_config(config).to(dtype),
