@@ -176,7 +176,7 @@ class TestSpoxGraphBuilderOpDispatch(ExtTestCase):
     def test_op_gemm_with_attrs(self):
         g = _make_builder(18)
         g.make_tensor_input("X", TensorProto.FLOAT, (None, 4))
-        w = g.make_initializer("W", np.ones((4, 3), dtype=np.float32))
+        w = g.make_initializer("W", np.ones((3, 4), dtype=np.float32))
         b = g.make_initializer("B", np.zeros(3, dtype=np.float32))
         y = g.op.Gemm("X", w, b, transB=1)
         self.assertIsInstance(y, str)

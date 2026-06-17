@@ -11,11 +11,15 @@ class PvVersion:
 
     def __init__(self, version: str):
         self.version = version
-        self.t_version = tuple(
-            self.to_int(i)
-            for i in re.split(r"[.+]", version)
-            if not i.startswith(("dev", "rc", "post", "cpu", "cu"))
-        )
+        parts = []
+        for i in re.split(r"[.+]", version):
+            match = re.match(r"\d+", i)
+            if match is None:
+                # Purely non-numeric component such as 'dev0', 'rc1', 'cpu', 'cu121'.
+                continue
+            # Keeps only the leading digits so suffixes like '0rc1' parse as '0'.
+            parts.append(self.to_int(match.group()))
+        self.t_version = tuple(parts)
 
     def __repr__(self) -> str:
         "usual"
