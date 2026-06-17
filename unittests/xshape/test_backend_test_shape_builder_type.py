@@ -158,6 +158,8 @@ backend_test.exclude(
     "|test_layer_normalization_4d"
     "|test_layer_normalization_default"
     "|test_range_float_type_positive_delta_expanded"
+    "|test_range_float16_type_positive_delta_expanded"
+    "|test_range_bfloat16_type_positive_delta_expanded"
     "|test_range_int32_type_negative_delta_expanded"
     "|test_rotary_embedding_interleaved_expanded"
     "|test_rotary_embedding_no_position_ids_interleaved_expanded"

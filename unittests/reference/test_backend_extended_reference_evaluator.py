@@ -119,6 +119,8 @@ backend_test.exclude(
 backend_test.exclude(
     "("
     "test_range_float_type_positive_delta_expanded"
+    "|test_range_float16_type_positive_delta_expanded"
+    "|test_range_bfloat16_type_positive_delta_expanded"
     "|test_range_int32_type_negative_delta_expanded"
     "|test_scatter_with(out)?_axis"
     ")"

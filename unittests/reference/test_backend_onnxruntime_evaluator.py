@@ -181,10 +181,31 @@ backend_test.exclude(
     "|test_cast_FLOAT16_to_INT4"
     "|test_cast_INT4_to_"
     "|test_castlike_INT4_to_"
+    "|test_castlike_FLOAT_to_INT4"
+    "|test_castlike_FLOAT16_to_INT4"
     "|test_cast_FLOAT_to_UINT4"
     "|test_cast_FLOAT16_to_UINT4"
     "|test_cast_UINT4_to_"
-    "|test_castlike_UINT4_to_)"
+    "|test_castlike_UINT4_to_"
+    "|test_castlike_FLOAT_to_UINT4"
+    "|test_castlike_FLOAT16_to_UINT4)"
+)
+
+# New sub-byte and low-precision float types (INT2/UINT2, FLOAT4E2M1, FLOAT8E8M0)
+# are emitted by a newer onnx but are not yet implemented by onnxruntime.
+backend_test.exclude("(?i)(int2|float4e2m1|e8m0)")
+
+# Operators not yet implemented by onnxruntime at the current opset.
+backend_test.exclude(
+    "(test_convinteger_with_padding"
+    "|test_gru_batchwise"
+    "|test_lstm_batchwise"
+    "|test_maxunpool_export_with_output_shape"
+    "|test_roialign_aligned_false"
+    "|test_roialign_aligned_true"
+    "|test_roialign_mode_max"
+    "|test_simple_rnn_batchwise"
+    ")"
 )
 
 backend_test.exclude(

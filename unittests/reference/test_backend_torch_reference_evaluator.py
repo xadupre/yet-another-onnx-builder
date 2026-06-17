@@ -166,6 +166,9 @@ backend_test.exclude(
     ")"
 )
 
+# Conv with auto_pad/causal padding is not supported by torch's conv (padding=[0, 0]).
+backend_test.exclude("(test_causal_conv_with_state)")
+
 # import all test cases at global scope to make them visible to python.unittest
 globals().update(backend_test.test_cases)
 
