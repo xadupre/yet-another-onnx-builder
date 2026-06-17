@@ -6570,7 +6570,7 @@ class GraphBuilder(
     def _improve_constraints(self):
         """Adds more correspondences deduced from self.constraints_."""
 
-        update = {}
+        update: Dict[str, Set[Union[str, int]]] = {}
         it = 0
         while (update or it == 0) and it < 10:
             it += 1
@@ -8068,8 +8068,9 @@ class GraphBuilder(
             # trouble, let's assume one move is ok.
             mini = max((first_at.get(i, -1), i) for i in node.input if i)
             pos, name = mini
-            assert (
-                name in self.nodes[pos].output
+            node_at_pos = self.nodes[pos]
+            assert node_at_pos is not None and (
+                name in node_at_pos.output
             ), f"Name {name!r} should be at node position {pos}"
             new_position = self._move_node_position(pos)
             if not new_position:
@@ -8411,12 +8412,12 @@ class GraphBuilder(
             )
             set_shape_type_custom(self, node)  # type: ignore[arg-type]
 
-    def infer_shapes(self) -> Dict[str, Tuple[DYNAMIC_SHAPE, DYNAMIC_SHAPE]]:
+    def infer_shapes(self) -> Dict[str, Tuple[Optional[DYNAMIC_SHAPE], Optional[DYNAMIC_SHAPE]]]:
         """Runs custom shape inference. Returns the updates."""
         begin = time.perf_counter()
         if self.verbose > 1:
             print("[GraphBuilder.infer_shapes]")
-        res: Dict[str, Tuple[DYNAMIC_SHAPE, DYNAMIC_SHAPE]] = {}
+        res: Dict[str, Tuple[Optional[DYNAMIC_SHAPE], Optional[DYNAMIC_SHAPE]]] = {}
         for node in self.nodes:
             if not node:
                 continue
