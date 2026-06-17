@@ -77,6 +77,7 @@ class ValidateSummary:
     discrepancies_atol: Optional[float] = None
     discrepancies_ratio_001: Optional[float] = None
     discrepancies_ratio_01: Optional[float] = None
+    discrepancies_rtol: Optional[float] = None
     error_discrepancies: Optional[str] = None
 
     def __init__(
