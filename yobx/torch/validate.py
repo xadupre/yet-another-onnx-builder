@@ -49,6 +49,7 @@ class ValidateSummary:
         discrepancies: ``"OK"`` or ``"FAILED"`` for the overall discrepancy check.
         discrepancies_max_abs: Maximum absolute discrepancy across all input sets.
         discrepancies_atol: Absolute tolerance threshold used to determine success.
+        discrepancies_rtol: Relative tolerance threshold used to determine success.
         discrepancies_ratio_001: Fraction of output elements with absolute difference > 0.01,
             aggregated across all input sets.
         discrepancies_ratio_01: Fraction of output elements with absolute difference > 0.1,
@@ -75,6 +76,7 @@ class ValidateSummary:
     discrepancies: Optional[str] = None
     discrepancies_max_abs: Optional[float] = None
     discrepancies_atol: Optional[float] = None
+    discrepancies_rtol: Optional[float] = None
     discrepancies_ratio_001: Optional[float] = None
     discrepancies_ratio_01: Optional[float] = None
     discrepancies_rtol: Optional[float] = None
@@ -101,6 +103,7 @@ class ValidateSummary:
         discrepancies: Optional[str] = None,
         discrepancies_max_abs: Optional[float] = None,
         discrepancies_atol: Optional[float] = None,
+        discrepancies_rtol: Optional[float] = None,
         discrepancies_ratio_001: Optional[float] = None,
         discrepancies_ratio_01: Optional[float] = None,
         error_discrepancies: Optional[str] = None,
@@ -124,6 +127,7 @@ class ValidateSummary:
         self.discrepancies = discrepancies
         self.discrepancies_max_abs = discrepancies_max_abs
         self.discrepancies_atol = discrepancies_atol
+        self.discrepancies_rtol = discrepancies_rtol
         self.discrepancies_ratio_001 = discrepancies_ratio_001
         self.discrepancies_ratio_01 = discrepancies_ratio_01
         self.error_discrepancies = error_discrepancies
