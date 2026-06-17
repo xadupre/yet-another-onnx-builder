@@ -10,6 +10,14 @@ class TestPvVersion(ExtTestCase):
     def test_pv_raise(self):
         self.assertRaise(lambda: PvVersion("5.0.07"), ValueError)
 
+    def test_pv_prerelease(self):
+        self.assertEqual(PvVersion("2.5.0rc1"), PvVersion("2.5.0rc1"))
+        self.assertTrue(PvVersion("2.5.0rc1") < PvVersion("2.5.1"))
+        self.assertTrue(PvVersion("2.5.0rc1") >= PvVersion("2.5.0"))
+        self.assertTrue(PvVersion("2.5.0.dev0") < PvVersion("2.5.1"))
+        self.assertTrue(PvVersion("2.1.0+cpu") < PvVersion("2.2.0"))
+        self.assertTrue(PvVersion("2.1.0+cu121") >= PvVersion("2.1.0"))
+
     def test_pv_version2(self):
         self.assertEqual(PvVersion("5.0"), PvVersion("5.0"))
         self.assertNotEqual(PvVersion("5.0"), PvVersion("5.1"))
