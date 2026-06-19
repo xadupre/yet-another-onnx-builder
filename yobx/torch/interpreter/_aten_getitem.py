@@ -184,7 +184,7 @@ def _getitem_slice(
 
     # if concat: one end is coming from a shape
     if concat:
-        iends: List[Union[str, np.ndarray]] = []
+        iends: List[Any] = []
         for i in ends:
             if isinstance(i, str):
                 if g.get_rank(i) == 0:
@@ -222,7 +222,7 @@ def _getitem_slice(
             source="_getitem_slice.2",
         )
     else:
-        istarts: List[Union[str, np.ndarray]] = []
+        istarts: List[Any] = []
         for i in starts:
             si = i.name if hasattr(i, "name") else i
             if isinstance(si, str):
