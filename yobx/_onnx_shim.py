@@ -1,24 +1,45 @@
 """Selects the onnx backend based on the ``USE_OPTIM_ONNX`` environment variable.
 
-When ``USE_OPTIM_ONNX=1`` is set, this module replaces the ``onnx`` package in
-:data:`sys.modules` with ``onnx_light`` so that every subsequent
-``import onnx`` statement throughout the codebase transparently uses the
-lighter implementation.  The substitution relies on Python's module-import
-machinery: once ``sys.modules["onnx"]`` is set to *onnx_light*, Python uses
-*onnx_light*'s ``__path__`` when resolving dotted imports such as
-``from onnx.helper import make_node``, so no other files need to be changed.
+The canonical equivalence is ``onnx`` ↔ ``onnx_light.onnx``.  When
+``USE_OPTIM_ONNX=1`` is set this module registers ``onnx_light.onnx`` as
+``sys.modules["onnx"]`` and maps each known sub-module
+(``onnx_light.onnx.helper``, ``onnx_light.onnx.defs``, …) into the
+corresponding ``sys.modules["onnx.*"]`` slot.  Every subsequent
+``import onnx`` or ``from onnx.X import Y`` statement throughout the codebase
+then transparently uses the lighter implementation without any other file
+needing to be changed.
 
 Importing this module is a **no-op** when ``USE_OPTIM_ONNX`` is not set to
-``"1"`` or when ``onnx_light`` is not installed.
+``"1"``.
 """
 
+import importlib
 import os
 import sys
+import types
+
+# Sub-modules of ``onnx`` that are used across the codebase.
+_ONNX_SUBMODULES = (
+    "backend",
+    "checker",
+    "defs",
+    "external_data_helper",
+    "helper",
+    "inliner",
+    "model_container",
+    "numpy_helper",
+    "reference",
+    "shape_inference",
+)
 
 
 def _apply_onnx_light() -> None:
-    """Replaces ``onnx`` with ``onnx_light`` in :data:`sys.modules` when
+    """Registers ``onnx_light.onnx`` as ``sys.modules["onnx"]`` when
     ``USE_OPTIM_ONNX=1`` is present in the process environment.
+
+    The function also maps each known ``onnx`` sub-module to its
+    ``onnx_light.onnx.*`` counterpart so that dotted imports such as
+    ``from onnx.helper import make_node`` continue to resolve correctly.
 
     Raises :exc:`ImportError` if ``USE_OPTIM_ONNX=1`` but the ``onnx_light``
     package is not installed.
@@ -26,19 +47,29 @@ def _apply_onnx_light() -> None:
     if os.environ.get("USE_OPTIM_ONNX") != "1":
         return
 
+    # ``onnx_light.onnx`` is the light-weight drop-in for the ``onnx`` package.
     try:
-        import onnx_light  # type: ignore[import-untyped]
+        onnx_mod: types.ModuleType = importlib.import_module("onnx_light.onnx")
     except ModuleNotFoundError as exc:
         raise ImportError(
             "USE_OPTIM_ONNX=1 requires the 'onnx_light' package to be installed. "
             "Install it or unset USE_OPTIM_ONNX to use the standard 'onnx' package."
         ) from exc
 
-    # Register onnx_light as the canonical onnx module.  Python's import
-    # machinery will then use onnx_light.__path__ when resolving any
-    # subsequent sub-module imports (e.g. ``onnx.helper``, ``onnx.defs``),
-    # so no further changes are needed in the rest of the codebase.
-    sys.modules["onnx"] = onnx_light
+    # Register the top-level replacement.
+    sys.modules["onnx"] = onnx_mod
+
+    # Register every known sub-module so that dotted imports work.
+    for name in _ONNX_SUBMODULES:
+        try:
+            sub: types.ModuleType = importlib.import_module(f"onnx_light.onnx.{name}")
+        except ModuleNotFoundError:
+            # onnx_light may not implement every sub-module — skip gracefully.
+            continue
+        sys.modules[f"onnx.{name}"] = sub
+        # Also expose as an attribute on the top-level module so that
+        # ``import onnx; onnx.helper.make_node(…)`` works correctly.
+        setattr(onnx_mod, name, sub)
 
 
 _apply_onnx_light()

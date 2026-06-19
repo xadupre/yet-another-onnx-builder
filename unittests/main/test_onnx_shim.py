@@ -28,15 +28,12 @@ class TestOnnxShim(unittest.TestCase):
 
         # Only run this sub-test when onnx_light is not actually installed.
         try:
-            import onnx_light  # type: ignore[import-untyped]  # noqa: F401
-
+            importlib.import_module("onnx_light.onnx")
             self.skipTest("onnx_light is installed; skipping absence test")
         except ModuleNotFoundError:
             pass
 
         original_onnx = sys.modules.get("onnx")
-        # Temporarily remove the shim from sys.modules so _apply_onnx_light
-        # runs again when we reimport it under the env var.
         shim_key = "yobx._onnx_shim"
         original_shim = sys.modules.pop(shim_key, None)
         try:
@@ -49,7 +46,6 @@ class TestOnnxShim(unittest.TestCase):
                 sys.modules[shim_key] = original_shim
             else:
                 sys.modules.pop(shim_key, None)
-            # Restore onnx in sys.modules
             if original_onnx is not None:
                 sys.modules["onnx"] = original_onnx
 
