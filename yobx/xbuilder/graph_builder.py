@@ -6608,12 +6608,13 @@ class GraphBuilder(
                         f"{k=}, {k2=}, {vv=}, {vv2=}, {n1=}, {n2=}, {v=}, "
                         f"{self.constraints_=}{self.get_debug_msg()}"
                     )
-                    eq = {k, k2, vv, vv2}
+                    eq: Set[Union[str, int]] = {k, k2, vv, vv2}
                     for e in eq:
-                        if e not in update:
-                            update[e] = eq
+                        es = cast(str, e)
+                        if es not in update:
+                            update[es] = eq
                         else:
-                            update[e] |= eq
+                            update[es] |= eq
 
             for k, v in update.items():
                 if self._debug_dyn_dim and self._debug_dyn_dim & {k}:
