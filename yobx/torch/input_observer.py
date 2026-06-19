@@ -1488,6 +1488,8 @@ class InputObserver:
                     n_inputs=len(input_names),
                     n_none=n_none,
                     n_empty=n_empty,
+                    atol=atol,
+                    rtol=rtol,
                 )
             )
             if include_io:
