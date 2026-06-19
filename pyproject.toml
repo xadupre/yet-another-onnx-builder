@@ -18,6 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+onnx-light = ["onnx_light"]
 dev = [
     "black",
     "matplotlib",

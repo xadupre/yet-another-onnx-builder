@@ -110,7 +110,7 @@ def _getitem_slice(
     if g.has_shape(input_name):
         shape_value = g.get_shape(input_name)
 
-    starts: List[Union[int, str]] = []
+    starts: List[Any] = []
     ends: List[Union[int, str]] = []
     steps: List[int] = []
     shape_name = None
