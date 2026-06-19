@@ -6,7 +6,7 @@ a :class:`~yobx.xbuilder.GraphBuilder` as their first argument so they can
 be used independently of the interpreter.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
 from onnx import TensorProto
@@ -110,9 +110,9 @@ def _getitem_slice(
     if g.has_shape(input_name):
         shape_value = g.get_shape(input_name)
 
-    starts = []
-    ends = []
-    steps = []
+    starts: List[Any] = []
+    ends: List[Union[int, str]] = []
+    steps: List[int] = []
     shape_name = None
     end_name = None
     concat = False
@@ -184,7 +184,7 @@ def _getitem_slice(
 
     # if concat: one end is coming from a shape
     if concat:
-        iends = []
+        iends: List[Union[str, np.ndarray]] = []
         for i in ends:
             if isinstance(i, str):
                 if g.get_rank(i) == 0:
@@ -222,7 +222,7 @@ def _getitem_slice(
             source="_getitem_slice.2",
         )
     else:
-        istarts = []
+        istarts: List[Union[str, np.ndarray]] = []
         for i in starts:
             si = i.name if hasattr(i, "name") else i
             if isinstance(si, str):
@@ -233,7 +233,7 @@ def _getitem_slice(
                 else:
                     assert (
                         g.get_rank(si) == 1
-                    ), f"Unexpected rank={g.get_rank(i)} for {si!r}{g.get_debug_msg()}"
+                    ), f"Unexpected rank={g.get_rank(si)} for {si!r}{g.get_debug_msg()}"
                     istarts.append(si)
             else:
                 assert isinstance(si, int), f"Unexpected value for end={si!r}{g.get_debug_msg()}"

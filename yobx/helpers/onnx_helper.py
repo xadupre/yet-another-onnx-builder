@@ -867,7 +867,7 @@ def _validate_function(g: onnx.FunctionProto, verbose: int = 0, watch: Optional[
 
 def onnx_find(
     onx: Union[str, onnx.ModelProto], verbose: int = 0, watch: Optional[Set[str]] = None
-) -> List[Union[onnx.NodeProto, onnx.TensorProto]]:
+) -> List[Union[onnx.NodeProto, onnx.TensorProto, onnx.ValueInfoProto]]:
     """
     Looks for node producing or consuming some results.
 
