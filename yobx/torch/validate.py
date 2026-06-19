@@ -49,6 +49,7 @@ class ValidateSummary:
         discrepancies: ``"OK"`` or ``"FAILED"`` for the overall discrepancy check.
         discrepancies_max_abs: Maximum absolute discrepancy across all input sets.
         discrepancies_atol: Absolute tolerance threshold used to determine success.
+        discrepancies_rtol: Relative tolerance threshold used to determine success.
         discrepancies_ratio_001: Fraction of output elements with absolute difference > 0.01,
             aggregated across all input sets.
         discrepancies_ratio_01: Fraction of output elements with absolute difference > 0.1,
@@ -75,6 +76,7 @@ class ValidateSummary:
     discrepancies: Optional[str] = None
     discrepancies_max_abs: Optional[float] = None
     discrepancies_atol: Optional[float] = None
+    discrepancies_rtol: Optional[float] = None
     discrepancies_ratio_001: Optional[float] = None
     discrepancies_ratio_01: Optional[float] = None
     error_discrepancies: Optional[str] = None
@@ -100,6 +102,7 @@ class ValidateSummary:
         discrepancies: Optional[str] = None,
         discrepancies_max_abs: Optional[float] = None,
         discrepancies_atol: Optional[float] = None,
+        discrepancies_rtol: Optional[float] = None,
         discrepancies_ratio_001: Optional[float] = None,
         discrepancies_ratio_01: Optional[float] = None,
         error_discrepancies: Optional[str] = None,
@@ -123,6 +126,7 @@ class ValidateSummary:
         self.discrepancies = discrepancies
         self.discrepancies_max_abs = discrepancies_max_abs
         self.discrepancies_atol = discrepancies_atol
+        self.discrepancies_rtol = discrepancies_rtol
         self.discrepancies_ratio_001 = discrepancies_ratio_001
         self.discrepancies_ratio_01 = discrepancies_ratio_01
         self.error_discrepancies = error_discrepancies
@@ -887,20 +891,21 @@ def _check_discrepancies(
     quiet: bool,
     summary: "ValidateSummary",
     collected_data: "ValidateData",
+    atol: float = 1e-4,
+    rtol: float = 0.1,
 ):
     """Run ONNX Runtime on every captured input set and compare against PyTorch outputs."""
     if verbose:
         print("[validate_model] checking discrepancies ...")
-    atol = 1e-4
     if quiet:
         try:
-            disc_data = observer.check_discrepancies(filename, atol=atol)
+            disc_data = observer.check_discrepancies(filename, atol=atol, rtol=rtol)
         except Exception as exc:
             summary.discrepancies = "FAILED"
             summary.error_discrepancies = str(exc)
             return
     else:
-        disc_data = observer.check_discrepancies(filename, atol=atol)
+        disc_data = observer.check_discrepancies(filename, atol=atol, rtol=rtol)
     collected_data.discrepancies = disc_data
     n_ok = sum(1 for row in disc_data if row.get("SUCCESS", False))
     n_total = len(disc_data)
@@ -908,6 +913,7 @@ def _check_discrepancies(
     summary.discrepancies_total = n_total
     summary.discrepancies = "OK" if n_ok == n_total else "FAILED"
     summary.discrepancies_atol = atol
+    summary.discrepancies_rtol = rtol
     # Aggregate per-element stats across all examples that ran without error.
     numeric_rows = [row for row in disc_data if "abs" in row]
     if numeric_rows:
@@ -957,6 +963,8 @@ def validate_model(
     tokenized_inputs: Optional[Dict[str, Any]] = None,
     config_overrides: Optional[Dict[str, Any]] = None,
     random_weights: bool = False,
+    atol: float = 1e-4,
+    rtol: float = 0.1,
 ) -> Tuple["ValidateSummary", "ValidateData"]:
     """
     Validates an ONNX export for any HuggingFace ``model_id`` by capturing real
@@ -1023,6 +1031,8 @@ def validate_model(
         (possibly modified) config with random weights instead of downloading
         the pretrained weights.  This avoids any network access for the model
         itself, which is useful for fast unit-testing or CI validation.
+    :param atol: absolute tolerance
+    :param rtol: relative tolerance
     :return: A 2-tuple ``(summary, data)`` where *summary* is a
         :class:`ValidateSummary` instance with status flags and error messages,
         and *data* is a :class:`ValidateData` instance that collects all
@@ -1106,7 +1116,14 @@ def validate_model(
                 collected_data.filename
             ), f"{collected_data.filename!r} is missing"
             _check_discrepancies(
-                observer, collected_data.filename, verbose, quiet, summary, collected_data
+                observer,
+                collected_data.filename,
+                verbose,
+                quiet,
+                summary,
+                collected_data,
+                atol=atol,
+                rtol=rtol,
             )
 
         from ..container import ExportArtifact
@@ -1290,7 +1307,14 @@ def validate_model(
         assert collected_data.filename, "No filename, this is needed to check for discrepancies."
         assert os.path.exists(collected_data.filename), f"{collected_data.filename!r} is missing"
         _check_discrepancies(
-            observer, collected_data.filename, verbose, quiet, summary, collected_data
+            observer,
+            collected_data.filename,
+            verbose,
+            quiet,
+            summary,
+            collected_data,
+            atol=atol,
+            rtol=rtol,
         )
 
     # --------------------------------- update xlsx report with discrepancies (yobx exporter only)
