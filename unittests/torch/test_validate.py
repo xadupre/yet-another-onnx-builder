@@ -547,7 +547,7 @@ class TestValidateModel(ExtTestCase):
         """Python API equivalent of the CLI command:
 
         ``python -m yobx validate -m google/gemma-3-4b-it -e yobx --opt default
-        --opset 22 --device cpu --dtype float32 --patch -r -o dump_test -v 1
+        --opset 22 --device cpu --dtype float32 --patch all -r -o dump_test -v 1
         --random-weights --config-override num_hidden_layers=2``
 
         The model is gated on the HuggingFace Hub, so the test is skipped when

@@ -742,7 +742,7 @@ def get_parser_validate() -> ArgumentParser:
 
                 python -m yobx validate -m arnir0/Tiny-LLM \\
                        -e yobx --opt default --opset 22 --device cuda --dtype float32 \\
-                       --patch -r -o dump_test -v 1
+                       --patch all -r -o dump_test -v 1
             """),
         formatter_class=RawTextHelpFormatter,
     )
