@@ -179,6 +179,22 @@ class TestValidateModel(ExtTestCase):
         self.assertIn("random_weights", dest_names)
         self.assertIn("config_override", dest_names)
 
+    def test_cmd_validate_has_atol_rtol(self):
+        """CLI parser exposes --atol and --rtol flags with the expected defaults."""
+        from yobx._command_lines_parser import get_parser_validate
+
+        parser = get_parser_validate()
+        dest_names = {a.dest for a in parser._actions}
+        self.assertIn("atol", dest_names)
+        self.assertIn("rtol", dest_names)
+        args = parser.parse_args(["-m", "arnir0/Tiny-LLM", "--atol", "1e-3", "--rtol", "0.05"])
+        self.assertAlmostEqual(args.atol, 1e-3)
+        self.assertAlmostEqual(args.rtol, 0.05)
+        # atol defaults to None so it can be resolved from the dtype later.
+        default_args = parser.parse_args(["-m", "arnir0/Tiny-LLM"])
+        self.assertIsNone(default_args.atol)
+        self.assertAlmostEqual(default_args.rtol, 0.1)
+
     def test_default_prompt(self):
         from yobx.torch.validate import DEFAULT_PROMPT
 

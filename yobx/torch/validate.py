@@ -963,7 +963,7 @@ def validate_model(
     tokenized_inputs: Optional[Dict[str, Any]] = None,
     config_overrides: Optional[Dict[str, Any]] = None,
     random_weights: bool = False,
-    atol: float = 1e-4,
+    atol: Optional[float] = None,
     rtol: float = 0.1,
 ) -> Tuple["ValidateSummary", "ValidateData"]:
     """
@@ -1031,8 +1031,10 @@ def validate_model(
         (possibly modified) config with random weights instead of downloading
         the pretrained weights.  This avoids any network access for the model
         itself, which is useful for fast unit-testing or CI validation.
-    :param atol: absolute tolerance
-    :param rtol: relative tolerance
+    :param atol: absolute tolerance used when checking discrepancies.
+        When ``None`` (default), it is set to ``1e-3`` for float32 and
+        ``1e-4`` for other dtypes.
+    :param rtol: relative tolerance used when checking discrepancies.
     :return: A 2-tuple ``(summary, data)`` where *summary* is a
         :class:`ValidateSummary` instance with status flags and error messages,
         and *data* is a :class:`ValidateData` instance that collects all
@@ -1053,6 +1055,8 @@ def validate_model(
 
     # ------------------------------------------------------------------ device / dtype
     torch_device = torch.device(device or "cpu")
+    if atol is None:
+        atol = 1e-3 if dtype in (None, "float32") else 1e-4
     if dtype is not None:
         dtype = getattr(torch, dtype)
 
