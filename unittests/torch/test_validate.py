@@ -472,6 +472,27 @@ class TestValidateModel(ExtTestCase):
         self.assertAlmostEqual(summary.discrepancies_atol, custom_atol)
         self.assertAlmostEqual(summary.discrepancies_rtol, custom_rtol)
 
+    def test_validate_model_default_atol_float32(self):
+        """When atol is not given, validate_model defaults to 1e-3 for float32."""
+        import torch
+        from yobx.torch.validate import validate_model
+
+        tokenized = {
+            "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
+            "attention_mask": torch.ones(1, 5, dtype=torch.int64),
+        }
+        summary, _data = validate_model(
+            "arnir0/Tiny-LLM",
+            tokenized_inputs=tokenized,
+            random_weights=True,
+            max_new_tokens=3,
+            do_run=True,
+            quiet=True,
+            verbose=0,
+        )
+        self.assertAlmostEqual(summary.discrepancies_atol, 1e-3)
+        self.assertAlmostEqual(summary.discrepancies_rtol, 0.1)
+
     @skipif_ci_windows("xlsx file locked by another process on Windows")
     def test_validate_model_artifact_xlsx_has_discrepancies_sheet(self):
         """The xlsx saved alongside the ONNX contains a 'discrepancies' sheet."""
