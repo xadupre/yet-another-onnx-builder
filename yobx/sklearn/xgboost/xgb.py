@@ -67,7 +67,11 @@ _REG_IDENTITY_OBJECTIVES = frozenset(
 )
 
 #: Regression objectives that apply ``sigmoid`` as the output transform.
-_REG_SIGMOID_OBJECTIVES = frozenset({"reg:logistic"})
+#: ``binary:logistic`` is included because :class:`xgboost.XGBRegressor` may be
+#: fitted with this objective; the raw tree output is in logit space and a
+#: ``Sigmoid`` is required to recover the probability-space prediction
+#: (see https://github.com/onnx/onnxmltools/pull/771).
+_REG_SIGMOID_OBJECTIVES = frozenset({"reg:logistic", "binary:logistic"})
 
 #: Regression objectives that apply ``exp`` as the output transform
 #: (log-link objectives).
@@ -763,7 +767,7 @@ def sklearn_xgb_regressor(
     :meth:`~xgboost.XGBRFRegressor.predict`:
 
     * Identity (``reg:squarederror``, ``reg:absoluteerror``, …): no transform.
-    * ``reg:logistic``: ``sigmoid(margin)``.
+    * ``reg:logistic`` / ``binary:logistic``: ``sigmoid(margin)``.
     * ``count:poisson``, ``reg:gamma``, ``reg:tweedie``, ``survival:cox``:
       ``exp(margin)``.
 
