@@ -23,7 +23,7 @@ jobs:
       head_sha: ${{ github.event.pull_request.head.sha }}
 
   torch_targeted_tests:
-    name: tr-releases targeted (${{ needs.detect_torch_subfolder.outputs.subfolder }}, torch-2.11, transformers-5.12.1)
+    name: tr-releases targeted (${{ needs.detect_torch_subfolder.outputs.subfolder }}, torch-2.12, transformers-5.12.1)
     needs: detect_torch_subfolder
     # Skip if no unique subfolder, or if the subfolder is 'coverage' (excluded from the full run).
     if: needs.detect_torch_subfolder.outputs.count == '1' && needs.detect_torch_subfolder.outputs.subfolder != 'coverage'
@@ -36,8 +36,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      - name: Install pytorch 2.11
-        run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install pytorch 2.12
+        run: pip install torch==2.12.1+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
       - name: Install transformers==5.12.1
@@ -62,7 +62,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        torch-version: ["2.11"]
+        torch-version: ["2.12"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.13
@@ -70,9 +70,9 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install pytorch 2.11
-        if: matrix.torch-version == '2.11'
-        run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install pytorch 2.12
+        if: matrix.torch-version == '2.12'
+        run: pip install torch==2.12.1+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       - name: Install nightly pytorch
         if: matrix.torch-version == 'nightly'
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
@@ -106,7 +106,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        torch-version: ["2.11"]
+        torch-version: ["2.12"]
         ort-nightly: [false, true]
     steps:
       - uses: actions/checkout@v4
@@ -115,9 +115,9 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install pytorch 2.11
-        if: matrix.torch-version == '2.11'
-        run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install pytorch 2.12
+        if: matrix.torch-version == '2.12'
+        run: pip install torch==2.12.1+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       - name: Install nightly pytorch
         if: matrix.torch-version == 'nightly'
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
