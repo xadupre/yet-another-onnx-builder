@@ -21,7 +21,7 @@ jobs:
       head_sha: ${{ github.event.pull_request.head.sha }}
 
   torch_targeted_tests:
-    name: torch-py targeted (${{ needs.detect_torch_subfolder.outputs.subfolder }}, ubuntu, py3.12, torch-2.11)
+    name: torch-py targeted (${{ needs.detect_torch_subfolder.outputs.subfolder }}, ubuntu, py3.12, torch-2.12)
     needs: detect_torch_subfolder
     # Skip if no unique subfolder, or if the subfolder is 'coverage' (excluded from the full run).
     if: needs.detect_torch_subfolder.outputs.count == '1' && needs.detect_torch_subfolder.outputs.subfolder != 'coverage'
@@ -35,8 +35,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install pytorch 2.11
-        run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install pytorch 2.12
+        run: pip install torch==2.12.1+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
@@ -66,7 +66,7 @@ jobs:
       matrix:
         os: ["ubuntu-latest", "macos-latest", "windows-latest"]
         python-version: ["3.12", "3.13"]
-        torch-version: ["2.11", "nightly"]
+        torch-version: ["2.12", "nightly"]
         exclude:
           - os: "macos-latest"
             python-version: "3.12"
@@ -81,7 +81,7 @@ jobs:
             torch-version: "nightly"
           - os: "ubuntu-latest"
             python-version: "3.13"
-            torch-version: "2.11"
+            torch-version: "2.12"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
@@ -93,13 +93,13 @@ jobs:
         if: matrix.torch-version == 'nightly'
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 
-      - name: Install pytorch 2.11 (Linux/Windows)
-        if: matrix.torch-version == '2.11' && matrix.os != 'macos-latest'
-        run: pip install torch==2.11.0+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install pytorch 2.12 (Linux/Windows)
+        if: matrix.torch-version == '2.12' && matrix.os != 'macos-latest'
+        run: pip install torch==2.12.1+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
-      - name: Install pytorch 2.11 (macOS)
-        if: matrix.torch-version == '2.11' && matrix.os == 'macos-latest'
-        run: pip install torch==2.11.0 torchvision torchaudio
+      - name: Install pytorch 2.12 (macOS)
+        if: matrix.torch-version == '2.12' && matrix.os == 'macos-latest'
+        run: pip install torch==2.12.1 torchvision torchaudio
 
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
