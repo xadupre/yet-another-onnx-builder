@@ -17,7 +17,12 @@ import unittest
 import numpy as np
 import onnx
 import torch
-from yobx.ext_test_case import ExtTestCase, requires_onnxruntime, requires_transformers
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_onnxruntime,
+    requires_transformers,
+    skipif_ci_windows,
+)
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.container import ExportArtifact
 
@@ -207,6 +212,10 @@ class TestLlamaAttentionConverter(ExtTestCase):
                 )
             raise
 
+    @skipif_ci_windows(
+        "torch bfloat16 CPU matmul crashes with an illegal instruction "
+        "(0xc000001d) on the Windows CI runner"
+    )
     def test_opset22_bfloat16(self):
         """Standard ONNX ops path, bfloat16 — model dtype check + ref/ORT validation."""
         attn = _make_llama_attention().to(torch.bfloat16).eval()
@@ -298,6 +307,10 @@ class TestLlamaAttentionConverter(ExtTestCase):
         self.assertEqualArray(expected, got_ort, atol=5e-3)
 
     @requires_onnxruntime("1.23")
+    @skipif_ci_windows(
+        "torch bfloat16 CPU matmul crashes with an illegal instruction "
+        "(0xc000001d) on the Windows CI runner"
+    )
     def test_opset24_bfloat16(self):
         """ONNX RotaryEmbedding + Attention op path (opset 24), bfloat16 —
         model dtype check + ref/ORT validation."""
@@ -427,6 +440,10 @@ class TestLlamaAttentionConverter(ExtTestCase):
         self.assertEqualArray(expected, got, atol=5e-3)
 
     @requires_onnxruntime("1.0")
+    @skipif_ci_windows(
+        "torch bfloat16 CPU matmul crashes with an illegal instruction "
+        "(0xc000001d) on the Windows CI runner"
+    )
     def test_com_microsoft_bfloat16(self):
         """com.microsoft.RotaryEmbedding + MultiHeadAttention path, bfloat16 —
         model dtype check + ORT validation."""
