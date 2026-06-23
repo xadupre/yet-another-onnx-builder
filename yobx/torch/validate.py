@@ -230,7 +230,7 @@ def _to_onnx(*args, exporter: str = "yobx", **kwargs):
                 new_kwargs[k] = v
 
         return to_onnx(*args, **new_kwargs)
-    if exporter in ("dynamo", "onnx-dynamo", "modelbuilder"):
+    if exporter in ("dynamo", "onnx-dynamo", "modelbuilder", "mbext"):
         import torch
 
         # Build a kwargs dict that torch.onnx.export understands.
@@ -253,7 +253,7 @@ def _to_onnx(*args, exporter: str = "yobx", **kwargs):
             else:
                 dynamo_kwargs[k] = v
 
-        if exporter == "modelbuilder":
+        if exporter in ("modelbuilder", "mbext"):
             dynamo_kwargs.setdefault("dynamo", True)
 
         epo = torch.onnx.export(*args, **dynamo_kwargs)
@@ -991,7 +991,7 @@ def validate_model(
     :param prompt: Text prompt used to drive the generation step.
         Defaults to :data:`DEFAULT_PROMPT`.
     :param exporter: ONNX exporter to use, e.g. ``"yobx"`` (default),
-        ``"modelbuilder"``, or ``"onnx-dynamo"``.
+        ``"modelbuilder"``, ``"mbext"``, or ``"onnx-dynamo"``.
     :param optimization: Optimisation level applied after export.
         Passed directly to :func:`yobx.torch.to_onnx`.  ``None`` means no
         optimisation; ``"default"`` applies the default set.

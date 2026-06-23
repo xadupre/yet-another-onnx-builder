@@ -305,6 +305,30 @@ class TestValidateModel(ExtTestCase):
         # Export may succeed or fail depending on torch version; both are acceptable.
         self.assertIsNotNone(summary.export)
 
+    def test_validate_model_exporter_mbext(self):
+        """validate_model with exporter='mbext' runs without unhandled exception."""
+        import torch
+        from yobx.torch.validate import validate_model
+
+        tokenized = {
+            "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
+            "attention_mask": torch.ones(1, 5, dtype=torch.int64),
+        }
+        summary, _data = validate_model(
+            "arnir0/Tiny-LLM",
+            exporter="mbext",
+            tokenized_inputs=tokenized,
+            random_weights=True,
+            max_new_tokens=3,
+            do_run=False,
+            quiet=True,
+            verbose=0,
+        )
+        self.assertIsNotNone(summary.model_id)
+        self.assertEqual(summary.model_id, "arnir0/Tiny-LLM")
+        # Export may succeed or fail depending on torch version; both are acceptable.
+        self.assertIsNotNone(summary.export)
+
     def test_check_discrepancies_verbose_2(self):
         """_check_discrepancies prints per-row detail lines when verbose >= 2."""
         import io
