@@ -41,6 +41,9 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
 
+      - name: Install mbext
+        run: pip install git+https://github.com/xadupre/mbext.git
+
       - name: pip freeze
         run: pip freeze
 
@@ -73,6 +76,9 @@ jobs:
 
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
+
+      - name: Install mbext
+        run: pip install git+https://github.com/xadupre/mbext.git
 
       - name: pip freeze
         run: pip freeze
