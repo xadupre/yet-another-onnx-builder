@@ -1,6 +1,6 @@
 import collections
 import unittest
-import onnx
+from yobx._onnx_shim import onnx  # noqa: TID251
 import torch
 from yobx.helpers import max_diff
 from yobx.helpers.rt_helper import make_feeds

@@ -687,19 +687,19 @@ class TestColumnRefDtype(ExtTestCase):
         self.assertEqual(cr.dtype, 0)
 
     def test_dtype_stored_as_tensor_proto_int(self):
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
 
         cr = ColumnRef("a", dtype=TensorProto.FLOAT)
         self.assertEqual(cr.dtype, TensorProto.FLOAT)
 
     def test_dtype_int64(self):
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
 
         cr = ColumnRef("a", dtype=TensorProto.INT64)
         self.assertEqual(cr.dtype, TensorProto.INT64)
 
     def test_dtype_independent_of_table(self):
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
 
         cr = ColumnRef("col", table="tbl", dtype=TensorProto.INT32)
         self.assertEqual(cr.table, "tbl")
@@ -707,7 +707,7 @@ class TestColumnRefDtype(ExtTestCase):
 
     def test_trace_dataframe_propagates_dtype(self):
         """ColumnRef nodes produced by trace_dataframe carry the TensorProto dtype."""
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
         from yobx.xtracing.parse import SelectOp
 
         def transform(df):
@@ -722,7 +722,7 @@ class TestColumnRefDtype(ExtTestCase):
 
     def test_trace_dataframe_multi_input_propagates_dtype(self):
         """Dtypes are propagated for multi-input trace_dataframe calls."""
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
         from yobx.xtracing.parse import SelectOp
 
         def transform(df1, df2):

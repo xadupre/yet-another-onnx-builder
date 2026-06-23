@@ -16,7 +16,7 @@ This confirms that the two builder paths produce interchangeable graphs.
 
 import unittest
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript, requires_sklearn
 from yobx.helpers.onnx_helper import _default_OPSET_TO_IR_VERSION
 from yobx.reference import ExtendedReferenceEvaluator
@@ -299,7 +299,7 @@ class TestOnnxScriptBridgeWithSklearnConverter(ExtTestCase):
         self.assertIsNotNone(t)
 
     def test_value_to_ir_tensor_tensor_proto(self):
-        from onnx import numpy_helper
+        from yobx._onnx_shim import numpy_helper  # noqa: TID251
         from yobx.builder.onnxscript.bridge_graph_builder import value_to_ir_tensor
 
         tp = numpy_helper.from_array(np.array([1.0, 2.0], dtype=np.float32), name="v")

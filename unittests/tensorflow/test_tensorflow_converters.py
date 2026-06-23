@@ -1932,7 +1932,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         b = np.array([[0.5, 1.5], [2.5, 3.5]], dtype=np.float16)
         onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
 
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
 
         elem_type = onx.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(elem_type, TensorProto.FLOAT16)
@@ -1953,7 +1953,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         b = np.random.rand(4, 2).astype(np.float16)
         onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
 
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
 
         elem_type = onx.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(elem_type, TensorProto.FLOAT16)
@@ -1994,7 +1994,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         b = np.array([[0.5, 1.5], [2.5, 3.5]], dtype=np.float64)
         onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
 
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
 
         elem_type = onx.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(elem_type, TensorProto.DOUBLE)
@@ -2015,7 +2015,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         b = np.random.rand(4, 2).astype(np.float64)
         onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
 
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
 
         elem_type = onx.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(elem_type, TensorProto.DOUBLE)
@@ -2045,7 +2045,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         b = np.array([[0.5, 1.5], [2.5, 3.5]], dtype=ml_dtypes.bfloat16)
         onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
 
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
 
         elem_type = onx.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(elem_type, TensorProto.BFLOAT16)
@@ -2068,7 +2068,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         cast_nodes = [n for n in onx.graph.node if n.op_type == "Cast"]
         self.assertTrue(len(cast_nodes) > 0)
 
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
 
         to_attr = next(a for a in cast_nodes[-1].attribute if a.name == "to")
         self.assertEqual(to_attr.i, TensorProto.BFLOAT16)

@@ -1502,7 +1502,7 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         # Convert to ONNX with new-tracing and verify the result is valid
         # and produces numerically correct outputs when run with OnnxRuntime.
         # ------------------------------------------------------------------
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
         from yobx.torch import ExportOptions
         from yobx.torch.export_options import TracingMode
         from yobx.torch.interpreter import to_onnx

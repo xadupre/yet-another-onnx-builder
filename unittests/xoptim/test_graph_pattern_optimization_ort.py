@@ -3,15 +3,17 @@ import os
 import unittest
 from typing import Optional
 import numpy as np
-from onnx import (
+from yobx._onnx_shim import (
     ModelProto,
     TensorProto,
     helper as oh,
     numpy_helper as onh,
     load as onnx_load,
     shape_inference,
-)
-from onnx.checker import check_model
+)  # noqa: TID251
+from yobx._onnx_shim import onnx  # noqa: TID251
+
+check_model = onnx.checker.check_model
 from yobx.ext_test_case import (
     ExtTestCase,
     ignore_warnings,
@@ -4201,7 +4203,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         The decoder subgraph is a trivial Cast(INT32→FLOAT) that satisfies the
         type constraints without executing any real language-model logic.
         """
-        from onnx import AttributeProto
+        from yobx._onnx_shim import AttributeProto  # noqa: TID251
 
         decoder_graph = oh.make_graph(
             [oh.make_node("Cast", ["input_ids"], ["logits"], to=TensorProto.FLOAT)],
@@ -5370,7 +5372,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         self.assertEqual(4, nh.i)
 
         # static_kv should be True for cross-attention
-        from onnx import numpy_helper as _onh
+        from yobx._onnx_shim import numpy_helper as _onh  # noqa: TID251
 
         init_map = {i.name: _onh.to_array(i) for i in opt_onx.graph.initializer}
         static_kv_val = init_map.get(fused[0].input[8])
@@ -5404,7 +5406,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         self.assertEqual(1, len(fused))
 
         # static_kv should be False for self-attention
-        from onnx import numpy_helper as _onh
+        from yobx._onnx_shim import numpy_helper as _onh  # noqa: TID251
 
         init_map = {i.name: _onh.to_array(i) for i in opt_onx.graph.initializer}
         static_kv_val = init_map.get(fused[0].input[8])
@@ -5455,7 +5457,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
 
         # The kv_weight initializer is input[3] of the fused node.
         kv_weight_name = fused[0].input[3]
-        from onnx import numpy_helper as _onh
+        from yobx._onnx_shim import numpy_helper as _onh  # noqa: TID251
 
         init_map = {i.name: _onh.to_array(i) for i in opt_onx.graph.initializer}
         kv_weight = init_map.get(kv_weight_name)
@@ -5478,7 +5480,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         self.assertEqual(1, len(fused))
 
         bias_name = fused[0].input[4]
-        from onnx import numpy_helper as _onh
+        from yobx._onnx_shim import numpy_helper as _onh  # noqa: TID251
 
         init_map = {i.name: _onh.to_array(i) for i in opt_onx.graph.initializer}
         bias = init_map.get(bias_name)

@@ -266,7 +266,7 @@ class TestOpsVarOperators(ExtTestCase):
         self._check(gr, "BlackmanWindow")
 
     def test_Cast(self):
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
 
         gr, x = _x()
         x.Cast(to=TensorProto.FLOAT16)

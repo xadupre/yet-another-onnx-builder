@@ -14,7 +14,7 @@ The tests validate:
 
 import unittest
 import numpy as np
-from onnx import TensorProto
+from yobx._onnx_shim import TensorProto  # noqa: TID251
 
 from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_spox
 from yobx.typing import GraphBuilderExtendedProtocol
