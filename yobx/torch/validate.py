@@ -214,6 +214,7 @@ class ValidateData:
 
 def _to_onnx(*args, exporter: str = "yobx", **kwargs):
     model_id = kwargs.pop("model_id", None)
+    config_overrides = kwargs.pop("config_overrides", None)
     if exporter == "yobx":
         from ..xbuilder import OptimizationOptions
         from . import to_onnx
@@ -246,7 +247,14 @@ def _to_onnx(*args, exporter: str = "yobx", **kwargs):
         output_dir = os.path.dirname(filename) or "."
         cache_dir = kwargs.get("cache_dir") or os.path.join(output_dir, "cache_dir")
 
-        create_model(model_id, "", output_dir, precision, execution_provider, cache_dir)
+        # mbext's ModelBuilder loads its own config from the HuggingFace model
+        # id, so config overrides (e.g. a reduced ``num_hidden_layers`` used to
+        # keep tests cheap) must be forwarded as ``extra_options``.
+        extra_options: Dict[str, Any] = dict(config_overrides) if config_overrides else {}
+
+        create_model(
+            model_id, "", output_dir, precision, execution_provider, cache_dir, **extra_options
+        )
 
         # ModelBuilder always writes ``model.onnx`` in the output directory; move
         # it to the requested filename (within the same directory so external
@@ -827,6 +835,7 @@ def _export(
     quiet: bool,
     summary: "ValidateSummary",
     collected_data: "ValidateData",
+    config_overrides: Optional[Dict[str, Any]] = None,
 ):
     """Export the model to ONNX and store the output filename."""
     from .flatten import register_flattening_functions
@@ -878,6 +887,7 @@ def _export(
                 filename=filename,
                 exporter=exporter,
                 model_id=model_id,
+                config_overrides=config_overrides,
                 opset_version=opset,
                 verbose=max(0, verbose - 1),
                 **export_kwargs,
@@ -1127,6 +1137,7 @@ def validate_model(
             quiet,
             summary,
             collected_data,
+            config_overrides=config_overrides,
         )
         if not ok:
             return summary, collected_data
@@ -1222,6 +1233,7 @@ def validate_model(
             quiet,
             summary,
             collected_data,
+            config_overrides=config_overrides,
         )
         if not ok:
             return summary, collected_data
@@ -1321,6 +1333,7 @@ def validate_model(
         quiet,
         summary,
         collected_data,
+        config_overrides=config_overrides,
     )
     if not ok:
         return summary, collected_data
