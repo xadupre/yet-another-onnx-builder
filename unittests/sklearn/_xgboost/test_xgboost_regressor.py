@@ -95,6 +95,42 @@ class TestXGBoostRegressor(ExtTestCase):
         ort_results = sess.run(None, {"X": X})
         self.assertEqualArray(expected, ort_results[0], atol=1e-4)
 
+    def test_xgb_regressor_binary_logistic_objective(self):
+        """binary:logistic objective on XGBRegressor applies sigmoid.
+
+        Mirrors https://github.com/onnx/onnxmltools/pull/771: the raw tree
+        output is in logit space (notably when ``subsample < 1.0`` produces
+        non-zero tree outputs) and a ``Sigmoid`` must recover the probability.
+        """
+        from xgboost import XGBRegressor
+
+        X, _ = self._make_regression_data()
+        y = (X[:, 0] + X[:, 1] > 0).astype(np.float32)
+        reg = XGBRegressor(
+            n_estimators=8,
+            max_depth=3,
+            random_state=0,
+            objective="binary:logistic",
+            subsample=0.7,
+        )
+        reg.fit(X, y)
+
+        onx = to_onnx(reg, (X,))
+
+        op_types = [n.op_type for n in onx.proto.graph.node]
+        self.assertIn("Sigmoid", op_types)
+
+        ref = ExtendedReferenceEvaluator(onx)
+        results = ref.run(None, {"X": X})
+        predictions = results[0]
+
+        expected = reg.predict(X).astype(np.float32).reshape(-1, 1)
+        self.assertEqualArray(expected, predictions, atol=1e-4)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected, ort_results[0], atol=1e-4)
+
     def test_xgb_regressor_unsupported_objective_raises(self):
         """Unknown regression objectives raise NotImplementedError."""
         from yobx.sklearn.xgboost.xgb import _get_reg_output_transform
