@@ -213,6 +213,7 @@ class ValidateData:
 
 
 def _to_onnx(*args, exporter: str = "yobx", **kwargs):
+    model_id = kwargs.pop("model_id", None)
     if exporter == "yobx":
         from ..xbuilder import OptimizationOptions
         from . import to_onnx
@@ -230,7 +231,31 @@ def _to_onnx(*args, exporter: str = "yobx", **kwargs):
                 new_kwargs[k] = v
 
         return to_onnx(*args, **new_kwargs)
-    if exporter in ("dynamo", "onnx-dynamo", "modelbuilder", "mbext"):
+    if exporter in ("modelbuilder", "mbext"):
+        # mbext (https://github.com/xadupre/mbext) reuses onnxruntime-genai's
+        # ModelBuilder to build the ONNX model directly from the HuggingFace
+        # model id. It does not trace the torch module, so torch.onnx.export
+        # must not be involved here.
+        from modelbuilder.builder import create_model
+
+        assert model_id, f"model_id is required for exporter={exporter!r}"
+        filename = kwargs.get("filename")
+        assert filename, f"filename is required for exporter={exporter!r}"
+        precision = kwargs.get("precision", "fp32")
+        execution_provider = kwargs.get("execution_provider", "cpu")
+        output_dir = os.path.dirname(filename) or "."
+        cache_dir = kwargs.get("cache_dir") or os.path.join(output_dir, "cache_dir")
+
+        create_model(model_id, "", output_dir, precision, execution_provider, cache_dir)
+
+        # ModelBuilder always writes ``model.onnx`` in the output directory; move
+        # it to the requested filename (within the same directory so external
+        # data references stay valid).
+        produced = os.path.join(output_dir, "model.onnx")
+        if os.path.exists(produced) and os.path.abspath(produced) != os.path.abspath(filename):
+            os.replace(produced, filename)
+        return None
+    if exporter in ("dynamo", "onnx-dynamo"):
         import torch
 
         # Build a kwargs dict that torch.onnx.export understands.
@@ -252,9 +277,6 @@ def _to_onnx(*args, exporter: str = "yobx", **kwargs):
                 dynamo_kwargs["report"] = True
             else:
                 dynamo_kwargs[k] = v
-
-        if exporter in ("modelbuilder", "mbext"):
-            dynamo_kwargs.setdefault("dynamo", True)
 
         epo = torch.onnx.export(*args, **dynamo_kwargs)
         if kwargs.get("optimization", "") in ("os_ort", "default+onnxruntime"):
@@ -855,6 +877,7 @@ def _export(
                 dynamic_shapes=dynamic_shapes,
                 filename=filename,
                 exporter=exporter,
+                model_id=model_id,
                 opset_version=opset,
                 verbose=max(0, verbose - 1),
                 **export_kwargs,
