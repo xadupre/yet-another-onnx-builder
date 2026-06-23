@@ -60,6 +60,17 @@ class TestOnnxShim(unittest.TestCase):
         with self.assertRaises(ModuleNotFoundError):
             self._reload_shim("1")
 
+    def test_env_var_1_with_onnx_light_uses_optim(self):
+        """Verifies that USE_OPTIM_ONNX=1 exposes onnx_light.onnx when installed."""
+        # Only run when onnx_light is installed.
+        try:
+            onnx_light_onnx = importlib.import_module("onnx_light.onnx")
+        except ModuleNotFoundError:
+            self.skipTest("onnx_light is not installed; skipping presence test")
+
+        shim = self._reload_shim("1")
+        self.assertIs(shim.onnx, onnx_light_onnx)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

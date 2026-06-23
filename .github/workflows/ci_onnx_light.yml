@@ -1,0 +1,47 @@
+name: ci-11-onnx-light
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 4 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # onnx-light release providing the prebuilt wheels.
+  # https://github.com/xadupre/onnx-light/releases/tag/0.1.1
+  ONNX_LIGHT_VERSION: "0.1.1"
+
+jobs:
+  onnx_light_tests:
+    name: onnx-light (ubuntu-latest, py3.12)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Install onnx-light
+        run: |
+          pip install \
+            "https://github.com/xadupre/onnx-light/releases/download/${ONNX_LIGHT_VERSION}/onnx_light-${ONNX_LIGHT_VERSION}-cp312-cp312-manylinux_2_28_x86_64.whl"
+
+      - name: pip freeze
+        run: pip freeze
+
+      - name: Run onnx shim tests with onnx-light
+        env:
+          USE_OPTIM_ONNX: "1"
+        run: pytest --durations=10 unittests/main/test_onnx_shim.py
