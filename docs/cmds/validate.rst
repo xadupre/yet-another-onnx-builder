@@ -61,3 +61,11 @@ Override multiple config attributes at once:
     python -m yobx validate -m arnir0/Tiny-LLM --random-weights \
            --config-override num_hidden_layers=2 \
            --config-override hidden_size=64
+
+Tune the discrepancy tolerances (``--atol`` defaults to ``1e-3`` for float32,
+``1e-4`` otherwise):
+
+.. code-block:: bash
+
+    python -m yobx validate -m arnir0/Tiny-LLM --atol 1e-3 --rtol 0.1
+

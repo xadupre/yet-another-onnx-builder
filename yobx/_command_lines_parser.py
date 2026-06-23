@@ -838,6 +838,19 @@ def get_parser_validate() -> ArgumentParser:
         "-v", "--verbose", default=0, type=int, help="Verbosity level (default: 0)."
     )
     parser.add_argument(
+        "--atol",
+        default=None,
+        type=float,
+        help="Absolute tolerance used when checking discrepancies. "
+        "When not set, defaults to 1e-3 for float32 and 1e-4 otherwise.",
+    )
+    parser.add_argument(
+        "--rtol",
+        default=0.1,
+        type=float,
+        help="Relative tolerance used when checking discrepancies (default: 0.1).",
+    )
+    parser.add_argument(
         "--random-weights",
         default=False,
         action="store_true",
@@ -905,6 +918,8 @@ def _cmd_validate(argv: List[Any]):
         quiet=args.quiet,
         config_overrides=config_overrides,
         random_weights=args.random_weights,
+        atol=args.atol,
+        rtol=args.rtol,
     )
 
     print("")

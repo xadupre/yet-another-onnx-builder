@@ -179,6 +179,22 @@ class TestValidateModel(ExtTestCase):
         self.assertIn("random_weights", dest_names)
         self.assertIn("config_override", dest_names)
 
+    def test_cmd_validate_has_atol_rtol(self):
+        """CLI parser exposes --atol and --rtol flags with the expected defaults."""
+        from yobx._command_lines_parser import get_parser_validate
+
+        parser = get_parser_validate()
+        dest_names = {a.dest for a in parser._actions}
+        self.assertIn("atol", dest_names)
+        self.assertIn("rtol", dest_names)
+        args = parser.parse_args(["-m", "arnir0/Tiny-LLM", "--atol", "1e-3", "--rtol", "0.05"])
+        self.assertAlmostEqual(args.atol, 1e-3)
+        self.assertAlmostEqual(args.rtol, 0.05)
+        # atol defaults to None so it can be resolved from the dtype later.
+        default_args = parser.parse_args(["-m", "arnir0/Tiny-LLM"])
+        self.assertIsNone(default_args.atol)
+        self.assertAlmostEqual(default_args.rtol, 0.1)
+
     def test_default_prompt(self):
         from yobx.torch.validate import DEFAULT_PROMPT
 
@@ -455,6 +471,27 @@ class TestValidateModel(ExtTestCase):
         # The summary should also record the tolerances used.
         self.assertAlmostEqual(summary.discrepancies_atol, custom_atol)
         self.assertAlmostEqual(summary.discrepancies_rtol, custom_rtol)
+
+    def test_validate_model_default_atol_float32(self):
+        """When atol is not given, validate_model defaults to 1e-3 for float32."""
+        import torch
+        from yobx.torch.validate import validate_model
+
+        tokenized = {
+            "input_ids": torch.randint(0, 1000, (1, 5), dtype=torch.int64),
+            "attention_mask": torch.ones(1, 5, dtype=torch.int64),
+        }
+        summary, _data = validate_model(
+            "arnir0/Tiny-LLM",
+            tokenized_inputs=tokenized,
+            random_weights=True,
+            max_new_tokens=3,
+            do_run=True,
+            quiet=True,
+            verbose=0,
+        )
+        self.assertAlmostEqual(summary.discrepancies_atol, 1e-3)
+        self.assertAlmostEqual(summary.discrepancies_rtol, 0.1)
 
     @skipif_ci_windows("xlsx file locked by another process on Windows")
     def test_validate_model_artifact_xlsx_has_discrepancies_sheet(self):
