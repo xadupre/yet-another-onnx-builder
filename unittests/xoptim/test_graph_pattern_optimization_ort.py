@@ -2617,9 +2617,11 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         value = np.random.rand(*(1, kv_num_heads, sequence_length, head_size))
         past_key = np.random.rand(*(1, kv_num_heads, past_length, head_size))
         past_value = np.random.rand(*(1, kv_num_heads, past_length, head_size))
-        attention_mask = np.random.randint(
-            0, 1, size=(sequence_length, sequence_length + past_length)
-        ).astype(bool)
+        # The attention mask must be valid (at least one enabled position) so that
+        # Attention and GroupQueryAttention produce the same result. An all-False
+        # mask leaves every position masked, which is numerically undefined and may
+        # diverge between the two operators depending on the onnxruntime build.
+        attention_mask = np.ones((sequence_length, sequence_length + past_length), dtype=bool)
 
         inputs = (
             query.astype(np.float32),
@@ -2861,9 +2863,11 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
         value = np.random.rand(*(1, sequence_length, kv_num_heads * head_size))
         past_key = np.random.rand(*(1, kv_num_heads, past_length, head_size))
         past_value = np.random.rand(*(1, kv_num_heads, past_length, head_size))
-        attention_mask = np.random.randint(
-            0, 1, size=(sequence_length, sequence_length + past_length)
-        ).astype(bool)
+        # The attention mask must be valid (at least one enabled position) so that
+        # Attention and GroupQueryAttention produce the same result. An all-False
+        # mask leaves every position masked, which is numerically undefined and may
+        # diverge between the two operators depending on the onnxruntime build.
+        attention_mask = np.ones((sequence_length, sequence_length + past_length), dtype=bool)
 
         # something is wrong here
         # query[:,:,:,:] = 1
