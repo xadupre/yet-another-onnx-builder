@@ -38,10 +38,13 @@ jobs:
           pip install \
             "https://github.com/xadupre/onnx-light/releases/download/${ONNX_LIGHT_VERSION}/onnx_light-${ONNX_LIGHT_VERSION}-cp312-cp312-manylinux_2_28_x86_64.whl"
 
+      - name: Uninstall onnx and onnxruntime
+        run: pip uninstall -y onnx onnxruntime
+
       - name: pip freeze
         run: pip freeze
 
-      - name: Run onnx shim tests with onnx-light
+      - name: Run tests with onnx-light
         env:
           USE_OPTIM_ONNX: "1"
-        run: pytest --durations=10 unittests/main/test_onnx_shim.py
+        run: pytest --durations=10 unittests
