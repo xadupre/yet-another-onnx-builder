@@ -3,9 +3,10 @@ import os
 import unittest
 from typing import Any, List, Optional
 import numpy as np
-import onnx
-import onnx.helper as oh
-from onnx.checker import check_model
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
+
+check_model = onnx.checker.check_model
 import torch
 from yobx.ext_test_case import (
     ExtTestCase,

@@ -1,8 +1,10 @@
 """Tests that verify yobx can export models that use ``torch.autocast``."""
 
 import unittest
-from onnx import TensorProto
-from onnx.inliner import inline_local_functions
+from yobx._onnx_shim import TensorProto  # noqa: TID251
+from yobx._onnx_shim import onnx  # noqa: TID251
+
+inline_local_functions = onnx.inliner.inline_local_functions
 from yobx.ext_test_case import (
     ExtTestCase,
     ignore_warnings,

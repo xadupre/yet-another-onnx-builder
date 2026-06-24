@@ -1,6 +1,6 @@
 import unittest
 from typing import Any, List, Optional
-import onnx
+from yobx._onnx_shim import onnx  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch import ExportOptions

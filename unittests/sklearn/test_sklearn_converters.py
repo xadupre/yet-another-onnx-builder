@@ -561,7 +561,7 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
 
     def test_standard_scaler_value_info_proto(self):
         """ValueInfoProto replaces the numpy array as input specification."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         ss = StandardScaler()
@@ -583,7 +583,7 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
 
     def test_standard_scaler_value_info_proto_with_input_names_override(self):
         """input_names overrides the name embedded in a ValueInfoProto."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
         ss = StandardScaler()
@@ -600,7 +600,7 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
 
     def test_pipeline_value_info_proto(self):
         """ValueInfoProto works with a Pipeline (scaler + regressor)."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
         from sklearn.linear_model import LinearRegression
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)
@@ -621,7 +621,7 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
     @hide_stdout()
     def test_verbosity(self):
         """ValueInfoProto works with a Pipeline (scaler + regressor)."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
         from sklearn.linear_model import LinearRegression
 
         X = np.array([[1, 2], [3, 4], [5, 6], [7, 8]], dtype=np.float32)

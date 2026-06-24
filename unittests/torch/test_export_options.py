@@ -1,7 +1,7 @@
 import os
 import tempfile
 import unittest
-import onnx
+from yobx._onnx_shim import onnx  # noqa: TID251
 import torch
 from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings, requires_torch
 from yobx.helpers.helper import get_sig_kwargs
@@ -581,7 +581,7 @@ class TestExportOptions(ExtTestCase):
     @ignore_warnings(UserWarning)
     def test_export_new_tracing_to_onnx(self):
         """Verifies that to_onnx with ExportOptions(tracing=TracingMode.NEW_TRACING) succeeds."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
         from yobx.torch.interpreter import to_onnx
 
         model = _Neuron()
@@ -1333,7 +1333,7 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
     def test_to_onnx_tracing_onnxscript_calls_dynamo_export(self):
         """Verifies that to_onnx with tracing=TracingMode.ONNXSCRIPT
         calls torch.onnx.export with dynamo=True."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
         from unittest.mock import MagicMock, patch
 
         model = self._Add()
@@ -1356,7 +1356,7 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
     def test_to_onnx_tracing_onnxscript_does_not_call_export_options_export(self):
         """Verifies that to_onnx with tracing=TracingMode.ONNXSCRIPT
         does not call ExportOptions.export()."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
         from unittest.mock import MagicMock, patch
 
         model = self._Add()
@@ -1378,7 +1378,7 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
         """Verifies that to_onnx with converting_library=ONNXSCRIPT + default tracing uses
         ExportOptions.export() to obtain an ExportedProgram, then calls
         torch.onnx.export on that program (not with dynamo=True)."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
         from unittest.mock import MagicMock, patch
 
         model = self._Add()
@@ -1411,7 +1411,7 @@ class TestToOnnxConvertingLibrary(ExtTestCase):
     def test_to_onnx_strategy_onnxscript_calls_dynamo_export(self):
         """Verifies that to_onnx with strategy='onnxscript' (shorthand for TracingMode.ONNXSCRIPT)
         calls torch.onnx.export with dynamo=True on the original model."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
         from unittest.mock import MagicMock, patch
 
         model = self._Add()

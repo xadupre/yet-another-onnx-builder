@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase, requires_torch
 
 
@@ -331,7 +331,7 @@ class TestToTensor(ExtTestCase):
 
     def setUp(self):
         from yobx.torch.torch_helper import to_tensor
-        import onnx.numpy_helper as onh
+        from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
 
         self.to_tensor = to_tensor
         self.onh = onh
