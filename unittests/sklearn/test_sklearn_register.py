@@ -37,6 +37,7 @@ class TestSklearnRegister(ExtTestCase):
             "_imblearn",
             "_xgboost",
             "_lightgbm",
+            "_perpetual",
             "_category_encoders",
             "_sksurv",
             "_statsmodels",
@@ -67,6 +68,7 @@ class TestSklearnRegister(ExtTestCase):
             "imblearn": (1, 20),
             "xgboost": (5, 5),
             "lightgbm": (3, 3),
+            "perpetual": (2, 2),
             "category_encoders": (10, 20),
             "sksurv": (10, 30),
             "statsmodels": (1, 5),
@@ -90,6 +92,8 @@ class TestSklearnRegister(ExtTestCase):
                     self.assertIn("sklearn.ensemble.HistGradientBoostingClassifier", rst)
                 elif lib == "lightgbm":
                     self.assertIn("lightgbm.LGBMRanker", rst)
+                elif lib == "perpetual":
+                    self.assertIn("perpetual.sklearn.PerpetualClassifier", rst)
                 elif lib == "xgboost":
                     self.assertIn("xgboost.XGBRanker", rst)
 

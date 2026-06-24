@@ -135,6 +135,7 @@ def get_sklearn_estimator_coverage(
             "category_encoders",
             "imblearn",
             "lightgbm",
+            "perpetual",
             "sklearn",
             "sksurv",
             "statsmodels",
@@ -176,6 +177,10 @@ def get_sklearn_estimator_coverage(
                 all_pairs.update(dict(all_estimators()))
             elif lib == "lightgbm":
                 from .lightgbm import all_estimators
+
+                all_pairs.update(dict(all_estimators()))
+            elif lib == "perpetual":
+                from .perpetual import all_estimators
 
                 all_pairs.update(dict(all_estimators()))
             elif lib == "category_encoders":

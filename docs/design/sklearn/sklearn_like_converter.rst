@@ -6,7 +6,7 @@ External Libraries Based on scikit-learn
 
 :func:`yobx.sklearn.to_onnx` converts fitted estimators to ONNX
 from :epkg:`xgboost`, :epkg:`lightgbm`, :epkg:`category_encoders`,
-and :epkg:`imbalanced-learn`
+:epkg:`imbalanced-learn`, and :epkg:`perpetual`
 using the same registry-based architecture as the other
 :mod:`yobx.sklearn` converters.
 
@@ -20,6 +20,8 @@ using the same registry-based architecture as the other
 | :epkg:`lightgbm`               | :mod:`yobx.sklearn.lightgbm`              |
 +--------------------------------+-------------------------------------------+
 | :epkg:`imbalanced-learn`       | :mod:`yobx.sklearn.imblearn`              |
++--------------------------------+-------------------------------------------+
+| :epkg:`perpetual`              | :mod:`yobx.sklearn.perpetual`             |
 +--------------------------------+-------------------------------------------+
 
 Comparison: XGBoost vs LightGBM

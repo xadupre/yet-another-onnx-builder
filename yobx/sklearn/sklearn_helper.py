@@ -83,15 +83,27 @@ def _should_use_feature_names(estimator: BaseEstimator) -> bool:
     return (
         (SelectorMixin is not None and isinstance(estimator, SelectorMixin))
         or isinstance(estimator, FeatureAgglomeration)
-        or (not isinstance(estimator, ClusterMixin) and not is_classifier(estimator))
+        or (not isinstance(estimator, ClusterMixin) and not _is_classifier_like(estimator))
     )
+
+
+def _is_classifier_like(estimator: BaseEstimator) -> bool:
+    if isinstance(estimator, BaseEstimator):
+        return is_classifier(estimator)
+    return getattr(estimator, "_estimator_type", None) == "classifier"
+
+
+def _is_regressor_like(estimator: BaseEstimator) -> bool:
+    if isinstance(estimator, BaseEstimator):
+        return is_regressor(estimator)
+    return getattr(estimator, "_estimator_type", None) == "regressor"
 
 
 def get_n_expected_outputs(estimator: BaseEstimator) -> int:
     """Returns the number of expected outputs."""
     if SelectorMixin is not None and isinstance(estimator, SelectorMixin):
         return 1
-    if is_classifier(estimator):
+    if _is_classifier_like(estimator):
         return 2 if hasattr(estimator, "predict_proba") else 1
     if isinstance(estimator, FeatureAgglomeration):
         return 1
@@ -164,7 +176,9 @@ def get_output_names(
 
     if SelectorMixin is not None and isinstance(last_step, SelectorMixin):
         return post_process_output_names(last_step, ["Y"], convert_options, effective_name)
-    if is_classifier(last_step):
+    classifier = _is_classifier_like(last_step)
+    regressor = _is_regressor_like(last_step)
+    if classifier:
         if hasattr(last_step, "predict_proba"):
             return post_process_output_names(
                 last_step, ["label", "probabilities"], convert_options, effective_name
@@ -182,7 +196,7 @@ def get_output_names(
         return post_process_output_names(
             last_step, ["label", "scores"], convert_options, effective_name
         )
-    if is_regressor(last_step):
+    if regressor:
         return post_process_output_names(
             last_step, ["predictions"], convert_options, effective_name
         )

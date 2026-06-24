@@ -4,6 +4,7 @@ specific functionalities to this project.
 """
 
 import glob
+import importlib.metadata
 import itertools
 import logging
 import os
@@ -624,6 +625,37 @@ def requires_xgboost(version: str = "", msg: str = "") -> Callable:
 
     if PvVersion(xgboost.__version__) < PvVersion(version):
         msg = f"xgboost version {xgboost.__version__} < {version}: {msg}"
+        return unittest.skip(msg)
+    return lambda x: x
+
+
+def has_perpetual(version: str = "") -> bool:
+    "Returns True if perpetual is installed and its version is high enough."
+    try:
+        import perpetual  # noqa: F401
+
+        perpetual_version = importlib.metadata.version("perpetual")
+    except (AttributeError, ImportError, importlib.metadata.PackageNotFoundError):
+        return False
+    if not version:
+        return True
+    return PvVersion(perpetual_version) >= PvVersion(version)
+
+
+def requires_perpetual(version: str = "", msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`perpetual` is not recent enough."""
+    try:
+        import perpetual  # noqa: F401
+
+        perpetual_version = importlib.metadata.version("perpetual")
+    except (AttributeError, ImportError, importlib.metadata.PackageNotFoundError):
+        return unittest.skip(msg or "perpetual not installed")
+
+    if not version:
+        return lambda x: x
+
+    if PvVersion(perpetual_version) < PvVersion(version):
+        msg = f"perpetual version {perpetual_version} < {version}: {msg}"
         return unittest.skip(msg)
     return lambda x: x
 
