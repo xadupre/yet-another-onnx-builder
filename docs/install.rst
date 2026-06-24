@@ -46,6 +46,9 @@ Install one or more of them alongside the base package:
     # LightGBM support
     pip install "yet-another-onnx-builder[lightgbm]"
 
+    # Perpetual support
+    pip install "yet-another-onnx-builder[perpetual]"
+
     # XGBoost support
     pip install "yet-another-onnx-builder[xgboost]"
 

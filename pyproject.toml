@@ -61,6 +61,7 @@ jax = ["jax[cpu]>=0.4", "tensorflow>=2.20"]
 lightgbm = ["scikit-learn>=1.4", "lightgbm>=3.0"]
 litert = ["ai-edge-litert"]
 onnxscript = ["onnxscript>=0.7.0"]
+perpetual = ["scikit-learn>=1.4", "perpetual>=2.1.0"]
 polars = ["polars"]
 sklearn = ["scikit-learn>=1.4"]
 sksurv = ["scikit-learn>=1.4", "scikit-survival>=0.22"]
@@ -197,6 +198,7 @@ module = [
     "yobx.sklearn.naive_bayes.*",
     "yobx.sklearn.neighbors.*",
     "yobx.sklearn.neural_network.*",
+    "yobx.sklearn.perpetual.*",
     "yobx.sklearn.preprocessing.*",
     "yobx.sklearn.pipeline.*",
     "yobx.sklearn.sksurv.*",

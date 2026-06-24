@@ -28,10 +28,10 @@ The table below summarizes the mapping:
      - ``yobx/xbuilder/``, ``yobx/xoptim/``, ``yobx/xshape/``, ``yobx/container/``, ``yobx/helpers/``, ``yobx/reference/``, ``yobx/translate/``
      - ``unittests/`` (excluding library sub-directories)
      - ``core_tests.yml``
-   * - scikit-learn (and xgboost, lightgbm)
+   * - scikit-learn (and xgboost, lightgbm, perpetual)
      - ``yobx/sklearn/``
      - ``unittests/sklearn/``
-     - ``sklearn_tests.yml``
+     - ``ci_sklearn.yml``, ``ci_perpetual.yml``
    * - PyTorch / Transformers
      - ``yobx/torch/``
      - ``unittests/torch/``

@@ -52,6 +52,7 @@ yobx.sklearn
     naive_bayes/index
     neural_network/index
     neighbors/index
+    perpetual/index
     pipeline/index
     preprocessing/index
     sksurv/index
@@ -59,4 +60,3 @@ yobx.sklearn
     svm/index
     tree/index
     xgboost/index
-

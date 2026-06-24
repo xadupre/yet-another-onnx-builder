@@ -127,15 +127,20 @@ def to_onnx(
         # Save to disk:
         artifact.save("model.onnx")
     """
-    check_is_fitted(
-        estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator,
-        attributes=sklearn_exportable_methods(),
-        all_or_any=any,
-        msg=(
-            "This %(name)s instance has neither a 'transform', 'predict', "
-            "'mahalanobis', nor 'score_samples' method and cannot be converted to ONNX."
-        ),
+    final_estimator = estimator.steps[-1][1] if isinstance(estimator, Pipeline) else estimator
+    check_msg = (
+        "This %(name)s instance has neither a 'transform', 'predict', "
+        "'mahalanobis', nor 'score_samples' method and cannot be converted to ONNX."
     )
+    if isinstance(final_estimator, BaseEstimator):
+        check_is_fitted(
+            final_estimator,
+            attributes=sklearn_exportable_methods(),
+            all_or_any=any,
+            msg=check_msg,
+        )
+    elif not any(hasattr(final_estimator, m) for m in sklearn_exportable_methods()):
+        raise AttributeError(check_msg % {"name": type(final_estimator).__name__})
     if isinstance(target_opset, int):
         dict_target_opset = {"": target_opset, "ai.onnx.ml": default_ai_onnx_ml(target_opset)}
     else:
@@ -146,6 +151,8 @@ def to_onnx(
             dict_target_opset[""] = 21
         if "ai.onnx.ml" not in dict_target_opset:
             dict_target_opset["ai.onnx.ml"] = default_ai_onnx_ml(dict_target_opset[""])
+    if type(final_estimator).__module__.startswith("perpetual"):
+        dict_target_opset["ai.onnx.ml"] = min(dict_target_opset.get("ai.onnx.ml", 3), 3)
 
     from . import register_sklearn_converters
 

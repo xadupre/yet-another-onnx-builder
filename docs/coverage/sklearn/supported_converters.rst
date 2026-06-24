@@ -8,7 +8,8 @@ The following :epkg:`scikit-learn` estimators and transformers have a
 registered converter in :mod:`yobx.sklearn`.  The list is generated
 programmatically from the live converter registry.  External-library
 estimators from :epkg:`lightgbm`, :epkg:`xgboost`,
-:epkg:`category_encoders`, and :epkg:`imbalanced-learn` are listed when
+:epkg:`category_encoders`, :epkg:`imbalanced-learn`, and
+:epkg:`perpetual` are listed when
 the corresponding optional dependencies are installed; see
 :ref:`l-design-sklearn-like-converters` for architecture details.
 
@@ -61,6 +62,20 @@ lightgbm
     register_sklearn_converters()
 
     print(get_sklearn_estimator_coverage(libraries=("lightgbm",), rst=True))
+
+perpetual
+---------
+
+.. runpython::
+    :showcode:
+    :rst:
+
+    from yobx.sklearn import register_sklearn_converters
+    from yobx.sklearn.register import get_sklearn_estimator_coverage
+
+    register_sklearn_converters()
+
+    print(get_sklearn_estimator_coverage(libraries=("perpetual",), rst=True))
 
 scikit-learn
 ------------

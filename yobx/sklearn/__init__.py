@@ -73,6 +73,7 @@ def register_sklearn_converters():
     from .naive_bayes import register as register_naive_bayes
     from .neighbors import register as register_neighbors
     from .neural_network import register as register_neural_network
+    from .perpetual import register as register_perpetual
     from .pipeline import register as register_pipeline
     from .preprocessing import register as register_preprocessing
     from .sksurv import register as register_sksurv
@@ -109,6 +110,7 @@ def register_sklearn_converters():
     register_naive_bayes()
     register_neighbors()
     register_neural_network()
+    register_perpetual()
     register_pipeline()
     register_preprocessing()
     register_sksurv()
