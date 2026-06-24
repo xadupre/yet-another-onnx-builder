@@ -131,6 +131,71 @@ class TestXGBoostRegressor(ExtTestCase):
         ort_results = sess.run(None, {"X": X})
         self.assertEqualArray(expected, ort_results[0], atol=1e-4)
 
+    def test_xgb_regressor_multi_target(self):
+        from xgboost import XGBRegressor
+
+        rng = np.random.default_rng(0)
+        X = rng.random((50, 10), dtype=np.float32)
+        y = rng.random((50, 10), dtype=np.float32)
+        reg = XGBRegressor(objective="reg:squarederror", n_estimators=3, random_state=0)
+        reg.fit(X, y)
+
+        for ml_opset in (3, 5):
+            with self.subTest(ml_opset=ml_opset):
+                onx = to_onnx(reg, (X,), target_opset={"": 21, "ai.onnx.ml": ml_opset})
+
+                tree_nodes = [
+                    n
+                    for n in onx.proto.graph.node
+                    if n.op_type in ("TreeEnsembleRegressor", "TreeEnsemble")
+                ]
+                self.assertEqual(len(tree_nodes), 1)
+                tree_node = tree_nodes[0]
+                attrs = {a.name: a for a in tree_node.attribute}
+                self.assertEqual(attrs["n_targets"].i, y.shape[1])
+                target_attr_name = (
+                    "leaf_targetids" if tree_node.op_type == "TreeEnsemble" else "target_ids"
+                )
+                self.assertEqual(set(attrs[target_attr_name].ints), set(range(y.shape[1])))
+
+                ref = ExtendedReferenceEvaluator(onx)
+                predictions = ref.run(None, {"X": X})[0]
+
+                expected = reg.predict(X).astype(np.float32)
+                self.assertEqual(expected.shape, predictions.shape)
+                self.assertEqualArray(expected, predictions, atol=1e-4)
+
+                sess = self.check_ort(onx)
+                ort_results = sess.run(None, {"X": X})
+                self.assertEqualArray(expected, ort_results[0], atol=1e-4)
+
+    def test_xgb_regressor_quantile_multi_alpha(self):
+        from xgboost import XGBRegressor
+
+        rng = np.random.default_rng(0)
+        X = rng.random((20, 3), dtype=np.float32)
+        y = rng.random(20, dtype=np.float32)
+        reg = XGBRegressor(
+            objective="reg:quantileerror",
+            quantile_alpha=[0.1, 0.5, 0.9],
+            n_estimators=3,
+            random_state=0,
+        )
+        reg.fit(X, y)
+
+        onx = to_onnx(reg, (X,))
+
+        ref = ExtendedReferenceEvaluator(onx)
+        predictions = ref.run(None, {"X": X})[0]
+
+        expected = reg.predict(X).astype(np.float32)
+        self.assertEqual(expected.shape, predictions.shape)
+        self.assertEqualArray(expected, predictions, atol=1e-4)
+
+        sess = self.check_ort(onx)
+        ort_results = sess.run(None, {"X": X})
+        self.assertEqualArray(expected, ort_results[0], atol=1e-4)
+
     def test_xgb_regressor_unsupported_objective_raises(self):
         """Unknown regression objectives raise NotImplementedError."""
         from yobx.sklearn.xgboost.xgb import _get_reg_output_transform
