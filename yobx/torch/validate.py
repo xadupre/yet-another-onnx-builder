@@ -7,6 +7,7 @@ inferred dynamic shapes are then used for the ONNX export.
 """
 
 import contextlib
+import warnings
 from collections import Counter
 from dataclasses import dataclass, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -311,7 +312,12 @@ def _apply_config_override(config: Any, key: str, value: Any) -> None:
     Behaviour:
 
     * Dotted keys (``"text_config.num_hidden_layers"``) walk the attribute
-      chain and set the value on the final object.
+      chain and set the value on the final object.  If an intermediate
+      attribute does not exist on the current object, a :class:`UserWarning`
+      is emitted and the override is silently skipped so that the same
+      command line can be reused across model families that differ in which
+      sub-configs they expose (e.g. ``vision_config`` is absent on
+      ``MixtralConfig`` but present on ``Gemma3Config``).
     * Plain keys are set on the top-level ``config`` only when the attribute
       is already defined there.  Otherwise, the value is forwarded to the
       first conventional language-model sub-config that exposes the
@@ -327,6 +333,14 @@ def _apply_config_override(config: Any, key: str, value: Any) -> None:
         parts = key.split(".")
         obj = config
         for part in parts[:-1]:
+            if not hasattr(obj, part):
+                warnings.warn(
+                    f"Config override {key!r}: attribute {part!r} not found on "
+                    f"{type(obj).__name__}, skipping.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+                return
             obj = getattr(obj, part)
         setattr(obj, parts[-1], value)
         return
