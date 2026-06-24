@@ -137,16 +137,43 @@ def _get_base_score(booster) -> float:
     :param booster: fitted :class:`xgboost.Booster`
     :return: raw base score as a Python float
     """
+    return float(_get_base_scores(booster)[0])
+
+
+def _get_base_scores(booster) -> np.ndarray:
+    """Return the raw (prediction-space) ``base_score`` values from an XGBoost booster.
+
+    The value is read from ``booster.save_config()`` which returns the stored
+    JSON configuration. In XGBoost 2.x the value is a plain float string; in
+    XGBoost 3.x it may be a JSON array encoded as a string (for example
+    ``"[0.75]"`` or ``"[0.1,0.5,0.9]"`` for multi-output models).
+
+    :param booster: fitted :class:`xgboost.Booster`
+    :return: raw base scores as a 1D float64 array
+    """
     try:
         cfg = json.loads(booster.save_config())
         raw = cfg["learner"]["learner_model_param"]["base_score"]
-        # XGBoost 3.x serialises base_score as a JSON array string e.g. "[0.75]"
-        raw_stripped = raw.strip() if isinstance(raw, str) else str(raw)
-        if raw_stripped.startswith("[") and raw_stripped.endswith("]"):
-            raw_stripped = raw_stripped[1:-1].strip()
-        return float(raw_stripped)
+        if isinstance(raw, str):
+            raw_stripped = raw.strip()
+            if raw_stripped.startswith("[") and raw_stripped.endswith("]"):
+                values = json.loads(raw_stripped)
+                return np.array(values, dtype=np.float64)
+            return np.array([float(raw_stripped)], dtype=np.float64)
+        if isinstance(raw, (list, tuple)):
+            return np.array(raw, dtype=np.float64)
+        return np.array([float(raw)], dtype=np.float64)
     except Exception:
-        return 0.5
+        return np.array([0.5], dtype=np.float64)
+
+
+def _get_tree_info(booster) -> Optional[List[int]]:
+    """Returns the XGBoost ``tree_info`` target routing for each tree."""
+    try:
+        raw = json.loads(booster.save_raw(raw_format="json"))
+        return raw["learner"]["gradient_booster"]["model"].get("tree_info")
+    except Exception:
+        return None
 
 
 def _get_num_parallel_tree(booster) -> int:
@@ -173,6 +200,7 @@ def _build_xgb_tree_attrs_legacy(
     feature_name_to_idx: Optional[dict] = None,
     is_classifier: bool = False,
     num_parallel_tree: int = 1,
+    tree_info: Optional[List[int]] = None,
 ) -> dict:
     """Build legacy ``TreeEnsembleRegressor`` / ``TreeEnsembleClassifier`` attribute arrays.
 
@@ -221,7 +249,11 @@ def _build_xgb_tree_attrs_legacy(
     for tree_idx, tree_root in enumerate(trees_json):
         nodes: dict = {}
         _collect_nodes(tree_root, nodes)
-        target_id = (tree_idx // num_parallel_tree) % n_targets
+        target_id = (
+            tree_info[tree_idx]
+            if tree_info is not None
+            else (tree_idx // num_parallel_tree) % n_targets
+        )
 
         for node_id in sorted(nodes.keys()):
             node = nodes[node_id]
@@ -303,6 +335,7 @@ def _build_xgb_tree_attrs_v5(
     feature_name_to_idx: Optional[dict],
     itype: int,
     num_parallel_tree: int = 1,
+    tree_info: Optional[List[int]] = None,
 ) -> dict:
     """Build ``TreeEnsemble`` (``ai.onnx.ml`` opset 5) attribute arrays.
 
@@ -339,7 +372,11 @@ def _build_xgb_tree_attrs_v5(
     for tree_idx, tree_root in enumerate(trees_json):
         nodes: dict = {}
         _collect_nodes(tree_root, nodes)
-        target_id = (tree_idx // num_parallel_tree) % n_targets
+        target_id = (
+            tree_info[tree_idx]
+            if tree_info is not None
+            else (tree_idx // num_parallel_tree) % n_targets
+        )
 
         # Partition nodes into internal (has children) and leaf (no children).
         internal_nodes = sorted(nid for nid, n in nodes.items() if "leaf" not in n)
@@ -474,6 +511,19 @@ def _compute_margin_bias(base_score: float, objective: str) -> float:
     return float(base_score)
 
 
+def _compute_margin_biases(base_scores: np.ndarray, objective: str) -> np.ndarray:
+    """Computes the margin-space bias vector from raw ``base_score`` values."""
+    base_scores = np.asarray(base_scores, dtype=np.float64)
+    if "binary" in objective or "logistic" in objective:
+        p = np.clip(base_scores, 1e-7, 1.0 - 1e-7)
+        return np.log(p / (1.0 - p))
+    if "softmax" in objective or "softprob" in objective or "multi" in objective:
+        return np.zeros_like(base_scores, dtype=np.float64)
+    if objective in _REG_EXP_OBJECTIVES:
+        return np.log(np.maximum(base_scores, 1e-7))
+    return base_scores.astype(np.float64, copy=False)
+
+
 def _get_reg_output_transform(objective: str) -> Optional[str]:
     """Return the ONNX output-transform type for an :class:`~xgboost.XGBRegressor` objective.
 
@@ -510,6 +560,7 @@ def _emit_tree_node(
     is_classifier: bool = False,
     itype: int = 0,
     num_parallel_tree: int = 1,
+    tree_info: Optional[List[int]] = None,
 ) -> str:
     """Emit a ``TreeEnsembleRegressor`` / ``TreeEnsembleClassifier`` / ``TreeEnsemble`` ONNX node.
 
@@ -539,6 +590,7 @@ def _emit_tree_node(
             feature_name_to_idx=feature_name_to_idx,
             itype=itype,
             num_parallel_tree=num_parallel_tree,
+            tree_info=tree_info,
         )
         result = g.make_node(
             "TreeEnsemble",
@@ -557,6 +609,7 @@ def _emit_tree_node(
             feature_name_to_idx=feature_name_to_idx,
             is_classifier=True,
             num_parallel_tree=num_parallel_tree,
+            tree_info=tree_info,
         )
         # The ONNX reference evaluator requires at least 2 class labels.
         # For binary (n_targets=1) we declare [0, 1] so the output scores
@@ -594,7 +647,11 @@ def _emit_tree_node(
         return scores
     else:
         attrs = _build_xgb_tree_attrs_legacy(
-            trees_json, n_targets=n_targets, feature_name_to_idx=feature_name_to_idx
+            trees_json,
+            n_targets=n_targets,
+            feature_name_to_idx=feature_name_to_idx,
+            num_parallel_tree=num_parallel_tree,
+            tree_info=tree_info,
         )
         result = g.make_node(
             "TreeEnsembleRegressor",
@@ -785,7 +842,7 @@ def sklearn_xgb_regressor(
     :param estimator: a fitted ``XGBRegressor`` or ``XGBRFRegressor``
     :param X: input tensor name
     :param name: prefix for node names added to the graph
-    :return: output tensor name (shape ``[N, 1]``)
+    :return: output tensor name (shape ``[N, n_targets]``)
     :raises NotImplementedError: if the model's objective is not supported
     """
     booster = estimator.get_booster()
@@ -801,6 +858,9 @@ def sklearn_xgb_regressor(
     trees_json = [json.loads(t) for t in booster.get_dump(dump_format="json")]
     feature_names = booster.feature_names
     feature_name_to_idx = {fn: i for i, fn in enumerate(feature_names)} if feature_names else None
+    tree_info = _get_tree_info(booster)
+    base_scores = _get_base_scores(booster)
+    n_targets = max(len(base_scores), (max(tree_info) + 1) if tree_info else 1)
 
     itype = g.get_type(X)
 
@@ -816,25 +876,27 @@ def sklearn_xgb_regressor(
         g,
         X,
         name,
-        n_targets=1,
+        n_targets=n_targets,
         trees_json=trees_json,
         feature_name_to_idx=feature_name_to_idx,
         ml_opset=ml_opset,
         intermediate_name=tree_out_name,
         itype=itype,
+        tree_info=tree_info,
     )
 
     raw_scores = g.make_node("Cast", [raw_scores], outputs=1, name=f"{name}_tree_cast", to=itype)
 
     # Add margin-space bias derived from base_score.
-    base_score = _get_base_score(booster)
-    bias = _compute_margin_bias(base_score, objective)
-    if abs(bias) > 1e-8:
+    bias = _compute_margin_biases(base_scores, objective)
+    if len(bias) == 1 and n_targets > 1:
+        bias = np.full((n_targets,), float(bias[0]), dtype=np.float64)
+    if np.any(np.abs(bias) > 1e-8):
         # Bias dtype matches the current working dtype:
         # - v5 float64: float64 tree → float64 bias
         # - v3 float64: float32 (after normalization above) → float32 bias
         # - float32: float32 bias
-        bias_arr = np.array([bias], dtype=dtype)
+        bias_arr = np.array(bias, dtype=dtype)
         raw_scores = g.op.Add(raw_scores, bias_arr, name=f"{name}_bias")
 
     # Apply the objective-specific output transform (Sigmoid / Exp / identity).
