@@ -130,23 +130,17 @@ class TestValidateModel(ExtTestCase):
         self.assertEqual(config.vision_config.num_hidden_layers, 4)
 
     def test_apply_config_override_dotted_missing_intermediate(self):
-        """_apply_config_override warns and skips when an intermediate attribute is absent."""
-        import warnings
+        """_apply_config_override raises AttributeError when an intermediate is absent."""
         from transformers import LlamaConfig
         from yobx.torch.validate import _apply_config_override
 
         config = LlamaConfig()
-        original_layers = config.num_hidden_layers
-        with warnings.catch_warnings(record=True) as caught:
-            warnings.simplefilter("always")
+        with self.assertRaises(AttributeError) as ctx:
             _apply_config_override(config, "vision_config.num_hidden_layers", 2)
-        # A UserWarning must be emitted.
-        self.assertTrue(any(issubclass(w.category, UserWarning) for w in caught))
-        warning_messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
-        self.assertTrue(any("vision_config" in m for m in warning_messages))
-        # The override must be silently skipped: no attribute created.
-        self.assertFalse(hasattr(config, "vision_config"))
-        self.assertEqual(config.num_hidden_layers, original_layers)
+        msg = str(ctx.exception)
+        self.assertIn("vision_config.num_hidden_layers", msg)
+        self.assertIn("vision_config", msg)
+        self.assertIn("LlamaConfig", msg)
 
     def test_apply_config_override_plain_attribute(self):
         """_apply_config_override sets attributes on flat (non-multimodal) configs."""

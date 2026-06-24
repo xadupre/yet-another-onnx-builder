@@ -7,7 +7,6 @@ inferred dynamic shapes are then used for the ONNX export.
 """
 
 import contextlib
-import warnings
 from collections import Counter
 from dataclasses import dataclass, fields
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -313,11 +312,9 @@ def _apply_config_override(config: Any, key: str, value: Any) -> None:
 
     * Dotted keys (``"text_config.num_hidden_layers"``) walk the attribute
       chain and set the value on the final object.  If an intermediate
-      attribute does not exist on the current object, a :class:`UserWarning`
-      is emitted and the override is silently skipped so that the same
-      command line can be reused across model families that differ in which
-      sub-configs they expose (e.g. ``vision_config`` is absent on
-      ``MixtralConfig`` but present on ``Gemma3Config``).
+      attribute does not exist on the current object, an :class:`AttributeError`
+      is raised with a message that names the config type, the missing
+      intermediate attribute, and the full override key.
     * Plain keys are set on the top-level ``config`` only when the attribute
       is already defined there.  Otherwise, the value is forwarded to the
       first conventional language-model sub-config that exposes the
@@ -334,13 +331,12 @@ def _apply_config_override(config: Any, key: str, value: Any) -> None:
         obj = config
         for part in parts[:-1]:
             if not hasattr(obj, part):
-                warnings.warn(
-                    f"Config override {key!r}: attribute {part!r} not found on "
-                    f"{type(obj).__name__}, skipping.",
-                    UserWarning,
-                    stacklevel=2,
+                raise AttributeError(
+                    f"Config override {key!r} (value={value!r}) failed: "
+                    f"{type(obj).__name__!r} has no attribute {part!r}. "
+                    f"The config type is {type(config).__name__!r}. "
+                    f"Check that the dotted path matches the structure of this config."
                 )
-                return
             obj = getattr(obj, part)
         setattr(obj, parts[-1], value)
         return
