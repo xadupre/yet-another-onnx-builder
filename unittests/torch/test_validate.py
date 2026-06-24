@@ -129,6 +129,19 @@ class TestValidateModel(ExtTestCase):
         _apply_config_override(config, "vision_config.num_hidden_layers", 4)
         self.assertEqual(config.vision_config.num_hidden_layers, 4)
 
+    def test_apply_config_override_dotted_missing_intermediate(self):
+        """_apply_config_override raises AttributeError when an intermediate is absent."""
+        from transformers import LlamaConfig
+        from yobx.torch.validate import _apply_config_override
+
+        config = LlamaConfig()
+        with self.assertRaises(AttributeError) as ctx:
+            _apply_config_override(config, "vision_config.num_hidden_layers", 2)
+        msg = str(ctx.exception)
+        self.assertIn("vision_config.num_hidden_layers", msg)
+        self.assertIn("vision_config", msg)
+        self.assertIn("LlamaConfig", msg)
+
     def test_apply_config_override_plain_attribute(self):
         """_apply_config_override sets attributes on flat (non-multimodal) configs."""
         from transformers import LlamaConfig
