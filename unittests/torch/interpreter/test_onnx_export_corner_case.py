@@ -218,6 +218,30 @@ class TestOnnxExportCornerCase(ExtTestCase):
 
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
+    @requires_torch("2.13")
+    def test_simple_export_remainder_scalar_tensor_padding_147973(self):
+        import torch
+
+        class Mod(torch.nn.Module):
+            def forward(self, x, window_size):
+                _, height, width, _ = x.shape
+                pad_h = (window_size - height % window_size) % window_size
+                pad_w = (window_size - width % window_size) % window_size
+                pad_h_ = pad_h.item()
+                pad_w_ = pad_w.item()
+                torch._check_is_size(pad_h_)
+                torch._check_is_size(pad_w_)
+                return torch.nn.functional.pad(x, (0, 0, 0, pad_w_, 0, pad_h_))
+
+        model = Mod()
+        x = torch.rand(1, 200, 204, 3)
+        window_size = torch.tensor(8)
+        expected = model(x, window_size)
+        onx = to_onnx(model, (x, window_size))
+        self.assert_conversion_with_ort_on_cpu(onx, expected, (x, window_size))
+
+    @skipif_ci_windows("torch dynamo not supported on windows")
+    @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
     def test_simple_export_pool(self):
         from onnxruntime import InferenceSession
