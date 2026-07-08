@@ -1494,15 +1494,6 @@ def aten_as_strided(
     name: str = "as_strided",
 ) -> T:
     "as_strided"
-    if storage_offset is None and min(stride) == max(stride) == 1 and g.has_shape(x):
-        shape = g.get_shape(x)
-        if np.prod(shape) == np.prod(size):
-            return g.op.Reshape(x, np.array(size, dtype=np.int64), outputs=outputs, name=name)
-
-    if g.has_shape(x) and g.get_shape(x) == tuple(size):
-        # Identity
-        return g.op.Identity(x, outputs=outputs, name=name)
-
     if is_static_shape(size) and all_int(stride):
         n_elems = np.prod(size)
         indices = np.zeros(np.prod(size), dtype=np.int64)
