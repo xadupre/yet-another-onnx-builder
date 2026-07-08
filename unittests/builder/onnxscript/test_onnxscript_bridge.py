@@ -357,6 +357,40 @@ class TestOnnxScriptBridge(ExtTestCase):
         self.assertEqualArray(y, x @ np.eye(3, dtype=np.float32))
 
     # ------------------------------------------------------------------
+    # node name forwarding (onnxscript PR #2858)
+    # ------------------------------------------------------------------
+
+    def test_make_node_name_forwarded_to_proto(self):
+        """Node name passed to make_node must appear in the exported ONNX proto."""
+        gr = self._make_builder()
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
+        gr.make_node("Relu", ["X"], ["Y"], name="my_relu")
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
+        proto = gr.to_onnx()
+        check_model(proto)
+        self.assertEqual(proto.graph.node[0].name, "my_relu")
+
+    def test_make_node_op_style_name_forwarded(self):
+        """Node name passed via op-style shortcut must appear in the exported proto."""
+        gr = self._make_builder()
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
+        result = gr.op.Relu("X", name="relu_via_op")
+        gr.make_tensor_output(result, onnx.TensorProto.FLOAT)
+        proto = gr.to_onnx()
+        check_model(proto)
+        self.assertEqual(proto.graph.node[0].name, "relu_via_op")
+
+    def test_make_node_without_name_uses_auto_name(self):
+        """When no name is provided, the node should still receive an auto-generated name."""
+        gr = self._make_builder()
+        gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3,))
+        gr.make_node("Relu", ["X"], ["Y"])
+        gr.make_tensor_output("Y", onnx.TensorProto.FLOAT)
+        proto = gr.to_onnx()
+        check_model(proto)
+        self.assertNotEqual(proto.graph.node[0].name, "")
+
+    # ------------------------------------------------------------------
     # Direct onnxscript builder access
     # ------------------------------------------------------------------
 
