@@ -5440,6 +5440,110 @@ def aten_fft_ifft2(
     )
 
 
+def aten__fft_c2r(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    dim: Union[List[int], Tuple[int, ...]],
+    normalization: int,
+    last_dim_size: int,
+    name: str = "_fft_c2r",
+) -> T:
+    """_fft_c2r"""
+    dim_name = g.make_initializer("", np.array(dim, dtype=np.int64), source=f"{name}.dim")
+    normalization_name = g.make_initializer(
+        "", np.array(normalization, dtype=np.int64), source=f"{name}.normalization"
+    )
+    last_dim_size_name = g.make_initializer(
+        "", np.array(last_dim_size, dtype=np.int64), source=f"{name}.last_dim_size"
+    )
+    g.add_domain("ai.onnx.complex", 1)
+    res = g.make_node(
+        "FftC2r",
+        [x, dim_name, normalization_name, last_dim_size_name],
+        outputs=outputs,
+        domain="ai.onnx.complex",
+        name=name,
+    )
+    if not sts and g.has_type(x):
+        itype = g.get_type(x)
+        if itype == TensorProto.COMPLEX64:
+            otype = TensorProto.FLOAT
+        elif itype == TensorProto.COMPLEX128:
+            otype = TensorProto.DOUBLE
+        else:
+            otype = itype
+        g.set_type(res, otype)
+        if g.has_shape(x):
+            shape_x = list(g.get_shape(x))
+            rank = len(shape_x)
+            if rank > 0:
+                dim_pos = [d + rank if d < 0 else d for d in dim]
+                if dim_pos and 0 <= dim_pos[-1] < rank:
+                    shape_x[dim_pos[-1]] = last_dim_size
+            g.set_shape(res, tuple(shape_x))
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x))
+    return res
+
+
+def aten_fft_irfft2(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    s: Optional[Tuple[int, int]] = None,
+    dim: Tuple[int, int] = (-2, -1),
+    norm: Optional[str] = None,
+    name: str = "fft_irfft2",
+) -> T:
+    """fft_irfft2"""
+    dim_name = g.make_initializer("", np.array(dim, dtype=np.int64), source=f"{name}.dim")
+    s_name = g.make_initializer(
+        "", np.array([-1, -1] if s is None else list(s), dtype=np.int64), source=f"{name}.s"
+    )
+    norm_code = {None: 0, "backward": 0, "forward": 1, "ortho": 2}
+    assert norm in norm_code, f"Unexpected value for norm={norm!r}{g.get_debug_msg()}"
+    norm_name = g.make_initializer(
+        "", np.array(norm_code[norm], dtype=np.int64), source=f"{name}.norm"
+    )
+
+    g.add_domain("ai.onnx.complex", 1)
+    res = g.make_node(
+        "FftIrfft2",
+        [x, s_name, dim_name, norm_name],
+        outputs=outputs,
+        domain="ai.onnx.complex",
+        name=name,
+    )
+    if not sts and g.has_type(x):
+        itype = g.get_type(x)
+        if itype == TensorProto.COMPLEX64:
+            otype = TensorProto.FLOAT
+        elif itype == TensorProto.COMPLEX128:
+            otype = TensorProto.DOUBLE
+        else:
+            otype = itype
+        g.set_type(res, otype)
+        if g.has_shape(x):
+            shape_x = list(g.get_shape(x))
+            rank = len(shape_x)
+            dim_pos = [d + rank if d < 0 else d for d in dim]
+            if dim_pos and 0 <= dim_pos[-1] < rank:
+                if s is not None:
+                    shape_x[dim_pos[-1]] = s[-1]
+                else:
+                    size = shape_x[dim_pos[-1]]
+                    shape_x[dim_pos[-1]] = None if size in (None, "?") else (size - 1) * 2
+            if s is not None and len(dim_pos) >= 2 and 0 <= dim_pos[-2] < rank:
+                shape_x[dim_pos[-2]] = s[-2]
+            g.set_shape(res, tuple(shape_x))
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x))
+    return res
+
+
 def aten_istft(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],

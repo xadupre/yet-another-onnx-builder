@@ -114,3 +114,56 @@ class Istft(OpRun):
             return_complex=return_complex_b,
         )
         return (output.detach().cpu().numpy(),)
+
+
+class FftC2r(OpRun):
+    op_domain = "ai.onnx.complex"
+
+    def _run(self, x, dim, normalization, last_dim_size):
+        import torch
+
+        def _to_int(value):
+            if isinstance(value, np.ndarray):
+                return int(value.reshape((-1,))[0])
+            return int(value)
+
+        def _to_dims(value):
+            if isinstance(value, np.ndarray):
+                return [int(v) for v in value.reshape((-1,)).tolist()]
+            if isinstance(value, (list, tuple)):
+                return [int(v) for v in value]
+            return [int(value)]
+
+        tx = torch.from_numpy(x)
+        output = torch.ops.aten._fft_c2r.default(
+            tx, _to_dims(dim), _to_int(normalization), _to_int(last_dim_size)
+        )
+        return (output.detach().cpu().numpy(),)
+
+
+class FftIrfft2(OpRun):
+    op_domain = "ai.onnx.complex"
+
+    def _run(self, x, s, dim, norm):
+        import torch
+
+        def _to_int(value):
+            if isinstance(value, np.ndarray):
+                return int(value.reshape((-1,))[0])
+            return int(value)
+
+        def _to_dims(value):
+            if isinstance(value, np.ndarray):
+                return [int(v) for v in value.reshape((-1,)).tolist()]
+            if isinstance(value, (list, tuple)):
+                return [int(v) for v in value]
+            return [int(value)]
+
+        s_values = _to_dims(s)
+        s_tuple = None if all(v < 0 for v in s_values) else tuple(s_values)
+        dim_tuple = tuple(_to_dims(dim))
+        norm_value = {0: "backward", 1: "forward", 2: "ortho"}[_to_int(norm)]
+
+        tx = torch.from_numpy(x)
+        output = torch.fft.irfft2(tx, s=s_tuple, dim=dim_tuple, norm=norm_value)
+        return (output.detach().cpu().numpy(),)
