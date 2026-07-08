@@ -12207,6 +12207,68 @@ def aten_permute(
     return g.op.Transpose(x, perm=dims, outputs=outputs, name="permute")
 
 
+def aten_pixel_shuffle(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    upscale_factor: int,
+    name: str = "pixel_shuffle",
+) -> T:
+    """pixel_shuffle
+
+    Rearranges elements in a tensor of shape ``(N, C*r^2, H, W)`` to a tensor
+    of shape ``(N, C, H*r, W*r)`` where *r* is ``upscale_factor``.
+    Maps to the ONNX ``DepthToSpace`` operator with ``mode="CRD"``.
+    """
+    res = g.op.DepthToSpace(x, blocksize=upscale_factor, mode="CRD", outputs=outputs, name=name)
+    if not sts:
+        if g.has_type(x):
+            g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            shape = g.get_shape(x)
+            r = upscale_factor
+            n, c = shape[0], shape[1]
+            new_c = c // (r * r) if isinstance(c, int) else f"({c})//{r * r}"
+            new_spatial = tuple(s * r if isinstance(s, int) else f"({s})*{r}" for s in shape[2:])
+            g.set_shape(res, (n, new_c, *new_spatial))
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x))
+    return res
+
+
+def aten_pixel_unshuffle(
+    g: GraphBuilder,
+    sts: Optional[Dict[str, Any]],
+    outputs: List[str],
+    x: T,
+    downscale_factor: int,
+    name: str = "pixel_unshuffle",
+) -> T:
+    """pixel_unshuffle
+
+    Rearranges elements in a tensor of shape ``(N, C, H*r, W*r)`` to a tensor
+    of shape ``(N, C*r^2, H, W)`` where *r* is ``downscale_factor``.
+    Maps to the ONNX ``SpaceToDepth`` operator.
+    """
+    res = g.op.SpaceToDepth(x, blocksize=downscale_factor, outputs=outputs, name=name)
+    if not sts:
+        if g.has_type(x):
+            g.set_type(res, g.get_type(x))
+        if g.has_shape(x):
+            shape = g.get_shape(x)
+            r = downscale_factor
+            n, c = shape[0], shape[1]
+            new_c = c * r * r if isinstance(c, int) else f"({c})*{r * r}"
+            new_spatial = tuple(
+                s // r if isinstance(s, int) else f"({s})//{r}" for s in shape[2:]
+            )
+            g.set_shape(res, (n, new_c, *new_spatial))
+        elif g.has_rank(x):
+            g.set_rank(res, g.get_rank(x))
+    return res
+
+
 def aten_polar(
     g: GraphBuilder,
     sts: Optional[Dict[str, Any]],
