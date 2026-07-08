@@ -3358,6 +3358,25 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
+    def test_aten_index_put_bool_mask_row_values(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, tensor, mask, values):
+                t = tensor.clone()
+                t[mask] = values
+                return t
+
+        model = Model()
+        inputs = (
+            torch.zeros((5, 3), dtype=torch.float32),
+            torch.tensor([True, False, True, True, False], dtype=torch.bool),
+            torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]),
+        )
+        expected = model(*inputs)
+        onx = to_onnx(model, inputs)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
+
     def test_aten_movedim1(self):
         import torch
 
@@ -3624,6 +3643,32 @@ class TestOnnxExportAten(ExtTestCase):
                 return torch.bincount(x, minlength=5)
 
         inputs = (torch.tensor([0, 1, 1, 3, 2, 1], dtype=torch.int64),)
+        model = Model()
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs, dynamic_shapes=({0: "length"},))
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_bincount_default_minlength(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.bincount(x)
+
+        inputs = (torch.tensor([2, 2, 2], dtype=torch.int64),)
+        model = Model()
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs, dynamic_shapes=({0: "length"},))
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
+
+    def test_aten_bincount_empty_input(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.bincount(x, minlength=4)
+
+        inputs = (torch.tensor([], dtype=torch.int64),)
         model = Model()
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs, dynamic_shapes=({0: "length"},))
