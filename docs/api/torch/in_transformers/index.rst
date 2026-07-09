@@ -7,6 +7,7 @@ yobx.torch.in_transformers
 
     _patches_model_rope_utils
     cache_helper
+    exporter
     flatten_class
     patches
     register
