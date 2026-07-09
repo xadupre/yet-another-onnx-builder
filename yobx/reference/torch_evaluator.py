@@ -664,7 +664,14 @@ class TorchReferenceEvaluator:
         assert all(
             self.runtime_info[o].value is not None for o in outputs
         ), "Not implemented yet when one output is None."
-        res2 = [self.runtime_info[o].value.copy() for o in outputs]  # type: ignore[assignment, union-attr]
+        res2 = [
+            (
+                self.runtime_info[o].value  # type: ignore[index]
+                if self.runtime_info[o].value.is_constant  # type: ignore[union-attr]
+                else self.runtime_info[o].value.copy()
+            )  # type: ignore[union-attr]
+            for o in outputs
+        ]  # type: ignore[assignment]
 
         # clean previous execution
         for k in self.input_names:

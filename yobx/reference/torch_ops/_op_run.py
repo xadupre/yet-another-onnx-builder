@@ -111,7 +111,7 @@ class OpRunTensor(OpRunValue):
 
     def copy(self) -> "OpRunTensor":
         "Shallow copy."
-        return self.__class__(self.tensor)
+        return self.__class__(self.tensor, is_constant=self.is_constant)
 
 
 class OpRunSequence(OpRunValue):
@@ -121,6 +121,7 @@ class OpRunSequence(OpRunValue):
         self, sequence: Optional[List[torch.Tensor]] = None, dtype: torch.dtype = torch.float32
     ):
         self.tensor = torch.tensor(-666666, dtype=dtype)
+        self.is_constant = False
         self.is_shape = False
         self.sequence = sequence or []
         self.cached: Optional[Tuple[int, ...]] = None

@@ -1652,6 +1652,72 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         self.assertEqual(list(piv.columns), ["r_cos", "r_exp", "r_x"])
         self.assertEqual(list(piv.index), [(0, "nx"), (1, "t"), (2, "u"), (3, "uZ"), (4, "Z")])
 
+    def test_op_run_tensor_copy_preserves_is_constant(self):
+        t = torch.tensor([1.0, 2.0, 3.0])
+        op = OpRunTensor(t, is_constant=True)
+        copied = op.copy()
+        self.assertTrue(copied.is_constant)
+        self.assertIs(copied.tensor, t)
+
+        op2 = OpRunTensor(t, is_constant=False)
+        copied2 = op2.copy()
+        self.assertFalse(copied2.is_constant)
+
+    def test_if_constant_output_borrowed_reference(self):
+        """Tests that Constant output of a subgraph returns a borrowed reference."""
+
+        def _mkv_(name):
+            value_info_proto = onnx.ValueInfoProto()
+            value_info_proto.name = name
+            return value_info_proto
+
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "Constant",
+                        [],
+                        ["cond"],
+                        value=onh.from_array(np.array(True, dtype=np.bool_)),
+                    ),
+                    oh.make_node(
+                        "If",
+                        ["cond"],
+                        ["Z"],
+                        then_branch=oh.make_graph(
+                            [oh.make_node("Constant", [], ["c"], value_floats=[2.1])],
+                            "then",
+                            [],
+                            [_mkv_("c")],
+                        ),
+                        else_branch=oh.make_graph(
+                            [oh.make_node("Constant", [], ["c"], value_floats=[3.1])],
+                            "else",
+                            [],
+                            [_mkv_("c")],
+                        ),
+                    ),
+                ],
+                "test",
+                [],
+                [oh.make_tensor_value_info("Z", TFLOAT, [1])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+            ir_version=10,
+        )
+        rt = TorchReferenceEvaluator(model)
+        got = rt.run(None, {})
+        self.assertAlmostEqual(got[0].numpy(), np.array([2.1], dtype=np.float32), atol=1e-5)
+
+        # Verify the subgraph's constant output is a borrowed reference (is_constant=True).
+        if_kernel = next(k for k in rt.kernels if k is not None)
+        sub_eval = if_kernel.then_branch  # type: ignore[attr-defined]
+        result = sub_eval.run_with_values()
+        self.assertTrue(
+            result.is_constant,
+            "Constant output of a subgraph should be a borrowed reference (is_constant=True).",
+        )
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
