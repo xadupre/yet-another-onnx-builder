@@ -41,6 +41,7 @@ from .shape_ops import (
 )
 from .unary_ops import (
     Abs_1,
+    Bernoulli_1,
     Cos_1,
     Erf_9,
     Exp_1,
