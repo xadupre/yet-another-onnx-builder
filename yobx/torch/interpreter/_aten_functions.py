@@ -2912,7 +2912,7 @@ def aten_bincount(
     # shape-inference path that requires all dimensions to be > 0).
     ones = g.op.ConstantOfShape(
         g.op.Shape(flat, name=name),
-        value=np.array([1], dtype=np.int64),
+        value=onh.from_array(np.array([1], dtype=np.int64)),
         name=name,
     )
     res = g.op.ScatterElements(
