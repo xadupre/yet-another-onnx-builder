@@ -4236,7 +4236,7 @@ class TestOnnxExportAten(ExtTestCase):
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("SpaceToDepth", op_types)
+        self.assertIn("Transpose", op_types)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     @skipif_ci_windows("not working on windows")
@@ -4259,12 +4259,13 @@ class TestOnnxExportAten(ExtTestCase):
 
     @skipif_ci_windows("not working on windows")
     def test_aten_pixel_unshuffle_multichannel(self):
-        """Verifies pixel_unshuffle (SpaceToDepth) matches PyTorch for C>1.
+        """Verifies pixel_unshuffle matches PyTorch for C>1.
 
         Regression for https://github.com/pytorch/pytorch/issues/186080 which
         reported wrong output ordering when exporting PixelUnshuffle with
-        ``dynamo=True``.  The yobx converter uses ONNX ``SpaceToDepth``
-        directly, bypassing the dynamo path.
+        ``dynamo=True``.  The yobx converter uses Reshape/Transpose/Reshape
+        directly, bypassing the dynamo path and matching PyTorch's channel
+        ordering.
         """
         import torch
 
@@ -4279,7 +4280,7 @@ class TestOnnxExportAten(ExtTestCase):
         expected = model(*torch_deepcopy(inputs))
         onx = to_onnx(model, inputs)
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("SpaceToDepth", op_types)
+        self.assertIn("Transpose", op_types)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
 

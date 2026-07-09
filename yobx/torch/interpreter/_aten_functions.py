@@ -12249,17 +12249,40 @@ def aten_pixel_unshuffle(
 
     Rearranges elements in a tensor of shape ``(N, C, H*r, W*r)`` to a tensor
     of shape ``(N, C*r^2, H, W)`` where *r* is ``downscale_factor``.
-    Maps to the ONNX ``SpaceToDepth`` operator.
+
+    Implemented as ``Reshape → Transpose → Reshape`` to match PyTorch's channel
+    ordering (original channel varies slowest, block position fastest).  ONNX
+    ``SpaceToDepth`` interleaves channels differently when ``C > 1`` and cannot
+    be used as a direct replacement.
     """
-    res = g.op.SpaceToDepth(x, blocksize=downscale_factor, outputs=outputs, name=name)
+    r = downscale_factor
+    r2 = r * r
+    # Step 1: reshape (N, C, H*r, W*r) → (N, C, H, r, W, r)
+    n_dim = g.op.Shape(x, start=0, end=1, name=name)
+    c_dim = g.op.Shape(x, start=1, end=2, name=name)
+    h_dim = g.op.Div(
+        g.op.Shape(x, start=2, end=3, name=name), np.array([r], dtype=np.int64), name=name
+    )
+    w_dim = g.op.Div(
+        g.op.Shape(x, start=3, end=4, name=name), np.array([r], dtype=np.int64), name=name
+    )
+    r_cst = np.array([r], dtype=np.int64)
+    shape6 = g.op.Concat(n_dim, c_dim, h_dim, r_cst, w_dim, r_cst, axis=0, name=name)
+    x6 = g.op.Reshape(x, shape6, name=name)
+    # Step 2: transpose (N, C, H, r1, W, r2) → (N, C, r1, r2, H, W)
+    # Original axes: 0=N, 1=C, 2=H, 3=r1, 4=W, 5=r2 → perm=[0, 1, 3, 5, 2, 4]
+    x6t = g.op.Transpose(x6, perm=[0, 1, 3, 5, 2, 4], name=name)
+    # Step 3: reshape (N, C, r1, r2, H, W) → (N, C*r^2, H, W)
+    cr2_dim = g.op.Mul(c_dim, np.array([r2], dtype=np.int64), name=name)
+    shape4 = g.op.Concat(n_dim, cr2_dim, h_dim, w_dim, axis=0, name=name)
+    res = g.op.Reshape(x6t, shape4, outputs=outputs, name=name)
     if not sts:
         if g.has_type(x):
             g.set_type(res, g.get_type(x))
         if g.has_shape(x):
             shape = g.get_shape(x)
-            r = downscale_factor
             n, c = shape[0], shape[1]
-            new_c = c * r * r if isinstance(c, int) else f"({c})*{r * r}"
+            new_c = c * r2 if isinstance(c, int) else f"({c})*{r2}"
             new_spatial = tuple(
                 s // r if isinstance(s, int) else f"({s})//{r}" for s in shape[2:]
             )
