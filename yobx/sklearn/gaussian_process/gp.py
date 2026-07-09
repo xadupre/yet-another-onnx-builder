@@ -529,40 +529,56 @@ def sklearn_gaussian_process_regressor(
     assert g.has_type(X), f"Missing type for {X!r}{g.get_debug_msg()}"
 
     itype = g.get_type(X)
-    dtype = tensor_dtype_to_np_dtype(itype)
 
-    X_train = estimator.X_train_.astype(dtype)  # (M, F)
-    alpha = estimator.alpha_.astype(dtype)  # (M,) or (M, n_targets)
+    # GPR arithmetic (large kernel constants, near-cancellation in the K_trans @ alpha
+    # dot product) requires float64 precision.  Cast float32 input to float64, compute
+    # everything in float64, and cast the result back to the original type at the end.
+    compute_dtype = np.float64
+    if itype == onnx.TensorProto.DOUBLE:
+        X_compute = X
+    else:
+        X_compute = g.op.Cast(X, to=onnx.TensorProto.DOUBLE, name=f"{name}_cast_input")
+        g.set_type(X_compute, onnx.TensorProto.DOUBLE)
+
+    X_train = estimator.X_train_.astype(compute_dtype)  # (M, F)
+    alpha = estimator.alpha_.astype(compute_dtype)  # (M,) or (M, n_targets)
     # _y_train_mean/_y_train_std may be 0-d scalars (normalize_y=True) or 1-D arrays
-    y_mean_train = np.atleast_1d(estimator._y_train_mean).astype(dtype)
-    y_std_train = np.atleast_1d(estimator._y_train_std).astype(dtype)
+    y_mean_train = np.atleast_1d(estimator._y_train_mean).astype(compute_dtype)
+    y_std_train = np.atleast_1d(estimator._y_train_std).astype(compute_dtype)
 
     # K_trans = kernel(X, X_train) → (N, M)
-    K_trans = _emit_kernel_matrix(g, estimator.kernel_, X, X_train, f"{name}_K", dtype)
+    K_trans = _emit_kernel_matrix(
+        g, estimator.kernel_, X_compute, X_train, f"{name}_K", compute_dtype
+    )
 
     if alpha.ndim == 1:
         # Single-target: alpha is (M,), reshape to (M, 1) for MatMul
         y_raw = g.op.MatMul(K_trans, alpha.reshape(-1, 1), name=f"{name}_raw")  # (N, 1)
         # Undo normalisation: y = y_std * y_raw + y_mean
         y_unnorm = g.op.Add(
-            g.op.Mul(y_raw, np.array(float(y_std_train[0]), dtype=dtype), name=f"{name}_std"),
-            np.array(float(y_mean_train[0]), dtype=dtype),
+            g.op.Mul(
+                y_raw, np.array(float(y_std_train[0]), dtype=compute_dtype), name=f"{name}_std"
+            ),
+            np.array(float(y_mean_train[0]), dtype=compute_dtype),
             name=f"{name}_unnorm",
         )
         # Squeeze (N, 1) → (N,)
-        result = g.op.Reshape(
-            y_unnorm, np.array([-1], dtype=np.int64), name=name, outputs=outputs[:1]
+        result_f64 = g.op.Reshape(
+            y_unnorm, np.array([-1], dtype=np.int64), name=f"{name}_reshaped"
         )
     else:
         # Multi-target: alpha is (M, n_targets)
         y_raw = g.op.MatMul(K_trans, alpha, name=f"{name}_raw")  # (N, n_targets)
         # Undo normalisation: y = y_std * y_raw + y_mean  (broadcast over N)
-        result = g.op.Add(
-            g.op.Mul(y_raw, y_std_train, name=f"{name}_std"),
-            y_mean_train,
-            name=name,
-            outputs=outputs[:1],
+        result_f64 = g.op.Add(
+            g.op.Mul(y_raw, y_std_train, name=f"{name}_std"), y_mean_train, name=f"{name}_unnorm"
         )
+
+    # Cast back to the requested output type
+    if itype == onnx.TensorProto.DOUBLE:
+        result = g.op.Identity(result_f64, name=name, outputs=outputs[:1])
+    else:
+        result = g.op.Cast(result_f64, to=itype, name=name, outputs=outputs[:1])
 
     g.set_type(result, itype)
     return result

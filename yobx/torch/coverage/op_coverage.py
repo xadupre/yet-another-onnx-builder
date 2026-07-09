@@ -202,6 +202,9 @@ XFAIL_OPS: Dict[str, FrozenSet[str]] = {
             "broadcast_tensors",  # NotImplementedError
             "clamp",  # onnxruntime RuntimeException
             "nan_to_num",  # TypeError
+            # ONNX SoftmaxCrossEntropyLoss requires (N,C) input; op_db samples use
+            # unbatched (C,) input which the ONNX reference evaluator rejects.
+            "nn_functional_linear_cross_entropy",  # RuntimeError: Unsupported shape (4,).
         }
     ),
     # Ops that fail specifically under ``ExportOptions(tracing=True)``,
