@@ -13292,14 +13292,17 @@ def aten_remainder(
 
     # a - a.div(b, rounding_mode="floor") * b
     if isinstance(other, (int, float)):
-        dtype = tensor_dtype_to_np_dtype(g.get_type(x))
-        res = g.op.Mod(x, np.array(other, dtype=dtype), name=name, outputs=outputs)
+        itype = _get_input_type(g, x, python_default=True)
+        assert itype is not None, f"Unable to guess type for {x!r}{g.get_debug_msg()}"
+        x, other = prepare_inputs_homogeneous_operator(g, x, other, force_type=itype)
+        res = g.op.Mod(x, other, name=name, outputs=outputs)
         if not sts:
             set_type_shape_unary_op(g, res, x)
         return res
 
     # rounded_quotient = g.op.Floor(g.op.Div(self, other))
     # return op.Sub(self, op.Mul(rounded_quotient, other))
+    x, other = prepare_inputs_homogeneous_operator(g, x, other)
     itype = g.get_type(x)
     if itype in {
         TensorProto.FLOAT,
@@ -13333,6 +13336,13 @@ def aten_remainder_Tensor(
 ) -> T:
     """mod"""
     return aten_remainder(g, sts, outputs, x, other, name="remainder_Tensor")
+
+
+def aten_remainder_Scalar_Tensor(
+    g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, other: T
+) -> T:
+    """mod"""
+    return aten_remainder(g, sts, outputs, x, other, name="remainder_Scalar_Tensor")
 
 
 def aten_repeat(
