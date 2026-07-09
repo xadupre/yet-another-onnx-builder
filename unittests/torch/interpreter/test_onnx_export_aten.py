@@ -3596,6 +3596,33 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
+    def test_torchvision_deform_conv2d_dynamo_185195(self):
+        import torch
+        import torchvision.ops as tv_ops
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.weight = torch.nn.Parameter(torch.rand((6, 4, 3, 3), dtype=torch.float32))
+                self.bias = torch.nn.Parameter(torch.rand((6,), dtype=torch.float32))
+
+            def forward(self, x, offset, mask):
+                return tv_ops.deform_conv2d(
+                    x, offset, self.weight, self.bias, stride=(1, 1), padding=(1, 1), mask=mask
+                )
+
+        inputs = (
+            torch.rand((1, 4, 8, 8), dtype=torch.float32),
+            torch.rand((1, 18, 8, 8), dtype=torch.float32),
+            torch.rand((1, 9, 8, 8), dtype=torch.float32),
+        )
+        model_path = self._call_exporter(
+            "test_torchvision_deform_conv2d_dynamo_185195", "dynamo", Model().eval(), inputs
+        )
+        onx = onnx.load(model_path)
+        check_model(onx)
+        self.assertIn(("DeformConv", ""), {(n.op_type, n.domain) for n in onx.graph.node})
+
     def test_aten_histc_float(self):
         import torch
 
