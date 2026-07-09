@@ -106,6 +106,10 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[category_encoders,dev,imblearn,lightgbm,perpetual,sklearn,sksurv,statsmodels,xgboost]"
 
+      - name: Pin scikit-survival==0.27.0 for sklearn 1.8
+        if: matrix.sklearn-version == '1.8'
+        run: pip install "scikit-survival==0.27.0"
+
       - name: Install scikit-learn==${{ matrix.sklearn-version }} again
         run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*" && pip freeze
 
@@ -158,6 +162,10 @@ jobs:
 
       - name: Install dependencies
         run: pip install -e ".[category_encoders,dev,imblearn,lightgbm,perpetual,sklearn,sksurv,statsmodels,xgboost]"
+
+      - name: Pin scikit-survival==0.27.0 for sklearn 1.8
+        if: matrix.sklearn-version == '1.8'
+        run: pip install "scikit-survival==0.27.0"
 
       - name: Install scikit-learn==${{ matrix.sklearn-version }} again
         run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*" && pip freeze
