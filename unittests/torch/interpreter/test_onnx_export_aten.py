@@ -240,7 +240,7 @@ class TestOnnxExportAten(ExtTestCase):
                 )
 
         model = Model()
-        x = torch.randn(1, 2, 16, 16, requires_grad=False)
+        x = torch.linspace(-1.0, 1.0, 1 * 2 * 16 * 16, dtype=torch.float32).reshape(1, 2, 16, 16)
         expected = model(x)
         model_path = self._call_exporter(
             "test_aten_interpolate_bilinear_antialias", "custom", model, (x,)
@@ -539,6 +539,16 @@ class TestOnnxExportAten(ExtTestCase):
         y = np_as_strided_2(x, shape, strides)
         self.assertEqualArray(expected, y)
 
+        shape_x = (1, 1, 4, 4)
+        shape = (1, 1, 4, 4)
+        strides = (1, 1, 1, 1)
+        x = torch.arange(np.prod(shape_x)).reshape(shape_x).to(int)
+        expected = torch.as_strided(x, shape, strides)
+        y = np_as_strided_1(x, shape, strides)
+        self.assertEqualArray(expected, y)
+        y = np_as_strided_2(x, shape, strides)
+        self.assertEqualArray(expected, y)
+
     @skipif_ci_windows("not working on windows")
     def test_aten_as_strided(self):
         import torch
@@ -555,6 +565,36 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.randn((2, 2, 8, 8), requires_grad=False)
         expected = model(x)
         model_path = self._call_exporter("test_aten_as_strided", "custom", model, (x,))
+        check_model(model_path)
+
+        import onnxruntime
+
+        sess_options = onnxruntime.SessionOptions()
+        sess = onnxruntime.InferenceSession(
+            model_path, sess_options=sess_options, providers=["CPUExecutionProvider"]
+        )
+        feeds = dict(zip([i.name for i in sess.get_inputs()], [x.detach().numpy()]))
+        got = sess.run(None, feeds)
+        self.assertEqualArray(expected, got[0], atol=1e-5)
+
+    @skipif_ci_windows("not working on windows")
+    def test_aten_as_strided_overlapping(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+
+            def forward(self, x):
+                y = torch.as_strided(x, (1, 1, 4, 4), (1, 1, 1, 1))
+                return y
+
+        model = Model()
+        x = torch.randn((1, 1, 4, 4), requires_grad=False)
+        expected = model(x)
+        model_path = self._call_exporter(
+            "test_aten_as_strided_overlapping", "custom", model, (x,)
+        )
         check_model(model_path)
 
         import onnxruntime
