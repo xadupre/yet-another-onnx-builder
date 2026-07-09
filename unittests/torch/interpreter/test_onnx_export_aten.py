@@ -240,7 +240,7 @@ class TestOnnxExportAten(ExtTestCase):
                 )
 
         model = Model()
-        x = torch.randn(1, 2, 16, 16, requires_grad=False)
+        x = torch.linspace(-1.0, 1.0, 1 * 2 * 16 * 16, dtype=torch.float32).reshape(1, 2, 16, 16)
         expected = model(x)
         model_path = self._call_exporter(
             "test_aten_interpolate_bilinear_antialias", "custom", model, (x,)
