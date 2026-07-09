@@ -2854,7 +2854,12 @@ def aten_bincount(
     minlength: int = 0,
     name: str = "bincount",
 ) -> T:
-    """Converts ``aten.bincount`` to ONNX."""
+    """Converts ``aten.bincount`` to ONNX.
+
+    Uses ScatterElements with reduction="add" instead of OneHot+ReduceSum to
+    avoid the O(N × depth) memory overhead of the one-hot matrix for large
+    depth values (e.g. large vocabularies).
+    """
     assert (
         isinstance(minlength, int) and minlength >= 0
     ), f"minlength must be a non-negative integer, got {minlength!r}{g.get_debug_msg()}"
@@ -2864,21 +2869,45 @@ def aten_bincount(
         x if g.get_type(x) == TensorProto.INT64 else g.op.Cast(x, to=TensorProto.INT64, name=name)
     )
     flat = g.op.Reshape(x64, g.MINUS_ONE, name=name)
-    # Adds a sentinel ``-1`` so ReduceMax works even for an empty input.
-    max_x = g.op.ReduceMax(
-        g.op.Concat(flat, np.array([-1], dtype=np.int64), axis=0, name=name),
-        keepdims=0,
+    # Appends a 0 so ReduceMax is defined even when ``flat`` is empty.  The
+    # sentinel only determines the output size and never contributes to counts.
+    max_x = g.op.UnsqueezeAnyOpset(
+        g.op.ReduceMax(
+            g.op.Concat(flat, np.array([0], dtype=np.int64), axis=0, name=name),
+            keepdims=0,
+            name=name,
+        ),
+        np.array([0], dtype=np.int64),
         name=name,
     )
-    depth = g.op.Max(
-        g.op.Add(max_x, np.array(1, dtype=np.int64), name=name),
-        np.array(minlength, dtype=np.int64),
+    # Multiply by a non-empty flag so an empty input yields depth 0 instead
+    # of 1 (the 0-sentinel would otherwise make max_x == 0, giving depth 1).
+    non_empty = g.op.UnsqueezeAnyOpset(
+        g.op.Cast(
+            g.op.Greater(g.op.Size(flat, name=name), np.array(0, dtype=np.int64), name=name),
+            to=TensorProto.INT64,
+            name=name,
+        ),
+        np.array([0], dtype=np.int64),
         name=name,
     )
-    values = np.array([0, 1], dtype=np.int64)
-    one_hot = g.op.OneHot(flat, depth, values, axis=-1, name=name)
-    res = g.op.ReduceSumAnyOpset(
-        one_hot, np.array([0], dtype=np.int64), keepdims=0, outputs=outputs, name=name
+    depth = g.op.Mul(
+        g.op.Add(max_x, np.array([1], dtype=np.int64), name=name), non_empty, name=name
+    )
+    if minlength > 0:
+        depth = g.op.Max(depth, np.array([minlength], dtype=np.int64), name=name)
+    # Scatter-add 1 for each occurrence into a zero vector of length ``depth``.
+    zeros = g.op.Expand(np.array(0, dtype=np.int64), depth, name=name)
+    # Use ConstantOfShape instead of Expand so that shape inference succeeds when
+    # ``flat`` is empty (Shape(flat) == [0] triggers an assertion in Expand's
+    # shape-inference path that requires all dimensions to be > 0).
+    ones = g.op.ConstantOfShape(
+        g.op.Shape(flat, name=name),
+        value=onh.from_array(np.array([1], dtype=np.int64)),
+        name=name,
+    )
+    res = g.op.ScatterElements(
+        zeros, flat, ones, axis=0, reduction="add", outputs=outputs, name=name
     )
     if not sts:
         g.set_type(res, TensorProto.INT64)
@@ -7836,23 +7865,56 @@ def aten_index_put(
                 return res
 
             # Let's make the indices as integers then.
+            # Use NonZero + ScatterND to handle multi-dimensional x/values
+            # correctly, avoiding the flat-array mismatch that arises when the
+            # number of True entries times the trailing slice size differs from
+            # the total element count of values.
             name += "_sc"
-            flat_mask = g.op.Cast(
-                g.op.Reshape(index, g.MINUS_ONE, name=name), to=TensorProto.INT32, name=name
+            assert g.has_rank(x), f"Missing rank for {x!r}{g.get_debug_msg()}"
+            assert g.has_rank(index), f"Missing rank for {index!r}{g.get_debug_msg()}"
+            self_rank = g.get_rank(x)
+            mask_rank = g.get_rank(index)
+            # Expand a lower-rank mask to the full shape of x so NonZero returns
+            # one coordinate per element that is selected.
+            expanded_mask = index
+            for _ in range(self_rank - mask_rank):
+                expanded_mask = g.op.UnsqueezeAnyOpset(expanded_mask, g.MINUS_ONE, name=name)
+            expanded_mask = g.op.Expand(expanded_mask, g.op.Shape(x, name=name), name=name)
+            # selected_indices: shape (num_true, self_rank)
+            selected_indices = g.op.Transpose(
+                g.op.NonZero(expanded_mask, name=name), perm=[1, 0], name=name
             )
-            flat_x = g.op.Reshape(x, g.MINUS_ONE, name=name)
-            flat_values = g.op.Reshape(values, g.MINUS_ONE, name=name)
-            flat_index = g.op.SqueezeAnyOpset(
-                g.op.NonZero(flat_mask, name=name), g.ZERO, name=name
+            # Broadcast values to (num_true, *x.shape[mask_rank:]) then flatten
+            # to one scalar update per selected element.
+            num_true = g.op.UnsqueezeAnyOpset(
+                g.op.ReduceSumAnyOpset(
+                    g.op.Cast(
+                        g.op.Reshape(index, g.MINUS_ONE, name=name),
+                        to=TensorProto.INT64,
+                        name=name,
+                    ),
+                    keepdims=0,
+                    name=name,
+                ),
+                np.array([0], dtype=np.int64),
+                name=name,
             )
-            updated = g.op.ScatterElements(
-                flat_x,
-                flat_index,
+            if mask_rank < self_rank:
+                trailing_shape = g.op.Shape(x, start=mask_rank, name=name)
+                selection_shape = g.op.Concat(num_true, trailing_shape, axis=0, name=name)
+            else:
+                selection_shape = num_true
+            flat_values = g.op.Reshape(
+                g.op.Expand(values, selection_shape, name=name), g.MINUS_ONE, name=name
+            )
+            res = g.op.ScatterND(
+                x,
+                selected_indices,
                 flat_values,
                 reduction="add" if accumulate else "none",
                 name=name,
+                outputs=outputs,
             )
-            res = g.op.Reshape(updated, g.op.Shape(x, name=name), name=name, outputs=outputs)
             if not sts:
                 g.set_type(res, g.get_type(x))
                 if g.has_shape(x):
