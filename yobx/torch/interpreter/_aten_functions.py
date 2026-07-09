@@ -2907,7 +2907,14 @@ def aten_bincount(
         depth = g.op.Max(depth, np.array([minlength], dtype=np.int64), name=name)
     # Scatter-add 1 for each occurrence into a zero vector of length ``depth``.
     zeros = g.op.Expand(np.array(0, dtype=np.int64), depth, name=name)
-    ones = g.op.Expand(np.array(1, dtype=np.int64), g.op.Shape(flat, name=name), name=name)
+    # Use ConstantOfShape instead of Expand so that shape inference succeeds when
+    # ``flat`` is empty (Shape(flat) == [0] triggers an assertion in Expand's
+    # shape-inference path that requires all dimensions to be > 0).
+    ones = g.op.ConstantOfShape(
+        g.op.Shape(flat, name=name),
+        value=np.array([1], dtype=np.int64),
+        name=name,
+    )
     res = g.op.ScatterElements(
         zeros, flat, ones, axis=0, reduction="add", outputs=outputs, name=name
     )
