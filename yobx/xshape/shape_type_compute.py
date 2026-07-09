@@ -2691,6 +2691,81 @@ def set_type_shape_istft(self: ShapeBuilder, node: NodeProto):
     return True
 
 
+def set_type_shape_fft_c2r(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for node type FftC2r."""
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_type(node.input[0]):
+        dtype = self.get_type(node.input[0])
+        mapping = {
+            TensorProto.COMPLEX64: TensorProto.FLOAT,
+            TensorProto.COMPLEX128: TensorProto.DOUBLE,
+        }
+        self.set_type(node.output[0], mapping.get(dtype, dtype))
+    if self.has_shape(node.input[0]):
+        shape = list(self.get_shape(node.input[0]))
+        if len(node.input) > 3 and len(shape) > 0:
+            cst = self.get_constant(node.input[3], computed_value=True)
+            if cst is not None:
+                value = np.asarray(cst).reshape((-1,))
+                if value.size > 0:
+                    iv = int(value[0])
+                    if iv >= 0:
+                        shape[-1] = iv
+        self.set_shape(node.output[0], tuple(shape))
+    elif self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+    return True
+
+
+def set_type_shape_fft_irfft2(self: ShapeBuilder, node: NodeProto):
+    """Sets the output shape for node type FftIrfft2."""
+    if self.has_device(node.input[0]):
+        self.set_device(node.output[0], self.get_device(node.input[0]))
+    if self.has_type(node.input[0]):
+        dtype = self.get_type(node.input[0])
+        mapping = {
+            TensorProto.COMPLEX64: TensorProto.FLOAT,
+            TensorProto.COMPLEX128: TensorProto.DOUBLE,
+        }
+        self.set_type(node.output[0], mapping.get(dtype, dtype))
+    if self.has_shape(node.input[0]):
+        shape = list(self.get_shape(node.input[0]))
+        rank = len(shape)
+        dims = None
+        svalues = None
+        if len(node.input) > 2:
+            cst_dim = self.get_constant(node.input[2], computed_value=True)
+            if cst_dim is not None:
+                dims = [int(v) for v in np.asarray(cst_dim).reshape((-1,)).tolist()]
+                dims = [d + rank if d < 0 else d for d in dims]
+        if dims is None:
+            dims = [rank - 2, rank - 1] if rank >= 2 else [rank - 1]
+        if len(node.input) > 1:
+            cst_s = self.get_constant(node.input[1], computed_value=True)
+            if cst_s is not None:
+                svalues = [int(v) for v in np.asarray(cst_s).reshape((-1,)).tolist()]
+                for i, d in enumerate(dims):
+                    if 0 <= d < rank and i < len(svalues) and svalues[i] >= 0:
+                        shape[d] = svalues[i]
+        need_infer_last = (
+            svalues is None or len(svalues) < len(dims) or svalues[len(dims) - 1] < 0
+        )
+        if (
+            need_infer_last
+            and dims
+            and 0 <= dims[-1] < rank
+            and shape[dims[-1]] not in (None, "?")
+        ):
+            last = shape[dims[-1]]
+            if isinstance(last, int):
+                shape[dims[-1]] = (last - 1) * 2
+        self.set_shape(node.output[0], tuple(shape))
+    elif self.has_rank(node.input[0]):
+        self.set_rank(node.output[0], self.get_rank(node.input[0]))
+    return True
+
+
 def set_type_shape_shared_input(self: ShapeBuilder, node: NodeProto):
     """Sets the output shapes for nodes with two outputs sharing the same inputs."""
     r1 = set_type_shape_binary_op(self, node.output[0], *node.input[:2])
@@ -2831,6 +2906,8 @@ set_shape_type_op_any_custom = {
     "ComplexModule": set_type_shape_complex_module,
     "ComplexMul": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
     "ComplexMulConj": lambda g, node: set_type_shape_binary_op(g, node.output[0], *node.input),
+    "FftC2r": set_type_shape_fft_c2r,
+    "FftIrfft2": set_type_shape_fft_irfft2,
     "FastGelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
     "FusedMatMul": set_type_shape_fused_matmul,
     "FusedMatMulActivation": set_type_shape_fused_matmul,

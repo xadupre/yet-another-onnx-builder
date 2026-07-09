@@ -267,6 +267,31 @@ class TestOnnxExportComplex(ExtTestCase):
                 got = ref.run(None, {"x": x.numpy()})
                 self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @ignore_warnings((UserWarning, FutureWarning))
+    @requires_torch("2.7")
+    @skipif_ci_windows("broken")
+    def test_irfft2_issue_188496(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, c):
+                return torch.fft.irfft2(c)
+
+        model = Model()
+        sample = self._range(2, 3, 8, 8, bias=1)
+        c = torch.fft.rfft2(sample)
+        expected = model(c)
+
+        onx = to_onnx(model, (c,), target_opset=20)
+        ref = ExtendedReferenceEvaluator(onx)
+        got = ref.run(None, {"c": c.numpy()})
+        self.assertEqualArray(expected, got[0], atol=1e-5)
+
+        onx_dec = to_onnx(model, (c,), export_options=ExportOptions("all"), target_opset=20)
+        ref_dec = ExtendedReferenceEvaluator(onx_dec)
+        got_dec = ref_dec.run(None, {"c": c.numpy()})
+        self.assertEqualArray(expected, got_dec[0], atol=1e-5)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
