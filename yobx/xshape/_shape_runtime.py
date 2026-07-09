@@ -95,6 +95,10 @@ class _ShapeRuntime:
             if i is None:
                 node.doc_string += "#SV-Ga/3"
                 return False
+            # TF generates int32 index constants; normalise to int64 so all
+            # downstream branches can assume a consistent integer dtype.
+            if isinstance(i, np.ndarray) and i.dtype == np.int32:
+                i = i.astype(np.int64)
             if isinstance(y, str) and isinstance(i, int):
                 self.set_value_shape(node.output[0], f"{y}[{i}]")
                 node.doc_string += "#SV-Ga3"
