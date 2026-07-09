@@ -92,7 +92,7 @@ jobs:
     strategy:
       fail-fast: true
       matrix:
-        sklearn-version: ["1.4", "1.8"]
+        sklearn-version: ["1.4", "1.8", "1.9"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.12
@@ -105,6 +105,10 @@ jobs:
 
       - name: Install dependencies
         run: pip install -e ".[category_encoders,dev,imblearn,lightgbm,perpetual,sklearn,sksurv,statsmodels,xgboost]"
+
+      - name: Pin scikit-survival==0.27.0 for sklearn 1.8
+        if: matrix.sklearn-version == '1.8'
+        run: pip install "scikit-survival==0.27.0"
 
       - name: Install scikit-learn==${{ matrix.sklearn-version }} again
         run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*" && pip freeze
@@ -145,7 +149,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        sklearn-version: ["1.4", "1.8"]
+        sklearn-version: ["1.4", "1.8", "1.9"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python 3.12
@@ -159,16 +163,20 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[category_encoders,dev,imblearn,lightgbm,perpetual,sklearn,sksurv,statsmodels,xgboost]"
 
+      - name: Pin scikit-survival==0.27.0 for sklearn 1.8
+        if: matrix.sklearn-version == '1.8'
+        run: pip install "scikit-survival==0.27.0"
+
       - name: Install scikit-learn==${{ matrix.sklearn-version }} again
         run: pip install "scikit-learn==${{ matrix.sklearn-version }}.*" && pip freeze
 
       - name: Run sklearn files with coverage, not pytest
-        if: matrix.sklearn-version != '1.8'
+        if: matrix.sklearn-version != '1.9'
         run: |
           PYTHONWARNINGS="ignore::FutureWarning,ignore::RuntimeWarning" python -m unittest discover -s unittests/sklearn
 
       - name: Run sklearn files with coverage, not pytest
-        if: matrix.sklearn-version == '1.8'
+        if: matrix.sklearn-version == '1.9'
         run: |
           PYTHONWARNINGS="ignore::FutureWarning,ignore::RuntimeWarning" coverage run -m unittest discover -s unittests/sklearn
           coverage xml
@@ -179,7 +187,7 @@ jobs:
           pytest --durations=10 unittests/parity/with_skl2onnx
 
       - name: Upload coverage to Codecov
-        if: matrix.sklearn-version == '1.8'
+        if: matrix.sklearn-version == '1.9'
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
