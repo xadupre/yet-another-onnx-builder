@@ -164,5 +164,75 @@ class TestYobxOnnxExporterExport(ExtTestCase):
         self.assertIsInstance(artifact, ExportArtifact)
 
 
+class TestYobxOnnxExporterRealModels(ExtTestCase):
+    @requires_transformers("4.0")
+    def test_export_tiny_llm_random_weights(self):
+        """Exports arnir0/Tiny-LLM with random weights via YobxOnnxExporter."""
+        import torch
+        from transformers import AutoModelForCausalLM
+        from transformers.exporters.configs import OnnxConfig
+
+        from yobx.container import ExportArtifact
+        from yobx.torch.in_transformers import YobxOnnxExporter
+        from yobx.torch.in_transformers.models import get_cached_configuration
+
+        config = get_cached_configuration("arnir0/Tiny-LLM")
+        model = AutoModelForCausalLM.from_config(config).eval()
+        sample_inputs = dict(
+            input_ids=torch.randint(0, config.vocab_size, (1, 5), dtype=torch.int64),
+            attention_mask=torch.ones(1, 5, dtype=torch.int64),
+        )
+
+        exporter = YobxOnnxExporter()
+        artifact = exporter.export(model, sample_inputs, config=OnnxConfig(dynamic=False))
+
+        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertGreater(len(artifact.graph.node), 0)
+
+    @requires_transformers("4.0")
+    def test_to_onnx_strategy_transformers_tiny_llm(self):
+        """to_onnx with ExportOptions(strategy='transformers') routes through YobxOnnxExporter."""
+        import torch
+        from transformers import AutoModelForCausalLM
+
+        from yobx.container import ExportArtifact
+        from yobx.torch import to_onnx
+        from yobx.torch.export_options import ExportOptions
+        from yobx.torch.in_transformers.models import get_cached_configuration
+
+        config = get_cached_configuration("arnir0/Tiny-LLM")
+        model = AutoModelForCausalLM.from_config(config).eval()
+        sample_inputs = dict(
+            input_ids=torch.randint(0, config.vocab_size, (1, 5), dtype=torch.int64),
+            attention_mask=torch.ones(1, 5, dtype=torch.int64),
+        )
+
+        artifact = to_onnx(
+            model, kwargs=sample_inputs, export_options=ExportOptions(strategy="transformers")
+        )
+
+        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertGreater(len(artifact.graph.node), 0)
+
+    @requires_transformers("4.0")
+    def test_export_whisper_tiny_random_weights(self):
+        """Exports openai/whisper-tiny with random weights via YobxOnnxExporter."""
+        from transformers.exporters.configs import OnnxConfig
+
+        from yobx.container import ExportArtifact
+        from yobx.torch.in_transformers import YobxOnnxExporter
+        from yobx.torch.tiny_models import get_tiny_model
+
+        model_data = get_tiny_model("openai/whisper-tiny")
+
+        exporter = YobxOnnxExporter()
+        artifact = exporter.export(
+            model_data.model, model_data.export_inputs, config=OnnxConfig(dynamic=False)
+        )
+
+        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertGreater(len(artifact.graph.node), 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

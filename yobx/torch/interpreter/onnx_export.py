@@ -1012,6 +1012,78 @@ def _to_onnx_via_onnxscript(
     return artifact
 
 
+def _to_onnx_via_transformers(
+    mod: "torch.nn.Module",  # noqa: F821
+    args: Optional[Sequence["torch.Tensor"]],  # noqa: F821
+    kwargs: Optional[Dict[str, "torch.Tensor"]],  # noqa: F821
+    target_opset: Optional[Union[int, Dict[str, int]]],
+    dynamic_shapes: Optional[Any],
+    verbose: int,
+    filename: Optional[str],
+    export_options: Optional[ExportOptions] = None,
+) -> "ExportArtifact":
+    """
+    Converts *mod* to ONNX via :class:`~yobx.torch.in_transformers.YobxOnnxExporter`.
+
+    This helper is called by :func:`to_onnx` when
+    ``export_options.strategy == "transformers"``.  *mod* must be a
+    :class:`~transformers.PreTrainedModel` and ``transformers`` must be installed.
+
+    :param mod: the :class:`~transformers.PreTrainedModel` to export.
+    :param args: positional arguments; expected to be empty or ``None`` for
+        transformer models (all inputs should be passed via *kwargs*).
+    :param kwargs: keyword arguments forwarded verbatim to the model's ``forward``.
+    :param target_opset: ONNX opset version to target.
+    :param dynamic_shapes: dynamic-shape specification passed to
+        :class:`~transformers.exporters.configs.OnnxConfig`.
+    :param verbose: verbosity level.
+    :param filename: if provided, the ONNX model is saved to this path.
+    :param export_options: the caller's :class:`~yobx.torch.ExportOptions`
+        (used to forward ``strict`` and
+        ``prefer_deferred_runtime_asserts_over_guards``).
+    :return: :class:`~yobx.container.ExportArtifact` wrapping the exported
+        ONNX proto.
+    """
+    from ..in_transformers.exporter import YobxOnnxExporter
+
+    # Build sample_inputs: transformer models use keyword-only forward calls.
+    # If the caller passed positional args, map them to parameter names.
+    if kwargs:
+        sample_inputs: Dict[str, Any] = dict(kwargs)
+    elif args:
+        import inspect
+
+        params = list(inspect.signature(mod.forward).parameters.keys())
+        sample_inputs = {params[i]: v for i, v in enumerate(args) if i < len(params)}
+    else:
+        sample_inputs = {}
+
+    if verbose:
+        from ...helpers import string_type
+
+        print(
+            f"[to_onnx/transformers] exporting via YobxOnnxExporter, "
+            f"sample_inputs={string_type(sample_inputs, with_shape=True)}"
+        )
+
+    exporter = YobxOnnxExporter(
+        target_opset=target_opset if isinstance(target_opset, int) else None
+    )
+
+    config_dict: Dict[str, Any] = {"dynamic": dynamic_shapes is not None}
+    if dynamic_shapes is not None:
+        config_dict["dynamic_shapes"] = dynamic_shapes
+    if export_options is not None:
+        config_dict["strict"] = export_options.strict
+        config_dict["prefer_deferred_runtime_asserts_over_guards"] = (
+            export_options.prefer_deferred_runtime_asserts_over_guards
+        )
+    if filename is not None:
+        config_dict["output_path"] = filename
+
+    return exporter.export(mod, sample_inputs, config=config_dict)
+
+
 def to_onnx(
     mod: Union["torch.nn.Module", "torch.fx.GraphModule"],  # noqa: F821
     args: Optional[Sequence["torch.Tensor"]] = None,  # noqa: F821
@@ -1161,6 +1233,19 @@ def to_onnx(
             args=args,
             kwargs=kwargs,
             input_names=input_names,
+            target_opset=target_opset,
+            dynamic_shapes=dynamic_shapes,
+            verbose=verbose,
+            filename=filename,
+            export_options=export_options,
+        )
+
+    # Route to YobxOnnxExporter (transformers pipeline) when requested.
+    if export_options is not None and export_options.strategy == "transformers":
+        return _to_onnx_via_transformers(
+            mod=mod,
+            args=args,
+            kwargs=kwargs,
             target_opset=target_opset,
             dynamic_shapes=dynamic_shapes,
             verbose=verbose,
