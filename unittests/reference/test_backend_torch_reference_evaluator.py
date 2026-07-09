@@ -5,7 +5,7 @@ import numpy
 import onnx.backend.base
 import onnx.backend.test
 import torch
-from onnx import ModelProto
+from yobx._onnx_shim import ModelProto  # noqa: TID251
 from onnx.backend.base import Device, DeviceType
 from yobx.reference.torch_evaluator import TorchReferenceEvaluator
 

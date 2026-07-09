@@ -96,7 +96,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         onx = self._check_lda(lda, X_train, X_test, atol=1e-4)
 
         # Verify that the ONNX graph operates in float32.
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         input_type = onx.proto.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(input_type, onnx.TensorProto.FLOAT)
@@ -115,7 +115,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         onx = self._check_lda(lda, X_train, X_test, atol=1e-6)
 
         # Verify that the ONNX graph operates in float64.
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         input_type = onx.proto.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(input_type, onnx.TensorProto.DOUBLE)

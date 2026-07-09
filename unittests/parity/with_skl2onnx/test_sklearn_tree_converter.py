@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
 import onnxruntime
 from sklearn.datasets import make_classification, make_regression
 from sklearn.model_selection import train_test_split

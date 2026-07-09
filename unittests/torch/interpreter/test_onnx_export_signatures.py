@@ -1,7 +1,7 @@
 import inspect
 import unittest
 from typing import Any, Dict, List, Optional, Tuple
-import onnx
+from yobx._onnx_shim import onnx  # noqa: TID251
 import numpy as np
 import torch
 from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, CacheKeyValue

@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
+from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xshape import ShapeBuilder, BasicShapeBuilder
@@ -465,7 +465,7 @@ class TestShapeBuilder(ExtTestCase):
     def test_get_attribute_with_default_unsupported_type(self):
         b = BasicShapeBuilder()
         node = oh.make_node("SomeOp", ["X"], ["Y"])
-        import onnx.numpy_helper as onh
+        from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
         import numpy as np
 
         tensor = onh.from_array(np.array([1.0], dtype=np.float32))
@@ -522,7 +522,7 @@ class TestShapeBuilder(ExtTestCase):
     def test_get_attributes_with_default_unsupported_type(self):
         b = BasicShapeBuilder()
         node = oh.make_node("SomeOp", ["X"], ["Y"])
-        import onnx.numpy_helper as onh
+        from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
         import numpy as np
 
         tensor = onh.from_array(np.array([1.0], dtype=np.float32))

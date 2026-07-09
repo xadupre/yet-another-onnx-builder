@@ -8,8 +8,8 @@ import tempfile
 import unittest
 
 import numpy as np
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
 from yobx.container import ExportArtifact, ExportReport, FunctionPieces
 from yobx.ext_test_case import ExtTestCase, skipif_ci_windows
 

@@ -1,5 +1,5 @@
 import unittest
-import onnx.helper as oh
+from yobx._onnx_shim import helper as oh  # noqa: TID251
 from onnx.reference.op_run import OpRun
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator

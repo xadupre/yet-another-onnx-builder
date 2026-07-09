@@ -1,7 +1,7 @@
 import textwrap
 import unittest
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase
 from yobx.helpers.dot_helper import to_dot, to_svg
 

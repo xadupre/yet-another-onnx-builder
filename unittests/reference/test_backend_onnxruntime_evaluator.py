@@ -4,9 +4,11 @@ from typing import Any
 import numpy
 import onnx.backend.base
 import onnx.backend.test
-from onnx import ModelProto
+from yobx._onnx_shim import ModelProto  # noqa: TID251
 from onnx.backend.base import Device, DeviceType
-from onnx.defs import onnx_opset_version
+from yobx._onnx_shim import onnx  # noqa: TID251
+
+onnx_opset_version = onnx.defs.onnx_opset_version
 import onnxruntime
 from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 from yobx.ext_test_case import has_torch

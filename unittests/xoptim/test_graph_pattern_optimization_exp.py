@@ -2,8 +2,15 @@ import itertools
 import unittest
 import numpy as np
 from typing import Optional
-from onnx import ModelProto, TensorProto, helper as oh, numpy_helper as onh
-from onnx.checker import check_model
+from yobx._onnx_shim import (
+    ModelProto,
+    TensorProto,
+    helper as oh,
+    numpy_helper as onh,
+)  # noqa: TID251
+from yobx._onnx_shim import onnx  # noqa: TID251
+
+check_model = onnx.checker.check_model
 from yobx.ext_test_case import ExtTestCase, skipif_ci_windows
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
 from yobx.xoptim import get_pattern_list

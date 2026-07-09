@@ -8,9 +8,17 @@ import os
 import unittest
 from typing import Optional
 import numpy as np
-from onnx import ModelProto, TensorProto, helper as oh, numpy_helper as onh, load as load_onnx
-from onnx.checker import check_model
-from onnx.shape_inference import infer_shapes
+from yobx._onnx_shim import (
+    ModelProto,
+    TensorProto,
+    helper as oh,
+    numpy_helper as onh,
+    load as load_onnx,
+)  # noqa: TID251
+from yobx._onnx_shim import onnx  # noqa: TID251
+
+check_model = onnx.checker.check_model
+infer_shapes = onnx.shape_inference.infer_shapes
 from onnx.onnx_cpp2py_export.shape_inference import InferenceError
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator

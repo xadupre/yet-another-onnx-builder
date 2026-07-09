@@ -10,7 +10,7 @@ from yobx.sklearn import to_onnx
 class TestSklearnUsingSklearnOnnx(ExtTestCase):
     def test_mlp_with_sklearn_onnx(self):
         from typing import Dict, List, Tuple
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
         from sklearn.neural_network import MLPClassifier
         from yobx.xbuilder import FunctionOptions
         from skl2onnx import convert_sklearn

@@ -1,8 +1,7 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper
-from onnx import TensorProto
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import TensorProto  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.helpers.rt_helper import make_feeds
 
