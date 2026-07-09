@@ -4246,6 +4246,70 @@ class TestOnnxExportAten(ExtTestCase):
         self.dump_onnx("test_aten_div_tensor_mode_trunc_int.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x, y))
 
+    @skipif_ci_windows("not working on windows")
+    def test_aten_pixel_unshuffle(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.pixel_unshuffle(x, 2)
+
+        model = Model()
+        # Input: (N, C, H*r, W*r) → Output: (N, C*r^2, H, W)
+        x = torch.tensor(
+            [[[[1.0, 2.0], [3.0, 4.0]], [[5.0, 6.0], [7.0, 8.0]]]], dtype=torch.float32
+        )
+        inputs = (x,)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Transpose", op_types)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
+
+    @skipif_ci_windows("not working on windows")
+    def test_aten_pixel_shuffle(self):
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.pixel_shuffle(x, 2)
+
+        model = Model()
+        # Input: (N, C*r^2, H, W) → Output: (N, C, H*r, W*r)
+        x = torch.arange(1, 1 + 8, dtype=torch.float32).reshape(1, 8, 1, 1)
+        inputs = (x,)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("DepthToSpace", op_types)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
+
+    @skipif_ci_windows("not working on windows")
+    def test_aten_pixel_unshuffle_multichannel(self):
+        """Verifies pixel_unshuffle matches PyTorch for C>1.
+
+        Regression for https://github.com/pytorch/pytorch/issues/186080 which
+        reported wrong output ordering when exporting PixelUnshuffle with
+        ``dynamo=True``.  The yobx converter uses Reshape/Transpose/Reshape
+        directly, bypassing the dynamo path and matching PyTorch's channel
+        ordering.
+        """
+        import torch
+
+        class Model(torch.nn.Module):
+            def forward(self, x):
+                return torch.pixel_unshuffle(x, 2)
+
+        model = Model()
+        # C=2, r=2: input (1, 2, 4, 4) → output (1, 8, 2, 2)
+        x = torch.arange(1, 1 + 2 * 4 * 4, dtype=torch.float32).reshape(1, 2, 4, 4)
+        inputs = (x,)
+        expected = model(*torch_deepcopy(inputs))
+        onx = to_onnx(model, inputs)
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertIn("Transpose", op_types)
+        self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
