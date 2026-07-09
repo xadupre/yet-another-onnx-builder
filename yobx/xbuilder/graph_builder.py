@@ -5258,6 +5258,8 @@ class GraphBuilder(
                 return t.size
             if hasattr(t, "dims"):
                 return np.prod(tuple(t.dims))
+            if callable(getattr(t, "numpy", None)):
+                return t.numpy().size
             raise RuntimeError(f"Size unknown for type {type(t)}-{t}.")
 
         def _values(t):
@@ -5276,6 +5278,8 @@ class GraphBuilder(
             if hasattr(t, "dims"):
                 a = onh.to_array(t)
                 return a.ravel().tolist()
+            if callable(getattr(t, "numpy", None)):
+                return t.numpy().ravel().tolist()
             raise RuntimeError(f"Values unknown for type {type(t)}-{t}.")
 
         rows = ["", "--DEBUG--", "-- to print the exported program: PRINT_EXPORTED_PROGRAM=1", ""]
