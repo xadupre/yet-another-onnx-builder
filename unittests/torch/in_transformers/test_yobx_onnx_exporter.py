@@ -167,6 +167,119 @@ class TestYobxOnnxExporterExport(ExtTestCase):
 
         self.assertIsInstance(artifact, ExportArtifact)
 
+    @requires_transformers("5.12")
+    def test_export_module_with_dynamic_cache_and_dynamic_shapes(self):
+        """Exports a minimal PreTrainedModel with a DynamicCache input and dynamic shapes.
+
+        Verifies end-to-end that symbolic dimensions survive in the ONNX output
+        when the model accepts a KV-cache (DynamicCache) as ``past_key_values``
+        and ``OnnxConfig(dynamic=True, dynamic_shapes=...)`` is supplied.
+        The model and weights are entirely self-contained — no HuggingFace
+        checkpoint download is required.
+        """
+        import torch
+        from transformers import PretrainedConfig, PreTrainedModel
+        from transformers.exporters.configs import OnnxConfig
+
+        from yobx.container import ExportArtifact
+        from yobx.torch import apply_patches_for_model, register_flattening_functions
+        from yobx.torch.in_transformers import YobxOnnxExporter
+        from yobx.torch.in_transformers.cache_helper import CacheKeyValue, make_dynamic_cache
+
+        # ---- minimal model definition ----------------------------------------
+
+        class TinyConfig(PretrainedConfig):
+            model_type = "tiny_cached_lm_unit"
+
+            def __init__(self, vocab_size: int = 32, embed_dim: int = 4, **kwargs):
+                super().__init__(**kwargs)
+                self.vocab_size = vocab_size
+                self.embed_dim = embed_dim
+
+        class TinyCachedLM(PreTrainedModel):
+            """Tiny LM that consumes the first layer's key cache as an additive bias."""
+
+            config_class = TinyConfig
+
+            def __init__(self, config: TinyConfig):
+                super().__init__(config)
+                self.embed = torch.nn.Embedding(config.vocab_size, config.embed_dim)
+
+            def forward(
+                self,
+                input_ids: torch.Tensor,
+                past_key_values=None,
+            ) -> torch.Tensor:
+                x = self.embed(input_ids)  # (batch, seq, embed_dim)
+                if past_key_values is not None:
+                    # Reduce the past key over heads and past-seq dims so it
+                    # broadcasts cleanly onto x: (batch, 1, embed_dim).
+                    k0 = CacheKeyValue(past_key_values).key_cache[0]
+                    x = x + k0.mean(dim=(1, 2)).unsqueeze(1)
+                return x
+
+        # ---- build a tiny model and a one-layer DynamicCache -----------------
+
+        n_layers = 1
+        bsize, nheads, slen, embed_dim = 2, 1, 5, 4
+
+        config = TinyConfig(vocab_size=32, embed_dim=embed_dim)
+        model = TinyCachedLM(config).eval()
+
+        past_key_values = make_dynamic_cache(
+            [
+                (
+                    torch.randn(bsize, nheads, slen, embed_dim),
+                    torch.randn(bsize, nheads, slen, embed_dim),
+                )
+                for _ in range(n_layers)
+            ]
+        )
+
+        sample_inputs = dict(
+            input_ids=torch.randint(0, 32, (bsize, 3), dtype=torch.int64),
+            past_key_values=past_key_values,
+        )
+
+        # Dynamic shapes: batch and sequence length for input_ids; batch and
+        # past_length for each of the 2*n_layers flattened cache tensors.
+        dynamic_shapes = dict(
+            input_ids={0: "batch", 1: "seq_length"},
+            past_key_values=[{0: "batch", 2: "past_length"} for _ in range(2 * n_layers)],
+        )
+
+        # ---- export ----------------------------------------------------------
+
+        exporter = YobxOnnxExporter()
+
+        with (
+            register_flattening_functions(patch_transformers=True),
+            apply_patches_for_model(
+                patch_torch=True, patch_transformers=True, model=model
+            ),
+        ):
+            artifact = exporter.export(
+                model,
+                sample_inputs,
+                config=OnnxConfig(dynamic=True, dynamic_shapes=dynamic_shapes),
+            )
+
+        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertGreater(len(artifact.graph.node), 0)
+
+        # At least one ONNX input dimension must carry a symbolic name.
+        dynamic_dims = [
+            d.dim_param
+            for inp in artifact.graph.input
+            for d in inp.type.tensor_type.shape.dim
+            if d.dim_param
+        ]
+        self.assertGreater(
+            len(dynamic_dims),
+            0,
+            "The ONNX model must contain at least one dynamic (symbolic) dimension.",
+        )
+
 
 class TestYobxOnnxExporterRealModels(ExtTestCase):
     @requires_transformers("5.12")
