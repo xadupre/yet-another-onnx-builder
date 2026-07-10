@@ -260,9 +260,11 @@ XFAIL_OPS_FLOAT16: Dict[str, FrozenSet[str]] = {
         {
             # Numerical mismatch too large for float16 tolerance (1e-2):
             "addcmul",  # ref_diff=0.03125
+            "cosh",  # ref_diff=1.0; float16 limited range causes large ONNX/PyTorch divergence
             "erfinv",  # float16 precision/domain sensitivity causes unstable mismatch
             "expm1",  # ref_diff=4
             "nn_functional_soft_margin_loss",  # float16 mismatch can saturate to non-finite diffs
+            "sinh",  # ref_diff=2.0; float16 limited range causes large ONNX/PyTorch divergence
             # Incorrect results (ordering) for float16:
             "argsort",  # ref_diff=7944
         }
@@ -456,11 +458,14 @@ ATOL_OPS_FLOAT32: Dict[str, float] = {
 # a larger tolerance than the global _ATOL_FLOAT16 = 1e-2.
 ATOL_OPS_FLOAT16: Dict[str, float] = {
     "addr": 0.02,
+    "exp": 0.05,  # float16: limited mantissa precision causes ref_diff~0.03125
     "linalg.cross": 7e-2,  # float16: cross product accumulates rounding error
+    "nn.functional.mish": 0.02,  # float16: compound Tanh/Softplus error; ref_diff~0.015625
     "nn.functional.mse_loss": 1.5e-1,  # float16: squared-error reduction amplifies rounding
     "nn.functional.pairwise_distance": 2e-2,  # float16: distance accumulates rounding error
     "std": 1e-1,  # variance accumulates float16 rounding; sqrt amplifies
     "std_mean": 3e-1,  # same compound error as std
+    "tan": 0.5,  # float16: near π/2 catastrophic cancellation; ref_diff~0.25
 }
 
 # Per-op absolute tolerance overrides for torch.bfloat16.
