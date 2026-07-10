@@ -130,7 +130,7 @@ class YobxOnnxExporter(_OnnxExporterBase):  # type: ignore[valid-type]
 
         from transformers import PreTrainedModel as _PreTrainedModel
 
-        from yobx.torch import to_onnx, use_dyn_not_str
+        from yobx.torch import to_onnx
 
         # Normalise config.
         if isinstance(config, dict):
@@ -149,12 +149,6 @@ class YobxOnnxExporter(_OnnxExporterBase):  # type: ignore[valid-type]
         dynamic_shapes = config.dynamic_shapes
         if config.dynamic and dynamic_shapes is None:
             dynamic_shapes = get_auto_dynamic_shapes(inputs_dict)
-
-        # torch.export.export requires Dim objects, not plain strings.
-        # use_dyn_not_str converts any string dimension markers to
-        # torch.export.Dim.DYNAMIC so the caller can use either form.
-        if dynamic_shapes is not None:
-            dynamic_shapes = use_dyn_not_str(dynamic_shapes)
 
         register_cache_pytrees_for_model(model)
 

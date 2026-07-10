@@ -205,11 +205,7 @@ class TestYobxOnnxExporterExport(ExtTestCase):
                 super().__init__(config)
                 self.embed = torch.nn.Embedding(config.vocab_size, config.embed_dim)
 
-            def forward(
-                self,
-                input_ids: torch.Tensor,
-                past_key_values=None,
-            ) -> torch.Tensor:
+            def forward(self, input_ids: torch.Tensor, past_key_values=None) -> torch.Tensor:
                 x = self.embed(input_ids)  # (batch, seq, embed_dim)
                 if past_key_values is not None:
                     # Reduce the past key over heads and past-seq dims so it
@@ -243,9 +239,14 @@ class TestYobxOnnxExporterExport(ExtTestCase):
 
         # Dynamic shapes: batch and sequence length for input_ids; batch and
         # past_length for each of the 2*n_layers flattened cache tensors.
+        # torch.export.export requires Dim objects (not plain strings), so we
+        # use Dim.DYNAMIC for each variable dimension.
+        batch = torch.export.Dim("batch")
+        seq_length = torch.export.Dim("seq_length")
+        past_length = torch.export.Dim("past_length")
         dynamic_shapes = dict(
-            input_ids={0: "batch", 1: "seq_length"},
-            past_key_values=[{0: "batch", 2: "past_length"} for _ in range(2 * n_layers)],
+            input_ids={0: batch, 1: seq_length},
+            past_key_values=[{0: batch, 2: past_length} for _ in range(2 * n_layers)],
         )
 
         # ---- export ----------------------------------------------------------
@@ -254,9 +255,7 @@ class TestYobxOnnxExporterExport(ExtTestCase):
 
         with (
             register_flattening_functions(patch_transformers=True),
-            apply_patches_for_model(
-                patch_torch=True, patch_transformers=True, model=model
-            ),
+            apply_patches_for_model(patch_torch=True, patch_transformers=True, model=model),
         ):
             artifact = exporter.export(
                 model,
@@ -314,7 +313,9 @@ class TestYobxOnnxExporterRealModels(ExtTestCase):
             artifact = exporter.export(
                 model_data.model,
                 torch_deepcopy(model_data.export_inputs),
-                config=OnnxConfig(dynamic=True, dynamic_shapes=model_data.dynamic_shapes),
+                config=OnnxConfig(
+                    dynamic=True, dynamic_shapes=model_data.dynamic_shapes_for_torch_export_export
+                ),
             )
 
         self.assertIsInstance(artifact, ExportArtifact)
