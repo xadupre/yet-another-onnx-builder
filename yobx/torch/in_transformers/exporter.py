@@ -84,7 +84,7 @@ class YobxOnnxExporter(_OnnxExporterBase):  # type: ignore[valid-type]
         # Call HfExporter.__init__ which validates required_packages.
         super().__init__()
 
-    def export(
+    def export(  # type: ignore[override]
         self,
         model: "PreTrainedModel",
         sample_inputs: MutableMapping[str, Any],
@@ -128,6 +128,8 @@ class YobxOnnxExporter(_OnnxExporterBase):  # type: ignore[valid-type]
             reset_model_state,
         )
 
+        from transformers import PreTrainedModel as _PreTrainedModel
+
         from yobx.torch import to_onnx
 
         # Normalise config.
@@ -139,10 +141,14 @@ class YobxOnnxExporter(_OnnxExporterBase):  # type: ignore[valid-type]
         # Apply transformers-side pre-processing (strips labels, pops output
         # flags, casts tensors to model dtype/device, etc.).
         model, sample_inputs, output_flags = prepare_for_export(model, sample_inputs)
+        assert isinstance(model, _PreTrainedModel)
+
+        # patch_forward_signature requires a plain dict, not a MutableMapping.
+        inputs_dict: Dict[str, Any] = dict(sample_inputs)
 
         dynamic_shapes = config.dynamic_shapes
         if config.dynamic and dynamic_shapes is None:
-            dynamic_shapes = get_auto_dynamic_shapes(sample_inputs)
+            dynamic_shapes = get_auto_dynamic_shapes(inputs_dict)
 
         register_cache_pytrees_for_model(model)
 
@@ -153,12 +159,12 @@ class YobxOnnxExporter(_OnnxExporterBase):  # type: ignore[valid-type]
             apply_patches("dynamo"),
             reset_model_state(model),
             patch_model_config(model, output_flags),
-            patch_forward_signature(model, sample_inputs),
+            patch_forward_signature(model, inputs_dict),
         ):
             exported_program = torch.export.export(
                 model,
                 args=(),
-                kwargs=copy.deepcopy(dict(sample_inputs)),
+                kwargs=copy.deepcopy(inputs_dict),
                 strict=config.strict,
                 dynamic_shapes=dynamic_shapes,
                 prefer_deferred_runtime_asserts_over_guards=(
