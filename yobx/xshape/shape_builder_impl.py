@@ -171,7 +171,7 @@ class BasicShapeBuilder(
             if value is not None:
                 self.constants_computed_[name] = value
                 return value
-            assert not self.is_constant(name), (
+            assert not exc or not self.is_constant(name), (
                 f"Issue with node {self.pretty_node(possible_value)}, name={name!r}, "
                 f"{computed_value=}{self.get_debug_msg()}"
             )
