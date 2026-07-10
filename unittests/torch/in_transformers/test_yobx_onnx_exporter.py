@@ -6,6 +6,10 @@ Covers:
 * Basic instantiation and attribute access.
 * Round-trip export of a tiny ``torch.nn.Linear`` wrapped in a
   ``torch.nn.Module`` when transformers and torch are available.
+* Export of a real causal LM (``arnir0/Tiny-LLM``) with a
+  :class:`transformers.cache_utils.DynamicCache` (past-key-value cache)
+  and dynamic shapes, verifying that the resulting ONNX model contains
+  symbolic (dynamic) dimensions.
 """
 
 import unittest
@@ -165,6 +169,57 @@ class TestYobxOnnxExporterExport(ExtTestCase):
 
 
 class TestYobxOnnxExporterRealModels(ExtTestCase):
+    @requires_transformers("5.12")
+    def test_export_tiny_llm_with_cache_and_dynamic_shapes(self):
+        """Exports arnir0/Tiny-LLM with a DynamicCache and dynamic shapes.
+
+        Verifies that the resulting ONNX model contains at least one dynamic
+        (symbolic) dimension, confirming that dynamic shapes are preserved
+        end-to-end through YobxOnnxExporter.
+        """
+        from transformers.exporters.configs import OnnxConfig
+
+        from yobx.container import ExportArtifact
+        from yobx.torch import apply_patches_for_model, register_flattening_functions
+        from yobx.torch.in_transformers import YobxOnnxExporter
+        from yobx.torch.tiny_models import get_tiny_model
+        from yobx.torch.torch_helper import torch_deepcopy
+
+        model_data = get_tiny_model("arnir0/Tiny-LLM")
+        exporter = YobxOnnxExporter()
+
+        # register_flattening_functions patches the pytree registration for
+        # DynamicCache so that torch.export.export can flatten and unflatten
+        # the KV cache correctly.  apply_patches_for_model applies the
+        # yobx-level torch and transformers patches needed for tracing.
+        with (
+            register_flattening_functions(patch_transformers=True),
+            apply_patches_for_model(
+                patch_torch=True, patch_transformers=True, model=model_data.model
+            ),
+        ):
+            artifact = exporter.export(
+                model_data.model,
+                torch_deepcopy(model_data.export_inputs),
+                config=OnnxConfig(dynamic=True, dynamic_shapes=model_data.dynamic_shapes),
+            )
+
+        self.assertIsInstance(artifact, ExportArtifact)
+        self.assertGreater(len(artifact.graph.node), 0)
+
+        # Verify that the ONNX model has at least one symbolic (dynamic) dim.
+        dynamic_dims = [
+            d.dim_param
+            for inp in artifact.graph.input
+            for d in inp.type.tensor_type.shape.dim
+            if d.dim_param
+        ]
+        self.assertGreater(
+            len(dynamic_dims),
+            0,
+            "The ONNX model must contain at least one dynamic (symbolic) dimension.",
+        )
+
     @requires_transformers("5.12")
     def test_export_tiny_llm_random_weights(self):
         """Exports arnir0/Tiny-LLM with random weights via YobxOnnxExporter."""
