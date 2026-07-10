@@ -229,6 +229,10 @@ module = [
 ]
 ignore_errors = true
 
+[[tool.mypy.overrides]]
+module = "yobx.xbuilder.graph_builder"
+disable_error_code = ["annotation-unchecked"]
+
 [tool.pyrefly]
 project-includes = ["yobx/**/*.py"]
 project-excludes = [

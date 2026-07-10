@@ -140,7 +140,7 @@ class YobxOnnxExporter(_OnnxExporterBase):  # type: ignore[valid-type]
 
         # Apply transformers-side pre-processing (strips labels, pops output
         # flags, casts tensors to model dtype/device, etc.).
-        model, sample_inputs, output_flags = prepare_for_export(model, sample_inputs)
+        model, sample_inputs, output_flags = prepare_for_export(model, sample_inputs)  # type: ignore[assignment]
         assert isinstance(model, _PreTrainedModel)
 
         # patch_forward_signature requires a plain dict, not a MutableMapping.
