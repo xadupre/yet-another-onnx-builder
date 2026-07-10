@@ -151,6 +151,8 @@ def get_tiny_model(
       and one ``attention`` layer, intended to test
       :func:`yobx.to_onnx` on the granitemoehybrid architecture
       (see https://huggingface.co/docs/transformers/model_doc/granitemoehybrid).
+    * ``"openai/whisper-tiny"`` — a tiny :class:`transformers.WhisperForConditionalGeneration`
+      with random weights, using a minimal config suitable for offline testing.
 
     :param model_id: model id, see the list of supported values above
     :param config_updates: modification to add to the configuration before creating the model
@@ -285,6 +287,37 @@ def get_tiny_model(
                         for i in range(n_layers)
                     ]
                 ),
+            ),
+        )
+
+    if model_id == "openai/whisper-tiny":
+        from transformers import WhisperForConditionalGeneration
+        from .in_transformers.models import get_cached_configuration
+
+        config = get_cached_configuration(model_id)
+        assert config is not None, f"No cached configuration for {model_id!r}"
+        if config_updates:
+            config = copy.deepcopy(config)
+            _update_config(config, config_updates)
+
+        assert (
+            dtype == torch.float32
+        ), f"model_id={model_id!r} only supports dtype=float32, got {dtype!r}"
+
+        # The Whisper encoder applies two Conv1d layers: conv1 (stride=1) keeps
+        # the length, conv2 (stride=2) halves it.  An input of length
+        # 2*max_source_positions therefore maps to exactly max_source_positions
+        # encoder tokens, matching the positional embedding size.
+        source_len = 2 * config.max_source_positions
+        return ModelData(
+            model_id=model_id,
+            model=WhisperForConditionalGeneration(config).eval(),
+            export_inputs=dict(
+                input_features=torch.randn(1, config.num_mel_bins, source_len, dtype=dtype),
+                decoder_input_ids=torch.randint(0, config.vocab_size, (1, 3), dtype=torch.int64),
+            ),
+            dynamic_shapes=dict(
+                input_features={0: "batch"}, decoder_input_ids={0: "batch", 1: "dec_seq"}
             ),
         )
 

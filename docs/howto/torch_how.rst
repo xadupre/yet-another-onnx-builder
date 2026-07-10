@@ -78,6 +78,52 @@ decomposition is handled and when each option is usually the most practical.
       - official exporter
       - decomposition behavior follows the official exporter pipeline
       - use when you want direct parity with :func:`torch.onnx.export`
+    * - ``strategy="transformers"``
+      - :func:`torch.export.export` via the transformers dynamo preprocessing pipeline
+      - yobx converter (via :class:`~yobx.torch.in_transformers.YobxOnnxExporter`)
+      - same preprocessing as ``DynamoExporter`` (label stripping, dynamic-shape
+        inference, cache pytree registration, model patches)
+      - use for :class:`~transformers.PreTrainedModel` instances when you want the
+        full transformers exporter preprocessing with yobx as the ONNX backend
+
+----
+
+How to export a transformers model via YobxOnnxExporter
+-------------------------------------------------------
+
+When exporting a :class:`~transformers.PreTrainedModel`, you can use the
+``"transformers"`` strategy to route through
+:class:`~yobx.torch.in_transformers.YobxOnnxExporter`. This applies the full
+transformers dynamo preprocessing pipeline before converting with yobx:
+
+.. code-block:: python
+
+    import torch
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    from yobx.torch.export_options import ExportOptions
+    from yobx.torch.interpreter import to_onnx
+
+    model = AutoModelForCausalLM.from_pretrained("arnir0/Tiny-LLM").eval()
+    tokenizer = AutoTokenizer.from_pretrained("arnir0/Tiny-LLM")
+    inputs = tokenizer("Hello, world!", return_tensors="pt")
+
+    artifact = to_onnx(
+        model,
+        kwargs=dict(inputs),
+        export_options=ExportOptions(strategy="transformers"),
+    )
+    artifact.save("model.onnx")
+
+You can also use :class:`~yobx.torch.in_transformers.YobxOnnxExporter` directly:
+
+.. code-block:: python
+
+    from transformers.exporters.configs import OnnxConfig
+    from yobx.torch.in_transformers import YobxOnnxExporter
+
+    exporter = YobxOnnxExporter(target_opset=18)
+    artifact = exporter.export(model, dict(inputs), config=OnnxConfig(dynamic=True))
+    artifact.save("model.onnx")
 
 ----
 

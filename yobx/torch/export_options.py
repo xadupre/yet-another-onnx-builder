@@ -64,7 +64,11 @@ class ExportOptions:
         to ``TracingMode.DEFAULT``); ``TracingMode.NEW_TRACING`` uses the
         dispatch-based :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
     :param jit: use jit to get a graph then converts it into a fx graph
-    :param strategy: to overwrite all the previous parameters with just a value
+    :param strategy: to overwrite all the previous parameters with just a value;
+        ``'transformers'`` routes the export through
+        :class:`~yobx.torch.in_transformers.YobxOnnxExporter` (requires
+        ``transformers`` to be installed and *mod* to be a
+        :class:`~transformers.PreTrainedModel`)
     :param remove_inplace: remove inplace nodes
     :param aten_as_function: keeps aten function as local function to keep a faithful
         translation of the fx graph, it can also be a set of function name the export
@@ -115,6 +119,7 @@ class ExportOptions:
         "decall": {"decomposition_table": "all"},
         "fake": {"fake": True},
         "onnxscript": {"tracing": TracingMode.ONNXSCRIPT},
+        "transformers": {},
     }
 
     def __init__(

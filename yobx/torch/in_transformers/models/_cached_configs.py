@@ -113,7 +113,46 @@ def _tcached_arnir0_tiny_LLM():
     return _tokenizer
 
 
+def _ccached_openai_whisper_tiny():
+    "openai/whisper-tiny"
+    # Tiny Whisper configuration for offline testing with random weights.
+    # Dimensions are chosen so that the two Conv1d layers in the encoder
+    # (conv1: stride=1, conv2: stride=2) map an input of length
+    # 2*max_source_positions to exactly max_source_positions encoder tokens.
+    #
+    # The real whisper-tiny vocabulary is 51865 tokens and uses token IDs
+    # such as pad=50257, decoder_start=50258 which are well beyond vocab_size=100.
+    # We override these special token IDs to be within range so that
+    # torch.nn.Embedding does not raise "padding_idx must be within num_embeddings".
+    return transformers.WhisperConfig(
+        **{
+            "architectures": ["WhisperForConditionalGeneration"],
+            "d_model": 32,
+            "decoder_attention_heads": 2,
+            "decoder_ffn_dim": 64,
+            "decoder_layers": 1,
+            "encoder_attention_heads": 2,
+            "encoder_ffn_dim": 64,
+            "encoder_layers": 1,
+            "max_source_positions": 20,
+            "max_target_positions": 10,
+            "model_type": "whisper",
+            "num_mel_bins": 40,
+            "vocab_size": 100,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 1,
+            "decoder_start_token_id": 2,
+        }
+    )
+
+
 if not hasattr(transformers, "GraniteMoeHybridConfig"):
     # Older versions of transformers do not ship GraniteMoeHybridConfig; drop
     # the registration so _retrieve_cached_configurations does not expose it.
     del _ccached_local_GraniteMoeHybrid
+
+if not hasattr(transformers, "WhisperConfig"):
+    # Older versions of transformers do not ship WhisperConfig; drop
+    # the registration so _retrieve_cached_configurations does not expose it.
+    del _ccached_openai_whisper_tiny

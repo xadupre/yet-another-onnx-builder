@@ -1,3 +1,4 @@
+from .exporter import YobxOnnxExporter
 from .register import get_transformer_converter, get_transformer_converters
 
 
