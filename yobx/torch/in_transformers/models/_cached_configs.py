@@ -119,6 +119,11 @@ def _ccached_openai_whisper_tiny():
     # Dimensions are chosen so that the two Conv1d layers in the encoder
     # (conv1: stride=1, conv2: stride=2) map an input of length
     # 2*max_source_positions to exactly max_source_positions encoder tokens.
+    #
+    # The real whisper-tiny vocabulary is 51865 tokens and uses token IDs
+    # such as pad=50257, decoder_start=50258 which are well beyond vocab_size=100.
+    # We override these special token IDs to be within range so that
+    # torch.nn.Embedding does not raise "padding_idx must be within num_embeddings".
     return transformers.WhisperConfig(
         **{
             "architectures": ["WhisperForConditionalGeneration"],
@@ -134,6 +139,10 @@ def _ccached_openai_whisper_tiny():
             "model_type": "whisper",
             "num_mel_bins": 40,
             "vocab_size": 100,
+            "pad_token_id": 0,
+            "bos_token_id": 1,
+            "eos_token_id": 1,
+            "decoder_start_token_id": 2,
         }
     )
 
