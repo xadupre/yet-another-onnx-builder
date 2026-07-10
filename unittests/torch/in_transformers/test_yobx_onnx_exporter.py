@@ -19,7 +19,7 @@ class TestYobxOnnxExporterImport(ExtTestCase):
         """Importing YobxOnnxExporter should not raise when torch is available."""
         from yobx.torch.in_transformers import YobxOnnxExporter  # noqa: F401
 
-    @requires_transformers("")
+    @requires_transformers("5.12")
     def test_yobx_onnx_exporter_is_subclass_of_onnx_exporter(self):
         """YobxOnnxExporter should be a subclass of transformers' OnnxExporter."""
         from transformers.exporters.exporter_onnx import OnnxExporter
@@ -28,7 +28,7 @@ class TestYobxOnnxExporterImport(ExtTestCase):
 
         self.assertTrue(issubclass(YobxOnnxExporter, OnnxExporter))
 
-    @requires_transformers("")
+    @requires_transformers("5.12")
     def test_yobx_onnx_exporter_instantiation(self):
         """YobxOnnxExporter can be instantiated without arguments."""
         from yobx.torch.in_transformers import YobxOnnxExporter
@@ -36,7 +36,7 @@ class TestYobxOnnxExporterImport(ExtTestCase):
         exporter = YobxOnnxExporter()
         self.assertIsNotNone(exporter)
 
-    @requires_transformers("")
+    @requires_transformers("5.12")
     def test_yobx_onnx_exporter_instantiation_with_opset(self):
         """YobxOnnxExporter accepts a target_opset argument."""
         from yobx.torch.in_transformers import YobxOnnxExporter
@@ -44,7 +44,7 @@ class TestYobxOnnxExporterImport(ExtTestCase):
         exporter = YobxOnnxExporter(target_opset=18)
         self.assertEqual(exporter._target_opset, 18)
 
-    @requires_transformers("")
+    @requires_transformers("5.12")
     def test_yobx_onnx_exporter_required_packages_no_onnxscript(self):
         """YobxOnnxExporter must not list onnxscript in required_packages."""
         from yobx.torch.in_transformers import YobxOnnxExporter
@@ -56,7 +56,7 @@ class TestYobxOnnxExporterImport(ExtTestCase):
 
 
 class TestYobxOnnxExporterExport(ExtTestCase):
-    @requires_transformers("4.0")
+    @requires_transformers("5.12")
     def test_export_simple_module(self):
         """Exports a simple torch.nn.Linear wrapped as a transformers-compatible module."""
         import torch
@@ -97,7 +97,7 @@ class TestYobxOnnxExporterExport(ExtTestCase):
         # The exported proto must have at least one node (the linear op).
         self.assertGreater(len(artifact.graph.node), 0)
 
-    @requires_transformers("4.0")
+    @requires_transformers("5.12")
     def test_export_with_target_opset(self):
         """Respects the target_opset constructor argument during export."""
         import torch
@@ -130,7 +130,7 @@ class TestYobxOnnxExporterExport(ExtTestCase):
 
         self.assertEqual(artifact.opset_import[0].version, 18)
 
-    @requires_transformers("4.0")
+    @requires_transformers("5.12")
     def test_export_with_dict_config(self):
         """Accepts a plain dict as config in addition to OnnxConfig instances."""
         import torch
@@ -165,7 +165,7 @@ class TestYobxOnnxExporterExport(ExtTestCase):
 
 
 class TestYobxOnnxExporterRealModels(ExtTestCase):
-    @requires_transformers("4.0")
+    @requires_transformers("5.12")
     def test_export_tiny_llm_random_weights(self):
         """Exports arnir0/Tiny-LLM with random weights via YobxOnnxExporter."""
         import torch
@@ -189,7 +189,7 @@ class TestYobxOnnxExporterRealModels(ExtTestCase):
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertGreater(len(artifact.graph.node), 0)
 
-    @requires_transformers("4.0")
+    @requires_transformers("5.12")
     def test_to_onnx_strategy_transformers_tiny_llm(self):
         """to_onnx with ExportOptions(strategy='transformers') routes through YobxOnnxExporter."""
         import torch
@@ -214,7 +214,7 @@ class TestYobxOnnxExporterRealModels(ExtTestCase):
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertGreater(len(artifact.graph.node), 0)
 
-    @requires_transformers("4.0")
+    @requires_transformers("5.12")
     def test_export_whisper_tiny_random_weights(self):
         """Exports openai/whisper-tiny with random weights via YobxOnnxExporter."""
         from transformers.exporters.configs import OnnxConfig

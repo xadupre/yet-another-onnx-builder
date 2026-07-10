@@ -248,6 +248,7 @@ project-excludes = [
     "yobx/torch/_model_eval_cases.py",
     "yobx/torch/in_transformers/_patches_model_rope_utils.py",
     "yobx/torch/in_transformers/classes/llama_attention.py",
+    "yobx/torch/in_transformers/exporter.py",
     "yobx/torch/in_transformers/models/_cached_configs.py",
     "yobx/torch/interpreter/_*functions*.py",
     "yobx/torch/interpreter/_*methods.py",
