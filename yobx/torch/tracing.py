@@ -844,9 +844,11 @@ def tree_unflatten_with_proxy(
     if isinstance(leaves, (list, tuple)):
         leaves = list(leaves)
     assert len(leaves) == tree_spec.num_leaves, (
-        f"treespec.unflatten(leaves): `leaves` has length {len(leaves)} "
-        f"but the spec refers to a pytree that holds {tree_spec.num_leaves} "
-        f"items ({tree_spec}).",
+        (
+            f"treespec.unflatten(leaves): `leaves` has length {len(leaves)} "
+            f"but the spec refers to a pytree that holds {tree_spec.num_leaves} "
+            f"items ({tree_spec})."
+        ),
     )
     if tree_spec.is_leaf():
         return leaves[0]

@@ -58,8 +58,10 @@ class LightEmitter(BaseEmitter):
         shape = kwargs.get("shape", None)
         if elem_type and shape:
             return [
-                f"vin({name!r}, elem_type=onnx.TensorProto."
-                f"{_ELEMENT_TYPE_NAME[elem_type]}, shape={shape!r})"
+                (
+                    f"vin({name!r}, elem_type=onnx.TensorProto."
+                    f"{_ELEMENT_TYPE_NAME[elem_type]}, shape={shape!r})"
+                )
             ]
         if elem_type:
             return [f"vin({name!r}, elem_type=onnx.TensorProto.{_ELEMENT_TYPE_NAME[elem_type]})"]

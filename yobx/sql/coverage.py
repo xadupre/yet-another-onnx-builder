@@ -28,8 +28,10 @@ SQL_COVERAGE: List[CoverageRow] = [
     (
         "``GROUP BY cols``",
         _PARTIAL,
-        "per-group aggregation via ``Unique`` + ``ScatterElements``; "
-        "multi-column keys cast to ``float64`` (precision loss for integers > 2**53)",
+        (
+            "per-group aggregation via ``Unique`` + ``ScatterElements``; "
+            "multi-column keys cast to ``float64`` (precision loss for integers > 2**53)"
+        ),
     ),
     (
         "``[INNER|LEFT|RIGHT|FULL] JOIN … ON col = col``",

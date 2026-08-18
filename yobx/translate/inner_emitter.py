@@ -123,17 +123,23 @@ class InnerEmitter(BaseEmitter):
         shape = kwargs.get("shape", None)
         if elem_type and shape:
             return [
-                f"{container}.append(oh.make_tensor_value_info({name!r}, "
-                f"onnx.TensorProto.{_ELEMENT_TYPE_NAME[elem_type]}, shape={shape!r}))"
+                (
+                    f"{container}.append(oh.make_tensor_value_info({name!r}, "
+                    f"onnx.TensorProto.{_ELEMENT_TYPE_NAME[elem_type]}, shape={shape!r}))"
+                )
             ]
         if elem_type:
             return [
-                f"{container}.append(oh.make_tensor_value_info({name!r}, "
-                f"onnx.TensorProto.{_ELEMENT_TYPE_NAME[elem_type]}, shape=[]))"
+                (
+                    f"{container}.append(oh.make_tensor_value_info({name!r}, "
+                    f"onnx.TensorProto.{_ELEMENT_TYPE_NAME[elem_type]}, shape=[]))"
+                )
             ]
         return [
-            f"{container}.append(oh.make_tensor_value_info({name!r}, "
-            f"onnx.TensorProto.UNDEFINED, []))"
+            (
+                f"{container}.append(oh.make_tensor_value_info({name!r}, "
+                f"onnx.TensorProto.UNDEFINED, []))"
+            )
         ]
 
     def _emit_input(self, **kwargs: Dict[str, Any]) -> List[str]:

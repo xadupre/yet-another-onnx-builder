@@ -98,7 +98,7 @@ class CubeViewDef:
         agg_args: Union[Sequence[Any], Callable[[str], Any]] = ("sum",),
         agg_kwargs: Optional[Dict[str, Any]] = None,
         agg_multi: Optional[
-            Dict[str, Callable[[pandas.api.typing.DataFrameGroupBy], pandas.Series]]
+            Dict[str, Callable[[pandas.api.typing.DataFrameGroupBy], Any]]
         ] = None,
         ignore_columns: Optional[Sequence[str]] = None,
         keep_columns_in_index: Optional[Sequence[str]] = None,
@@ -757,8 +757,10 @@ class CubeLogs:
         )
         set_key_agg = set(key_agg)
         assert set_key_agg <= set(self.keys_time), (
-            f"view_def.name={view_def.name!r}, "
-            f"non existing keys in key_agg {set_key_agg - set(self.keys_time)}",
+            (
+                f"view_def.name={view_def.name!r}, "
+                f"non existing keys in key_agg {set_key_agg - set(self.keys_time)}"
+            ),
             f"keys={sorted(self.keys_time)}",
         )
 

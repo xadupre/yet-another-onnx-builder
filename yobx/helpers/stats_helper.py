@@ -747,10 +747,7 @@ def enumerate_stats_nodes(
         Dict[
             Tuple[str, str],
             Callable[
-                [
-                    Union[GraphProto, FunctionProto],
-                    Union[NodeProto, TensorProto, SparseTensorProto],
-                ],
+                [Union[GraphProto, FunctionProto], NodeProto],
                 Union[NodeStatistics, "HistStatistics"],
             ],
         ]

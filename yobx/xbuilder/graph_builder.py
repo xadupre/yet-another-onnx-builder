@@ -5286,10 +5286,12 @@ class GraphBuilder(
         hs = self._hash()
         rows.extend(
             [
-                f"[GraphBuilder-{hs}] Message starts, there are "
-                f"{len(self.initializers_dict)} initializers, "
-                f"{len(self.nodes)} nodes, {len(self.inputs)} inputs, "
-                f"{len(self.inputs)} outputs.",
+                (
+                    f"[GraphBuilder-{hs}] Message starts, there are "
+                    f"{len(self.initializers_dict)} initializers, "
+                    f"{len(self.nodes)} nodes, {len(self.inputs)} inputs, "
+                    f"{len(self.inputs)} outputs."
+                ),
                 f"input_names={self.input_names}",
                 f"output_names={self.output_names}",
             ]
@@ -7019,10 +7021,12 @@ class GraphBuilder(
 
     def _compile_model_statistics(self, detailed: bool):
         rows = [
-            f"--MODEL: {len(self.nodes)} nodes, {len(self.inputs)} inputs, "
-            f"{len(self.outputs)} outputs, "
-            f"{len(self.initializers_dict)} initializers--"
-            f"{'DETAILED--' if detailed else ''}"
+            (
+                f"--MODEL: {len(self.nodes)} nodes, {len(self.inputs)} inputs, "
+                f"{len(self.outputs)} outputs, "
+                f"{len(self.initializers_dict)} initializers--"
+                f"{'DETAILED--' if detailed else ''}"
+            )
         ]
         if detailed:
 
