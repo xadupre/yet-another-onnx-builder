@@ -325,11 +325,19 @@ def _parse_polars_plan(plan: str) -> _PolarsPlan:
             i += 1
             continue
 
-        # FILTER [condition]
-        if stripped.startswith("FILTER ["):
-            inner = _extract_bracketed_list(stripped, "FILTER ")
+        # FILTER [condition] (Polars < 1.43) or FILTER condition (Polars >= 1.43)
+        if stripped.startswith("FILTER "):
+            filter_expr = stripped[len("FILTER ") :].strip()
+            if filter_expr.startswith("["):
+                inner = _extract_bracketed_list(stripped, "FILTER ")
+            else:
+                inner = filter_expr
             if inner is not None:
-                result.where_condition = _polars_expr_to_sql(inner)
+                condition = _polars_expr_to_sql(inner)
+                if result.where_condition:
+                    result.where_condition = f"{condition} AND {result.where_condition}"
+                else:
+                    result.where_condition = condition
             i += 1
             continue
 

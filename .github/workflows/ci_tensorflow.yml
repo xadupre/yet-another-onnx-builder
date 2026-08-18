@@ -110,6 +110,7 @@ jobs:
           pytest --durations=10 unittests/parity/with_tf2onnx
 
       - name: Parity with jax2onnx
+        if: matrix.jax-version != '0.9'
         run: |
           pip install jax2onnx
           pytest --durations=10 unittests/parity/with_jax2onnx

@@ -147,6 +147,34 @@ class TestPolarsExprToSql(ExtTestCase):
         self.assertIn("a > 0.0", result)
         self.assertIn("b < 6.0", result)
 
+    def test_parse_filter_plan_syntaxes(self):
+        from yobx.sql.polars_convert import _parse_polars_plan
+
+        old_plan = """
+        FILTER [(col("a")) > (0.0)]
+        FROM
+          DF ["a", "b"]; PROJECT */2 COLUMNS
+        """
+        new_plan = """
+        FILTER col("a") > 0.0
+        FROM
+          DF ["a", "b"]; PROJECT */2 COLUMNS
+        """
+        self.assertEqual(_parse_polars_plan(old_plan).where_condition, "a > 0.0")
+        self.assertEqual(_parse_polars_plan(new_plan).where_condition, "a > 0.0")
+
+    def test_parse_nested_filters(self):
+        from yobx.sql.polars_convert import _parse_polars_plan
+
+        plan = """
+        FILTER col("b") < 6.0
+        FROM
+          FILTER col("a") > 1.0
+          FROM
+            DF ["a", "b"]; PROJECT */2 COLUMNS
+        """
+        self.assertEqual(_parse_polars_plan(plan).where_condition, "a > 1.0 AND b < 6.0")
+
     def test_numeric_literal(self):
         self.assertEqual(self._fn()("1.5"), "1.5")
 
