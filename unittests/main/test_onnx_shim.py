@@ -1,4 +1,4 @@
-"""Tests for the onnx shim (USE_OPTIM_ONNX switching)."""
+"""Tests for the onnx shim (USE_ONNX_LIGHT switching)."""
 
 import importlib
 import os
@@ -11,21 +11,21 @@ class TestOnnxShim(unittest.TestCase):
     """Tests that the _onnx_shim module behaves correctly."""
 
     def _reload_shim(self, env_value: str | None) -> types.ModuleType:
-        """Reloads yobx._onnx_shim with the given USE_OPTIM_ONNX value."""
+        """Reloads yobx._onnx_shim with the given USE_ONNX_LIGHT value."""
         # Remove cached module so the top-level if/else re-runs on import.
         sys.modules.pop("yobx._onnx_shim", None)
-        original = os.environ.get("USE_OPTIM_ONNX")
+        original = os.environ.get("USE_ONNX_LIGHT")
         try:
             if env_value is None:
-                os.environ.pop("USE_OPTIM_ONNX", None)
+                os.environ.pop("USE_ONNX_LIGHT", None)
             else:
-                os.environ["USE_OPTIM_ONNX"] = env_value
+                os.environ["USE_ONNX_LIGHT"] = env_value
             return importlib.import_module("yobx._onnx_shim")
         finally:
             if original is None:
-                os.environ.pop("USE_OPTIM_ONNX", None)
+                os.environ.pop("USE_ONNX_LIGHT", None)
             else:
-                os.environ["USE_OPTIM_ONNX"] = original
+                os.environ["USE_ONNX_LIGHT"] = original
             # Restore cached module to the version loaded without the env var.
             sys.modules.pop("yobx._onnx_shim", None)
 
@@ -42,14 +42,14 @@ class TestOnnxShim(unittest.TestCase):
         self.assertIs(shim.onnx, real_onnx)
 
     def test_env_var_0_exposes_standard_onnx(self):
-        """Verifies that USE_OPTIM_ONNX=0 uses standard onnx."""
+        """Verifies that USE_ONNX_LIGHT=0 uses standard onnx."""
         import onnx as real_onnx
 
         shim = self._reload_shim("0")
         self.assertIs(shim.onnx, real_onnx)
 
     def test_env_var_1_without_onnx_light_raises(self):
-        """Verifies that USE_OPTIM_ONNX=1 without onnx_light raises ModuleNotFoundError."""
+        """Verifies that USE_ONNX_LIGHT=1 without onnx_light raises ModuleNotFoundError."""
         # Only run when onnx_light is not installed.
         try:
             importlib.import_module("onnx_light.onnx")
@@ -59,6 +59,17 @@ class TestOnnxShim(unittest.TestCase):
 
         with self.assertRaises(ModuleNotFoundError):
             self._reload_shim("1")
+
+    def test_env_var_1_with_onnx_light_uses_optim(self):
+        """Verifies that USE_ONNX_LIGHT=1 exposes onnx_light.onnx when installed."""
+        # Only run when onnx_light is installed.
+        try:
+            onnx_light_onnx = importlib.import_module("onnx_light.onnx")
+        except ModuleNotFoundError:
+            self.skipTest("onnx_light is not installed; skipping presence test")
+
+        shim = self._reload_shim("1")
+        self.assertIs(shim.onnx, onnx_light_onnx)
 
 
 if __name__ == "__main__":

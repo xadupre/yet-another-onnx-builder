@@ -114,7 +114,7 @@ class TestLightOpsetApi(ExtTestCase):
 
     def test_set_opset_reflected_in_to_onnx(self):
         """set_opset domain must appear in the exported model's opset_imports."""
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
 
         g = OnnxGraph(opset=18)
         g.set_opset("ai.onnx.ml", 3)

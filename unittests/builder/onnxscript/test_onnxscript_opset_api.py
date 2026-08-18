@@ -96,7 +96,7 @@ class TestOnnxScriptGraphBuilderOpsetApi(ExtTestCase):
 
     def test_set_opset_exported_model_contains_domain(self):
         """set_opset is reflected in the exported ONNX ModelProto."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         g = self._make_builder()
         g.set_opset("ai.onnx.ml", 3)
@@ -144,7 +144,7 @@ class TestOnnxScriptGraphBuilderOpsetApi(ExtTestCase):
 
     def test_add_domain_exported_model_contains_domain(self):
         """add_domain is reflected in the exported ONNX ModelProto."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         g = self._make_builder()
         g.add_domain("ai.onnx.ml", 3)

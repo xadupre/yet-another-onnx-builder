@@ -351,7 +351,7 @@ class TestSqlToOnnxReturnedModel(ExtTestCase):
         onx = sql_to_onnx("SELECT a FROM t", dtypes)
         self.assertIsInstance(onx, ExportArtifact)
         # The underlying proto is accessible via the attribute:
-        from onnx import ModelProto
+        from yobx._onnx_shim import ModelProto  # noqa: TID251
 
         self.assertIsInstance(onx.proto, ModelProto)
 
@@ -440,7 +440,7 @@ class TestSqlToOnnxGraph(ExtTestCase):
 
     def test_existing_input_reused(self):
         """sql_to_onnx_graph must not duplicate an input already in the builder."""
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
         from yobx.xbuilder import GraphBuilder
 
         g = GraphBuilder(18, ir_version=10)

@@ -17,7 +17,7 @@ class TestNumpyArray(ExtTestCase):
 
     def test_trace_numpy_function_basic(self):
         """trace_numpy_function should work with an existing GraphBuilder."""
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
         from yobx.xbuilder import GraphBuilder
         from yobx.xtracing import trace_numpy_function
 
@@ -38,7 +38,7 @@ class TestNumpyArray(ExtTestCase):
 
     def test_trace_numpy_function_multiple_outputs(self):
         """trace_numpy_function raises when output count mismatches."""
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
         from yobx.xbuilder import GraphBuilder
         from yobx.xtracing import trace_numpy_function
 
@@ -57,7 +57,7 @@ class TestNumpyArray(ExtTestCase):
 
     def test_expand_dims_method(self):
         """NumpyArray.expand_dims adds a size-1 dimension."""
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
         from yobx.xbuilder import GraphBuilder
         from yobx.xtracing.numpy_array import NumpyArray
 
@@ -165,7 +165,7 @@ class TestNumpyArray(ExtTestCase):
 
     def test_trace_numpy_function_two_outputs(self):
         """trace_numpy_function should correctly handle functions returning tuples."""
-        from onnx import TensorProto
+        from yobx._onnx_shim import TensorProto  # noqa: TID251
         from yobx.xbuilder import GraphBuilder
         from yobx.xtracing import trace_numpy_function
 

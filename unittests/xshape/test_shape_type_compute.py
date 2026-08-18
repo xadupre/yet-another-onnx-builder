@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
+from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase
 from yobx.xshape import ShapeBuilder, BasicShapeBuilder
 from yobx.xshape.shape_type_compute import (
@@ -275,7 +275,7 @@ class TestShapeTypeCompute(ExtTestCase):
     def test_broadcast_shape_constraint_propagated_through_model(self):
         # Full end-to-end: broadcast a symbolic-shaped input against a
         # constant bias; verify both the output shape and the constraint.
-        import onnx.numpy_helper as onh
+        from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
 
         model = oh.make_model(
             oh.make_graph(

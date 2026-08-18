@@ -13,7 +13,7 @@ Tests are structured in three groups:
 import unittest
 
 import numpy as np
-from onnx import TensorProto
+from yobx._onnx_shim import TensorProto  # noqa: TID251
 
 from yobx.ext_test_case import ExtTestCase
 from yobx.litert.litert_helper import _make_sample_tflite_model

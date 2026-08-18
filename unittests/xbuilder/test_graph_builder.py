@@ -1,9 +1,9 @@
 import unittest
 from typing import Dict, List
-import onnx.helper as oh
+from yobx._onnx_shim import helper as oh  # noqa: TID251
 import numpy as np
-import onnx.numpy_helper as onh
-from onnx import AttributeProto, FunctionProto, GraphProto, TensorProto
+from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
+from yobx._onnx_shim import AttributeProto, FunctionProto, GraphProto, TensorProto  # noqa: TID251
 from yobx.ext_test_case import (
     ExtTestCase,
     hide_stdout,
@@ -2449,7 +2449,7 @@ class TestGetInputDynamicShape(ExtTestCase):
 
     @requires_torch()
     def test_get_attribute_with_default_unsupported_type(self):
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         gr = GraphBuilder(18, ir_version=9)
         node = oh.make_node("SomeOp", ["X"], ["Y"])
@@ -2514,7 +2514,7 @@ class TestGetInputDynamicShape(ExtTestCase):
 
     @requires_torch()
     def test_get_attributes_with_default_unsupported_type(self):
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         gr = GraphBuilder(18, ir_version=9)
         node = oh.make_node("SomeOp", ["X"], ["Y"])

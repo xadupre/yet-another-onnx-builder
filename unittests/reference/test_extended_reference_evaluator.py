@@ -1,9 +1,9 @@
 import unittest
 from typing import Optional
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
+from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase, has_cuda
 from yobx.reference import ExtendedReferenceEvaluator
 

@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
 import onnxruntime
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
 from sklearn.datasets import make_classification, make_regression
 from sklearn.ensemble import (
     ExtraTreesClassifier,

@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
+from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase
 from yobx.helpers.stats_helper import (
     ModelStatistics,
@@ -213,7 +213,7 @@ class TestStatsHelper(ExtTestCase):
         Every registered op handler must return a non-zero cost for a fixed
         non-empty input, except ``Identity`` which is the only allowed zero-cost op.
         """
-        import onnx.helper as _oh
+        from yobx._onnx_shim import helper as _oh  # noqa: TID251
         from yobx.xshape.cost_inference import _OP_HANDLERS
 
         # A fixed non-empty shape used for all inputs.

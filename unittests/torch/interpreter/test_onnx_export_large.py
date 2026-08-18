@@ -2,7 +2,9 @@ import os
 import unittest
 import warnings
 from typing import Optional
-from onnx.reference import ReferenceEvaluator
+from yobx._onnx_shim import onnx  # noqa: TID251
+
+ReferenceEvaluator = onnx.reference.ReferenceEvaluator
 from yobx.ext_test_case import ExtTestCase, ignore_warnings, skipif_ci_windows
 from yobx.xbuilder import OptimizationOptions
 from yobx.torch import ExportOptions
@@ -76,7 +78,7 @@ class TestOnnxExportLarge(ExtTestCase):
             try:
                 InferenceSession(name, providers=["CPUExecutionProvider"])
             except Exception as e:
-                import onnx
+                from yobx._onnx_shim import onnx  # noqa: TID251
 
                 raise AssertionError(  # noqa: B904
                     f"onnxruntime cannot load the model "

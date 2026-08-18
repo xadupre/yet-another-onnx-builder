@@ -1,5 +1,7 @@
 import unittest
-from onnx.checker import check_model
+from yobx._onnx_shim import onnx  # noqa: TID251
+
+check_model = onnx.checker.check_model
 from yobx.ext_test_case import (
     ExtTestCase,
     skipif_ci_windows,

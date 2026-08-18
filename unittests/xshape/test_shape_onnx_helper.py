@@ -1,6 +1,6 @@
 import unittest
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase
 from yobx.helpers.onnx_helper import (
     element_wise_binary_op_types,

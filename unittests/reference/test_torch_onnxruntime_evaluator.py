@@ -2,9 +2,9 @@ import unittest
 from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import ml_dtypes
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
+from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
 import torch
 from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings, requires_cuda
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype

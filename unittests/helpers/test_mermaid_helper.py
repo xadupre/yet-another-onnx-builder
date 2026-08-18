@@ -1,8 +1,8 @@
 import unittest
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
 import numpy as np
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase
 from yobx.helpers.mermaid_helper import to_mermaid
 

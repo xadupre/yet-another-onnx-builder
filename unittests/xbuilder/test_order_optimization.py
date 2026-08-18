@@ -1,10 +1,11 @@
 import unittest
 from typing import Optional
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-from onnx.checker import check_model
+from yobx._onnx_shim import onnx  # noqa: TID251
+from yobx._onnx_shim import helper as oh  # noqa: TID251
+from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
+
+check_model = onnx.checker.check_model
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions

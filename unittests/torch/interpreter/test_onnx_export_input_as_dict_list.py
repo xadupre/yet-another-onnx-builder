@@ -196,7 +196,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
             export_options=ExportOptions(tracing=True),
             verbose=10,
         )
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         onnx.save(onx, self.get_dump_file("test_list_input_tracer.onnx"))
         shapes = [
@@ -234,7 +234,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
         onx = to_onnx(
             model, (x,), dynamic_shapes=({0: batch},), export_options=ExportOptions(tracing=True)
         )
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         onnx.save(onx, self.get_dump_file("test_neuron_tracer.onnx"))
         feeds = {"x": x.numpy()}

@@ -8,7 +8,7 @@ onnxruntime.
 
 import unittest
 import numpy as np
-from onnx import TensorProto
+from yobx._onnx_shim import TensorProto  # noqa: TID251
 from onnxruntime import InferenceSession
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.graph_builder import GraphBuilder

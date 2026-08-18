@@ -15,7 +15,7 @@ Tests cover:
 
 import unittest
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx  # noqa: TID251
 import torch
 from yobx.ext_test_case import (
     ExtTestCase,
@@ -528,7 +528,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
 
     def test_opset22_returns_model_proto(self):
         """Converter returns a valid ModelProto."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         attn = _make_llama_attention().eval()
         hs, cos, sin = self._get_inputs()

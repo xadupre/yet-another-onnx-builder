@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx  # noqa: TID251
 from yobx.ext_test_case import (
     ExtTestCase,
     requires_ipython,

@@ -5,7 +5,7 @@ Unit tests for :class:`yobx.builder.light.Var` focusing on ``__str__``,
 
 import unittest
 
-from onnx import TensorProto
+from yobx._onnx_shim import TensorProto  # noqa: TID251
 
 from yobx.builder.light import Var, Vars, start
 from yobx.ext_test_case import ExtTestCase
@@ -169,7 +169,7 @@ class TestVarOperators(ExtTestCase):
     # --- chaining: result can be used in a further model ---
 
     def test_truediv_builds_valid_model(self):
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         gr, x, y = _xy()
         (x / y).rename("Z").vout()
@@ -178,7 +178,7 @@ class TestVarOperators(ExtTestCase):
         self.assertEqual(onx.graph.node[0].op_type, "Div")
 
     def test_matmul_builds_valid_model(self):
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         gr, x, y = _xy()
         (x @ y).rename("Z").vout()
@@ -187,7 +187,7 @@ class TestVarOperators(ExtTestCase):
         self.assertEqual(onx.graph.node[0].op_type, "MatMul")
 
     def test_pow_builds_valid_model(self):
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         gr, x, y = _xy()
         (x**y).rename("Z").vout()

@@ -1,6 +1,6 @@
 import unittest
 import numpy as np
-import onnx.helper as oh
+from yobx._onnx_shim import helper as oh  # noqa: TID251
 from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.xshape import BasicShapeBuilder
 

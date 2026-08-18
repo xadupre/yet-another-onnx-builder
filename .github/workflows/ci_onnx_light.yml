@@ -1,0 +1,60 @@
+name: ci-11-onnx-light
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  schedule:
+    - cron: "0 4 * * *"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # onnx-light release providing the prebuilt wheels.
+  # https://github.com/xadupre/onnx-light/releases/tag/0.1.1
+  ONNX_LIGHT_VERSION: "0.1.1"
+
+jobs:
+  onnx_light_tests:
+    name: onnx-light (ubuntu-latest, py3.12)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -e ".[dev,spox,onnxscript]"
+
+      - name: Install onnx-light
+        run: |
+          pip install \
+            "https://github.com/xadupre/onnx-light/releases/download/${ONNX_LIGHT_VERSION}/onnx_light-${ONNX_LIGHT_VERSION}-cp312-cp312-manylinux_2_28_x86_64.whl"
+
+      - name: Uninstall onnx and onnxruntime
+        run: pip uninstall -y onnx onnxruntime
+
+      - name: pip freeze
+        run: pip freeze
+
+      - name: Run tests with onnx-light
+        env:
+          USE_ONNX_LIGHT: "1"
+        # The backend tests rely on onnx.backend.base / onnx.backend.test,
+        # which have no onnx-light equivalent, so they are disabled here.
+        run: |
+          pytest --durations=10 unittests \
+            --ignore=unittests/helpers/test_backend_test_pretty.py \
+            --ignore=unittests/reference/test_backend_torch_reference_evaluator.py \
+            --ignore=unittests/reference/test_backend_extended_reference_evaluator.py \
+            --ignore=unittests/reference/test_backend_onnxruntime_evaluator.py \
+            --ignore=unittests/xshape/test_backend_test_shape_builder_type.py \
+            --ignore=unittests/xshape/test_backend_test_shape_builder_shape.py \
+            --ignore=unittests/xshape/test_backend_test_shape_builder_cost.py

@@ -4,10 +4,12 @@ import time
 import unittest
 from typing import List, Optional
 import numpy as np
-from onnx import NodeProto, TensorProto, load
-from onnx.checker import check_model
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import NodeProto, TensorProto, load  # noqa: TID251
+from yobx._onnx_shim import onnx  # noqa: TID251
+
+check_model = onnx.checker.check_model
+from yobx._onnx_shim import helper as oh  # noqa: TID251
+from yobx._onnx_shim import numpy_helper as onh  # noqa: TID251
 from onnx.reference.op_run import OpRun
 from yobx.ext_test_case import ExtTestCase
 from yobx.typing import GraphBuilderExtendedProtocol

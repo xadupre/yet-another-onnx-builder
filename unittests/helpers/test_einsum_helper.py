@@ -58,7 +58,7 @@ class TestEinsumHelper(ExtTestCase):
     def test_decompose_einsum_float64(self):
         """Tests decomposition with float64 dtype."""
         model = decompose_einsum("ij,jk->ik", (3, 4), (4, 5), dtype=np.float64)
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         self.assertEqual(model.graph.input[0].type.tensor_type.elem_type, onnx.TensorProto.DOUBLE)
 
@@ -260,7 +260,7 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
 
     def test_float64(self):
         """Decomposition should honour float64 dtype."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         model = decompose_einsum_2inputs("ij,jk->ik", (3, 4), (4, 5), dtype=np.float64)
         self.assertEqual(model.graph.input[0].type.tensor_type.elem_type, onnx.TensorProto.DOUBLE)

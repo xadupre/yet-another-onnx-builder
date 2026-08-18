@@ -16,7 +16,7 @@ class TestTensorflowToOnnxValueInfoProto(ExtTestCase):
 
     def test_dense_value_info_proto(self):
         """ValueInfoProto replaces the numpy array as input specification."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         model = tf.keras.Sequential([tf.keras.layers.Dense(4, input_shape=(3,))])
         X = np.random.rand(5, 3).astype(np.float32)
@@ -35,7 +35,7 @@ class TestTensorflowToOnnxValueInfoProto(ExtTestCase):
 
     def test_dense_value_info_proto_with_input_names_override(self):
         """input_names overrides the name embedded in a ValueInfoProto."""
-        import onnx
+        from yobx._onnx_shim import onnx  # noqa: TID251
 
         model = tf.keras.Sequential([tf.keras.layers.Dense(4, input_shape=(3,))])
         X = np.random.rand(5, 3).astype(np.float32)
