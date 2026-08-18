@@ -17,7 +17,7 @@ def _sklearn_mixture_core(
     estimator: BaseMixture,
     X: str,
     name: str,
-    log_weights: Union[None, "np.ndarray"] = None,
+    log_weights: Union["np.ndarray", None] = None,
 ) -> Tuple[str, str]:
     """
     Shared implementation for Gaussian mixture model converters.

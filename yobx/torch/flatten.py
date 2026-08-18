@@ -115,7 +115,7 @@ def flattening_functions(
 
     supported_classes: Set[type] = set()
     classes: Dict[type, Callable[[], bool]] = {}
-    all_functions: Dict[type, Optional[str]] = {}
+    all_functions: Dict[str, Callable] = {}
 
     if patch_transformers != TransformersPatchEnum.NONE:
         from .in_transformers.flatten_class import (  # type: ignore[attr-defined]

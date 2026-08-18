@@ -2,7 +2,7 @@ import datetime
 import glob
 import os
 import zipfile
-from typing import Callable, Iterator, List, Optional, Sequence, Tuple, Union
+from typing import Callable, Iterator, List, Optional, Sequence, Tuple, Union, cast
 import numpy as np
 import pandas
 
@@ -158,7 +158,10 @@ def filter_data(
 
 def enumerate_csv_files(
     data: Union[
-        pandas.DataFrame, List[Union[str, Tuple[str, str]]], str, Tuple[str, str, str, str]
+        pandas.DataFrame,
+        List[Union[str, Tuple[str, str, str, str]]],
+        str,
+        Tuple[str, str, str, str],
     ],
     verbose: int = 0,
     filtering: Optional[Callable[[str], bool]] = None,
@@ -194,7 +197,8 @@ def enumerate_csv_files(
             # A file in a zipfile
             if verbose:
                 print(f"[enumerate_csv_files] data[{itn}] is {filename!r}")
-            yield filename
+            assert len(filename) == 4, f"unexpected tuple value {filename!r}"
+            yield cast(Tuple[str, str, str, str], filename)
             continue
 
         assert isinstance(filename, str), f"unexpected type {type(filename)} for filename"
