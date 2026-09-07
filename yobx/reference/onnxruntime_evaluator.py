@@ -517,6 +517,10 @@ class OnnxruntimeEvaluator:
                 # We force the type to be a boolean.
                 ref = ExtendedReferenceEvaluator(node)
                 cst = ref.run(None, {})[0]
+                if not isinstance(cst, np.ndarray):
+                    raise TypeError(
+                        f"Constant {node.output[0]!s} must produce a tensor, got {type(cst)!r}."
+                    )
                 vinputs: List[onnx.ValueInfoProto] = []
                 voutputs = [
                     oh.make_tensor_value_info(

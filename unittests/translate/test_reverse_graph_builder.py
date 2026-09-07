@@ -258,9 +258,9 @@ class TestReverseGraphBuilder(ExtTestCase):
 
         def make_custom_LinearRegression(g):
             gr = GraphBuilder({"": 14}, as_function=True)
-            x = gr.make_tensor_input("x")
-            a = gr.make_tensor_input("a")
-            b = gr.make_tensor_input("b")
+            x = gr.make_tensor_input("x", TFLOAT, (None, None))
+            a = gr.make_tensor_input("a", TFLOAT, (None, None))
+            b = gr.make_tensor_input("b", TFLOAT, (None, None))
             op = gr.op
             xa = op.MatMul(x, a)
             y = op.Add(xa, b)

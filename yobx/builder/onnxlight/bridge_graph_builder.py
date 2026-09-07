@@ -1,9 +1,11 @@
 """Adapts the published onnx-light native builder to the converter protocol."""
 
 import contextlib
+import heapq
+import importlib
 from dataclasses import dataclass
 from functools import partial
-from typing import Optional, Sequence, Union
+from typing import TYPE_CHECKING, Optional, Sequence, Union
 
 import numpy
 from onnx_light import onnx
@@ -13,6 +15,12 @@ from onnx_light.onnx_core.optimization import GraphGraph, standard_pattern_names
 from onnx_light.onnx_core.shape_inference import ShapesContext, SymShape, SymTensor
 
 from ...typing import DefaultConvertOptions
+
+if TYPE_CHECKING:
+    from ...xshape._shape_helper import ONNX_SHAPE
+
+# Loading the native extension registers constant-folding kernels without an evaluator.
+importlib.import_module("onnx_light.onnx_py._onnxpykernels")
 
 
 @dataclass
@@ -123,12 +131,29 @@ class OnnxLightGraphBuilderOpset:
         self.builder = builder
 
     def __getattr__(self, op_type):
+        if op_type == "DFTAnyOpset":
+            return self._dft_any_opset
         if op_type.endswith("AnyOpset"):
             base = op_type[:-8]
             if base not in self._axes_versions:
                 raise NotImplementedError(f"Native opset adapter does not support {op_type}.")
             return partial(self._any_opset, base)
         return partial(self.make_node, op_type)
+
+    def _dft_any_opset(self, data, dft_length="", axis=None, **kwargs):
+        if self.builder.main_opset < 17:
+            raise ValueError("DFT requires opset 17 or newer.")
+        if self.builder.main_opset < 20:
+            if axis is not None:
+                if isinstance(axis, str):
+                    axis = self.builder.get_constant(axis)
+                kwargs["axis"] = int(numpy.asarray(axis).item())
+            return self.make_node("DFT", data, dft_length, **kwargs)
+        if axis is None:
+            return self.make_node("DFT", data, dft_length, **kwargs)
+        if not isinstance(axis, str):
+            axis = numpy.asarray(axis, dtype=numpy.int64).reshape(())
+        return self.make_node("DFT", data, dft_length, axis, **kwargs)
 
     def _any_opset(self, op_type, *inputs, **kwargs):
         if len(inputs) not in (1, 2):
@@ -199,6 +224,7 @@ class OnnxLightGraphBuilder:
         optimization_options=None,
         convert_options=None,
         verbose=0,
+        as_function=False,
     ):
         if optimization_options is not None and not isinstance(
             optimization_options, OnnxLightOptimizationOptions
@@ -210,6 +236,10 @@ class OnnxLightGraphBuilder:
         self.optimization_options = optimization_options or OnnxLightOptimizationOptions()
         self.convert_options = convert_options or DefaultConvertOptions()
         self.verbose = verbose
+        self.as_function = as_function
+        self._devices = {}
+        self._dimension_names = set()
+        self._function_graphs = {}
         self._prefix_stack = []
         self._reserved_names = set()
         self._node_names = set()
@@ -302,6 +332,54 @@ class OnnxLightGraphBuilder:
         return {str(value.name): value for value in self._inner.to_graph().initializer}
 
     @property
+    def functions(self):
+        """Returns exported native local function definitions."""
+        return {
+            (str(value.domain), str(value.name)): value
+            for value in self._inner.to_onnx().functions
+        }
+
+    def empty_copy(self, as_function=False):
+        """Creates an independent native builder with the same converter options."""
+        return type(self)(
+            self.opsets,
+            ir_version=self.ir_version,
+            optimization_options=self.optimization_options,
+            convert_options=self.convert_options,
+            verbose=self.verbose,
+            as_function=as_function,
+        )
+
+    def make_subset_builder(self, input_names, name="", domain="", add_local_functions=False):
+        """Creates an independent native function builder from selected input descriptors."""
+        builder = self.empty_copy(as_function=True)
+        for input_name in input_names:
+            builder.make_tensor_input(
+                input_name,
+                self.get_type(input_name) if self.has_type(input_name) else None,
+                self.get_shape(input_name) if self.has_shape(input_name) else None,
+                device=self.get_device(input_name) if self.has_device(input_name) else None,
+            )
+        if add_local_functions:
+            for key, graph in self._function_graphs.items():
+                nested = builder._inner.make_local_function(key[1], key[0])
+                self._populate_native(nested, graph, self.opsets)
+                builder._function_graphs[key] = _native_proto(graph, onnx.GraphProto)
+        return builder
+
+    def make_tensor_value_info_from_name(self, name):
+        """Returns a native value-info using the context's explicit metadata."""
+        if not self.has_type(name) and not self.has_rank(name):
+            value = onnx.ValueInfoProto()
+            value.name = name
+            return value
+        return helper.make_tensor_value_info(
+            name,
+            self.get_type(name) if self.has_type(name) else 0,
+            self.get_shape(name) if self.has_shape(name) else None,
+        )
+
+    @property
     def last_added_node(self):
         """Returns the most recently added native node."""
         nodes = self.nodes
@@ -340,6 +418,22 @@ class OnnxLightGraphBuilder:
         self._reserved_names.add(name)
         return name
 
+    def unique_dimension_name(self, prefix="dim"):
+        """Returns a symbolic dimension name absent from native descriptors."""
+        occupied = {
+            dimension
+            for name in self._shape_names
+            for dimension in self.get_shape(name)
+            if isinstance(dimension, str)
+        } | self._dimension_names
+        name = prefix or "dim"
+        index = 2
+        while name in occupied:
+            name = f"{prefix or 'dim'}_{index}"
+            index += 1
+        self._dimension_names.add(name)
+        return name
+
     @contextlib.contextmanager
     def prefix_name_context(self, prefix):
         """Scopes generated names to a nested converter prefix."""
@@ -367,7 +461,7 @@ class OnnxLightGraphBuilder:
         """Returns whether the tensor shape, including its rank, is known."""
         return name in self._shape_names and self.shapes_context.has(name)
 
-    def get_shape(self, name):
+    def get_shape(self, name: str) -> "ONNX_SHAPE":
         """Returns native symbolic dimensions as a tuple."""
         if not self.has_shape(name):
             raise KeyError(f"No tensor shape is known for {name!r}.")
@@ -427,10 +521,16 @@ class OnnxLightGraphBuilder:
             return True
         return False
 
+    def set_type_shape_or_rank(self, name, like):
+        """Copies native tensor descriptors and explicit device metadata."""
+        self.set_type_shape_unary_op(name, like)
+        if self.has_device(like):
+            self.set_device(name, self.get_device(like))
+
     def make_tensor_input(self, name, elem_type=None, shape=None, device=None):
         """Declares a tensor input with a native value-info proto."""
-        if device not in (None, -1):
-            raise NotImplementedError("Native converter inputs support CPU tensors only.")
+        if device is not None and not isinstance(device, int):
+            raise TypeError(f"Expected an integer device index, not {type(device)!r}.")
         if self.has_name(name):
             raise ValueError(f"Input name {name!r} already exists.")
         value = helper.make_tensor_value_info(name, elem_type or 0, shape)
@@ -440,19 +540,25 @@ class OnnxLightGraphBuilder:
         )
         if shape is not None:
             self._shape_names.add(name)
+        if device is not None:
+            self.set_device(name, device)
         return name
 
     def make_tensor_output(
-        self, name, elem_type=None, shape=None, indexed=False, allow_untyped_output=False
-    ):
+        self,
+        name: Union[str, list[str], tuple[str, ...]],
+        elem_type=None,
+        shape=None,
+        indexed=False,
+        allow_untyped_output=False,
+    ) -> Union[str, list[str]]:
         """Declares one or more native tensor outputs."""
         if indexed:
             raise NotImplementedError("Indexed output renaming is not supported.")
         if isinstance(name, (tuple, list)):
-            return [
-                self.make_tensor_output(n, elem_type, shape, False, allow_untyped_output)
-                for n in name
-            ]
+            for output in name:
+                self.make_tensor_output(output, elem_type, shape, False, allow_untyped_output)
+            return list(name)
         if not self.has_name(name):
             raise KeyError(f"Unknown output {name!r}.")
         if elem_type is not None:
@@ -472,25 +578,37 @@ class OnnxLightGraphBuilder:
         return name
 
     def make_initializer(
-        self, name, value, give_unique_name=True, source=None, *, allow_empty=False, msg=None
+        self,
+        name,
+        value,
+        give_unique_name=True,
+        source=None,
+        *,
+        allow_empty=False,
+        msg=None,
+        parameter_name=None,
     ):
         """Adds an initializer after converting it to a native tensor."""
+        if parameter_name:
+            name = parameter_name
         if not name or (self.has_name(name) and give_unique_name):
             name = self.unique_name(name or "init")
         elif self.has_name(name):
             raise ValueError(f"Initializer name {name!r} already exists.")
         if type(value).__module__.startswith("torch") and hasattr(value, "detach"):
-            from torch._subclasses.fake_tensor import FakeTensor
             from ...helpers.mini_onnx_builder import proto_from_array
 
-            if isinstance(value, FakeTensor) or value.is_meta:
+            fake_tensor_type = importlib.import_module("torch._subclasses.fake_tensor").FakeTensor
+            if isinstance(value, fake_tensor_type) or value.is_meta:
                 raise NotImplementedError("Native initializers require concrete tensor storage.")
             value = proto_from_array(value.detach().cpu(), name=name)
         if isinstance(value, onnx.TensorProto):
             tensor = _native_proto(value, onnx.TensorProto)
             tensor.name = name
         else:
-            if isinstance(value, int):
+            if isinstance(value, numpy.generic):
+                value = numpy.asarray(value)
+            elif isinstance(value, int):
                 value = numpy.array(value, dtype=numpy.int64)
             elif isinstance(value, float):
                 value = numpy.array(value, dtype=numpy.float32)
@@ -561,7 +679,24 @@ class OnnxLightGraphBuilder:
             op_type, normalized_inputs, outputs, domain=domain, name=node_name
         )
         node.attribute.extend(native_attributes)
-        self.shapes_context.compute_shape_node(node)
+        key = (domain, op_type)
+        if key in self._function_graphs:
+            graph = _native_proto(self._function_graphs[key], onnx.GraphProto)
+            if len(graph.input) != len(normalized_inputs):
+                raise ValueError(f"Invalid number of inputs for local function {key!r}.")
+            context = ShapesContext()
+            for function_domain, version in self.opsets.items():
+                context.set_opset_version(function_domain, version)
+            for formal, actual in zip(graph.input, normalized_inputs):
+                info = self.make_tensor_value_info_from_name(actual)
+                formal.ClearField("type")
+                formal.type.CopyFrom(info.type)
+            context.compute_shape_graph(graph)
+            for formal, actual in zip(graph.output, outputs):
+                if context.has(str(formal.name)):
+                    self.shapes_context.set(actual, context.get(str(formal.name)))
+        else:
+            self.shapes_context.compute_shape_node(node)
         self._inner.make_node(
             op_type, normalized_inputs, outputs, domain, node_name, native_attributes
         )
@@ -582,13 +717,195 @@ class OnnxLightGraphBuilder:
                     self.shapes_context.get(name).dtype,
                     self.get_shape(name) if self.has_shape(name) else None,
                 )
+                value.ClearField("type")
                 value.type.CopyFrom(info.type)
         return model
 
     def _synchronize_annotations(self):
         if self._annotations_dirty:
-            self._inner = GraphBuilder(self._native_model())
+            self._inner = self._rebuild_native(self._native_model())
             self._annotations_dirty = False
+
+    @staticmethod
+    def _populate_native(builder, graph, opsets):
+        """Populates a native builder from explicitly typed graph declarations."""
+        for domain, version in opsets.items():
+            builder.set_opset_version(domain, version)
+        for value in graph.input:
+            builder.make_input(value)
+        for value in graph.initializer:
+            builder.make_initializer(value)
+        for node in graph.node:
+            builder.make_node(
+                str(node.op_type),
+                [str(value) for value in node.input],
+                [str(value) for value in node.output],
+                str(node.domain),
+                str(node.name),
+                list(node.attribute),
+            )
+        for value in graph.output:
+            builder.make_output(value)
+
+    def _rebuild_native(self, model):
+        """Reconstructs native functions with their declared input descriptors."""
+        if not model.functions or not self._function_graphs:
+            return GraphBuilder(model)
+        builder = GraphBuilder(str(model.graph.name))
+        for function in model.functions:
+            key = (str(function.domain), str(function.name))
+            if key not in self._function_graphs:
+                raise NotImplementedError(
+                    f"The native wheel requires typed construction metadata for {key!r}."
+                )
+            nested = builder.make_local_function(key[1], key[0])
+            graph = _native_proto(self._function_graphs[key], onnx.GraphProto)
+            graph.ClearField("node")
+            graph.node.extend(function.node)
+            self._populate_native(
+                nested,
+                graph,
+                {str(opset.domain): opset.version for opset in function.opset_import},
+            )
+        self._populate_native(builder, model.graph, self.opsets)
+        return builder
+
+    def _function_artifact(self, options, optimize, inline):
+        """Exports a native function with constants or explicit parameter inputs."""
+        from ...container import ExportArtifact, FunctionPieces
+
+        model, _, _ = self._export_native(optimize, inline)
+        graph = model.graph
+        graph.name = options.name
+        promoted = {}
+        constants = []
+        for tensor in graph.initializer:
+            value = numpy_helper.to_array(tensor)
+            if options.return_initializer and (
+                not options.move_initializer_to_constant
+                or value.nbytes >= options.external_threshold
+            ):
+                promoted[str(tensor.name)] = value
+                graph.input.append(
+                    helper.make_tensor_value_info(
+                        str(tensor.name), tensor.data_type, list(tensor.dims)
+                    )
+                )
+            else:
+                constants.append(
+                    helper.make_node("Constant", [], [str(tensor.name)], value=tensor)
+                )
+        nodes = constants + list(graph.node)
+        graph.ClearField("initializer")
+        graph.ClearField("node")
+        graph.node.extend(nodes)
+        # Function serialization is owned by the native builder. Nested definitions
+        # are returned alongside the proto because FunctionProto cannot contain them.
+        model.ClearField("functions")
+        native = GraphBuilder(model)
+        native.set_opset_version(options.domain, self.opsets.get(options.domain, 1))
+        function = native.to_function(options.domain)
+        function.name = options.name
+        return ExportArtifact(
+            proto=function,
+            builder=self,
+            function=FunctionPieces(
+                initializers_name=list(promoted),
+                initializers_dict=promoted,
+                initializers_renaming={name: name for name in promoted},
+                nested_functions=list(self.functions.values()) if not inline else [],
+            ),
+        )
+
+    def make_local_function(self, builder, function_options, optimize=False):
+        """Registers a typed converter function through the native nested builder API."""
+        options = function_options
+        if not options.name or not options.domain:
+            raise ValueError("A local function requires a name and a nonempty domain.")
+        artifact = builder._function_artifact(options, optimize, options.inline)
+        function = artifact.proto
+        key = (str(function.domain), str(function.name))
+        if key in self.functions:
+            existing = self.functions[key]
+            if options.merge_allowed and self._function_signature(
+                existing
+            ) == self._function_signature(function):
+                return self._add_function_initializers(artifact), key
+            if not options.rename_allowed:
+                raise ValueError(f"Local function {key!r} already exists.")
+            index = 2
+            while (key[0], f"{key[1]}_{index}") in self.functions:
+                index += 1
+            key = (key[0], f"{key[1]}_{index}")
+            function.name = key[1]
+        if not self.has_opset(key[0]):
+            self.set_opset(key[0], 1)
+        self._synchronize_annotations()
+        for nested_key, graph in builder._function_graphs.items():
+            if nested_key in self._function_graphs:
+                if (
+                    self._function_graphs[nested_key].SerializeToString()
+                    != graph.SerializeToString()
+                ):
+                    raise ValueError(f"Conflicting nested local function {nested_key!r}.")
+            else:
+                nested = self._inner.make_local_function(nested_key[1], nested_key[0])
+                self._populate_native(nested, graph, builder.opsets)
+                self._function_graphs[nested_key] = _native_proto(graph, onnx.GraphProto)
+        inputs = [builder.make_tensor_value_info_from_name(str(name)) for name in function.input]
+        outputs = [
+            builder.make_tensor_value_info_from_name(str(name)) for name in function.output
+        ]
+        graph = helper.make_graph(list(function.node), key[1], inputs, outputs)
+        nested = self._inner.make_local_function(key[1], key[0])
+        self._populate_native(
+            nested, graph, {str(opset.domain): opset.version for opset in function.opset_import}
+        )
+        self._function_graphs[key] = graph
+        return self._add_function_initializers(artifact), key
+
+    def _add_function_initializers(self, artifact):
+        return [
+            name if self.constant_is_equal_to(name, value) else self.make_initializer(name, value)
+            for name, value in artifact.function.initializers_dict.items()
+        ]
+
+    @staticmethod
+    def _function_signature(function):
+        normalized = _native_proto(function, onnx.FunctionProto)
+        opsets = sorted((str(opset.domain), opset.version) for opset in normalized.opset_import)
+        normalized.ClearField("opset_import")
+        normalized.opset_import.extend(
+            helper.make_opsetid(domain, version) for domain, version in opsets
+        )
+        return normalized.SerializeToString()
+
+    def inline_functions(self, verbose=0):
+        """Inlines local functions using the native graph operation."""
+        count = self.inner_builder.inline_local_functions()
+        self._function_graphs.clear()
+        return count
+
+    def remove_unused(self):
+        """Removes unused nodes with the native cleanup pass."""
+        return self.inner_builder.remove_unused_nodes()
+
+    def remove_identity_nodes(self):
+        """Removes internal identities while preserving native graph output names."""
+        return self.inner_builder.remove_identity_nodes()
+
+    def move_initializers_to_constant(self, full_parameter_name=False):
+        """Lowers graph initializers to native Constant nodes for function export."""
+        model = self._native_model()
+        constants = [
+            helper.make_node("Constant", [], [str(tensor.name)], value=tensor)
+            for tensor in model.graph.initializer
+        ]
+        nodes = constants + list(model.graph.node)
+        model.graph.ClearField("initializer")
+        model.graph.ClearField("node")
+        model.graph.node.extend(nodes)
+        self._inner = self._rebuild_native(model)
 
     def is_constant(self, name):
         """Queries constant ownership through native GraphGraph."""
@@ -612,6 +929,46 @@ class OnnxLightGraphBuilder:
             return None
         value = numpy_helper.to_array(tensor)
         return tuple(value.reshape(-1).tolist()) if as_shape else value
+
+    def constant_is_equal_to(self, name, value):
+        """Compares a native computed constant without size-dependent shortcuts."""
+        actual = self.get_constant(name, exc=False)
+        if actual is None:
+            return False
+        assert isinstance(actual, numpy.ndarray), "Native tensor constants must be ndarrays."
+        if isinstance(value, onnx.TensorProto):
+            value = numpy_helper.to_array(value)
+        value = numpy.asarray(value)
+        return (
+            actual.dtype == value.dtype
+            and actual.shape == value.shape
+            and numpy.array_equal(actual, value)
+        )
+
+    def get_dynamic_dimension(self, dimension, keep_const=False):
+        """Builds a rank-one dimension tensor with native ONNX operators."""
+        if isinstance(dimension, int):
+            value = numpy.array([dimension], dtype=numpy.int64)
+            return value if keep_const else self.make_initializer("", value)
+        name = self.get_dimension_as_result(dimension)
+        return (
+            self.op.UnsqueezeAnyOpset(name, numpy.array([0], dtype=numpy.int64))
+            if self.get_rank(name) == 0
+            else name
+        )
+
+    def get_dimension_as_result(self, dimension):
+        """Materializes a named dimension from native input shape descriptors."""
+        if self.has_name(dimension):
+            return dimension
+        for name in self.input_names:
+            if self.has_shape(name) and dimension in self.get_shape(name):
+                return self.op.Gather(
+                    self.op.Shape(name),
+                    numpy.array(self.get_shape(name).index(dimension), dtype=numpy.int64),
+                    outputs=[dimension],
+                )
+        raise ValueError(f"No input shape defines dimension {dimension!r}.")
 
     def value_as_shape(self, name):
         """Returns a shape value recorded by the native inference engine."""
@@ -643,12 +1000,18 @@ class OnnxLightGraphBuilder:
         )
 
     def has_device(self, name):
-        """Returns false because device tracking is not exposed by this bridge."""
-        return False
+        """Returns whether explicit converter device metadata is available."""
+        return name in self._devices
 
     def get_device(self, name):
-        """Rejects unsupported device tracking."""
-        raise NotImplementedError("The native converter bridge does not track devices.")
+        """Returns explicit converter device metadata."""
+        return self._devices[name]
+
+    def set_device(self, name, device):
+        """Records device metadata without changing native inference or execution."""
+        if not isinstance(device, int):
+            raise TypeError(f"Expected an integer device index, not {type(device)!r}.")
+        self._devices[name] = device
 
     def onnx_dtype_to_np_dtype(self, itype):
         """Returns the NumPy dtype through the native ONNX helper."""
@@ -658,9 +1021,13 @@ class OnnxLightGraphBuilder:
         """Returns native builder diagnostics."""
         return f"\nOnnxLightGraphBuilder(opsets={self.opsets}, inputs={self.input_names})"
 
+    def pretty_text(self):
+        """Returns the native builder's graph diagnostics."""
+        return self._inner.to_string()
+
     def _export_native(self, optimize, inline):
         """Exports a native model and optional native rewrite statistics."""
-        builder = GraphBuilder(self._native_model())
+        builder = self._rebuild_native(self._native_model())
         if inline:
             builder.inline_local_functions()
         rewrites = []
@@ -670,6 +1037,12 @@ class OnnxLightGraphBuilder:
                 builder, self.optimization_options.pattern_names(), use_global_patterns=False
             ).optimize(self.optimization_options.max_iter, report=True)
         model = builder.to_onnx(ir_version=self.ir_version)
+        if self._topological_order_model(model):
+            # Native finalization must recompute lifetime/release annotations after
+            # reordering; moving serialized nodes alone leaves stale runtime metadata.
+            model = self._rebuild_native(model).to_onnx(ir_version=self.ir_version)
+            if self._topological_order_model(model):
+                raise RuntimeError("Native finalization changed the graph's topological order.")
         if self._original_model is not None:
             original = onnx.ModelProto()
             original.ParseFromString(self._original_model)
@@ -690,6 +1063,83 @@ class OnnxLightGraphBuilder:
         # Native rewrites may reuse a source name for several inserted nodes.
         self._normalize_node_names(model)
         return model, rewrites, native_report
+
+    @staticmethod
+    def _topological_order_model(model):
+        """Stably orders native nodes using data dependencies and lexical captures."""
+        changed = False
+
+        def sort_scope(scope, outer_names):
+            nonlocal changed
+            nodes = list(scope.node)
+            inputs = {
+                str(value.name) if hasattr(value, "name") else str(value) for value in scope.input
+            }
+            inputs.update(str(value.name) for value in getattr(scope, "initializer", ()))
+            inputs.update(
+                str(value.values.name) for value in getattr(scope, "sparse_initializer", ())
+            )
+            producers = {}
+            for index, node in enumerate(nodes):
+                for output in node.output:
+                    name = str(output)
+                    if not name:
+                        continue
+                    if name in producers or name in inputs:
+                        raise ValueError(
+                            f"Duplicate definition of {name!r} in {str(scope.name)!r}."
+                        )
+                    producers[name] = index
+            local_names = inputs | producers.keys()
+            dependencies = []
+            captures = set()
+            for node in nodes:
+                required = {str(name) for name in node.input if name}
+                for attribute in node.attribute:
+                    subgraphs = ([attribute.g] if attribute.HasField("g") else []) + list(
+                        attribute.graphs
+                    )
+                    for subgraph in subgraphs:
+                        required.update(sort_scope(subgraph, outer_names | local_names))
+                captures.update(required - local_names)
+                dependencies.append(required)
+            outputs = {
+                str(value.name) if hasattr(value, "name") else str(value)
+                for value in scope.output
+            }
+            captures.update(outputs - local_names)
+            missing = captures - outer_names
+            if missing:
+                raise ValueError(f"Undefined values in {str(scope.name)!r}: {sorted(missing)!r}.")
+            successors = [[] for _ in nodes]
+            counts = []
+            for index, required in enumerate(dependencies):
+                predecessors = {producers[name] for name in required if name in producers}
+                counts.append(len(predecessors))
+                for predecessor in predecessors:
+                    successors[predecessor].append(index)
+            ready = [index for index, count in enumerate(counts) if not count]
+            heapq.heapify(ready)
+            order = []
+            while ready:
+                index = heapq.heappop(ready)
+                order.append(index)
+                for successor in successors[index]:
+                    counts[successor] -= 1
+                    if not counts[successor]:
+                        heapq.heappush(ready, successor)
+            if len(order) != len(nodes):
+                raise ValueError(f"Cyclic node dependencies in {str(scope.name)!r}.")
+            if order != list(range(len(nodes))):
+                scope.ClearField("node")
+                scope.node.extend(nodes[index] for index in order)
+                changed = True
+            return captures
+
+        sort_scope(model.graph, set())
+        for function in model.functions:
+            sort_scope(function, set())
+        return changed
 
     def to_native(self, optimize=True, inline=True):
         """Returns a native model without importing reference ONNX or its runtime.
@@ -719,10 +1169,17 @@ class OnnxLightGraphBuilder:
         """Exports an artifact after optional native GraphGraph optimization."""
         if large_model and as_graph_proto:
             raise NotImplementedError("Large-model containers require a ModelProto export.")
-        if function_options is not None or mask_outputs is not None:
-            raise NotImplementedError(
-                "Native export does not support function options or output masks."
-            )
+        if function_options is not None and function_options.export_as_function:
+            if (
+                large_model
+                or as_graph_proto
+                or return_optimize_report
+                or mask_outputs is not None
+            ):
+                raise ValueError("Function export cannot be combined with model export options.")
+            return self._function_artifact(function_options, optimize, inline)
+        if mask_outputs is not None:
+            raise NotImplementedError("Native export does not support output masks.")
         from ...container import ExportArtifact, ExportReport, ExtendedModelContainer
 
         native_model, rewrites, native_report = self._export_native(optimize, inline)

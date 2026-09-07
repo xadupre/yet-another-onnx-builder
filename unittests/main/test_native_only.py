@@ -12,6 +12,7 @@ class TestNativeOnly(unittest.TestCase):
         """Builds, optimizes, reports, saves and reloads native protobufs."""
         code = textwrap.dedent("""
             import importlib.abc
+            import importlib.util
             import pathlib
             import sys
             import tempfile
@@ -26,6 +27,7 @@ class TestNativeOnly(unittest.TestCase):
             from onnx_light import onnx
             from onnx_light.onnx_core.graph_builder import GraphBuilder as NativeBuilder
             from yobx.xbuilder import GraphBuilder, OptimizationOptions
+            from yobx.xbuilder.graph_builder_opset import Opset
             from yobx.container import ExportArtifact
             import yobx.xshape
 
@@ -35,6 +37,8 @@ class TestNativeOnly(unittest.TestCase):
                 optimization_options=OptimizationOptions(patterns=["TransposeTranspose"])
             )
             assert isinstance(builder.inner_builder, NativeBuilder)
+            assert type(builder.op) is Opset
+            assert importlib.util.find_spec("yobx.xbuilder.order_optim") is None
             builder.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 3))
             transposed = builder.op.Transpose("X", perm=[1, 0])
             output = builder.op.Transpose(transposed, perm=[1, 0])

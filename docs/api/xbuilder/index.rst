@@ -14,6 +14,11 @@ Native optimization options select registered pattern names through
 legacy pattern groups such as ``"default+onnxruntime"``, and unsupported
 legacy options raise explicit errors.
 
+The historical ``graph_builder_opset.Opset`` import resolves to the native
+adapter too. The Python ``OrderOptimization`` engine and ``OrderAlgorithm``
+selection have been retired; shape-node ordering uses the native builder's
+``move_shape_and_size_nodes`` operation.
+
 .. toctree::
     :maxdepth: 1
     :caption: modules
@@ -24,7 +29,6 @@ legacy options raise explicit errors.
     graph_builder_opset
     infer_shapes_options
     optimization_options
-    order_optim
 
 GraphBuilder
 ++++++++++++
@@ -52,13 +56,6 @@ OptimizationOptions
 +++++++++++++++++++
 
 .. autoclass:: yobx.xbuilder.OptimizationOptions
-    :members:
-    :no-undoc-members:
-
-OrderAlgorithm
-++++++++++++++
-
-.. autoclass:: yobx.xbuilder.OrderAlgorithm
     :members:
     :no-undoc-members:
 

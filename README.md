@@ -197,6 +197,20 @@ Standalone ONNX functions and custom conversion dispatchers are supported.
 Delegation to `torch.onnx.export` through onnxscript and the Spox/onnxscript
 builder bridges are no longer supported.
 
+The published 0.1.24 wheel still blocks dependent local-function calls,
+generic function imports and referenced attributes, some lexical subgraph
+captures/shadowing, and removal of unused initializers. These failures remain
+visible in the core suite; completing that compatibility requires native-wheel
+fixes, not a Python graph or shape-inference fallback. In particular, even a
+typed native local function can leave its call result unavailable to the next
+node's internal shape context.
+
+The converter adapter repairs non-topological serialized node order produced
+by native optimization and then rebuilds the native graph to regenerate its
+lifetime metadata. This does not replace native pattern selection or inference.
+The old Python ordering optimizer has been removed, and the historical
+`graph_builder_opset.Opset` import now resolves to the native converter adapter.
+
 ## Comparison with existing ONNX conversion tools
 
 **Design choices `yobx`**

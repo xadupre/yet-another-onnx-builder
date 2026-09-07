@@ -1,4 +1,5 @@
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     ContextManager,
@@ -12,6 +13,9 @@ from typing import (
     Union,
     runtime_checkable,
 )
+
+if TYPE_CHECKING:
+    from .xshape._shape_helper import ONNX_SHAPE
 
 
 @runtime_checkable
@@ -217,18 +221,16 @@ class GraphBuilderProtocol(Protocol):
         """
         ...
 
-    def get_shape(self, name: str) -> Tuple[Union[int, str], ...]:
+    def get_shape(self, name: str) -> "ONNX_SHAPE":
         """Returns the shape of *name*.
 
         :param name: tensor name
         :return: shape as a tuple where each element is an ``int``,
-            a ``str`` (symbolic dimension)
+            a ``str`` (symbolic dimension), or ``None`` (unknown dimension)
         """
         ...
 
-    def set_shape(
-        self, name: str, shape: Tuple[Union[int, str], ...], allow_zero: bool = False
-    ) -> None:
+    def set_shape(self, name: str, shape: "ONNX_SHAPE", allow_zero: bool = False) -> None:
         """Sets the shape for *name*.
 
         :param name: tensor name
@@ -241,7 +243,7 @@ class GraphBuilderProtocol(Protocol):
         self,
         name: str,
         elem_type: Optional[int] = None,
-        shape: Optional[Tuple[Union[int, str], ...]] = None,
+        shape: Optional["ONNX_SHAPE"] = None,
         device: Optional[int] = None,
     ) -> Union[str, List[str]]:
         """Declares a graph input and returns its name.
@@ -260,7 +262,7 @@ class GraphBuilderProtocol(Protocol):
         self,
         name: Union[str, List[str]],
         elem_type: Optional[int] = None,
-        shape: Optional[Tuple[Union[int, str], ...]] = None,
+        shape: Optional["ONNX_SHAPE"] = None,
         indexed: bool = False,
         allow_untyped_output: bool = False,
     ) -> Union[str, List[str]]:
@@ -299,7 +301,7 @@ class GraphBuilderProtocol(Protocol):
         attributes: Optional[List[Any]] = None,
         name: Optional[str] = None,
         **kwargs: Any,
-    ) -> Union[str, Tuple[str]]:
+    ) -> Union[str, Tuple[str, ...]]:
         """Creates an ONNX node and returns its output name(s).
 
         :param op_type: ONNX operator type (e.g. ``"Relu"``, ``"MatMul"``)
@@ -310,7 +312,7 @@ class GraphBuilderProtocol(Protocol):
         :param attributes: list of :class:`onnx.AttributeProto` to attach
         :param name: optional node name for debugging
         :param kwargs: operator attributes as Python primitives
-        :return: output name when a single output is created, otherwise a list
+        :return: output name when a single output is created, otherwise a tuple
         """
         ...
 

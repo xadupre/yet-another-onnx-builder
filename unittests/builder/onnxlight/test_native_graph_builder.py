@@ -1,6 +1,7 @@
 """Tests the converter bridge against the published native onnx-light wheel."""
 
 import importlib.util
+import importlib.metadata
 import os
 from pathlib import Path
 import subprocess
@@ -20,6 +21,239 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         from yobx.builder.onnxlight import OnnxLightGraphBuilder
 
         return OnnxLightGraphBuilder(*args, **kwargs)
+
+    def test_converter_metadata_and_scalar_initializers(self):
+        builder = self.make_builder(18)
+        builder.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 4), device=-1)
+        self.assertEqual(builder.unique_dimension_name("batch"), "batch_2")
+        self.assertEqual(builder.unique_dimension_name("batch"), "batch_3")
+        builder.set_type_shape_or_rank("Y", "X")
+        self.assertEqual(builder.get_shape("Y"), ("batch", 4))
+        self.assertEqual(builder.get_device("Y"), -1)
+        name = builder.make_initializer("weight", numpy.int64(4), parameter_name="layer.weight")
+        self.assertEqual(name, "layer.weight")
+        self.assertEqual(builder.get_shape(name), ())
+        self.assertEqual(builder.get_constant(name).dtype, numpy.dtype("int64"))
+        with self.assertRaises(TypeError):
+            builder.set_device("Y", "cuda")
+
+    def test_native_function_export_constants_and_parameters(self):
+        from yobx.xbuilder.function_options import FunctionOptions
+
+        builder = self.make_builder(18, as_function=True)
+        builder.make_tensor_input("X", onnx.TensorProto.FLOAT, (2, 4))
+        weights = numpy.arange(12, dtype=numpy.float32).reshape(4, 3)
+        builder.op.MatMul("X", weights, outputs=["Y"])
+        builder.make_tensor_output("Y")
+        feeds = {"X": numpy.arange(8, dtype=numpy.float32).reshape(2, 4)}
+        for return_initializer in (False, True):
+            with self.subTest(return_initializer=return_initializer):
+                artifact = builder.to_onnx(
+                    optimize=False,
+                    function_options=FunctionOptions(
+                        name="Linear", domain="custom", return_initializer=return_initializer
+                    ),
+                )
+                self.assertIsInstance(artifact.proto, onnx.FunctionProto)
+                self.assertEqual(str(artifact.proto.name), "Linear")
+                values = {**feeds, **artifact.function.initializers_dict}
+                actual = ReferenceEvaluator(artifact.proto).run(None, values)[0]
+                numpy.testing.assert_array_equal(actual, feeds["X"] @ weights)
+                self.assertEqual(len(artifact.proto.input), 2 if return_initializer else 1)
+        self.assertEqual(len(builder.initializers_dict), 1)
+
+    def test_native_local_function_converter_registration(self):
+        from yobx.xbuilder.function_options import FunctionOptions
+
+        function = self.make_builder(18, as_function=True)
+        function.make_tensor_input("X", onnx.TensorProto.FLOAT, (2, 4))
+        weights = numpy.ones((4, 3), dtype=numpy.float32)
+        function.op.MatMul("X", weights, outputs=["Y"])
+        function.make_tensor_output("Y")
+        builder = self.make_builder(18)
+        builder.make_tensor_input("A", onnx.TensorProto.FLOAT, (2, 4))
+        initializers, key = builder.make_local_function(
+            function,
+            FunctionOptions(name="Linear", domain="custom", move_initializer_to_constant=True),
+        )
+        self.assertEqual(initializers, [])
+        self.assertEqual(key, ("custom", "Linear"))
+        builder.make_node(key[1], ["A"], ["B"], domain=key[0])
+        self.assertEqual(builder.get_shape("B"), (2, 3))
+        builder.make_tensor_output("B")
+        feeds = {"A": numpy.ones((2, 4), dtype=numpy.float32)}
+        for inline in (False, True):
+            with self.subTest(inline=inline):
+                model = builder.to_native(optimize=False, inline=inline)
+                self.assertEqual(len(model.functions), 0 if inline else 1)
+                actual = ReferenceEvaluator(model).run(None, feeds)[0]
+                numpy.testing.assert_array_equal(actual, feeds["A"] @ weights)
+
+    def test_native_local_function_merge_and_rename(self):
+        from yobx.xbuilder.function_options import FunctionOptions
+
+        function = self.make_builder(18, as_function=True)
+        function.make_tensor_input("X", onnx.TensorProto.FLOAT, (2, 3))
+        function.op.Add("X", numpy.ones(3, dtype=numpy.float32), outputs=["Y"])
+        function.make_tensor_output("Y")
+        builder = self.make_builder(18)
+        options = FunctionOptions(
+            name="AddBias", domain="custom", return_initializer=True, merge_allowed=True
+        )
+        first = builder.make_local_function(function, options)
+        second = builder.make_local_function(function, options)
+        self.assertEqual(first, second)
+        self.assertEqual(len(builder.functions), 1)
+        self.assertEqual(len(builder.initializers_dict), 1)
+        with self.assertRaisesRegex(ValueError, "already exists"):
+            builder.make_local_function(
+                function, FunctionOptions(name="AddBias", domain="custom")
+            )
+        _, renamed = builder.make_local_function(
+            function, FunctionOptions(name="AddBias", domain="custom", rename_allowed=True)
+        )
+        self.assertEqual(renamed, ("custom", "AddBias_2"))
+        self.assertEqual(len(builder.functions), 2)
+
+    def test_topological_order_tracks_captured_subgraph_values(self):
+        from onnx_light.onnx import helper
+
+        branch = helper.make_graph(
+            [
+                helper.make_node("Neg", ["sum"], ["branch_output"]),
+                helper.make_node("Add", ["X", "bias"], ["sum"]),
+            ],
+            "branch",
+            [],
+            [helper.make_tensor_value_info("branch_output", onnx.TensorProto.FLOAT, [2])],
+        )
+        model = helper.make_model(
+            helper.make_graph(
+                [
+                    helper.make_node(
+                        "If", ["condition"], ["Y"], then_branch=branch, else_branch=branch
+                    ),
+                    helper.make_node(
+                        "Constant",
+                        [],
+                        ["bias"],
+                        value=onnx.numpy_helper.from_array(
+                            numpy.array([2, 3], dtype=numpy.float32)
+                        ),
+                    ),
+                    helper.make_node("Identity", ["X"], ["unused"]),
+                ],
+                "captures",
+                [
+                    helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [2]),
+                    helper.make_tensor_value_info("condition", onnx.TensorProto.BOOL, []),
+                ],
+                [helper.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [2])],
+            ),
+            opset_imports=[helper.make_opsetid("", 18)],
+        )
+        builder_type = type(self.make_builder())
+        self.assertTrue(builder_type._topological_order_model(model))
+        self.assertEqual(
+            [str(node.op_type) for node in model.graph.node], ["Constant", "If", "Identity"]
+        )
+        for attribute in model.graph.node[1].attribute:
+            self.assertEqual([str(node.op_type) for node in attribute.g.node], ["Add", "Neg"])
+        serialized = model.SerializeToString()
+        self.assertFalse(builder_type._topological_order_model(model))
+        self.assertEqual(model.SerializeToString(), serialized)
+        exported = self.make_builder(model).to_native(optimize=False)
+        checker.check_model(exported)
+        for condition in (False, True):
+            result = ReferenceEvaluator(exported).run(
+                None,
+                {
+                    "X": numpy.array([4, 5], dtype=numpy.float32),
+                    "condition": numpy.array(condition),
+                },
+            )[0]
+            numpy.testing.assert_array_equal(result, numpy.array([-6, -8], dtype=numpy.float32))
+
+    def test_topological_order_tracks_forwarded_subgraph_outputs(self):
+        from onnx_light.onnx import helper
+
+        branch = helper.make_graph(
+            [helper.make_node("Identity", ["bias"], ["forwarded"])],
+            "forward",
+            [],
+            [helper.make_tensor_value_info("forwarded", onnx.TensorProto.FLOAT, [1])],
+        )
+        model = helper.make_model(
+            helper.make_graph(
+                [
+                    helper.make_node(
+                        "If", ["condition"], ["Y"], then_branch=branch, else_branch=branch
+                    ),
+                    helper.make_node("Identity", ["X"], ["bias"]),
+                ],
+                "forwarded_capture",
+                [
+                    helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [1]),
+                    helper.make_tensor_value_info("condition", onnx.TensorProto.BOOL, []),
+                ],
+                [helper.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [1])],
+            ),
+            opset_imports=[helper.make_opsetid("", 18)],
+        )
+        self.assertTrue(type(self.make_builder())._topological_order_model(model))
+        self.assertEqual([str(node.op_type) for node in model.graph.node], ["Identity", "If"])
+        checker.check_model(model)
+
+    def test_topological_order_sorts_functions_and_rejects_invalid_dependencies(self):
+        from onnx_light.onnx import helper
+
+        function = helper.make_function(
+            "custom",
+            "Twice",
+            ["X"],
+            ["Y"],
+            [
+                helper.make_node("Neg", ["sum"], ["Y"]),
+                helper.make_node("Add", ["X", "X"], ["sum"]),
+            ],
+            [helper.make_opsetid("", 18)],
+        )
+        model = helper.make_model(
+            helper.make_graph([], "empty", [], []),
+            functions=[function],
+            opset_imports=[helper.make_opsetid("", 18)],
+        )
+        order = type(self.make_builder())._topological_order_model
+        self.assertTrue(order(model))
+        self.assertEqual([str(node.op_type) for node in model.functions[0].node], ["Add", "Neg"])
+        checker.check_model(model)
+        model.graph.node.extend(
+            [
+                helper.make_node("Identity", ["B"], ["A"]),
+                helper.make_node("Identity", ["A"], ["B"]),
+            ]
+        )
+        with self.assertRaisesRegex(ValueError, "Cyclic node dependencies"):
+            order(model)
+        model.graph.ClearField("node")
+        model.graph.node.append(helper.make_node("Identity", ["missing"], ["A"]))
+        with self.assertRaisesRegex(ValueError, "Undefined values.*missing"):
+            order(model)
+
+    def test_dimension_materialization_uses_native_shape_operators(self):
+        builder = self.make_builder(18)
+        builder.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 3))
+        name = builder.get_dimension_as_result("batch")
+        self.assertEqual(builder.get_shape(name), ())
+        self.assertEqual(builder.value_as_shape(name), ("batch",))
+        builder.make_tensor_output(name)
+        model = builder.to_native(optimize=False)
+        actual = ReferenceEvaluator(model).run(
+            None, {"X": numpy.ones((5, 3), dtype=numpy.float32)}
+        )[0]
+        self.assertEqual(actual, 5)
+        with self.assertRaisesRegex(ValueError, "No input shape"):
+            builder.get_dimension_as_result("missing")
 
     def test_native_export_without_reference_imports(self):
         code = textwrap.dedent("""
@@ -133,6 +367,52 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("native-only export and metadata roundtrip passed", result.stdout)
+
+    def test_native_constant_folding_without_evaluator_import(self):
+        code = textwrap.dedent("""
+            import importlib.abc
+            import sys
+            import numpy
+
+            class RejectEvaluatorImports(importlib.abc.MetaPathFinder):
+                def find_spec(self, fullname, path=None, target=None):
+                    blocked = (
+                        "onnx", "yobx.reference", "onnx_light.onnx.reference",
+                        "onnx_light._reference",
+                    )
+                    if any(fullname == name or fullname.startswith(name + ".")
+                           for name in blocked):
+                        raise AssertionError("Evaluator import attempted: " + fullname)
+                    return None
+
+            sys.meta_path.insert(0, RejectEvaluatorImports())
+            from yobx.builder.onnxlight import OnnxLightGraphBuilder
+            from onnx_light.onnx import checker
+
+            builder = OnnxLightGraphBuilder(18)
+            builder.make_tensor_input("X", 1, (2, 3))
+            shape = builder.op.Concat(
+                numpy.array([2], dtype=numpy.int64),
+                numpy.array([3], dtype=numpy.int64),
+                axis=0,
+            )
+            builder.op.Reshape("X", shape, outputs=["Y"])
+            builder.make_tensor_output("Y")
+            model = builder.to_native()
+            checker.check_model(model)
+            assert all(str(node.op_type) != "Concat" for node in model.graph.node)
+            assert builder.get_shape("Y") == (2, 3)
+            print("native Concat folding without evaluator passed")
+            """)
+        result = subprocess.run(
+            [sys.executable, "-c", code],
+            env={**os.environ, "PYTHONPATH": os.getcwd()},
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("native Concat folding without evaluator passed", result.stdout)
 
     def test_dynamic_add_native_engines(self):
         from onnx_light.onnx_core.graph_builder import GraphBuilder
@@ -400,7 +680,10 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         actual = session.run(None, {"X": x, "condition": numpy.array(True)})[0]
         numpy.testing.assert_array_equal(actual, numpy.maximum(x, 0))
 
-    @unittest.skipUnless(importlib.util.find_spec("sklearn"), "scikit-learn is not installed")
+    @unittest.skipUnless(
+        "scikit-learn" in importlib.metadata.packages_distributions().get("sklearn", []),
+        "scikit-learn is not installed",
+    )
     def test_sklearn_converter_repeated_node_names(self):
         from sklearn.linear_model import Ridge
         from sklearn.pipeline import make_pipeline
@@ -617,7 +900,10 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "Register the opset"):
             builder.make_node("Unknown", [], domain="unregistered")
 
-    @unittest.skipUnless(importlib.util.find_spec("sklearn"), "scikit-learn is not installed")
+    @unittest.skipUnless(
+        "scikit-learn" in importlib.metadata.packages_distributions().get("sklearn", []),
+        "scikit-learn is not installed",
+    )
     def test_sklearn_linear_regression(self):
         from sklearn.linear_model import LinearRegression
         from yobx.builder.onnxlight import OnnxLightGraphBuilder

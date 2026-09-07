@@ -427,12 +427,24 @@ class TestGraphBuilderTorchProtocol(ExtTestCase):
 
     def test_graphbuilder_has_torch_attrs(self):
         g = GraphBuilder(18, ir_version=9)
-        for name in self.TORCH_ONLY_ATTRS:
+        for name in (
+            "has_rank",
+            "get_rank",
+            "set_rank",
+            "has_device",
+            "get_device",
+            "set_device",
+            "make_local_function",
+            "anyop",
+            "last_added_node",
+        ):
             self.assertTrue(hasattr(g, name), msg=f"GraphBuilder missing attribute '{name}'")
+        self.assertFalse(hasattr(g, "register_users"))
 
     def test_graphbuilder_is_instance_torch_protocol(self):
         g = GraphBuilder(18, ir_version=9)
-        self.assertIsInstance(g, GraphBuilderTorchProtocol)
+        self.assertIsInstance(g, GraphBuilderExtendedProtocol)
+        self.assertNotIsInstance(g, GraphBuilderTorchProtocol)
 
     def test_has_rank_returns_false_for_unknown(self):
         g = GraphBuilder(18, ir_version=9)

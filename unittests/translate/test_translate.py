@@ -51,7 +51,7 @@ class TestTranslate(ExtTestCase):
     def test_translate_header_onnx(self):
         header = translate_header("onnx")
         self.assertIn("import onnx", header)
-        self.assertIn("import onnx.helper as oh", header)
+        self.assertIn("import onnx_light.onnx.helper as oh", header)
         self.assertIn("make_ref_attribute", header)
         self.assertNotIn("make_node_extended", header)
 
@@ -305,8 +305,8 @@ class TestTranslate(ExtTestCase):
         """translate_header('onnx-compact') should return valid import header."""
         header = translate_header("onnx-compact")
         self.assertIn("import onnx", header)
-        self.assertIn("import onnx.helper as oh", header)
-        self.assertIn("import onnx.numpy_helper as onh", header)
+        self.assertIn("import onnx_light.onnx.helper as oh", header)
+        self.assertIn("import onnx_light.onnx.numpy_helper as onh", header)
 
 
 if __name__ == "__main__":

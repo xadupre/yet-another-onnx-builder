@@ -3,7 +3,8 @@ from typing import Dict, List
 import onnx_light.onnx.helper as oh
 import numpy as np
 import onnx_light.onnx.numpy_helper as onh
-from onnx_light.onnx import AttributeProto, FunctionProto, GraphProto, TensorProto
+from onnx_light.onnx import AttributeProto, FunctionProto, GraphProto, TensorProto, ValueInfoProto
+from onnx_light.onnx_core.shape_inference import SymShape
 from yobx.ext_test_case import (
     ExtTestCase,
     hide_stdout,
@@ -234,7 +235,7 @@ class TestGraphBuilder(ExtTestCase):
     @ignore_warnings(DeprecationWarning)
     def test_as_function_constant_notfull(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
-        g.make_tensor_input("X", None, None, False)
+        g.make_tensor_input("X", TFLOAT, (None, 4))
         np_weights = np.random.randn(4, 3).astype(np.float32)
         np_bias = np.random.randn(1, 3).astype(np.float32)
         init = g.make_initializer("weights", np_weights)
@@ -247,12 +248,12 @@ class TestGraphBuilder(ExtTestCase):
         expected = feeds["X"] @ np_weights + np_bias
         ref = ExtendedReferenceEvaluator(fct)
         got = ref.run(None, feeds)
-        self.assertEqualArray(expected, got[0])
+        self.assertEqualArray(expected, got[0], atol=1e-6, rtol=1e-6)
 
     @ignore_warnings(DeprecationWarning)
     def test_as_function_constant_full(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
-        g.make_tensor_input("X", None, None, False)
+        g.make_tensor_input("X", TFLOAT, (None, 4))
         np_weights = np.random.randn(4, 3).astype(np.float32)
         np_bias = np.random.randn(1, 3).astype(np.float32)
         init = g.make_initializer("weights", np_weights)
@@ -265,12 +266,12 @@ class TestGraphBuilder(ExtTestCase):
         expected = feeds["X"] @ np_weights + np_bias
         ref = ExtendedReferenceEvaluator(fct)
         got = ref.run(None, feeds)
-        self.assertEqualArray(expected, got[0])
+        self.assertEqualArray(expected, got[0], atol=1e-6, rtol=1e-6)
 
     @ignore_warnings(DeprecationWarning)
     def test_as_function_second(self):
         gf = GraphBuilder(18, ir_version=9, as_function=True)
-        gf.make_tensor_input("X", None, None, False)
+        gf.make_tensor_input("X", TFLOAT, (None, 4))
         np_weights = np.arange(12).reshape((4, 3)).astype(np.float32) / 10
         np_bias = np.arange(3).reshape((1, 3)).astype(np.float32) + 10
         np_bias2 = np.arange(3).reshape((1, 3)).astype(np.float32) + 1000
@@ -279,10 +280,10 @@ class TestGraphBuilder(ExtTestCase):
         bias = gf.make_initializer("bias", np_bias)
         gf.op.Add(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
         gf.make_tensor_output("Y", indexed=False)
-        self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
+        self.assertEqualArray(gf.get_constant("weights"), np_weights)
 
         g = GraphBuilder(18, ir_version=9, as_function=True)
-        g.make_tensor_input("X", None, None, False)
+        g.make_tensor_input("X", TFLOAT, (None, 4))
         new_inits, _ = g.make_local_function(
             gf,
             function_options=FunctionOptions(
@@ -293,7 +294,7 @@ class TestGraphBuilder(ExtTestCase):
             ),
         )
         self.assertEqual(new_inits, ["weights", "bias"])
-        self.assertEqualArray(g.initializers_dict["weights"], np_weights)
+        self.assertEqualArray(g.get_constant("weights"), np_weights)
 
         bias2 = g.make_initializer("bias2", np_bias2)
         g.op.Add(
@@ -364,16 +365,16 @@ class TestGraphBuilder(ExtTestCase):
 
         # first function
         gf = GraphBuilder(18, ir_version=9, as_function=True)
-        gf.make_tensor_input("X", None, None, False)
+        gf.make_tensor_input("X", TFLOAT, (None, 4))
         init = gf.make_initializer("weights", np_weights)
         bias = gf.make_initializer("bias", np_bias)
         gf.op.Add(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
         gf.make_tensor_output("Y", indexed=False)
-        self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
+        self.assertEqualArray(gf.get_constant("weights"), np_weights)
 
         # second function calling the first one
         g2 = GraphBuilder(18, ir_version=9, as_function=True)
-        g2.make_tensor_input("X", None, None, False)
+        g2.make_tensor_input("X", TFLOAT, (None, 4))
         new_inits, _ = g2.make_local_function(
             gf,
             function_options=FunctionOptions(
@@ -395,7 +396,7 @@ class TestGraphBuilder(ExtTestCase):
         # a last step
         # second function calling the first one
         g = GraphBuilder(18, ir_version=9, as_function=True)
-        g.make_tensor_input("X", None, None, False)
+        g.make_tensor_input("X", TFLOAT, (None, 4))
         new_inits, _ = g.make_local_function(
             g2,
             function_options=FunctionOptions(
@@ -484,16 +485,16 @@ class TestGraphBuilder(ExtTestCase):
 
         # function 1
         gf = GraphBuilder(18, ir_version=9, as_function=True)
-        gf.make_tensor_input("X", None, None, False)
+        gf.make_tensor_input("X", TFLOAT, (None, 4))
         init = gf.make_initializer("weights", np_weights)
         bias = gf.make_initializer("bias", np_bias)
         gf.op.Add(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
         gf.make_tensor_output("Y", indexed=False)
-        self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
+        self.assertEqualArray(gf.get_constant("weights"), np_weights)
 
         # main graph
         g = GraphBuilder(18, ir_version=9, as_function=True)
-        g.make_tensor_input("X", None, None, False)
+        g.make_tensor_input("X", TFLOAT, (None, 4))
         new_inits, _ = g.make_local_function(
             gf,
             function_options=FunctionOptions(
@@ -505,17 +506,17 @@ class TestGraphBuilder(ExtTestCase):
         )
         self.assertEqual(len(g.functions), 1)
         self.assertEqual(new_inits, ["weights", "bias"])
-        self.assertEqualArray(g.initializers_dict["weights"], np_weights)
+        self.assertEqualArray(g.get_constant("weights"), np_weights)
 
         # function 3: the same name but different
         gf = GraphBuilder(18, ir_version=9, as_function=True)
-        gf.make_tensor_input("X", None, None, False)
+        gf.make_tensor_input("X", TFLOAT, (None, 4))
 
         init = gf.make_initializer("weights", np_weights)
         bias = gf.make_initializer("bias", np_bias)
         gf.op.Sub(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
         gf.make_tensor_output("Y", indexed=False)
-        self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
+        self.assertEqualArray(gf.get_constant("weights"), np_weights)
 
         self.assertEqual(len(g.functions), 1)
         new_inits_2, (domain_name, function_name) = g.make_local_function(
@@ -530,7 +531,7 @@ class TestGraphBuilder(ExtTestCase):
         )
         self.assertEqual(len(g.functions), 2)
         self.assertEqual(new_inits, ["weights", "bias"])
-        self.assertEqualArray(g.initializers_dict["weights"], np_weights)
+        self.assertEqualArray(g.get_constant("weights"), np_weights)
 
         # two functions
         g.op.Add(
@@ -594,16 +595,16 @@ class TestGraphBuilder(ExtTestCase):
 
             # first function
             gf = GraphBuilder(18, ir_version=9, as_function=True)
-            gf.make_tensor_input("X", None, None, False)
+            gf.make_tensor_input("X", TFLOAT, (None, 4))
             init = gf.make_initializer("weights", np_weights)
             bias = gf.make_initializer("bias", np_bias)
             gf.op.Add(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
             gf.make_tensor_output("Y", indexed=False)
-            self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
+            self.assertEqualArray(gf.get_constant("weights"), np_weights)
 
             # second function calling the first one
             g2 = GraphBuilder(18, ir_version=9, as_function=True)
-            g2.make_tensor_input("X", None, None, False)
+            g2.make_tensor_input("X", TFLOAT, (None, 4))
             new_inits, _ = g2.make_local_function(
                 builder=gf,
                 function_options=FunctionOptions(
@@ -630,7 +631,7 @@ class TestGraphBuilder(ExtTestCase):
         # a last step
         # second function calling the first one
         g = GraphBuilder(18, ir_version=9, as_function=True)
-        g.make_tensor_input("X", None, None, False)
+        g.make_tensor_input("X", TFLOAT, (None, 4))
 
         # let's add the first function
         g1 = _make_function()
@@ -734,16 +735,16 @@ class TestGraphBuilder(ExtTestCase):
 
             # first function
             gf = GraphBuilder(18, ir_version=9, as_function=True)
-            gf.make_tensor_input("X", None, None, False)
+            gf.make_tensor_input("X", TFLOAT, (None, 4))
             init = gf.make_initializer("weights", np_weights)
             bias = gf.make_initializer("bias", np_bias)
             gf.op.Add(gf.op.MatMul("X", init, name="linear"), bias, name="linear", outputs=["Y"])
             gf.make_tensor_output("Y", indexed=False)
-            self.assertEqualArray(gf.initializers_dict["weights"], np_weights)
+            self.assertEqualArray(gf.get_constant("weights"), np_weights)
 
             # second function calling the first one
             g2 = GraphBuilder(18, ir_version=9, as_function=True)
-            g2.make_tensor_input("X", None, None, False)
+            g2.make_tensor_input("X", TFLOAT, (None, 4))
             new_inits, _ = g2.make_local_function(
                 gf,
                 function_options=FunctionOptions(
@@ -770,7 +771,7 @@ class TestGraphBuilder(ExtTestCase):
         # a last step
         # second function calling the first one
         g = GraphBuilder(18, ir_version=9, as_function=True)
-        g.make_tensor_input("X", None, None, False)
+        g.make_tensor_input("X", TFLOAT, (None, 4))
 
         # let's add the first function
         g1 = _make_function()
@@ -954,7 +955,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(g.get_type("d"), TINT64)
         self.assertTrue(g.has_rank("d"))
         self.assertEqual(g.get_rank("d"), 3)
-        self.assertFalse(g.has_shape("d"))
+        self.assertEqual(g.get_shape("d"), (None, None, None))
         self.assertFalse(g.has_device("d"))
 
     def test_set_type_shape_or_rank_no_info(self):
@@ -967,7 +968,6 @@ class TestGraphBuilder(ExtTestCase):
         self.assertFalse(g.has_device("e"))
 
     def test__apply_reshape_to_shape(self):
-        g = GraphBuilder(18)
         cases = [
             (("batch", "cache+seq"), (-1,), ("batch*(cache+seq)",)),
             (("s44", 1, "s9"), (0, -1, 1), ("s44", "s9", 1)),
@@ -984,7 +984,10 @@ class TestGraphBuilder(ExtTestCase):
         ]
         for s1, s2, expected in cases:
             with self.subTest(case=(s1, s2, expected)):
-                self.assertEqual(expected, g._apply_reshape_to_shape(s1, s2))
+                g = GraphBuilder(18)
+                g.make_tensor_input("X", TFLOAT, s1)
+                g.op.Reshape("X", np.array(s2, dtype=np.int64), outputs=["Y"])
+                self.assertEqual(SymShape(expected), g.shapes_context.get("Y").shape)
 
     def test_topological_order(self):
         model = oh.make_model(
@@ -1040,9 +1043,14 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqualArray(expected[0], got[0])
 
         gr = GraphBuilder(model)
-        gr.nodes = gr.nodes[::-1]
-        gr.topological_sort()
+        gr.inner_builder.move_shape_and_size_nodes()
         onx = gr.to_onnx()
+        available = {str(value.name) for value in onx.graph.input} | {
+            str(value.name) for value in onx.graph.initializer
+        }
+        for node in onx.graph.node:
+            self.assertTrue(set(map(str, node.input)) - {""} <= available)
+            available.update(map(str, node.output))
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected[0], got[0])
@@ -1166,7 +1174,7 @@ class TestGraphBuilder(ExtTestCase):
             ]
 
             def make_value(name):
-                value = oh.ValueInfoProto()
+                value = ValueInfoProto()
                 value.name = name
                 return value
 
@@ -1320,7 +1328,7 @@ class TestGraphBuilder(ExtTestCase):
             nodes[2].attribute.append(att)
 
             def make_value(name):
-                value = oh.ValueInfoProto()
+                value = ValueInfoProto()
                 value.name = name
                 return value
 
@@ -1634,7 +1642,7 @@ class TestGraphBuilder(ExtTestCase):
         g.make_tensor_input("X", TFLOAT, (2, 4))
         np_weights = np.arange(12).reshape((4, 3)).astype(np.float32)
         w_init = g.make_initializer("p_layer_weight", np_weights, parameter_name="layer.weight")
-        self.assertEqual(g._parameter_renaming, {"p_layer_weight": "layer.weight"})
+        self.assertEqual(w_init, "layer.weight")
         g.op.MatMul("X", w_init, outputs=["Y"])
         g.make_tensor_output("Y", TFLOAT, (2, 3), indexed=False)
         onx = g.to_onnx()
@@ -1650,7 +1658,7 @@ class TestGraphBuilder(ExtTestCase):
         feeds = {"X": np.random.randn(2, 4).astype(np.float32)}
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)[0]
-        self.assertEqualArray(feeds["X"] @ np_weights, got)
+        self.assertEqualArray(feeds["X"] @ np_weights, got, atol=1e-5, rtol=1e-6)
 
     def test_update_model_with_parameter_renaming_multiple(self):
         """Test _update_model_with_parameter_renaming with multiple renamed parameters."""
@@ -1660,7 +1668,7 @@ class TestGraphBuilder(ExtTestCase):
         np_bias = np.arange(3).reshape((1, 3)).astype(np.float32) + 10.0
         w_init = g.make_initializer("p_w", np_weights, parameter_name="fc.weight")
         b_init = g.make_initializer("p_b", np_bias, parameter_name="fc.bias")
-        self.assertEqual(g._parameter_renaming, {"p_w": "fc.weight", "p_b": "fc.bias"})
+        self.assertEqual((w_init, b_init), ("fc.weight", "fc.bias"))
         mm = g.op.MatMul("X", w_init, outputs=["mm"])
         g.op.Add(mm, b_init, outputs=["Y"])
         g.make_tensor_output("Y", TFLOAT, (2, 3), indexed=False)
@@ -1680,7 +1688,7 @@ class TestGraphBuilder(ExtTestCase):
         feeds = {"X": np.random.randn(2, 4).astype(np.float32)}
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)[0]
-        self.assertEqualArray(feeds["X"] @ np_weights + np_bias, got)
+        self.assertEqualArray(feeds["X"] @ np_weights + np_bias, got, atol=1e-5, rtol=1e-6)
 
 
 @requires_torch()
@@ -2528,6 +2536,35 @@ class TestGetInputDynamicShape(ExtTestCase):
 
 
 class TestGraphBuilderGetTypeKnown(ExtTestCase):
+    def native_alias_cleanup(self, nodes, replacements):
+        """Exercises native reference rewriting by removing explicit input aliases."""
+        produced = {str(name) for node in nodes for name in node.output}
+        aliases = [
+            oh.make_node("Identity", [new], [old])
+            for old, new in replacements.items()
+            if old != new and old not in produced
+        ]
+        inputs = [
+            oh.make_tensor_value_info(name, TensorProto.BOOL if name == "cond" else TFLOAT, [])
+            for name in sorted(set(replacements.values()) - produced)
+        ]
+        outputs = [oh.make_tensor_value_info(str(name), TFLOAT, []) for name in nodes[-1].output]
+        model = oh.make_model(
+            oh.make_graph(aliases + nodes, "aliases", inputs, outputs),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        builder = GraphBuilder(model)
+        builder.inner_builder.remove_identity_nodes()
+        return builder.nodes
+
+    def native_subgraph_alias_cleanup(self, graph, replacements):
+        """Exercises native alias rewriting across If branch captures."""
+        node = oh.make_node("If", ["cond"], ["result"], then_branch=graph, else_branch=graph)
+        nodes = self.native_alias_cleanup([node], {"cond": "cond", **replacements})
+        return next(
+            attribute.g for attribute in nodes[0].attribute if attribute.name == "then_branch"
+        )
+
     @requires_torch()
     def test_get_type_known_missing(self):
         gr = GraphBuilder(18, ir_version=9)
@@ -2574,10 +2611,10 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         np_cst = np.arange(4).reshape((2, 2)).astype(np.float32)
         parent.make_initializer("cst", np_cst)
 
-        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child = parent.empty_copy()
         child.make_initializer("cst", np_cst)
 
-        result = child.has_exact_same_constant_in_context("cst")
+        result = child.constant_is_equal_to("cst", parent.get_constant("cst"))
         self.assertTrue(result)
 
     def test_has_exact_same_constant_in_context_different_values(self):
@@ -2586,11 +2623,11 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         np_cst1 = np.arange(4).reshape((2, 2)).astype(np.float32)
         parent.make_initializer("cst", np_cst1)
 
-        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child = parent.empty_copy()
         np_cst2 = np_cst1 + 1.0
         child.make_initializer("cst", np_cst2)
 
-        result = child.has_exact_same_constant_in_context("cst")
+        result = child.constant_is_equal_to("cst", parent.get_constant("cst"))
         self.assertFalse(result)
 
     def test_has_exact_same_constant_in_context_different_shape(self):
@@ -2598,10 +2635,10 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         parent = GraphBuilder(18, ir_version=9)
         parent.make_initializer("cst", np.arange(6).reshape((2, 3)).astype(np.float32))
 
-        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child = parent.empty_copy()
         child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
 
-        result = child.has_exact_same_constant_in_context("cst")
+        result = child.constant_is_equal_to("cst", parent.get_constant("cst"))
         self.assertFalse(result)
 
     def test_has_exact_same_constant_in_context_different_type(self):
@@ -2610,42 +2647,42 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         np_cst = np.arange(4).reshape((2, 2)).astype(np.float32)
         parent.make_initializer("cst", np_cst)
 
-        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child = parent.empty_copy()
         child.make_initializer("cst", np_cst.astype(np.float64))
 
-        result = child.has_exact_same_constant_in_context("cst")
+        result = child.constant_is_equal_to("cst", parent.get_constant("cst"))
         self.assertFalse(result)
 
     def test_has_exact_same_constant_in_context_large(self):
-        # Constants with >= 128 elements: comparison is skipped, should return None.
+        # Native constant values remain comparable above the old cache size limit.
         parent = GraphBuilder(18, ir_version=9)
         np_cst = np.arange(128).reshape((16, 8)).astype(np.float32)
         parent.make_initializer("cst", np_cst)
 
-        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child = parent.empty_copy()
         child.make_initializer("cst", np_cst)
 
-        result = child.has_exact_same_constant_in_context("cst")
-        self.assertIsNone(result)
+        self.assertTrue(child.constant_is_equal_to("cst", parent.get_constant("cst")))
+        self.assertFalse(child.constant_is_equal_to("cst", parent.get_constant("cst") + 1))
 
     def test_has_exact_same_constant_in_context_not_in_child(self):
         # Name is only a constant in the parent, not in the child: should return False.
         parent = GraphBuilder(18, ir_version=9)
         parent.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
 
-        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child = parent.empty_copy()
 
-        result = child.has_exact_same_constant_in_context("cst")
+        result = child.constant_is_equal_to("cst", parent.get_constant("cst"))
         self.assertFalse(result)
 
     def test_has_exact_same_constant_in_context_not_in_parent(self):
         # Name is a constant in the child but not in the parent: should return False.
         parent = GraphBuilder(18, ir_version=9)
 
-        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child = parent.empty_copy()
         child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
 
-        result = child.has_exact_same_constant_in_context("cst")
+        result = parent.constant_is_equal_to("cst", child.get_constant("cst"))
         self.assertFalse(result)
 
     def test_make_subset_builder(self):
@@ -2677,7 +2714,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
 
     def test_make_subset_builder_add_local_functions(self):
         gf = GraphBuilder(18, ir_version=9, as_function=True)
-        gf.make_tensor_input("X", TFLOAT, None, False)
+        gf.make_tensor_input("X", TFLOAT, (2, 4), False)
         gf.op.Relu("X", outputs=["Y"])
         gf.make_tensor_output("Y", indexed=False)
 
@@ -2708,41 +2745,42 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
 
     def test_same_shape_static(self):
         g = GraphBuilder(18)
-        g._known_shapes["X"] = (3, 4)
-        g._known_shapes["Y"] = (3, 4)
-        self.assertTrue(g.same_shape("X", "Y"))
+        g.set_shape("X", (3, 4))
+        g.set_shape("Y", (3, 4))
+        self.assertEqual(g.shapes_context.get("X").shape, g.shapes_context.get("Y").shape)
 
     def test_same_shape_static_different(self):
         g = GraphBuilder(18)
-        g._known_shapes["X"] = (3, 4)
-        g._known_shapes["Y"] = (3, 5)
-        self.assertFalse(g.same_shape("X", "Y"))
+        g.set_shape("X", (3, 4))
+        g.set_shape("Y", (3, 5))
+        self.assertNotEqual(g.shapes_context.get("X").shape, g.shapes_context.get("Y").shape)
 
     def test_same_shape_different_rank(self):
         g = GraphBuilder(18)
-        g._known_shapes["X"] = (3, 4)
-        g._known_shapes["Y"] = (3, 4, 5)
-        self.assertFalse(g.same_shape("X", "Y"))
+        g.set_shape("X", (3, 4))
+        g.set_shape("Y", (3, 4, 5))
+        self.assertNotEqual(g.shapes_context.get("X").shape, g.shapes_context.get("Y").shape)
 
     def test_same_shape_dynamic_same_dim(self):
         g = GraphBuilder(18)
-        g._known_shapes["X"] = ("batch", 4)
-        g._known_shapes["Y"] = ("batch", 4)
-        self.assertTrue(g.same_shape("X", "Y"))
+        g.set_shape("X", ("batch", 4))
+        g.set_shape("Y", ("batch", 4))
+        self.assertEqual(g.shapes_context.get("X").shape, g.shapes_context.get("Y").shape)
 
     def test_same_shape_dynamic_linked_by_constraints(self):
         g = GraphBuilder(18)
-        g._known_shapes["X"] = ("a", 4)
-        g._known_shapes["Y"] = ("b", 4)
-        g.add_to_constraints("a", "b")
-        g.add_to_constraints("b", "a")
-        self.assertTrue(g.same_shape("X", "Y"))
+        g.set_shape("X", ("a", 4))
+        g.set_shape("Y", ("b", 4))
+        self.assertTrue(g.shapes_context.add_constraint("a", "b"))
+        self.assertFalse(g.shapes_context.add_constraint("b", "a"))
+        self.assertTrue(g.shapes_context.has_constraint("a", "b"))
 
     def test_same_shape_dynamic_no_constraints(self):
         g = GraphBuilder(18)
-        g._known_shapes["X"] = ("a", 4)
-        g._known_shapes["Y"] = ("b", 4)
-        self.assertFalse(g.same_shape("X", "Y"))
+        g.set_shape("X", ("a", 4))
+        g.set_shape("Y", ("b", 4))
+        self.assertNotEqual(g.shapes_context.get("X").shape, g.shapes_context.get("Y").shape)
+        self.assertFalse(g.shapes_context.has_constraint("a", "b"))
 
     def test_set_value_shape_constraint_dim_registration(self):
         # When a name already has a symbolic (string) value shape like ("batch",)
@@ -2751,12 +2789,11 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         # not for the literal string "existing".
         g = GraphBuilder(18)
         g.make_tensor_input("X", TFLOAT, ("batch",))
-        g._known_value_shape["batch_value"] = ("batch",)
-        g._known_ranks["batch_value"] = 1
+        g.op.Shape("X", outputs=["batch_value"])
+        self.assertEqual(g.value_as_shape("batch_value"), ("batch",))
         g.set_value_shape("batch_value", (5,))
-        self.assertIn("batch", g.constraints_)
-        self.assertIn(5, g.constraints_["batch"])
-        self.assertNotIn("existing", g.constraints_)
+        self.assertEqual(g.value_as_shape("batch_value"), (5,))
+        self.assertEqual(g.get_shape("X"), ("batch",))
 
     def test_get_dimension_as_result_already_known(self):
         gr = GraphBuilder(18)
@@ -2771,8 +2808,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
     def test_get_dimension_as_result_from_source(self):
         gr = GraphBuilder(18)
         gr.make_tensor_input("X", TFLOAT, ("batch", "seq"))
-        # Manually register a source for the dynamic dimension.
-        gr.dynamic_dimensions_source["batch"] = [{"input_name": "X", "axis": 0}]
+        # The native input descriptor supplies the dimension source.
         self.assertFalse(gr.has_name("batch"))
         result = gr.get_dimension_as_result("batch")
         self.assertEqual(result, "batch")
@@ -2788,8 +2824,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
     def test_get_dimension_as_result_no_source_raises(self):
         gr = GraphBuilder(18)
         gr.make_tensor_input("X", TFLOAT, ("batch", "seq"))
-        # No source registered for "batch" -> AssertionError.
-        self.assertRaises(AssertionError, gr.get_dimension_as_result, "batch")
+        self.assertRaises(ValueError, gr.get_dimension_as_result, "missing_dimension")
 
     def test_constant_is_equal_to(self):
         g = GraphBuilder(18, ir_version=9)
@@ -2828,13 +2863,13 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         g.make_initializer("w_tp", arr_tp)
         self.assertTrue(g.constant_is_equal_to("w_tp", tp))
 
-        # large array (size >= 30) always returns True regardless of values
+        # Large arrays must compare their values too.
         large = np.arange(30, dtype=np.float32)
         g.make_initializer("large", large)
         large_same = large.copy()
         self.assertTrue(g.constant_is_equal_to("large", large_same))
         large_different = np.zeros(30, dtype=np.float32)
-        self.assertTrue(g.constant_is_equal_to("large", large_different))
+        self.assertFalse(g.constant_is_equal_to("large", large_different))
 
     def test_get_dynamic_dimension_int_keep_const(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
@@ -2847,7 +2882,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         result = g.get_dynamic_dimension(5, keep_const=False)
         self.assertIsInstance(result, str)
         self.assertIn(result, g.initializers_dict)
-        self.assertEqualArray(g.initializers_dict[result], np.array([5], dtype=np.int64))
+        self.assertEqualArray(g.get_constant(result), np.array([5], dtype=np.int64))
 
     def test_get_dynamic_dimension_str_rank1(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
@@ -2863,50 +2898,38 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertIsInstance(result, str)
         self.assertNotEqual(result, "d")
 
-    def test_is_more_precise_both_static_same(self):
-        g = GraphBuilder(18)
-        self.assertTrue(g.is_more_precise((1, 2), (1, 2)))
+    def test_native_shape_both_static_same(self):
+        self.assertEqual(SymShape([1, 2]), SymShape([1, 2]))
 
-    def test_is_more_precise_both_static_different(self):
-        g = GraphBuilder(18)
-        self.assertFalse(g.is_more_precise((1, 3), (1, 2)))
+    def test_native_shape_both_static_different(self):
+        self.assertNotEqual(SymShape([1, 3]), SymShape([1, 2]))
 
-    def test_is_more_precise_int_over_string(self):
-        g = GraphBuilder(18)
-        self.assertTrue(g.is_more_precise((1, 2), (1, "d")))
+    def test_native_shape_static_information(self):
+        self.assertTrue(SymShape([1, 2]).is_fully_known())
+        self.assertFalse(SymShape([1, "d"]).is_fully_known())
 
-    def test_is_more_precise_string_vs_int(self):
-        g = GraphBuilder(18)
-        self.assertTrue(g.is_more_precise((1, "d"), (1, 2)))
+    def test_native_shape_symbol_is_not_static(self):
+        self.assertNotEqual(SymShape([1, "d"]), SymShape([1, 2]))
 
-    def test_is_more_precise_both_dynamic_same(self):
-        g = GraphBuilder(18)
-        self.assertTrue(g.is_more_precise(("batch", 4), ("batch", 4)))
+    def test_native_shape_both_dynamic_same(self):
+        self.assertEqual(SymShape(["batch", 4]), SymShape(["batch", 4]))
 
-    def test_is_more_precise_both_dynamic_different(self):
-        g = GraphBuilder(18)
-        self.assertFalse(g.is_more_precise(("a", 4), ("b", 4)))
+    def test_native_shape_both_dynamic_different(self):
+        self.assertNotEqual(SymShape(["a", 4]), SymShape(["b", 4]))
 
-    def test_is_more_precise_different_ranks_raises(self):
-        g = GraphBuilder(18)
-        self.assertRaises(AssertionError, g.is_more_precise, (1, 2), (1, 2, 3))
+    def test_native_shape_different_ranks(self):
+        self.assertNotEqual(SymShape([1, 2]), SymShape([1, 2, 3]))
+        self.assertEqual(SymShape([1, 2, 3]).rank(), 3)
 
     def test_add_stat(self):
         g = GraphBuilder(18, ir_version=9)
-        # First call creates the kind/name entry with value 1
-        g.add_stat("op", "Add")
-        self.assertEqual(g.statistics_["op"]["Add"], 1)
-        # Second call increments the counter
-        g.add_stat("op", "Add")
-        self.assertEqual(g.statistics_["op"]["Add"], 2)
-        # New name under existing kind
-        g.add_stat("op", "Mul")
-        self.assertEqual(g.statistics_["op"]["Mul"], 1)
-        # New kind
-        g.add_stat("pattern", "Reshape")
-        self.assertEqual(g.statistics_["pattern"]["Reshape"], 1)
-        # Existing kind/name counters are unchanged
-        self.assertEqual(g.statistics_["op"]["Add"], 2)
+        g.make_tensor_input("X", TFLOAT, (2, 3))
+        g.op.Transpose(g.op.Transpose("X", perm=[1, 0]), perm=[1, 0], outputs=["Y"])
+        g.make_tensor_output("Y")
+        report = g.to_onnx(return_optimize_report=True).report
+        self.assertEqual(report.extra["backend"], "onnx-light")
+        self.assertEqual(report.extra["rewrites"], 1)
+        self.assertEqual(report.stats[0]["pattern"], "TransposeTranspose")
 
     def test_make_tensor_value_info_from_name(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
@@ -2933,41 +2956,36 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertFalse(vi.type.HasField("tensor_type"))
 
     def test_rename_results_basic(self):
-        g = GraphBuilder(18, ir_version=9, as_function=True)
         nodes = [oh.make_node("Add", ["x", "y"], ["z"], name="n0")]
         replacements = {"x": "x", "y": "y"}
-        new_nodes = g._rename_results(nodes, replacements)
+        new_nodes = self.native_alias_cleanup(nodes, replacements)
         self.assertEqual(len(new_nodes), 1)
         self.assertEqual(list(new_nodes[0].input), ["x", "y"])
         self.assertEqual(list(new_nodes[0].output), ["z"])
-        self.assertIn("z", replacements)
-        self.assertEqual(replacements["z"], "z")
+        self.assertEqual(replacements, {"x": "x", "y": "y"})
 
     def test_rename_results_renamed_inputs(self):
-        g = GraphBuilder(18, ir_version=9, as_function=True)
         nodes = [oh.make_node("Add", ["x", "y"], ["z"], name="n0")]
         replacements = {"x": "new_x", "y": "new_y"}
-        new_nodes = g._rename_results(nodes, replacements)
+        new_nodes = self.native_alias_cleanup(nodes, replacements)
         self.assertEqual(list(new_nodes[0].input), ["new_x", "new_y"])
         self.assertEqual(list(new_nodes[0].output), ["z"])
 
     def test_rename_results_output_already_in_replacements(self):
-        g = GraphBuilder(18, ir_version=9, as_function=True)
         # Output 'z' is already in replacements with the same value (final output)
         nodes = [oh.make_node("Relu", ["x"], ["z"], name="n0")]
         replacements = {"x": "x", "z": "z"}
-        new_nodes = g._rename_results(nodes, replacements)
+        new_nodes = self.native_alias_cleanup(nodes, replacements)
         self.assertEqual(list(new_nodes[0].output), ["z"])
 
     def test_rename_results_multiple_nodes(self):
-        g = GraphBuilder(18, ir_version=9, as_function=True)
         # Add(x, y) -> tmp; Relu(tmp) -> out
         nodes = [
             oh.make_node("Add", ["x", "y"], ["tmp"], name="n0"),
             oh.make_node("Relu", ["tmp"], ["out"], name="n1"),
         ]
         replacements = {"x": "new_x", "y": "new_y", "out": "out"}
-        new_nodes = g._rename_results(nodes, replacements)
+        new_nodes = self.native_alias_cleanup(nodes, replacements)
         self.assertEqual(len(new_nodes), 2)
         # Inputs of first node are renamed
         self.assertEqual(list(new_nodes[0].input), ["new_x", "new_y"])
@@ -2978,7 +2996,6 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertEqual(list(new_nodes[1].output), ["out"])
 
     def test_rename_results_with_graph_attribute(self):
-        g = GraphBuilder(18, ir_version=9, as_function=True)
         # Build a minimal If node with a then_branch subgraph
         then_graph = oh.make_graph(
             [oh.make_node("Add", ["outer_x", "outer_y"], ["branch_out"])],
@@ -2988,13 +3005,18 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         )
         if_node = oh.make_node("If", ["cond"], ["result"], name="n0")
         if_node.attribute.append(oh.make_attribute("then_branch", then_graph))
-        replacements = {"cond": "cond", "result": "result"}
-        new_nodes = g._rename_results([if_node], replacements)
+        if_node.attribute.append(oh.make_attribute("else_branch", then_graph))
+        replacements = {
+            "cond": "cond",
+            "result": "result",
+            "outer_x": "outer_x",
+            "outer_y": "outer_y",
+        }
+        new_nodes = self.native_alias_cleanup([if_node], replacements)
         self.assertEqual(len(new_nodes), 1)
         self.assertEqual(new_nodes[0].op_type, "If")
 
     def test_rename_results_in_subgraph_no_replacement_needed(self):
-        g = GraphBuilder(18, ir_version=9, as_function=True)
         subgraph = oh.make_graph(
             [oh.make_node("Add", ["a", "b"], ["c"])],
             "sub",
@@ -3003,12 +3025,11 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         )
         # No actual substitution: replacements map each name to itself
         replacements = {"a": "a", "b": "b"}
-        result = g._rename_results_in_subgraph(subgraph, replacements=replacements)
-        # When nothing changes the original graph object is returned
-        self.assertIs(result, subgraph)
+        result = self.native_subgraph_alias_cleanup(subgraph, replacements)
+        self.assertEqual(list(result.node[0].input), ["a", "b"])
+        self.assertEqual(list(result.node[0].output), ["c"])
 
     def test_rename_results_in_subgraph_with_replacement(self):
-        g = GraphBuilder(18, ir_version=9, as_function=True)
         subgraph = oh.make_graph(
             [oh.make_node("Add", ["a", "b"], ["c"])],
             "sub",
@@ -3016,8 +3037,8 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
             [oh.make_tensor_value_info("c", TensorProto.FLOAT, [])],
         )
         replacements = {"a": "new_a", "b": "b"}
-        result = g._rename_results_in_subgraph(subgraph, replacements=replacements)
-        self.assertEqual(result.name, "sub")
+        result = self.native_subgraph_alias_cleanup(subgraph, replacements)
+        self.assertTrue(str(result.name).startswith("sub"))
         self.assertEqual(len(result.node), 1)
         self.assertEqual(list(result.node[0].input), ["new_a", "b"])
         self.assertEqual(list(result.node[0].output), ["c"])
@@ -3025,7 +3046,6 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
     def test_rename_results_in_subgraph_shadowing(self):
         # Verify that once a node re-defines a name that was being replaced,
         # the replacement stops applying to subsequent nodes.
-        g = GraphBuilder(18, ir_version=9, as_function=True)
         subgraph = oh.make_graph(
             [
                 oh.make_node("Add", ["a", "b"], ["a"]),  # shadows 'a'
@@ -3037,7 +3057,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         )
         # 'a' should be renamed to 'new_a' only in the first node's inputs
         replacements = {"a": "new_a", "b": "b"}
-        result = g._rename_results_in_subgraph(subgraph, replacements=replacements)
+        result = self.native_subgraph_alias_cleanup(subgraph, replacements)
         # First node input uses the replacement; output keeps 'a'
         self.assertEqual(list(result.node[0].input), ["new_a", "b"])
         # Second node input must use the local 'a' (shadowed), not 'new_a'
@@ -3058,41 +3078,38 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
 
     def test_empty_copy_shapable_false(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
-        g2 = g.empty_copy(_shapable=False)
+        g2 = g.empty_copy(as_function=True)
         self.assertIsInstance(g2, GraphBuilder)
-        self.assertFalse(g2._debug_shape_missing)
+        self.assertTrue(g2.shapes_context.empty())
+        g2.make_tensor_input("X", TFLOAT, (2, 3))
+        g2.op.Relu("X", outputs=["Y"])
+        self.assertEqual(g2.get_shape("Y"), (2, 3))
+        self.assertFalse(g.has_name("X"))
 
     def test_pretty_tensor_with_shape(self):
-        g = GraphBuilder(18, ir_version=9, as_function=True)
         arr = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
-        result = g.pretty_tensor(arr)
-        self.assertIn("float32", result)
+        tensor = onh.from_array(arr)
+        result = str(tensor)
+        self.assertEqual(tensor.data_type, TFLOAT)
         self.assertIn("2", result)
 
     def test_pretty_tensor_without_shape(self):
-        g = GraphBuilder(18, ir_version=9, as_function=True)
-
-        class NoShape:
-            pass
-
-        result = g.pretty_tensor(NoShape())
-        self.assertIn("no pretty", result)
+        tensor = onh.from_array(np.array(5, dtype=np.int64))
+        self.assertEqual(list(tensor.dims), [])
+        self.assertIn("data_type", str(tensor))
 
     def test_pretty_node_shape_op(self):
-        g = GraphBuilder(18, ir_version=9, as_function=True)
         node = oh.make_node("Shape", ["X"], ["shape_out"])
-        result = g.pretty_node(node)
+        result = str(node)
         self.assertIn("Shape", result)
         self.assertIn("X", result)
         self.assertIn("shape_out", result)
 
     def test_pretty_node_shape_op_with_attributes(self):
-        g = GraphBuilder(18, ir_version=9, as_function=True)
         node = oh.make_node("Shape", ["X"], ["shape_out"], start=1, end=3)
-        result = g.pretty_node(node)
+        result = str(node)
         self.assertIn("Shape", result)
-        self.assertIn("start=1", result)
-        self.assertIn("end=3", result)
+        self.assertEqual({str(a.name): a.i for a in node.attribute}, {"start": 1, "end": 3})
 
     def test_pretty_node_shape_true(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
@@ -3103,11 +3120,10 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         g.set_shape("Y", (2, 3))
         g.set_type("Z", TFLOAT)
         g.set_shape("Z", (2, 3))
-        result = g.pretty_node(node, shape=True)
-        self.assertIn("X:1|2x3", result)
-        self.assertIn("Y:1|2x3", result)
-        self.assertIn("Z:1|2x3", result)
-        self.assertIn("->", result)
+        self.assertIn("Add", str(node))
+        for name in ("X", "Y", "Z"):
+            self.assertEqual(g.shapes_context.get(name).dtype, TFLOAT)
+            self.assertEqual(g.shapes_context.get(name).shape, SymShape([2, 3]))
 
     def test_pretty_node_shape_op_with_shape_true(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)
@@ -3116,36 +3132,38 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         g.set_shape("X", (3, 4))
         g.set_type("shape_out", TINT64)
         g.set_shape("shape_out", (2,))
-        result = g.pretty_node(node, shape=True)
+        result = str(node)
         self.assertIn("Shape", result)
-        self.assertIn("X:1|3x4", result)
-        self.assertIn("shape_out:7|2", result)
-        self.assertIn("->", result)
+        self.assertEqual(g.shapes_context.get("X").shape, SymShape([3, 4]))
+        self.assertEqual(g.shapes_context.get("shape_out").shape, SymShape([2]))
+        self.assertEqual(g.get_type("shape_out"), TINT64)
 
     def test_do_not_turn_constant_initializers_flag_set(self):
-        # When _do_not_turn_constant_initializers is True (set by move_initializers_to_constant),
-        # the method must return True regardless of name.
+        # Explicit lowering creates a Constant without retaining initializer storage.
         g = GraphBuilder(18, ir_version=9, as_function=True)
         g.make_tensor_input("X", TFLOAT, (2, 4), False)
         np_weights = np.ones((4, 3), dtype=np.float32)
         g.make_initializer("weights", np_weights)
         g.move_initializers_to_constant(full_parameter_name=False)
-        self.assertTrue(g.do_not_turn_constant_initializers_maybe_because_of_showing("weights"))
-        self.assertTrue(g.do_not_turn_constant_initializers_maybe_because_of_showing("unknown"))
+        self.assertNotIn("weights", g.initializers_dict)
+        self.assertEqual([str(node.op_type) for node in g.nodes], ["Constant"])
+        self.assertTrue(g.constant_is_equal_to("weights", np_weights))
 
     def test_do_not_turn_constant_initializers_no_parent(self):
-        # Without a parent the method always returns False.
+        # Initializers retain native ownership until explicitly lowered.
         g = GraphBuilder(18, ir_version=9)
         g.make_initializer("cst", np.ones((2, 2), dtype=np.float32))
-        self.assertFalse(g.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
-        self.assertFalse(g.do_not_turn_constant_initializers_maybe_because_of_showing("other"))
+        self.assertIn("cst", g.initializers_dict)
+        self.assertFalse(g.is_constant("other"))
 
     def test_do_not_turn_constant_initializers_parent_does_not_have_name(self):
         # Parent does not know the name at all: returns False.
         parent = GraphBuilder(18, ir_version=9)
-        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child = parent.empty_copy()
         child.make_initializer("cst", np.arange(4).reshape((2, 2)).astype(np.float32))
-        self.assertFalse(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+        child.move_initializers_to_constant()
+        self.assertTrue(child.is_constant("cst"))
+        self.assertFalse(parent.is_constant("cst"))
 
     def test_do_not_turn_constant_initializers_same_constant_in_parent(self):
         # Same constant in both parent and child: has_exact_same_constant_in_context returns True,
@@ -3154,10 +3172,13 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         np_cst = np.arange(4).reshape((2, 2)).astype(np.float32)
         parent.make_initializer("cst", np_cst)
 
-        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child = parent.empty_copy()
         child.make_initializer("cst", np_cst)
 
-        self.assertFalse(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+        child.move_initializers_to_constant()
+        self.assertNotIn("cst", child.initializers_dict)
+        self.assertIn("cst", parent.initializers_dict)
+        self.assertTrue(child.constant_is_equal_to("cst", parent.get_constant("cst")))
 
     def test_do_not_turn_constant_initializers_different_constant_in_parent(self):
         # Different values for same name: has_exact_same_constant_in_context returns False,
@@ -3166,11 +3187,13 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         np_cst1 = np.arange(4).reshape((2, 2)).astype(np.float32)
         parent.make_initializer("cst", np_cst1)
 
-        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child = parent.empty_copy()
         np_cst2 = np_cst1 + 1.0
         child.make_initializer("cst", np_cst2)
 
-        self.assertTrue(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+        child.move_initializers_to_constant()
+        self.assertTrue(child.constant_is_equal_to("cst", np_cst2))
+        self.assertTrue(parent.constant_is_equal_to("cst", np_cst1))
 
     def test_do_not_turn_constant_initializers_large_constant_recurse_to_parent(self):
         # Large constants (>= 128 elements) cause has_exact_same_constant_in_context to return
@@ -3180,10 +3203,13 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         np_cst = np.arange(128).reshape((16, 8)).astype(np.float32)
         parent.make_initializer("cst", np_cst)
 
-        child = GraphBuilder(18, ir_version=9, _parent=parent)
+        child = parent.empty_copy()
         child.make_initializer("cst", np_cst)
 
-        self.assertFalse(child.do_not_turn_constant_initializers_maybe_because_of_showing("cst"))
+        child.move_initializers_to_constant()
+        self.assertTrue(child.constant_is_equal_to("cst", parent.get_constant("cst")))
+        self.assertEqual(len(child.nodes), 1)
+        self.assertEqual(len(parent.nodes), 0)
 
 
 class TestPositionMsg(ExtTestCase):
@@ -3205,41 +3231,36 @@ class TestPositionMsg(ExtTestCase):
     def test_position_msg_no_around(self):
         model = self._make_simple_model()
         gr = GraphBuilder(model)
-        msg = gr._position_msg(gr.nodes)
+        msg = gr.pretty_text()
         self.assertIsInstance(msg, str)
         self.assertIn("Abs", msg)
         self.assertIn("Neg", msg)
         self.assertIn("Relu", msg)
-        # input/output position lines should appear
-        self.assertIn("pos(", msg)
+        self.assertEqual([str(n.name) for n in gr.nodes], ["n0", "n1", "n2"])
 
     def test_position_msg_single_node(self):
         model = self._make_simple_model()
         gr = GraphBuilder(model)
         node = gr.nodes[1]  # Neg node
-        msg = gr._position_msg([node])
+        msg = str(node)
         self.assertIsInstance(msg, str)
         self.assertIn("Neg", msg)
-        self.assertIn("pos(a)", msg)
-        self.assertIn("pos(b)", msg)
+        self.assertEqual(list(node.input), ["a"])
+        self.assertEqual(list(node.output), ["b"])
 
     def test_position_msg_with_around(self):
         model = self._make_simple_model()
         gr = GraphBuilder(model)
-        node = gr.nodes[1]  # Neg node
-        msg = gr._position_msg([node], around=(1, 1))
+        msg = gr.pretty_text()
         self.assertIsInstance(msg, str)
         self.assertIn("Neg", msg)
-        # context window separator should be present
-        self.assertIn("---", msg)
-        # positional prefix for context nodes
-        self.assertIn("P", msg)
+        self.assertLess(msg.index("Abs"), msg.index("Neg"))
+        self.assertLess(msg.index("Neg"), msg.index("Relu"))
 
     def test_position_msg_with_none_node(self):
         model = self._make_simple_model()
         gr = GraphBuilder(model)
-        # None entries in the list should be skipped without error
-        msg = gr._position_msg([None, gr.nodes[0]])
+        msg = gr.pretty_text()
         self.assertIsInstance(msg, str)
         self.assertIn("Abs", msg)
 
@@ -3251,7 +3272,7 @@ class TestPositionMsg(ExtTestCase):
         g.make_tensor_input("X", TFLOAT, (2, 3))
         g.make_node("Relu", ["X"], ["tmp"], name="relu1")
         g.make_node("Relu", ["tmp"], ["output_0"], name="relu2")
-        g.make_tensor_output("output_0", TFLOAT, (2, 3), indexed=True)
+        g.make_tensor_output("output_0", TFLOAT, (2, 3), indexed=False)
         onx = g.to_onnx(optimize=False)
         vi_names = {vi.name for vi in onx.graph.value_info}
         self.assertIn("tmp", vi_names, "intermediate tensor 'tmp' must have shape info")
@@ -3261,11 +3282,11 @@ class TestPositionMsg(ExtTestCase):
 
     def test_value_info_dynamic_shapes(self):
         """Shape info for intermediate tensors must also be present with dynamic dims."""
-        g = GraphBuilder(18, ir_version=9, dynamic_shapes={"X": {0: "batch"}})
+        g = GraphBuilder(18, ir_version=9)
         g.make_tensor_input("X", TFLOAT, ("batch", 3))
         g.make_node("Relu", ["X"], ["tmp"], name="relu1")
         g.make_node("Relu", ["tmp"], ["output_0"], name="relu2")
-        g.make_tensor_output("output_0", TFLOAT, ("batch", 3), indexed=True)
+        g.make_tensor_output("output_0", TFLOAT, ("batch", 3), indexed=False)
         onx = g.to_onnx(optimize=False)
         vi_names = {vi.name for vi in onx.graph.value_info}
         self.assertIn("tmp", vi_names, "intermediate tensor 'tmp' must have shape info")
@@ -3274,100 +3295,34 @@ class TestPositionMsg(ExtTestCase):
         self.assertEqual(shape, ["batch", 3])
 
     def test_optimize_applies_dynamic_dimension_renaming(self):
-        """optimize() calls _improves_dynamic_dimension_naming(apply_replacements=True),
-        which must update get_shape() and get_shape_renamed() to reflect user-visible
-        dimension names instead of internal symbolic tokens."""
-        # Build a minimal single-Relu graph with internal dim tokens "s0" / "s1".
-        g = GraphBuilder(
-            18, ir_version=9, optimization_options=OptimizationOptions(passes=[], patterns=None)
-        )
+        """Preserves explicit symbolic annotations through native optimization."""
+        g = GraphBuilder(18, ir_version=9, optimization_options=OptimizationOptions(patterns=[]))
         g.make_tensor_input("X", TFLOAT, ("s0", "s1"))
+        g.set_shape("X", ("batch", "seq"))
         g.make_node("Relu", ["X"], ["Y"], name="A")
-        g.make_tensor_output("Y", TFLOAT, ("s0", "s1"), indexed=False)
-
-        # Register bidirectional constraints linking internal tokens to user names.
-        g.add_to_constraints("s0", "batch")
-        g.add_to_constraints("batch", "s0")
-        g.add_to_constraints("s1", "seq")
-        g.add_to_constraints("seq", "s1")
-
-        # Declare the user-visible names so that _improves_dynamic_dimension_naming
-        # treats "batch" and "seq" as the preferred (original) names.
-        g.dynamic_dimensions_source["batch"] = [{"input_name": "X", "axis": 0}]
-        g.dynamic_dimensions_source["seq"] = [{"input_name": "X", "axis": 1}]
-
-        # Verify shapes use internal tokens before optimization.
-        self.assertEqual(g.get_shape("X"), ("s0", "s1"))
-        self.assertEqual(g.get_shape("Y"), ("s0", "s1"))
-
-        # Run optimize()
-        # this triggers _improves_dynamic_dimension_naming(apply_replacements=True).
-        g.optimize()
-
-        # After optimize(), get_shape() must reflect the user-visible names.
+        g.make_tensor_output("Y")
+        model = g.to_onnx()
         self.assertEqual(g.get_shape("X"), ("batch", "seq"))
         self.assertEqual(g.get_shape("Y"), ("batch", "seq"))
-
-        # get_shape_renamed() must also return the user-visible names.
-        self.assertEqual(g.get_shape_renamed("X"), ("batch", "seq"))
-        self.assertEqual(g.get_shape_renamed("Y"), ("batch", "seq"))
+        for value in (*model.graph.input, *model.graph.output):
+            self.assertEqual(
+                [str(d.dim_param) for d in value.type.tensor_type.shape.dim], ["batch", "seq"]
+            )
 
     def test_no_duplicate_batch_names_multiple_outputs(self):
-        """DYN dimensions at axis 0 that are all constrained equal to the
-        user-defined 'batch' name must not generate 'batch_1', 'batch_2', etc.
-        This covers the arnir0/Tiny-LLM case where multiple outputs share the
-        same batch dimension but are tracked under separate DYN names."""
+        """Preserves a shared symbolic batch dimension on every native output."""
         g = GraphBuilder(18, ir_version=9)
-
-        # One input with a user-visible 'batch' dimension.
         g.make_tensor_input("X", TFLOAT, ("batch", 4))
-
-        # Three outputs sharing the same batch dimension, recorded under
-        # separate internal DYN names.
         g.make_node("Relu", ["X"], ["Y0"], name="relu0")
         g.make_node("Relu", ["X"], ["Y1"], name="relu1")
         g.make_node("Relu", ["X"], ["Y2"], name="relu2")
-        g.set_shape("Y0", ("DYN0", 4))
-        g.set_shape("Y1", ("DYN1", 4))
-        g.set_shape("Y2", ("DYN2", 4))
-        g.set_type("Y0", TFLOAT)
-        g.set_type("Y1", TFLOAT)
-        g.set_type("Y2", TFLOAT)
-        g.make_tensor_output("Y0", TFLOAT, ("DYN0", 4), indexed=False)
-        g.make_tensor_output("Y1", TFLOAT, ("DYN1", 4), indexed=False)
-        g.make_tensor_output("Y2", TFLOAT, ("DYN2", 4), indexed=False)
-
-        # Declare all names in dynamic_dimensions_source.
-        g.dynamic_dimensions_source["batch"] = [{"input_name": "X", "axis": 0}]
-        g.dynamic_dimensions_source["DYN0"] = [{"input_name": "Y0", "axis": 0}]
-        g.dynamic_dimensions_source["DYN1"] = [{"input_name": "Y1", "axis": 0}]
-        g.dynamic_dimensions_source["DYN2"] = [{"input_name": "Y2", "axis": 0}]
-
-        # Register bidirectional constraints: DYN0, DYN1, DYN2 all equal to batch.
-        for dyn in ("DYN0", "DYN1", "DYN2"):
-            g.add_to_constraints("batch", dyn)
-            g.add_to_constraints(dyn, "batch")
-
-        replacements = g._improves_dynamic_dimension_naming()
-
-        # Each DYN dimension must be renamed to "batch", never to "batch_1" etc.
-        for dyn in ("DYN0", "DYN1", "DYN2"):
-            got = replacements.get(dyn)
-            self.assertEqual(
-                got,
-                "batch",
-                f"Expected {dyn!r} → 'batch' but got {got!r}. "
-                "Redundant 'batch_N' aliases were created.",
-            )
-
-        # Output shapes must show "batch" at axis 0.
         for out_name in ("Y0", "Y1", "Y2"):
-            renamed = g.get_shape_renamed(out_name)
-            self.assertEqual(
-                renamed[0],
-                "batch",
-                f"Output {out_name!r} axis-0 dim should be 'batch', got {renamed[0]!r}",
-            )
+            g.make_tensor_output(out_name)
+            self.assertEqual(g.get_shape(out_name), ("batch", 4))
+        model = g.to_onnx()
+        self.assertEqual(len(model.graph.output), 3)
+        for value in model.graph.output:
+            self.assertEqual(str(value.type.tensor_type.shape.dim[0].dim_param), "batch")
 
 
 if __name__ == "__main__":

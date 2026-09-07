@@ -1,5 +1,9 @@
 """Exercises native backend cases through the explicit ONNX Runtime evaluator."""
 
+import unittest
+from unittest.mock import patch
+import numpy
+from onnx_light.onnx import helper
 from onnx_light.onnx.backend import make_test_class
 from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 
@@ -21,3 +25,16 @@ TestGeneratedOnnxruntimeBackend = make_test_class(
     include_big=False,
     unload=True,
 )
+
+
+class TestOnnxruntimeConstant(unittest.TestCase):
+    def test_constant_tensor_boundary(self):
+        node = helper.make_node("Constant", [], ["value"], value_float=1.0)
+        actual = OnnxruntimeEvaluator(node, opsets=18).run(None, {})[0]
+        numpy.testing.assert_array_equal(actual, numpy.array(1.0, dtype=numpy.float32))
+        with patch(
+            "yobx.reference.onnxruntime_evaluator.ExtendedReferenceEvaluator"
+        ) as evaluator:
+            evaluator.return_value.run.return_value = [[actual]]
+            with self.assertRaisesRegex(TypeError, "must produce a tensor"):
+                OnnxruntimeEvaluator(node, opsets=18).run(None, {})
