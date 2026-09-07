@@ -62,14 +62,14 @@ Other Variables
 ===============
 
 Environment variables used by the graph builder, shape-inference engine,
-pattern optimizer, and PyTorch exporter are documented in the dedicated
+native graph optimizer, and PyTorch exporter are documented in the dedicated
 sections below:
 
 * :ref:`l-graphbuilder-debugging-env` — ``GraphBuilder`` and shape-inference
   environment variables (``ONNXSTOP*``, ``ONNXCST``, ``NULLSHAPE``,
   ``ONNXSHAPECOMPUTE``, ``PRINTNAME``, …).
 * :ref:`l-design-xshape-debugging` — shape-inference debugging variables.
-* :ref:`l-design-pattern-optimizer-debugging` — pattern-optimizer variables
+* :ref:`l-design-graph-builder-optimization` — native graph-optimization notes
   (``LOG_PATTERN_OPTIMIZE``, ``PATTERN``, ``DROPPATTERN``, …).
 * :ref:`l-design-torch-converter` — PyTorch exporter variables
   (``PRINT_EXPORTED_PROGRAM``, ``PRINT_GRAPH_MODULE``, ``ONNXVERBOSE``,

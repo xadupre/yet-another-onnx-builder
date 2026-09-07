@@ -50,6 +50,7 @@ jobs:
             unittests/main/test_native_only.py \
             unittests/container \
             unittests/xshape \
+            unittests/xoptim \
             unittests/reference \
             unittests/torch/test_native_export.py \
             unittests/helpers/test_backend_test_pretty.py \

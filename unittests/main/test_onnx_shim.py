@@ -53,6 +53,31 @@ class TestOnnxShim(unittest.TestCase):
             ):
                 builder(18)
 
+    def test_python_pattern_engine_is_removed(self):
+        """Prevents shipping obsolete Python matchers or their public interfaces."""
+        import yobx
+        import yobx.typing
+        from yobx.translate import reverse_graph_builder
+
+        package = pathlib.Path(yobx.__file__).parent
+        self.assertEqual(list((package / "xoptim").rglob("*.py")), [])
+        self.assertFalse(hasattr(yobx.typing, "GraphBuilderPatternOptimizationProtocol"))
+        self.assertFalse(hasattr(reverse_graph_builder, "to_graph_pattern_matching"))
+        retired_classes = {
+            "PatternOptimization",
+            "EasyPatternOptimization",
+            "OnnxEasyPatternOptimization",
+            "GraphBuilderPatternOptimization",
+            "MatchResult",
+        }
+        violations = [
+            f"{path}:{node.lineno}:{node.name}"
+            for path in package.rglob("*.py")
+            for node in ast.walk(ast.parse(path.read_text()))
+            if isinstance(node, ast.ClassDef) and node.name in retired_classes
+        ]
+        self.assertEqual(violations, [])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

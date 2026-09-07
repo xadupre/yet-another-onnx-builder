@@ -10,6 +10,8 @@ yobx.reference.ops
     :caption: modules
 
     op__overwrite_gather
+    op__overwrite_argminmax
+    op__overwrite_comparison
     op_complex
     op_fast_gelu
     op_fused_matmul_activation

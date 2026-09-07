@@ -179,6 +179,11 @@ weight-folding runtime kernels. Extras that installed `onnxscript`, `onnx-ir`,
 `spox` or reference shape inference have been removed because they would
 reintroduce the reference ONNX dependency.
 
+The Python pattern package `yobx.xoptim` and its matching/code-generation APIs
+have been removed, not retained as an inactive fallback. Pattern implementations
+and their registry come exclusively from the `onnx-light` wheel; YOBX only
+selects native pattern names and forwards optimization requests to `GraphGraph`.
+
 The historical `yobx.xbuilder.graph_builder.GraphBuilder` import also resolves
 to the native implementation; the Python graph engine has been removed.
 PyTorch export uses `torch.export` and native ONNX lowering, including dynamic

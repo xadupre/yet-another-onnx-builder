@@ -4,12 +4,10 @@ GraphBuilder to build and optimize ONNX Models
 This section covers the tools for building and optimizing ONNX computation graphs
 programmatically. It includes the :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>` class
 for constructing ONNX graphs from scratch, shape inference mechanisms for tracking tensor
-dimensions throughout the graph, and a pattern-based optimizer for rewriting and simplifying
-graphs.
+dimensions throughout the graph, and the native optimization bridge used by
+``OptimizationOptions`` to select registered pattern names.
 
 .. toctree::
    :maxdepth: 1
 
    graph_builder
-   optimizer
-   optimizer_patterns
