@@ -3,11 +3,14 @@
 of every :func:`to_onnx` conversion function.
 """
 
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 from onnx_light import onnx
 from ..typing import GraphBuilderExtendedProtocol, ExportArtifactProtocol
 from .model_container import ExtendedModelContainer
 from .build_stats import BuildStats
+
+if TYPE_CHECKING:
+    import torch
 
 
 class ExportReport:
@@ -472,6 +475,10 @@ class ExportArtifact(ExportArtifactProtocol):
     container, an :class:`ExportReport` describing the export process,
     and an optional filename.
 
+    The optional :attr:`ep` retains the PyTorch ExportedProgram when a
+    Torch export requests ``return_ep=True``. It is ``None`` otherwise,
+    and does not require importing Torch to construct an artifact.
+
     Args:
         proto : ModelProto | FunctionProto | GraphProto | None
             The ONNX proto produced by the export.  When *large_model* was
@@ -534,6 +541,7 @@ class ExportArtifact(ExportArtifactProtocol):
         self.filename = filename
         self.builder = builder
         self.function = function
+        self.ep: Optional["torch.export.ExportedProgram"] = None
         if self.container and self.container._stats:
             if not self.report:
                 self.report = ExportReport(build_stats=self.container._stats)

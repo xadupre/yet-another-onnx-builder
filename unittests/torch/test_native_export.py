@@ -85,6 +85,37 @@ class TestNativeTorchExport(unittest.TestCase):
                     actual, model(x).detach().numpy(), rtol=1e-12, atol=1e-12
                 )
 
+    def test_exported_input_signature_errors(self):
+        """Reports unsupported symbolic arguments and missing parameter targets."""
+        import torch
+        from torch.export.graph_signature import InputKind, SymIntArgument
+        from yobx.torch import to_onnx
+        from yobx.torch.export_options import ExportOptions
+
+        class Model(torch.nn.Module):
+            def forward(self, x, scale):
+                return x * scale
+
+        x = torch.randn(2, 3)
+        options = ExportOptions(remove_inplace=False)
+        program = torch.export.export(Model(), (x, 2))
+        artifact = to_onnx(program, validate_onnx=True, export_options=options)
+        self.assertIsNone(artifact.ep)
+        spec = program.graph_signature.input_specs[-1]
+        spec.arg = SymIntArgument(name=spec.arg.name)
+        with self.assertRaisesRegex(NotImplementedError, "does not support user input"):
+            to_onnx(program, export_options=options)
+
+        program = torch.export.export(torch.nn.Linear(3, 2), (x,))
+        spec = next(
+            spec
+            for spec in program.graph_signature.input_specs
+            if spec.kind == InputKind.PARAMETER
+        )
+        spec.target = None
+        with self.assertRaisesRegex(ValueError, "has no target"):
+            to_onnx(program, export_options=options)
+
     def test_native_transpose_pattern(self):
         import torch
         from yobx.builder.onnxlight import OnnxLightOptimizationOptions

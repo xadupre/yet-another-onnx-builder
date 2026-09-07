@@ -478,7 +478,7 @@ class NativeTorchInterpreter:
                 if isinstance(value, (tuple, list))
                 else [name]
             )
-            state = {"native": True}
+            state: dict[str, bool | torch.dtype] = {"native": True}
             if isinstance(value, torch.Tensor):
                 state["dtype"] = value.dtype
             return converter(self.builder, state, outputs, *args, **kwargs)
@@ -613,7 +613,12 @@ def to_onnx(
             export_options.get_decomposition_table() if export_options.decomposition_table else {}
         )
         program = program.run_decompositions(decompositions)
-    from torch.export.graph_signature import InputKind, OutputKind, TensorArgument
+    from torch.export.graph_signature import (
+        ConstantArgument,
+        InputKind,
+        OutputKind,
+        TensorArgument,
+    )
 
     if any(spec.kind != OutputKind.USER_OUTPUT for spec in program.graph_signature.output_specs):
         raise NotImplementedError(
@@ -647,6 +652,8 @@ def to_onnx(
     user_index = 0
     for node, spec in zip(placeholders, program.graph_signature.input_specs):
         if spec.kind in (InputKind.PARAMETER, InputKind.BUFFER, InputKind.CONSTANT_TENSOR):
+            if spec.target is None:
+                raise ValueError(f"Exported {spec.kind.name} input {node.name!r} has no target.")
             value = (
                 program.state_dict[spec.target]
                 if spec.target in program.state_dict
@@ -669,8 +676,12 @@ def to_onnx(
                 )
                 interpreter.values[node] = name
                 tensor_index += 1
-            else:
+            elif isinstance(spec.arg, ConstantArgument):
                 interpreter.values[node] = spec.arg.value
+            else:
+                raise NotImplementedError(
+                    f"Native Torch export does not support user input {spec.arg!r}."
+                )
             user_index += 1
         else:
             raise NotImplementedError(f"Unsupported exported input kind {spec.kind!r}.")
@@ -694,13 +705,19 @@ def to_onnx(
         external_threshold=external_threshold,
         return_optimize_report=True,
     )
-    artifact.report.update(
+    report = artifact.report
+    if report is None:
+        raise RuntimeError("Native Torch export requires the requested optimization report.")
+    report.update(
         {"torch_backend": "native", "time_torch_lowering": time.perf_counter() - started}
     )
     if verbose:
+        model = artifact.get_proto(include_weights=False)
+        if not isinstance(model, onnx.ModelProto):
+            raise TypeError(f"Expected a native ModelProto, got {type(model)!r}.")
         print(
-            f"[nativeTorch] {len(artifact.proto.graph.node)} ONNX nodes, "
-            f"{artifact.report.extra['rewrites']} native rewrites"
+            f"[nativeTorch] {len(model.graph.node)} ONNX nodes, "
+            f"{report.extra['rewrites']} native rewrites"
         )
     if function_export:
         artifact = _function_artifact(artifact, function_options)
@@ -728,8 +745,12 @@ def to_onnx(
         expected, _ = torch.utils._pytree.tree_flatten(expected)
         if len(expected) != len(actual):
             raise ValueError("Validation result count does not match the exported outputs.")
-        tolerance = validate_onnx if isinstance(validate_onnx, float) else 1e-5
+        tolerance = float(validate_onnx) if isinstance(validate_onnx, float) else 1e-5
         for got, want in zip(actual, expected):
+            if not isinstance(got, numpy.ndarray):
+                raise TypeError(
+                    f"Native Torch validation expects tensor outputs, got {type(got)!r}."
+                )
             value = want.detach().cpu().numpy() if isinstance(want, torch.Tensor) else want
             numpy.testing.assert_allclose(got, value, atol=tolerance, rtol=tolerance)
     return artifact
