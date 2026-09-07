@@ -23,8 +23,8 @@ ONNX ML operator set does not support bitset-based categorical splits.
 
 from typing import Dict, List, Tuple, Union
 import numpy as np
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 from sklearn.ensemble import HistGradientBoostingClassifier, HistGradientBoostingRegressor
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..register import register_sklearn_converter

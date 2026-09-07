@@ -46,7 +46,7 @@ while presenting the same string-based API to converters.
     :showcode:
 
     import numpy as np
-    import onnx
+    from yobx._onnx_shim import onnx
     from sklearn.preprocessing import StandardScaler
     from yobx.sklearn import to_onnx
     from yobx.builder.onnxscript import OnnxScriptGraphBuilder
@@ -72,7 +72,7 @@ The only change relative to the default workflow is passing
     :showcode:
 
     import numpy as np
-    import onnx
+    from yobx._onnx_shim import onnx
     from sklearn.preprocessing import StandardScaler
     from sklearn.pipeline import Pipeline
     from sklearn.linear_model import LogisticRegression

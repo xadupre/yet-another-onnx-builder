@@ -40,6 +40,8 @@ jobs:
       - name: Install tensorflow==2.21 jax==0.10
         run: pip install "tensorflow==2.21.*" "jax==0.10.*"
 
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
         run: pip install -e ".[dev,tensorflow]"
 
@@ -85,6 +87,8 @@ jobs:
 
       - name: Install tensorflow==${{ matrix.tensorflow-version }} jax==${{ matrix.jax-version }}
         run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" "jax==${{ matrix.jax-version }}.*"
+
+      - uses: ./.github/actions/install-onnx-light
 
       - name: Install dependencies
         run: pip install -e ".[dev,tensorflow]"

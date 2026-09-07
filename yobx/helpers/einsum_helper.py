@@ -11,7 +11,7 @@ or stitched into a larger graph.
 
 from typing import List, Optional, Sequence, Tuple, Union
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from ._einsum import decompose_einsum_equation
 from ._einsum.einsum_2_onnx import decompose_einsum_2inputs as _decompose_einsum_2inputs
 from .onnx_helper import np_dtype_to_tensor_dtype
@@ -146,21 +146,21 @@ def decompose_einsum(
     # Optimize: apply GraphBuilder pattern rewrites, identity removal, and
     # constant folding.  Import deferred to avoid a circular import with
     # yobx.xbuilder.
-    from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
+    from yobx.xbuilder import GraphBuilder, OptimizationOptions
 
     gb = GraphBuilder(
         model,
         verbose=0,
         optimization_options=None if not patterns else OptimizationOptions(patterns=patterns),
     )
-    gb.optimize()
-    artifact = gb.to_onnx(optimize=False)
+    artifact = gb.to_onnx(optimize=True)
     opt_model = artifact.get_proto()
     # GraphBuilder embeds extra metadata_props (e.g. statistics) that ORT
     # does not expect.  Stripping them and doing an onnx round-trip normalises
     # the protobuf so ORT can load it directly from SerializeToString().
     del opt_model.metadata_props[:]
-    final_model = onnx.load_from_string(opt_model.SerializeToString())
+    final_model = onnx.ModelProto()
+    final_model.ParseFromString(opt_model.SerializeToString())
 
     # Post-processing: replace integer dimensions in the input value_info
     # with their einsum index letters so the returned model is dynamic by

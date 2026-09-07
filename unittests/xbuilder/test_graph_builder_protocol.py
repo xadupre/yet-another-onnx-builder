@@ -10,7 +10,7 @@ required method/property exists with a functional smoke test).
 """
 
 import unittest
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 from yobx.typing import (
     GraphBuilderProtocol,
     GraphBuilderExtendedProtocol,

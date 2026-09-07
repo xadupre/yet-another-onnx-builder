@@ -8,9 +8,9 @@ import pprint
 from collections import Counter
 from typing import Any, Callable, Dict, Iterable, Iterator, List, Optional, Set, Tuple, Union
 import numpy as np
-import onnx
-import onnx.numpy_helper as onh
-from onnx import (
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.numpy_helper as onh
+from onnx_light.onnx import (
     AttributeProto,
     FunctionProto,
     GraphProto,
@@ -36,7 +36,7 @@ class ModelStatistics:
     :meth:`~yobx.typing.GraphBuilderProtocol.to_onnx`.
 
     :param model: ONNX model or graph builder
-    :param verbose: verbosity level passed to :class:`BasicShapeBuilder`
+    :param verbose: verbosity level passed to :class:`NativeShapeInference`
         (ignored when *model* is a graph builder)
 
     Usage::
@@ -90,7 +90,7 @@ class ModelStatistics:
 
     def _build_shape_map(self) -> None:
         """Populates :attr:`_shape_map` from the builder (if provided) or by
-        running :class:`BasicShapeBuilder` on the stored model."""
+        running :class:`NativeShapeInference` on the stored model."""
         all_names: set = set()
         self._collect_names(self.model.graph, all_names)
 
@@ -105,9 +105,9 @@ class ModelStatistics:
                 else:
                     self._shape_map[name] = sh
         else:
-            from ..xshape import BasicShapeBuilder
+            from ..xshape import NativeShapeInference
 
-            self._bs = BasicShapeBuilder(verbose=self.verbose)
+            self._bs = NativeShapeInference(verbose=self.verbose)
             self._bs.run_model(self.model)
 
             for name in all_names:

@@ -237,7 +237,7 @@ Which we can render as follows:
 .. gdot::
     :script: DOT-SECTION
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.doc import to_dot, demo_mlp_model
 
     onx = demo_mlp_model("temp_doc_mlp.onnx")
@@ -249,7 +249,7 @@ We then apply the optimizations by writing the following code:
 .. runpython::
     :showcode:
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.xbuilder import GraphBuilder
     from yobx.doc import demo_mlp_model
@@ -273,7 +273,7 @@ Which renders as follows:
 .. gdot::
     :script: DOT-SECTION
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.doc import to_dot
 
     onx = onnx.load("temp_doc_mlp_opt.onnx")
@@ -286,7 +286,7 @@ Verbosity
 .. runpython::
     :showcode:
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder
     from yobx.doc import demo_mlp_model
 
@@ -300,7 +300,7 @@ With more verbosity:
 .. runpython::
     :showcode:
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder
     from yobx.doc import demo_mlp_model
 
@@ -318,7 +318,7 @@ is used to enable or disable patterns.
 .. runpython::
     :showcode:
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
     from yobx.doc import demo_mlp_model
 
@@ -343,7 +343,7 @@ There exists some predefined lists of patterns:
 .. runpython::
     :showcode:
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
     from yobx.doc import demo_mlp_model
 
@@ -367,7 +367,7 @@ This can be used to see when a pattern is applied and how long it takes.
     :showcode:
 
     import pandas
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
     from yobx.doc import demo_mlp_model
 
@@ -388,7 +388,7 @@ It can be aggregated:
     :showcode:
 
     import pandas
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
     from yobx.doc import demo_mlp_model
 
@@ -542,7 +542,7 @@ helpers provided by
 
     import inspect
     from typing import List, Optional
-    from onnx import NodeProto
+    from onnx_light.onnx import NodeProto
     from yobx.xoptim import PatternOptimization, MatchResult
 
 
@@ -595,7 +595,7 @@ calls. The framework takes care of matching and result renaming automatically.
 .. code-block:: python
 
     from typing import List, Optional
-    from onnx import NodeProto
+    from onnx_light.onnx import NodeProto
     from yobx.xoptim import EasyPatternOptimization, MatchResult
 
 

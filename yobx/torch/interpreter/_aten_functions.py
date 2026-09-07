@@ -8,16 +8,16 @@ import sys
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
-import onnx.numpy_helper as onh
-from onnx import FunctionProto, TensorProto, ValueInfoProto
-from onnx.helper import (
+import onnx_light.onnx.numpy_helper as onh
+from onnx_light.onnx import FunctionProto, TensorProto, ValueInfoProto
+from onnx_light.onnx.helper import (
     make_graph,
     make_node,
     make_tensor_sequence_value_info,
     make_tensor_type_proto,
     make_tensor_value_info,
 )
-from onnx.shape_inference import infer_function_output_types
+from onnx_light.onnx.shape_inference import infer_function_output_types
 from ...helpers.onnx_helper import (
     tensor_dtype_to_np_dtype,
     np_dtype_to_tensor_dtype,

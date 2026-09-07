@@ -5,7 +5,7 @@ Symbolic Cost of a Model: Attention Block
 ==========================================
 
 This example shows how to compute the **symbolic FLOPs cost** of an ONNX model
-using :class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+using :class:`NativeShapeInference <yobx.xshape.NativeShapeInference>`
 with ``inference=InferenceMode.COST``.
 
 The model used is a single-head **scaled dot-product attention** block, which
@@ -28,12 +28,12 @@ tensors and replacing them with a single multiplication on the smaller
 """
 
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 
 from yobx.xbuilder import GraphBuilder, OptimizationOptions
-from yobx.xshape import BasicShapeBuilder, InferenceMode
+from yobx.xshape import NativeShapeInference, InferenceMode
 
 TFLOAT = onnx.TensorProto.FLOAT
 
@@ -96,7 +96,7 @@ for node in model.graph.node:
 # 2. Compute the symbolic cost
 # --------------------------------
 #
-# :meth:`BasicShapeBuilder.run_model` with ``inference=InferenceMode.COST``
+# :meth:`NativeShapeInference.run_model` with ``inference=InferenceMode.COST``
 # walks every node and calls :func:`~yobx.xshape.cost_inference.estimate_node_flops`
 # on each one.  Because the model inputs have symbolic dimensions, the returned
 # FLOPs values are **symbolic arithmetic expressions** (strings such as
@@ -105,7 +105,7 @@ for node in model.graph.node:
 # ``Transpose`` costs 1 read + 1 write per element (input element count).
 # Truly zero-cost ops (``Reshape``, ``Identity``, ``Cast``, …) return ``0``.
 
-builder_before = BasicShapeBuilder()
+builder_before = NativeShapeInference()
 cost_before = builder_before.run_model(model, inference=InferenceMode.COST)
 
 print("Symbolic FLOPs per node (before optimization):")
@@ -119,7 +119,7 @@ for op_type, flops, _ in cost_before:
 # -----------------------------------------------------------
 #
 # Once we have actual input tensors,
-# :meth:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder.evaluate_cost_with_true_inputs`
+# :meth:`~yobx.xshape.NativeShapeInference.evaluate_cost_with_true_inputs`
 # substitutes the true dimension values into every symbolic expression and
 # returns concrete integer FLOPs.
 
@@ -181,7 +181,7 @@ for node in opt_model.graph.node:
 #
 # We run the same symbolic cost analysis on the optimized model.
 
-builder_after = BasicShapeBuilder()
+builder_after = NativeShapeInference()
 cost_after = builder_after.run_model(opt_model, inference=InferenceMode.COST)
 
 print("Symbolic FLOPs per node (after optimization):")

@@ -1,5 +1,5 @@
 from typing import Optional, Tuple
-import onnx
+from onnx_light import onnx
 import torch
 from . import OpRunKernel, OpRunTensor
 

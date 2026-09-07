@@ -14,9 +14,15 @@ import unittest
 import pprint
 from typing import Optional
 import numpy as np
-import onnx
-from onnx import TensorProto, ValueInfoProto, helper as oh, numpy_helper as onh, load as onnx_load
-from onnx.checker import check_model
+from yobx._onnx_shim import onnx
+from onnx_light.onnx import (
+    TensorProto,
+    ValueInfoProto,
+    helper as oh,
+    numpy_helper as onh,
+    load as onnx_load,
+)
+from onnx_light.onnx.checker import check_model
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.ext_test_case import (
     ExtTestCase,

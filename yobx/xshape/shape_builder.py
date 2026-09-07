@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import numpy as np
-import onnx
-import onnx.helper as oh
+from onnx_light import onnx
+from onnx_light.onnx import helper as oh
 from ..helpers import string_type
 from ..helpers.onnx_helper import dtype_to_tensor_dtype
 from ._shape_helper import DYNAMIC_SHAPE
@@ -24,8 +24,8 @@ class ShapeBuilder:
     """
     API for a class computing shapes in an ONNX model.
 
-    The main implementation is :class:`BasicShapeBuilder
-    <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`.
+    The main implementation is :class:`NativeShapeInference
+    <yobx.xshape.native_shape_inference.NativeShapeInference>`.
     It walks through all the nodes of an ONNX model and infers output shapes
     and types based on the input shapes, using symbolic expressions when the
     exact integer values are not known.
@@ -48,9 +48,9 @@ class ShapeBuilder:
     .. runpython::
         :showcode:
 
-        import onnx
-        import onnx.helper as oh
-        from yobx.xshape import BasicShapeBuilder
+        from onnx_light import onnx
+        import onnx_light.onnx.helper as oh
+        from yobx.xshape import NativeShapeInference
 
         TFLOAT = onnx.TensorProto.FLOAT
 
@@ -69,7 +69,7 @@ class ShapeBuilder:
             ir_version=10,
         )
 
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model)
 
         print("input names :", builder.input_names)
@@ -296,7 +296,7 @@ class ShapeBuilder:
             This method accesses ``self._known_shapes`` which must be a
             ``dict`` mapping result names to shape tuples.  This attribute
             is provided by concrete subclasses such as
-            :class:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder`.
+            :class:`~yobx.xshape.native_shape_inference.NativeShapeInference`.
 
         :param original: set of preferred (user-visible) dimension names to
                          try to substitute into the shapes

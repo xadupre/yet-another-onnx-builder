@@ -1,7 +1,7 @@
 import unittest
 from typing import Optional
 import numpy as np
-from onnx import ModelProto, TensorProto, helper as oh, numpy_helper as onh
+from onnx_light.onnx import ModelProto, TensorProto, helper as oh, numpy_helper as onh
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions

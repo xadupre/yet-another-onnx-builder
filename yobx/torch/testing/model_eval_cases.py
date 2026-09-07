@@ -4,7 +4,7 @@ import itertools
 import re
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 import torch
 from ...helpers import string_type, max_diff
 from ...helpers.onnx_helper import pretty_onnx

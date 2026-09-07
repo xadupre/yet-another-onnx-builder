@@ -9,7 +9,7 @@ for ONNX models in *yobx*, and programmatically lists the formula used for every
 supported operator.
 
 The estimator is built around :func:`~yobx.xshape.estimate_node_flops` and is
-exposed through :class:`~yobx.xshape.BasicShapeBuilder` via
+exposed through :class:`~yobx.xshape.NativeShapeInference` via
 ``inference=InferenceMode.COST``.  When model inputs have *symbolic* dimensions
 (strings like ``"batch"`` or ``"seq"``), the cost values are symbolic arithmetic
 expressions that can be evaluated later with concrete shapes.
@@ -24,12 +24,12 @@ For a complete worked example using a real attention model, see
 #
 # We build a small two-node ONNX graph (``MatMul`` + ``Relu``) with symbolic
 # input dimensions and compute its cost with
-# :meth:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder.run_model`.
+# :meth:`~yobx.xshape.NativeShapeInference.run_model`.
 
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 
-from yobx.xshape import BasicShapeBuilder, InferenceMode
+from yobx.xshape import NativeShapeInference, InferenceMode
 
 TFLOAT = onnx.TensorProto.FLOAT
 
@@ -47,7 +47,7 @@ model = oh.make_model(
     ir_version=10,
 )
 
-builder = BasicShapeBuilder()
+builder = NativeShapeInference()
 cost_list = builder.run_model(model, inference=InferenceMode.COST)
 
 print("Symbolic FLOPs per node:")
@@ -61,7 +61,7 @@ for op_type, flops, _ in cost_list:
 #
 # Once the graph has been analysed with symbolic shapes, pass actual numpy
 # arrays to
-# :meth:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder.evaluate_cost_with_true_inputs`
+# :meth:`~yobx.xshape.NativeShapeInference.evaluate_cost_with_true_inputs`
 # to substitute the dimension values and get integer FLOPs counts.
 
 import numpy as np  # noqa: E402

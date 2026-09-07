@@ -1,8 +1,8 @@
 import subprocess
 from typing import Dict
 import numpy as np
-import onnx
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.numpy_helper as onh
 from ..reference import ExtendedReferenceEvaluator as Inference
 from .onnx_helper import onnx_dtype_name, pretty_onnx, get_hidden_inputs
 
@@ -57,9 +57,9 @@ def to_dot(model: onnx.ModelProto) -> str:
         :script: DOT-SECTION
 
         import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        from yobx._onnx_shim import onnx
+        import onnx_light.onnx.helper as oh
+        import onnx_light.onnx.numpy_helper as onh
         from yobx.helpers.dot_helper import to_dot
 
         TFLOAT = onnx.TensorProto.FLOAT
@@ -99,14 +99,10 @@ def to_dot(model: onnx.ModelProto) -> str:
         _unique[id_obj] = i
         return i
 
-    builder = None
-    try:
-        from ..xshape import BasicShapeBuilder
+    from ..xshape import NativeShapeInference
 
-        builder = BasicShapeBuilder()
-        builder.run_model(model)
-    except Exception:
-        builder = None
+    builder = NativeShapeInference()
+    builder.run_model(model)
 
     op_type_colors = {
         "Shape": "#d2a81f",

@@ -1,6 +1,6 @@
 import inspect
 from typing import Dict, List, Optional, Set
-from onnx import AttributeProto, NodeProto, TensorProto
+from onnx_light.onnx import AttributeProto, NodeProto, TensorProto
 from ...helpers.onnx_helper import make_idn, unary_like_op_types
 from ..patterns_api import MatchResult, PatternOptimization
 

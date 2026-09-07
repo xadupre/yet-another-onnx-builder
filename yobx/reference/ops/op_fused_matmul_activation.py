@@ -1,8 +1,8 @@
 import numpy as np
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
-class FusedMatMulActivation(OpRun):
+class FusedMatMulActivation(NativeOpKernel):
     """Represents the ``com.microsoft.FusedMatMulActivation`` operator.
 
     Applies an element-wise activation function to the result of a scaled

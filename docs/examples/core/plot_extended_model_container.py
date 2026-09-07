@@ -30,8 +30,8 @@ The example shows:
 import tempfile
 import os
 import numpy as np
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 import onnxruntime
 from yobx.container import ExtendedModelContainer
 

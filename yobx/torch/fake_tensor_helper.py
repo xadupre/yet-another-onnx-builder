@@ -290,7 +290,7 @@ class FakeTensorContext:
         :raises ValueError: if the shape is missing or a dimension is
             unresolvable
         """
-        from onnx import TensorProto as _TensorProto
+        from onnx_light.onnx import TensorProto as _TensorProto
         from .torch_helper import onnx_dtype_to_torch_dtype
 
         tt = vip.type.tensor_type

@@ -1,7 +1,7 @@
 from enum import IntEnum
 from typing import Any, Dict, List, Optional, Union
 import numpy as np
-from onnx import (
+from onnx_light.onnx import (
     ModelProto,
     NodeProto,
     SparseTensorProto,
@@ -9,10 +9,16 @@ from onnx import (
     TensorShapeProto,
     ValueInfoProto,
 )
-from onnx.checker import check_model
-from onnx.defs import onnx_opset_version
-from onnx.helper import make_graph, make_model, make_node, make_opsetid, make_tensor_value_info
-from onnx.numpy_helper import from_array
+from onnx_light.onnx.checker import check_model
+from onnx_light.onnx.defs import onnx_opset_version
+from onnx_light.onnx.helper import (
+    make_graph,
+    make_model,
+    make_node,
+    make_opsetid,
+    make_tensor_value_info,
+)
+from onnx_light.onnx.numpy_helper import from_array
 
 
 class ProtoType(IntEnum):

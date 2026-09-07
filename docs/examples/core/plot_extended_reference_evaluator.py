@@ -23,8 +23,8 @@ This example shows:
 """
 
 import numpy as np
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 from yobx.reference import ExtendedReferenceEvaluator
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -138,7 +138,7 @@ print("QuickGelu result:", z_gelu)
 # <yobx.reference.evaluator.ExtendedReferenceEvaluator.default_ops>` are
 # always merged in automatically, so you only need to list your additions.
 
-from onnx.reference.op_run import OpRun  # noqa: E402
+from onnx_light.onnx.reference.op_run import OpRun  # noqa: E402
 
 
 class Scale(OpRun):

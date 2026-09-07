@@ -44,9 +44,9 @@ Empty groups (e.g. no batch dimensions) are handled by using a constant
 from typing import List, Optional, Sequence, Tuple, Union
 
 import numpy
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -253,7 +253,7 @@ def decompose_einsum_2inputs(
         across both inputs carry the same string), or a string (symbolic
         name preserved as-is).  When omitted the input has no shape
         annotation.  Pass string elements (e.g. ``("M", "K")``) when you
-        need the :class:`~yobx.xshape.BasicShapeBuilder` to propagate
+        need the :class:`~yobx.xshape.NativeShapeInference` to propagate
         symbolic FLOPs formulae through the graph.
     :param shape1: optional shape of the second input (same convention).
     :param name0: name used for the first graph input (default ``"X0"``).
@@ -295,7 +295,7 @@ def decompose_einsum_2inputs(
         (result,) = sess.run(None, {"X0": a, "X1": b})
         assert np.allclose(result, np.einsum("ij,jk->ik", a, b), atol=1e-5)
     """
-    from ..onnx_helper import pretty_onnx
+    from ..onnx_helper import _default_OPSET_TO_IR_VERSION, pretty_onnx
 
     if opset is None:
         opset = min(18, onnx.defs.onnx_opset_version())
@@ -431,7 +431,7 @@ def decompose_einsum_2inputs(
     )
 
     model = oh.make_model(graph, opset_imports=[oh.make_opsetid("", opset)])
-    model.ir_version = onnx.IR_VERSION
+    model.ir_version = _default_OPSET_TO_IR_VERSION()[opset]
 
     for inp in model.graph.input:
         shape = tuple(d.dim_param or d.dim_value for d in inp.type.tensor_type.shape.dim)
@@ -444,11 +444,10 @@ def decompose_einsum_2inputs(
     # Skip optimization for scalar output to avoid pattern-rewrite edge cases.
     # Import deferred to avoid a circular import with yobx.xbuilder.
     if rhs:
-        from yobx.xbuilder.graph_builder import GraphBuilder
+        from yobx.xbuilder import GraphBuilder
 
         gb = GraphBuilder(model, verbose=0)
-        gb.optimize()
-        artifact = gb.to_onnx(optimize=False)
+        artifact = gb.to_onnx(optimize=True)
         opt_model = artifact.get_proto()
         # Strip GraphBuilder metadata_props to keep the model lean.
         del opt_model.metadata_props[:]

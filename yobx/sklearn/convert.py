@@ -159,7 +159,7 @@ def to_onnx(
     register_sklearn_converters()
 
     kwargs = (
-        dict(optimization_options=OptimizationOptions(patterns="default+onnxruntime"))
+        dict(optimization_options=OptimizationOptions())
         if "com.microsoft" in dict_target_opset
         else {}
     )
@@ -240,7 +240,7 @@ def to_onnx(
         g.make_tensor_output(name, indexed=False, allow_untyped_output=True)
     # When local functions are requested we must NOT inline them; pass inline=False
     # so the function bodies are preserved in the returned ModelProto.
-    if isinstance(g, GraphBuilder):
+    if isinstance(g, GraphBuilder) or getattr(g, "supports_optimization_report", False):
         onx = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,

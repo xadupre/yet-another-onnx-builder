@@ -3,10 +3,10 @@ import re
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
 import ml_dtypes
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-from onnx.defs import onnx_opset_version, get_all_schemas_with_history
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
+from onnx_light.onnx.defs import onnx_opset_version, get_all_schemas_with_history
 
 
 def _default_OPSET_TO_IR_VERSION() -> Dict[int, int]:
@@ -312,7 +312,7 @@ def onnx_dtype_name(itype: int, exc: bool = True) -> str:
     .. runpython::
         :showcode:
 
-        import onnx
+        from yobx._onnx_shim import onnx
         from yobx.helpers.onnx_helper import onnx_dtype_name
 
         itype = onnx.TensorProto.BFLOAT16
@@ -1088,9 +1088,9 @@ def make_model_with_local_functions(
         :showcode:
 
         import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        from yobx._onnx_shim import onnx
+        import onnx_light.onnx.helper as oh
+        import onnx_light.onnx.numpy_helper as onh
         from yobx.helpers.onnx_helper import (
             make_model_with_local_functions,
             pretty_onnx,

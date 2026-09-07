@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.reference.runtime_info import (
     first_used_last_used,

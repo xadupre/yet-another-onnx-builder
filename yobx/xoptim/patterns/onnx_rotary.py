@@ -1,7 +1,7 @@
 import inspect
 from typing import List, Optional, Tuple
 import numpy as np
-from onnx import NodeProto, TensorProto
+from onnx_light.onnx import NodeProto, TensorProto
 from ...helpers.onnx_helper import make_idn
 from ...xbuilder import FunctionOptions, GraphBuilder
 from ...xshape._shape_helper import STATIC_SHAPE

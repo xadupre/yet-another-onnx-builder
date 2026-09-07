@@ -7,7 +7,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional
 
 import numpy as np
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 
 from ...xbuilder import GraphBuilder
 from ...xtracing.parse import JoinOp

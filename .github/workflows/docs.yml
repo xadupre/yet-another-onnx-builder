@@ -36,8 +36,10 @@ jobs:
         run: sudo apt-get install -y pandoc
       - name: Install nightly version
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,docs,imblearn,lightgbm,op-db,perpetual,polars,sklearn,sksurv,spox,statmodels,tensorflow,torch,transformers,xgboost]"
+        run: pip install -e ".[category_encoders,docs,imblearn,lightgbm,op-db,perpetual,polars,sklearn,sksurv,statmodels,tensorflow,torch,transformers,xgboost]"
       - name: pip freeze
         run: pip freeze
       - name: Build TensorFlow gallery examples

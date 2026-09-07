@@ -1,6 +1,6 @@
 import pprint
 from typing import List, Optional, Union
-from onnx import ModelProto
+from onnx_light.onnx import ModelProto
 from .graph_builder_optim import GraphBuilderPatternOptimization
 from .patterns_api import (
     MatchResult,

@@ -1,5 +1,5 @@
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.datasets import make_classification, make_multilabel_classification, make_regression
 from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator

@@ -1,5 +1,5 @@
 from typing import Dict, List, Optional, Tuple, Union
-import onnx
+from onnx_light import onnx
 import numpy as np
 import torch
 from torch._C import _from_dlpack

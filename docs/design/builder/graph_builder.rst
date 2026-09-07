@@ -99,7 +99,7 @@ The simplest workflow is:
     :showcode:
 
     import numpy as np
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.xbuilder import GraphBuilder
 
@@ -134,8 +134,8 @@ re-optimized.
 .. runpython::
     :showcode:
 
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.xbuilder import GraphBuilder
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -174,7 +174,7 @@ creating a duplicate node.
     :showcode:
 
     import numpy as np
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -222,7 +222,7 @@ tracked as symbolic dimensions.
 .. runpython::
     :showcode:
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -282,8 +282,8 @@ Default passes (in order):
 .. runpython::
     :showcode:
 
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -346,8 +346,8 @@ exploration:
     :showcode:
 
     import pandas
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -385,8 +385,8 @@ The report can be aggregated by pass name:
     :showcode:
 
     import pandas
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -430,7 +430,7 @@ A sub-graph can be exported as a reusable ONNX local function (a
 .. runpython::
     :showcode:
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder, FunctionOptions
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -494,7 +494,7 @@ problems:
      - Prints a message every time a node producing ``<name>`` is added.
 
 In addition,
-:meth:`get_debug_msg <yobx.xshape.shape_builder_impl.BasicShapeBuilder.get_debug_msg>`
+:meth:`get_debug_msg <yobx.xshape.NativeShapeInference.get_debug_msg>`
 returns a detailed text dump of the builder's internal state (known shapes,
 types, ranks, constants, and node list) which can be printed or logged whenever
 an assertion fails.
@@ -506,8 +506,8 @@ outputs) and is useful for quick visual inspection:
 .. runpython::
     :showcode:
 
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.xbuilder import GraphBuilder
 
     TFLOAT = onnx.TensorProto.FLOAT

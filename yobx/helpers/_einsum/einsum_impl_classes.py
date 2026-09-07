@@ -1,7 +1,7 @@
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Union
 import numpy
-from onnx import helper, numpy_helper, ModelProto, NodeProto, TensorProto
-import onnx
+from onnx_light.onnx import helper, numpy_helper, ModelProto, NodeProto, TensorProto
+from yobx._onnx_shim import onnx
 from yobx.helpers.onnx_helper import np_dtype_to_tensor_dtype as _np_dtype_to_tensor_dtype
 from .einsum_impl_ext import (
     numpy_extended_dot,

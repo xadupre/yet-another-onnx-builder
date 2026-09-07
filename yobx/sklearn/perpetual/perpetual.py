@@ -6,7 +6,7 @@ and :class:`perpetual.PerpetualRegressor`.
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Dict, List, Union
-import onnx
+from yobx._onnx_shim import onnx
 from perpetual import PerpetualClassifier, PerpetualRegressor
 from ...typing import GraphBuilderExtendedProtocol
 from ...xbuilder import GraphBuilder

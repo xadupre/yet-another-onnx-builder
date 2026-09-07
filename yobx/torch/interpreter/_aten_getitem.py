@@ -9,7 +9,7 @@ be used independently of the interpreter.
 from typing import Any, Dict, List, Optional, Union
 
 import numpy as np
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 from ...typing import GraphBuilderTorchProtocol
 from ...container.model_container import _get_type
 from ...helpers import string_type

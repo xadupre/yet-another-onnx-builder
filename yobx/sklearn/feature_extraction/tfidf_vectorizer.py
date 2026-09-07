@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 from ...typing import GraphBuilderExtendedProtocol

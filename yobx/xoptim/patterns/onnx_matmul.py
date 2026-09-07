@@ -1,7 +1,7 @@
 import inspect
 from typing import Dict, List, Optional, Set, Tuple, Union
 import numpy as np
-from onnx import NodeProto
+from onnx_light.onnx import NodeProto
 from ...xshape._shape_helper import (
     compatible_shapes,
     compatible_dimensions,

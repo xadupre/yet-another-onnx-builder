@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple, Union
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.linear_model import Perceptron, RidgeClassifier, RidgeClassifierCV, SGDClassifier
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol

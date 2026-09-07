@@ -1,7 +1,7 @@
 import inspect
 from typing import List, Optional, Tuple, Union
 import numpy as np
-from onnx import NodeProto, TensorProto
+from onnx_light.onnx import NodeProto, TensorProto
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ...xbuilder import FunctionOptions, GraphBuilder
 from ..patterns_api import MatchResult, PatternOptimization

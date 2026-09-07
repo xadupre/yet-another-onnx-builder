@@ -8,17 +8,16 @@ version = "0.1.0"
 description = "Converts models to ONNX format and other things"
 readme = "README.md"
 license = { file = "LICENSE" }
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "ml_dtypes",
-    "numpy>=2.1",
-    "onnx>=1.14",
+    "numpy>=2.2",
+    "onnx-light>=0.1.24",
     "onnxruntime>=1.24",
     "scipy",
 ]
 
 [project.optional-dependencies]
-onnx-light = ["onnx_light"]
 dev = [
     "black",
     "matplotlib",
@@ -36,12 +35,9 @@ docs = [
     "ipython",
     "matplotlib",
     "mermaid-py",
-    "onnx-ir",
-    "onnx-shape-inference",
     "openpyxl",
     "pandas",
     "pydata-sphinx-theme",
-    "skl2onnx",  # for one example
     "sphinx>=7",
     "sphinxcontrib-mermaid",
     "sphinx-copybutton",
@@ -60,17 +56,14 @@ imblearn = ["scikit-learn>=1.4", "imbalanced-learn>=0.11"]
 jax = ["jax[cpu]>=0.4", "tensorflow>=2.20"]
 lightgbm = ["scikit-learn>=1.4", "lightgbm>=3.0"]
 litert = ["ai-edge-litert"]
-onnxscript = ["onnxscript>=0.7.0"]
 perpetual = ["scikit-learn>=1.4", "perpetual>=2.1.0"]
 polars = ["polars"]
 sklearn = ["scikit-learn>=1.4"]
 sksurv = ["scikit-learn>=1.4", "scikit-survival>=0.22"]
-spox = ["spox>=0.12"]
 statsmodels = ["scikit-learn>=1.4", "statsmodels"]
 tensorflow = ["jax", "tensorflow>=2.20"]
 torch = [
     "accelerate",
-    "onnxscript>=0.7.0",
     "optree",
     "sentencepiece",
     "torch>=2.11",
@@ -92,6 +85,7 @@ testpaths = ["unittests"]
 
 [tool.black]
 line-length = 98
+target-version = ["py312"]
 extend-exclude = '''.*clones*'''
 skip-magic-trailing-comma = true
 
@@ -153,6 +147,7 @@ select = [
 "yobx/builder/light/*" = ["PYI032", "UP037"]
 "yobx/builder/light/_op*" = ["F821"]
 "yobx/torch/in_transformers/models/_cached_configs.py" = ["PIE804"]
+"yobx/torch/export_options.py" = ["UP042"]  # Preserve the existing enum string representation.
 
 [tool.mypy]
 ignore_missing_imports = true

@@ -1,6 +1,6 @@
 from typing import Dict, List, Optional, Tuple
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.naive_bayes import CategoricalNB
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol

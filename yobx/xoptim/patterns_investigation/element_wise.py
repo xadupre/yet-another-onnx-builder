@@ -1,5 +1,5 @@
 from typing import List, Optional
-from onnx import NodeProto
+from onnx_light.onnx import NodeProto
 from ..patterns_api import MatchResult, PatternOptimization
 
 

@@ -1,6 +1,6 @@
 import unittest
-from onnx import TensorProto
-import onnx.helper as oh
+from onnx_light.onnx import TensorProto
+import onnx_light.onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions, InferShapesOptions
 from yobx.xoptim import GraphBuilderPatternOptimization, EasyPatternOptimization

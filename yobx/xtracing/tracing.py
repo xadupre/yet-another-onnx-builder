@@ -57,7 +57,7 @@ def trace_numpy_function(
         from yobx.xbuilder import GraphBuilder
         from yobx.xtracing import trace_numpy_function
         import numpy as np
-        from onnx import TensorProto
+        from onnx_light.onnx import TensorProto
 
         g = GraphBuilder({"": 21, "ai.onnx.ml": 1})
         g.make_tensor_input("X", TensorProto.FLOAT, ("batch", 3))

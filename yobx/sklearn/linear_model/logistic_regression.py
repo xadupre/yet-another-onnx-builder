@@ -1,6 +1,6 @@
 from typing import Tuple, Dict, List, Union
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.linear_model import LogisticRegression, LogisticRegressionCV
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol

@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.neighbors import RadiusNeighborsClassifier, RadiusNeighborsRegressor
 
 from ..register import register_sklearn_converter

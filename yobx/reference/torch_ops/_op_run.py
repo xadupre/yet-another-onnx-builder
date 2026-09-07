@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional, Union, Tuple
-import onnx
+from onnx_light import onnx
 import torch
 from ...typing import TensorLike
 from ...helpers import string_type

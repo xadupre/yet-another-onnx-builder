@@ -1,7 +1,7 @@
 import collections
 import inspect
 from typing import List, Optional
-from onnx import NodeProto, TensorProto
+from onnx_light.onnx import NodeProto, TensorProto
 from ..patterns_api import MatchResult, PatternOptimization
 
 

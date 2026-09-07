@@ -1,9 +1,9 @@
 import os
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.xbuilder import GraphBuilder, OptimizationOptions
 from yobx.xoptim.patterns_api import OnnxEasyPatternOptimization

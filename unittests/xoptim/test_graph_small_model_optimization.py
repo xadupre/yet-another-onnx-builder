@@ -1,9 +1,9 @@
 import unittest
 import numpy as np
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-from onnx import TensorProto
-from onnx.checker import check_model
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
+from onnx_light.onnx import TensorProto
+from onnx_light.onnx.checker import check_model
 from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
 

@@ -1,6 +1,6 @@
 import inspect
 from typing import List, Optional, Tuple
-from onnx import NodeProto, TensorProto, helper
+from onnx_light.onnx import NodeProto, TensorProto, helper
 from ..patterns_api import MatchResult, PatternOptimization
 
 

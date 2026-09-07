@@ -266,7 +266,7 @@ class TestOpsVarOperators(ExtTestCase):
         self._check(gr, "BlackmanWindow")
 
     def test_Cast(self):
-        from onnx import TensorProto
+        from onnx_light.onnx import TensorProto
 
         gr, x = _x()
         x.Cast(to=TensorProto.FLOAT16)

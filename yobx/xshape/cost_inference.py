@@ -4,27 +4,27 @@ Per-op FLOPs (floating-point operation) estimators for ONNX nodes.
 The public entry point is :func:`estimate_node_flops`.  All per-op helper
 functions are private (``_flops_*``) and dispatched via :data:`_OP_HANDLERS`.
 
-All estimators use the symbolic-dimension helpers from
-:mod:`yobx.xexpressions.operations` so that symbolic (dynamic) dimensions are
+All estimators use the native symbolic-dimension helpers from
+``onnx_light.onnx_core.expressions`` so that symbolic (dynamic) dimensions are
 handled correctly.  When the shapes are partially or fully unknown the
 estimators return ``None``.
 
-Integration with :class:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder`:
-use :meth:`BasicShapeBuilder.estimate_node_flops` to estimate the cost of a
+Integration with :class:`~yobx.xshape.native_shape_inference.NativeShapeInference`:
+use :meth:`NativeShapeInference.estimate_node_flops` to estimate the cost of a
 node using the shapes already inferred during a
-:meth:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder.run_model` call.
+:meth:`~yobx.xshape.native_shape_inference.NativeShapeInference.run_model` call.
 """
 
 from __future__ import annotations
 
-import glob
-import os
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
 import numpy as np
-import onnx
+from onnx_light import onnx
 
-from ..xexpressions.operations import dim_add, dim_div, dim_mul, dim_multi_mul, DIM_TYPE
+from onnx_light.onnx_core.expressions import dim_add, dim_div, dim_mul, dim_multi_mul
+
+DIM_TYPE = Union[int, str]
 
 # ---------------------------------------------------------------------------
 # Type aliases
@@ -182,7 +182,7 @@ def _get_attribute_value(node: onnx.NodeProto, name: str, default: Any = None) -
 
 def _literal_size(shape: Optional[Tuple]) -> Optional[DIM_TYPE]:
     """Returns the number of elements in a static shape, or None if dynamic."""
-    if shape is None:
+    if shape is None or any(d is None or d == "" for d in shape):
         return None
     if all(isinstance(a, int) for a in shape):
         return int(np.prod(shape))
@@ -251,6 +251,10 @@ def _flops_matmul(
     b = _resolve_shape(node.input[1], shape_fn, literal_fn)
     if a is None or b is None:
         return None
+    output = shape_fn(node.output[0]) if node.output else None
+    if output is not None and a and b:
+        size = _literal_size(output)
+        return None if size is None else dim_multi_mul(2, size, a[-1])
     if len(a) < 2 or len(b) < 2:
         return None
     M, K = a[-2], a[-1]
@@ -533,11 +537,11 @@ def list_op_cost_formulas() -> Dict[str, str]:
     expression produced by :func:`estimate_node_flops` on a representative test
     case from the ONNX backend test suite.
 
-    For every single-node model found in the ONNX backend test data directory
+    For every single-node model in the native wheel's backend test inventory
     the static input dimensions are replaced by symbolic variables (``DIM<n>``)
     using
     :func:`~yobx.helpers.onnx_helper.replace_static_dimensions_by_strings`.
-    :class:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder` is then run with
+    :class:`~yobx.xshape.native_shape_inference.NativeShapeInference` is then run with
     ``inference=InferenceMode.COST`` to obtain the symbolic FLOPs expression.
 
     Only the first passing test case per ``op_type`` is kept.  Operators with
@@ -547,7 +551,9 @@ def list_op_cost_formulas() -> Dict[str, str]:
     :return: ``{op_type: symbolic_flops_expression}`` sorted alphabetically.
     """
     # Lazy imports to avoid circular dependencies at module load time.
-    from .shape_builder_impl import BasicShapeBuilder, InferenceMode
+    from .native_shape_inference import NativeShapeInference
+    from .shape_builder_impl import InferenceMode
+    from onnx_light.onnx.backend import collect_test_cases
     from ..helpers.onnx_helper import (
         overwrite_shape_in_model_proto,
         replace_static_dimensions_by_strings,
@@ -577,18 +583,11 @@ def list_op_cost_formulas() -> Dict[str, str]:
         }
     )
 
-    data_dir = os.path.join(os.path.dirname(onnx.__file__), "backend", "test", "data", "node")
-    if not os.path.isdir(data_dir):
-        return {}
-
     result: Dict[str, str] = {}
-    for test_dir in sorted(glob.glob(os.path.join(data_dir, "test_*"))):
-        if "expanded" in os.path.basename(test_dir):
+    for test in sorted(collect_test_cases(), key=lambda case: case.name):
+        if "expanded" in test.name:
             continue  # skip expanded variants; they tend to be multi-node rewrites
-        model_path = os.path.join(test_dir, "model.onnx")
-        if not os.path.exists(model_path):
-            continue
-        model = onnx.load(model_path)
+        model = test.model
         if len(model.graph.node) != 1:
             continue
         op_type = model.graph.node[0].op_type
@@ -598,7 +597,7 @@ def list_op_cost_formulas() -> Dict[str, str]:
         if n_in is not None:
             model = overwrite_shape_in_model_proto(model, n_in=n_in)
         dyn_model, _ = replace_static_dimensions_by_strings(model)
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         cost = builder.run_model(dyn_model, inference=InferenceMode.COST)
         assert cost is not None, f"no cost was produced by {builder}"
         for ct, flops, _ in cost:

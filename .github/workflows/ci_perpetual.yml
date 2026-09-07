@@ -25,6 +25,8 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
         run: pip install -e ".[dev,perpetual,sklearn]"
 

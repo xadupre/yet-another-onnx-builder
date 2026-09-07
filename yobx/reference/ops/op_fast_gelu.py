@@ -1,8 +1,8 @@
 import numpy as np
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
-class FastGelu(OpRun):
+class FastGelu(NativeOpKernel):
     """Implements the ``com.microsoft.FastGelu`` operator.
 
     Applies the FastGelu activation, optionally adding a bias before the activation.

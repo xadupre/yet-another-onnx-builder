@@ -4,11 +4,11 @@ import time
 import unittest
 from typing import List, Optional
 import numpy as np
-from onnx import NodeProto, TensorProto, load
-from onnx.checker import check_model
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-from onnx.reference.op_run import OpRun
+from onnx_light.onnx import NodeProto, TensorProto, load
+from onnx_light.onnx.checker import check_model
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
+from yobx.reference.ops._native_op import NativeOpKernel
 from yobx.ext_test_case import ExtTestCase
 from yobx.typing import GraphBuilderExtendedProtocol
 from yobx.xoptim import EasyPatternOptimization, make_pattern_from_onnx
@@ -47,7 +47,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                 """
                 return g.anyop.AddAdd(x, y, z, domain="ZZZ")
 
-        class AddAdd(OpRun):
+        class AddAdd(NativeOpKernel):
             op_domain = "ZZZ"
 
             def _run(self, x, y, z):
@@ -116,7 +116,7 @@ class TestGraphPatternBuilder(ExtTestCase):
                 """
                 return g.anyop.AddAddAddAdd(x, y, w, z, domain="ZZZ", outputs=2)
 
-        class AddAddAddAdd(OpRun):
+        class AddAddAddAdd(NativeOpKernel):
             op_domain = "ZZZ"
 
             def _run(self, x, y, w, z):
@@ -258,7 +258,7 @@ class TestGraphPatternBuilder(ExtTestCase):
         self.assertIn("RotaryEmbedding", op_types)
 
     def test_graph_pattern_builder_onnx(self):
-        class AddAdd(OpRun):
+        class AddAdd(NativeOpKernel):
             op_domain = "ZZZ"
 
             def _run(self, x, y, z):

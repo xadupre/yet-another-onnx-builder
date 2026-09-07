@@ -1,6 +1,6 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
-from onnx import ValueInfoProto
+from onnx_light.onnx import ValueInfoProto
 import tensorflow as tf
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
@@ -151,7 +151,7 @@ def to_onnx(
 
     # Populate an ONNX GraphBuilder by walking the concrete-function graph.
     kwargs = (
-        dict(optimization_options=OptimizationOptions(patterns="default+onnxruntime"))
+        dict(optimization_options=OptimizationOptions())
         if "com.microsoft" in dict_target_opset
         else {}
     )
@@ -171,7 +171,7 @@ def to_onnx(
     g = builder_cls(dict_target_opset, **kwargs)  # type: ignore
 
     _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
-    if isinstance(g, GraphBuilder):
+    if isinstance(g, GraphBuilder) or getattr(g, "supports_optimization_report", False):
         onx = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,

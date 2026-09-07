@@ -1,10 +1,10 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape import BasicShapeBuilder
+from yobx.xshape import NativeShapeInference
 from yobx.xbuilder import GraphBuilder
 
 
@@ -49,7 +49,7 @@ class TestValueAsShape(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 20)],
         )
         onnx.checker.check_model(model_proto)
-        bshape = BasicShapeBuilder()
+        bshape = NativeShapeInference()
         bshape.run_model(model_proto)
         self.assertEqual(bshape.value_as_shape("shape1"), ("N+1", 2))
         self.assertEqual(bshape.value_as_shape("shape2"), ("N", 1))

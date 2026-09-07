@@ -1204,7 +1204,7 @@ def requires_litert(version: str = "", msg: str = "") -> Callable:
 def requires_onnx(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx` is not recent enough."""
     try:
-        import onnx
+        from yobx._onnx_shim import onnx
     except ImportError:
         return unittest.skip(msg or "onnx not installed")
 

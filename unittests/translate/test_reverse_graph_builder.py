@@ -2,9 +2,9 @@ import inspect
 import textwrap
 import unittest
 from typing import List, Optional
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 import numpy as np
 from yobx.ext_test_case import ExtTestCase
 from yobx.translate.reverse_graph_builder import to_graph_builder_code, to_graph_pattern_matching
@@ -49,8 +49,8 @@ class TestReverseGraphBuilder(ExtTestCase):
         expected = (
             textwrap.dedent("""
         import numpy as np
-        import onnx
-        import onnx.numpy_helper as onh
+        from yobx._onnx_shim import onnx
+        import onnx_light.onnx.numpy_helper as onh
         from yobx.xbuilder import GraphBuilder, FunctionOptions
 
 
@@ -118,8 +118,8 @@ class TestReverseGraphBuilder(ExtTestCase):
         expected = (
             textwrap.dedent("""
         import numpy as np
-        import onnx
-        import onnx.numpy_helper as onh
+        from yobx._onnx_shim import onnx
+        import onnx_light.onnx.numpy_helper as onh
         from yobx.xbuilder import GraphBuilder, FunctionOptions
 
 
@@ -195,8 +195,8 @@ class TestReverseGraphBuilder(ExtTestCase):
 
         expected = textwrap.dedent("""
             import numpy as np
-            import onnx
-            import onnx.numpy_helper as onh
+            from yobx._onnx_shim import onnx
+            import onnx_light.onnx.numpy_helper as onh
             from yobx.xbuilder import GraphBuilder, FunctionOptions
 
 

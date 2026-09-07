@@ -58,7 +58,7 @@ class TestEinsumHelper(ExtTestCase):
     def test_decompose_einsum_float64(self):
         """Tests decomposition with float64 dtype."""
         model = decompose_einsum("ij,jk->ik", (3, 4), (4, 5), dtype=np.float64)
-        import onnx
+        from yobx._onnx_shim import onnx
 
         self.assertEqual(model.graph.input[0].type.tensor_type.elem_type, onnx.TensorProto.DOUBLE)
 
@@ -215,7 +215,7 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
         """Cost inference for ``abij,abjk->abik`` with symbolic dims
         ('A', 'B', 'I', 'K') x ('A', 'B', 'K', 'N') and concrete feeds
         (2, 3, 16, 32) x (2, 3, 32, 8)."""
-        from yobx.xshape import BasicShapeBuilder, InferenceMode
+        from yobx.xshape import NativeShapeInference, InferenceMode
 
         model = decompose_einsum_2inputs(
             "abij,abjk->abik", ("A", "B", "I", "K"), ("A", "B", "K", "N")
@@ -224,7 +224,7 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
             "X0": np.ones((2, 3, 16, 32), dtype=np.float32),
             "X1": np.ones((2, 3, 32, 8), dtype=np.float32),
         }
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         cost_sym = builder.run_model(model, inference=InferenceMode.COST)
         cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
         total = sum(f or 0 for _, f, _ in cost_conc)
@@ -260,7 +260,7 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
 
     def test_float64(self):
         """Decomposition should honour float64 dtype."""
-        import onnx
+        from yobx._onnx_shim import onnx
 
         model = decompose_einsum_2inputs("ij,jk->ik", (3, 4), (4, 5), dtype=np.float64)
         self.assertEqual(model.graph.input[0].type.tensor_type.elem_type, onnx.TensorProto.DOUBLE)
@@ -307,26 +307,26 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_cost_inference_4d_multi_batch_decompose_einsum(self):
-        """BasicShapeBuilder.run_model with InferenceMode.COST must succeed for
+        """NativeShapeInference.run_model with InferenceMode.COST must succeed for
         a 4-D multi-batch equation using decompose_einsum (strategy A)."""
-        from yobx.xshape import BasicShapeBuilder, InferenceMode
+        from yobx.xshape import NativeShapeInference, InferenceMode
 
         model = decompose_einsum("abij,abjk->abik", (2, 3, 8, 4), (2, 3, 4, 6))
         feeds = {
             "X0": np.ones((2, 3, 8, 4), dtype=np.float32),
             "X1": np.ones((2, 3, 4, 6), dtype=np.float32),
         }
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         cost_sym = builder.run_model(model, inference=InferenceMode.COST)
         cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
         total = sum(f or 0 for _, f, _ in cost_conc)
         self.assertGreater(total, 0)
 
     def test_cost_inference_symbolic_shapes_decompose_einsum(self):
-        """BasicShapeBuilder.run_model with InferenceMode.COST must succeed for
+        """NativeShapeInference.run_model with InferenceMode.COST must succeed for
         a 4-D multi-batch equation using decompose_einsum (strategy A) with
         fully symbolic (string) dimension names."""
-        from yobx.xshape import BasicShapeBuilder, InferenceMode
+        from yobx.xshape import NativeShapeInference, InferenceMode
 
         # abij,abjk->abik: dims (a,b,i,j) and (a,b,j,k); j is contracting.
         model = decompose_einsum("abij,abjk->abik", ("A", "B", "I", "J"), ("A", "B", "J", "K"))
@@ -338,20 +338,20 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
             "X0": np.ones((2, 3, 8, 4), dtype=np.float32),
             "X1": np.ones((2, 3, 4, 6), dtype=np.float32),
         }
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         cost_sym = builder.run_model(model, inference=InferenceMode.COST)
         cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
         total = sum(f or 0 for _, f, _ in cost_conc)
         self.assertGreater(total, 0)
 
     def test_cost_inference_4d_multi_batch_decompose_einsum_2inputs(self):
-        """BasicShapeBuilder.run_model with InferenceMode.COST must succeed for
+        """NativeShapeInference.run_model with InferenceMode.COST must succeed for
         a 4-D multi-batch equation using decompose_einsum_2inputs (strategy B).
 
         Symbolic (string) dims are used so the shape builder can propagate
         expressions through the graph; concrete values are substituted at
         evaluation time via ``evaluate_cost_with_true_inputs``."""
-        from yobx.xshape import BasicShapeBuilder, InferenceMode
+        from yobx.xshape import NativeShapeInference, InferenceMode
 
         model = decompose_einsum_2inputs(
             "abij,abjk->abik", ("A", "B", "I", "K"), ("A", "B", "K", "L")
@@ -360,27 +360,27 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
             "X0": np.ones((2, 3, 8, 4), dtype=np.float32),
             "X1": np.ones((2, 3, 4, 6), dtype=np.float32),
         }
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         cost_sym = builder.run_model(model, inference=InferenceMode.COST)
         cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
         total = sum(f or 0 for _, f, _ in cost_conc)
         self.assertGreater(total, 0)
 
     def test_cost_inference_4d_reduction(self):
-        """BasicShapeBuilder.run_model with InferenceMode.COST must succeed for
+        """NativeShapeInference.run_model with InferenceMode.COST must succeed for
         a 4-D reduction equation using decompose_einsum_2inputs (strategy B).
 
         Symbolic (string) dims are used so the shape builder can propagate
         expressions through the graph; concrete values are substituted at
         evaluation time via ``evaluate_cost_with_true_inputs``."""
-        from yobx.xshape import BasicShapeBuilder, InferenceMode
+        from yobx.xshape import NativeShapeInference, InferenceMode
 
         model = decompose_einsum_2inputs("abij,ij->ab", ("A", "B", "I", "J"), ("I", "J"))
         feeds = {
             "X0": np.ones((2, 3, 8, 4), dtype=np.float32),
             "X1": np.ones((8, 4), dtype=np.float32),
         }
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         cost_sym = builder.run_model(model, inference=InferenceMode.COST)
         cost_conc = builder.evaluate_cost_with_true_inputs(feeds, cost_sym)
         total = sum(f or 0 for _, f, _ in cost_conc)

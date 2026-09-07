@@ -5,13 +5,12 @@ import pprint
 import time
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
-from onnx import ModelProto, ValueInfoProto
-from onnx.defs import onnx_opset_version
-from onnx.model_container import ModelContainer
-from ...container import ExportArtifact, ExportReport
+from onnx_light.onnx import ModelProto, ValueInfoProto
+from yobx.container.model_container import ModelContainer
+from ...container import ExportArtifact
 from ...helpers import string_type
 from ...xbuilder.graph_builder import GraphBuilder, OptimizationOptions, FunctionOptions
-from ..export_options import ExportOptions, ConvertingLibrary
+from ..export_options import ExportOptions
 
 
 def match_input_parameters(
@@ -497,16 +496,16 @@ def _make_builder_interpreter(
     Optional[List[bool]],
 ]:
     """
-    Exports a torch model into ONNX using
-    `dynamo export
-    <https://docs.pytorch.org/tutorials/intermediate/torch_export_tutorial.html>`_.
+    Retains interpreter setup for legacy tracing integrations.
+    The public :func:`to_onnx` entry point does not use this helper. Its legacy
+    builder constructor requirements are not supported by the native builder.
 
     :param mod: torch module
     :param args: input arguments
     :param kwargs: keyword attributes
     :param input_names: input names
     :param target_opset: targeted opset or targeted opsets as a dictionary
-    :param as_function: export as a ModelProto or a FunctionProto
+    :param as_function: export as a native ModelProto or standalone FunctionProto
     :param optimization_options: optimization options
     :param verbose: verbosity level
     :param raise_list: the builder stops any time a name falls into that list,
@@ -932,84 +931,11 @@ def _to_onnx_via_onnxscript(
     filename: Optional[str],
     export_options: Optional[ExportOptions] = None,
 ) -> "ExportArtifact":
-    """
-    Converts *mod* to ONNX via :func:`torch.onnx.export`.
-
-    Two paths are supported depending on :attr:`ExportOptions.tracing`:
-
-    * ``TracingMode.ONNXSCRIPT``: calls :func:`torch.onnx.export` directly
-      with ``dynamo=True``, letting torch handle the full tracing pipeline.
-    * Any other tracing mode (e.g. ``TracingMode.DEFAULT``) with
-      ``converting_library=ConvertingLibrary.ONNXSCRIPT``: first uses
-      :meth:`ExportOptions.export` to obtain a
-      :class:`torch.export.ExportedProgram` (which already runs decompositions),
-      then calls :func:`torch.onnx.export` on that program.
-
-    This helper is called by :func:`to_onnx` when
-    ``export_options.converting_library == ConvertingLibrary.ONNXSCRIPT``.
-
-    :return: an :class:`~yobx.container.ExportArtifact` wrapping the exported
-        ONNX proto.
-    """
-    import torch
-    from ..export_options import TracingMode
-
-    if verbose:
-        tracing = getattr(export_options, "tracing", None)
-        print(f"[to_onnx/onnxscript] tracing={tracing!r}")
-
-    # Path 1 — tracing == DEFAULT (or other non-onnxscript mode):
-    # export the model with torch.export.export first, then hand the
-    # ExportedProgram to torch.onnx.export (no dynamo=True needed).
-    if export_options is not None and export_options.tracing != TracingMode.ONNXSCRIPT:
-        args_tuple: tuple = (
-            args if isinstance(args, tuple) else (tuple() if args is None else tuple(args))
-        )
-        exported_program = export_options.export(
-            mod,
-            args_tuple,
-            kwargs,
-            tracing_mode=False,
-            dynamic_shapes=dynamic_shapes,
-            same_signature=True,
-            input_names=list(input_names) if input_names else None,
-            verbose=verbose,
-        )
-        export_kwargs: Dict[str, Any] = {}
-        if input_names:
-            export_kwargs["input_names"] = list(input_names)
-        if isinstance(target_opset, int):
-            export_kwargs["opset_version"] = target_opset
-        if verbose:
-            export_kwargs["report"] = True
-            print(
-                f"[to_onnx/onnxscript] calling torch.onnx.export(ExportedProgram) "
-                f"with {list(export_kwargs.keys())}"
-            )
-        export_output = torch.onnx.export(exported_program, **export_kwargs)
-    else:
-        # Path 2 — tracing == ONNXSCRIPT:
-        # call torch.onnx.export directly with dynamo=True.
-        export_kwargs = {"dynamo": True}
-        if input_names:
-            export_kwargs["input_names"] = list(input_names)
-        if dynamic_shapes is not None:
-            export_kwargs["dynamic_shapes"] = dynamic_shapes
-        if isinstance(target_opset, int):
-            export_kwargs["opset_version"] = target_opset
-        if verbose:
-            export_kwargs["report"] = True
-            print(
-                f"[to_onnx/onnxscript] calling torch.onnx.export with "
-                f"{list(export_kwargs.keys())}"
-            )
-        export_output = torch.onnx.export(mod, args or (), kwargs=kwargs or {}, **export_kwargs)
-
-    proto = export_output.model_proto
-    artifact = ExportArtifact(proto=proto)
-    if filename:
-        artifact.save(filename)
-    return artifact
+    """Rejects the retired exporter that requires reference ONNX."""
+    raise NotImplementedError(
+        "The onnxscript exporter requires the removed reference ONNX dependency. "
+        "Use yobx's default conversion pipeline."
+    )
 
 
 def _to_onnx_via_transformers(
@@ -1112,28 +1038,30 @@ def to_onnx(
     return_ep: bool = False,
 ) -> ExportArtifact:
     """
-    Exports a torch model into ONNX using
-    `dynamo export
-    <https://docs.pytorch.org/tutorials/intermediate/torch_export_tutorial.html>`_.
+    Exports a torch model through ``torch.export`` and the native onnx-light
+    builder, shape context and pattern optimizer. There is no legacy graph
+    engine fallback. Supported ATen operations, conditional branches and
+    standalone functions are implemented by
+    :mod:`yobx.torch.interpreter.native_export`; unsupported requests raise
+    ``NotImplementedError`` at the relevant option or FX node.
 
     :param mod: torch module
     :param args: input arguments
     :param kwargs: keyword attributes
     :param input_names: input names
     :param target_opset: targeted opset or targeted opsets as a dictionary
-    :param as_function: export as a ModelProto or a FunctionProto
+    :param as_function: export as a native ModelProto or standalone FunctionProto
     :param options: optimization options
     :param verbose: verbosity level
-    :param return_builder: returns the builder as well
-    :param return_ep: returns the ExportedProgram, or an fx.Graph or a GraphModule as well
+    :param return_builder: retains the native builder on the artifact
+    :param return_ep: retains the ExportedProgram on ``artifact.ep``
     :param raise_list: the builder stops any time a name falls into that list,
         this is a debugging tool
     :param dynamic_shapes: see :epkg:`torch.export.export`
     :param optimize: optimize the model before exporting into onnx
     :param dispatcher: see :class:`yobx.torch.interpreter.Dispatcher`
-    :param large_model: if True returns a :class:`onnx.model_container.ModelContainer`,
-        it lets the user to decide later if the weights should be part of the model
-        or saved as external weights
+    :param large_model: stores weights in a native
+        :class:`~yobx.container.ExtendedModelContainer` on the returned artifact
     :param external_threshold: if large_model is True, every tensor above this limit
         is stored as external
     :param return_optimize_report: returns statistics on the optimization as well;
@@ -1143,30 +1071,18 @@ def to_onnx(
     :param inline: inline the model before converting to onnx, this is done before
             any optimization takes place
     :param export_options: to apply different options before to get the exported program
-    :param export_modules_as_functions: export submodules as local functions,
-        this parameter can be filled with a set of class to preserve,
-        all this other will be exported as usual
-    :param function_options: to specify what to do with the initializers in local functions,
-        add them as constants or inputs
+    :param export_modules_as_functions: currently unsupported; module-boundary
+        preservation raises explicitly
+    :param function_options: standalone function name, domain and whether to
+        promote initializer values to additional function inputs
     :param output_names: to rename the output names
-    :param output_dynamic_shapes: same as *dynamic_shapes* but for the output
+    :param output_dynamic_shapes: currently unsupported; output shapes are inferred natively
     :param validate_onnx: if a float or True, validates the onnx model
         against the model with the input used to export,
         if True, the tolerance is 1e-5
     :return: :class:`~yobx.container.ExportArtifact` wrapping the exported ONNX
-        proto and an :class:`~yobx.container.ExportReport`.  When
-        *return_builder* is ``True`` a tuple ``(artifact, builder)`` is returned
-        instead; when *return_optimize_report* is also ``True`` the tuple is
-        ``(artifact, builder, stats)``.
-
-    If environment variable ``PRINT_GRAPH_MODULE`` is set to one,
-    information about the graph module is printed out.
-    Environment variable ``ONNXVERBOSE=1`` can be used to
-    increase verbosity in this function.
-    Environment variable ``ONNX_BUILDER_PROGRESS=1`` can be used to show
-    a progress bar on big models.
-    Other debugging options are available, see :class:`GraphBuiler
-    <yobx.xbuilder.GraphBuilder>`.
+        proto and an :class:`~yobx.container.ExportReport`. The native builder is
+        retained on ``artifact.builder`` rather than returned in a tuple.
 
     Example::
 
@@ -1185,232 +1101,35 @@ def to_onnx(
         artifact = to_onnx(Neuron(), (x,))
         artifact.save("model.onnx")
     """
-    if kwargs is None and isinstance(args, dict):
-        kwargs = args
-        args = tuple()
-    assert export_options is None or isinstance(
-        export_options, ExportOptions
-    ), f"Unexpected type {type(export_options)} for export_options"
-    assert options is None or isinstance(
-        options, OptimizationOptions
-    ), f"Unexpected type {type(options)} for options"
-    from ... import DEFAULT_TARGET_OPSET
+    from . import native_export
 
-    if target_opset is None:
-        target_opset = min(DEFAULT_TARGET_OPSET, onnx_opset_version() - 1)
-    if options is None:
-        if isinstance(target_opset, dict) and "com.microsoft" in target_opset:
-            options = OptimizationOptions(patterns="default+onnxruntime")
-        else:
-            options = OptimizationOptions()
-    begin = time.perf_counter()
-
-    # Convert any ValueInfoProto objects in args to fake torch tensors so the
-    # caller can pass ONNX type/shape descriptors instead of real tensors.
-    if args is not None and _contains_value_info_proto(args):
-        from ..fake_tensor_helper import FakeTensorContext
-
-        _ctx = FakeTensorContext()
-        args, _derived_dynamic_shapes = _replace_value_info_protos(args, _ctx)
-        if dynamic_shapes is None and _derived_dynamic_shapes is not None:
-            dynamic_shapes = _derived_dynamic_shapes
-
-    verbose = max(verbose, int(os.environ.get("ONNXVERBOSE", verbose)))
-    if verbose:
-        print(f"[to_onnx] build the graph module from {type(mod)}, type(args)={type(args)}")
-        if input_names:
-            print(f"[to_onnx] build the graph module with input_names={input_names}")
-        if dynamic_shapes:
-            print(f"[to_onnx] dynamic_shapes={dynamic_shapes}")
-
-    # Route to torch.onnx.export (onnxscript/dynamo) when requested.
-    if (
-        export_options is not None
-        and export_options.converting_library == ConvertingLibrary.ONNXSCRIPT
-    ):
-        return _to_onnx_via_onnxscript(
-            mod=mod,
-            args=args,
-            kwargs=kwargs,
-            input_names=input_names,
-            target_opset=target_opset,
-            dynamic_shapes=dynamic_shapes,
-            verbose=verbose,
-            filename=filename,
-            export_options=export_options,
-        )
-
-    # Route to YobxOnnxExporter (transformers pipeline) when requested.
-    if export_options is not None and export_options.strategy == "transformers":
-        return _to_onnx_via_transformers(
-            mod=mod,
-            args=args,
-            kwargs=kwargs,
-            target_opset=target_opset,
-            dynamic_shapes=dynamic_shapes,
-            verbose=verbose,
-            filename=filename,
-            export_options=export_options,
-        )
-
-    graph_module, builder, interpreter, mask_outputs = _make_builder_interpreter(
+    return native_export.to_onnx(
         mod=mod,
         args=args,
         kwargs=kwargs,
         input_names=input_names,
-        output_names=output_names,
         target_opset=target_opset,
         as_function=as_function,
-        optimization_options=options,
+        options=options,
         verbose=verbose,
+        return_builder=return_builder,
         raise_list=raise_list,
         dynamic_shapes=dynamic_shapes,
-        dispatcher=dispatcher,
-        export_options=export_options,
-        optimize_submodules=optimize,
-        function_options=function_options,
-        module_name="",
-        output_dynamic_shapes=output_dynamic_shapes,
-    )
-
-    add_stats = {}
-    t = time.perf_counter()
-    add_stats["time_export_graph_module"] = t - begin
-    for k in dir(interpreter):
-        if k.startswith("_stat_time"):
-            add_stats[k[1:]] = getattr(interpreter, k)
-    winning_opt = getattr(interpreter, "_working_export_options", None)
-    if winning_opt:
-        add_stats["onnx_export_options_strict"] = 1 if winning_opt.strict else 0
-        if winning_opt.decomposition_table:
-            add_stats["onnx_export_options_decomp"] = winning_opt.decomposition_table
-        if winning_opt.tracing:
-            add_stats["onnx_export_options_tracing"] = 1
-        if winning_opt.jit:
-            add_stats["onnx_export_options_jit"] = 1
-        if winning_opt.dynamo:
-            add_stats["onnx_export_options_dynamo"] = 1
-
-    if verbose:
-        print(f"[to_onnx] graph module done in {t - begin} s")
-
-    if export_modules_as_functions:
-        if export_modules_as_functions is True:
-            export_modules_as_functions = set(type(m) for m in mod.modules())
-        interpreter.register_named_modules(
-            None, export_modules_as_functions, dict(mod.named_modules())
-        )
-        if (
-            graph_module.__class__.__name__ == "ExportedProgram"
-            and builder._has_torch
-            and isinstance(graph_module, builder.torch.export.ExportedProgram)
-        ):
-            if verbose > 1:
-                disp = sorted(
-                    (c if isinstance(c, str) else getattr(c, "__name__", str(c)))
-                    for c in export_modules_as_functions
-                )
-                print(f"[to_onnx] unflatten the graph_module, preserve {disp}")
-
-            a = time.perf_counter()
-            new_graph_module = builder.torch.export.unflatten(graph_module)
-            graph_module = new_graph_module
-            add_stats["time_export_unflatten"] = time.perf_counter() - a
-
-    if filename:
-        if (
-            graph_module.__class__.__name__ == "ExportedProgram"
-            and builder._has_torch
-            and isinstance(graph_module, builder.torch.export.ExportedProgram)
-        ):
-            filename_root = os.path.splitext(filename)[0]
-            ep_filename = f"{filename_root}.txt.ep"
-            with open(ep_filename, "w") as f:
-                f.write(str(graph_module))
-            ep_filename = f"{filename_root}.txt.ep.graph"
-            with open(ep_filename, "w") as f:
-                f.write(str(graph_module.graph))
-        elif (
-            graph_module.__class__.__name__ == "UnflattenedModule"
-            and builder._has_torch
-            and isinstance(graph_module, builder.torch.export.UnflattenedModule)
-        ):
-            filename_root = os.path.splitext(filename)[0]
-            ep_filename = f"{filename_root}.txt.ep.unflat.graph"
-            with open(ep_filename, "w") as f:
-                f.write(str(graph_module.graph))
-
-    if verbose > 4:
-        print(f"[to_onnx] -- fx graph --\n{graph_module.graph}")
-
-    if verbose:
-        print("[to_onnx] start creating the onnx nodes")
-        print(f"[to_onnx] interpreter.function_options={interpreter.function_options!r}")
-
-    source_lines = build_source_lines(mod)
-    begin = t
-    builder.process(graph_module, interpreter, source_lines)
-    t = time.perf_counter()
-    add_stats["time_export_builder_process"] = t - begin
-    if verbose:
-        print(f"[to_onnx] {len(builder.nodes)} onnx nodes done in {t - begin} s")
-        print(
-            f"[to_onnx] start conversion to onnx (before optimization) "
-            f"mask_outputs={mask_outputs}"
-        )
-
-    begin = t
-    onx = builder.to_onnx(
         optimize=optimize,
+        dispatcher=dispatcher,
         large_model=large_model,
         external_threshold=external_threshold,
-        return_optimize_report=True,
+        export_options=export_options,
+        return_optimize_report=return_optimize_report,
+        filename=filename,
         inline=inline,
+        export_modules_as_functions=export_modules_as_functions,
         function_options=function_options,
-        mask_outputs=mask_outputs,
+        output_names=output_names,
+        output_dynamic_shapes=output_dynamic_shapes,
+        validate_onnx=validate_onnx,
+        return_ep=return_ep,
     )
-    if return_builder:
-        onx.builder = builder
-    if return_ep:
-        onx.ep = graph_module
-    all_stats = dict(builder=builder.statistics_)
-    if onx.report and onx.report.stats:
-        add_stats["optimization"] = onx.report
-    t = time.perf_counter()
-    add_stats["time_export_to_onnx"] = t - begin
-
-    if verbose:
-        print(
-            f"[to_onnx] to_onnx done in {t - begin}s "
-            f"and {len(onx.graph.node)} nodes, "
-            f"{len(onx.graph.initializer)} initializers, "
-            f"{len(onx.graph.input)} inputs, "
-            f"{len(onx.graph.output)} outputs"
-        )
-        if verbose >= 10:
-            print(builder.get_debug_msg())
-
-    # Build ExportArtifact
-    all_stats.update(add_stats)
-    report = ExportReport(extra=all_stats)
-    onx.update(report)
-    artifact = onx
-
-    if filename:
-        artifact.compute_node_stats()
-        artifact.save(filename)
-
-    if isinstance(validate_onnx, float) or validate_onnx:
-        assert filename, "validate_onnx is only implemented when filename is specified"
-        validate_exported_onnx(
-            mod,
-            args,
-            kwargs,
-            filename,
-            verbose=verbose,
-            atol=validate_onnx if isinstance(validate_onnx, float) else 1e-5,
-        )
-    return artifact
 
 
 def validate_exported_onnx(

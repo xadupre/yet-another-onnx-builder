@@ -5,7 +5,7 @@ import textwrap
 from collections import Counter
 from typing import Any, Callable, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
-from onnx import AttributeProto, FunctionProto, ModelProto, NodeProto, TensorProto
+from onnx_light.onnx import AttributeProto, FunctionProto, ModelProto, NodeProto, TensorProto
 from ..helpers.onnx_helper import make_idn
 from ..typing import GraphBuilderPatternOptimizationProtocol
 

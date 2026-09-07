@@ -1,6 +1,6 @@
 import inspect
 from typing import List, Optional
-from onnx import NodeProto, TensorProto
+from onnx_light.onnx import NodeProto, TensorProto
 from ...helpers.helper import size_type
 from ...helpers.onnx_helper import is_float_type
 from ..patterns_api import MatchResult, PatternOptimization

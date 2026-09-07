@@ -7,7 +7,7 @@ import re
 import types
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple, Union
 import numpy as np
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 from ...container.model_container import _get_type
 from ...helpers import string_type, make_hash, flatten_object
 from ...xbuilder import GraphBuilder, FunctionOptions, GraphBuilderTorchProtocol

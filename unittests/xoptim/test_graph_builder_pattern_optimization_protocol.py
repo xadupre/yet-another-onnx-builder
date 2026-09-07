@@ -7,7 +7,7 @@ depend on.
 """
 
 import unittest
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 from yobx.typing import GraphBuilderPatternOptimizationProtocol
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder import GraphBuilder

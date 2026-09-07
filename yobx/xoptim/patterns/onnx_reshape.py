@@ -1,7 +1,7 @@
 import inspect
 from typing import List, Optional, Set, Tuple, Union
 import numpy as np
-from onnx import NodeProto
+from onnx_light.onnx import NodeProto
 from ...helpers.onnx_helper import element_wise_binary_op_types
 from ...xshape._shape_helper import all_int, DYNAMIC_SHAPE, STATIC_SHAPE
 from ..patterns_api import MatchResult, PatternOptimization

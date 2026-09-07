@@ -4,10 +4,10 @@ import textwrap
 import time
 from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple, Union
 import numpy as np
-from onnx import AttributeProto, GraphProto, NodeProto, TensorProto, save as onnx_save
-from onnx.shape_inference import infer_shapes
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light.onnx import AttributeProto, GraphProto, NodeProto, TensorProto, save as onnx_save
+from onnx_light.onnx.shape_inference import infer_shapes
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from ..helpers.onnx_helper import make_idn, enumerate_subgraphs_builder
 from ..xshape.type_inference import infer_types
 from .patterns_api import MatchResult, PatternOptimization

@@ -1,8 +1,8 @@
 import inspect
 from typing import List, Optional
 import numpy as np
-import onnx.numpy_helper as onh
-from onnx import NodeProto
+import onnx_light.onnx.numpy_helper as onh
+from onnx_light.onnx import NodeProto
 from ..patterns_api import MatchResult, PatternOptimization
 
 

@@ -133,7 +133,7 @@ A typical onnxscript rewriter looks like this:
 
 .. code-block:: python
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from onnxscript.rewriter import pattern, rewrite
 
     op = pattern.onnxop
@@ -158,7 +158,7 @@ already shipped with the optimizer:
 
 .. code-block:: python
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
 
     onx = onnx.load("model.onnx")
@@ -239,7 +239,7 @@ API:
 
     import inspect
     from typing import List, Optional
-    from onnx import NodeProto
+    from onnx_light.onnx import NodeProto
     from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
     from yobx.xoptim import MatchResult, PatternOptimization

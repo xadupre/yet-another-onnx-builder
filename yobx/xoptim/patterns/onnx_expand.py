@@ -1,7 +1,7 @@
 import inspect
 from typing import List, Optional, Sequence, Tuple, Union
 import numpy as np
-from onnx import NodeProto
+from onnx_light.onnx import NodeProto
 from ...helpers.onnx_helper import (
     element_wise_binary_op_types,
     element_wise_op_cmp_types,

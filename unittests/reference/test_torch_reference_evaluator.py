@@ -1,9 +1,10 @@
 import unittest
+import warnings
 import numpy as np
 import pandas
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 import torch
 from yobx.ext_test_case import ExtTestCase, ignore_warnings, hide_stdout, skipif_ci_windows
 from yobx.reference import ExtendedReferenceEvaluator, ReportResultComparison
@@ -16,6 +17,28 @@ TINT64 = onnx.TensorProto.INT64
 
 
 class TestTorchReferenceEvaluator(ExtTestCase):
+    def test_numpy_feed_copies_only_readonly_storage(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Identity", ["X"], ["Y"])],
+                "identity",
+                [oh.make_tensor_value_info("X", TFLOAT, [3])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [3])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        session = TorchReferenceEvaluator(model)
+        for writeable in (True, False):
+            with self.subTest(writeable=writeable):
+                x = np.arange(3, dtype=np.float32)
+                x.flags.writeable = writeable
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", UserWarning)
+                    result = session.run(None, {"X": x})[0]
+                np.testing.assert_array_equal(result, x)
+                self.assertEqual(np.shares_memory(result, x), writeable)
+                self.assertTrue(result.flags.writeable)
+
     def test_kernels(self):
         ker = get_kernels()
         self.assertIsInstance(ker, dict)

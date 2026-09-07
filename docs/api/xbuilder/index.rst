@@ -3,6 +3,17 @@ yobx.xbuilder
 
 API for the graph builder used to construct and optimize ONNX graphs.
 
+``GraphBuilder`` and ``OptimizationOptions`` expose the native
+``onnx-light`` adapter. The historical ``yobx.xbuilder.graph_builder`` and
+``yobx.xbuilder.optimization_options`` imports resolve to the same classes.
+Graph construction, shape inference and pattern optimization do not fall back
+to the former Python engines.
+
+Native optimization options select registered pattern names through
+``patterns`` and limit iterations through ``max_iter``. Python pattern objects,
+legacy pattern groups such as ``"default+onnxruntime"``, and unsupported
+legacy options raise explicit errors.
+
 .. toctree::
     :maxdepth: 1
     :caption: modules

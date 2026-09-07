@@ -2,7 +2,7 @@ import re
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 
 from ..helpers.onnx_helper import get_hidden_inputs, onnx_dtype_name
 from .base_emitter import BaseEmitter
@@ -49,7 +49,7 @@ class MermaidEmitter(BaseEmitter):
         """
         :param edge_labels: optional pre-computed edge labels mapping
             tensor name to ``"DTYPE(shape)"`` string (e.g. from
-            ``BasicShapeBuilder``).  When *None*, labels are derived
+            ``NativeShapeInference``).  When *None*, labels are derived
             from input/output type annotations only.
         """
         self._counter: int = 0

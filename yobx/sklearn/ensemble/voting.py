@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.ensemble import VotingClassifier, VotingRegressor
 
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype

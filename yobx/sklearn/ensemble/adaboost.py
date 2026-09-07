@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.ensemble import AdaBoostClassifier, AdaBoostRegressor
 
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype

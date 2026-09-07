@@ -8,7 +8,7 @@ Description
 +++++++++++
 
 See :func:`yobx.helpers.onnx_helper.pretty_onnx` and
-:class:`yobx.xshape.BasicShapeBuilder`.
+:class:`yobx.xshape.NativeShapeInference`.
 
 .. runpython::
 
@@ -59,8 +59,8 @@ the command to show what the output actually looks like.
 
     import os
     import tempfile
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx._command_lines_parser import _cmd_print
 
     TFLOAT = onnx.TensorProto.FLOAT

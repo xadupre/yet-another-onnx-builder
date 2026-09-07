@@ -1,8 +1,7 @@
-from typing import Any, Dict, List, Optional, Union
-from onnx import FunctionProto, ModelProto, NodeProto, TypeProto
-from onnx.defs import get_schema
-from onnx.reference import ReferenceEvaluator
-from onnx.reference.op_run import OpRun
+from typing import Any, Dict, List, Optional
+from onnx_light.onnx import FunctionProto, GraphProto, ModelProto, NodeProto, helper, numpy_helper
+from onnx_light.onnx.reference import ReferenceEvaluator
+from .ops._native_op import NativeOpKernel
 from .ops.op__extended_add_add_mul_mul import (
     AddAdd,
     AddMul,
@@ -20,9 +19,8 @@ from .ops.op__extended_rotary import Rotary
 from .ops.op__extended_scatternd_of_shape import MaskedScatterNDOfShape, ScatterNDOfShape
 from .ops.op__extended_transpose_cast import Transpose2DCastFP16, Transpose2DCastFP32
 from .ops.op__extended_tri_matrix import TriMatrix
-from .ops.op__overwrite_gather_elements import GatherElements
-from .ops.op__overwrite_gather import Gather
-from .ops.op__overwrite_scatter_elements import ScatterElements
+from .ops.op__overwrite_argminmax import ArgMax, ArgMin
+from .ops.op__overwrite_comparison import Greater
 from .ops.op_attention import Attention
 from .ops.op_bias_softmax import BiasSoftmax
 from .ops.op_complex import (
@@ -47,127 +45,26 @@ from .ops.op_simplified_layer_normalization import SimplifiedLayerNormalization
 
 
 class ExtendedReferenceEvaluator(ReferenceEvaluator):
-    """
-    Extends :class:`onnx.reference.ReferenceEvaluator` with additional operator
-    kernels for non-standard domains such as ``com.microsoft``.
+    """Executes models with the onnx-light native runtime.
 
-    The evaluator allows testing scenarios outside what a standard ONNX backend
-    can handle, such as optimization patterns that rely on ONNX Runtime contrib
-    operators (e.g. :class:`FusedMatMul <yobx.reference.ops.op_fused_matmul.FusedMatMul>`,
-    :class:`QuickGelu <yobx.reference.ops.op_quick_gelu.QuickGelu>`).
+    Operators execute through the native runtime. Project NumPy kernels, including
+    full-precision comparison and index reductions, are explicitly registered
+    through its custom-kernel API. Missing kernels never trigger another evaluator
+    or runtime.
 
-    **Basic usage** — run an ONNX model with standard operators:
+    ``run(None, feeds)`` returns outputs in graph declaration order. ``run(feeds_list)``
+    maps positional values to graph inputs. Models, serialized models, filenames,
+    graphs, individual nodes, functions and export artifacts are accepted.
 
-    .. runpython::
-        :showcode:
-
-        import numpy as np
-        import onnx.helper as oh
-        import onnx
-        from yobx.reference import ExtendedReferenceEvaluator
-
-        TFLOAT = onnx.TensorProto.FLOAT
-        model = oh.make_model(
-            oh.make_graph(
-                [oh.make_node("Add", ["X", "Y"], ["Z"])],
-                "add_graph",
-                [
-                    oh.make_tensor_value_info("X", TFLOAT, [None, None]),
-                    oh.make_tensor_value_info("Y", TFLOAT, [None, None]),
-                ],
-                [oh.make_tensor_value_info("Z", TFLOAT, [None, None])],
-            ),
-            opset_imports=[oh.make_opsetid("", 18)],
-            ir_version=10,
-        )
-        ref = ExtendedReferenceEvaluator(model)
-        x = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
-        (result,) = ref.run(None, {"X": x, "Y": x})
-        print(result)
-
-    **Using contrib operators** — run a ``com.microsoft`` operator:
-
-    .. runpython::
-        :showcode:
-
-        import numpy as np
-        import onnx.helper as oh
-        import onnx
-        from yobx.reference import ExtendedReferenceEvaluator
-
-        TFLOAT = onnx.TensorProto.FLOAT
-        model = oh.make_model(
-            oh.make_graph(
-                [oh.make_node("FusedMatMul", ["X", "Y"], ["Z"], domain="com.microsoft")],
-                "fused_mm",
-                [
-                    oh.make_tensor_value_info("X", TFLOAT, None),
-                    oh.make_tensor_value_info("Y", TFLOAT, None),
-                ],
-                [oh.make_tensor_value_info("Z", TFLOAT, None)],
-            ),
-            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
-        )
-        ref = ExtendedReferenceEvaluator(model)
-        a = np.arange(4, dtype=np.float32).reshape(2, 2)
-        (result,) = ref.run(None, {"X": a, "Y": a})
-        print(result)
-
-    **Adding custom operators** — pass extra :class:`OpRun
-    <onnx.reference.op_run.OpRun>` subclasses via ``new_ops``:
-
-    .. runpython::
-        :showcode:
-
-        import numpy as np
-        import onnx.helper as oh
-        import onnx
-        from onnx.reference.op_run import OpRun
-        from yobx.reference import ExtendedReferenceEvaluator
-
-        TFLOAT = onnx.TensorProto.FLOAT
-
-        class MyCustomOp(OpRun):
-            op_domain = "my.domain"
-
-            def _run(self, X):
-                return (X * 2,)
-
-        model = oh.make_model(
-            oh.make_graph(
-                [oh.make_node("MyCustomOp", ["X"], ["Z"], domain="my.domain")],
-                "custom_graph",
-                [oh.make_tensor_value_info("X", TFLOAT, [None])],
-                [oh.make_tensor_value_info("Z", TFLOAT, [None])],
-            ),
-            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("my.domain", 1)],
-            ir_version=10,
-        )
-        ref = ExtendedReferenceEvaluator(model, new_ops=[MyCustomOp])
-        x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
-        (result,) = ref.run(None, {"X": x})
-        print(result)
-
-    The ``new_ops`` list is *merged* with :attr:`default_ops`; you do not need
-    to re-list the built-in contrib operators.
-
-    The class overloads or adds the following operators by default:
-
-    .. runpython::
-        :showcode:
-
-        import pprint
-        from yobx.reference import ExtendedReferenceEvaluator
-
-        pprint.pprint(ExtendedReferenceEvaluator.default_ops)
+    ``new_ops`` accepts :class:`NativeOpKernel` subclasses. Alternatively,
+    ``register_custom_kernel(domain, op_type, fn)`` registers a callable with
+    signature ``fn(node, *inputs)`` returning an array or a tuple of arrays.
     """
 
-    default_ops: List[type[OpRun]] = [
-        # overwritten
-        Gather,
-        GatherElements,
-        ScatterElements,
-        # com.microsoft
+    default_ops: List[type[NativeOpKernel]] = [
+        ArgMax,
+        ArgMin,
+        Greater,
         Attention,
         BiasSoftmax,
         ComplexModule,
@@ -188,7 +85,6 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         SimplifiedLayerNormalization,
         SkipLayerNormalization,
         ToComplex,
-        # yaourt.ortops.fused_kernel.cuda
         AddAdd,
         AddMul,
         AddSharedInput,
@@ -210,138 +106,188 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
 
     @staticmethod
     def filter_ops(proto, new_ops, opsets):
+        """Selects the highest compatible version of each custom kernel."""
         if opsets is None and isinstance(proto, (ModelProto, FunctionProto)):
             opsets = {d.domain: d.version for d in proto.opset_import}
         best = {}
-        renamed = {}
-        for cl in new_ops:
-            if "_" not in cl.__name__:
+        renamed = set()
+        for kernel in new_ops:
+            name, separator, version = kernel.__name__.rpartition("_")
+            if not separator or not version.isdecimal():
                 continue
-            vers = cl.__name__.split("_")
-            try:
-                v = int(vers[-1])
-            except ValueError:
-                # not a version
+            version = int(version)
+            if opsets is not None and version > opsets.get(kernel.op_domain, 1):
                 continue
-            if opsets is not None and v > opsets.get(cl.op_domain, 1):
-                continue
-            renamed[cl.__name__] = cl
-            key = cl.op_domain, "_".join(vers[:-1])
-            if key not in best or best[key][0] < v:
-                best[key] = (v, cl)
-
-        modified = []
-        for cl in new_ops:
-            if cl.__name__ not in renamed:
-                modified.append(cl)
-        for k, v in best.items():
-            atts = {"domain": k[0]}
-            bases = (v[1],)
-            if not hasattr(v[1], "op_schema"):
-                atts["op_schema"] = get_schema(k[1], v[0], domain=v[1].op_domain)
-            new_cl = type(k[1], bases, atts)
-            modified.append(new_cl)
-
-        new_ops = modified
-        return new_ops
+            renamed.add(kernel.__name__)
+            key = kernel.op_domain, name
+            if key not in best or best[key][0] < version:
+                best[key] = (version, kernel)
+        result = [kernel for kernel in new_ops if kernel.__name__ not in renamed]
+        for (domain, name), (_, kernel) in best.items():
+            result.append(type(name, (kernel,), {"op_domain": domain}))
+        return result
 
     def __init__(
         self,
         proto: Any,
         opsets: Optional[Dict[str, int]] = None,
-        functions: Optional[List[Union[ReferenceEvaluator, FunctionProto]]] = None,
+        functions: Optional[List] = None,
         verbose: int = 0,
-        new_ops: Optional[List[type[OpRun]]] = None,
+        new_ops: Optional[List[type[NativeOpKernel]]] = None,
         **kwargs,
     ):
         from ..container.export_artifact import ExportArtifact
 
         if isinstance(proto, ExportArtifact):
-            # Unwrap: prefer the container (for large models) then the proto.
-            proto = proto.container if proto.container is not None else proto.proto
+            proto = proto.get_proto(include_weights=True)
+        node_proto = proto if isinstance(proto, NodeProto) else None
+        if node_proto is not None:
+            from ..helpers.onnx_helper import get_hidden_inputs
 
-        if new_ops is None:
-            new_ops = ExtendedReferenceEvaluator.default_ops
-        else:
-            new_ops = new_ops.copy()
-            new_ops.extend(ExtendedReferenceEvaluator.default_ops)
-        new_ops = ExtendedReferenceEvaluator.filter_ops(proto, new_ops, opsets)
-
-        ReferenceEvaluator.__init__(
-            self,
-            proto,
-            opsets=opsets,
-            functions=functions,
-            verbose=verbose,
-            new_ops=new_ops,
-            **kwargs,
-        )
-
-    def run(self, *args, **kwargs):
-        """See :meth:`onnx.reference.ReferenceEvaluator.run`."""
-        if len(args) == 1 and isinstance(args[0], list):
-            feeds = dict(zip(self.input_names, args[0]))
-            return self.run(None, feeds, **kwargs)
-        if isinstance(self.proto_, FunctionProto):
-            return self._run_function(*args, **kwargs)
-        return ReferenceEvaluator.run(self, *args, **kwargs)
-
-    def _load_impl(self, node: NodeProto, input_types: TypeProto | None = None) -> Any:
-        res = super()._load_impl(node, input_types)
-        assert (
-            not hasattr(res, "op_domain") or res.op_domain == node.domain
-        ), f"Domain mismatch {res.op_domain!r} != {node.domain} for node={node}"
-        return res
-
-    def _run_function(
-        self,
-        output_names,
-        feed_inputs: Dict[str, Any],
-        attributes: Optional[Dict[str, Any]] = None,
-        intermediate: bool = False,
-    ) -> Union[Dict[str, Any], List[Any]]:  # type: ignore
-        if output_names is None:
-            output_names = self.output_names
-
-        # step 1: inputs and initializers
-        results = {"": None}  # optional input
-        results.update(self.rt_inits_)  # type: ignore[arg-type]
-        results.update(feed_inputs)
-        for k, v in self.rt_inits_.items():
-            self._log(2, " +C %s: %s", k, v)  # type: ignore[arg-type]
-        for k, v in feed_inputs.items():
-            self._log(2, " +I %s: %s", k, v)  # type: ignore[arg-type]
-
-        # step 2: execute nodes
-        for node in self.rt_nodes_:
-            self._log(1, "%s(%s) -> %s", node.op_type, node.input, node.output)
-            for i in node.input:
-                if i not in results:
-                    raise RuntimeError(
-                        f"Unable to find input {i!r} in known results {sorted(results)}, "
-                        f"self.rt_inits_ has {sorted(self.rt_inits_)}, "
-                        f"feed_inputs has {sorted(feed_inputs)}."
-                    )
-            inputs = [results[i] for i in node.input]
-            linked_attributes = {}
-            if node.has_linked_attribute and attributes:
-                linked_attributes["linked_attributes"] = attributes
-            if node.need_context():
-                outputs = node.run(*inputs, context=results, **linked_attributes)
-            else:
-                outputs = node.run(*inputs, **linked_attributes)
-            for name, value in zip(node.output, outputs):
-                self._log(2, " + %s: %s", name, value)  # type: ignore[arg-type]
-                results[name] = value
-
-        # return the results
-        if intermediate:
-            return results
-
-        for name in output_names:
-            if name not in results:
-                raise RuntimeError(
-                    f"Unable to find output name {name!r} "
-                    f"in {sorted(results)}, proto is\n{self.proto_}"
+            proto = helper.make_graph(
+                [node_proto],
+                str(node_proto.name or node_proto.op_type),
+                [],
+                [
+                    helper.make_tensor_value_info(str(name), 0, None)
+                    for name in node_proto.output
+                    if name
+                ],
+            )
+            inputs = list(dict.fromkeys(str(name) for name in node_proto.input if name))
+            inputs.extend(sorted(get_hidden_inputs(proto) - set(inputs)))
+            proto.input.extend(
+                helper.make_tensor_value_info(str(name), 0, None) for name in inputs
+            )
+            if opsets is None:
+                opsets = {"": 18}
+                if node_proto.domain:
+                    opsets[str(node_proto.domain)] = 1
+        proto = self._load_proto(proto)
+        self.proto_ = node_proto if node_proto is not None else proto
+        functions = [
+            function.proto_ if isinstance(function, ExtendedReferenceEvaluator) else function
+            for function in functions or []
+        ]
+        if any(not isinstance(function, FunctionProto) for function in functions):
+            raise TypeError("functions must contain native FunctionProto objects.")
+        if isinstance(proto, GraphProto):
+            proto = helper.make_model(
+                proto,
+                opset_imports=[
+                    helper.make_opsetid(domain, version)
+                    for domain, version in (opsets or {"": 18}).items()
+                ],
+                functions=functions,
+            )
+        elif isinstance(proto, ModelProto) and (functions or opsets):
+            model = ModelProto()
+            model.CopyFrom(proto)
+            model.functions.extend(functions)
+            if opsets:
+                model.ClearField("opset_import")
+                model.opset_import.extend(
+                    helper.make_opsetid(domain, version) for domain, version in opsets.items()
                 )
-        return [results[name] for name in output_names]
+            proto = model
+        self._extra_functions = functions
+        kernels = [*(new_ops or []), *self.default_ops]
+        for kernel in kernels:
+            if not isinstance(kernel, type) or not issubclass(kernel, NativeOpKernel):
+                raise TypeError(
+                    "new_ops requires NativeOpKernel subclasses; use "
+                    "register_custom_kernel(domain, op_type, fn) for native callbacks."
+                )
+        self._kernel_classes = self.filter_ops(proto, kernels, opsets)
+        self._native_options = {"verbose": verbose, **kwargs}
+        self._registered_callbacks = {}
+        self._execution_graph = proto.graph if isinstance(proto, ModelProto) else proto
+        super().__init__(proto, verbose=verbose, **kwargs)
+        registered = set()
+        for kernel in self._kernel_classes:
+            key = kernel.op_domain, kernel.__name__
+            if key not in registered:
+                self.register_custom_kernel(*key, kernel(None, {}))
+                registered.add(key)
+
+    def register_custom_kernel(self, domain, op_type, fn):
+        """Registers an explicit callback, including for attributed function calls."""
+        super().register_custom_kernel(domain, op_type, fn)
+        self._registered_callbacks[domain, op_type] = fn
+
+    def unregister_custom_kernel(self, domain, op_type):
+        """Unregisters an explicit callback."""
+        super().unregister_custom_kernel(domain, op_type)
+        self._registered_callbacks.pop((domain, op_type), None)
+
+    @property
+    def input_types(self):
+        """Returns the declared graph input types."""
+        graph = self._execution_graph
+        if isinstance(graph, FunctionProto):
+            return None
+        return [value.type for value in graph.input if value.name in self.input_names]
+
+    @property
+    def output_types(self):
+        """Returns the declared graph output types."""
+        graph = self._execution_graph
+        if isinstance(graph, FunctionProto):
+            return None
+        return [value.type for value in graph.output]
+
+    @property
+    def rt_inits_(self):
+        """Returns graph initializers as arrays."""
+        graph = self._execution_graph
+        if isinstance(graph, FunctionProto):
+            return {}
+        return {value.name: numpy_helper.to_array(value) for value in graph.initializer}
+
+    def run(self, output_names, feed_inputs=None, attributes=None, intermediate=False):
+        """Returns requested outputs, or a dictionary including intermediate values."""
+        if feed_inputs is None and isinstance(output_names, list):
+            if len(output_names) != len(self.input_names):
+                raise ValueError(
+                    f"Expected {len(self.input_names)} inputs, got {len(output_names)}."
+                )
+            feed_inputs = dict(zip(self.input_names, output_names))
+            output_names = None
+        if attributes or (isinstance(self.proto_, FunctionProto) and self._extra_functions):
+            if not isinstance(self.proto_, FunctionProto):
+                raise NotImplementedError("Run attributes are only supported for functions.")
+            if intermediate:
+                raise NotImplementedError(
+                    "Intermediate outputs of wrapped function calls are not supported."
+                )
+            function = self.proto_
+            model = helper.make_model(
+                helper.make_graph(
+                    [
+                        helper.make_node(
+                            function.name,
+                            list(function.input),
+                            list(function.output),
+                            domain=function.domain,
+                            **(attributes or {}),
+                        )
+                    ],
+                    function.name,
+                    [helper.make_tensor_value_info(name, 0, None) for name in function.input],
+                    [helper.make_tensor_value_info(name, 0, None) for name in function.output],
+                ),
+                functions=[*self._extra_functions, function],
+                opset_imports=[*function.opset_import, helper.make_opsetid(function.domain, 1)],
+            )
+            evaluator = ReferenceEvaluator(model, **self._native_options)
+            for (domain, op_type), fn in self._registered_callbacks.items():
+                evaluator.register_custom_kernel(domain, op_type, fn)
+            return evaluator.run(output_names, feed_inputs)
+        if intermediate:
+            graph = self._execution_graph
+            names = list(
+                dict.fromkeys(name for node in graph.node for name in node.output if name)
+            )
+            values = super().run(names, feed_inputs)
+            return {"": None, **self.rt_inits_, **feed_inputs, **dict(zip(names, values))}
+        return super().run(output_names, feed_inputs)

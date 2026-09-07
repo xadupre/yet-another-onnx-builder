@@ -81,7 +81,7 @@ The snippet below builds the same ``Sub`` / ``Div`` graph emitted by the
     :showcode:
 
     import numpy as np
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
     from yobx.helpers.onnx_helper import pretty_onnx
 
@@ -381,7 +381,7 @@ Any class that satisfies the two-part API above can be passed as
     :showcode:
 
     import numpy as np
-    import onnx
+    from yobx._onnx_shim import onnx
     from sklearn.preprocessing import StandardScaler
     from yobx.sklearn import to_onnx
     from yobx.builder.onnxscript import OnnxScriptGraphBuilder

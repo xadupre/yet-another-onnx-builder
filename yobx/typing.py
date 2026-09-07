@@ -135,6 +135,11 @@ class GraphBuilderProtocol(Protocol):
     when converting models to ONNX format.  Both :class:`yobx.xbuilder.GraphBuilder`
     and :class:`yobx.builder.onnxscript.OnnxScriptGraphBuilder` satisfy this
     protocol.
+
+    Builders whose ``to_onnx`` method accepts ``return_optimize_report`` can
+    declare ``supports_optimization_report = True``. Converters then forward
+    report requests without requiring inheritance from the Python GraphBuilder.
+    The capability is optional so existing third-party builders remain valid.
     """
 
     @property

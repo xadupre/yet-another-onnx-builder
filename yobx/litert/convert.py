@@ -3,7 +3,7 @@
 import os
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
 from ..xbuilder import GraphBuilder, OptimizationOptions
@@ -110,7 +110,7 @@ def to_onnx(
 
     kwargs: Dict[str, Any] = {}
     if "com.microsoft" in dict_target_opset:
-        kwargs["optimization_options"] = OptimizationOptions(patterns="default+onnxruntime")
+        kwargs["optimization_options"] = OptimizationOptions()
     if verbose and issubclass(builder_cls, GraphBuilder):  # type: ignore
         kwargs["verbose"] = verbose
 
@@ -195,7 +195,7 @@ def _finalize_builder(
     return_optimize_report: bool = False,
 ) -> ExportArtifact:
     """Call ``g.to_onnx(...)`` and return the resulting :class:`ExportArtifact`."""
-    if isinstance(g, GraphBuilder):
+    if isinstance(g, GraphBuilder) or getattr(g, "supports_optimization_report", False):
         onx = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,

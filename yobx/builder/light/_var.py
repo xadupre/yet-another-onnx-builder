@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 import numpy as np
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 from ._graph import OnnxGraph
 from ._op_var import OpsVar
 from ._op_vars import OpsVars

@@ -1,7 +1,7 @@
 import inspect
 from collections import Counter
 from typing import List, Optional
-from onnx import NodeProto
+from onnx_light.onnx import NodeProto
 from ...xbuilder import GraphBuilder, FunctionOptions
 from ..patterns_api import MatchResult, PatternOptimization
 from . import SimplifyingEasyPatternFunction

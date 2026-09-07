@@ -18,8 +18,8 @@ The same result can be achieved from the terminal with::
 
 import os
 import tempfile
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 from yobx._command_lines_parser import _cmd_print
 
 TFLOAT = onnx.TensorProto.FLOAT

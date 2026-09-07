@@ -3,7 +3,7 @@ import os
 import unittest
 from typing import Optional
 import numpy as np
-from onnx import (
+from onnx_light.onnx import (
     ModelProto,
     TensorProto,
     helper as oh,
@@ -11,7 +11,7 @@ from onnx import (
     load as onnx_load,
     shape_inference,
 )
-from onnx.checker import check_model
+from onnx_light.onnx.checker import check_model
 from yobx.ext_test_case import (
     ExtTestCase,
     ignore_warnings,
@@ -1748,9 +1748,9 @@ class TestGraphPatternOptimizationOrt(ExtTestCase):
 
     @hide_stdout()
     def test_contrib_gemma_rotary_embedding(self):
-        from onnx.reference.op_run import OpRun
+        from yobx.reference.ops._native_op import NativeOpKernel
 
-        class GemmaRotaryEmbedding(OpRun):
+        class GemmaRotaryEmbedding(NativeOpKernel):
             op_domain = "com.microsoft"
 
             def _run(self, emb, q, q_rot, k, k_rot):
@@ -4207,7 +4207,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         The decoder subgraph is a trivial Cast(INT32→FLOAT) that satisfies the
         type constraints without executing any real language-model logic.
         """
-        from onnx import AttributeProto
+        from onnx_light.onnx import AttributeProto
 
         decoder_graph = oh.make_graph(
             [oh.make_node("Cast", ["input_ids"], ["logits"], to=TensorProto.FLOAT)],
@@ -5376,7 +5376,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         self.assertEqual(4, nh.i)
 
         # static_kv should be True for cross-attention
-        from onnx import numpy_helper as _onh
+        from onnx_light.onnx import numpy_helper as _onh
 
         init_map = {i.name: _onh.to_array(i) for i in opt_onx.graph.initializer}
         static_kv_val = init_map.get(fused[0].input[8])
@@ -5410,7 +5410,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         self.assertEqual(1, len(fused))
 
         # static_kv should be False for self-attention
-        from onnx import numpy_helper as _onh
+        from onnx_light.onnx import numpy_helper as _onh
 
         init_map = {i.name: _onh.to_array(i) for i in opt_onx.graph.initializer}
         static_kv_val = init_map.get(fused[0].input[8])
@@ -5461,7 +5461,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
 
         # The kv_weight initializer is input[3] of the fused node.
         kv_weight_name = fused[0].input[3]
-        from onnx import numpy_helper as _onh
+        from onnx_light.onnx import numpy_helper as _onh
 
         init_map = {i.name: _onh.to_array(i) for i in opt_onx.graph.initializer}
         kv_weight = init_map.get(kv_weight_name)
@@ -5484,7 +5484,7 @@ class TestCausalConvWithStatePattern(ExtTestCase):
         self.assertEqual(1, len(fused))
 
         bias_name = fused[0].input[4]
-        from onnx import numpy_helper as _onh
+        from onnx_light.onnx import numpy_helper as _onh
 
         init_map = {i.name: _onh.to_array(i) for i in opt_onx.graph.initializer}
         bias = init_map.get(bias_name)

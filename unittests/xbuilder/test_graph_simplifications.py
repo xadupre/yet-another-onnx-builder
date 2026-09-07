@@ -1,10 +1,10 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-import onnx.checker as oc
-from onnx import TensorProto
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
+import onnx_light.onnx.checker as oc
+from onnx_light.onnx import TensorProto
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.graph_builder import GraphBuilder
 from yobx.reference import ExtendedReferenceEvaluator

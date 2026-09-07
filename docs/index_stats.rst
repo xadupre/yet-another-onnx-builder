@@ -18,7 +18,7 @@ With the following versions:
     import ml_dtypes
     import scipy
     import sklearn
-    import onnx
+    from yobx._onnx_shim import onnx
     import onnx_ir
     import onnxruntime
     import onnxscript

@@ -1,8 +1,8 @@
 import sys
 from typing import List, Union
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from ..xbuilder import GraphBuilder
 
 
@@ -28,7 +28,7 @@ def unfused_nodes(
 
     .. code-block:: python
 
-        import onnx
+        from yobx._onnx_shim import onnx
         from yobx.xoptim.unfused import unfused_nodes
         from yobx.helpers.onnx_helper import pretty_onnx
 

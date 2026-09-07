@@ -205,9 +205,9 @@ sphinx_gallery_conf = {
     ),
 }
 
-substring_to_disable = []
+substring_to_disable = ["plot_sklearn_with_spox", "plot_sklearn_with_sklearn_onnx"]
 if int(os.environ.get("UNITTEST_GOING", "0")):
-    substring_to_disable = ["tiny_llm", "examples.transformers.plot_"]
+    substring_to_disable += ["tiny_llm", "examples.transformers.plot_"]
 substring = "|".join(f"({s})" for s in substring_to_disable)
 if substring:
     sphinx_gallery_conf["ignore_pattern"] = f".*({substring}).*"
