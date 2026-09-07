@@ -148,13 +148,13 @@ def convert_shape(
     """
     Converts TF ``Shape`` → ONNX ``Shape``.
 
-    TF's ``Shape`` op may output ``int32`` (via the ``out_type`` attribute),
-    but the ONNX ``Shape`` operator always returns ``int64``.  The output is
-    kept as ``int64`` throughout the ONNX graph; downstream converters
-    (e.g. ``StridedSlice``, ``Pack``) cast their non-int64 constant inputs
-    to match.
+    Preserves TensorFlow's requested integer dtype. Consumers such as
+    ``Reshape`` cast shape inputs to int64 at their own ONNX boundary.
     """
-    return g.op.Shape(op.inputs[0].name, outputs=outputs[:1], name=op.name)
+    if op.outputs[0].dtype == tf.int64:
+        return g.op.Shape(op.inputs[0].name, outputs=outputs[:1], name=op.name)
+    shape = g.op.Shape(op.inputs[0].name, name=f"{op.name}_shape")
+    return g.op.Cast(shape, to=TensorProto.INT32, outputs=outputs[:1], name=op.name)
 
 
 @register_tf_op_converter("StridedSlice")
@@ -234,8 +234,8 @@ def convert_pack(
     ``Pack`` stacks N tensors along a new axis.  In ONNX this is expressed
     as unsqueezing each input along the new axis and then concatenating them.
 
-    Each input is cast to ``int64`` so that the resulting tensor can be used
-    as an ONNX ``Reshape`` shape argument (which requires ``int64``).
+    Preserves the input dtype, including floating-point tensors. Shape
+    consumers perform their own int64 conversion when required.
     """
     axis = int(op.get_attr("axis"))
     inputs = [inp.name for inp in op.inputs]
@@ -243,9 +243,7 @@ def convert_pack(
 
     unsqueezed = []
     for i, inp in enumerate(inputs):
-        # Cast to int64: shape computations in ONNX use int64.
-        casted = g.op.Cast(inp, to=TensorProto.INT64, name=f"{op.name}_cast_{i}")
-        us = g.op.Unsqueeze(casted, axes_arr, name=f"{op.name}_us_{i}")
+        us = g.op.Unsqueeze(inp, axes_arr, name=f"{op.name}_us_{i}")
         unsqueezed.append(us)
 
     if len(unsqueezed) == 1:
@@ -283,16 +281,14 @@ def convert_transpose(
     ONNX builder's constant-folding path is used as a fallback.
     """
     perm_op = op.inputs[1].op
-    try:
-        perm = list(tf.make_ndarray(perm_op.get_attr("value")).astype(int))
-    except (AttributeError, ValueError):
-        # Permutation is a computed constant (e.g. concat of Const tensors).
+    perm_arr = tf.get_static_value(op.inputs[1])
+    if perm_arr is None:
         perm_arr = g.get_constant(op.inputs[1].name, computed_value=True, exc=False)
         if perm_arr is None:
             raise NotImplementedError(
                 f"Cannot determine permutation for Transpose op {op.name!r}: "
                 f"perm input is produced by a {perm_op.type!r} op whose value "
                 f"is not statically computable."
-            ) from None
-        perm = list(np.asarray(perm_arr).astype(int))
+            )
+    perm = np.asarray(perm_arr).astype(int).tolist()
     return g.op.Transpose(op.inputs[0].name, perm=perm, outputs=outputs[:1], name=op.name)
