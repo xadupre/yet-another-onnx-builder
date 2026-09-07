@@ -3,7 +3,6 @@
 import unittest
 import numpy
 from onnx_light.onnx import helper
-from scipy.special import log_softmax
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
 
@@ -30,7 +29,10 @@ class TestNativeFloatKernels(ExtTestCase):
                                 int(numpy.prod(data.shape[:selected_axis], dtype=numpy.int64)), -1
                             )
                             selected_axis = 1
-                        expected = log_softmax(values, axis=selected_axis).reshape(data.shape)
+                        expected = (
+                            values
+                            - numpy.logaddexp.reduce(values, axis=selected_axis, keepdims=True)
+                        ).reshape(data.shape)
                         self.assertEqual(result.dtype, data.dtype)
                         self.assertEqualArray(
                             expected.astype(dtype), result, atol=1e-6, rtol=1e-6
