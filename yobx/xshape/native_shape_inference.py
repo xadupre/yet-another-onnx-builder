@@ -6,6 +6,7 @@ from onnx_light.onnx_core.shape_inference import ShapesContext, SymTensor
 
 from .shape_builder_impl import InferenceMode
 from .shape_builder import ShapeBuilder
+from ._shape_helper import ONNX_SHAPE
 
 
 class NativeShapeInference(ShapeBuilder):
@@ -97,7 +98,7 @@ class NativeShapeInference(ShapeBuilder):
             return False
         return not full or all(isinstance(d, int) and d >= 0 for d in self.get_shape(name))
 
-    def get_shape(self, name):
+    def get_shape(self, name: str) -> ONNX_SHAPE:
         """Returns native dimensions, preserving anonymous dimensions as ``None``."""
         if not self.has_shape(name):
             raise KeyError(f"Shape is unknown for {name!r}.")
@@ -111,12 +112,12 @@ class NativeShapeInference(ShapeBuilder):
         """Returns the inferred rank."""
         return len(self.get_shape(name))
 
-    def set_type(self, name, dtype, exc=True):
+    def set_type(self, name: str, itype: int, exc: bool = True) -> bool:
         """Seeds a native descriptor with an element type."""
         previous = self.context.get(str(name)) if self.context.has(str(name)) else None
         if previous is None:
             self._unshaped.add(str(name))
-        tensor = SymTensor(int(dtype), previous.shape.dims() if previous is not None else [])
+        tensor = SymTensor(int(itype), previous.shape.dims() if previous is not None else [])
         if previous is not None and previous.has_value_as_shape():
             tensor.set_value_as_shape(previous.value_as_shape())
         self.context.set(str(name), tensor)
@@ -145,7 +146,7 @@ class NativeShapeInference(ShapeBuilder):
         """Returns caller-supplied device metadata."""
         return self._devices[str(name)]
 
-    def set_device(self, name, device, **kwargs):
+    def set_device(self, name: str, device: int, **kwargs) -> None:
         """Stores optional device metadata without performing inference."""
         self._devices[str(name)] = device
 
@@ -187,7 +188,7 @@ class NativeShapeInference(ShapeBuilder):
         """Returns the native domain opset."""
         return self.context.opset_version(str(name))
 
-    def set_opset(self, name, version):
+    def set_opset(self, name: str, version: int) -> None:
         """Registers a domain opset with the native engine."""
         self.opsets[str(name)] = version
         self.context.set_opset_version(str(name), version)
@@ -206,7 +207,7 @@ class NativeShapeInference(ShapeBuilder):
         if equal_to:
             self.context.add_constraint(str(equal_to[0]), str(equal_to[1]))
 
-    def value_as_shape(self, name):
+    def value_as_shape(self, name: str) -> ONNX_SHAPE | None:
         """Returns native shape-tensor values, or ``None`` when unavailable."""
         if not self.context.has(str(name)):
             return None
@@ -294,9 +295,9 @@ class NativeShapeInference(ShapeBuilder):
         model.ParseFromString(self._model.SerializeToString())
         return self.update_shapes(model)
 
-    def get_registered_constraints(self):
+    def get_registered_constraints(self) -> dict[str, set[int | str]]:
         """Returns equality constraints recorded by the native engine."""
-        result = {}
+        result: dict[str, set[int | str]] = {}
         for left, right in self.context.constraints():
             result.setdefault(left, set()).add(
                 int(right) if right.lstrip("-").isdigit() else right
@@ -304,14 +305,16 @@ class NativeShapeInference(ShapeBuilder):
             result.setdefault(right, set()).add(int(left) if left.lstrip("-").isdigit() else left)
         return result
 
-    def register_constraint_dimension(self, name, value):
-        """Registers a native dimension equality."""
-        self.context.add_constraint(str(name), str(value))
+    def register_constraint_dimension(
+        self, dim_name: str, value: int | str | set[int | str]
+    ) -> None:
+        """Registers one or several native dimension equalities."""
+        self.add_to_constraints(dim_name, value)
 
-    def add_to_constraints(self, name, value):
+    def add_to_constraints(self, dim_name: str, value: int | str | set[int | str]) -> None:
         """Registers one or several native dimension equalities."""
         for item in value if isinstance(value, set) else (value,):
-            self.register_constraint_dimension(name, item)
+            self.context.add_constraint(str(dim_name), str(item))
 
     def get_shape_renamed(self, name):
         """Returns dimensions as resolved by the native engine."""
@@ -321,11 +324,10 @@ class NativeShapeInference(ShapeBuilder):
         """Estimates arithmetic cost using only native descriptors and values."""
         from .cost_inference import estimate_node_flops
 
-        def shape(name):
+        def shape(name: str) -> ONNX_SHAPE | None:
             if not name or not self.has_shape(name):
                 return None
-            dims = self.get_shape(name)
-            return None if None in dims else dims
+            return self.get_shape(name)
 
         return estimate_node_flops(node, shape, self.value_as_shape)
 
@@ -353,8 +355,8 @@ class NativeShapeInference(ShapeBuilder):
             result.append((op, flops, shapes))
         return result
 
-    def evaluate_shape(self, name, context):
-        """Evaluates native dimension expressions, including exact division."""
+    def evaluate_shape(self, name: str, context: dict[str, int]) -> tuple[int | None, ...]:
+        """Evaluates native expressions and preserves anonymous unknown dimensions."""
         from onnx_light.onnx_core.expressions import evaluate_expression
 
         return tuple(

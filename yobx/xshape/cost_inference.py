@@ -19,10 +19,10 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Optional, Tuple, Union
 
-import numpy as np
 from onnx_light import onnx
 
 from onnx_light.onnx_core.expressions import dim_add, dim_div, dim_mul, dim_multi_mul
+from ._shape_helper import ONNX_SHAPE
 
 DIM_TYPE = Union[int, str]
 
@@ -30,12 +30,12 @@ DIM_TYPE = Union[int, str]
 # Type aliases
 # ---------------------------------------------------------------------------
 
-#: Maps a tensor name → shape tuple (int for static dims, str for symbolic).
-_ShapeFn = Callable[[str], Optional[Tuple[DIM_TYPE, ...]]]
+#: Maps a tensor name to static, symbolic, or anonymous unknown dimensions.
+_ShapeFn = Callable[[str], Optional[ONNX_SHAPE]]
 
 #: Maps a tensor name → integer values of a 1-D integer constant tensor
 #: (shape-spec literals, e.g. the second input of a Reshape node).
-_LiteralFn = Callable[[str], Optional[Tuple[DIM_TYPE, ...]]]
+_LiteralFn = Callable[[str], Optional[ONNX_SHAPE]]
 
 #: Signature of a per-op FLOPs estimator.
 _FlopsHandler = Callable[[onnx.NodeProto, "_ShapeFn", "_LiteralFn"], Optional[DIM_TYPE]]  # type: ignore[type-arg]
@@ -180,26 +180,38 @@ def _get_attribute_value(node: onnx.NodeProto, name: str, default: Any = None) -
     return default
 
 
-def _literal_size(shape: Optional[Tuple]) -> Optional[DIM_TYPE]:
-    """Returns the number of elements in a static shape, or None if dynamic."""
-    if shape is None or any(d is None or d == "" for d in shape):
+def _literal_size(shape: Optional[ONNX_SHAPE]) -> Optional[DIM_TYPE]:
+    """Returns the element count, or ``None`` when a dimension is unknown."""
+    if shape is None:
         return None
-    if all(isinstance(a, int) for a in shape):
-        return int(np.prod(shape))
-    return dim_multi_mul(*shape)
+    dimensions: list[DIM_TYPE] = []
+    for dim in shape:
+        if dim is None or dim == "":
+            return None
+        dimensions.append(dim)
+    return dim_multi_mul(*dimensions)
 
 
-def _resolve_shape(name: str, shape_fn: _ShapeFn, literal_fn: _LiteralFn) -> Optional[Tuple]:
+def _resolve_shape(
+    name: str, shape_fn: _ShapeFn, literal_fn: _LiteralFn
+) -> Optional[Tuple[DIM_TYPE, ...]]:
     """
-    Returns the shape of *name* using *shape_fn* first, then *literal_fn* as a
+    Returns fully specified dimensions using *shape_fn* first, then *literal_fn* as a
     fallback.  *literal_fn* is consulted when the tensor is a 1-D integer
     constant whose *values* encode a shape specification (e.g. the shape input
-    of a Reshape node).
+    of a Reshape node). Anonymous unknown dimensions prevent arithmetic cost estimation.
     """
     sh = shape_fn(name)
-    if sh is not None:
-        return sh
-    return literal_fn(name)
+    if sh is None:
+        sh = literal_fn(name)
+    if sh is None:
+        return None
+    dimensions: list[DIM_TYPE] = []
+    for dim in sh:
+        if dim is None or dim == "":
+            return None
+        dimensions.append(dim)
+    return tuple(dimensions)
 
 
 # ---------------------------------------------------------------------------
@@ -455,13 +467,17 @@ def _flops_rank_cost(
     if node.op_type == "Shape":
         # Shape reads one value per input dimension.
         if node.input:
-            sh = _resolve_shape(node.input[0], shape_fn, literal_fn)
+            sh = shape_fn(node.input[0])
+            if sh is None:
+                sh = literal_fn(node.input[0])
             if sh is not None:
                 return len(sh)
         return None
     # Reshape / Squeeze / Unsqueeze: rank of output.
     if node.output:
-        sh = _resolve_shape(node.output[0], shape_fn, literal_fn)
+        sh = shape_fn(node.output[0])
+        if sh is None:
+            sh = literal_fn(node.output[0])
         if sh is not None:
             return len(sh)
     return None
@@ -515,11 +531,13 @@ def estimate_node_flops(
     """
     Estimates the number of floating-point operations for a single ONNX node.
 
-    Returns ``None`` when the shapes are not fully known (dynamic shapes) or the
-    ``op_type`` is not covered.
+    Returns ``None`` when required dimensions are unknown or the ``op_type``
+    is not covered. Symbolic dimensions produce symbolic costs. Rank-only
+    costs remain available when individual dimensions are unknown.
 
     :param node: ONNX node
-    :param shape_fn: callable mapping tensor name → shape tuple (from shape inference)
+    :param shape_fn: callable mapping tensor name to a shape tuple containing
+        integers, symbolic strings, or ``None`` for unknown dimensions
     :param literal_fn: callable mapping tensor name → int-value tuple for 1-D integer
         constant tensors (shape specification tensors); used as a fallback when
         *shape_fn* cannot resolve a shape

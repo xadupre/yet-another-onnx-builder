@@ -6,6 +6,8 @@ from onnx_light.onnx import helper, numpy_helper
 from onnx_light.onnx_core.shape_inference import ShapesContext
 
 from yobx.xshape import InferenceMode, NativeShapeInference
+from yobx.xshape.cost_inference import estimate_node_flops
+from yobx.xshape.shape_builder import ShapeBuilder
 
 
 class TestNativeShapeInference(unittest.TestCase):
@@ -110,6 +112,42 @@ class TestNativeShapeInference(unittest.TestCase):
         self.assertTrue(inference.context.has_constraint("N", "M"))
         constraints = inference.get_registered_constraints()
         self.assertTrue("M" in constraints.get("N", set()) or "N" in constraints.get("M", set()))
+
+    def test_shape_api_keyword_arguments(self):
+        inference: ShapeBuilder = NativeShapeInference()
+        inference.set_type(name="X", itype=onnx.TensorProto.FLOAT)
+        inference.set_shape(name="X", shape=(None, "N/:2", 3))
+        inference.set_device(name="X", device=2)
+        inference.set_opset(name="", version=19)
+        self.assertEqual(inference.get_type("X"), onnx.TensorProto.FLOAT)
+        self.assertEqual(inference.get_device("X"), 2)
+        self.assertEqual(inference.get_opset(""), 19)
+        self.assertEqual(inference.evaluate_shape(name="X", context={"N": 8}), (None, 4, 3))
+        with self.assertRaises(RuntimeError):
+            inference.evaluate_shape(name="X", context={})
+
+    def test_native_constraint_sets(self):
+        inference: ShapeBuilder = NativeShapeInference()
+        inference.register_constraint_dimension(dim_name="N", value={"M", 4})
+        inference.add_to_constraints(dim_name="N", value="K")
+        constraints = inference.get_registered_constraints()
+        self.assertEqual(constraints["N"], {"M", "K", 4})
+        self.assertEqual(constraints["M"], {"N"})
+
+    def test_unknown_dimensions_in_cost_callbacks(self):
+        node = helper.make_node("MatMul", ["X", "Y"], ["Z"])
+        shapes = {"X": (None, 3), "Y": (3, 4), "Z": (None, 4)}
+        self.assertIsNone(estimate_node_flops(node, shapes.get, lambda name: None))
+        literals = {"X": (2, None), "Y": (None, 4), "Z": (2, 4)}
+        self.assertIsNone(estimate_node_flops(node, lambda name: None, literals.get))
+
+    def test_rank_cost_preserves_unknown_dimensions(self):
+        inference = NativeShapeInference()
+        inference.set_type("X", onnx.TensorProto.FLOAT)
+        inference.set_shape("X", (None, 3))
+        node = helper.make_node("Shape", ["X"], ["shape"])
+        self.assertEqual(inference.run_node(node), 2)
+        self.assertEqual(inference.value_as_shape("shape"), (None, 3))
 
     def test_unknown_operator_does_not_fallback(self):
         for exc in (False, True):
