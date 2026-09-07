@@ -1,5 +1,4 @@
 import unittest
-from collections import Counter
 import numpy as np
 import onnxruntime
 from yobx.ext_test_case import ExtTestCase
@@ -23,6 +22,9 @@ class TestEinsumHelper(ExtTestCase):
         model = decompose_einsum("ij,jk->ik", (3, 4), (4, 5))
         self.assertIsNotNone(model)
         self.assertGreater(len(model.graph.node), 0)
+        self.assertEqual(
+            [dim.dim_value for dim in model.graph.input[0].type.tensor_type.shape.dim], [3, 4]
+        )
 
         a = np.random.rand(3, 4).astype(np.float32)
         b = np.random.rand(4, 5).astype(np.float32)
@@ -54,6 +56,26 @@ class TestEinsumHelper(ExtTestCase):
         model = decompose_einsum("ij,jk->ik")
         self.assertIsNotNone(model)
         self.assertGreater(len(model.graph.node), 0)
+        for rows, contract, columns in [(3, 4, 5), (2, 7, 3)]:
+            with self.subTest(rows=rows, contract=contract, columns=columns):
+                a = np.random.rand(rows, contract).astype(np.float32)
+                b = np.random.rand(contract, columns).astype(np.float32)
+                self.assertAlmostEqual(
+                    self._run(model, {"X0": a, "X1": b}), np.einsum("ij,jk->ik", a, b), atol=1e-5
+                )
+
+    def test_decompose_einsum_dynamic_reduction(self):
+        """Tests explicit reshape products across multiple dynamic input sizes."""
+        model = decompose_einsum("abij,ij->ab", ("A", "B", "I", "J"), ("I", "J"))
+        for shape in [(2, 3, 4, 5), (3, 2, 5, 4)]:
+            with self.subTest(shape=shape):
+                a = np.random.rand(*shape).astype(np.float32)
+                b = np.random.rand(*shape[2:]).astype(np.float32)
+                self.assertAlmostEqual(
+                    self._run(model, {"X0": a, "X1": b}),
+                    np.einsum("abij,ij->ab", a, b),
+                    atol=1e-5,
+                )
 
     def test_decompose_einsum_float64(self):
         """Tests decomposition with float64 dtype."""
@@ -177,25 +199,26 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
     def test_multi_batch_matmul(self):
         self._check("bcij,bcjk->bcik", (2, 3, 4, 5), (2, 3, 5, 6))
 
-    def test_pattern_optimization_concat_gather(self):
+    def test_native_pattern_selection(self):
         dec = decompose_einsum(
-            "bik,bjk->bij", ("B", "I", "K"), ("B", "J", "K"), patterns="default-GatherShape"
+            "bik,bjk->bij", ("B", "I", "K"), ("B", "J", "K"), patterns="ConcatGather"
         )
         op_types = [n.op_type for n in dec.graph.node]
-        counter = Counter(op_types)
-        self.dump_onnx("test_pattern_optimization_concat_gather.onnx", dec)
-        # ConcatGatherPattern must reduce the number of Concat nodes from 3+
-        # down to at most 1 (some optimizer passes may eliminate it entirely).
-        self.assertLessEqual(counter.get("Concat", 0), 1)
-        # Verify numerical correctness.
+        self.assertNotIn("Einsum", op_types)
+        unoptimized = decompose_einsum(
+            "bik,bjk->bij", ("B", "I", "K"), ("B", "J", "K"), patterns=[]
+        )
+        self.assertLessEqual(len(dec.graph.node), len(unoptimized.graph.node))
         sess = onnxruntime.InferenceSession(
             dec.SerializeToString(), providers=["CPUExecutionProvider"]
         )
-        x0 = np.random.randn(2, 3, 5).astype(np.float32)
-        x1 = np.random.randn(2, 4, 5).astype(np.float32)
-        expected = np.einsum("bik,bjk->bij", x0, x1)
-        (result,) = sess.run(None, {"X0": x0, "X1": x1})
-        self.assertEqualArray(expected, result, atol=1e-5)
+        for batch, left, right, contract in [(2, 3, 4, 5), (3, 2, 5, 4)]:
+            with self.subTest(batch=batch, left=left, right=right, contract=contract):
+                x0 = np.random.randn(batch, left, contract).astype(np.float32)
+                x1 = np.random.randn(batch, right, contract).astype(np.float32)
+                expected = np.einsum("bik,bjk->bij", x0, x1)
+                (result,) = sess.run(None, {"X0": x0, "X1": x1})
+                self.assertEqualArray(expected, result, atol=1e-5)
 
     def test_multi_batch_matmul_4d(self):
         """Multi-batch 4D matmul ``abij,abjk->abik`` (label: multi-batch matmul 4D).

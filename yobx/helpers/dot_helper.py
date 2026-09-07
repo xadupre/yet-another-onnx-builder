@@ -172,8 +172,12 @@ def to_dot(model: onnx.ModelProto) -> str:
             continue
 
         sess = Inference(node)
-        value = sess.run(None, {})[0]  # type: ignore
-        inits.append(onh.from_array(value, name=node.output[0]))
+        value = sess.run(None, {})[0]
+        if not isinstance(value, np.ndarray):
+            raise TypeError(
+                f"Constant {node.output[0]!s} produced {type(value)}, expected ndarray."
+            )
+        inits.append(onh.from_array(value, name=str(node.output[0])))
 
     for init in inits:
         if init.name in name_to_ids:

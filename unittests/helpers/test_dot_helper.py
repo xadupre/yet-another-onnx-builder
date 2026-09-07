@@ -1,5 +1,6 @@
 import textwrap
 import unittest
+from unittest import mock
 from yobx._onnx_shim import onnx
 import onnx_light.onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
@@ -7,6 +8,26 @@ from yobx.helpers.dot_helper import to_dot, to_svg
 
 
 class TestDotHelper(ExtTestCase):
+    def test_constant_requires_tensor_result(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node("Constant", [], ["constant"], value_float=1.0),
+                    oh.make_node("Identity", ["constant"], ["Y"]),
+                ],
+                "constant_graph",
+                [],
+                [oh.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        with (
+            mock.patch("yobx.helpers.dot_helper.Inference") as inference,
+            self.assertRaisesRegex(TypeError, "expected ndarray"),
+        ):
+            inference.return_value.run.return_value = [None]
+            to_dot(model)
+
     def test_custom_doc_kernels_layer_normalization(self):
         TFLOAT16 = onnx.TensorProto.FLOAT16
         model = oh.make_model(
@@ -69,7 +90,7 @@ class TestDotHelper(ExtTestCase):
                         axis=-1,
                         epsilon=9.999999974752427e-7,
                     ),
-                    oh.make_node("Constant", [], ["cst"], value_float=[1]),
+                    oh.make_node("Constant", [], ["cst"], value_floats=[1.0]),
                     oh.make_node("Cast", ["cst"], ["cst16"], to=onnx.TensorProto.FLOAT16),
                     oh.make_node("Add", ["ln", "cst16"], ["Z"], axis=-1),
                 ],

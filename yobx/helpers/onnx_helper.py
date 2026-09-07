@@ -334,7 +334,7 @@ def onnx_dtype_name(itype: int, exc: bool = True) -> str:
 def np_dtype_to_tensor_dtype(dtype: np.dtype) -> int:
     """Converts a numpy dtype to an onnx element type."""
     try:
-        return oh.np_dtype_to_tensor_dtype(dtype)
+        return oh.np_dtype_to_tensor_dtype(np.dtype(dtype))
     except ValueError as e:
         if dtype == np.int64:
             return onnx.TensorProto.INT64

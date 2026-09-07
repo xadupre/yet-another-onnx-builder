@@ -44,12 +44,12 @@ class TestVarStr(ExtTestCase):
         gr = start()
         x = gr.vin("X", elem_type=TensorProto.FLOAT)
         # TensorProto.FLOAT == 1
-        self.assertEqual(str(x), f"X:{TensorProto.FLOAT}")
+        self.assertEqual(str(x), f"X:{int(TensorProto.FLOAT)}")
 
     def test_str_with_elem_type_and_shape(self):
         gr = start()
         x = gr.vin("X", elem_type=TensorProto.FLOAT, shape=(2, 3))
-        self.assertEqual(str(x), f"X:{TensorProto.FLOAT}:[2, 3]")
+        self.assertEqual(str(x), f"X:{int(TensorProto.FLOAT)}:[2, 3]")
 
     def test_str_with_shape_no_elem_type(self):
         # elem_type=None but shape provided: only shape suffix
@@ -61,7 +61,7 @@ class TestVarStr(ExtTestCase):
         gr = start()
         x = gr.vin("X")
         x.rename("Z")
-        self.assertEqual(str(x), f"Z:{TensorProto.FLOAT}")
+        self.assertEqual(str(x), f"Z:{int(TensorProto.FLOAT)}")
 
     def test_repr(self):
         gr = start()

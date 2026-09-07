@@ -332,7 +332,7 @@ def onnx_generate(
     if attention_mask is None:
         attention_mask = torch.ones(input_ids.shape, dtype=torch.int64, device=device)
     else:
-        attention_mask = attention_mask.to(device=device)
+        attention_mask = torch.as_tensor(attention_mask, device=device)
 
     # Bootstrap zero-filled KV-cache tensors on the same device as input_ids.
     empty_cache = _make_empty_cache(

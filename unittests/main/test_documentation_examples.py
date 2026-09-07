@@ -1,9 +1,9 @@
 import unittest
 import os
 import sys
-import importlib.util
 import subprocess
 import time
+from unittest import mock
 from yobx import __file__ as yobx_file
 from yobx.ext_test_case import (
     ExtTestCase,
@@ -25,18 +25,6 @@ VERBOSE = 0
 ROOT = os.path.realpath(os.path.abspath(os.path.join(yobx_file, "..", "..")))
 
 
-def import_source(module_file_path, module_name):
-    if not os.path.exists(module_file_path):
-        raise FileNotFoundError(module_file_path)
-    module_spec = importlib.util.spec_from_file_location(module_name, module_file_path)
-    if module_spec is None:
-        raise FileNotFoundError(
-            "Unable to find '{}' in '{}'.".format(module_name, module_file_path)
-        )
-    module = importlib.util.module_from_spec(module_spec)
-    return module_spec.loader.exec_module(module)
-
-
 class TestDocumentationExamples(ExtTestCase):
     def run_test(self, fold: str, name: str, verbose=0) -> int:
         ppath = os.environ.get("PYTHONPATH", "")
@@ -46,35 +34,37 @@ class TestDocumentationExamples(ExtTestCase):
             sep = ";" if is_windows() else ":"
             os.environ["PYTHONPATH"] = ppath + sep + ROOT
         perf = time.perf_counter()
-        try:
-            mod = import_source(fold, os.path.splitext(name)[0])
-            assert mod is not None
-        except FileNotFoundError:
-            # try another way
-            cmds = [sys.executable, "-u", os.path.join(fold, name)]
-            p = subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            res = p.communicate()
-            _out, err = res
-            st = err.decode("ascii", errors="ignore")
-            if st and "Traceback" in st:
-                if '"dot" not found in path.' in st:
-                    # dot not installed, this part
-                    # is tested in onnx framework
-                    raise unittest.SkipTest(f"failed: {name!r} due to missing dot.")
-                if (
-                    "We couldn't connect to 'https://huggingface.co'" in st
-                    or "Cannot access content at: https://huggingface.co/" in st
-                ):
-                    raise unittest.SkipTest(f"Connectivity issues due to\n{err}")
-                raise AssertionError(  # noqa: B904
-                    "Example '{}' (cmd: {} - exec_prefix='{}') "
-                    "failed due to\n{}"
-                    "".format(name, cmds, sys.exec_prefix, st)
-                )
+        cmds = [sys.executable, "-u", os.path.join(fold, name)]
+        env = dict(os.environ, MPLBACKEND="Agg")
+        p = subprocess.Popen(cmds, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+        _out, err = p.communicate()
+        st = err.decode("utf-8", errors="replace")
+        if p.returncode:
+            if '"dot" not found in path.' in st:
+                raise unittest.SkipTest(f"failed: {name!r} due to missing dot.")
+            if (
+                "We couldn't connect to 'https://huggingface.co'" in st
+                or "Cannot access content at: https://huggingface.co/" in st
+            ):
+                raise unittest.SkipTest(f"Connectivity issues due to\n{err}")
+            raise AssertionError(
+                f"Example {name!r} (cmd: {cmds} - exec_prefix={sys.exec_prefix!r}) "
+                f"failed with exit code {p.returncode} due to\n{st}"
+            )
         dt = time.perf_counter() - perf
         if verbose:
             print(f"{dt:.3f}: run {name!r}")
         return 1
+
+    def test_subprocess_failure_without_traceback(self):
+        process = mock.Mock(returncode=1)
+        process.communicate.return_value = (b"", b"Native execution failed")
+        with (
+            mock.patch.object(subprocess, "Popen", return_value=process) as popen,
+            self.assertRaisesRegex(AssertionError, "Native execution failed"),
+        ):
+            self.run_test(ROOT, "native_failure.py")
+        self.assertEqual(popen.call_args.kwargs["env"]["MPLBACKEND"], "Agg")
 
     @classmethod
     def add_test_methods(cls):

@@ -54,7 +54,7 @@ weight_proto = onnx.TensorProto()
 weight_proto.name = "weight"
 weight_proto.data_type = TFLOAT
 weight_proto.data_location = onnx.TensorProto.EXTERNAL
-weight_proto.dims[:] = list(weight_data.shape)
+weight_proto.dims.extend(weight_data.shape)
 ext_entry = weight_proto.external_data.add()
 ext_entry.key = "location"
 ext_entry.value = "#weight"  # symbolic key used in large_initializers
@@ -157,7 +157,7 @@ def make_external_proto(name: str, shape: list) -> onnx.TensorProto:
     proto.name = name
     proto.data_type = TFLOAT
     proto.data_location = onnx.TensorProto.EXTERNAL
-    proto.dims[:] = shape
+    proto.dims.extend(shape)
     entry = proto.external_data.add()
     entry.key = "location"
     entry.value = f"#{name}"

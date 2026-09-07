@@ -208,6 +208,7 @@ class OnnxGraph:
         :param shape: optional shape
         :return: :class:`onnx.ValueInfoProto`
         """
+        name = str(name)
         if not self.has_name(name):
             raise ValueError(f"Name {name!r} does not exist.")
         var = make_tensor_value_info(name, elem_type, shape)

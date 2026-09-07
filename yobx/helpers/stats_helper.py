@@ -100,10 +100,7 @@ class ModelStatistics:
                 if not self._builder.has_shape(name):
                     continue
                 sh = self._builder.get_shape(name)
-                if all(isinstance(d, int) for d in sh):
-                    self._shape_map[name] = tuple(int(d) for d in sh)
-                else:
-                    self._shape_map[name] = sh
+                self._shape_map[name] = tuple(int(d) if isinstance(d, int) else d for d in sh)
         else:
             from ..xshape import NativeShapeInference
 
@@ -114,10 +111,7 @@ class ModelStatistics:
                 if not self._bs.has_shape(name):
                     continue
                 sh = self._bs.get_shape(name)
-                if all(isinstance(d, int) for d in sh):
-                    self._shape_map[name] = tuple(int(d) for d in sh)
-                else:
-                    self._shape_map[name] = sh
+                self._shape_map[name] = tuple(int(d) if isinstance(d, int) else d for d in sh)
 
     def shape_fn(self, name: str) -> Optional[Tuple]:
         """Returns the inferred shape of *name*, or ``None`` if unknown."""

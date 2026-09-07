@@ -150,7 +150,7 @@ class Var(BaseVar, OpsVar):
     def __str__(self) -> str:
         s = self.name
         if self.elem_type is not None:
-            s = f"{s}:{self.elem_type}"
+            s = f"{s}:{int(self.elem_type)}"
         if self.shape is not None:
             s = f"{s}:{list(self.shape)}"
         return s
