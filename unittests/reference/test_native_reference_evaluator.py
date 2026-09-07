@@ -121,6 +121,9 @@ class TestNativeReferenceEvaluator(unittest.TestCase):
                 self.assertEqual(result.shape, tuple(shape))
                 self.assertEqual(result.dtype, np.bool_)
                 self.assertTrue(result.all())
+                np.testing.assert_array_equal(
+                    ExtendedReferenceEvaluator(node).run(None)[0], result
+                )
 
     def test_node_proto_captured_subgraph_inputs(self):
         then_branch = helper.make_graph(
@@ -157,6 +160,9 @@ class TestNativeReferenceEvaluator(unittest.TestCase):
         np.testing.assert_array_equal(
             result, self.feeds["X"] - np.array([1, -1], dtype=np.float32)
         )
+        self.assertTrue(session.unregister_custom_kernel("", "Add"))
+        self.assertFalse(session.unregister_custom_kernel("", "Add"))
+        np.testing.assert_array_equal(session.run(["sum"], self.feeds)[0], self.expected_sum)
 
     def test_greater_float64_broadcast_precision(self):
         x = np.array([[1 + 1e-12, 1.0], [1 - 1e-12, 1 + 3e-12]], dtype=np.float64)

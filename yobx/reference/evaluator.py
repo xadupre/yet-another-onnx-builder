@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Literal, Optional, Union, overload
+import numpy
 from onnx_light.onnx import (
     FunctionProto,
     GraphProto,
@@ -30,7 +31,9 @@ from .ops.op__extended_tri_matrix import TriMatrix
 from .ops.op__overwrite_argminmax import ArgMax, ArgMin
 from .ops.op__overwrite_comparison import Greater, Less
 from .ops.op__overwrite_compress import Compress
+from .ops.op__overwrite_log_softmax import LogSoftmax_1, LogSoftmax_13
 from .ops.op__overwrite_reduce import ReduceMax, ReduceMean, ReduceMin
+from .ops.op__overwrite_where import Where
 from .ops.op_attention import Attention
 from .ops.op_bias_softmax import BiasSoftmax
 from .ops.op_complex import (
@@ -52,6 +55,9 @@ from .ops.op_qlinear_conv import QLinearConv
 from .ops.op_quick_gelu import QuickGelu
 from .ops.op_skip_layer_normalization import SkipLayerNormalization
 from .ops.op_simplified_layer_normalization import SimplifiedLayerNormalization
+
+NativeValue = Union[numpy.ndarray, List[numpy.ndarray]]
+IntermediateValues = Dict[str, Optional[NativeValue]]
 
 
 class ExtendedReferenceEvaluator(ReferenceEvaluator):
@@ -77,9 +83,12 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         Greater,
         Less,
         Compress,
+        LogSoftmax_1,
+        LogSoftmax_13,
         ReduceMax,
         ReduceMean,
         ReduceMin,
+        Where,
         Attention,
         BiasSoftmax,
         ComplexModule,
@@ -214,7 +223,7 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
                     "register_custom_kernel(domain, op_type, fn) for native callbacks."
                 )
         self._kernel_classes = self.filter_ops(proto, kernels, opsets)
-        self._native_options = {"verbose": verbose, **kwargs}
+        self._native_options: Dict[str, Any] = {"verbose": verbose, **kwargs}
         self._registered_callbacks: Dict[tuple[str, str], Callable] = {}
         self._execution_graph = proto.graph if isinstance(proto, ModelProto) else proto
         # The wheel's initializer cache loses STRING payloads. The native feed
@@ -243,8 +252,9 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
 
     def unregister_custom_kernel(self, domain, op_type):
         """Unregisters an explicit callback."""
-        super().unregister_custom_kernel(domain, op_type)
+        removed = super().unregister_custom_kernel(domain, op_type)
         self._registered_callbacks.pop((domain, op_type), None)
+        return removed
 
     @property
     def input_types(self):
@@ -270,7 +280,41 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
             return {}
         return {value.name: numpy_helper.to_array(value) for value in graph.initializer}
 
-    def run(self, output_names, feed_inputs=None, attributes=None, intermediate=False):
+    @overload
+    def run(
+        self,
+        output_names,
+        feed_inputs: Optional[Dict[str, Any]] = None,
+        attributes=None,
+        intermediate: Literal[False] = False,
+    ) -> List[NativeValue]: ...
+
+    @overload
+    def run(
+        self,
+        output_names,
+        feed_inputs: Optional[Dict[str, Any]] = None,
+        attributes=None,
+        *,
+        intermediate: Literal[True],
+    ) -> IntermediateValues: ...
+
+    @overload
+    def run(
+        self,
+        output_names,
+        feed_inputs: Optional[Dict[str, Any]] = None,
+        attributes=None,
+        intermediate: bool = False,
+    ) -> Union[List[NativeValue], IntermediateValues]: ...
+
+    def run(
+        self,
+        output_names,
+        feed_inputs: Optional[Dict[str, Any]] = None,
+        attributes=None,
+        intermediate: bool = False,
+    ) -> Union[List[NativeValue], IntermediateValues]:
         """Returns requested outputs, or a dictionary including intermediate values."""
         if feed_inputs is None and isinstance(output_names, list):
             if len(output_names) != len(self.input_names):
@@ -279,8 +323,10 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
                 )
             feed_inputs = dict(zip(self.input_names, output_names))
             output_names = None
+        if feed_inputs is None:
+            feed_inputs = {}
         if self._string_initializers:
-            feed_inputs = {**self._string_initializers, **(feed_inputs or {})}
+            feed_inputs = {**self._string_initializers, **feed_inputs}
         if attributes or (isinstance(self.proto_, FunctionProto) and self._extra_functions):
             if not isinstance(self.proto_, FunctionProto):
                 raise NotImplementedError("Run attributes are only supported for functions.")

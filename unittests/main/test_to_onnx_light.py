@@ -1,10 +1,10 @@
 """Exercises the native backend through the public conversion entry point."""
 
-import importlib.util
 import unittest
 from unittest.mock import Mock, patch
 import numpy as np
 from yobx import to_onnx
+from yobx.ext_test_case import requires_sklearn
 
 
 class TestGraphBackendSelection(unittest.TestCase):
@@ -147,7 +147,7 @@ class TestNativeBackendConversion(unittest.TestCase):
                 onnx.load(filename).SerializeToString(), artifact.SerializeToString()
             )
 
-    @unittest.skipUnless(importlib.util.find_spec("sklearn"), "Requires scikit-learn.")
+    @requires_sklearn("1.4")
     def test_sklearn(self):
         """Converts a fitted regression and preserves its dynamic batch dimension."""
         from sklearn.linear_model import LinearRegression
