@@ -178,6 +178,9 @@ rank. The base wheel does not provide all
 weight-folding runtime kernels. Extras that installed `onnxscript`, `onnx-ir`,
 `spox` or reference shape inference have been removed because they would
 reintroduce the reference ONNX dependency.
+TensorFlow CI likewise does not install `tf2onnx` or `jax2onnx` for
+cross-exporter comparisons, since both require reference ONNX. Its native
+converter tests continue to compare results against TensorFlow and ONNX Runtime.
 
 The Python pattern package `yobx.xoptim` and its matching/code-generation APIs
 have been removed, not retained as an inactive fallback. Pattern implementations
