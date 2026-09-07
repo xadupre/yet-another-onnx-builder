@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_perpetual, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
-from ._helpers import native_to_onnx
+from unittests.sklearn._perpetual._helpers import native_to_onnx
 
 
 @requires_sklearn("1.4")
