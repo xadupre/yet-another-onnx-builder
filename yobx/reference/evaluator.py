@@ -1,5 +1,13 @@
-from typing import Any, Dict, List, Optional
-from onnx_light.onnx import FunctionProto, GraphProto, ModelProto, NodeProto, helper, numpy_helper
+from typing import Any, Callable, Dict, List, Optional
+from onnx_light.onnx import (
+    FunctionProto,
+    GraphProto,
+    ModelProto,
+    NodeProto,
+    TensorProto,
+    helper,
+    numpy_helper,
+)
 from onnx_light.onnx.reference import ReferenceEvaluator
 from .ops._native_op import NativeOpKernel
 from .ops.op__extended_add_add_mul_mul import (
@@ -20,7 +28,9 @@ from .ops.op__extended_scatternd_of_shape import MaskedScatterNDOfShape, Scatter
 from .ops.op__extended_transpose_cast import Transpose2DCastFP16, Transpose2DCastFP32
 from .ops.op__extended_tri_matrix import TriMatrix
 from .ops.op__overwrite_argminmax import ArgMax, ArgMin
-from .ops.op__overwrite_comparison import Greater
+from .ops.op__overwrite_comparison import Greater, Less
+from .ops.op__overwrite_compress import Compress
+from .ops.op__overwrite_reduce import ReduceMax, ReduceMean, ReduceMin
 from .ops.op_attention import Attention
 from .ops.op_bias_softmax import BiasSoftmax
 from .ops.op_complex import (
@@ -65,6 +75,11 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         ArgMax,
         ArgMin,
         Greater,
+        Less,
+        Compress,
+        ReduceMax,
+        ReduceMean,
+        ReduceMin,
         Attention,
         BiasSoftmax,
         ComplexModule,
@@ -200,8 +215,19 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
                 )
         self._kernel_classes = self.filter_ops(proto, kernels, opsets)
         self._native_options = {"verbose": verbose, **kwargs}
-        self._registered_callbacks = {}
+        self._registered_callbacks: Dict[tuple[str, str], Callable] = {}
         self._execution_graph = proto.graph if isinstance(proto, ModelProto) else proto
+        # The wheel's initializer cache loses STRING payloads. The native feed
+        # path preserves them and supports overriding initializer values.
+        self._string_initializers = (
+            {
+                str(value.name): numpy_helper.to_array(value)
+                for value in self._execution_graph.initializer
+                if value.data_type == TensorProto.STRING
+            }
+            if isinstance(self._execution_graph, GraphProto)
+            else {}
+        )
         super().__init__(proto, verbose=verbose, **kwargs)
         registered = set()
         for kernel in self._kernel_classes:
@@ -253,6 +279,8 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
                 )
             feed_inputs = dict(zip(self.input_names, output_names))
             output_names = None
+        if self._string_initializers:
+            feed_inputs = {**self._string_initializers, **(feed_inputs or {})}
         if attributes or (isinstance(self.proto_, FunctionProto) and self._extra_functions):
             if not isinstance(self.proto_, FunctionProto):
                 raise NotImplementedError("Run attributes are only supported for functions.")
