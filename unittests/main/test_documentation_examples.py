@@ -3,16 +3,19 @@ import os
 import sys
 import subprocess
 import time
+import textwrap
+from contextlib import redirect_stdout
+from io import StringIO
+from pathlib import Path
 from unittest import mock
 from yobx import __file__ as yobx_file
 from yobx.ext_test_case import (
     ExtTestCase,
+    requires_sklearn,
     is_windows,
     ignore_errors,
     has_ipython,
     has_jax,
-    has_onnx_ir,
-    has_onnx_shape_inference,
     has_sklearn,
     has_sksurv,
     has_spox,
@@ -26,6 +29,42 @@ ROOT = os.path.realpath(os.path.abspath(os.path.join(yobx_file, "..", "..")))
 
 
 class TestDocumentationExamples(ExtTestCase):
+    def run_rst_examples(self, relative_path):
+        """Executes embedded documentation examples and returns their output."""
+        path = Path(ROOT) / "docs" / relative_path
+        lines = path.read_text(encoding="utf-8").splitlines()
+        executed = 0
+        output = StringIO()
+        for index, line in enumerate(lines):
+            if line != ".. runpython::":
+                continue
+            end = index + 1
+            while end < len(lines) and (not lines[end].strip() or lines[end].startswith("    ")):
+                end += 1
+            block = lines[index + 1 : end]
+            while block and (not block[0].strip() or block[0].lstrip().startswith(":")):
+                block.pop(0)
+            source = textwrap.dedent("\n".join(block))
+            with self.subTest(line=index + 1), redirect_stdout(output):
+                exec(compile(source, f"{path}:{index + 1}", "exec"), {})
+            executed += 1
+        self.assertGreater(executed, 0)
+        return output.getvalue()
+
+    def test_graph_builder_rst_examples(self):
+        output = self.run_rst_examples("design/builder/graph_builder.rst")
+        self.assertIn("initializer shape: (64, 32)", output)
+
+    @requires_sklearn()
+    def test_native_builder_protocol_rst_examples(self):
+        output = self.run_rst_examples("design/misc/graph_builder_protocol.rst")
+        self.assertIn("output: name='probabilities'", output)
+
+    @requires_sklearn()
+    def test_expected_api_rst_examples(self):
+        output = self.run_rst_examples("design/sklearn/expected_api.rst")
+        self.assertIn("Sub(X,", output)
+
     def run_test(self, fold: str, name: str, verbose=0) -> int:
         ppath = os.environ.get("PYTHONPATH", "")
         if not ppath:
@@ -162,13 +201,6 @@ class TestDocumentationExamples(ExtTestCase):
 
             if not reason and not has_ipython() and "mermaid" in name:
                 reason = "IPython not installed"
-
-            if (
-                not reason
-                and (not has_onnx_ir() or not has_onnx_shape_inference())
-                and name in {"plot_computed_shapes.py"}
-            ):
-                reason = "onnx_ir is missing"
 
             if reason:
 

@@ -69,7 +69,7 @@ Alternatively, ``inference.update_shapes(model)`` writes native inferred
 annotations to an existing model or graph in place.
 
 Incremental and custom inference
--------------------------------
+---------------------------------
 
 ``set_type``, ``set_shape``, and ``run_node`` provide incremental inference.
 The public ``context`` also exposes the wheel's native constraint,
@@ -90,16 +90,22 @@ constraints, and custom callbacks; custom callbacks must then be registered
 again.
 
 Limitations and unknown values
------------------------------
+-------------------------------
 
 Anonymous dimensions are returned as ``None`` rather than invented Python
 symbols; costs requiring them are unavailable. ``value_as_shape(name)``
 returns only shape values computed by the native engine, or ``None``.
 Equality constraints are registered and resolved by ``ShapesContext``.
-The 0.1.24 wheel does not propagate shape-tensor values through every operator
-(for example, ``Identity``, ``Mul``, and ``Slice`` may leave them unavailable).
+The published 0.1.25 wheel does not propagate shape-tensor values through every
+operator (for example, ``Identity``, ``Mul``, and ``Slice`` leave them unavailable).
 The adapter does not fill those gaps with a Python evaluator. Native expression
 evaluation supports the wheel's exact-division syntax, such as ``N/:2``.
+Updating an element type or shape preserves the descriptor's native shape values
+and minimum/maximum value bounds.
+
+``Squeeze`` with omitted axes removes singleton dimensions. However, an empty
+axes tensor supplied as a graph input does not currently produce that same
+inferred shape, even when the axes input has a declared shape of ``[0]``.
 
 The current wheel represents unknown rank and scalar rank with the same native
 descriptor. Shape/cost inference therefore rejects graph inputs without a

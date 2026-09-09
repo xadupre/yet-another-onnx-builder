@@ -118,8 +118,8 @@ class NativeShapeInference(ShapeBuilder):
         if previous is None:
             self._unshaped.add(str(name))
         tensor = SymTensor(int(itype), previous.shape.dims() if previous is not None else [])
-        if previous is not None and previous.has_value_as_shape():
-            tensor.set_value_as_shape(previous.value_as_shape())
+        if previous is not None:
+            self._copy_value_metadata(previous, tensor)
         self.context.set(str(name), tensor)
         return True
 
@@ -128,11 +128,20 @@ class NativeShapeInference(ShapeBuilder):
         tensor = SymTensor(self.get_type(name), ["" if d is None else d for d in shape])
         if self.context.has(str(name)):
             previous = self.context.get(str(name))
-            if previous.has_value_as_shape():
-                tensor.set_value_as_shape(previous.value_as_shape())
+            self._copy_value_metadata(previous, tensor)
         self.context.set(str(name), tensor)
         self._unshaped.discard(str(name))
         return True
+
+    @staticmethod
+    def _copy_value_metadata(source, target):
+        """Preserves native shape values and bounds when replacing a descriptor."""
+        if source.has_value_as_shape():
+            target.set_value_as_shape(source.value_as_shape())
+        if source.has_min():
+            target.set_min(source.min())
+        if source.has_max():
+            target.set_max(source.max())
 
     def set_rank(self, name, rank):
         """Seeds a rank with anonymous native dimensions."""
@@ -201,7 +210,9 @@ class NativeShapeInference(ShapeBuilder):
             if self.context.has(str(name))
             else SymTensor(onnx.TensorProto.INT64, [] if scalar else [len(value)])
         )
-        tensor.set_value_as_shape([value] if scalar else list(value))
+        tensor.set_value_as_shape(
+            ["" if dim is None else dim for dim in ([value] if scalar else value)]
+        )
         self.context.set(str(name), tensor)
         self._unshaped.discard(str(name))
         if equal_to:

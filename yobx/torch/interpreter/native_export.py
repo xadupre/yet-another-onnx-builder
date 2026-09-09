@@ -76,16 +76,20 @@ class NativeTorchInterpreter:
         "sub": "Sub",
         "mul": "Mul",
         "div": "Div",
+        "true_divide": "Div",
         "pow": "Pow",
         "maximum": "Max",
         "minimum": "Min",
         "eq": "Equal",
+        "ne": "Equal",
         "lt": "Less",
         "le": "LessOrEqual",
         "gt": "Greater",
         "ge": "GreaterOrEqual",
         "logical_and": "And",
         "logical_or": "Or",
+        "logical_xor": "Xor",
+        "bitwise_and": "BitwiseAnd",
     }
 
     def __init__(self, builder, graph_module, dispatcher=None, raise_list=None):
@@ -167,6 +171,101 @@ class NativeTorchInterpreter:
         if isinstance(value, (torch.SymInt, int)):
             return onnx.TensorProto.INT64
         return None
+
+    def assert_tensor_metadata(self, node):
+        """Discharges only assertions proved by exported tensor metadata."""
+        from torch.fx.experimental.symbolic_shapes import statically_known_true
+
+        arguments = {
+            argument.name: value
+            for argument, value in zip(node.target._schema.arguments, node.args)
+        }
+        arguments.update(node.kwargs)
+        source = arguments["a"]
+        value = source.meta.get("val") if isinstance(source, torch.fx.Node) else source
+        if not isinstance(value, torch.Tensor):
+            raise NotImplementedError("Tensor metadata assertions require export metadata.")
+
+        def metadata(item):
+            return item.meta.get("val") if isinstance(item, torch.fx.Node) else item
+
+        scalar_metadata = {"dtype": value.dtype, "device": value.device, "layout": value.layout}
+        for key in ("size", "stride", *scalar_metadata):
+            expected = arguments.get(key)
+            if expected is None:
+                continue
+            if key in ("size", "stride"):
+                dimensions = value.shape if key == "size" else value.stride()
+                if len(expected) != len(dimensions):
+                    raise ValueError(f"Tensor metadata assertion failed for {key}: rank.")
+                pairs = zip(dimensions, expected)
+            else:
+                pairs = [(scalar_metadata[key], expected)]
+            for left, right in pairs:
+                right = metadata(right)
+                if right is None:
+                    raise NotImplementedError(f"Cannot prove tensor metadata assertion: {key}.")
+                equal = left == right
+                if isinstance(equal, bool):
+                    if not equal:
+                        raise ValueError(f"Tensor metadata assertion failed for {key}.")
+                elif not statically_known_true(equal):
+                    raise NotImplementedError(
+                        f"Cannot prove dynamic tensor metadata assertion: {key}."
+                    )
+        return None
+
+    def broadcast_tensors(self, tensors, name):
+        """Expands tensors to a shared runtime shape without promoting their dtypes."""
+        g = self.builder
+        if not tensors:
+            return []
+        rank = max(g.get_rank(tensor) for tensor in tensors)
+        shape = numpy.ones(rank, dtype=numpy.int64)
+        for tensor in tensors:
+            padding = rank - g.get_rank(tensor)
+            other = g.op.Shape(tensor)
+            if padding:
+                other = g.op.Concat(numpy.ones(padding, dtype=numpy.int64), other, axis=0)
+            # A zero dimension broadcasts with one to zero, not to their maximum.
+            shape = g.op.Where(g.op.Equal(shape, numpy.array(1, dtype=numpy.int64)), other, shape)
+        return [
+            g.op.Expand(tensor, shape, outputs=[g.unique_name(f"{name}_{index}")])
+            for index, tensor in enumerate(tensors)
+        ]
+
+    def remainder(self, node, args, outputs):
+        """Computes floor remainder with exact integer and floating fmod semantics."""
+        g = self.builder
+        dtype = self.output_dtype(node)
+        floating = dtype in (
+            onnx.TensorProto.FLOAT,
+            onnx.TensorProto.DOUBLE,
+            onnx.TensorProto.FLOAT16,
+            onnx.TensorProto.BFLOAT16,
+        )
+        compute_dtype = (
+            onnx.TensorProto.FLOAT
+            if dtype in (onnx.TensorProto.FLOAT16, onnx.TensorProto.BFLOAT16)
+            else dtype
+        )
+        left, right = (
+            self.tensor(self.tensor(value, dtype), compute_dtype) for value in args[:2]
+        )
+        if not floating:
+            return g.op.Mod(left, right, fmod=0, outputs=outputs)
+        remainder = g.op.Mod(left, right, fmod=1)
+        zero = self.tensor(0, compute_dtype)
+        adjust = g.op.And(
+            g.op.Not(g.op.Equal(remainder, zero)),
+            g.op.Xor(g.op.Less(remainder, zero), g.op.Less(right, zero)),
+        )
+        result = g.op.Where(adjust, g.op.Add(remainder, right), remainder)
+        return (
+            g.op.Cast(result, to=dtype, outputs=outputs)
+            if dtype != compute_dtype
+            else g.op.Identity(result, outputs=outputs)
+        )
 
     def run(self):
         """Lowers all nodes after placeholders have been registered."""
@@ -266,6 +365,27 @@ class NativeTorchInterpreter:
             return self.custom(node, args, kwargs, name)
         op = schema.name.split("::", 1)[1]
         outputs = [name]
+        if op == "_assert_tensor_metadata":
+            return self.assert_tensor_metadata(node)
+        if op == "broadcast_tensors":
+            return self.broadcast_tensors(args[0], name)
+        if op == "remainder":
+            return self.remainder(node, args, outputs)
+        if op in ("zeros_like", "ones_like"):
+            if kwargs.get("layout") not in (None, torch.strided):
+                raise NotImplementedError("Native tensor factories require strided layout.")
+            return g.op.Expand(
+                self.tensor(int(op == "ones_like"), self.output_dtype(node)),
+                g.op.Shape(args[0]),
+                outputs=outputs,
+            )
+        if op == "square":
+            dtype = self.output_dtype(node)
+            value = self.tensor(args[0], dtype)
+            if dtype in (onnx.TensorProto.FLOAT16, onnx.TensorProto.BFLOAT16):
+                value = self.tensor(value, onnx.TensorProto.FLOAT)
+                return g.op.Cast(g.op.Mul(value, value), to=dtype, outputs=outputs)
+            return g.op.Mul(value, value, outputs=outputs)
         if op in self.unary:
             operand = (
                 self.tensor(args[0], onnx.TensorProto.BOOL) if op == "logical_not" else args[0]
@@ -274,13 +394,17 @@ class NativeTorchInterpreter:
             return g.op.Reciprocal(value) if op == "rsqrt" else value
         if op in self.binary:
             dtype = self.output_dtype(node)
-            if dtype == onnx.TensorProto.BOOL and op not in ("logical_and", "logical_or"):
+            if dtype == onnx.TensorProto.BOOL and op in ("eq", "ne", "lt", "le", "gt", "ge"):
                 operands = [
                     value.meta["val"] if isinstance(value, torch.fx.Node) else value
                     for value in node.args[:2]
                 ]
                 dtype = torch_dtype_to_onnx_dtype(torch.result_type(*operands))
             left, right = (self.tensor(value, dtype) for value in args[:2])
+            if dtype == onnx.TensorProto.BFLOAT16 and op in ("eq", "ne", "lt", "le", "gt", "ge"):
+                left, right = (
+                    self.tensor(value, onnx.TensorProto.FLOAT) for value in (left, right)
+                )
             alpha = kwargs.get("alpha", args[2] if len(args) > 2 and op in ("add", "sub") else 1)
             if alpha != 1:
                 right = g.op.Mul(right, self.tensor(alpha, dtype))
@@ -288,6 +412,21 @@ class NativeTorchInterpreter:
                 raise NotImplementedError(
                     "Native Torch division currently requires rounding_mode=None."
                 )
+            if op in ("div", "true_divide") and dtype in (
+                onnx.TensorProto.FLOAT16,
+                onnx.TensorProto.BFLOAT16,
+            ):
+                left, right = (
+                    self.tensor(value, onnx.TensorProto.FLOAT) for value in (left, right)
+                )
+                return g.op.Cast(g.op.Div(left, right), to=dtype, outputs=outputs)
+            if op == "ne":
+                return g.op.Not(g.op.Equal(left, right), outputs=outputs)
+            if op == "bitwise_and":
+                if dtype == onnx.TensorProto.BOOL:
+                    return g.op.And(left, right, outputs=outputs)
+                if g.main_opset < 18:
+                    raise NotImplementedError("Native bitwise_and requires opset 18 or newer.")
             return g.make_node(self.binary[op], [left, right], outputs)
         if op == "linear":
             value = g.op.MatMul(args[0], g.op.Transpose(args[1], perm=[1, 0]))

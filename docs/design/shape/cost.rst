@@ -23,7 +23,7 @@ that can be evaluated once concrete shapes are known.  Static shapes yield plain
 integer counts.
 
 Integration with NativeShapeInference
-====================================
+======================================
 
 :class:`~yobx.xshape.NativeShapeInference` integrates cost inference through the
 :meth:`~yobx.xshape.native_shape_inference.NativeShapeInference.run_model` method.

@@ -22,8 +22,8 @@ class TestNativeBackendShapes(unittest.TestCase):
                 with self.subTest(case=case.name):
                     if case.name == "test_cc_squeeze_all_singleton":
                         self.skipTest(
-                            "onnx-light 0.1.24 infers anonymous dimensions for Squeeze "
-                            "without axes instead of removing all singleton dimensions."
+                            "onnx-light 0.1.25 does not infer Squeeze with an empty "
+                            "axes graph input; omitting the axes input is supported."
                         )
                     model = case.model
                     inference = NativeShapeInference()

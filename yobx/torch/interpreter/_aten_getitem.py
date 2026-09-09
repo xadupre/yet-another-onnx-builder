@@ -154,7 +154,8 @@ def _getitem_slice(
         starts.append(aslice.start or 0)
 
         if aslice.stop is None:
-            if shape_value is None or not isinstance(shape_value[axis], int):
+            axis_size = None if shape_value is None else shape_value[axis]
+            if not isinstance(axis_size, int):
                 if shape_name is None:
                     shape_name = g.unique_name(f"{output_name}_shape")
                     g.make_node("Shape", [input_name], [shape_name], name=f"{name}A")
@@ -174,7 +175,7 @@ def _getitem_slice(
                 ends.append(end_name)
                 concat = True
             else:
-                ends.append(shape_value[axis])
+                ends.append(axis_size)
         else:
             vstop = aslice.stop.name if hasattr(aslice.stop, "name") else aslice.stop
             concat |= isinstance(vstop, str)

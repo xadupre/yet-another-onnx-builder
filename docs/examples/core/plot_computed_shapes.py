@@ -183,7 +183,7 @@ print_shapes(native_shapes, ["X", "Y", "added", "concat_out", "Z"])
 
 # %%
 # Shape inference with NativeShapeInference
-# ----------------------------------------
+# ------------------------------------------
 #
 # :class:`NativeShapeInference <yobx.xshape.NativeShapeInference>`
 # keeps the shapes as symbolic expressions.  Because ``reshape_shape`` is a

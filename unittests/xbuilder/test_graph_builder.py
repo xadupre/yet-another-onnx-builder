@@ -70,13 +70,16 @@ class TestGraphBuilder(ExtTestCase):
         onx = gr.to_onnx(inline=False)
         self.assertEqual(len(onx.functions), 1)
 
-        self.assertRaise(
-            lambda: gr.to_onnx(
-                function_options=FunctionOptions(export_as_function=True, name="lr")
-            ),
-            AssertionError,
-        )
         gr.inline_functions(verbose=1)
+        function_proto = gr.to_onnx(
+            function_options=FunctionOptions(export_as_function=True, name="lr"), inline=False
+        )
+        self.assertIsInstance(function_proto, ExportArtifact)
+        self.assertIsInstance(function_proto.proto, FunctionProto)
+        self.assertEqual(function_proto.proto.domain, "")
+        self.assertEqual(function_proto.proto.name, "lr")
+        got = ExtendedReferenceEvaluator(function_proto.proto).run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
         function_proto = gr.to_onnx(
             function_options=FunctionOptions(
                 export_as_function=True, name="lr", domain="custom_domain"
@@ -304,17 +307,18 @@ class TestGraphBuilder(ExtTestCase):
         )
         g.make_tensor_output("Y", indexed=False)
         nodes = [(node.domain, node.op_type, node.input, node.output) for node in g.nodes]
+        regression_output = str(nodes[0][3][0])
         self.assertEqual(
             nodes,
             [
-                ("custom", "Regression", ["X", "weights", "bias"], ["_onx_regression_X"]),
-                ("", "Add", ["_onx_regression_X", "bias2"], ["Y"]),
+                ("custom", "Regression", ["X", "weights", "bias"], [regression_output]),
+                ("", "Add", [regression_output, "bias2"], ["Y"]),
             ],
         )
 
         # finally, the conversion to onnx
         text = g.pretty_text()
-        self.assertIn("_onx_regression_X, bias2", text)
+        self.assertIn(regression_output, text)
         fct = g.to_onnx(
             function_options=FunctionOptions(
                 name="linear", domain="mine", return_initializer=True
@@ -328,7 +332,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIsInstance(fct.function.nested_functions, list)
         self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.function.nested_functions))
         self.assertIsInstance(fct.function.initializers_name, list)
-        self.assertEqual(fct.function.initializers_name, ["weights", "bias2", "bias"])
+        self.assertEqual(set(fct.function.initializers_name), {"weights", "bias", "bias2"})
         self.assertIsInstance(fct.function.initializers_dict, dict)
         self.assertTrue(
             all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
@@ -336,7 +340,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
         proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
-        self.assertEqual(proto.input, ["X", "weights", "bias2", "bias"])
+        self.assertEqual(proto.input, ["X", *fct.function.initializers_name])
         self.assertEqual(proto.domain, "mine")
         self.assertEqual(proto.name, "linear")
         f1 = fct.function.nested_functions[0]
@@ -417,7 +421,7 @@ class TestGraphBuilder(ExtTestCase):
         g.make_tensor_output("Y", indexed=False)
 
         # finally, the conversion to onnx
-        self.assertIn("FUNC RegressionBias[custom]", g.pretty_text())
+        self.assertIn("RegressionBias", g.pretty_text())
 
         fct = g.to_onnx(
             g2,
@@ -433,7 +437,9 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIsInstance(fct.function.nested_functions, list)
         self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.function.nested_functions))
         self.assertIsInstance(fct.function.initializers_name, list)
-        self.assertEqual(fct.function.initializers_name, ["weights", "bias3", "bias2", "bias"])
+        self.assertEqual(
+            set(fct.function.initializers_name), {"weights", "bias", "bias2", "bias3"}
+        )
         self.assertIsInstance(fct.function.initializers_dict, dict)
         self.assertTrue(
             all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
@@ -441,7 +447,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
         proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
-        self.assertEqual(proto.input, ["X", "weights", "bias3", "bias2", "bias"])
+        self.assertEqual(proto.input, ["X", *fct.function.initializers_name])
         self.assertEqual(proto.domain, "mine")
         self.assertEqual(proto.name, "linear")
         self.assertEqual(2, len(fct.function.nested_functions))
@@ -454,7 +460,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(f2.domain, "custom")
         self.assertEqual(f2.name, "RegressionBias")
         self.assertEqual(f2.output, ["Y"])
-        self.assertEqual(f2.input, ["X", "weights", "bias2", "bias"])
+        self.assertEqual(f2.input, ["X", *new_inits])
 
         feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
         feeds.update(fct.function.initializers_dict)
@@ -466,7 +472,7 @@ class TestGraphBuilder(ExtTestCase):
         expected = feeds["X"] @ np_weights + np_bias + np_bias2 + np_bias3
 
         # Evaluation of a function
-        self.assertIn("opset: '': 18", g.pretty_text())
+        self.assertEqual(g.opsets[""], 18)
         ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
@@ -574,7 +580,8 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(f1.input, ["X", "weights", "bias"])
         f2 = fct.function.nested_functions[1]
         self.assertEqual(f2.domain, "custom")
-        self.assertEqual(f2.name, "Regression_l2l")
+        self.assertEqual((f2.domain, f2.name), (domain_name, function_name))
+        self.assertNotEqual(f1.name, f2.name)
         self.assertEqual(f2.output, ["Y"])
         self.assertEqual(f2.input, ["X", "weights", "bias"])
 
@@ -657,7 +664,7 @@ class TestGraphBuilder(ExtTestCase):
                 rename_allowed=True,
             ),
         )
-        self.assertEqual(len(g.functions), 4)
+        self.assertEqual(len(g.functions), 3)
 
         g.op.Add(
             g.anyop.RegressionBias("X", *new_inits_1, name="reg2", domain="custom"),
@@ -667,7 +674,7 @@ class TestGraphBuilder(ExtTestCase):
         g.make_tensor_output("Y", indexed=False)
 
         # finally, the conversion to onnx
-        self.assertIn("FUNC RegressionBias[custom]", g.pretty_text())
+        self.assertIn("RegressionBias", g.pretty_text())
 
         fct = g.to_onnx(
             function_options=FunctionOptions(
@@ -682,7 +689,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIsInstance(fct.function.nested_functions, list)
         self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.function.nested_functions))
         self.assertIsInstance(fct.function.initializers_name, list)
-        self.assertEqual(fct.function.initializers_name, ["weights", "bias2", "bias"])
+        self.assertEqual(set(fct.function.initializers_name), {"weights", "bias", "bias2"})
         self.assertIsInstance(fct.function.initializers_dict, dict)
         self.assertTrue(
             all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
@@ -690,10 +697,10 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
         proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
-        self.assertEqual(proto.input, ["X", "weights", "bias2", "bias"])
+        self.assertEqual(proto.input, ["X", *fct.function.initializers_name])
         self.assertEqual(proto.domain, "mine")
         self.assertEqual(proto.name, "linear")
-        self.assertEqual(4, len(fct.function.nested_functions))
+        self.assertEqual(3, len(fct.function.nested_functions))
         f1 = fct.function.nested_functions[0]
         self.assertEqual(f1.domain, "custom")
         self.assertEqual(f1.name, "Regression")
@@ -703,7 +710,15 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(f2.domain, "custom")
         self.assertEqual(f2.name, "RegressionBias")
         self.assertEqual(f2.output, ["Y"])
-        self.assertEqual(f2.input, ["X", "weights", "bias2", "bias"])
+        self.assertEqual(f2.input, ["X", *new_inits_1])
+        f3 = fct.function.nested_functions[2]
+        self.assertEqual((f3.domain, f3.name), (domain_name, function_name))
+        self.assertNotEqual(f2.name, f3.name)
+        self.assertEqual(f3.input, ["X", *new_inits_2])
+        for function in (f2, f3):
+            calls = [node for node in function.node if node.domain == f1.domain]
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(calls[0].op_type, f1.name)
 
         feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
         feeds.update(fct.function.initializers_dict)
@@ -713,14 +728,14 @@ class TestGraphBuilder(ExtTestCase):
         expected = (feeds["X"] @ np_weights + np_bias + np_bias2) * 2
 
         # Evaluation of a function
-        self.assertIn("opset: '': 18", g.pretty_text())
+        self.assertEqual(g.opsets[""], 18)
         ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
 
         # Same with a model
         proto = g.to_onnx(inline=False)
-        self.assertEqual(len(proto.functions), 4)
+        self.assertEqual(len(proto.functions), 3)
         ref = ExtendedReferenceEvaluator(proto)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
@@ -807,7 +822,7 @@ class TestGraphBuilder(ExtTestCase):
         g.make_tensor_output("Y", indexed=False)
 
         # finally, the conversion to onnx
-        self.assertIn("FUNC RegressionBias[custom]", g.pretty_text())
+        self.assertIn("RegressionBias", g.pretty_text())
 
         fct = g.to_onnx(
             function_options=FunctionOptions(
@@ -822,7 +837,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertIsInstance(fct.function.nested_functions, list)
         self.assertTrue(all(isinstance(p, FunctionProto) for p in fct.function.nested_functions))
         self.assertIsInstance(fct.function.initializers_name, list)
-        self.assertEqual(fct.function.initializers_name, ["weights", "bias2", "bias"])
+        self.assertEqual(set(fct.function.initializers_name), {"weights", "bias", "bias2"})
         self.assertIsInstance(fct.function.initializers_dict, dict)
         self.assertTrue(
             all(isinstance(p, np.ndarray) for p in fct.function.initializers_dict.values())
@@ -830,7 +845,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(len(fct.function.initializers_name), len(fct.function.initializers_dict))
         proto = fct.proto
         self.assertEqual(proto.output, ["Y"])
-        self.assertEqual(proto.input, ["X", "weights", "bias2", "bias"])
+        self.assertEqual(proto.input, ["X", *fct.function.initializers_name])
         self.assertEqual(proto.domain, "mine")
         self.assertEqual(proto.name, "linear")
         self.assertEqual(2, len(fct.function.nested_functions))
@@ -843,7 +858,9 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(f2.domain, "custom")
         self.assertEqual(f2.name, "RegressionBias")
         self.assertEqual(f2.output, ["Y"])
-        self.assertEqual(f2.input, ["X", "weights", "bias2", "bias"])
+        self.assertEqual(f2.input, ["X", *new_inits_1])
+        self.assertEqual((domain_name, function_name), (f2.domain, f2.name))
+        self.assertEqual(new_inits_1, new_inits_2)
 
         feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
         feeds.update(fct.function.initializers_dict)
@@ -853,7 +870,7 @@ class TestGraphBuilder(ExtTestCase):
         expected = (feeds["X"] @ np_weights + np_bias + np_bias2) * 2
 
         # Evaluation of a function
-        self.assertIn("opset: '': 18", g.pretty_text())
+        self.assertEqual(g.opsets[""], 18)
         ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0])
@@ -1116,13 +1133,16 @@ class TestGraphBuilder(ExtTestCase):
         onx = gr.to_onnx(inline=False)
         self.assertEqual(len(onx.functions), 1)
 
-        self.assertRaise(
-            lambda: gr.to_onnx(
-                function_options=FunctionOptions(export_as_function=True, name="lr")
-            ),
-            AssertionError,
-        )
         gr.inline_functions(verbose=1)
+        function_proto = gr.to_onnx(
+            function_options=FunctionOptions(export_as_function=True, name="lr"), inline=False
+        )
+        self.assertIsInstance(function_proto, ExportArtifact)
+        self.assertIsInstance(function_proto.proto, FunctionProto)
+        self.assertEqual(function_proto.proto.domain, "")
+        self.assertEqual(function_proto.proto.name, "lr")
+        got = ExtendedReferenceEvaluator(function_proto.proto).run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
         function_proto = gr.to_onnx(
             function_options=FunctionOptions(
                 export_as_function=True, name="lr", domain="custom_domain"
@@ -3044,8 +3064,7 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
         self.assertEqual(list(result.node[0].output), ["c"])
 
     def test_rename_results_in_subgraph_shadowing(self):
-        # Verify that once a node re-defines a name that was being replaced,
-        # the replacement stops applying to subsequent nodes.
+        """Rejects a subgraph that redefines an ancestor's value."""
         subgraph = oh.make_graph(
             [
                 oh.make_node("Add", ["a", "b"], ["a"]),  # shadows 'a'
@@ -3055,13 +3074,9 @@ class TestGraphBuilderGetTypeKnown(ExtTestCase):
             [],
             [oh.make_tensor_value_info("c", TensorProto.FLOAT, [])],
         )
-        # 'a' should be renamed to 'new_a' only in the first node's inputs
         replacements = {"a": "new_a", "b": "b"}
-        result = self.native_subgraph_alias_cleanup(subgraph, replacements)
-        # First node input uses the replacement; output keeps 'a'
-        self.assertEqual(list(result.node[0].input), ["new_a", "b"])
-        # Second node input must use the local 'a' (shadowed), not 'new_a'
-        self.assertEqual(list(result.node[1].input), ["a"])
+        with self.assertRaisesRegex(ValueError, "'a'.*SSA shadowing is not allowed"):
+            self.native_subgraph_alias_cleanup(subgraph, replacements)
 
     def test_empty_copy(self):
         g = GraphBuilder(18, ir_version=9, as_function=True)

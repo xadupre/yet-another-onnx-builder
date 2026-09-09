@@ -179,7 +179,7 @@ fuses matrix multiplication with optional transposition of either operand.
 Adding custom operators
 -----------------------
 
-Pass extra :class:`OpRun <onnx.reference.op_run.OpRun>` subclasses through
+Pass extra :class:`NativeOpKernel <yobx.reference.ops._native_op.NativeOpKernel>` subclasses through
 the ``new_ops`` argument.  They are *merged* with :attr:`default_ops`; you do
 not need to re-list the built-in contrib operators.
 
@@ -189,12 +189,12 @@ not need to re-list the built-in contrib operators.
     import numpy as np
     from yobx._onnx_shim import onnx
     import onnx_light.onnx.helper as oh
-    from onnx_light.onnx.reference.op_run import OpRun
+    from yobx.reference.ops._native_op import NativeOpKernel
     from yobx.reference import ExtendedReferenceEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
 
-    class MyCustomOp(OpRun):
+    class MyCustomOp(NativeOpKernel):
         op_domain = "my.domain"
 
         def _run(self, X):

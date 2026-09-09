@@ -56,17 +56,17 @@ covers the methods they actually use:
        opset registration, type/shape/sequence accessors, and
        :meth:`~yobx.typing.GraphBuilderProtocol.to_onnx`.
    * - :class:`GraphBuilderExtendedProtocol <yobx.typing.GraphBuilderExtendedProtocol>`
-        - Extends the core protocol with ``main_opset``,
-          :attr:`~yobx.typing.GraphBuilderExtendedProtocol.op` (the
-          :class:`~yobx.typing.OpsetProtocol` helper),
-          :meth:`~yobx.typing.GraphBuilderExtendedProtocol.set_type_shape_unary_op`,
-          constant queries, and :meth:`~yobx.typing.GraphBuilderExtendedProtocol.get_debug_msg`.
-          Required by the :mod:`yobx.sklearn` converters.
-      * - :class:`GraphBuilderTorchProtocol <yobx.typing.GraphBuilderTorchProtocol>`
-        - Extends :class:`~yobx.typing.GraphBuilderExtendedProtocol` with the
-          full torch-exporter surface: rank helpers, device helpers, dynamic-shape
-          helpers, sub-builder / local-function support, and miscellaneous
-          utilities used by :class:`~yobx.torch.interpreter.FxGraphInterpreter`.
+     - Extends the core protocol with ``main_opset``,
+       :attr:`~yobx.typing.GraphBuilderExtendedProtocol.op` (the
+       :class:`~yobx.typing.OpsetProtocol` helper),
+       :meth:`~yobx.typing.GraphBuilderExtendedProtocol.set_type_shape_unary_op`,
+       constant queries, and :meth:`~yobx.typing.GraphBuilderExtendedProtocol.get_debug_msg`.
+       Required by the :mod:`yobx.sklearn` converters.
+   * - :class:`GraphBuilderTorchProtocol <yobx.typing.GraphBuilderTorchProtocol>`
+     - Extends :class:`~yobx.typing.GraphBuilderExtendedProtocol` with the
+       full torch-exporter surface: rank helpers, device helpers, dynamic-shape
+       helpers, sub-builder / local-function support, and miscellaneous
+       utilities used by :class:`~yobx.torch.interpreter.FxGraphInterpreter`.
 
 The :attr:`~yobx.typing.GraphBuilderExtendedProtocol.op` property returns an
 object that satisfies :class:`OpsetProtocol <yobx.typing.OpsetProtocol>`,
@@ -186,7 +186,7 @@ creating a duplicate node.
                          indexed=False)
     model = g.to_onnx()
     print("initializer name :", list(g.initializers_dict)[0])
-    print("initializer shape:", list(g.initializers_dict.values())[0].shape)
+    print("initializer shape:", tuple(g.initializers_dict[w_name].dims))
 
 .. _builder-api:
 
@@ -271,6 +271,11 @@ Only the native pattern selection knobs are exposed here:
 
 Python pattern classes, legacy pass flags, and historical reorder /
 constant-folding options are not supported by the native bridge.
+With ``onnx-light>=0.1.25``, dependency ordering and lifetime metadata are
+finalized by the native engine; the adapter does not reorder serialized nodes
+or reconstruct the optimized graph to repair them. Local function imports,
+nested calls, and referenced attributes likewise use the native builder
+without replaying typed function bodies in Python.
 
 .. runpython::
     :showcode:

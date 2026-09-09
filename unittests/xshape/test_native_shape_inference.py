@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from onnx_light import onnx
 from onnx_light.onnx import helper, numpy_helper
-from onnx_light.onnx_core.shape_inference import ShapesContext
+from onnx_light.onnx_core.shape_inference import ShapesContext, SymTensor
 
 from yobx.xshape import InferenceMode, NativeShapeInference
 from yobx.xshape.cost_inference import estimate_node_flops
@@ -112,6 +112,49 @@ class TestNativeShapeInference(unittest.TestCase):
         self.assertTrue(inference.context.has_constraint("N", "M"))
         constraints = inference.get_registered_constraints()
         self.assertTrue("M" in constraints.get("N", set()) or "N" in constraints.get("M", set()))
+
+    def test_descriptor_updates_preserve_native_value_metadata(self):
+        for update in ("type", "shape"):
+            with self.subTest(update=update):
+                inference = NativeShapeInference()
+                tensor = SymTensor(onnx.TensorProto.INT64, [2])
+                tensor.set_value_as_shape(["N", 3])
+                tensor.set_min(1)
+                tensor.set_max(10)
+                inference.context.set("shape", tensor)
+                if update == "type":
+                    inference.set_type("shape", onnx.TensorProto.INT32)
+                else:
+                    inference.set_shape("shape", (None,))
+                updated = inference.context.get("shape")
+                self.assertEqual(inference.value_as_shape("shape"), ("N", 3))
+                self.assertTrue(updated.has_min())
+                self.assertTrue(updated.has_max())
+                self.assertEqual(updated.min(), 1)
+                self.assertEqual(updated.max(), 10)
+                self.assertEqual(
+                    inference.get_type("shape"),
+                    onnx.TensorProto.INT32 if update == "type" else onnx.TensorProto.INT64,
+                )
+                self.assertEqual(
+                    inference.get_shape("shape"), (2,) if update == "type" else (None,)
+                )
+
+    def test_seed_anonymous_shape_values(self):
+        inference = NativeShapeInference()
+        inference.set_value_shape("shape", (None, 3))
+        self.assertEqual(inference.value_as_shape("shape"), (None, 3))
+        self.assertEqual(inference.get_shape("shape"), (2,))
+        self.assertEqual(inference.context.get("shape").value_as_shape().dims(), ["", 3])
+
+    def test_squeeze_without_axes(self):
+        for shape, expected in (((1, 2, 1, 3), (2, 3)), ((1, 1), ()), (("N", 1, 3), ("N", 3))):
+            with self.subTest(shape=shape):
+                inference = NativeShapeInference()
+                inference.set_type("X", onnx.TensorProto.FLOAT)
+                inference.set_shape("X", shape)
+                inference.run_node(helper.make_node("Squeeze", ["X"], ["Y"]), cost=False)
+                self.assertEqual(inference.get_shape("Y"), expected)
 
     def test_shape_api_keyword_arguments(self):
         inference: ShapeBuilder = NativeShapeInference()

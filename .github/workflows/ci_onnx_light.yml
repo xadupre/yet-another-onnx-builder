@@ -53,6 +53,12 @@ jobs:
             unittests/xoptim \
             unittests/reference \
             unittests/torch/test_native_export.py \
+            unittests/torch/test_native_common_ops.py \
             unittests/helpers/test_backend_test_pretty.py \
             unittests/sql/test_trace_numpy_to_onnx.py \
             unittests/sql/test_to_onnx_params.py
+      - name: Run native local-function compatibility tests
+        run: |
+          python -m pytest -q \
+            unittests/xbuilder/test_graph_builder.py::TestGraphBuilder \
+            -k "as_function or inline_1_function or inline_2_functions or inline_function_with_parameters or inline_functions_subgraph"

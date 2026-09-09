@@ -119,13 +119,13 @@ build. For example, from this repository on Linux x86-64 with CPython 3.12:
 ```bash
 python3.12 -m venv .venv
 .venv/bin/python -m pip install --only-binary=:all: \
-  https://github.com/xadupre/onnx-light/releases/download/0.1.24/onnx_light-0.1.24-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl \
+  https://github.com/xadupre/onnx-light/releases/download/0.1.25/onnx_light-0.1.25-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl \
   numpy ml_dtypes scipy onnxruntime scikit-learn
 export PYTHONPATH="$PWD"
 ```
 
 For another Python version or platform, select the matching full wheel from
-the [onnx-light release](https://github.com/xadupre/onnx-light/releases/tag/0.1.24).
+the [onnx-light release](https://github.com/xadupre/onnx-light/releases/tag/0.1.25).
 The native backend requires Python 3.12 or newer. Restricting `PYTHONPATH`
 to this repository prevents another onnx-light source checkout from shadowing
 the installed wheel.
@@ -197,19 +197,21 @@ Standalone ONNX functions and custom conversion dispatchers are supported.
 Delegation to `torch.onnx.export` through onnxscript and the Spox/onnxscript
 builder bridges are no longer supported.
 
-The published 0.1.24 wheel still blocks dependent local-function calls,
-generic function imports and referenced attributes, some lexical subgraph
-captures/shadowing, and removal of unused initializers. These failures remain
-visible in the core suite; completing that compatibility requires native-wheel
-fixes, not a Python graph or shape-inference fallback. In particular, even a
-typed native local function can leave its call result unavailable to the next
-node's internal shape context.
+The project pins the published wheel to **0.1.25**. Local functions, including nested
+calls and referenced attributes, are imported directly by the native builder.
+Their result descriptors come from native inference, without a separate Python
+replay of typed function bodies. Unused initializers are removed by native cleanup.
 
-The converter adapter repairs non-topological serialized node order produced
-by native optimization and then rebuilds the native graph to regenerate its
-lifetime metadata. This does not replace native pattern selection or inference.
-The old Python ordering optimizer has been removed, and the historical
+Native optimization now owns both dependency ordering and lifetime metadata;
+the adapter no longer sorts serialized nodes or rebuilds the optimized graph
+to repair those analyses. The old Python ordering optimizer has been removed,
+and the historical
 `graph_builder_opset.Opset` import now resolves to the native converter adapter.
+
+Some legacy cases remain incompatible: the 0.1.25 builder rejects multi-output
+`Scan` at opset 22, and subgraphs that redefine names visible in an ancestor
+scope are rejected as SSA violations. These errors are surfaced rather than
+hidden behind a Python fallback.
 
 ## Comparison with existing ONNX conversion tools
 

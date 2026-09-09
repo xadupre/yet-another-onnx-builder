@@ -1,7 +1,6 @@
 """Adapts the published onnx-light native builder to the converter protocol."""
 
 import contextlib
-import heapq
 import importlib
 from dataclasses import dataclass
 from functools import partial
@@ -239,7 +238,6 @@ class OnnxLightGraphBuilder:
         self.as_function = as_function
         self._devices = {}
         self._dimension_names = set()
-        self._function_graphs = {}
         self._prefix_stack = []
         self._reserved_names = set()
         self._node_names = set()
@@ -361,10 +359,9 @@ class OnnxLightGraphBuilder:
                 device=self.get_device(input_name) if self.has_device(input_name) else None,
             )
         if add_local_functions:
-            for key, graph in self._function_graphs.items():
-                nested = builder._inner.make_local_function(key[1], key[0])
-                self._populate_native(nested, graph, self.opsets)
-                builder._function_graphs[key] = _native_proto(graph, onnx.GraphProto)
+            model = builder._native_model()
+            model.functions.extend(self.functions.values())
+            builder._inner = GraphBuilder(model)
         return builder
 
     def make_tensor_value_info_from_name(self, name):
@@ -679,27 +676,18 @@ class OnnxLightGraphBuilder:
             op_type, normalized_inputs, outputs, domain=domain, name=node_name
         )
         node.attribute.extend(native_attributes)
-        key = (domain, op_type)
-        if key in self._function_graphs:
-            graph = _native_proto(self._function_graphs[key], onnx.GraphProto)
-            if len(graph.input) != len(normalized_inputs):
-                raise ValueError(f"Invalid number of inputs for local function {key!r}.")
-            context = ShapesContext()
-            for function_domain, version in self.opsets.items():
-                context.set_opset_version(function_domain, version)
-            for formal, actual in zip(graph.input, normalized_inputs):
-                info = self.make_tensor_value_info_from_name(actual)
-                formal.ClearField("type")
-                formal.type.CopyFrom(info.type)
-            context.compute_shape_graph(graph)
-            for formal, actual in zip(graph.output, outputs):
-                if context.has(str(formal.name)):
-                    self.shapes_context.set(actual, context.get(str(formal.name)))
-        else:
+        local_function = (
+            self._inner.has_local_function(op_type) and (domain, op_type) in self.functions
+        )
+        if not local_function:
             self.shapes_context.compute_shape_node(node)
         self._inner.make_node(
             op_type, normalized_inputs, outputs, domain, node_name, native_attributes
         )
+        if local_function:
+            for output in outputs:
+                if output and self._inner.has_shape(output):
+                    self.shapes_context.set(output, self._inner.get_shape(output))
         self._node_names.add(node_name)
         self._shape_names.update(output for output in outputs if self.shapes_context.has(output))
         return outputs[0] if len(outputs) == 1 else tuple(outputs)
@@ -723,52 +711,8 @@ class OnnxLightGraphBuilder:
 
     def _synchronize_annotations(self):
         if self._annotations_dirty:
-            self._inner = self._rebuild_native(self._native_model())
+            self._inner = GraphBuilder(self._native_model())
             self._annotations_dirty = False
-
-    @staticmethod
-    def _populate_native(builder, graph, opsets):
-        """Populates a native builder from explicitly typed graph declarations."""
-        for domain, version in opsets.items():
-            builder.set_opset_version(domain, version)
-        for value in graph.input:
-            builder.make_input(value)
-        for value in graph.initializer:
-            builder.make_initializer(value)
-        for node in graph.node:
-            builder.make_node(
-                str(node.op_type),
-                [str(value) for value in node.input],
-                [str(value) for value in node.output],
-                str(node.domain),
-                str(node.name),
-                list(node.attribute),
-            )
-        for value in graph.output:
-            builder.make_output(value)
-
-    def _rebuild_native(self, model):
-        """Reconstructs native functions with their declared input descriptors."""
-        if not model.functions or not self._function_graphs:
-            return GraphBuilder(model)
-        builder = GraphBuilder(str(model.graph.name))
-        for function in model.functions:
-            key = (str(function.domain), str(function.name))
-            if key not in self._function_graphs:
-                raise NotImplementedError(
-                    f"The native wheel requires typed construction metadata for {key!r}."
-                )
-            nested = builder.make_local_function(key[1], key[0])
-            graph = _native_proto(self._function_graphs[key], onnx.GraphProto)
-            graph.ClearField("node")
-            graph.node.extend(function.node)
-            self._populate_native(
-                nested,
-                graph,
-                {str(opset.domain): opset.version for opset in function.opset_import},
-            )
-        self._populate_native(builder, model.graph, self.opsets)
-        return builder
 
     def _function_artifact(self, options, optimize, inline):
         """Exports a native function with constants or explicit parameter inputs."""
@@ -801,7 +745,6 @@ class OnnxLightGraphBuilder:
         graph.node.extend(nodes)
         # Function serialization is owned by the native builder. Nested definitions
         # are returned alongside the proto because FunctionProto cannot contain them.
-        model.ClearField("functions")
         native = GraphBuilder(model)
         native.set_opset_version(options.domain, self.opsets.get(options.domain, 1))
         function = native.to_function(options.domain)
@@ -818,15 +761,25 @@ class OnnxLightGraphBuilder:
         )
 
     def make_local_function(self, builder, function_options, optimize=False):
-        """Registers a typed converter function through the native nested builder API."""
+        """Registers converter functions through native model import."""
         options = function_options
         if not options.name or not options.domain:
             raise ValueError("A local function requires a name and a nonempty domain.")
         artifact = builder._function_artifact(options, optimize, options.inline)
         function = artifact.proto
         key = (str(function.domain), str(function.name))
-        if key in self.functions:
-            existing = self.functions[key]
+        functions = self.functions
+        nested_functions = {
+            (str(nested.domain), str(nested.name)): nested
+            for nested in artifact.function.nested_functions
+        }
+        for nested_key, nested in nested_functions.items():
+            if nested_key in functions and self._function_signature(
+                functions[nested_key]
+            ) != self._function_signature(nested):
+                raise ValueError(f"Conflicting nested local function {nested_key!r}.")
+        if key in functions:
+            existing = functions[key]
             if options.merge_allowed and self._function_signature(
                 existing
             ) == self._function_signature(function):
@@ -834,34 +787,19 @@ class OnnxLightGraphBuilder:
             if not options.rename_allowed:
                 raise ValueError(f"Local function {key!r} already exists.")
             index = 2
-            while (key[0], f"{key[1]}_{index}") in self.functions:
+            while (key[0], f"{key[1]}_{index}") in functions:
                 index += 1
             key = (key[0], f"{key[1]}_{index}")
             function.name = key[1]
         if not self.has_opset(key[0]):
             self.set_opset(key[0], 1)
         self._synchronize_annotations()
-        for nested_key, graph in builder._function_graphs.items():
-            if nested_key in self._function_graphs:
-                if (
-                    self._function_graphs[nested_key].SerializeToString()
-                    != graph.SerializeToString()
-                ):
-                    raise ValueError(f"Conflicting nested local function {nested_key!r}.")
-            else:
-                nested = self._inner.make_local_function(nested_key[1], nested_key[0])
-                self._populate_native(nested, graph, builder.opsets)
-                self._function_graphs[nested_key] = _native_proto(graph, onnx.GraphProto)
-        inputs = [builder.make_tensor_value_info_from_name(str(name)) for name in function.input]
-        outputs = [
-            builder.make_tensor_value_info_from_name(str(name)) for name in function.output
-        ]
-        graph = helper.make_graph(list(function.node), key[1], inputs, outputs)
-        nested = self._inner.make_local_function(key[1], key[0])
-        self._populate_native(
-            nested, graph, {str(opset.domain): opset.version for opset in function.opset_import}
-        )
-        self._function_graphs[key] = graph
+        model = self._native_model()
+        for nested_key, nested in nested_functions.items():
+            if nested_key not in functions:
+                model.functions.append(nested)
+        model.functions.append(function)
+        self._inner = GraphBuilder(model)
         return self._add_function_initializers(artifact), key
 
     def _add_function_initializers(self, artifact):
@@ -883,7 +821,6 @@ class OnnxLightGraphBuilder:
     def inline_functions(self, verbose=0):
         """Inlines local functions using the native graph operation."""
         count = self.inner_builder.inline_local_functions()
-        self._function_graphs.clear()
         return count
 
     def remove_unused(self):
@@ -905,7 +842,7 @@ class OnnxLightGraphBuilder:
         model.graph.ClearField("initializer")
         model.graph.ClearField("node")
         model.graph.node.extend(nodes)
-        self._inner = self._rebuild_native(model)
+        self._inner = GraphBuilder(model)
 
     def is_constant(self, name):
         """Queries constant ownership through native GraphGraph."""
@@ -1027,7 +964,7 @@ class OnnxLightGraphBuilder:
 
     def _export_native(self, optimize, inline):
         """Exports a native model and optional native rewrite statistics."""
-        builder = self._rebuild_native(self._native_model())
+        builder = GraphBuilder(self._native_model())
         if inline:
             builder.inline_local_functions()
         rewrites = []
@@ -1037,12 +974,6 @@ class OnnxLightGraphBuilder:
                 builder, self.optimization_options.pattern_names(), use_global_patterns=False
             ).optimize(self.optimization_options.max_iter, report=True)
         model = builder.to_onnx(ir_version=self.ir_version)
-        if self._topological_order_model(model):
-            # Native finalization must recompute lifetime/release annotations after
-            # reordering; moving serialized nodes alone leaves stale runtime metadata.
-            model = self._rebuild_native(model).to_onnx(ir_version=self.ir_version)
-            if self._topological_order_model(model):
-                raise RuntimeError("Native finalization changed the graph's topological order.")
         if self._original_model is not None:
             original = onnx.ModelProto()
             original.ParseFromString(self._original_model)
@@ -1050,7 +981,6 @@ class OnnxLightGraphBuilder:
             model.graph.doc_string = original.graph.doc_string
             model.graph.ClearField("metadata_props")
             model.graph.metadata_props.extend(original.graph.metadata_props)
-            # Native GraphProto.CopyFrom appends repeated fields in this wheel.
             original.ClearField("graph")
             original.graph.CopyFrom(model.graph)
             original.ClearField("opset_import")
@@ -1063,83 +993,6 @@ class OnnxLightGraphBuilder:
         # Native rewrites may reuse a source name for several inserted nodes.
         self._normalize_node_names(model)
         return model, rewrites, native_report
-
-    @staticmethod
-    def _topological_order_model(model):
-        """Stably orders native nodes using data dependencies and lexical captures."""
-        changed = False
-
-        def sort_scope(scope, outer_names):
-            nonlocal changed
-            nodes = list(scope.node)
-            inputs = {
-                str(value.name) if hasattr(value, "name") else str(value) for value in scope.input
-            }
-            inputs.update(str(value.name) for value in getattr(scope, "initializer", ()))
-            inputs.update(
-                str(value.values.name) for value in getattr(scope, "sparse_initializer", ())
-            )
-            producers = {}
-            for index, node in enumerate(nodes):
-                for output in node.output:
-                    name = str(output)
-                    if not name:
-                        continue
-                    if name in producers or name in inputs:
-                        raise ValueError(
-                            f"Duplicate definition of {name!r} in {str(scope.name)!r}."
-                        )
-                    producers[name] = index
-            local_names = inputs | producers.keys()
-            dependencies = []
-            captures = set()
-            for node in nodes:
-                required = {str(name) for name in node.input if name}
-                for attribute in node.attribute:
-                    subgraphs = ([attribute.g] if attribute.HasField("g") else []) + list(
-                        attribute.graphs
-                    )
-                    for subgraph in subgraphs:
-                        required.update(sort_scope(subgraph, outer_names | local_names))
-                captures.update(required - local_names)
-                dependencies.append(required)
-            outputs = {
-                str(value.name) if hasattr(value, "name") else str(value)
-                for value in scope.output
-            }
-            captures.update(outputs - local_names)
-            missing = captures - outer_names
-            if missing:
-                raise ValueError(f"Undefined values in {str(scope.name)!r}: {sorted(missing)!r}.")
-            successors = [[] for _ in nodes]
-            counts = []
-            for index, required in enumerate(dependencies):
-                predecessors = {producers[name] for name in required if name in producers}
-                counts.append(len(predecessors))
-                for predecessor in predecessors:
-                    successors[predecessor].append(index)
-            ready = [index for index, count in enumerate(counts) if not count]
-            heapq.heapify(ready)
-            order = []
-            while ready:
-                index = heapq.heappop(ready)
-                order.append(index)
-                for successor in successors[index]:
-                    counts[successor] -= 1
-                    if not counts[successor]:
-                        heapq.heappush(ready, successor)
-            if len(order) != len(nodes):
-                raise ValueError(f"Cyclic node dependencies in {str(scope.name)!r}.")
-            if order != list(range(len(nodes))):
-                scope.ClearField("node")
-                scope.node.extend(nodes[index] for index in order)
-                changed = True
-            return captures
-
-        sort_scope(model.graph, set())
-        for function in model.functions:
-            sort_scope(function, set())
-        return changed
 
     def to_native(self, optimize=True, inline=True):
         """Returns a native model without importing reference ONNX or its runtime.
