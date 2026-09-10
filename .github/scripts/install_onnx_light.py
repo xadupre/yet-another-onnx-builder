@@ -32,7 +32,7 @@ def select_wheel(assets, supported_tags):
 def main():
     """Selects and installs a published binary wheel."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", default="0.1.25")
+    parser.add_argument("--version", default="0.1.26")
     parser.add_argument("--print-url", action="store_true")
     args = parser.parse_args()
     headers = {"Accept": "application/vnd.github+json"}
