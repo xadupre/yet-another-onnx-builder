@@ -41,7 +41,7 @@ class TestNativeTorchExport(unittest.TestCase):
         import torch
         from onnx_light.onnx_core.graph_builder import GraphBuilder
         from onnx_light.onnx_core.shape_inference import ShapesContext
-        from yobx.torch import to_onnx
+        from yobx.torch.interpreter.native_export import to_onnx
 
         torch.manual_seed(0)
         model = torch.nn.Sequential(torch.nn.Linear(4, 3), torch.nn.ReLU(inplace=True)).eval()
@@ -73,7 +73,7 @@ class TestNativeTorchExport(unittest.TestCase):
 
     def test_linear_vector_and_batched_double(self):
         import torch
-        from yobx.torch import to_onnx
+        from yobx.torch.interpreter.native_export import to_onnx
 
         model = torch.nn.Linear(4, 3).double().eval()
         for shape in ((4,), (2, 5, 4)):
@@ -89,7 +89,7 @@ class TestNativeTorchExport(unittest.TestCase):
         """Reports unsupported symbolic arguments and missing parameter targets."""
         import torch
         from torch.export.graph_signature import InputKind, SymIntArgument
-        from yobx.torch import to_onnx
+        from yobx.torch.interpreter.native_export import to_onnx
         from yobx.torch.export_options import ExportOptions
 
         class Model(torch.nn.Module):
@@ -119,7 +119,7 @@ class TestNativeTorchExport(unittest.TestCase):
     def test_native_transpose_pattern(self):
         import torch
         from yobx.builder.onnxlight import OnnxLightOptimizationOptions
-        from yobx.torch import to_onnx
+        from yobx.torch.interpreter.native_export import to_onnx
 
         class Model(torch.nn.Module):
             def forward(self, x):
@@ -141,7 +141,7 @@ class TestNativeTorchExport(unittest.TestCase):
 
     def test_dynamic_reshape_reduction(self):
         import torch
-        from yobx.torch import to_onnx
+        from yobx.torch.interpreter.native_export import to_onnx
 
         class Model(torch.nn.Module):
             def forward(self, x):
@@ -165,7 +165,7 @@ class TestNativeTorchExport(unittest.TestCase):
 
     def test_conditional_branches_and_symbolic_predicate(self):
         import torch
-        from yobx.torch import to_onnx
+        from yobx.torch.interpreter.native_export import to_onnx
 
         class Conditional(torch.nn.Module):
             def forward(self, predicate, x):
@@ -207,7 +207,8 @@ class TestNativeTorchExport(unittest.TestCase):
 
     def test_standalone_functions(self):
         import torch
-        from yobx.torch import to_onnx, FunctionOptions
+        from yobx.torch import FunctionOptions
+        from yobx.torch.interpreter.native_export import to_onnx
 
         model = torch.nn.Linear(4, 3).eval()
         x = torch.randn(2, 4)
@@ -251,15 +252,14 @@ class TestNativeTorchExport(unittest.TestCase):
     def test_default_top_level_dispatch(self):
         import torch
         from yobx import to_onnx
-        from yobx.builder.onnxlight import OnnxLightGraphBuilder
+        from yobx.torch.interpreter.graph_builder import TorchOnnxLightGraphBuilder
 
         model = torch.nn.Linear(3, 2).eval()
         x = torch.randn(4, 3)
         for backend in (None, "onnx-light"):
             with self.subTest(backend=backend):
                 artifact = to_onnx(model, (x,), input_names=["X"], graph_backend=backend)
-                self.assertIsInstance(artifact.builder, OnnxLightGraphBuilder)
-                self.assertEqual(artifact.report.extra["torch_backend"], "native")
+                self.assertIsInstance(artifact.builder, TorchOnnxLightGraphBuilder)
                 actual = self.session(artifact.proto).run(None, {"X": x.numpy()})[0]
                 numpy.testing.assert_allclose(
                     actual, model(x).detach().numpy(), rtol=1e-5, atol=1e-6
@@ -291,7 +291,7 @@ class TestNativeTorchExport(unittest.TestCase):
     def test_custom_dispatcher_and_tensor_initializers(self):
         import torch
         from yobx.builder.onnxlight import OnnxLightGraphBuilder
-        from yobx.torch import to_onnx
+        from yobx.torch.interpreter.native_export import to_onnx
 
         calls = []
 
@@ -317,7 +317,7 @@ class TestNativeTorchExport(unittest.TestCase):
 
     def test_parameter_names_and_repeated_outputs(self):
         import torch
-        from yobx.torch import to_onnx
+        from yobx.torch.interpreter.native_export import to_onnx
 
         model = torch.nn.Linear(4, 3)
         x = torch.randn(2, 4)
@@ -337,7 +337,7 @@ class TestNativeTorchExport(unittest.TestCase):
 
     def test_convolution(self):
         import torch
-        from yobx.torch import to_onnx
+        from yobx.torch.interpreter.native_export import to_onnx
 
         model = torch.nn.Sequential(
             torch.nn.Conv2d(2, 3, 3, padding=1), torch.nn.Sigmoid()
@@ -351,7 +351,7 @@ class TestNativeTorchExport(unittest.TestCase):
 
     def test_kwargs_scalar_promotion_and_validation(self):
         import torch
-        from yobx.torch import to_onnx
+        from yobx.torch.interpreter.native_export import to_onnx
 
         class Model(torch.nn.Module):
             def forward(self, x, *, y, scale=2):
@@ -381,7 +381,7 @@ class TestNativeTorchExport(unittest.TestCase):
     def test_exported_program_and_external_weights(self):
         import torch
         from yobx.container import ExportArtifact
-        from yobx.torch import to_onnx
+        from yobx.torch.interpreter.native_export import to_onnx
 
         model = torch.nn.Linear(4, 3).eval()
         x = torch.randn(2, 4)
@@ -398,7 +398,8 @@ class TestNativeTorchExport(unittest.TestCase):
 
     def test_unsupported_requests_are_explicit(self):
         import torch
-        from yobx.torch import to_onnx, ExportOptions
+        from yobx.torch import ExportOptions
+        from yobx.torch.interpreter.native_export import to_onnx
 
         x = torch.randn(2, 3)
         model = torch.nn.ReLU()
@@ -450,7 +451,7 @@ class TestNativeTorchExport(unittest.TestCase):
             sys.meta_path.insert(0, RejectLegacyEngines())
             import torch
             from onnx_light import onnx
-            from yobx.torch import to_onnx
+            from yobx.torch.interpreter.native_export import to_onnx
             model = torch.nn.Sequential(torch.nn.Linear(4, 3), torch.nn.ReLU()).eval()
             artifact = to_onnx(
                 model, (torch.randn(2, 4),), dynamic_shapes=({0: "batch"},),

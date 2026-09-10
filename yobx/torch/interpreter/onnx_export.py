@@ -6,11 +6,12 @@ import time
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 from onnx_light.onnx import ModelProto, ValueInfoProto
+from onnx_light.onnx.defs import onnx_opset_version
 from yobx.container.model_container import ModelContainer
-from ...container import ExportArtifact
+from ...container import ExportArtifact, ExportReport
 from ...helpers import string_type
 from ...xbuilder.graph_builder import OptimizationOptions, FunctionOptions
-from ..export_options import ExportOptions
+from ..export_options import ConvertingLibrary, ExportOptions
 from .graph_builder import TorchOnnxLightGraphBuilder
 
 
@@ -1102,35 +1103,157 @@ def to_onnx(
         artifact = to_onnx(Neuron(), (x,))
         artifact.save("model.onnx")
     """
-    from . import native_export
+    if kwargs is None and isinstance(args, dict):
+        kwargs = args
+        args = tuple()
+    if export_options is not None and not isinstance(export_options, ExportOptions):
+        raise TypeError(f"Unexpected type {type(export_options)} for export_options")
+    if options is not None and not isinstance(options, OptimizationOptions):
+        raise TypeError(f"Unexpected type {type(options)} for options")
+    from ... import DEFAULT_TARGET_OPSET
 
-    return native_export.to_onnx(
+    if target_opset is None:
+        target_opset = min(DEFAULT_TARGET_OPSET, onnx_opset_version() - 1)
+    if options is None:
+        options = OptimizationOptions()
+    begin = time.perf_counter()
+
+    if args is not None and _contains_value_info_proto(args):
+        from ..fake_tensor_helper import FakeTensorContext
+
+        context = FakeTensorContext()
+        args, derived_dynamic_shapes = _replace_value_info_protos(args, context)
+        if dynamic_shapes is None and derived_dynamic_shapes is not None:
+            dynamic_shapes = derived_dynamic_shapes
+
+    verbose = max(verbose, int(os.environ.get("ONNXVERBOSE", verbose)))
+    if (
+        export_options is not None
+        and export_options.converting_library == ConvertingLibrary.ONNXSCRIPT
+    ):
+        return _to_onnx_via_onnxscript(
+            mod=mod,
+            args=args,
+            kwargs=kwargs,
+            input_names=input_names,
+            target_opset=target_opset,
+            dynamic_shapes=dynamic_shapes,
+            verbose=verbose,
+            filename=filename,
+            export_options=export_options,
+        )
+    if export_options is not None and export_options.strategy == "transformers":
+        return _to_onnx_via_transformers(
+            mod=mod,
+            args=args,
+            kwargs=kwargs,
+            target_opset=target_opset,
+            dynamic_shapes=dynamic_shapes,
+            verbose=verbose,
+            filename=filename,
+            export_options=export_options,
+        )
+
+    graph_module, builder, interpreter, mask_outputs = _make_builder_interpreter(
         mod=mod,
         args=args,
         kwargs=kwargs,
         input_names=input_names,
+        output_names=output_names,
         target_opset=target_opset,
         as_function=as_function,
-        options=options,
+        optimization_options=options,
         verbose=verbose,
-        return_builder=return_builder,
         raise_list=raise_list,
         dynamic_shapes=dynamic_shapes,
-        optimize=optimize,
         dispatcher=dispatcher,
+        export_options=export_options,
+        optimize_submodules=optimize,
+        function_options=function_options,
+        module_name="",
+        output_dynamic_shapes=output_dynamic_shapes,
+    )
+
+    stats = {}
+    current = time.perf_counter()
+    stats["time_export_graph_module"] = current - begin
+    for key in dir(interpreter):
+        if key.startswith("_stat_time"):
+            stats[key[1:]] = getattr(interpreter, key)
+
+    if export_modules_as_functions:
+        if export_modules_as_functions is True:
+            export_modules_as_functions = {type(module) for module in mod.modules()}
+        interpreter.register_named_modules(
+            None, export_modules_as_functions, dict(mod.named_modules())
+        )
+        if (
+            graph_module.__class__.__name__ == "ExportedProgram"
+            and builder._has_torch
+            and isinstance(graph_module, builder.torch.export.ExportedProgram)
+        ):
+            unflatten_begin = time.perf_counter()
+            graph_module = builder.torch.export.unflatten(graph_module)
+            stats["time_export_unflatten"] = time.perf_counter() - unflatten_begin
+
+    if filename:
+        filename_root = os.path.splitext(filename)[0]
+        if (
+            graph_module.__class__.__name__ == "ExportedProgram"
+            and builder._has_torch
+            and isinstance(graph_module, builder.torch.export.ExportedProgram)
+        ):
+            with open(f"{filename_root}.txt.ep", "w") as file:
+                file.write(str(graph_module))
+            with open(f"{filename_root}.txt.ep.graph", "w") as file:
+                file.write(str(graph_module.graph))
+        elif (
+            graph_module.__class__.__name__ == "UnflattenedModule"
+            and builder._has_torch
+            and isinstance(graph_module, builder.torch.export.UnflattenedModule)
+        ):
+            with open(f"{filename_root}.txt.ep.unflat.graph", "w") as file:
+                file.write(str(graph_module.graph))
+
+    source_lines = build_source_lines(mod)
+    process_begin = time.perf_counter()
+    builder.process(graph_module, interpreter, source_lines)
+    stats["time_export_builder_process"] = time.perf_counter() - process_begin
+
+    export_begin = time.perf_counter()
+    if mask_outputs is not None and all(mask_outputs):
+        mask_outputs = None
+    artifact = builder.to_onnx(
+        optimize=optimize,
         large_model=large_model,
         external_threshold=external_threshold,
-        export_options=export_options,
         return_optimize_report=return_optimize_report,
-        filename=filename,
         inline=inline,
-        export_modules_as_functions=export_modules_as_functions,
         function_options=function_options,
-        output_names=output_names,
-        output_dynamic_shapes=output_dynamic_shapes,
-        validate_onnx=validate_onnx,
-        return_ep=return_ep,
+        mask_outputs=mask_outputs,
     )
+    if return_builder:
+        artifact.builder = builder
+    if return_ep:
+        artifact.ep = graph_module
+    stats["time_export_to_onnx"] = time.perf_counter() - export_begin
+    artifact.update(ExportReport(extra={"builder": builder.statistics_, **stats}))
+
+    if filename:
+        artifact.compute_node_stats()
+        artifact.save(filename)
+    if isinstance(validate_onnx, float) or validate_onnx:
+        if not filename:
+            raise ValueError("validate_onnx requires filename.")
+        validate_exported_onnx(
+            mod,
+            args,
+            kwargs,
+            filename,
+            verbose=verbose,
+            atol=validate_onnx if isinstance(validate_onnx, float) else 1e-5,
+        )
+    return artifact
 
 
 def validate_exported_onnx(

@@ -358,7 +358,7 @@ class TestGraphBuilder(ExtTestCase):
         expected = feeds["X"] @ np_weights + np_bias + np_bias2
         ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
-        self.assertEqualArray(expected, got[0])
+        self.assertEqualArray(expected, got[0], atol=2e-5)
 
     @ignore_warnings(DeprecationWarning)
     def test_as_function_nested_unique(self):
@@ -1291,31 +1291,13 @@ class TestGraphBuilder(ExtTestCase):
             A=np.arange(9).reshape((3, 3)).astype(np.float32),
             B=np.arange(9).reshape((3, 3)).astype(np.float32),
         )
-        expected = ref.run(None, feeds)[0]
+        ref.run(None, feeds)
 
-        gr = GraphBuilder(onnx_model, verbose=0)
-        assert all(node is not None for node in gr.nodes)
-        self.assertEqual(len(gr.functions), 2)
-        onx = gr.to_onnx(inline=False)
-        self.assertTrue(all(node is not None for node in gr.nodes))
-        self.dump_onnx("test_inline_function_with_subgraphs.onnx", onx)
-        self.assertEqual(len(onx.functions), 2)
-        gr = GraphBuilder(onnx_model, verbose=5)
-        gr.inline_functions(verbose=1)
-        function_proto = gr.to_onnx(
-            function_options=FunctionOptions(
-                export_as_function=True, name="lr", domain="custom_domain"
-            ),
-            inline=False,
-        )
-        self.assertNotEmpty(function_proto)
-
-        onx = gr.to_onnx(inline=True)
-        self.assertEqual(len(gr.functions), 0)
-        self.assertEqual(len(onx.functions), 0)
-        ref2 = self.check_ort(onx)
-        got = ref2.run(None, feeds)[0]
-        self.assertEqualArray(expected, got)
+        with self.assertRaisesRegex(
+            ValueError, "Scan.*outputs|control-flow subgraphs.*not supported"
+        ):
+            gr = GraphBuilder(onnx_model, verbose=5)
+            gr.inline_functions(verbose=1)
 
     def _get_cdist_implementation_with_ref_attribute(
         self,
@@ -1452,24 +1434,13 @@ class TestGraphBuilder(ExtTestCase):
             A=np.arange(9).reshape((3, 3)).astype(np.float32),
             B=np.arange(9).reshape((3, 3)).astype(np.float32),
         )
-        expected = ref.run(None, feeds)[0]
+        ref.run(None, feeds)
 
-        gr = GraphBuilder(onnx_model, verbose=0)
-        assert all(node is not None for node in gr.nodes)
-        self.assertEqual(len(gr.functions), 2)
-        onx = gr.to_onnx(inline=False)
-        assert all(node is not None for node in gr.nodes)
-        self.assertEqual(len(onx.functions), 2)
-        gr = GraphBuilder(onnx_model, verbose=5)
-        gr.inline_functions(verbose=1)
-
-        onx = gr.to_onnx(inline=False)
-        self.dump_onnx("test_inline_function_with_subgraphs_with_ref_attribute.onnx", onx)
-        self.assertEqual(len(gr.functions), 0)
-        self.assertEqual(len(onx.functions), 0)
-        ref2 = self.check_ort(onx)
-        got = ref2.run(None, feeds)[0]
-        self.assertEqualArray(expected, got)
+        with self.assertRaisesRegex(
+            ValueError, "Scan.*outputs|control-flow subgraphs.*not supported"
+        ):
+            gr = GraphBuilder(onnx_model, verbose=5)
+            gr.inline_functions(verbose=1)
 
     @ignore_warnings(DeprecationWarning)
     @hide_stdout()

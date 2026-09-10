@@ -10,6 +10,8 @@ from onnx_light.onnx_core.graph_builder import GraphBuilder as NativeGraphBuilde
 
 from ...builder.onnxlight import OnnxLightGraphBuilder
 from ...container.model_container import _get_type
+from ...xexpressions.rename_expressions import rename_expression
+from ...xexpressions.simplify_expressions import simplify_two_expressions
 from ...xbuilder._wrap_dim import WrapDim
 from ...xbuilder._wrap_sym import WrapSym
 from ..new_tracing.shape import TracingInt
@@ -86,6 +88,7 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         self.output_dynamic_dimensions_source_flat = None
         self._dynamic_alias = {}
         self._dimension_equivalences = {}
+        self.constraints_ = {}
         self._known_torch_value = {}
         self._registered_users = {}
         self.statistics_ = {}
@@ -197,6 +200,10 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         if default_initializer is not None:
             tensor = numpy_helper.from_array(numpy.asarray(default_initializer), name=input_name)
             self._inner.make_initializer(tensor)
+            self.shapes_context.compute_shape_graph(
+                helper.make_graph([], "initializer", [], [], [tensor])
+            )
+            self._shape_names.add(input_name)
         if input_name != name:
             self.make_node("Identity", [input_name], [name], name="make_tensor_input_id")
         return name
@@ -226,6 +233,16 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
                     value.doc_string = doc_string
             self._inner = NativeGraphBuilder(model)
         return result
+
+    def make_initializer(self, name, value, parameter_name=None, **kwargs):
+        """Adds an initializer and preserves its FX name when a parameter is renamed."""
+        initializer_name = super().make_initializer(
+            name, value, parameter_name=parameter_name, **kwargs
+        )
+        if name and initializer_name != name:
+            self.make_node("Identity", [initializer_name], [name], name=f"{name}_parameter_alias")
+            return name
+        return initializer_name
 
     def make_node(
         self, op_type, inputs, outputs=1, domain="", attributes=None, name=None, **kwargs
@@ -378,6 +395,49 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
             self.torch.fx.experimental.symbolic_shapes.GuardOnDataDependentSymNode,
         ) as exc:
             raise AssertionError(f"Unable to convert {value!r} into a dimension.") from exc
+
+    def _torch_sym_int(self, value, add=False):
+        """Converts and optionally registers a Torch symbolic dimension."""
+        result = self._torch_sym_int_to_str(value)
+        if add and isinstance(result, str) and result not in self.dynamic_objects:
+            self.add_dynamic_object(result, value, parse=True, check_tokens=False)
+        return result
+
+    def add_to_constraints(self, dimension, value):
+        """Adds one or more equivalent values for a symbolic dimension."""
+        values = value if isinstance(value, set) else {value}
+        if not all(isinstance(item, (int, str)) for item in values):
+            raise TypeError(f"Unexpected constraint values {values!r}.")
+        self.constraints_.setdefault(dimension, set()).update(values)
+
+    def get_registered_constraints(self):
+        """Returns the registered symbolic dimension constraints."""
+        return self.constraints_
+
+    def _improve_constraints(self):
+        """Deduces symbolic equivalences from pairs of affine expressions."""
+        additions = {}
+        for left, values in tuple(self.constraints_.items()):
+            for right in tuple(values):
+                if not isinstance(left, str) or not isinstance(right, str):
+                    continue
+                simplified = simplify_two_expressions(left, right)
+                if len(simplified) != 2:
+                    continue
+                items = list(simplified.items())
+                if items[0][1] != -items[1][1]:
+                    continue
+                first = items[0][0].replace(" ", "")
+                second = items[1][0].replace(" ", "")
+                additions.setdefault(first, set()).add(second)
+                additions.setdefault(second, set()).add(first)
+                renamed_left = rename_expression(left, {first: second})
+                renamed_right = rename_expression(right, {second: first})
+                equivalent = {left, right, renamed_left, renamed_right}
+                for expression in equivalent:
+                    additions.setdefault(expression, set()).update(equivalent)
+        for dimension, values in additions.items():
+            self.add_to_constraints(dimension, values)
 
     def add_dynamic_object(self, key, value, name=None, dim=None, parse=False, check_tokens=True):
         """Registers a symbolic dimension or dimension expression."""
@@ -640,7 +700,9 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
                 continue
             scalar = self._dimension_expression_result(dimension)
             if not self.has_rank(scalar):
-                raise ValueError(f"No rank is known for dynamic dimension {dimension!r}.")
+                self.set_rank(scalar, 0)
+            if not self.has_type(scalar):
+                self.set_type(scalar, onnx.TensorProto.INT64)
             if self.get_rank(scalar) == 0:
                 scalar = self.op.UnsqueezeAnyOpset(
                     scalar, self.ZERO, name=f"_mkshape_{name or dimension}"
@@ -948,6 +1010,9 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
                 self.make_tensor_output(output, allow_untyped_output=True)
             return
         graph = graph_module.graph
+        self._reserved_names.update(
+            node.name for node in graph.nodes if getattr(node, "name", None)
+        )
         interpreter.start_graph(graph)
         placeholders = [node for node in graph.nodes if node.op == "placeholder"]
         removable = set()

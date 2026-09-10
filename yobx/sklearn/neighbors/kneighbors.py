@@ -97,11 +97,6 @@ def _compute_pairwise_distances(
             metric=metric,
             name=f"{name}_cdist",
         )
-        g.set_type(dists, itype)
-        if g.has_shape(X):
-            g.set_shape(dists, (g.get_shape(X)[0], training_data.shape[0]))
-        elif g.has_rank(X):
-            g.set_rank(dists, 2)
         zero = np.array([0], dtype=dtype)
         return g.op.Max(dists, zero, name=f"{name}_clip")
 

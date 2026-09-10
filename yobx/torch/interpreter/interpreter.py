@@ -2343,6 +2343,12 @@ class FxGraphInterpreter:
                 getattr(tracer, "traced_model", None) or sub_module, graph
             )
 
+        if new_args:
+            placeholders = (node for node in gm.graph.nodes if node.op == "placeholder")
+            for node, argument in zip(placeholders, new_args):
+                if node.meta.get("val") is None and node.meta.get("example_value") is None:
+                    node.meta["example_value"] = argument
+
         graph_module, builder, interpreter, mask_outputs = _make_builder_interpreter(
             gm,
             args=None if new_args is None else tuple(new_args),
