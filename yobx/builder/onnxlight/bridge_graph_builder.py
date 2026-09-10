@@ -685,7 +685,10 @@ class OnnxLightGraphBuilder:
             "ai.onnx.preview.training",
             "ai.onnx.training",
         }
-        if not local_function and native_inference_domain:
+        custom_inference = self.shapes_context.has_custom_shape_inference_function(
+            domain, op_type
+        )
+        if not local_function and (native_inference_domain or custom_inference):
             self.shapes_context.compute_shape_node(node)
         self._inner.make_node(
             op_type, normalized_inputs, outputs, domain, node_name, native_attributes

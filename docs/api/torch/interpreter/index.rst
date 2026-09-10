@@ -24,6 +24,7 @@ yobx.torch.interpreter
     aten_functions_transformers
     aten_methods
     dispatcher
+    graph_builder
     interpreter
     onnx_export
     native_export

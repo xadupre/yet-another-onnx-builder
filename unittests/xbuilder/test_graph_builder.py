@@ -1294,10 +1294,10 @@ class TestGraphBuilder(ExtTestCase):
         expected = ref.run(None, feeds)[0]
 
         gr = GraphBuilder(onnx_model, verbose=0)
-        assert None not in gr.nodes
+        assert all(node is not None for node in gr.nodes)
         self.assertEqual(len(gr.functions), 2)
         onx = gr.to_onnx(inline=False)
-        self.assertNotIn(None, gr.nodes)
+        self.assertTrue(all(node is not None for node in gr.nodes))
         self.dump_onnx("test_inline_function_with_subgraphs.onnx", onx)
         self.assertEqual(len(onx.functions), 2)
         gr = GraphBuilder(onnx_model, verbose=5)
@@ -1455,10 +1455,10 @@ class TestGraphBuilder(ExtTestCase):
         expected = ref.run(None, feeds)[0]
 
         gr = GraphBuilder(onnx_model, verbose=0)
-        assert None not in gr.nodes
+        assert all(node is not None for node in gr.nodes)
         self.assertEqual(len(gr.functions), 2)
         onx = gr.to_onnx(inline=False)
-        assert None not in gr.nodes
+        assert all(node is not None for node in gr.nodes)
         self.assertEqual(len(onx.functions), 2)
         gr = GraphBuilder(onnx_model, verbose=5)
         gr.inline_functions(verbose=1)
