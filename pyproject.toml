@@ -35,6 +35,7 @@ docs = [
     "ipython",
     "matplotlib",
     "mermaid-py",
+    "onnx-ir",
     "openpyxl",
     "pandas",
     "pydata-sphinx-theme",

@@ -1004,8 +1004,7 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
 
         with self.assertRaisesRegex(TypeError, "OnnxLightOptimizationOptions"):
             self.make_builder(18, optimization_options=object())
-        with self.assertRaisesRegex(ValueError, "Unsupported native patterns"):
-            OnnxLightOptimizationOptions("default+onnxruntime")
+        self.assertTrue(OnnxLightOptimizationOptions("default+onnxruntime").pattern_names())
         with self.assertRaisesRegex(ValueError, "Unsupported native patterns"):
             OnnxLightOptimizationOptions([object()])
         with self.assertRaises(ValueError):

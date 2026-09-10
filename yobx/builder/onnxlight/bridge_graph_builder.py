@@ -39,7 +39,7 @@ class OnnxLightOptimizationOptions:
     def pattern_names(self):
         """Returns validated native pattern names."""
         available = set(standard_pattern_names())
-        if self.patterns is None or self.patterns == "default":
+        if self.patterns is None or self.patterns in ("default", "default+onnxruntime"):
             return sorted(available)
         names = [self.patterns] if isinstance(self.patterns, str) else list(self.patterns)
         if any(not isinstance(name, str) or name not in available for name in names):

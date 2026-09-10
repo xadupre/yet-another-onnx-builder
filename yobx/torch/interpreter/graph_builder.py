@@ -1158,6 +1158,8 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         return normalized
 
     def _normalize_dimension(self, dimension, add):
+        if dimension is None:
+            return None
         if isinstance(dimension, (int, numpy.integer)):
             return int(dimension)
         name = self._dimension_name(dimension)
