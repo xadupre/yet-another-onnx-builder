@@ -96,7 +96,7 @@ Anonymous dimensions are returned as ``None`` rather than invented Python
 symbols; costs requiring them are unavailable. ``value_as_shape(name)``
 returns only shape values computed by the native engine, or ``None``.
 Equality constraints are registered and resolved by ``ShapesContext``.
-The published 0.1.25 wheel does not propagate shape-tensor values through every
+The published 0.1.26 wheel does not propagate shape-tensor values through every
 operator (for example, ``Identity``, ``Mul``, and ``Slice`` leave them unavailable).
 The adapter does not fill those gaps with a Python evaluator. Native expression
 evaluation supports the wheel's exact-division syntax, such as ``N/:2``.

@@ -20,10 +20,10 @@ class TestNativeWheelSelection(unittest.TestCase):
 
     def test_full_wheel_only(self):
         """Excludes reduced builds and source archives."""
-        filename = "onnx_light-0.1.25-cp312-cp312-manylinux_2_28_x86_64.whl"
+        filename = "onnx_light-0.1.26-cp312-cp312-manylinux_2_28_x86_64.whl"
         assets = [
-            self.asset("onnx_light-0.1.25.tar.gz"),
-            self.asset("onnx_light-0.1.25-0reduced-cp312-cp312-manylinux_2_28_x86_64.whl"),
+            self.asset("onnx_light-0.1.26.tar.gz"),
+            self.asset("onnx_light-0.1.26-0reduced-cp312-cp312-manylinux_2_28_x86_64.whl"),
             self.asset(filename),
         ]
         self.assertEqual(
@@ -34,8 +34,8 @@ class TestNativeWheelSelection(unittest.TestCase):
     def test_platform_preference(self):
         """Respects interpreter tag priority across compatible wheels."""
         filenames = [
-            "onnx_light-0.1.25-cp312-cp312-manylinux_2_27_x86_64.whl",
-            "onnx_light-0.1.25-cp312-cp312-manylinux_2_28_x86_64.whl",
+            "onnx_light-0.1.26-cp312-cp312-manylinux_2_27_x86_64.whl",
+            "onnx_light-0.1.26-cp312-cp312-manylinux_2_28_x86_64.whl",
         ]
         self.assertEqual(
             self.select_wheel(
@@ -52,7 +52,7 @@ class TestNativeWheelSelection(unittest.TestCase):
         """Fails when the release has no matching binary."""
         with self.assertRaisesRegex(RuntimeError, "no full wheel"):
             self.select_wheel(
-                [self.asset("onnx_light-0.1.25-cp313-cp313-win_amd64.whl")],
+                [self.asset("onnx_light-0.1.26-cp313-cp313-win_amd64.whl")],
                 [Tag("cp312", "cp312", "manylinux_2_28_x86_64")],
             )
 
