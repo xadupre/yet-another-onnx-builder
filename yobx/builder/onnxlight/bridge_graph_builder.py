@@ -627,7 +627,16 @@ class OnnxLightGraphBuilder:
         return name
 
     def make_node(
-        self, op_type, inputs, outputs=1, domain="", attributes=None, name=None, **kwargs
+        self,
+        op_type,
+        inputs,
+        outputs=1,
+        domain="",
+        attributes=None,
+        name=None,
+        _infer_shapes=True,
+        _synchronize_annotations=True,
+        **kwargs,
     ):
         """Creates a native node and computes its shape with ShapesContext."""
         domain = self._domain(domain)
@@ -643,10 +652,12 @@ class OnnxLightGraphBuilder:
             )
             for value in inputs
         ]
-        inputs_have_shapes = all(
-            not value or not self.has_name(value) or self.has_shape(value)
-            for value in normalized_inputs
-        )
+        for value in normalized_inputs:
+            if _infer_shapes and value and self.has_name(value) and not self.has_shape(value):
+                raise NotImplementedError(
+                    f"Native inference requires a declared rank for {value!r}; "
+                    "use set_shape or set_rank before creating nodes."
+                )
         if outputs is None:
             outputs = 1
         if isinstance(outputs, int):
@@ -657,6 +668,10 @@ class OnnxLightGraphBuilder:
             outputs = [outputs]
         else:
             outputs = list(outputs)
+        if _synchronize_annotations:
+            for output in outputs:
+                if output and self.has_name(output):
+                    raise ValueError(f"Output name {output!r} already exists.")
         native_attributes = []
         if isinstance(attributes, dict):
             kwargs = {**attributes, **kwargs}
@@ -667,6 +682,8 @@ class OnnxLightGraphBuilder:
             for key, value in kwargs.items()
             if value is not None
         )
+        if _synchronize_annotations:
+            self._synchronize_annotations()
         base_name = str(name) if name else self.unique_name(op_type)
         node_name = base_name
         index = 2
@@ -689,15 +706,7 @@ class OnnxLightGraphBuilder:
         custom_inference = self.shapes_context.has_custom_shape_inference_function(
             domain, op_type
         )
-        outputs_have_annotations = any(
-            output and self.shapes_context.has(output) for output in outputs
-        )
-        if (
-            not local_function
-            and not outputs_have_annotations
-            and inputs_have_shapes
-            and (native_inference_domain or custom_inference)
-        ):
+        if _infer_shapes and not local_function and (native_inference_domain or custom_inference):
             self.shapes_context.compute_shape_node(node)
         self._inner.make_node(
             op_type, normalized_inputs, outputs, domain, node_name, native_attributes

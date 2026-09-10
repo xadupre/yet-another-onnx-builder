@@ -7,7 +7,7 @@ import torch
 from onnx_light.onnx import checker
 from onnxruntime import InferenceSession, SessionOptions
 
-from yobx.torch import to_onnx
+from yobx.torch.interpreter.native_export import to_onnx
 from yobx.torch.export_options import ExportOptions
 
 

@@ -234,10 +234,26 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
             self._inner = NativeGraphBuilder(model)
         return result
 
-    def make_initializer(self, name, value, parameter_name=None, **kwargs):
+    def make_initializer(
+        self,
+        name,
+        value,
+        give_unique_name=True,
+        source=None,
+        *,
+        allow_empty=False,
+        msg=None,
+        parameter_name=None,
+    ):
         """Adds an initializer and preserves its FX name when a parameter is renamed."""
         initializer_name = super().make_initializer(
-            name, value, parameter_name=parameter_name, **kwargs
+            name,
+            value,
+            give_unique_name=give_unique_name,
+            source=source,
+            allow_empty=allow_empty,
+            msg=msg,
+            parameter_name=parameter_name,
         )
         if name and initializer_name != name:
             self.make_node("Identity", [initializer_name], [name], name=f"{name}_parameter_alias")
@@ -245,7 +261,16 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         return initializer_name
 
     def make_node(
-        self, op_type, inputs, outputs=1, domain="", attributes=None, name=None, **kwargs
+        self,
+        op_type,
+        inputs,
+        outputs=1,
+        domain="",
+        attributes=None,
+        name=None,
+        _infer_shapes=True,
+        _synchronize_annotations=True,
+        **kwargs,
     ):
         """Creates a native node after removing Torch converter-only options."""
         kwargs.pop("check", None)
@@ -260,6 +285,25 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
                 raise ValueError("SequenceAt does not accept attributes.")
             result = self._make_sequence_at(inputs, outputs, name)
             return result
+        normalized_outputs = (
+            [outputs]
+            if isinstance(outputs, str)
+            else [] if isinstance(outputs, int) else list(outputs or [])
+        )
+        normalized_inputs = [inputs] if isinstance(inputs, str) else list(inputs)
+        infer_shapes = (
+            _infer_shapes
+            and all(
+                not isinstance(value, str)
+                or not value
+                or not self.has_name(value)
+                or self.has_shape(value)
+                for value in normalized_inputs
+            )
+            and not any(
+                output and self.shapes_context.has(output) for output in normalized_outputs
+            )
+        )
         result = super().make_node(
             op_type,
             inputs,
@@ -267,6 +311,8 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
             domain=domain,
             attributes=attributes,
             name=name,
+            _infer_shapes=infer_shapes,
+            _synchronize_annotations=_synchronize_annotations and infer_shapes,
             **kwargs,
         )
         if metadata_props:

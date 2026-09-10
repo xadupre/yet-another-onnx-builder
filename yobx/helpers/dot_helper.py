@@ -1,8 +1,9 @@
 import subprocess
-from typing import Dict
+from typing import Dict, Union
 import numpy as np
 from yobx._onnx_shim import onnx
 import onnx_light.onnx.numpy_helper as onh
+from ..container import ExportArtifact
 from ..reference import ExtendedReferenceEvaluator as Inference
 from .onnx_helper import onnx_dtype_name, pretty_onnx, get_hidden_inputs
 
@@ -48,7 +49,7 @@ def _make_edge_label(value_info: onnx.ValueInfoProto, multi_line: bool = False) 
     return f"{onnx_dtype_name(itype)}({sshape})"
 
 
-def to_dot(model: onnx.ModelProto) -> str:
+def to_dot(model: Union[onnx.ModelProto, ExportArtifact]) -> str:
     """
     Converts a model into a dot graph.
     Here is an example:
@@ -89,6 +90,11 @@ def to_dot(model: onnx.ModelProto) -> str:
         dot = to_dot(model)
         print("DOT-SECTION", dot)
     """
+    if isinstance(model, ExportArtifact):
+        if model.proto is None:
+            raise ValueError("The export artifact does not contain an ONNX model.")
+        model = model.proto
+
     _unique: Dict[int, int] = {}
 
     def _mkn(obj: object) -> int:
