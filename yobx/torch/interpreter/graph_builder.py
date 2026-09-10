@@ -91,6 +91,8 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         self.constraints_ = {}
         self._known_torch_value = {}
         self._registered_users = {}
+        self._debug_node_type = False
+        self._debug_shape_missing = False
         self.statistics_ = {}
         self._torch_unique_node_names = set()
         self.functions_builder = {}
@@ -275,9 +277,12 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         """Creates a native node after removing Torch converter-only options."""
         kwargs.pop("check", None)
         metadata_props = kwargs.pop("metadata_props", None)
+        normalized_domain = self._domain(domain)
+        if normalized_domain and not self.has_opset(normalized_domain):
+            self.add_domain(normalized_domain, 1)
         if (
             op_type == "SequenceAt"
-            and self._domain(domain) == ""
+            and normalized_domain == ""
             and inputs
             and self.is_sequence(inputs[0])
         ):

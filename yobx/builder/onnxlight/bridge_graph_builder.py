@@ -4,7 +4,7 @@ import contextlib
 import importlib
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING, Optional, Sequence, Union
+from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 
 import numpy
 from onnx_light import onnx
@@ -35,6 +35,10 @@ class OnnxLightOptimizationOptions:
 
     patterns: Optional[Union[str, Sequence[str]]] = None
     max_iter: int = -1
+    verbose: int = 0
+    remove_unused: bool = True
+    constant_folding: bool = True
+    processor: Optional[Any] = None
 
     def pattern_names(self):
         """Returns validated native pattern names."""

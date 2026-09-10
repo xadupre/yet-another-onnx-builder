@@ -423,6 +423,7 @@ def aten_abs(
     assert g.has_type(x), f"missing type for x={x!r}{g.get_debug_msg()}"
     itype = g.get_type(x)
     if itype in {TensorProto.COMPLEX64, TensorProto.COMPLEX128}:
+        g.add_domain("ai.onnx.complex", 1)
         res = g.anyop.ComplexModule(x, name=name, domain="ai.onnx.complex")
         if not sts:
             rtype = TensorProto.FLOAT32 if itype == TensorProto.COMPLEX64 else TensorProto.DOUBLE
@@ -5357,6 +5358,7 @@ def aten__fftn_onnx(
         # Already complex
         fitype = itype
 
+    g.add_domain("ai.onnx.complex", 1)
     final = g.anyop.ToComplex(normalized, name=name, outputs=outputs, domain="ai.onnx.complex")
     if not sts:
         g.set_type(final, fitype)
