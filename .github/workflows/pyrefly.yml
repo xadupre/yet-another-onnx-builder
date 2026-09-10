@@ -26,7 +26,7 @@ jobs:
       - uses: ./.github/actions/install-onnx-light
 
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,imblearn,lightgbm,perpetual,polars,sklearn,sksurv,statmodels,tensorflow,torch,transformers,xgboost]" pyrefly
+        run: pip install -e ".[category_encoders,imblearn,lightgbm,perpetual,polars,sklearn,sksurv,statsmodels,tensorflow,torch,transformers,xgboost]" pyrefly
       - name: Install mbext
         run: pip install git+https://github.com/xadupre/mbext.git
       - name: Run pyrefly

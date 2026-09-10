@@ -9,8 +9,9 @@ from onnx_light.onnx import ModelProto, ValueInfoProto
 from yobx.container.model_container import ModelContainer
 from ...container import ExportArtifact
 from ...helpers import string_type
-from ...xbuilder.graph_builder import GraphBuilder, OptimizationOptions, FunctionOptions
+from ...xbuilder.graph_builder import OptimizationOptions, FunctionOptions
 from ..export_options import ExportOptions
+from .graph_builder import TorchOnnxLightGraphBuilder
 
 
 def match_input_parameters(
@@ -108,7 +109,7 @@ def _retrieve(
     buffers: Dict[str, "torch.Tensor"],  # noqa: F821
     constants: Dict[str, "torch.Tensor"],  # noqa: F821
     mapping: Dict[str, Tuple[str, bool]],
-    graph_builder: "GraphBuilder",  # noqa: F821
+    graph_builder: TorchOnnxLightGraphBuilder,
     debug: Optional[Any] = None,
     exc: bool = True,
 ) -> "torch.Tensor":  # noqa: F821
@@ -491,14 +492,14 @@ def _make_builder_interpreter(
     output_dynamic_shapes: Optional[Union[Dict[str, Any], Tuple[Any]]] = None,
 ) -> Tuple[
     Union["torch.export.ExportedProgram", "torch.fx.GraphModule"],  # noqa: F821
-    GraphBuilder,
+    TorchOnnxLightGraphBuilder,
     "FxGraphInterpreter",  # noqa: F821
     Optional[List[bool]],
 ]:
     """
     Retains interpreter setup for legacy tracing integrations.
     The public :func:`to_onnx` entry point does not use this helper. Its legacy
-    builder constructor requirements are not supported by the native builder.
+    constructor state is adapted by :class:`TorchOnnxLightGraphBuilder`.
 
     :param mod: torch module
     :param args: input arguments
@@ -714,7 +715,7 @@ def _make_builder_interpreter(
                 mapping[k] = k, False
 
     stat_time_export = time.perf_counter() - begin
-    builder = GraphBuilder(
+    builder = TorchOnnxLightGraphBuilder(
         target_opset,
         input_names=input_names,
         output_names=output_names,

@@ -1,6 +1,7 @@
 from ..pv_version import PvVersion
 from .convert import to_onnx
 from .convert_options import ConvertOptions
+from .graph_builder import SklearnOnnxLightGraphBuilder
 from .skl2onnx_converter import wrap_skl2onnx_converter
 from .sklearn_helper import NoKnownOutputMixin, TraceableMixin
 
@@ -8,6 +9,7 @@ __all__ = [
     "ConvertOptions",
     "NoKnownOutputMixin",
     "NumericalDiscrepancyWarning",
+    "SklearnOnnxLightGraphBuilder",
     "TraceableMixin",
     "register_sklearn_converters",
     "to_onnx",

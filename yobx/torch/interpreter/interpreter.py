@@ -10,7 +10,7 @@ import numpy as np
 from onnx_light.onnx import TensorProto
 from ...container.model_container import _get_type
 from ...helpers import string_type, make_hash, flatten_object
-from ...xbuilder import GraphBuilder, FunctionOptions, GraphBuilderTorchProtocol
+from ...xbuilder import FunctionOptions, GraphBuilderTorchProtocol
 from ...xbuilder._virtual_tensor import VirtualTensor
 from ...xshape._shape_helper import DYNAMIC_SHAPE
 from ...helpers.onnx_helper import onnx_dtype_name
@@ -18,6 +18,7 @@ from ..torch_helper import torch_dtype_to_onnx_dtype, onnx_dtype_to_torch_dtype
 from ..export_options import ExportOptions
 from . import LOCAL_DOMAIN
 from ._exceptions import FunctionNotFoundError
+from .graph_builder import TorchOnnxLightGraphBuilder as GraphBuilder
 from .aten_functions import find_function
 from .aten_functions_transformers import find_function as find_transformers_function
 from .aten_methods import find_method

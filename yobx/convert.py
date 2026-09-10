@@ -209,8 +209,13 @@ def to_onnx(
         from sklearn.base import BaseEstimator  # noqa: PLC0415
 
         if isinstance(model, BaseEstimator):
-            from .sklearn import to_onnx as sklearn_to_onnx  # noqa: PLC0415
+            from .sklearn import (  # noqa: PLC0415
+                SklearnOnnxLightGraphBuilder,
+                to_onnx as sklearn_to_onnx,
+            )
 
+            if graph_backend == "onnx-light":
+                kwargs["builder_cls"] = SklearnOnnxLightGraphBuilder
             return sklearn_to_onnx(model, args, **common, **kwargs)
 
     # ------------------------------------------------------------------ #

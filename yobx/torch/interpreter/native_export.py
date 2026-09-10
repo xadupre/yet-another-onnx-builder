@@ -8,12 +8,13 @@ import torch
 from onnx_light import onnx
 from onnx_light.onnx import helper
 
-from ...builder.onnxlight import OnnxLightGraphBuilder, OnnxLightOptimizationOptions
+from ...builder.onnxlight import OnnxLightOptimizationOptions
 from ...container import ExportArtifact, FunctionPieces
 from ...helpers.mini_onnx_builder import proto_from_array
 from ...xbuilder.function_options import FunctionOptions
 from ..export_options import ConvertingLibrary, ExportOptions, TracingMode
 from ..torch_helper import torch_dtype_to_onnx_dtype
+from .graph_builder import TorchOnnxLightGraphBuilder
 
 
 def _dynamic_shapes(value):
@@ -296,7 +297,7 @@ class NativeTorchInterpreter:
 
     def branch(self, module, operands, prefix):
         """Builds an ONNX If branch with native inference and lexical captures."""
-        child = OnnxLightGraphBuilder(self.builder.opsets)
+        child = self.builder.empty_copy(as_function=True)
         interpreter = NativeTorchInterpreter(child, module, self.dispatcher, self.raise_list)
         placeholders = [node for node in module.graph.nodes if node.op == "placeholder"]
         if len(placeholders) != len(operands):
@@ -767,7 +768,9 @@ def to_onnx(
         from ... import DEFAULT_TARGET_OPSET
 
         target_opset = DEFAULT_TARGET_OPSET
-    builder = OnnxLightGraphBuilder(target_opset, optimization_options=options, verbose=verbose)
+    builder = TorchOnnxLightGraphBuilder(
+        target_opset, optimization_options=options, verbose=verbose
+    )
     interpreter = NativeTorchInterpreter(builder, program.graph_module, dispatcher, raise_list)
     placeholders = [node for node in program.graph.nodes if node.op == "placeholder"]
     tensor_specs = [

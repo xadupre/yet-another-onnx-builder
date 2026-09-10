@@ -110,8 +110,10 @@ sess = onnxruntime.InferenceSession(
 `yobx.xbuilder.GraphBuilder` uses onnx-light's native `GraphBuilder`,
 pattern optimizer (`GraphGraph`), and symbolic shape inference by default.
 The explicit `graph_backend="onnx-light"` selection remains available.
-For converter-specific entry points, pass
-`builder_cls=yobx.builder.onnxlight.OnnxLightGraphBuilder`.
+The scikit-learn and PyTorch converters use dedicated subclasses that keep
+their converter-specific naming, dynamic-shape, local-function, and FX graph
+contracts without adding those APIs to the shared native builder. For direct
+graph construction, pass `builder_cls=yobx.builder.onnxlight.OnnxLightGraphBuilder`.
 
 Use the **published wheels**, not an editable onnx-light checkout or a source
 build. For example, from this repository on Linux x86-64 with CPython 3.12:
@@ -189,6 +191,9 @@ selects native pattern names and forwards optimization requests to `GraphGraph`.
 
 The historical `yobx.xbuilder.graph_builder.GraphBuilder` import also resolves
 to the native implementation; the Python graph engine has been removed.
+Scikit-learn uses `SklearnOnnxLightGraphBuilder`, while PyTorch uses
+`TorchOnnxLightGraphBuilder`; both subclasses delegate graph storage,
+shape inference, and optimization to onnx-light.
 PyTorch export uses `torch.export` and native ONNX lowering, including dynamic
 dimensions, linear layers, convolutions, reductions and `torch.cond`. Nested
 arguments, input mutations, submodule/ATen function preservation, alternative

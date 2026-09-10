@@ -6,12 +6,15 @@ from sklearn.utils.validation import check_is_fitted
 from .. import DEFAULT_TARGET_OPSET
 from ..typing import ConvertOptionsProtocol
 from ..container import ExportArtifact
-from ..xbuilder import GraphBuilder, OptimizationOptions
+from ..xbuilder import OptimizationOptions
 from ..xbuilder.function_options import FunctionOptions
 from ..helpers.to_onnx_helper import register_inputs
 from .register import get_sklearn_converter, sklearn_exportable_methods
 from .sklearn_helper import get_output_names
 from .convert_helper import wrap_step_as_function, wrap_step, default_ai_onnx_ml
+from .graph_builder import SklearnOnnxLightGraphBuilder
+
+GraphBuilder = SklearnOnnxLightGraphBuilder
 
 
 def to_onnx(
@@ -21,7 +24,7 @@ def to_onnx(
     dynamic_shapes: Optional[Tuple[Dict[int, str]]] = None,
     target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
     verbose: int = 0,
-    builder_cls: Union[type, Callable] = GraphBuilder,
+    builder_cls: Union[type, Callable] = SklearnOnnxLightGraphBuilder,
     extra_converters: Optional[Dict[type, Callable]] = None,
     large_model: bool = False,
     external_threshold: int = 1024,

@@ -679,7 +679,13 @@ class OnnxLightGraphBuilder:
         local_function = (
             self._inner.has_local_function(op_type) and (domain, op_type) in self.functions
         )
-        if not local_function:
+        native_inference_domain = domain in {
+            "",
+            "ai.onnx.ml",
+            "ai.onnx.preview.training",
+            "ai.onnx.training",
+        }
+        if not local_function and native_inference_domain:
             self.shapes_context.compute_shape_node(node)
         self._inner.make_node(
             op_type, normalized_inputs, outputs, domain, node_name, native_attributes
