@@ -1,78 +1,46 @@
 import pprint
 from typing import Optional, Sequence, Union
 import numpy as np
-import onnx
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.numpy_helper as onh
 from .onnx_helper import tensor_dtype_to_np_dtype
 from ..container import ExportArtifact
 
 
 def _get_type(obj0):
     obj = obj0
-    if hasattr(obj, "data_type"):
-        if obj.data_type == onnx.TensorProto.FLOAT and hasattr(obj, "float_data"):
-            return tensor_dtype_to_np_dtype(onnx.TensorProto.FLOAT)
-        if obj.data_type == onnx.TensorProto.DOUBLE and hasattr(obj, "double_data"):
-            return tensor_dtype_to_np_dtype(onnx.TensorProto.DOUBLE)
-        if obj.data_type == onnx.TensorProto.INT64 and hasattr(obj, "int64_data"):
-            return tensor_dtype_to_np_dtype(onnx.TensorProto.INT64)
-        if obj.data_type in (
-            onnx.TensorProto.INT8,
-            onnx.TensorProto.UINT8,
-            onnx.TensorProto.UINT16,
-            onnx.TensorProto.INT16,
-            onnx.TensorProto.INT32,
-            onnx.TensorProto.FLOAT8E4M3FN,
-            onnx.TensorProto.FLOAT8E4M3FNUZ,
-            onnx.TensorProto.FLOAT8E5M2,
-            onnx.TensorProto.FLOAT8E5M2FNUZ,
-        ) and hasattr(obj, "int32_data"):
-            return tensor_dtype_to_np_dtype(onnx.TensorProto.INT32)
-        if hasattr(obj, "raw_data") and len(obj.raw_data) > 0:
-            arr = onh.to_array(obj)
-            return arr.dtype
-        raise RuntimeError(
-            f"Unable to guess type from obj.data_type={obj.data_type} "
-            f"and obj={obj0!r} - {onnx.TensorProto.__dict__}."
-        )
-    if hasattr(obj, "type"):
+    if isinstance(obj, onnx.TensorProto):
+        return tensor_dtype_to_np_dtype(obj.data_type)
+    if isinstance(obj, onnx.ValueInfoProto):
         obj = obj.type
-    if hasattr(obj, "tensor_type"):
-        obj = obj.tensor_type
-    if hasattr(obj, "elem_type"):
-        if obj.elem_type == 0:
-            return "NOTENSOR"
-        return tensor_dtype_to_np_dtype(obj.elem_type)
+    if isinstance(obj, onnx.TypeProto):
+        if obj.HasField("tensor_type"):
+            return (
+                tensor_dtype_to_np_dtype(obj.tensor_type.elem_type)
+                if obj.tensor_type.elem_type
+                else "NOTENSOR"
+            )
+        if obj.HasField("sequence_type"):
+            return f"sequence({_get_type(obj.sequence_type.elem_type)})"
+        if obj.HasField("optional_type"):
+            return f"optional({_get_type(obj.optional_type.elem_type)})"
+        if obj.HasField("map_type"):
+            return (
+                f"map({tensor_dtype_to_np_dtype(obj.map_type.key_type)}, "
+                f"{_get_type(obj.map_type.value_type)})"
+            )
+        if obj.HasField("sparse_tensor_type"):
+            return f"sparse({tensor_dtype_to_np_dtype(obj.sparse_tensor_type.elem_type)})"
+        return "NOTENSOR"
     raise RuntimeError(f"Unable to guess type from {obj0!r}.")  # pragma: no cover
 
 
 def _get_shape(obj):
-    try:
-        arr = onh.to_array(obj)
-        return arr.shape
-    except Exception:
-        pass
-    obj0 = obj
-    if hasattr(obj, "data_type"):
-        if obj.data_type == onnx.TensorProto.FLOAT and hasattr(obj, "float_data"):
-            return (len(obj.float_data),)
-        if obj.data_type == onnx.TensorProto.DOUBLE and hasattr(obj, "double_data"):
-            return (len(obj.double_data),)
-        if obj.data_type == onnx.TensorProto.INT64 and hasattr(obj, "int64_data"):
-            return (len(obj.int64_data),)
-        if obj.data_type == onnx.TensorProto.INT32 and hasattr(obj, "int32_data"):
-            return (len(obj.int32_data),)
-        if hasattr(obj, "raw_data") and len(obj.raw_data) > 0:
-            arr = onh.to_array(obj)
-            return arr.shape
-        raise RuntimeError(  # pragma: no cover
-            f"Unable to guess type from {obj0!r}, data_type is {obj.data_type!r}."
-        )
-    if hasattr(obj, "type"):
-        obj = obj.type
-    if hasattr(obj, "tensor_type"):
+    if isinstance(obj, onnx.TensorProto):
+        return tuple(obj.dims)
+    if isinstance(obj, (onnx.ValueInfoProto, onnx.TypeProto)):
         return get_tensor_shape(obj)
-    raise RuntimeError(f"Unable to guess type from {obj0!r}.")  # pragma: no cover
+    raise TypeError(f"Unable to get shape from {type(obj)!r}.")
 
 
 def get_tensor_shape(obj):
@@ -81,12 +49,12 @@ def get_tensor_shape(obj):
         return get_tensor_shape(obj.type)
     elif not isinstance(obj, onnx.TypeProto):
         raise TypeError(f"Unexpected type {type(obj)!r}.")  # pragma: no cover
-    shape = []
-    for d in obj.tensor_type.shape.dim:
-        v = d.dim_value if d.dim_value > 0 else d.dim_param
-        shape.append(v)
-    shape = None if not shape else [None if s == 0 else s for s in shape]
-    return shape
+    if not obj.HasField("tensor_type") or not obj.tensor_type.HasField("shape"):
+        return None
+    return [
+        d.dim_value if d.HasField("dim_value") else (str(d.dim_param) if d.dim_param else None)
+        for d in obj.tensor_type.shape.dim
+    ]
 
 
 def _append_succ_pred(

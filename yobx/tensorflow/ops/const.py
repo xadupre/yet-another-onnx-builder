@@ -28,13 +28,8 @@ def convert_read_variable_op(
 def convert_const(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
-    """Materialises a TF ``Const`` op as a TensorFlow tensor in the context.
-
-    The constant value is extracted from the op's ``"value"`` attribute and
-    kept as a :class:`tensorflow.Tensor`.  Conversion to numpy happens at
-    export time when the ONNX initializer is built.
-    """
-    value = tf.constant(tf.make_ndarray(op.get_attr("value")))
+    """Materializes a TF constant as a NumPy value for the native initializer."""
+    value = tf.make_ndarray(op.get_attr("value"))
     return g.op.Identity(value, outputs=outputs, name=op.name)
 
 

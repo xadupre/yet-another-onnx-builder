@@ -2,9 +2,9 @@ import os
 import tempfile
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light import onnx
+from onnx_light.onnx import helper as oh
+from onnx_light.onnx import numpy_helper as onh
 from yobx.ext_test_case import (
     ExtTestCase,
     requires_tensorflow,
@@ -125,7 +125,7 @@ class TestExtendedModelContainer(ExtTestCase):
         container.model_proto = model
         container.large_initializers = {"#weight": data}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             file_path = os.path.join(tmp, "model.onnx")
             saved = container.save(file_path)
             self.assertIsInstance(saved, onnx.ModelProto)
@@ -143,7 +143,7 @@ class TestExtendedModelContainer(ExtTestCase):
         container.model_proto = model
         container.large_initializers = {"#weight": data}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             file_path = os.path.join(tmp, "model.onnx")
             saved = container.save(file_path)
             self.assertIsInstance(saved, onnx.ModelProto)
@@ -160,7 +160,7 @@ class TestExtendedModelContainer(ExtTestCase):
         container.model_proto = model
         container.large_initializers = {"#weight": data}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             file_path = os.path.join(tmp, "model.onnx")
             container.save(file_path, all_tensors_to_one_file=True)
             self.assertTrue(os.path.exists(file_path))
@@ -185,7 +185,7 @@ class TestExtendedModelContainer(ExtTestCase):
         container.model_proto = model
         container.large_initializers = {"#weight": data}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             file_path = os.path.join(tmp, "model.onnx")
             container.save(file_path, all_tensors_to_one_file=False)
             self.assertTrue(os.path.exists(file_path))
@@ -212,7 +212,7 @@ class TestExtendedModelContainer(ExtTestCase):
         container.model_proto = model
         container.large_initializers = {"#weight": data}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             file_path = os.path.join(tmp, "model.onnx")
             container.save(file_path, all_tensors_to_one_file=True)
             self.assertTrue(os.path.exists(file_path))
@@ -238,7 +238,7 @@ class TestExtendedModelContainer(ExtTestCase):
         container.model_proto = model
         container.large_initializers = {"#weight": data}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             file_path = os.path.join(tmp, "model.onnx")
             container.save(file_path, all_tensors_to_one_file=False)
             self.assertTrue(os.path.exists(file_path))
@@ -599,7 +599,7 @@ class TestExtendedModelContainerTF(ExtTestCase):
         container.model_proto = model
         container.large_initializers = {"#weight": tf_tensor}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             file_path = os.path.join(tmp, "model.onnx")
             saved = container.save(file_path)
             self.assertIsInstance(saved, onnx.ModelProto)
@@ -618,7 +618,7 @@ class TestExtendedModelContainerTF(ExtTestCase):
         container.model_proto = model
         container.large_initializers = {"#weight": tf_tensor}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             file_path = os.path.join(tmp, "model.onnx")
             container.save(file_path, all_tensors_to_one_file=True)
             self.assertTrue(os.path.exists(file_path))
@@ -642,7 +642,7 @@ class TestExtendedModelContainerTF(ExtTestCase):
         container.model_proto = model
         container.large_initializers = {"#weight": tf_tensor}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             file_path = os.path.join(tmp, "model.onnx")
             container.save(file_path, all_tensors_to_one_file=False)
             self.assertTrue(os.path.exists(file_path))
@@ -711,7 +711,7 @@ class TestExtendedModelContainerString(ExtTestCase):
         container.model_proto = model
         container.large_initializers = {}
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             file_path = os.path.join(tmp, "model.onnx")
             saved = container.save(file_path)
             self.assertIsInstance(saved, onnx.ModelProto)

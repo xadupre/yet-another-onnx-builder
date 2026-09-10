@@ -254,7 +254,7 @@ To extend the built-in op coverage:
 
     # yobx/tensorflow/ops/reduce.py
     import numpy as np
-    from onnx import TensorProto
+    from onnx_light.onnx import TensorProto
     from ..register import register_tf_op_converter
     from ...xbuilder import GraphBuilder
 

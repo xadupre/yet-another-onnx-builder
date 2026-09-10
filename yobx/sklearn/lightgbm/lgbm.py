@@ -38,8 +38,8 @@ branch of every chain node) are assigned exactly one flat node ID.
 
 from typing import Dict, List, Optional, Tuple
 import numpy as np
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 from lightgbm import LGBMRegressor, LGBMClassifier, LGBMRanker
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype

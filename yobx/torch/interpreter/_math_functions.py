@@ -1,5 +1,5 @@
 from typing import Any, Dict, List, Optional
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 from ...xbuilder.graph_builder import GraphBuilder
 
 T = str

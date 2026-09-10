@@ -4,39 +4,32 @@
 Computed Shapes: Add + Concat + Reshape
 ========================================
 
-This example shows how :class:`BasicShapeBuilder
-<yobx.xshape.shape_builder_impl.BasicShapeBuilder>` tracks symbolic dimension
+This example shows how :class:`NativeShapeInference
+<yobx.xshape.NativeShapeInference>` tracks symbolic dimension
 expressions through a sequence of ``Add``, ``Concat``, and ``Reshape`` nodes,
-and compares the result with the standard
-:func:`onnx.shape_inference.infer_shapes` and the
-`onnx-shape-inference <https://pypi.org/project/onnx-shape-inference/>`_
-package from PyPI.
+and compares the native ONNX-compatible inference API with onnx-light's
+symbolic inference API. All three interfaces use onnx-light protobufs.
 
 The key difference is that ``onnx.shape_inference.infer_shapes`` can only
 propagate shapes when dimensions are statically known integers.  When the
 model contains dynamic (symbolic) dimensions it typically assigns ``None``
-(unknown) to most intermediate results. :class:`BasicShapeBuilder` instead
+(unknown) to most intermediate results. :class:`NativeShapeInference` instead
 keeps the dimensions as symbolic arithmetic expressions so that output shapes
 are expressed in terms of the input dimension names.
 
-The ``onnx-shape-inference`` package also performs symbolic shape inference
-using `SymPy <https://www.sympy.org>`_ to track dimension expressions across
-nodes.  It operates on the :pypi:`onnx-ir` representation of the model.
-
 See :ref:`l-design-shape` for a detailed description of how
-:class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+:class:`NativeShapeInference <yobx.xshape.NativeShapeInference>`
 works and a comparison table with :func:`onnx.shape_inference.infer_shapes`.
 """
 
 import numpy as np
 import pandas
-import onnx
-import onnx_ir as ir
+from yobx._onnx_shim import onnx
 import onnxruntime
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-from onnx_shape_inference import infer_symbolic_shapes
-from yobx.xshape import BasicShapeBuilder
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
+from onnx_light.onnx_core.shape_inference import infer_shapes_model
+from yobx.xshape import NativeShapeInference
 
 TFLOAT = onnx.TensorProto.FLOAT
 TINT64 = onnx.TensorProto.INT64
@@ -51,37 +44,43 @@ TINT64 = onnx.TensorProto.INT64
 
 
 def infer_shapes_onnx(model: onnx.ModelProto) -> dict:
-    """Run :func:`onnx.shape_inference.infer_shapes`; return ``{name: shape}``."""
-    inferred = onnx.shape_inference.infer_shapes(model)
+    """Runs the native ONNX-compatible inference API."""
+    inferred = onnx.ModelProto()
+    inferred.ParseFromString(model.SerializeToString())
+    onnx.shape_inference.infer_shapes(inferred)
+    return model_shapes(inferred)
+
+
+def model_shapes(inferred: onnx.ModelProto) -> dict:
+    """Returns shape annotations from a native model."""
     shapes = {}
     for vi in [*inferred.graph.input, *inferred.graph.value_info, *inferred.graph.output]:
         t = vi.type.tensor_type
         if t.HasField("shape"):
-            shapes[vi.name] = tuple(
-                d.dim_param if d.dim_param else (d.dim_value if d.dim_value else None)
+            shapes[str(vi.name)] = tuple(
+                (
+                    str(d.dim_param)
+                    if d.dim_param
+                    else (d.dim_value if d.HasField("dim_value") else None)
+                )
                 for d in t.shape.dim
             )
         else:
-            shapes[vi.name] = "unknown"
+            shapes[str(vi.name)] = "unknown"
     return shapes
 
 
-def infer_shapes_onnx_ir(model: onnx.ModelProto) -> dict:
-    """Run onnx-shape-inference :func:`infer_symbolic_shapes`; return ``{name: shape}``."""
-    ir_model = ir.serde.deserialize_model(model)
-    ir_model = infer_symbolic_shapes(ir_model)
-    shapes = {}
-    for v in ir_model.graph.inputs:
-        shapes[v.name] = str(v.shape)
-    for node in ir_model.graph:
-        for out in node.outputs:
-            shapes[out.name] = str(out.shape)
-    return shapes
+def infer_shapes_native(model: onnx.ModelProto) -> dict:
+    """Runs the native symbolic inference API."""
+    inferred = onnx.ModelProto()
+    inferred.ParseFromString(model.SerializeToString())
+    infer_shapes_model(inferred)
+    return model_shapes(inferred)
 
 
-def infer_shapes_basic(model: onnx.ModelProto) -> BasicShapeBuilder:
-    """Run :class:`BasicShapeBuilder` over *model*; return the populated builder."""
-    b = BasicShapeBuilder()
+def infer_shapes_basic(model: onnx.ModelProto) -> NativeShapeInference:
+    """Run :class:`NativeShapeInference` over *model*; return the populated builder."""
+    b = NativeShapeInference()
     b.run_model(model)
     return b
 
@@ -90,8 +89,8 @@ def print_shapes(shapes, names: list) -> None:
     """Print shapes for *names* from *shapes*.
 
     *shapes* may be either a ``{name: shape}`` dict (as returned by
-    :func:`infer_shapes_onnx` and :func:`infer_shapes_onnx_ir`) or a
-    :class:`BasicShapeBuilder` instance (as returned by
+    :func:`infer_shapes_onnx` and :func:`infer_shapes_native`) or a
+    :class:`NativeShapeInference` instance (as returned by
     :func:`infer_shapes_basic`).
     """
     for name in names:
@@ -108,19 +107,19 @@ def make_shape_comparison_table(model: onnx.ModelProto, names: list) -> pandas.D
     Runs all three inference tools and returns a :class:`pandas.DataFrame`
     with one row per tensor name and one column per tool.
 
-    Columns: ``onnx``, ``onnx_ir``, ``basic``.
+    Columns: ``onnx_compatible``, ``native``, ``builder``.
     """
     onnx_shapes = infer_shapes_onnx(model)
-    ir_shapes = infer_shapes_onnx_ir(model)
+    native_shapes = infer_shapes_native(model)
     basic = infer_shapes_basic(model)
     rows = []
     for name in names:
         rows.append(
             {
                 "name": name,
-                "onnx": str(onnx_shapes.get(name, "unknown")),
-                "onnx_ir": str(ir_shapes.get(name, "unknown")),
-                "basic": str(basic.get_shape(name)),
+                "onnx_compatible": str(onnx_shapes.get(name, "unknown")),
+                "native": str(native_shapes.get(name, "unknown")),
+                "builder": str(basic.get_shape(name)),
             }
         )
     return pandas.DataFrame(rows).set_index("name")
@@ -172,30 +171,21 @@ for name, shape in infer_shapes_onnx(model).items():
     print(f"  {name:15s}  shape={shape}")
 
 # %%
-# Shape inference with onnx-shape-inference (PyPI)
+# Native symbolic shape inference
 # --------------------------------------------------
 #
-# The `onnx-shape-inference <https://pypi.org/project/onnx-shape-inference/>`_
-# package offers a second symbolic approach.  It works on the
-# :class:`onnx_ir.Model` representation and uses SymPy to track dimension
-# expressions.  Install it with ``pip install onnx-shape-inference``.
-#
-# Compared with ``onnx.shape_inference.infer_shapes``, it successfully
-# resolves the ``Concat`` output to ``(batch, seq, 2*d_model)``.  The
-# ``Reshape`` output receives a freshly-generated symbol (``_d0``) because
-# the ``[0, 0, -1]`` constant shape tensor is not yet fully evaluated by this
-# library.
+# This API writes symbolic shapes directly into native model annotations.
 
-onnx_ir_shapes = infer_shapes_onnx_ir(model)
+native_shapes = infer_shapes_native(model)
 
-print("=== onnx-shape-inference (infer_symbolic_shapes) ===")
-print_shapes(onnx_ir_shapes, ["X", "Y", "added", "concat_out", "Z"])
+print("=== onnx-light symbolic inference ===")
+print_shapes(native_shapes, ["X", "Y", "added", "concat_out", "Z"])
 
 # %%
-# Shape inference with BasicShapeBuilder
-# ----------------------------------------
+# Shape inference with NativeShapeInference
+# ------------------------------------------
 #
-# :class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+# :class:`NativeShapeInference <yobx.xshape.NativeShapeInference>`
 # keeps the shapes as symbolic expressions.  Because ``reshape_shape`` is a
 # constant ``[0, 0, -1]``, the builder can evaluate the ``Reshape`` and express
 # the output shape as a function of the input dimensions.
@@ -203,7 +193,7 @@ print_shapes(onnx_ir_shapes, ["X", "Y", "added", "concat_out", "Z"])
 
 builder = infer_shapes_basic(model)
 
-print("\n=== BasicShapeBuilder ===")
+print("\n=== NativeShapeInference ===")
 print_shapes(builder, ["X", "Y", "added", "concat_out", "Z"])
 
 # %%
@@ -224,7 +214,7 @@ for name in ["X", "Y", "added", "concat_out", "Z"]:
 # ----------------------
 #
 # Finally, run the model with concrete numpy arrays and confirm that the
-# shapes predicted by :class:`BasicShapeBuilder` match the actual output
+# shapes predicted by :class:`NativeShapeInference` match the actual output
 # shapes.
 
 feeds = {
@@ -252,7 +242,7 @@ print(pandas.DataFrame(data).pivot(index=["result", "dimension"], columns="col",
 #
 # Some operators—such as ``NonZero``—introduce a *fresh* symbolic dimension for
 # their output because the number of results depends on the *values* of the
-# input tensor, not merely its shape.  :class:`BasicShapeBuilder` assigns an
+# input tensor, not merely its shape.  :class:`NativeShapeInference` assigns an
 # internal name like ``NEWDIM_nonzero_0`` to that dimension.
 #
 # When the graph output is declared **without** named dimensions (all ``None``),
@@ -260,7 +250,7 @@ print(pandas.DataFrame(data).pivot(index=["result", "dimension"], columns="col",
 #
 # When the graph output is declared **with** named dimensions (e.g.
 # ``["rank", "nnz"]``), :meth:`run_value_info
-# <yobx.xshape.shape_builder_impl.BasicShapeBuilder.run_value_info>` detects
+# <yobx.xshape.NativeShapeInference.run_value_info>` detects
 # the mismatch between the computed internal name ``NEWDIM_nonzero_0`` and the
 # user-supplied name ``nnz``, and registers the constraint
 # ``NEWDIM_nonzero_0 = nnz``.  The dimension naming step then renames the
@@ -335,7 +325,7 @@ nz_model_named = oh.make_model(
 #
 # With ``[None, None]`` output annotations the data-dependent dimension is
 # kept as the internal placeholder ``NEWDIM_nonzero_0`` by
-# :class:`BasicShapeBuilder`; no constraint is registered.
+# :class:`NativeShapeInference`; no constraint is registered.
 
 print("=== anonymous output shapes ===")
 print(make_shape_comparison_table(nz_model_anon, _NZ_NAMES).to_string())
@@ -350,7 +340,7 @@ print("constraints:", anon_builder.get_registered_constraints())
 # Comparison table — named output shapes
 # ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 #
-# With ``["rank", "nnz"]`` output annotations :class:`BasicShapeBuilder`
+# With ``["rank", "nnz"]`` output annotations :class:`NativeShapeInference`
 # registers the constraint ``NEWDIM_nonzero_0 = nnz`` and renames the
 # placeholder everywhere, so ``nz`` shape becomes ``(2, 'nnz')`` and the
 # propagation continues through ``Transpose`` and ``Cast``.

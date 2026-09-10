@@ -1,7 +1,7 @@
 import functools
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
-import onnx
+from onnx_light import onnx
 import torch
 from ..container import ExportArtifact
 from .runtime_info import first_used_last_used, RuntimeValue
@@ -71,8 +71,8 @@ class TorchReferenceEvaluator:
     .. runpython::
         :showcode:
 
-        import onnx
-        import onnx.helper as oh
+        from onnx_light import onnx
+        import onnx_light.onnx.helper as oh
         import torch
         from yobx.helpers import string_type
         from yobx.reference.torch_evaluator import TorchReferenceEvaluator
@@ -110,8 +110,8 @@ class TorchReferenceEvaluator:
     .. runpython::
         :showcode:
 
-        import onnx
-        import onnx.helper as oh
+        from onnx_light import onnx
+        import onnx_light.onnx.helper as oh
         import torch
         from yobx.helpers import string_type
         from yobx.reference.torch_evaluator import TorchReferenceEvaluator
@@ -156,8 +156,8 @@ class TorchReferenceEvaluator:
         :showcode:
 
         import numpy as np
-        import onnx
-        import onnx.helper as oh
+        from onnx_light import onnx
+        import onnx_light.onnx.helper as oh
         import onnxruntime
         import torch
         from yobx.helpers import string_type
@@ -471,7 +471,14 @@ class TorchReferenceEvaluator:
         """
         use_numpy = any(isinstance(t, np.ndarray) for t in feeds.values())
         if use_numpy:
-            feeds = {k: torch.from_numpy(v) for k, v in feeds.items()}
+            feeds = {
+                k: (
+                    torch.from_numpy(v if v.flags.writeable else v.copy())
+                    if isinstance(v, np.ndarray)
+                    else v
+                )
+                for k, v in feeds.items()
+            }
         if outputs is None:
             outputs = self.output_names
 

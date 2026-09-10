@@ -3,6 +3,7 @@ from typing import Any, Sequence, Tuple, Union
 import numpy as np
 
 STATIC_SHAPE = Tuple[int, ...]
+ONNX_SHAPE = Tuple[Union[int, str, None], ...]
 DYNAMIC_SHAPE = Tuple[Union[int, "torch.SymInt", "torch.SymFloat", "TracingInt", float, str], ...]  # type: ignore[name-defined]  # noqa: F821
 
 

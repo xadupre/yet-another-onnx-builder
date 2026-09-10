@@ -1,22 +1,22 @@
 import numpy as np
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
-class AddAdd(OpRun):
+class AddAdd(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z):
         return (x + y + z,)
 
 
-class MulMul(OpRun):
+class MulMul(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z):
         return (x * y * z,)
 
 
-class AddMul(OpRun):
+class AddMul(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z, transposeMiddle=None):
@@ -26,7 +26,7 @@ class AddMul(OpRun):
         return (res,)
 
 
-class MulAdd(OpRun):
+class MulAdd(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z, transposeMiddle=None):
@@ -36,7 +36,7 @@ class MulAdd(OpRun):
         return (res,)
 
 
-class SubMul(OpRun):
+class SubMul(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z, negative=None):
@@ -45,7 +45,7 @@ class SubMul(OpRun):
         return ((x - y) * z,)
 
 
-class MulSub(OpRun):
+class MulSub(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z, negative=None):
@@ -54,14 +54,14 @@ class MulSub(OpRun):
         return ((x * y) - z,)
 
 
-class AddSharedInput(OpRun):
+class AddSharedInput(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z):
         return (x + y, x + z)
 
 
-class MulSharedInput(OpRun):
+class MulSharedInput(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, x, y, z):

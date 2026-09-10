@@ -25,8 +25,8 @@ _UFUNC_TO_ONNX: Dict[Any, Any] = {
     np.divide: ("Div", 2),
     np.floor_divide: "floor_divide",  # Floor(Div(a,b))
     np.power: ("Pow", 2),
-    np.mod: ("Mod", 2),
-    np.fmod: ("Mod", 2),
+    np.mod: "remainder",
+    np.fmod: "fmod",
     np.negative: ("Neg", 1),
     np.absolute: ("Abs", 1),
     np.sqrt: ("Sqrt", 1),
@@ -215,6 +215,34 @@ class NumpyArray:
         res = getattr(self._g.op, op)(self._name, name=self._g.unique_name(op.lower()))
         return self._new(res)
 
+    def _modulo(self, a: Any, b: Any, *, fmod: bool = False) -> "NumpyArray":
+        """Emits modulo with NumPy's sign semantics and valid floating-point ONNX."""
+        from ..helpers.onnx_helper import is_float_type
+
+        left, right = self._arg(a), self._arg(b)
+        op = self._g.op
+        floating = is_float_type(self._g.get_type(self._name))
+        remainder = op.Mod(
+            left, right, fmod=int(fmod or floating), name=self._g.unique_name("mod")
+        )
+        if fmod or not floating:
+            return self._new(remainder)
+        # ONNX permits floating-point Mod only with fmod=1 (dividend sign).
+        # NumPy remainder instead follows the divisor, including signed zero.
+        zero = op.CastLike(np.array(0, dtype=np.float32), remainder)
+        is_zero = op.Equal(remainder, zero)
+        negative_divisor = op.Less(right, zero)
+        different_signs = op.Xor(op.Less(remainder, zero), negative_divisor)
+        adjusted = op.Where(
+            op.And(op.Not(is_zero), different_signs), op.Add(remainder, right), remainder
+        )
+        direction = op.Where(
+            negative_divisor,
+            op.CastLike(np.array(-1, dtype=np.float32), remainder),
+            op.CastLike(np.array(1, dtype=np.float32), remainder),
+        )
+        return self._new(op.Mul(op.Abs(adjusted), direction))
+
     def _reduce(self, onnx_op: str, axis=None, keepdims: bool = False) -> "NumpyArray":
         """Emit a reduction ONNX operation."""
         kd = int(keepdims)
@@ -266,10 +294,10 @@ class NumpyArray:
         return div._unary("Floor")
 
     def __mod__(self, other) -> "NumpyArray":
-        return self._binary("Mod", self, other)
+        return self._modulo(self, other)
 
     def __rmod__(self, other) -> "NumpyArray":
-        return self._binary("Mod", other, self)
+        return self._modulo(other, self)
 
     def __pow__(self, other) -> "NumpyArray":
         return self._binary("Pow", self, other)
@@ -485,10 +513,13 @@ class NumpyArray:
             None,
         )
 
+        mapping = _UFUNC_TO_ONNX[ufunc]
+        if mapping in ("remainder", "fmod"):
+            proxy = next(inp for inp in inputs if isinstance(inp, NumpyArray))
+            return proxy._modulo(*inputs, fmod=mapping == "fmod")
+
         # Convert all inputs to Opset-compatible arguments.
         onnx_args = [_to_onnx_arg(inp, g, ref_dtype) for inp in inputs]
-
-        mapping = _UFUNC_TO_ONNX[ufunc]
 
         # ---- special cases ----
         if mapping == "not_equal":

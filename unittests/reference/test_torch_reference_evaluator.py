@@ -1,9 +1,10 @@
 import unittest
+import warnings
 import numpy as np
 import pandas
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 import torch
 from yobx.ext_test_case import ExtTestCase, ignore_warnings, hide_stdout, skipif_ci_windows
 from yobx.reference import ExtendedReferenceEvaluator, ReportResultComparison
@@ -16,6 +17,28 @@ TINT64 = onnx.TensorProto.INT64
 
 
 class TestTorchReferenceEvaluator(ExtTestCase):
+    def test_numpy_feed_copies_only_readonly_storage(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [oh.make_node("Identity", ["X"], ["Y"])],
+                "identity",
+                [oh.make_tensor_value_info("X", TFLOAT, [3])],
+                [oh.make_tensor_value_info("Y", TFLOAT, [3])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18)],
+        )
+        session = TorchReferenceEvaluator(model)
+        for writeable in (True, False):
+            with self.subTest(writeable=writeable):
+                x = np.arange(3, dtype=np.float32)
+                x.flags.writeable = writeable
+                with warnings.catch_warnings():
+                    warnings.simplefilter("error", UserWarning)
+                    result = session.run(None, {"X": x})[0]
+                np.testing.assert_array_equal(result, x)
+                self.assertEqual(np.shares_memory(result, x), writeable)
+                self.assertTrue(result.flags.writeable)
+
     def test_kernels(self):
         ker = get_kernels()
         self.assertIsInstance(ker, dict)
@@ -1191,7 +1214,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
                 [
                     oh.make_tensor_value_info("X", TFLOAT, [None, None, None, None]),
                     oh.make_tensor_value_info("W", TFLOAT, [None, None, None, None]),
-                    oh.make_tensor_value_info("B", TFLOAT, [None, None, None, None]),
+                    oh.make_tensor_value_info("B", TFLOAT, [None]),
                 ],
                 [oh.make_tensor_value_info("Y", TFLOAT, [None, None, None, None])],
             ),
@@ -1205,7 +1228,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         X[0, 0, i, j] = 1.0
         W = torch.zeros((1, 1, 3, 3), dtype=torch.float32)
         W[0, 0, :, :] = torch.minimum(2 ** torch.arange(9).reshape((3, -1)), torch.tensor([256]))
-        B = torch.tensor([[[[0]]]], dtype=torch.float32)
+        B = torch.tensor([0], dtype=torch.float32)
         self._finalize_test(model, X, W, B, use_ort=True)
 
     def test_conv_autopad_valid(self):
@@ -1225,7 +1248,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
                 [
                     oh.make_tensor_value_info("X", TFLOAT, [None, None, None, None]),
                     oh.make_tensor_value_info("W", TFLOAT, [None, None, None, None]),
-                    oh.make_tensor_value_info("B", TFLOAT, [None, None, None, None]),
+                    oh.make_tensor_value_info("B", TFLOAT, [None]),
                 ],
                 [oh.make_tensor_value_info("Y", TFLOAT, [None, None, None, None])],
             ),
@@ -1239,7 +1262,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         X[0, 0, i, j] = 1.0
         W = torch.zeros((1, 1, 3, 3), dtype=torch.float32)
         W[0, 0, :, :] = torch.minimum(2 ** torch.arange(9).reshape((3, -1)), torch.tensor([256]))
-        B = torch.tensor([[[[0]]]], dtype=torch.float32)
+        B = torch.tensor([0], dtype=torch.float32)
         self._finalize_test(model, X, W, B, use_ort=True)
 
     def test_conv_autopad_upper(self):
@@ -1259,7 +1282,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
                 [
                     oh.make_tensor_value_info("X", TFLOAT, [None, None, None, None]),
                     oh.make_tensor_value_info("W", TFLOAT, [None, None, None, None]),
-                    oh.make_tensor_value_info("B", TFLOAT, [None, None, None, None]),
+                    oh.make_tensor_value_info("B", TFLOAT, [None]),
                 ],
                 [oh.make_tensor_value_info("Y", TFLOAT, [None, None, None, None])],
             ),
@@ -1273,7 +1296,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         X[0, 0, i, j] = 1.0
         W = torch.zeros((1, 1, 3, 3), dtype=torch.float32)
         W[0, 0, :, :] = torch.minimum(2 ** torch.arange(9).reshape((3, -1)), torch.tensor([256]))
-        B = torch.tensor([[[[0]]]], dtype=torch.float32)
+        B = torch.tensor([0], dtype=torch.float32)
         self._finalize_test(model, X, W, B, use_ort=True)
 
     def test_nonzero(self):

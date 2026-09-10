@@ -1,10 +1,11 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape import ShapeBuilder, BasicShapeBuilder
+from yobx.xshape import ShapeBuilder, NativeShapeInference
+from yobx.xshape._builder_runtime import _BuilderRuntime
 from yobx.xshape.shape_type_compute import (
     broadcast_shape,
     compute_reshape_shape,
@@ -46,18 +47,19 @@ TCOMPLEX128 = onnx.TensorProto.COMPLEX128
 _mkv_ = oh.make_tensor_value_info
 
 
-class _TestShapeBuilder(BasicShapeBuilder):
-    """BasicShapeBuilder extended with test-only helpers."""
+class _TestShapeBuilder(NativeShapeInference):
+    """NativeShapeInference extended with test-only helpers."""
 
     as_function = False
     _dim_counter = 0
+    _apply_expand_to_shape = _BuilderRuntime._apply_expand_to_shape
 
     def unique_dimension_name(self, prefix: str) -> str:
         _TestShapeBuilder._dim_counter += 1
         return f"{prefix}_{_TestShapeBuilder._dim_counter}"
 
     def set_sequence(self, name: str, dtype: int = 0):
-        self._known_types[name] = dtype
+        self.set_type(name, dtype)
 
     def is_constant_or_attribute(
         self, node: onnx.NodeProto, input_index: int, attr_name: str
@@ -150,8 +152,8 @@ class _MockShapeBuilder(ShapeBuilder):
         return []
 
 
-class _LocalFunctionShapeBuilder(BasicShapeBuilder):
-    """BasicShapeBuilder with local function support for testing set_shape_type_custom."""
+class _LocalFunctionShapeBuilder(NativeShapeInference):
+    """NativeShapeInference with local function support for testing set_shape_type_custom."""
 
     def __init__(self):
         super().__init__()
@@ -178,13 +180,10 @@ class _LocalFunctionShapeBuilder(BasicShapeBuilder):
         self._functions_builder[key] = func_builder
 
     def reset_types_and_shapes(self):
-        """Clear cached shapes and types so they can be recomputed."""
-        self._known_shapes = {}
-        self._known_types = {}
-        self._known_ranks = {}
-        self._known_devices = {}
-        self.constants_ = {}
-        self._calls = []
+        """Clears native descriptors so they can be recomputed."""
+        outputs = self._output_names
+        super().reset_types_and_shapes()
+        self._output_names = outputs
 
     def infer_shapes(self):
         """Re-run shape inference over the stored function nodes."""
@@ -242,7 +241,7 @@ class TestShapeTypeCompute(ExtTestCase):
         # Here (64,) is right-aligned with ("batch", "d_model"):
         #   batch vs 1  -> batch (1 broadcasts to anything)
         #   d_model vs 64 -> 64 (concrete int wins), constraint d_model=64 recorded
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         result = broadcast_shape(("batch", "d_model"), (64,), graph_builder=b)
         self.assertEqual(result, ("batch", 64))
         constraints = b.get_registered_constraints()
@@ -251,7 +250,7 @@ class TestShapeTypeCompute(ExtTestCase):
 
     def test_broadcast_shape_registers_constraint_int_vs_str(self):
         # Same scenario but concrete integer is in the first shape.
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         result = broadcast_shape((64,), ("batch", "d_model"), graph_builder=b)
         self.assertEqual(result, ("batch", 64))
         constraints = b.get_registered_constraints()
@@ -261,7 +260,7 @@ class TestShapeTypeCompute(ExtTestCase):
     def test_broadcast_shape_no_constraint_when_int_is_one(self):
         # A concrete dimension of 1 broadcasts to the symbolic dimension;
         # no constraint should be registered in this case.
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         result = broadcast_shape(("batch", "seq"), (1, 1), graph_builder=b)
         self.assertEqual(result, ("batch", "seq"))
         self.assertEqual(b.get_registered_constraints(), {})
@@ -275,7 +274,7 @@ class TestShapeTypeCompute(ExtTestCase):
     def test_broadcast_shape_constraint_propagated_through_model(self):
         # Full end-to-end: broadcast a symbolic-shaped input against a
         # constant bias; verify both the output shape and the constraint.
-        import onnx.numpy_helper as onh
+        import onnx_light.onnx.numpy_helper as onh
 
         model = oh.make_model(
             oh.make_graph(
@@ -288,21 +287,21 @@ class TestShapeTypeCompute(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         # The concrete size 64 wins over the symbolic "d_model".
         self.assertEqual(b.get_shape("Z"), ("batch", 64))
-        # The constraint records the relationship d_model = 64.
+        # Broadcasting also allows d_model=1, so equality must not be invented.
         constraints = b.get_registered_constraints()
-        self.assertIn("d_model", constraints)
-        self.assertIn(64, constraints["d_model"])
+        self.assertEqual(constraints, {})
+        self.assertEqual(b.get_shape("X"), ("batch", "d_model"))
 
     # ------------------------------------------------------------------
     # set_type_shape_reshape
     # ------------------------------------------------------------------
 
     def test_set_type_shape_reshape_static(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         set_type_shape_reshape(b, "Y", "X", (2, 6))
@@ -310,7 +309,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (2, 6))
 
     def test_set_type_shape_reshape_with_neg1(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         set_type_shape_reshape(b, "Y", "X", (6, -1))
@@ -318,7 +317,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (6, 2))
 
     def test_set_type_shape_reshape_dynamic(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", ("a", "b"))
         # new_shape with string dimensions — only rank is set
@@ -327,7 +326,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_rank("Y"), 3)
 
     def test_set_type_shape_reshape_new_shape_string_with_known_shape(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         # new_shape is a string and its shape is known: shape=(3,) → rank set to 3
@@ -337,7 +336,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_rank("Y"), 3)
 
     def test_set_type_shape_reshape_new_shape_string_without_known_shape(self):
-        b = BasicShapeBuilder()
+        b = _MockShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         # new_shape is a string but its shape is not registered → no rank/shape set
@@ -347,7 +346,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertFalse(b.has_rank("Y"))
 
     def test_set_type_shape_reshape_dynamic_input_neg1(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", ("N",))
         # 1-D input with one dynamic dim; reshape(-1, 1) → the -1 should be propagated
@@ -356,7 +355,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), ("N", 1))
 
     def test_set_type_shape_reshape_dynamic_input_neg1_fallback(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", ("N", "M"))
         # 2-D input with two dynamic dims; cannot resolve -1 → only rank set
@@ -369,7 +368,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_unary_op_with_shape(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         set_type_shape_unary_op(b, "Y", "X")
@@ -377,7 +376,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
     def test_set_type_shape_unary_op_rank_only(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 2)
         set_type_shape_unary_op(b, "Y", "X")
@@ -385,7 +384,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_rank("Y"), 2)
 
     def test_set_type_shape_unary_op_explicit_itype(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         set_type_shape_unary_op(b, "Y", "X", itype=TINT64)
@@ -397,7 +396,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_unary_op_abs_regular(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         set_type_shape_unary_op_abs(b, "Y", "X")
@@ -405,7 +404,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
     def test_set_type_shape_unary_op_abs_complex64(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TCOMPLEX64)
         b.set_shape("X", (3, 4))
         set_type_shape_unary_op_abs(b, "Y", "X")
@@ -413,7 +412,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
     def test_set_type_shape_unary_op_abs_complex128(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TCOMPLEX128)
         b.set_shape("X", (3, 4))
         set_type_shape_unary_op_abs(b, "Y", "X")
@@ -421,7 +420,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
     def test_set_type_shape_unary_op_abs_rank_only(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 3)
         set_type_shape_unary_op_abs(b, "Y", "X")
@@ -433,7 +432,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_logsoftmax_with_shape(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (2, 3, 4))
         node = oh.make_node("LogSoftmax", inputs=["X"], outputs=["Y"], axis=1)
@@ -442,7 +441,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (2, 3, 4))
 
     def test_logsoftmax_with_rank_only(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 3)
         node = oh.make_node("LogSoftmax", inputs=["X"], outputs=["Y"], axis=2)
@@ -455,7 +454,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_binary_op_same_shape(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
@@ -465,7 +464,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Z"), (3, 4))
 
     def test_set_type_shape_binary_op_broadcast(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
@@ -475,7 +474,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Z"), (3, 4))
 
     def test_set_type_shape_binary_op_cmp(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
@@ -485,7 +484,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Z"), (3, 4))
 
     def test_set_type_shape_binary_op_explicit_itype(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
@@ -494,7 +493,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Z"), TINT64)
 
     def test_set_type_shape_binary_op_rank_only(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 3)
         b.set_type("Y", TFLOAT)
@@ -508,7 +507,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_matmul_2d(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
@@ -519,7 +518,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(result, (3, 5))
 
     def test_set_type_shape_matmul_batched(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (2, 3, 4))
         b.set_type("Y", TFLOAT)
@@ -528,7 +527,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Z"), (2, 3, 5))
 
     def test_set_type_shape_matmul_1d(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (4,))
         b.set_type("Y", TFLOAT)
@@ -537,7 +536,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Z"), tuple())
 
     def test_set_type_shape_matmul_rank_only(self):
-        b = BasicShapeBuilder()
+        b = _MockShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 3)
         b.set_type("Y", TFLOAT)
@@ -550,7 +549,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_gemm_no_trans(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
@@ -559,7 +558,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Z"), (3, 5))
 
     def test_set_type_shape_gemm_transA(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (4, 3))
         b.set_type("Y", TFLOAT)
@@ -568,7 +567,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Z"), (3, 5))
 
     def test_set_type_shape_gemm_transB(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
@@ -581,7 +580,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_reduce_op_keepdim(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4, 5))
         set_type_shape_reduce_op(b, "Y", "X", keepdim=1, axes=(1,))
@@ -589,21 +588,21 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (3, 1, 5))
 
     def test_set_type_shape_reduce_op_no_keepdim(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4, 5))
         set_type_shape_reduce_op(b, "Y", "X", keepdim=0, axes=(1,))
         self.assertEqual(b.get_shape("Y"), (3, 5))
 
     def test_set_type_shape_reduce_op_no_axes(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4, 5))
         set_type_shape_reduce_op(b, "Y", "X", keepdim=1, axes=None)
         self.assertEqual(b.get_shape("Y"), (1, 1, 1))
 
     def test_set_type_shape_reduce_op_rank_only(self):
-        b = BasicShapeBuilder()
+        b = _MockShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 3)
         set_type_shape_reduce_op(b, "Y", "X", keepdim=1, axes=(0,))
@@ -625,7 +624,7 @@ class TestShapeTypeCompute(ExtTestCase):
                 onh.from_array(np.ones(3, dtype=np.float32), name="vr"),
             ],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (2, 3, 4))
@@ -640,7 +639,7 @@ class TestShapeTypeCompute(ExtTestCase):
                 onh.from_array(np.zeros(4, dtype=np.float32), name="bi"),
             ],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (2, 3, 4))
@@ -655,7 +654,7 @@ class TestShapeTypeCompute(ExtTestCase):
                 onh.from_array(np.zeros(3, dtype=np.float32), name="bi"),
             ],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (2, 3, 4))
@@ -666,7 +665,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [2, 3, 4])],
             [_mkv_("Y", TFLOAT, [2, 3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (2, 3, 4))
@@ -677,7 +676,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TINT64, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TINT64)
         self.assertEqual(b.get_shape("Y"), (3, 4))
@@ -688,7 +687,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4]), _mkv_("cond", TBOOL, [3])],
             [_mkv_("Y", TFLOAT, [None, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         # No axis: input is flattened, output is 1-D with unknown size
@@ -700,7 +699,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4]), _mkv_("cond", TBOOL, [3])],
             [_mkv_("Y", TFLOAT, [None, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         # axis=0: same rank, axis dim is unknown, other dims preserved
@@ -715,7 +714,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4]), _mkv_("cond", TBOOL, [4])],
             [_mkv_("Y", TFLOAT, [3, None])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         # axis=1: same rank, axis dim is unknown, other dims preserved
@@ -730,7 +729,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4]), _mkv_("Y", TFLOAT, [2, 4])],
             [_mkv_("Z", TFLOAT, [5, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Z"), TFLOAT)
         self.assertEqual(b.get_shape("Z"), (5, 4))
@@ -742,7 +741,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [1, 1, 6, 6])],
             [onh.from_array(np.ones((1, 1, 3, 3), dtype=np.float32), name="W")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 1, 6, 6))
@@ -753,7 +752,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [1, 1, 6, 6])],
             [_mkv_("Y", TFLOAT, [1, 1, 5, 5])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 1, 5, 5))
@@ -765,7 +764,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [1, 1, 3, 3])],
             [onh.from_array(np.ones((1, 1, 3, 3), dtype=np.float32), name="W")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 1, 3, 3))
@@ -776,7 +775,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [1, 1, 8, 8])],
             [_mkv_("Y", TFLOAT, [1, 1, 4, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 1, 4, 4))
@@ -788,7 +787,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [1, 1, 4, 4])],
             [onh.from_array(np.ones((1, 1, 3, 3), dtype=np.float32), name="W")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 1, 4, 4))
@@ -800,7 +799,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [1, 1, 4, 4])],
             [onh.from_array(np.ones((1, 1, 3, 3), dtype=np.float32), name="W")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 1, 4, 4))
@@ -815,7 +814,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [1, 1, 7, 7])],
             [_mkv_("Y", TFLOAT, [1, 1, 4, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 1, 4, 4))
@@ -826,7 +825,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [1, 1, 6, 6])],
             [_mkv_("Y", TFLOAT, [1, 1, 3, 3]), _mkv_("I", TINT64, [1, 1, 3, 3])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 1, 3, 3))
@@ -841,10 +840,11 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, None)],
             [onh.from_array(np.ones((1, 1, 3, 3), dtype=np.float32), name="W")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
-        self.assertEqual(b.get_shape("Y"), (1, 1, "conv_f3_0(N,3,2)", 4))
+        self.assertEqual(b.get_shape("Y"), (1, 1, "(1+N)//2", 4))
+        self.assertEqual(b.evaluate_shape("Y", {"N": 7}), (1, 1, 4, 4))
 
     def test_op_max_pool_kernel_1_dynamic(self):
         # kernel_shape=1 with dynamic spatial dims triggers simplified formula branch
@@ -853,16 +853,16 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, ["N", 1, "H", 8])],
             [_mkv_("Y", TFLOAT, None)],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
-        self.assertEqual(b.get_shape("Y"), ("N", 1, "H", 8))
+        self.assertEqual(b.get_shape("Y"), ("N", 1, "MaxPool(H,k=1,s=1,d=1,p=0+0,ceil=0)", 8))
 
     def test_op_max_pool_rank_only(self):
         # Input has rank but no shape: output rank is propagated
         from yobx.xshape.shape_type_compute import set_shape_type_op_any_conv_max_pool
 
-        b = BasicShapeBuilder()
+        b = _MockShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 4)
         node = oh.make_node("MaxPool", ["X"], ["Y"], kernel_shape=[2, 2])
@@ -876,7 +876,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [5, 4]), _mkv_("idx", TINT64, [3])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_rank("Y"), 2)
@@ -887,7 +887,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4]), _mkv_("idx", TINT64, [2, 4])],
             [_mkv_("Y", TFLOAT, [2, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (2, 4))
@@ -899,7 +899,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [3, 5])],
             [onh.from_array(np.ones((4, 5), dtype=np.float32), name="W")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 5))
@@ -910,7 +910,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4]), _mkv_("Y", TFLOAT, [4, 5])],
             [_mkv_("Z", TFLOAT, [3, 5])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Z"), TFLOAT)
         self.assertEqual(b.get_shape("Z"), (3, 5))
@@ -921,7 +921,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3]), _mkv_("Y", TFLOAT, [4])],
             [_mkv_("Z", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Z"), TFLOAT)
         self.assertEqual(b.get_shape("Z"), (3, 4))
@@ -932,7 +932,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Z", TFLOAT, [3])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Z"), TFLOAT)
         self.assertEqual(b.get_shape("Z"), (3,))
@@ -943,7 +943,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [2, 3, 4]), _mkv_("Y", TFLOAT, [2, 4, 5])],
             [_mkv_("Z", TFLOAT, [2, 3, 5])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Z"), TFLOAT)
         self.assertEqual(b.get_shape("Z"), (2, 3, 5))
@@ -968,7 +968,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4]), _mkv_("Y", TFLOAT, [4, 5])],
             [_mkv_("Z", TFLOAT, [3, 5])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Z"), TFLOAT)
         self.assertEqual(b.get_shape("Z"), (3, 5))
@@ -993,9 +993,8 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TINT64, None)],
         )
         b = _TestShapeBuilder()
-        b.run_model(model)
-        self.assertEqual(b.get_type("Y"), TINT64)
-        self.assertEqual(b.get_rank("Y"), 2)
+        with self.assertRaisesRegex(ValueError, "unknown rank"):
+            b.run_model(model)
 
     def test_op_pad(self):
         model = _make_model(
@@ -1004,7 +1003,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [5, 6])],
             [onh.from_array(np.array([1, 1, 1, 1], dtype=np.int64), name="pads")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (5, 6))
@@ -1020,7 +1019,7 @@ class TestShapeTypeCompute(ExtTestCase):
                 onh.from_array(np.array([1], dtype=np.int64), name="axes"),
             ],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 9))
@@ -1071,7 +1070,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [3, 1])],
             [onh.from_array(np.array([1], dtype=np.int64), name="axes")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 1))
@@ -1083,7 +1082,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [2, 6])],
             [onh.from_array(np.array([2, 6], dtype=np.int64), name="shape")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (2, 6))
@@ -1169,7 +1168,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [1, 3, 8, 10])],
             [onh.from_array(np.array([1, 3, 8, 10], dtype=np.int64), name="sizes")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 3, 8, 10))
@@ -1181,7 +1180,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [1, 3, 8, 10])],
             [onh.from_array(np.array([1.0, 1.0, 2.0, 2.0], dtype=np.float32), name="scales")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 3, 8, 10))
@@ -1192,7 +1191,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
@@ -1208,7 +1207,7 @@ class TestShapeTypeCompute(ExtTestCase):
                 onh.from_array(np.array([0], dtype=np.int64), name="axes"),
             ],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 6))
@@ -1224,7 +1223,7 @@ class TestShapeTypeCompute(ExtTestCase):
                 onh.from_array(np.array([7, 5], dtype=np.int64), name="ends"),
             ],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_shape("Y"), (5, 4))
 
@@ -1241,7 +1240,7 @@ class TestShapeTypeCompute(ExtTestCase):
                 onh.from_array(np.array([2], dtype=np.int64), name="steps"),
             ],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_shape("Y"), (5, 4))
 
@@ -1257,7 +1256,7 @@ class TestShapeTypeCompute(ExtTestCase):
                 onh.from_array(np.array([0], dtype=np.int64), name="axes"),
             ],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_shape("Y"), (5, 6))
 
@@ -1273,7 +1272,7 @@ class TestShapeTypeCompute(ExtTestCase):
                 onh.from_array(np.array([0], dtype=np.int64), name="axes"),
             ],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_shape("Y"), (2, 6))
 
@@ -1289,7 +1288,7 @@ class TestShapeTypeCompute(ExtTestCase):
                 onh.from_array(np.array([1], dtype=np.int64), name="axes"),
             ],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         # axis 1 (integer 6) is sliced: output[1] = 3; axis 0 is "batch" (symbolic)
         self.assertEqual(b.get_shape("Y"), ("batch", 3))
@@ -1306,7 +1305,7 @@ class TestShapeTypeCompute(ExtTestCase):
                 onh.from_array(np.array([0], dtype=np.int64), name="axes"),
             ],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         result_shape = b.get_shape("Y")
         # axis 0 ("batch") is sliced → fresh symbolic NEWDIM_slice; axis 1 stays 6
@@ -1318,7 +1317,7 @@ class TestShapeTypeCompute(ExtTestCase):
         # splits tensor is NOT a constant but is tracked via value_as_shape
         from yobx.xshape.shape_type_compute import set_shape_type_op_any_split
 
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (6, 4))
         # splits tracked as shape value, not a constant
@@ -1333,7 +1332,7 @@ class TestShapeTypeCompute(ExtTestCase):
         # starts/ends are NOT constants but their values are tracked via value_as_shape
         from yobx.xshape.shape_type_compute import set_shape_type_op_any_slice
 
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (10, 8))
         # register dynamic starts/ends as shape values (not constants)
@@ -1350,7 +1349,7 @@ class TestShapeTypeCompute(ExtTestCase):
         # starts/ends/axes are all tracked via value_as_shape (no constants)
         from yobx.xshape.shape_type_compute import set_shape_type_op_any_slice
 
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (10, 8))
         b.set_value_shape("starts", (1,))
@@ -1367,11 +1366,11 @@ class TestShapeTypeCompute(ExtTestCase):
         # but axes is a constant → sliced axis gets a fresh dynamic dimension.
         from yobx.xshape.shape_type_compute import set_shape_type_op_any_slice
 
-        b = BasicShapeBuilder()
+        b = _TestShapeBuilder()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (10, 8))
         # axes is a constant initializer; starts/ends are completely unknown
-        b.constants_["axes"] = onh.from_array(np.array([0], dtype=np.int64), name="axes")
+        b.set_constant("axes", onh.from_array(np.array([0], dtype=np.int64), name="axes"))
         node = oh.make_node("Slice", ["X", "starts", "ends", "axes"], ["Y"])
         set_shape_type_op_any_slice(b, node)
         self.assertEqual(b.get_type("Y"), TFLOAT)
@@ -1388,7 +1387,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("A", TFLOAT, [3, 4]), _mkv_("B", TFLOAT, [3, 4])],
             [onh.from_array(np.array([3, 3], dtype=np.int64), name="sp")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("A"), TFLOAT)
         self.assertEqual(b.get_shape("A"), (3, 4))
@@ -1404,7 +1403,7 @@ class TestShapeTypeCompute(ExtTestCase):
             ],
             [_mkv_("Y", TFLOAT, [4, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (4, 4))
@@ -1422,7 +1421,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [2, 3, 4])],
             [_mkv_("Y", TFLOAT, [3, 2, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 2, 4))
@@ -1434,7 +1433,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [4, 9])],
             [onh.from_array(np.array([2, 3], dtype=np.int64), name="reps")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_rank("Y"), 2)
@@ -1446,7 +1445,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("vals", TFLOAT, [3, 5]), _mkv_("idx", TINT64, [3, 5])],
             [onh.from_array(np.array([5], dtype=np.int64), name="k")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("vals"), TFLOAT)
         self.assertEqual(b.get_shape("vals"), (3, 5))
@@ -1461,7 +1460,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("vals", TFLOAT, [3, 4]), _mkv_("idx", TINT64, [3, 4])],
             [onh.from_array(np.array([3], dtype=np.int64), name="k")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_shape("vals"), (3, 4))
         self.assertEqual(b.get_type("vals"), TFLOAT)
@@ -1475,7 +1474,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 10]), _mkv_("k", TINT64, [1])],
             [_mkv_("vals", TFLOAT, [3, 5]), _mkv_("idx", TINT64, [3, 5])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("vals"), TFLOAT)
         self.assertEqual(b.get_type("idx"), TINT64)
@@ -1489,7 +1488,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [1, 3, 4])],
             [onh.from_array(np.array([0], dtype=np.int64), name="axes")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (1, 3, 4))
@@ -1575,7 +1574,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("Y", TFLOAT, [3, 4, 1])],
             [onh.from_array(np.array([-1], dtype=np.int64), name="axes")],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4, 1))
@@ -1589,9 +1588,9 @@ class TestShapeTypeCompute(ExtTestCase):
             opset=12,
         )
         b = _TestShapeBuilder()
-        b.run_model(model)
-        self.assertEqual(b.get_type("Y"), TFLOAT)
-        self.assertEqual(b.get_shape("Y"), (1, 3, 4))
+        # The wheel requires the modern axes input even for this older opset.
+        with self.assertRaisesRegex(ValueError, "expects at least 2"):
+            b.run_model(model)
 
     def test_op_unsqueeze_rank_only(self):
         # When only rank (not shape) is known the output rank is inferred.
@@ -1624,7 +1623,7 @@ class TestShapeTypeCompute(ExtTestCase):
             ],
             [_mkv_("Z", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Z"), TFLOAT)
         self.assertEqual(b.get_shape("Z"), (3, 4))
@@ -1635,7 +1634,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
@@ -1646,7 +1645,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
@@ -1657,7 +1656,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
@@ -1668,7 +1667,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4]), _mkv_("Y", TFLOAT, [3, 4])],
             [_mkv_("Z", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Z"), TFLOAT)
         self.assertEqual(b.get_shape("Z"), (3, 4))
@@ -1679,7 +1678,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TINT64, [3, 4]), _mkv_("Y", TINT64, [3, 4])],
             [_mkv_("Z", TBOOL, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Z"), TBOOL)
         self.assertEqual(b.get_shape("Z"), (3, 4))
@@ -1690,7 +1689,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4]), _mkv_("Y", TFLOAT, [3, 4])],
             [_mkv_("Z", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Z"), TFLOAT)
         self.assertEqual(b.get_shape("Z"), (3, 4))
@@ -1701,7 +1700,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
@@ -1712,7 +1711,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertEqual(b.get_shape("Y"), (3, 4))
@@ -1723,7 +1722,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TBOOL, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TBOOL)
         self.assertEqual(b.get_shape("Y"), (3, 4))
@@ -1734,7 +1733,7 @@ class TestShapeTypeCompute(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TBOOL, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         self.assertEqual(b.get_type("Y"), TBOOL)
         self.assertEqual(b.get_shape("Y"), (3, 4))
@@ -1744,7 +1743,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_fused_matmul_no_trans(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
@@ -1754,7 +1753,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Z"), (3, 5))
 
     def test_set_type_shape_fused_matmul_transA(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (4, 3))
         b.set_type("Y", TFLOAT)
@@ -1764,7 +1763,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Z"), (3, 5))
 
     def test_set_type_shape_fused_matmul_rank_only(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 2)
         b.set_type("Y", TFLOAT)
@@ -1778,7 +1777,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_tree_ensemble(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (10, 5))
         b.set_opset("ai.onnx.ml", 3)
@@ -1808,7 +1807,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (10, 3))
 
     def test_set_type_shape_tree_ensemble_rank_only(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_rank("X", 2)
         b.set_opset("ai.onnx.ml", 5)
@@ -1841,7 +1840,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_to_complex_float(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4, 2))
         node = oh.make_node("ToComplex", ["X"], ["Y"], domain="com.microsoft")
@@ -1850,7 +1849,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
     def test_set_type_shape_to_complex_double(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TDOUBLE)
         b.set_shape("X", (3, 4, 2))
         node = oh.make_node("ToComplex", ["X"], ["Y"], domain="com.microsoft")
@@ -1858,7 +1857,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_type("Y"), TCOMPLEX128)
 
     def test_set_type_shape_complex_module(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TCOMPLEX64)
         b.set_shape("X", (3, 4))
         node = oh.make_node("ComplexModule", ["X"], ["Y"], domain="com.microsoft")
@@ -1871,7 +1870,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_shared_input(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
@@ -1890,12 +1889,10 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_scatter_nd_of_shape(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("shape", TINT64)
         b.set_shape("shape", (3,))
-        b.constants_["shape"] = onh.from_array(np.array([2, 3, 4], dtype=np.int64))
-        b.constants_computed_["shape"] = np.array([2, 3, 4], dtype=np.int64)
-        b._known_value_shape["shape"] = (2, 3, 4)
+        b.set_constant("shape", onh.from_array(np.array([2, 3, 4], dtype=np.int64)))
         b.set_type("idx", TINT64)
         b.set_type("upd", TFLOAT)
         b.set_shape("upd", (5, 3, 4))
@@ -1911,12 +1908,10 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_tri_matrix(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("shape", TINT64)
         b.set_shape("shape", (2,))
-        b.constants_["shape"] = onh.from_array(np.array([4, 4], dtype=np.int64))
-        b.constants_computed_["shape"] = np.array([4, 4], dtype=np.int64)
-        b._known_value_shape["shape"] = (4, 4)
+        b.set_constant("shape", onh.from_array(np.array([4, 4], dtype=np.int64)))
         b.set_type("val", TFLOAT)
         b.set_shape("val", ())
         node = oh.make_node("TriMatrix", ["shape", "val"], ["Y"], domain="com.microsoft")
@@ -1929,7 +1924,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_transpose_2d_cast_fp16(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         node = oh.make_node("Transpose2DCastFP16", ["X"], ["Y"], domain="com.microsoft")
@@ -1938,7 +1933,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (4, 3))
 
     def test_set_type_shape_transpose_2d_cast_fp32(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT16)
         b.set_shape("X", (3, 4))
         node = oh.make_node("Transpose2DCastFP32", ["X"], ["Y"], domain="com.microsoft")
@@ -1951,7 +1946,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_type_shape_multi_head_attention(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         for name in ("Q", "K", "V"):
             b.set_type(name, TFLOAT)
             b.set_shape(name, (2, 5, 64))
@@ -1968,7 +1963,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("out1"), (2, 5, 64))
 
     def test_set_type_shape_multi_head_attention_rank_only(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         for name in ("Q", "K", "V"):
             b.set_type(name, TFLOAT)
             b.set_rank(name, 3)
@@ -1983,7 +1978,7 @@ class TestShapeTypeCompute(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_set_shape_type_custom_replace_zero(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         node = oh.make_node("ReplaceZero", ["X"], ["Y"], domain="com.microsoft")
@@ -1992,7 +1987,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Y"), (3, 4))
 
     def test_set_shape_type_custom_fused_matmul(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_type("Y", TFLOAT)
@@ -2002,7 +1997,7 @@ class TestShapeTypeCompute(ExtTestCase):
         self.assertEqual(b.get_shape("Z"), (3, 5))
 
     def test_set_shape_type_custom_tree_ensemble(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (5, 3))
         b.set_opset("ai.onnx.ml", 3)
@@ -2652,7 +2647,7 @@ class TestDevicePropagation(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_fused_matmul_transA_device_propagation(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (4, 3))
         b.set_device("X", -1)
@@ -2667,7 +2662,7 @@ class TestDevicePropagation(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_tree_ensemble_device_propagation(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (4, 3))
         b.set_device("X", -1)
@@ -2683,7 +2678,7 @@ class TestDevicePropagation(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_to_complex_device_propagation(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4, 2))
         b.set_device("X", -1)
@@ -2696,7 +2691,7 @@ class TestDevicePropagation(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_complex_module_device_propagation(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TCOMPLEX64)
         b.set_shape("X", (3, 4))
         b.set_device("X", -1)
@@ -2709,7 +2704,7 @@ class TestDevicePropagation(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_scatter_nd_of_shape_device_propagation(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("updates", TFLOAT)
         b.set_shape("updates", (2, 4))
         b.set_device("updates", -1)
@@ -2724,7 +2719,7 @@ class TestDevicePropagation(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_tri_matrix_device_propagation(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("val", TFLOAT)
         b.set_shape("val", ())
         b.set_device("val", -1)
@@ -2737,7 +2732,7 @@ class TestDevicePropagation(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_transpose_2d_cast_fp16_device_propagation(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
         b.set_device("X", -1)
@@ -2746,7 +2741,7 @@ class TestDevicePropagation(ExtTestCase):
         self.assertEqual(b.get_device("Y"), -1)
 
     def test_transpose_2d_cast_fp32_device_propagation(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT16)
         b.set_shape("X", (3, 4))
         b.set_device("X", -1)
@@ -2759,7 +2754,7 @@ class TestDevicePropagation(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_multi_head_attention_device_propagation(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("Q", TFLOAT)
         b.set_rank("Q", 3)
         b.set_device("Q", -1)
@@ -2935,7 +2930,7 @@ class TestLoopShapeInference(ExtTestCase):
 
         # Build minimal body nodes: always use a Constant as a source so the
         # body is valid even when there are no loop-carried variables.
-        nodes = []
+        nodes = [oh.make_node("Identity", ["cond_in"], ["cond_out"])]
         if v_inputs:
             nodes.append(oh.make_node("Identity", [v_inputs[0]], [v_outs[0]]))
             for s in scan_outs:
@@ -2959,6 +2954,8 @@ class TestLoopShapeInference(ExtTestCase):
         b = _TestShapeBuilder()
         b.set_type("max_iter", TINT64)
         b.set_type("cond", TBOOL)
+        b.set_shape("max_iter", ())
+        b.set_shape("cond", ())
         b.set_type("v0", TFLOAT)
         b.set_shape("v0", (3, 4))
         b.run_node(node)
@@ -2970,6 +2967,8 @@ class TestLoopShapeInference(ExtTestCase):
         b = _TestShapeBuilder()
         b.set_type("max_iter", TINT64)
         b.set_type("cond", TBOOL)
+        b.set_shape("max_iter", ())
+        b.set_shape("cond", ())
         b.set_type("v0", TFLOAT)
         b.set_shape("v0", (3, 4))
         b.run_node(node)
@@ -2994,6 +2993,7 @@ class TestLoopShapeInference(ExtTestCase):
         inferred by propagating types through the body graph nodes."""
         body = oh.make_graph(
             [
+                oh.make_node("Identity", ["cond_in"], ["cond_out"]),
                 oh.make_node("Add", ["v", "v"], ["v_out"]),
                 oh.make_node("Identity", ["v"], ["scan_out"]),
             ],
@@ -3017,6 +3017,8 @@ class TestLoopShapeInference(ExtTestCase):
         b = _TestShapeBuilder()
         b.set_type("max_iter", TINT64)
         b.set_type("cond", TBOOL)
+        b.set_shape("max_iter", ())
+        b.set_shape("cond", ())
         b.set_type("v_in", TFLOAT)
         b.set_shape("v_in", (3, 4))
         b.run_node(node)

@@ -211,7 +211,7 @@ Adding a new built-in converter
 .. code-block:: python
 
     # yobx/litert/ops/cast_ops.py
-    from onnx import TensorProto
+    from onnx_light.onnx import TensorProto
     from ..register import register_litert_op_converter
     from ..litert_helper import BuiltinOperator
     from ...xbuilder import GraphBuilder

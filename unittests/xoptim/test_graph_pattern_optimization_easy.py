@@ -10,9 +10,9 @@ Use:
 
 import unittest
 import numpy as np
-import onnx
-from onnx import TensorProto, helper as oh, numpy_helper as onh
-from yobx.reference import ExtendedReferenceEvaluator
+from onnx_light import onnx
+from onnx_light.onnx import TensorProto, helper as oh, numpy_helper as onh
+from onnx_light.onnx.reference import ReferenceEvaluator
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
 
@@ -29,7 +29,10 @@ class TestGraphPatternOptimizationEasy(ExtTestCase):
             # Creates an input tensor with a dimension defined by the onnx model
             # or equals to i + 2 with i being the dimension index.
             # The tensor is kept small to make the test fast.
-            shape = tuple((d.dim_value if d.dim_value > 0 else i + 2) for i, d in enumerate(ish))
+            shape = tuple(
+                (d.dim_value if d.dim_value is not None and d.dim_value > 0 else i + 2)
+                for i, d in enumerate(ish)
+            )
             if i.type.tensor_type.elem_type == onnx.TensorProto.FLOAT:
                 feeds[i.name] = np.random.randn(*shape).astype(np.float32)
             elif i.type.tensor_type.elem_type == onnx.TensorProto.FLOAT16:
@@ -60,7 +63,7 @@ class TestGraphPatternOptimizationEasy(ExtTestCase):
                 onx.SerializeToString(), providers=["CPUExecutionProvider"]
             )
         else:
-            cls = lambda onx: ExtendedReferenceEvaluator(onx, verbose=0)  # noqa: E731
+            cls = ReferenceEvaluator
         ref = cls(model)
         opt = cls(optimized_model)
         expected = ref.run(None, feeds)
@@ -110,21 +113,21 @@ class TestGraphPatternOptimizationEasy(ExtTestCase):
                     ],
                 ),
                 opset_imports=[oh.make_opsetid("", 18)],
+                ir_version=10,
             )
         ]
 
         for model in models:
             gr = GraphBuilder(
                 model,
-                infer_shapes_options=True,
                 optimization_options=OptimizationOptions(
-                    patterns=["SoftmaxCrossEntropyLossCast"], verbose=0
+                    patterns=["SoftmaxCrossEntropyLossCast"]
                 ),
             )
-            opt_onx = gr.to_onnx(optimize=True)
+            opt_onx = gr.to_onnx(optimize=True).proto
             self.assertIn("SoftmaxCrossEntropyLoss", set(n.op_type for n in opt_onx.graph.node))
             self.assertEqual(0, len(opt_onx.graph.initializer))
-            self._check_model(model, opt_onx)
+            self._check_model(model, opt_onx, use_ort=True)
 
 
 if __name__ == "__main__":

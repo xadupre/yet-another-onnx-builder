@@ -5,7 +5,7 @@ Unit tests for :class:`yobx.builder.light.Var` focusing on ``__str__``,
 
 import unittest
 
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 
 from yobx.builder.light import Var, Vars, start
 from yobx.ext_test_case import ExtTestCase
@@ -44,12 +44,12 @@ class TestVarStr(ExtTestCase):
         gr = start()
         x = gr.vin("X", elem_type=TensorProto.FLOAT)
         # TensorProto.FLOAT == 1
-        self.assertEqual(str(x), f"X:{TensorProto.FLOAT}")
+        self.assertEqual(str(x), f"X:{int(TensorProto.FLOAT)}")
 
     def test_str_with_elem_type_and_shape(self):
         gr = start()
         x = gr.vin("X", elem_type=TensorProto.FLOAT, shape=(2, 3))
-        self.assertEqual(str(x), f"X:{TensorProto.FLOAT}:[2, 3]")
+        self.assertEqual(str(x), f"X:{int(TensorProto.FLOAT)}:[2, 3]")
 
     def test_str_with_shape_no_elem_type(self):
         # elem_type=None but shape provided: only shape suffix
@@ -61,7 +61,7 @@ class TestVarStr(ExtTestCase):
         gr = start()
         x = gr.vin("X")
         x.rename("Z")
-        self.assertEqual(str(x), f"Z:{TensorProto.FLOAT}")
+        self.assertEqual(str(x), f"Z:{int(TensorProto.FLOAT)}")
 
     def test_repr(self):
         gr = start()
@@ -169,7 +169,7 @@ class TestVarOperators(ExtTestCase):
     # --- chaining: result can be used in a further model ---
 
     def test_truediv_builds_valid_model(self):
-        import onnx
+        from yobx._onnx_shim import onnx
 
         gr, x, y = _xy()
         (x / y).rename("Z").vout()
@@ -178,7 +178,7 @@ class TestVarOperators(ExtTestCase):
         self.assertEqual(onx.graph.node[0].op_type, "Div")
 
     def test_matmul_builds_valid_model(self):
-        import onnx
+        from yobx._onnx_shim import onnx
 
         gr, x, y = _xy()
         (x @ y).rename("Z").vout()
@@ -187,7 +187,7 @@ class TestVarOperators(ExtTestCase):
         self.assertEqual(onx.graph.node[0].op_type, "MatMul")
 
     def test_pow_builds_valid_model(self):
-        import onnx
+        from yobx._onnx_shim import onnx
 
         gr, x, y = _xy()
         (x**y).rename("Z").vout()

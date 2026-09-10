@@ -49,7 +49,7 @@ Example:
 .. code-block:: python
 
     import torch
-    from onnx import TensorProto
+    from onnx_light.onnx import TensorProto
     from transformers import LlamaConfig
     from transformers.models.llama.modeling_llama import LlamaAttention
     from yobx.xbuilder import GraphBuilder
@@ -90,7 +90,7 @@ Example:
 
 from typing import Optional
 import numpy as np
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 import transformers
 
 from ....helpers.onnx_helper import tensor_dtype_to_np_dtype
@@ -492,7 +492,7 @@ def llama_attention_to_onnx(
 
     Example::
 
-        from onnx import TensorProto
+        from onnx_light.onnx import TensorProto
         from yobx.xbuilder import GraphBuilder
         from yobx.torch.in_transformers.models import llama_attention_to_onnx
 

@@ -5,9 +5,9 @@ for the full list of aten functions.
 
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
-import onnx.numpy_helper as onh
-from onnx import TensorProto
-from onnx.helper import make_tensor
+import onnx_light.onnx.numpy_helper as onh
+from onnx_light.onnx import TensorProto
+from onnx_light.onnx.helper import make_tensor
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ...xbuilder.graph_builder import GraphBuilder
 from ...xshape.shape_type_compute import set_type_shape_unary_op, set_type_shape_binary_op

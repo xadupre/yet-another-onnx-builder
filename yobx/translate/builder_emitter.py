@@ -1,7 +1,7 @@
 from typing import Any, Dict, List
 import numpy as np
-from onnx import TensorProto
-from onnx.numpy_helper import to_array
+from onnx_light.onnx import TensorProto
+from onnx_light.onnx.numpy_helper import to_array
 from .base_emitter import BaseEmitter
 
 _types = {

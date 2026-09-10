@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Union
 import numpy as np
-from onnx import AttributeProto, FunctionProto, GraphProto, ModelProto, NodeProto
-from onnx.numpy_helper import to_array
+from onnx_light.onnx import AttributeProto, FunctionProto, GraphProto, ModelProto, NodeProto
+from onnx_light.onnx.numpy_helper import to_array
 from .base_emitter import EventType
 
 if TYPE_CHECKING:

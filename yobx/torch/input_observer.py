@@ -2,7 +2,7 @@ import contextlib
 import inspect
 import time
 from typing import Any, Callable, Generator, Sequence
-import onnx
+from yobx._onnx_shim import onnx
 import torch
 import torch.utils._pytree as pytree
 from ..helpers import max_diff, string_type

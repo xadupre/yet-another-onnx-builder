@@ -38,6 +38,8 @@ jobs:
       - name: Install nightly pytorch
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
 
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
 
@@ -73,6 +75,8 @@ jobs:
 
       - name: Install nightly pytorch
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
+
+      - uses: ./.github/actions/install-onnx-light
 
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"

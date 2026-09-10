@@ -23,8 +23,8 @@ This example shows:
 """
 
 import numpy as np
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 from yobx.reference import ExtendedReferenceEvaluator
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -133,15 +133,15 @@ print("QuickGelu result:", z_gelu)
 # 4. Adding a custom operator via ``new_ops``
 # -------------------------------------------
 #
-# Any :class:`OpRun <onnx.reference.op_run.OpRun>` subclass can be passed
-# through the ``new_ops`` argument.  The built-in :attr:`default_ops
+# Any :class:`NativeOpKernel <yobx.reference.ops._native_op.NativeOpKernel>` subclass
+# can be passed through ``new_ops``.  The built-in :attr:`default_ops
 # <yobx.reference.evaluator.ExtendedReferenceEvaluator.default_ops>` are
 # always merged in automatically, so you only need to list your additions.
 
-from onnx.reference.op_run import OpRun  # noqa: E402
+from yobx.reference.ops._native_op import NativeOpKernel  # noqa: E402
 
 
-class Scale(OpRun):
+class Scale(NativeOpKernel):
     """Multiplies every element of X by a constant *factor*."""
 
     op_domain = "my.domain"

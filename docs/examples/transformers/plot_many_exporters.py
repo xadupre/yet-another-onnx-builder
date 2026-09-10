@@ -16,7 +16,7 @@ import argparse
 import sys
 import matplotlib.pyplot as plt
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 import onnxruntime
 import torch
 from transformers import AutoConfig, AutoModelForCausalLM, AutoTokenizer

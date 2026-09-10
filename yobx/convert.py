@@ -20,6 +20,7 @@ def to_onnx(
     external_threshold: int = 1024,
     filename: Optional[str] = None,
     return_optimize_report: bool = False,
+    graph_backend: Optional[str] = None,
     **kwargs: Any,
 ) -> Any:
     """
@@ -101,6 +102,12 @@ def to_onnx(
         :class:`~yobx.container.ExportArtifact` has its
         :attr:`~yobx.container.ExportArtifact.report` attribute populated with
         per-pattern optimization statistics.  Supported by all backends.
+    :param graph_backend: ``None`` uses the converter's default native builder.
+        ``"onnx-light"`` explicitly selects native graph construction, pattern
+        optimization, and symbolic shape inference from the onnx-light wheel.
+        Exported artifacts retain native protobufs. PyTorch models use
+        ``torch.export`` followed by native ONNX lowering. Cannot be combined
+        with ``builder_cls``.
     :param kwargs: additional backend-specific keyword arguments forwarded
         verbatim to the selected converter.  See the backend-specific
         ``to_onnx`` functions listed above for their full parameter lists.
@@ -157,6 +164,13 @@ def to_onnx(
             {"a": np.float32, "b": np.float32},
         )
     """
+    if graph_backend not in (None, "onnx-light"):
+        raise ValueError(
+            f"Unknown graph_backend={graph_backend!r}; expected 'onnx-light' or None."
+        )
+    if graph_backend is not None and "builder_cls" in kwargs:
+        raise ValueError("graph_backend and builder_cls cannot be specified together.")
+
     # Build a dict of the common named arguments so they can be passed to
     # each backend without duplicating keyword logic.
     from .ext_test_case import has_litert, has_sklearn, has_tensorflow, has_torch  # noqa: PLC0415
@@ -183,6 +197,11 @@ def to_onnx(
 
             return torch_to_onnx(model, args, **common, **kwargs)
 
+    if graph_backend == "onnx-light":
+        from .builder.onnxlight import OnnxLightGraphBuilder
+
+        kwargs["builder_cls"] = OnnxLightGraphBuilder
+
     # ------------------------------------------------------------------ #
     # 2. scikit-learn BaseEstimator                                       #
     # ------------------------------------------------------------------ #
@@ -190,8 +209,13 @@ def to_onnx(
         from sklearn.base import BaseEstimator  # noqa: PLC0415
 
         if isinstance(model, BaseEstimator):
-            from .sklearn import to_onnx as sklearn_to_onnx  # noqa: PLC0415
+            from .sklearn import (  # noqa: PLC0415
+                SklearnOnnxLightGraphBuilder,
+                to_onnx as sklearn_to_onnx,
+            )
 
+            if graph_backend == "onnx-light":
+                kwargs["builder_cls"] = SklearnOnnxLightGraphBuilder
             return sklearn_to_onnx(model, args, **common, **kwargs)
 
     # ------------------------------------------------------------------ #

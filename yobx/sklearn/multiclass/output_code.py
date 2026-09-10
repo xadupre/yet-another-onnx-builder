@@ -1,7 +1,7 @@
 from typing import Dict, List
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.multiclass import OutputCodeClassifier
 
 try:

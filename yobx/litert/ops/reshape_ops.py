@@ -22,7 +22,7 @@ def convert_reshape(
     x = op.inputs[0]
     shape_tensor = op.inputs[1]
     # Cast to int64 as ONNX Reshape requires int64 shape.
-    from onnx import TensorProto
+    from onnx_light.onnx import TensorProto
 
     shape_i64 = g.op.Cast(shape_tensor, to=TensorProto.INT64, name="litert_reshape_shape_cast")
     return g.op.Reshape(x, shape_i64, outputs=outputs, name="litert_reshape")
@@ -52,7 +52,7 @@ def convert_expand_dims(
 
     The axis index comes from tensor input 1.
     """
-    from onnx import TensorProto
+    from onnx_light.onnx import TensorProto
 
     axis_i64 = g.op.Cast(op.inputs[1], to=TensorProto.INT64, name="litert_expand_axis_cast")
     return g.op.Unsqueeze(op.inputs[0], axis_i64, outputs=outputs, name="litert_expand_dims")
@@ -91,7 +91,7 @@ def convert_mean(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``MEAN`` → ONNX ``ReduceMean``."""
-    from onnx import TensorProto
+    from onnx_light.onnx import TensorProto
 
     keep_dims = op.builtin_options.get("keep_dims", False)
     axes_i64 = g.op.Cast(op.inputs[1], to=TensorProto.INT64, name="litert_mean_axes")
@@ -105,7 +105,7 @@ def convert_sum(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``SUM`` → ONNX ``ReduceSum``."""
-    from onnx import TensorProto
+    from onnx_light.onnx import TensorProto
 
     keep_dims = op.builtin_options.get("keep_dims", False)
     axes_i64 = g.op.Cast(op.inputs[1], to=TensorProto.INT64, name="litert_sum_axes")
@@ -119,7 +119,7 @@ def convert_reduce_max(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``REDUCE_MAX`` → ONNX ``ReduceMax``."""
-    from onnx import TensorProto
+    from onnx_light.onnx import TensorProto
 
     keep_dims = op.builtin_options.get("keep_dims", False)
     axes_i64 = g.op.Cast(op.inputs[1], to=TensorProto.INT64, name="litert_reduce_max_axes")
@@ -133,7 +133,7 @@ def convert_reduce_min(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: TFLiteOperator
 ) -> str:
     """TFLite ``REDUCE_MIN`` → ONNX ``ReduceMin``."""
-    from onnx import TensorProto
+    from onnx_light.onnx import TensorProto
 
     keep_dims = op.builtin_options.get("keep_dims", False)
     axes_i64 = g.op.Cast(op.inputs[1], to=TensorProto.INT64, name="litert_reduce_min_axes")

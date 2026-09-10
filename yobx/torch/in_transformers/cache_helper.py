@@ -423,7 +423,7 @@ def make_static_cache(
     )
     torch._check(
         max_cache_len >= key_value_pairs[0][0].shape[2],
-        (
+        lambda: (
             f"max_cache_len={max_cache_len} cannot be smaller "
             f"shape[2]={key_value_pairs[0][0].shape[2]} in shape "
             f"{key_value_pairs[0][0].shape}"

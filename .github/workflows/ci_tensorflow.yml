@@ -40,11 +40,16 @@ jobs:
       - name: Install tensorflow==2.21 jax==0.10
         run: pip install "tensorflow==2.21.*" "jax==0.10.*"
 
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
         run: pip install -e ".[dev,tensorflow]"
 
       - name: Install tensorflow==2.21 jax==0.10 again
         run: pip install "tensorflow==2.21.*" "jax==0.10.*"
+
+      - name: Check native-only ONNX dependencies
+        run: python -c "import importlib.util; import onnx_light; assert importlib.util.find_spec('onnx') is None"
 
       - name: pip freeze
         run: pip freeze
@@ -86,11 +91,16 @@ jobs:
       - name: Install tensorflow==${{ matrix.tensorflow-version }} jax==${{ matrix.jax-version }}
         run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" "jax==${{ matrix.jax-version }}.*"
 
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
         run: pip install -e ".[dev,tensorflow]"
 
       - name: Install tensorflow==${{ matrix.tensorflow-version }} jax==${{ matrix.jax-version }} again
         run: pip install "tensorflow==${{ matrix.tensorflow-version }}.*" "jax==${{ matrix.jax-version }}.*"
+
+      - name: Check native-only ONNX dependencies
+        run: python -c "import importlib.util; import onnx_light; assert importlib.util.find_spec('onnx') is None"
 
       - name: Run tensorflow tests with coverage
         run: |
@@ -103,17 +113,6 @@ jobs:
               --ignore=unittests/sklearn \
               --ignore=unittests/sql \
               --ignore=unittests/torch
-
-      - name: Parity with tf2onnx
-        run: |
-          pip install tf2onnx
-          pytest --durations=10 unittests/parity/with_tf2onnx
-
-      - name: Parity with jax2onnx
-        if: matrix.jax-version != '0.9'
-        run: |
-          pip install jax2onnx
-          pytest --durations=10 unittests/parity/with_jax2onnx
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5

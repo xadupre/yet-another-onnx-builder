@@ -4,38 +4,38 @@ Per-op FLOPs (floating-point operation) estimators for ONNX nodes.
 The public entry point is :func:`estimate_node_flops`.  All per-op helper
 functions are private (``_flops_*``) and dispatched via :data:`_OP_HANDLERS`.
 
-All estimators use the symbolic-dimension helpers from
-:mod:`yobx.xexpressions.operations` so that symbolic (dynamic) dimensions are
+All estimators use the native symbolic-dimension helpers from
+``onnx_light.onnx_core.expressions`` so that symbolic (dynamic) dimensions are
 handled correctly.  When the shapes are partially or fully unknown the
 estimators return ``None``.
 
-Integration with :class:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder`:
-use :meth:`BasicShapeBuilder.estimate_node_flops` to estimate the cost of a
+Integration with :class:`~yobx.xshape.native_shape_inference.NativeShapeInference`:
+use :meth:`NativeShapeInference.estimate_node_flops` to estimate the cost of a
 node using the shapes already inferred during a
-:meth:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder.run_model` call.
+:meth:`~yobx.xshape.native_shape_inference.NativeShapeInference.run_model` call.
 """
 
 from __future__ import annotations
 
-import glob
-import os
-from typing import Any, Callable, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple, Union
 
-import numpy as np
-import onnx
+from onnx_light import onnx
 
-from ..xexpressions.operations import dim_add, dim_div, dim_mul, dim_multi_mul, DIM_TYPE
+from onnx_light.onnx_core.expressions import dim_add, dim_div, dim_mul, dim_multi_mul
+from ._shape_helper import ONNX_SHAPE
+
+DIM_TYPE = Union[int, str]
 
 # ---------------------------------------------------------------------------
 # Type aliases
 # ---------------------------------------------------------------------------
 
-#: Maps a tensor name → shape tuple (int for static dims, str for symbolic).
-_ShapeFn = Callable[[str], Optional[Tuple[DIM_TYPE, ...]]]
+#: Maps a tensor name to static, symbolic, or anonymous unknown dimensions.
+_ShapeFn = Callable[[str], Optional[ONNX_SHAPE]]
 
 #: Maps a tensor name → integer values of a 1-D integer constant tensor
 #: (shape-spec literals, e.g. the second input of a Reshape node).
-_LiteralFn = Callable[[str], Optional[Tuple[DIM_TYPE, ...]]]
+_LiteralFn = Callable[[str], Optional[ONNX_SHAPE]]
 
 #: Signature of a per-op FLOPs estimator.
 _FlopsHandler = Callable[[onnx.NodeProto, "_ShapeFn", "_LiteralFn"], Optional[DIM_TYPE]]  # type: ignore[type-arg]
@@ -180,26 +180,38 @@ def _get_attribute_value(node: onnx.NodeProto, name: str, default: Any = None) -
     return default
 
 
-def _literal_size(shape: Optional[Tuple]) -> Optional[DIM_TYPE]:
-    """Returns the number of elements in a static shape, or None if dynamic."""
+def _literal_size(shape: Optional[ONNX_SHAPE]) -> Optional[DIM_TYPE]:
+    """Returns the element count, or ``None`` when a dimension is unknown."""
     if shape is None:
         return None
-    if all(isinstance(a, int) for a in shape):
-        return int(np.prod(shape))
-    return dim_multi_mul(*shape)
+    dimensions: list[DIM_TYPE] = []
+    for dim in shape:
+        if dim is None or dim == "":
+            return None
+        dimensions.append(dim)
+    return dim_multi_mul(*dimensions)
 
 
-def _resolve_shape(name: str, shape_fn: _ShapeFn, literal_fn: _LiteralFn) -> Optional[Tuple]:
+def _resolve_shape(
+    name: str, shape_fn: _ShapeFn, literal_fn: _LiteralFn
+) -> Optional[Tuple[DIM_TYPE, ...]]:
     """
-    Returns the shape of *name* using *shape_fn* first, then *literal_fn* as a
+    Returns fully specified dimensions using *shape_fn* first, then *literal_fn* as a
     fallback.  *literal_fn* is consulted when the tensor is a 1-D integer
     constant whose *values* encode a shape specification (e.g. the shape input
-    of a Reshape node).
+    of a Reshape node). Anonymous unknown dimensions prevent arithmetic cost estimation.
     """
     sh = shape_fn(name)
-    if sh is not None:
-        return sh
-    return literal_fn(name)
+    if sh is None:
+        sh = literal_fn(name)
+    if sh is None:
+        return None
+    dimensions: list[DIM_TYPE] = []
+    for dim in sh:
+        if dim is None or dim == "":
+            return None
+        dimensions.append(dim)
+    return tuple(dimensions)
 
 
 # ---------------------------------------------------------------------------
@@ -251,6 +263,10 @@ def _flops_matmul(
     b = _resolve_shape(node.input[1], shape_fn, literal_fn)
     if a is None or b is None:
         return None
+    output = shape_fn(node.output[0]) if node.output else None
+    if output is not None and a and b:
+        size = _literal_size(output)
+        return None if size is None else dim_multi_mul(2, size, a[-1])
     if len(a) < 2 or len(b) < 2:
         return None
     M, K = a[-2], a[-1]
@@ -451,13 +467,17 @@ def _flops_rank_cost(
     if node.op_type == "Shape":
         # Shape reads one value per input dimension.
         if node.input:
-            sh = _resolve_shape(node.input[0], shape_fn, literal_fn)
+            sh = shape_fn(node.input[0])
+            if sh is None:
+                sh = literal_fn(node.input[0])
             if sh is not None:
                 return len(sh)
         return None
     # Reshape / Squeeze / Unsqueeze: rank of output.
     if node.output:
-        sh = _resolve_shape(node.output[0], shape_fn, literal_fn)
+        sh = shape_fn(node.output[0])
+        if sh is None:
+            sh = literal_fn(node.output[0])
         if sh is not None:
             return len(sh)
     return None
@@ -511,11 +531,13 @@ def estimate_node_flops(
     """
     Estimates the number of floating-point operations for a single ONNX node.
 
-    Returns ``None`` when the shapes are not fully known (dynamic shapes) or the
-    ``op_type`` is not covered.
+    Returns ``None`` when required dimensions are unknown or the ``op_type``
+    is not covered. Symbolic dimensions produce symbolic costs. Rank-only
+    costs remain available when individual dimensions are unknown.
 
     :param node: ONNX node
-    :param shape_fn: callable mapping tensor name → shape tuple (from shape inference)
+    :param shape_fn: callable mapping tensor name to a shape tuple containing
+        integers, symbolic strings, or ``None`` for unknown dimensions
     :param literal_fn: callable mapping tensor name → int-value tuple for 1-D integer
         constant tensors (shape specification tensors); used as a fallback when
         *shape_fn* cannot resolve a shape
@@ -533,11 +555,11 @@ def list_op_cost_formulas() -> Dict[str, str]:
     expression produced by :func:`estimate_node_flops` on a representative test
     case from the ONNX backend test suite.
 
-    For every single-node model found in the ONNX backend test data directory
+    For every single-node model in the native wheel's backend test inventory
     the static input dimensions are replaced by symbolic variables (``DIM<n>``)
     using
     :func:`~yobx.helpers.onnx_helper.replace_static_dimensions_by_strings`.
-    :class:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder` is then run with
+    :class:`~yobx.xshape.native_shape_inference.NativeShapeInference` is then run with
     ``inference=InferenceMode.COST`` to obtain the symbolic FLOPs expression.
 
     Only the first passing test case per ``op_type`` is kept.  Operators with
@@ -547,7 +569,9 @@ def list_op_cost_formulas() -> Dict[str, str]:
     :return: ``{op_type: symbolic_flops_expression}`` sorted alphabetically.
     """
     # Lazy imports to avoid circular dependencies at module load time.
-    from .shape_builder_impl import BasicShapeBuilder, InferenceMode
+    from .native_shape_inference import NativeShapeInference
+    from .shape_builder_impl import InferenceMode
+    from onnx_light.onnx.backend import collect_test_cases
     from ..helpers.onnx_helper import (
         overwrite_shape_in_model_proto,
         replace_static_dimensions_by_strings,
@@ -577,18 +601,11 @@ def list_op_cost_formulas() -> Dict[str, str]:
         }
     )
 
-    data_dir = os.path.join(os.path.dirname(onnx.__file__), "backend", "test", "data", "node")
-    if not os.path.isdir(data_dir):
-        return {}
-
     result: Dict[str, str] = {}
-    for test_dir in sorted(glob.glob(os.path.join(data_dir, "test_*"))):
-        if "expanded" in os.path.basename(test_dir):
+    for test in sorted(collect_test_cases(), key=lambda case: case.name):
+        if "expanded" in test.name:
             continue  # skip expanded variants; they tend to be multi-node rewrites
-        model_path = os.path.join(test_dir, "model.onnx")
-        if not os.path.exists(model_path):
-            continue
-        model = onnx.load(model_path)
+        model = test.model
         if len(model.graph.node) != 1:
             continue
         op_type = model.graph.node[0].op_type
@@ -598,7 +615,7 @@ def list_op_cost_formulas() -> Dict[str, str]:
         if n_in is not None:
             model = overwrite_shape_in_model_proto(model, n_in=n_in)
         dyn_model, _ = replace_static_dimensions_by_strings(model)
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         cost = builder.run_model(dyn_model, inference=InferenceMode.COST)
         assert cost is not None, f"no cost was produced by {builder}"
         for ct, flops, _ in cost:

@@ -1,5 +1,5 @@
 from typing import Optional
-from onnx import AttributeProto
+from onnx_light.onnx import AttributeProto
 
 
 def make_ref_attribute(

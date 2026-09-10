@@ -3,7 +3,7 @@ from itertools import zip_longest
 import os
 from typing import Any, Dict, Generator, List, Tuple
 import numpy as np
-from onnx import NodeProto
+from onnx_light.onnx import NodeProto
 from ..helpers import string_type
 from ..helpers.onnx_helper import (
     dtype_to_tensor_dtype,
@@ -678,7 +678,7 @@ class _BuilderRuntime:
             f"Node {node.op_type} (name={node.name!r}) has not enough "
             f"inputs {node.input}\n{self.pretty_text()}"
         )
-        data, starts, ends = [new_feeds[k] for k in node.input[:3]]
+        data, starts, ends = [new_feeds[k] for k in list(node.input)[:3]]
         axes = new_feeds[node.input[3]] if len(node.input) > 3 and node.input[3] else None
         steps = new_feeds[node.input[4]] if len(node.input) > 4 and node.input[4] else None
 

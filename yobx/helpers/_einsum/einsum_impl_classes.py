@@ -1,7 +1,7 @@
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Union
 import numpy
-from onnx import helper, numpy_helper, ModelProto, NodeProto, TensorProto
-import onnx
+from onnx_light.onnx import helper, numpy_helper, ModelProto, NodeProto, TensorProto
+from yobx._onnx_shim import onnx
 from yobx.helpers.onnx_helper import np_dtype_to_tensor_dtype as _np_dtype_to_tensor_dtype
 from .einsum_impl_ext import (
     numpy_extended_dot,
@@ -760,6 +760,24 @@ class EinsumSubOp:
         inp = self.inputs[0]
         name = self._get_data(names, inp)
         perm = self.kwargs["perm"]
+        if isinstance(inp, EinsumSubOp) and inp.name == "expand_dims":
+            # Permutes only operand axes before inserting broadcast dimensions.
+            # This avoids transposing a much higher-rank expanded tensor.
+            axes = {axis[1] for axis in inp.kwargs["axes"]}
+            original_axes = [axis for axis in range(len(perm)) if axis not in axes]
+            operand_perm = [original_axes.index(axis) for axis in perm if axis not in axes]
+            expanded_axes = [index for index, axis in enumerate(perm) if axis in axes]
+            operand_name = self._get_data(names, inp.inputs[0])
+            transposed_name = self._onnx_name() + "_operand"
+            yield helper.make_node(
+                "Transpose", [operand_name], [transposed_name], perm=operand_perm
+            )
+            axes_name = self._onnx_name() + "_axes"
+            yield numpy_helper.from_array(
+                numpy.array(expanded_axes, dtype=numpy.int64), name=axes_name
+            )
+            yield helper.make_node("Unsqueeze", [transposed_name, axes_name], [self._onnx_name()])
+            return
         s_perm = "".join(map(str, perm))
         yield helper.make_node(
             "Transpose",
@@ -838,6 +856,17 @@ class EinsumSubOp:
         yield helper.make_node("Shape", [name1], [name_shape1])
         yield helper.make_node("Shape", [name2], [name_shape2])
 
+        def shape_product(shape_name, axes, suffix):
+            name = root + suffix
+            if not axes:
+                yield numpy_helper.from_array(numpy.array([1], dtype=numpy.int64), name=name)
+                return
+            indices = name + "_axes"
+            yield numpy_helper.from_array(numpy.array(axes, dtype=numpy.int64), name=indices)
+            gathered = name + "_gather"
+            yield helper.make_node("Gather", [shape_name, indices], [gathered])
+            yield helper.make_node("ReduceProd", [gathered], [name], keepdims=1)
+
         name_batch_axes: Optional[str] = None
         if len(batch_axes) > 0:
             name_batch_axes = root + "_batch_axes"
@@ -890,10 +919,15 @@ class EinsumSubOp:
         # dimb = int(-1 if keep_axes is None else numpy.prod(
         #     [m1.shape[i] for i in keep_axes]))
         if keep_axes in (-1, None) or len(keep_axes) == 0:
-            name_dimb = root + "__1"
-            concat_left.append(name_dimb)
-            concat_right.append(name_dimb)
-            yield numpy_helper.from_array(numpy.array([-1], dtype=numpy.int64), name=name_dimb)
+            free_axes = [
+                axis
+                for axis in range(self.full_dim)
+                if axis not in batch_axes and axis not in sum_axes
+            ]
+            concat_left.append(root + "_free1")
+            concat_right.append(root + "_free2")
+            yield from shape_product(name_shape1, free_axes, "_free1")
+            yield from shape_product(name_shape2, free_axes, "_free2")
         elif len(keep_axes) == 1:
             name_keep_axes = root + "_keep_axes"
             name_dimb = root + "_dimb"
@@ -953,17 +987,16 @@ class EinsumSubOp:
         batch_kind = self.get_dot_kind()
         if batch_kind in ("11", "N1", "1N"):
             # *shape1, *shape2
-            name_minus_one = root + "__01"
-            yield numpy_helper.from_array(
-                numpy.array([-1], dtype=numpy.int64), name=name_minus_one
-            )
+            free_axes = [axis for axis in range(self.full_dim) if axis not in sum_axes]
+            yield from shape_product(name_shape1, free_axes, "_flat1")
+            yield from shape_product(name_shape2, free_axes, "_flat2")
             name_agg_shape1_2 = root + f"_resh1_{batch_kind}"
             name_agg_shape2_2 = root + f"_resh2_{batch_kind}"
             yield helper.make_node(
-                "Concat", [name_minus_one, name_dim1], [name_agg_shape1_2], axis=0
+                "Concat", [root + "_flat1", name_dim1], [name_agg_shape1_2], axis=0
             )
             yield helper.make_node(
-                "Concat", [name_minus_one, name_dim2], [name_agg_shape2_2], axis=0
+                "Concat", [root + "_flat2", name_dim2], [name_agg_shape2_2], axis=0
             )
 
             # m1sh = m1.reshape((-1, dim1))

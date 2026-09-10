@@ -1,9 +1,9 @@
 import unittest
 from typing import Any, Dict, Optional, Tuple
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 import torch
 from torch._C import _from_dlpack
 from yobx.ext_test_case import (

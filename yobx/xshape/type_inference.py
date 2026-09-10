@@ -1,6 +1,6 @@
 from typing import Dict, List, NoReturn, Optional, Sequence, Tuple, Union
-import onnx
-from onnx import FunctionProto, GraphProto, NodeProto, TensorProto
+from onnx_light import onnx
+from onnx_light.onnx import FunctionProto, GraphProto, NodeProto, TensorProto
 
 _i1_o1_node_types = {
     "Abs",

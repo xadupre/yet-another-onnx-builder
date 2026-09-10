@@ -1,64 +1,82 @@
-"""Tests for the onnx shim (USE_OPTIM_ONNX switching)."""
+"""Tests the mandatory native ONNX dependency."""
 
-import importlib
-import os
-import sys
-import types
+import ast
+import pathlib
 import unittest
+from unittest.mock import patch
+from onnx_light import onnx
 
 
 class TestOnnxShim(unittest.TestCase):
-    """Tests that the _onnx_shim module behaves correctly."""
+    def test_native_namespace(self):
+        """Exposes only the onnx-light namespace."""
+        from yobx import _onnx_shim
 
-    def _reload_shim(self, env_value: str | None) -> types.ModuleType:
-        """Reloads yobx._onnx_shim with the given USE_OPTIM_ONNX value."""
-        # Remove cached module so the top-level if/else re-runs on import.
-        sys.modules.pop("yobx._onnx_shim", None)
-        original = os.environ.get("USE_OPTIM_ONNX")
-        try:
-            if env_value is None:
-                os.environ.pop("USE_OPTIM_ONNX", None)
-            else:
-                os.environ["USE_OPTIM_ONNX"] = env_value
-            return importlib.import_module("yobx._onnx_shim")
-        finally:
-            if original is None:
-                os.environ.pop("USE_OPTIM_ONNX", None)
-            else:
-                os.environ["USE_OPTIM_ONNX"] = original
-            # Restore cached module to the version loaded without the env var.
-            sys.modules.pop("yobx._onnx_shim", None)
+        self.assertIs(_onnx_shim.onnx, onnx)
+        self.assertIs(_onnx_shim.helper, onnx.helper)
+        self.assertTrue(onnx.ModelProto.__module__.startswith("onnx_light."))
 
-    def test_shim_module_importable(self):
-        """Verifies that yobx._onnx_shim can be imported without errors."""
-        mod = importlib.import_module("yobx._onnx_shim")
-        self.assertTrue(hasattr(mod, "onnx"))
+    def test_legacy_environment_cannot_enable_reference_onnx(self):
+        """Keeps native ONNX mandatory regardless of the retired switch."""
+        import importlib
+        from yobx import _onnx_shim
 
-    def test_no_env_var_exposes_standard_onnx(self):
-        """Verifies that the shim exposes the standard onnx module by default."""
-        import onnx as real_onnx
+        for value in ("0", "1"):
+            with self.subTest(value=value), patch.dict("os.environ", USE_OPTIM_ONNX=value):
+                self.assertIs(importlib.reload(_onnx_shim).onnx, onnx)
 
-        shim = self._reload_shim(None)
-        self.assertIs(shim.onnx, real_onnx)
+    def test_no_reference_imports(self):
+        """Rejects reference ONNX imports anywhere in the package."""
+        import yobx
 
-    def test_env_var_0_exposes_standard_onnx(self):
-        """Verifies that USE_OPTIM_ONNX=0 uses standard onnx."""
-        import onnx as real_onnx
+        violations = []
+        for path in pathlib.Path(yobx.__file__).parent.rglob("*.py"):
+            for node in ast.walk(ast.parse(path.read_text())):
+                modules = (
+                    [alias.name for alias in node.names]
+                    if isinstance(node, ast.Import)
+                    else [node.module] if isinstance(node, ast.ImportFrom) else []
+                )
+                if any(name and (name == "onnx" or name.startswith("onnx.")) for name in modules):
+                    violations.append(f"{path}:{node.lineno}")
+        self.assertEqual(violations, [])
 
-        shim = self._reload_shim("0")
-        self.assertIs(shim.onnx, real_onnx)
+    def test_reference_dependent_builders_are_retired(self):
+        """Rejects third-party builders instead of reinstalling reference ONNX."""
+        from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+        from yobx.builder.spox import SpoxGraphBuilder
 
-    def test_env_var_1_without_onnx_light_raises(self):
-        """Verifies that USE_OPTIM_ONNX=1 without onnx_light raises ModuleNotFoundError."""
-        # Only run when onnx_light is not installed.
-        try:
-            importlib.import_module("onnx_light.onnx")
-            self.skipTest("onnx_light is installed; skipping absence test")
-        except ModuleNotFoundError:
-            pass
+        for builder in (OnnxScriptGraphBuilder, SpoxGraphBuilder):
+            with (
+                self.subTest(builder=builder.__name__),
+                self.assertRaisesRegex(NotImplementedError, "removed reference ONNX"),
+            ):
+                builder(18)
 
-        with self.assertRaises(ModuleNotFoundError):
-            self._reload_shim("1")
+    def test_python_pattern_engine_is_removed(self):
+        """Prevents shipping obsolete Python matchers or their public interfaces."""
+        import yobx
+        import yobx.typing
+        from yobx.translate import reverse_graph_builder
+
+        package = pathlib.Path(yobx.__file__).parent
+        self.assertEqual(list((package / "xoptim").rglob("*.py")), [])
+        self.assertFalse(hasattr(yobx.typing, "GraphBuilderPatternOptimizationProtocol"))
+        self.assertFalse(hasattr(reverse_graph_builder, "to_graph_pattern_matching"))
+        retired_classes = {
+            "PatternOptimization",
+            "EasyPatternOptimization",
+            "OnnxEasyPatternOptimization",
+            "GraphBuilderPatternOptimization",
+            "MatchResult",
+        }
+        violations = [
+            f"{path}:{node.lineno}:{node.name}"
+            for path in package.rglob("*.py")
+            for node in ast.walk(ast.parse(path.read_text()))
+            if isinstance(node, ast.ClassDef) and node.name in retired_classes
+        ]
+        self.assertEqual(violations, [])
 
 
 if __name__ == "__main__":

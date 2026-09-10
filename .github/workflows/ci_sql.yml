@@ -37,6 +37,8 @@ jobs:
         with:
           python-version: "3.12"
 
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
         run: pip install -e ".[dev,polars,sql]"
 
@@ -65,6 +67,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - uses: ./.github/actions/install-onnx-light
 
       - name: Install dependencies
         run: pip install -e ".[dev,polars,sql]"

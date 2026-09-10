@@ -1,5 +1,5 @@
 import unittest
-from onnx.checker import check_model
+from onnx_light.onnx.checker import check_model
 from yobx.ext_test_case import (
     ExtTestCase,
     skipif_ci_windows,

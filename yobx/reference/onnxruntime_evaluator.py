@@ -1,10 +1,10 @@
 from typing import Any, Dict, Iterator, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-import onnx.shape_inference as shi
-from onnx.defs import onnx_opset_version
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
+import onnx_light.onnx.shape_inference as shi
+from onnx_light.onnx.defs import onnx_opset_version
 import onnxruntime
 from ..container import ExportArtifact
 from ..helpers import string_type
@@ -62,7 +62,11 @@ class OnnxList(list):
 
         return OnnxList(
             [
-                torch.from_numpy(t).to(tensor_like.device) if isinstance(t, np.ndarray) else t
+                (
+                    torch.from_numpy(t if t.flags.writeable else t.copy()).to(tensor_like.device)
+                    if isinstance(t, np.ndarray)
+                    else t
+                )
                 for t in self
             ]
         )
@@ -426,7 +430,7 @@ class OnnxruntimeEvaluator:
             ir_version=getattr(self.proto, "ir_version", self.ir_version),
             functions=[*getattr(self.proto, "functions", []), *(functions or [])],
         )
-        del onx.opset_import[:]
+        onx.ClearField("opset_import")
         if hasattr(self.proto, "opset_import"):
             onx.opset_import.extend(self.proto.opset_import)
         elif self.opsets:
@@ -513,10 +517,14 @@ class OnnxruntimeEvaluator:
                 # We force the type to be a boolean.
                 ref = ExtendedReferenceEvaluator(node)
                 cst = ref.run(None, {})[0]
+                if not isinstance(cst, np.ndarray):
+                    raise TypeError(
+                        f"Constant {node.output[0]!s} must produce a tensor, got {type(cst)!r}."
+                    )
                 vinputs: List[onnx.ValueInfoProto] = []
                 voutputs = [
                     oh.make_tensor_value_info(
-                        node.output[0], dtype_to_tensor_dtype(cst.dtype), cst.shape
+                        str(node.output[0]), dtype_to_tensor_dtype(cst.dtype), cst.shape
                     )
                 ]
                 prenodes = []  # type: ignore[var-annotated]
@@ -524,13 +532,13 @@ class OnnxruntimeEvaluator:
                 # We force the type to be a boolean.
                 vinputs = [
                     oh.make_value_info(
-                        node.input[0],
+                        str(node.input[0]),
                         type_proto=oh.make_sequence_type_proto(
                             oh.make_tensor_type_proto(elem_type=inputs[0].itype, shape=None)
                         ),
                     )
                 ]
-                voutputs = [oh.make_tensor_value_info(node.output[0], inputs[0].itype, None)]
+                voutputs = [oh.make_tensor_value_info(str(node.output[0]), inputs[0].itype, None)]
                 prenodes = []  # type: ignore[var-annotated]
             else:
                 unique_names = set()
@@ -694,7 +702,10 @@ class OnnxruntimeEvaluator:
                     return list(res)
                 import torch
 
-                return [torch.from_numpy(r).to(inputs[0][0].device) for r in res]
+                return [
+                    torch.from_numpy(r if r.flags.writeable else r.copy()).to(inputs[0][0].device)
+                    for r in res
+                ]
 
         outputs = list(sess.run(None, feeds))
         assert isinstance(outputs, list), f"Unexpected type for outputs {type(outputs)}"
@@ -739,7 +750,7 @@ class OnnxruntimeEvaluator:
 
         begin = 0 if node.op_type == "Scan" else 1
         voutputs = []
-        for name, _goutput in zip(node.output, g.output[begin:]):
+        for name, _goutput in zip(node.output, list(g.output)[begin:]):
             v = onnx.ValueInfoProto()
             # v.ParseFromString(goutput.SerializeToString())
             v.name = name

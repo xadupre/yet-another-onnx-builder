@@ -1,6 +1,6 @@
 from typing import Dict, List
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.svm import LinearSVC, LinearSVR
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol

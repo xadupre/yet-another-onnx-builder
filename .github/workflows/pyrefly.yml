@@ -23,8 +23,10 @@ jobs:
           python-version: "3.12"
       - name: Install pytorch 2.12
         run: pip install torch==2.12.1+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,imblearn,lightgbm,perpetual,polars,sklearn,sksurv,spox,statmodels,tensorflow,torch,transformers,xgboost]" pyrefly
+        run: pip install -e ".[category_encoders,imblearn,lightgbm,perpetual,polars,sklearn,sksurv,statsmodels,tensorflow,torch,transformers,xgboost]" pyrefly
       - name: Install mbext
         run: pip install git+https://github.com/xadupre/mbext.git
       - name: Run pyrefly
