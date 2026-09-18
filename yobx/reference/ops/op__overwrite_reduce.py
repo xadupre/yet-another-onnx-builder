@@ -48,3 +48,26 @@ class ReduceMean(NativeOpKernel):
         return (
             numpy.mean(data, axis=axes, keepdims=bool(keepdims)).astype(data.dtype, copy=False),
         )
+
+
+class ReduceSum(NativeOpKernel):
+    """Computes sums with exact integer and widened low-precision accumulation."""
+
+    operation = staticmethod(numpy.sum)
+
+    def _run(self, data, axes=None, keepdims=1, noop_with_empty_axes=0):
+        axes = reduction_axes(axes)
+        if axes is None and noop_with_empty_axes:
+            return (data,)
+        dtype = numpy.float32 if data.dtype.name in {"float16", "bfloat16"} else data.dtype
+        return (
+            self.operation(data, axis=axes, keepdims=bool(keepdims), dtype=dtype).astype(
+                data.dtype, copy=False
+            ),
+        )
+
+
+class ReduceProd(ReduceSum):
+    """Computes products without converting integer inputs to floating point."""
+
+    operation = staticmethod(numpy.prod)

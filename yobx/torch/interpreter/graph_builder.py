@@ -495,17 +495,6 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         key = self._dimension_name(key)
         if key is None:
             raise TypeError(f"Unexpected dynamic object key {key!r}.")
-        self.dynamic_objects[key] = value
-        value_key = self._dynamic_value_key(value)
-        self.dynamic_objects_rev.setdefault(value_key, [])
-        if not any(
-            existing_key == key for existing_key, _ in self.dynamic_objects_rev[value_key]
-        ):
-            self.dynamic_objects_rev[value_key].append((key, value))
-        if name is not None and dim is not None:
-            self.dynamic_dimensions_source.setdefault(key, []).append(
-                {"input_name": name, "axis": dim}
-            )
         tokens = self._expression_names(key)
         if (parse or check_tokens) and tokens - {key}:
             missing = {
@@ -517,6 +506,17 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
                 raise AssertionError(
                     f"Dynamic expression {key!r} uses unknown dimensions {sorted(missing)!r}."
                 )
+        self.dynamic_objects[key] = value
+        value_key = self._dynamic_value_key(value)
+        self.dynamic_objects_rev.setdefault(value_key, [])
+        if not any(
+            existing_key == key for existing_key, _ in self.dynamic_objects_rev[value_key]
+        ):
+            self.dynamic_objects_rev[value_key].append((key, value))
+        if name is not None and dim is not None:
+            self.dynamic_dimensions_source.setdefault(key, []).append(
+                {"input_name": name, "axis": dim}
+            )
 
     def _dynamic_value_key(self, value):
         if isinstance(value, WrapSym):
@@ -534,7 +534,12 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
             tree = ast.parse(expression, mode="eval")
         except SyntaxError:
             return {expression}
-        return {node.id for node in ast.walk(tree) if isinstance(node, ast.Name)}
+        call_targets = {node.func for node in ast.walk(tree) if isinstance(node, ast.Call)}
+        return {
+            node.id
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Name) and node not in call_targets
+        }
 
     def _dimension_is_declared(self, dimension):
         return any(

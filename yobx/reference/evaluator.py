@@ -29,10 +29,20 @@ from .ops.op__extended_scatternd_of_shape import MaskedScatterNDOfShape, Scatter
 from .ops.op__extended_transpose_cast import Transpose2DCastFP16, Transpose2DCastFP32
 from .ops.op__extended_tri_matrix import TriMatrix
 from .ops.op__overwrite_argminmax import ArgMax, ArgMin
-from .ops.op__overwrite_comparison import Greater, Less
+from .ops.op__overwrite_comparison import Greater, Less, LessOrEqual
 from .ops.op__overwrite_compress import Compress
+from .ops.op__overwrite_elementwise import (
+    Clip_6,
+    Clip_11,
+    HardSigmoid,
+    IsInf,
+    Max,
+    Min,
+    NonZero,
+    Pow,
+)
 from .ops.op__overwrite_log_softmax import LogSoftmax_1, LogSoftmax_13
-from .ops.op__overwrite_reduce import ReduceMax, ReduceMean, ReduceMin
+from .ops.op__overwrite_reduce import ReduceMax, ReduceMean, ReduceMin, ReduceProd, ReduceSum
 from .ops.op__overwrite_where import Where
 from .ops.op_attention import Attention
 from .ops.op_bias_softmax import BiasSoftmax
@@ -85,12 +95,23 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         ArgMin,
         Greater,
         Less,
+        LessOrEqual,
         Compress,
+        Clip_6,
+        Clip_11,
+        HardSigmoid,
+        IsInf,
+        Max,
+        Min,
+        NonZero,
+        Pow,
         LogSoftmax_1,
         LogSoftmax_13,
         ReduceMax,
         ReduceMean,
         ReduceMin,
+        ReduceProd,
+        ReduceSum,
         Where,
         Attention,
         BiasSoftmax,

@@ -221,6 +221,14 @@ The 0.1.27 native builder also rejects valid omitted optional outputs for
 This upstream schema-arity issue is tracked in
 [xadupre/onnx-light#4991](https://github.com/xadupre/onnx-light/issues/4991);
 the adapter does not add dummy outputs to conceal it.
+Two optimizer correctness defects are also reproduced with the published 0.1.27
+wheel: `Identity` changes `Mul(0.5, 1.0)` to `1.0`
+([xadupre/onnx-light#4992](https://github.com/xadupre/onnx-light/issues/4992)),
+and `ShapeBasedIdentity` removes a `Slice` with a runtime end bound
+([xadupre/onnx-light#4993](https://github.com/xadupre/onnx-light/issues/4993)).
+These affect optimized `smooth_l1_loss` and `masked_scatter` exports, respectively.
+Their unoptimized graphs execute correctly; `optimize=False` avoids those
+rewrites but does not resolve the optional-output construction limitation.
 
 ## Comparison with existing ONNX conversion tools
 

@@ -104,6 +104,38 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
         self.assertIn("fresh_d0", builder.dynamic_objects)
         self.assertIn("fresh_d1", builder.dynamic_objects)
 
+    def test_dynamic_expression_function_names_are_not_dimensions(self):
+        """Registers function expressions while validating their dimension arguments."""
+        builder = TorchOnnxLightGraphBuilder(18)
+        builder.make_tensor_input("X", onnx.TensorProto.FLOAT, ("s70", "s9"))
+        for expression in (
+            "Max(s70,s9)",
+            "Min(s70,2*s9)",
+            "CeilToInt(FloatTrueDiv(s70,s9))",
+            "Max(s70,Min(s9,4))",
+        ):
+            with self.subTest(expression=expression):
+                builder.add_dynamic_object(expression, expression, parse=True)
+                self.assertIn(expression, builder.dynamic_objects)
+        self.assertNotIn("Max", builder.dynamic_objects)
+        self.assertEqual(builder._expression_names("Max+Max(s70,s9)"), {"Max", "s70", "s9"})
+        for expression in ("Max(s70,missing)", "Max(missing,Min(s70,s9))"):
+            with self.subTest(expression=expression):
+                before = builder.dynamic_objects.copy()
+                reverse_before = {
+                    key: list(values) for key, values in builder.dynamic_objects_rev.items()
+                }
+                sources_before = {
+                    key: list(values) for key, values in builder.dynamic_dimensions_source.items()
+                }
+                with self.assertRaisesRegex(AssertionError, "unknown dimensions.*missing"):
+                    builder.add_dynamic_object(
+                        expression, expression, name="Y", dim=0, parse=True
+                    )
+                self.assertEqual(builder.dynamic_objects, before)
+                self.assertEqual(builder.dynamic_objects_rev, reverse_before)
+                self.assertEqual(builder.dynamic_dimensions_source, sources_before)
+
     def test_set_shape_normalizes_symbolic_dimensions_without_guards(self):
         """Preserves unbacked symbols and expressions without forcing integer guards."""
         from torch.fx.experimental.symbolic_shapes import ShapeEnv
@@ -124,6 +156,51 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
         builder.set_shape("X", (dimension, 0, 3), allow_zero=True)
         self.assertEqual(builder.get_shape("X"), (str(dimension), 0, 3))
         self.assertEqual(environment.guards, [])
+
+    def test_static_slice_bounds_use_native_inference(self):
+        """Preserves constant bounds, including zero ends, with native slice inference."""
+        from onnxruntime import InferenceSession
+        from yobx.torch.interpreter._aten_functions import aten_slice_Tensor
+
+        x = numpy.arange(12, dtype=numpy.float32).reshape(2, 6)
+        for start, end, step in ((0, 3, 1), (1, None, 1), (0, 0, 1), (-4, -1, 1), (0, 6, 2)):
+            for batch in (2, "batch"):
+                with self.subTest(start=start, end=end, step=step, batch=batch):
+                    builder = TorchOnnxLightGraphBuilder(18)
+                    builder.make_tensor_input("X", onnx.TensorProto.FLOAT, (batch, 6))
+                    aten_slice_Tensor(
+                        builder, None, ["Y"], "X", dim=1, start=start, end=end, step=step
+                    )
+                    builder.make_tensor_output("Y")
+                    expected = x[:, start:end:step]
+                    self.assertEqual(builder.get_shape("Y"), (batch, expected.shape[1]))
+                    model = builder.to_onnx(optimize=False)
+                    actual = InferenceSession(
+                        model.SerializeToString(), providers=["CPUExecutionProvider"]
+                    ).run(None, {"X": x})[0]
+                    numpy.testing.assert_array_equal(actual, expected)
+
+    def test_flatten_uses_native_output_shape(self):
+        """Preserves unflattened axes when native inference handles partial flattening."""
+        from onnxruntime import InferenceSession
+        from yobx.torch.interpreter._aten_functions import aten_flatten_using_ints
+
+        x = numpy.arange(24, dtype=numpy.float32).reshape(2, 3, 4)
+        for batch in (2, "batch"):
+            for end_dim, shape in ((-1, (24,)), (0, (2, 3, 4)), (1, (6, 4)), (-2, (6, 4))):
+                with self.subTest(batch=batch, end_dim=end_dim):
+                    builder = TorchOnnxLightGraphBuilder(18)
+                    builder.make_tensor_input("X", onnx.TensorProto.FLOAT, (batch, 3, 4))
+                    aten_flatten_using_ints(
+                        builder, None, ["Y"], "X", start_dim=0, end_dim=end_dim
+                    )
+                    builder.make_tensor_output("Y")
+                    self.assertEqual(builder.get_rank("Y"), len(shape))
+                    model = builder.to_onnx(optimize=False)
+                    actual = InferenceSession(
+                        model.SerializeToString(), providers=["CPUExecutionProvider"]
+                    ).run(None, {"X": x})[0]
+                    numpy.testing.assert_array_equal(actual, x.reshape(shape))
 
     def test_legacy_export_symbolic_intermediate_shapes(self):
         """Exports and executes dynamic intermediates with the published native builder."""
@@ -148,6 +225,33 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
                 numpy.testing.assert_allclose(
                     actual, model(x).detach().numpy(), rtol=1e-5, atol=1e-6
                 )
+
+    def test_tensor_split_registers_data_dependent_output_shapes(self):
+        """Exports nested tensor outputs with newly introduced symbolic dimensions."""
+        import torch
+        from onnxruntime import InferenceSession
+        from yobx.reference import ExtendedReferenceEvaluator
+        from yobx.torch.interpreter.onnx_export import to_onnx
+
+        class Model(torch.nn.Module):
+            def forward(self, x, indices):
+                return torch.tensor_split(x, indices, dim=0)
+
+        model = Model()
+        x = torch.arange(18, dtype=torch.float32).reshape(6, 3)
+        artifact = to_onnx(model, (x, torch.tensor([1, 4])))
+        evaluators = (
+            InferenceSession(artifact.SerializeToString(), providers=["CPUExecutionProvider"]),
+            ExtendedReferenceEvaluator(artifact),
+        )
+        for indices in (torch.tensor([1, 4]), torch.tensor([0, 6]), torch.tensor([2, 3])):
+            with self.subTest(indices=indices.tolist()):
+                expected = model(x, indices)
+                for evaluator in evaluators:
+                    actual = evaluator.run(None, {"x": x.numpy(), "indices": indices.numpy()})
+                    self.assertEqual(len(actual), len(expected))
+                    for result, reference in zip(actual, expected):
+                        numpy.testing.assert_array_equal(result, reference.numpy())
 
     def test_sequence_input_and_local_function_helpers(self):
         """Declares sequence inputs and exposes native local-function metadata."""

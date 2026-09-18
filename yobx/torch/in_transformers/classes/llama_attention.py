@@ -14,6 +14,7 @@ the opsets registered in the graph builder:
   *onnxruntime*.
   GQA key/value heads are expanded (via repeat-interleave) to match the query
   head count before the attention op.
+  The converter declares contrib output types and shapes for downstream inference.
   The model runs efficiently on CPU and CUDA with OnnxRuntime.
 * **opset ≥ 24** (main opset ≥ 24):
   Uses the standard ONNX ``RotaryEmbedding`` operator (opset ≥ 23) for
@@ -313,6 +314,8 @@ def _mha_com_microsoft(
     # MultiHeadAttention returns (output [, present_key, present_value]); keep only output
     if isinstance(out, (list, tuple)):
         out = out[0]
+    g.set_type(out, g.get_type(query_3d))
+    g.set_shape(out, g.get_shape(query_3d))
     return out
 
 
@@ -421,9 +424,13 @@ def _apply_rope_ms_op(
     expand_shape = g.op.Concat(batch_1d, seq_1d, axis=0, name=name)
     position_ids = g.op.Expand(position_ids_1row, expand_shape, name=name)
 
-    return g.op.RotaryEmbedding(
+    out = g.op.RotaryEmbedding(
         x_3d, position_ids, cos_2d, sin_2d, domain="com.microsoft", num_heads=num_heads, name=name
     )
+    # Contrib operators do not have native ONNX shape inference.
+    g.set_type(out, g.get_type(x_3d))
+    g.set_shape(out, g.get_shape(x_3d))
+    return out
 
 
 @register_transformer_converter(transformers.models.llama.modeling_llama.LlamaAttention)

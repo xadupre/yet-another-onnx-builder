@@ -1994,6 +1994,18 @@ class FxGraphInterpreter:
             return val.dtype
         return None
 
+    def _register_shape_dimensions(self, shape):
+        """Registers symbolic dimensions introduced by Torch tensor metadata."""
+        for dimension in shape:
+            if isinstance(dimension, self.builder.torch.SymInt):
+                expression = str(dimension.node._expr).replace(" ", "")
+            elif isinstance(dimension, self.builder.TracingInt) and not dimension.is_static:
+                expression = dimension.value
+            else:
+                continue
+            if expression not in self.builder.dynamic_objects:
+                self.builder.add_dynamic_object(expression, dimension, parse=True)
+
     def _set_shape_and_type(
         self,
         node: "torch.fx.Node",  # noqa: F821
@@ -2079,22 +2091,13 @@ class FxGraphInterpreter:
                     ):
                         # It seems the type is not very consistent
                         # and the output might not be used.
-                        self.builder.set_type(r, dtype, exc=False)
+                        if not self.builder.has_type(r):
+                            self.builder.set_type(r, dtype)
                     else:
                         self.builder.set_type(r, dtype)
                     shape = tuple(v.shape)
 
-                    for t in shape:
-                        if isinstance(t, self.builder.torch.SymInt):
-                            expr = str(t.node._expr).replace(" ", "")
-                            if expr not in self.builder.dynamic_objects:
-                                # A new shape may be given to a result.
-                                self.builder.add_dynamic_object(expr, t, parse=True)
-                        elif isinstance(t, self.builder.TracingInt) and not t.is_static:
-                            expr = t.value
-                            if expr not in self.builder.dynamic_objects:
-                                # A new shape may be given to a result.
-                                self.builder.add_dynamic_object(expr, t, parse=True)
+                    self._register_shape_dimensions(shape)
 
                     if self.builder.is_dynamic_shape(shape):
                         # sets shape coming from the original model
@@ -2183,6 +2186,7 @@ class FxGraphInterpreter:
                                 self.builder.set_type(r_, torch_dtype_to_onnx_dtype(v_.dtype))
                                 self.builder.set_device(r_, v_.get_device())
                                 shape = tuple(v_.shape)
+                                self._register_shape_dimensions(shape)
                                 if not any(
                                     i == 0 for i in shape if isinstance(i, int)
                                 ) and self.builder.is_dynamic_shape(

@@ -466,6 +466,39 @@ class TestLlamaAttentionConverter(ExtTestCase):
     # MHA with equal heads (no GQA repeat)                                 #
     # ------------------------------------------------------------------ #
 
+    def test_com_microsoft_output_metadata(self):
+        """Preserves contrib output types and shapes before downstream inference."""
+        from yobx.xbuilder import GraphBuilder
+        from yobx.torch.in_transformers.classes.llama_attention import llama_attention_to_onnx
+        from yobx.torch.torch_helper import torch_dtype_to_onnx_dtype
+
+        for dtype in (torch.float32, torch.float16, torch.bfloat16):
+            for num_kv_heads in (2, 4):
+                for batch, seq in ((2, 10), ("batch", "seq")):
+                    with self.subTest(dtype=dtype, num_kv_heads=num_kv_heads, shape=(batch, seq)):
+                        attn = _make_llama_attention(num_key_value_heads=num_kv_heads)
+                        attn = attn.to(dtype).eval()
+                        elem_type = torch_dtype_to_onnx_dtype(dtype)
+                        g = GraphBuilder({"": 22, "com.microsoft": 1})
+                        g.make_tensor_input("hidden_states", elem_type, (batch, seq, 64))
+                        g.make_tensor_input("cos", elem_type, (batch, seq, 16))
+                        g.make_tensor_input("sin", elem_type, (batch, seq, 16))
+
+                        out = llama_attention_to_onnx(g, attn, "hidden_states", "cos", "sin")
+
+                        contrib_nodes = [n for n in g.nodes if n.domain == "com.microsoft"]
+                        self.assertEqual(
+                            [n.op_type for n in contrib_nodes],
+                            ["RotaryEmbedding", "RotaryEmbedding", "MultiHeadAttention"],
+                        )
+                        for node, width in zip(contrib_nodes, (64, num_kv_heads * 16, 64)):
+                            output_name = str(node.output[0])
+                            self.assertEqual(g.get_type(output_name), elem_type)
+                            self.assertEqual(g.get_shape(output_name), (batch, seq, width))
+                            self.assertEqual(g.get_rank(output_name), 3)
+                        self.assertEqual(g.get_type(out), elem_type)
+                        self.assertEqual(g.get_shape(out), (batch, seq, 64))
+
     @requires_onnxruntime("1.0")
     def test_com_microsoft_no_gqa_float32(self):
         """com.microsoft path when num_kv_heads == num_attention_heads."""

@@ -64,6 +64,18 @@ run and unit-test such models with the native onnx-light runtime and explicit
 NumPy callbacks, without requiring a full
 ONNX Runtime installation.
 
+Standard-operator dtype coverage
+-------------------------------
+
+Explicit NumPy kernels also cover standard operators whose native wheel kernels
+do not support every required dtype: ``ReduceSum``, ``ReduceProd``, ``Pow``,
+``LessOrEqual``, ``Min``, ``Max``, ``IsInf``, ``NonZero``, ``Clip`` and
+``HardSigmoid``. These registrations are selected before execution; they are
+not exception-triggered fallbacks. Double and integer inputs retain their
+precision. Half-precision and bfloat16 reductions accumulate in float32 and
+return the original dtype. Native graph optimization and constant folding
+remain separate from these evaluator registrations.
+
 Custom kernel lifetime
 ----------------------
 
