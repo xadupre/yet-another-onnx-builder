@@ -34,8 +34,8 @@ class TestNativeTorchExport(unittest.TestCase):
         self.assertIs(GraphBuilder, OnnxLightGraphBuilder)
         self.assertIs(DirectGraphBuilder, OnnxLightGraphBuilder)
         self.assertIs(OptimizationOptions, OnnxLightOptimizationOptions)
-        with self.assertRaises(TypeError):
-            OptimizationOptions(constant_folding=False)
+        options = OptimizationOptions(constant_folding=False)
+        self.assertFalse(options.constant_folding)
 
     def test_linear_relu_dynamic_batch(self):
         import torch
