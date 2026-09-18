@@ -46,7 +46,7 @@ jobs:
       - name: Install mbext
         run: |
           pip install --no-deps git+https://github.com/xadupre/mbext.git
-          python -c "import onnx_light; assert onnx_light.__version__ == '0.1.26'"
+          python -c "import onnx_light; assert onnx_light.__version__ == '0.1.27'"
 
       - name: pip freeze
         run: pip freeze
@@ -86,7 +86,7 @@ jobs:
       - name: Install mbext
         run: |
           pip install --no-deps git+https://github.com/xadupre/mbext.git
-          python -c "import onnx_light; assert onnx_light.__version__ == '0.1.26'"
+          python -c "import onnx_light; assert onnx_light.__version__ == '0.1.27'"
 
       - name: pip freeze
         run: pip freeze
