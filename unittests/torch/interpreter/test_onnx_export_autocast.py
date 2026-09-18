@@ -145,7 +145,7 @@ class TestOnnxExportAutocast(ExtTestCase):
         onx = to_onnx(model, inputs, verbose=10)
 
         # Inline local functions so every Cast node is visible in the flat graph.
-        flat = inline_local_functions(onx)
+        flat = inline_local_functions(onx.proto)
         cast_tos = _cast_targets(flat)
 
         self.assertIn(
@@ -183,7 +183,7 @@ class TestOnnxExportAutocast(ExtTestCase):
         onx = to_onnx(model, inputs)
 
         # 1. Check that a Cast to float16 is present anywhere in the model.
-        flat = inline_local_functions(onx)
+        flat = inline_local_functions(onx.proto)
         cast_tos = _cast_targets(flat)
         self.assertIn(
             TensorProto.FLOAT16,

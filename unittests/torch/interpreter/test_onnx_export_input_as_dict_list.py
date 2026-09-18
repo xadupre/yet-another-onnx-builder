@@ -198,7 +198,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
         )
         from yobx._onnx_shim import onnx
 
-        onnx.save(onx, self.get_dump_file("test_list_input_tracer.onnx"))
+        onnx.save(onx.proto, self.get_dump_file("test_list_input_tracer.onnx"))
         shapes = [
             tuple(
                 (d.dim_value if d.dim_value else d.dim_param)
@@ -236,7 +236,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
         )
         from yobx._onnx_shim import onnx
 
-        onnx.save(onx, self.get_dump_file("test_neuron_tracer.onnx"))
+        onnx.save(onx.proto, self.get_dump_file("test_neuron_tracer.onnx"))
         feeds = {"x": x.numpy()}
 
         expected = model(x)

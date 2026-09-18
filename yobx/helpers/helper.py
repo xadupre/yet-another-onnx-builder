@@ -1287,7 +1287,7 @@ def max_diff(
 
 
 def size_type(dtype: Any) -> int:
-    """Returns the element size for an element type."""
+    """Returns the byte size of a fixed-width element, rejecting packed ONNX types."""
     if isinstance(dtype, int):
         from onnx_light.onnx import TensorProto
 

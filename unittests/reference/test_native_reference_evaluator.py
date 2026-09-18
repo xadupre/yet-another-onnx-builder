@@ -162,7 +162,55 @@ class TestNativeReferenceEvaluator(unittest.TestCase):
         )
         self.assertTrue(session.unregister_custom_kernel("", "Add"))
         self.assertFalse(session.unregister_custom_kernel("", "Add"))
+        np.testing.assert_array_equal(session.run(["sum"], self.feeds)[0], result)
+        fresh_session = ExtendedReferenceEvaluator(self.make_model())
+        np.testing.assert_array_equal(
+            fresh_session.run(["sum"], self.feeds)[0], self.expected_sum
+        )
+
+    def test_custom_callback_replacement_before_and_after_resolution(self):
+        session = ExtendedReferenceEvaluator(self.make_model())
+        session.register_custom_kernel("", "Add", lambda node, x, b: x - b)
+        session.register_custom_kernel("", "Add", lambda node, x, b: x * b)
+        expected = self.feeds["X"] * np.array([1, -1], dtype=np.float32)
+        np.testing.assert_array_equal(session.run(["sum"], self.feeds)[0], expected)
+
+        session.register_custom_kernel("", "Add", lambda node, x, b: x - b)
+        np.testing.assert_array_equal(session.run(["sum"], self.feeds)[0], expected)
+        fresh_session = ExtendedReferenceEvaluator(self.make_model())
+        fresh_session.register_custom_kernel("", "Add", lambda node, x, b: x - b)
+        np.testing.assert_array_equal(
+            fresh_session.run(["sum"], self.feeds)[0],
+            self.feeds["X"] - np.array([1, -1], dtype=np.float32),
+        )
+
+    def test_custom_callback_removal_before_resolution(self):
+        session = ExtendedReferenceEvaluator(self.make_model())
+        session.register_custom_kernel("", "Add", lambda node, x, b: x - b)
+        self.assertTrue(session.unregister_custom_kernel("", "Add"))
         np.testing.assert_array_equal(session.run(["sum"], self.feeds)[0], self.expected_sum)
+
+    def test_custom_callback_registration_keeps_resolved_builtin(self):
+        session = ExtendedReferenceEvaluator(self.make_model())
+        np.testing.assert_array_equal(session.run(["sum"], self.feeds)[0], self.expected_sum)
+        session.register_custom_kernel("", "Add", lambda node, x, b: x - b)
+        np.testing.assert_array_equal(session.run(["sum"], self.feeds)[0], self.expected_sum)
+
+    def test_custom_callback_survives_shape_changes_after_removal(self):
+        model = self.make_model()
+        for value in [model.graph.input[0], *model.graph.output]:
+            value.type.tensor_type.shape.dim[0].dim_param = "batch"
+        session = ExtendedReferenceEvaluator(model)
+        session.register_custom_kernel("", "Add", lambda node, x, b: x - b)
+        bias = np.array([1, -1], dtype=np.float32)
+        np.testing.assert_array_equal(session.run(["sum"], self.feeds)[0], self.feeds["X"] - bias)
+        self.assertTrue(session.unregister_custom_kernel("", "Add"))
+        for batch in (1, 3, 2):
+            with self.subTest(batch=batch):
+                x = np.arange(batch * 2, dtype=np.float32).reshape(batch, 2)
+                product, total = session.run(None, {**self.feeds, "X": x})
+                np.testing.assert_array_equal(total, x - bias)
+                np.testing.assert_array_equal(product, (x - bias) @ self.feeds["W"])
 
     def test_greater_float64_broadcast_precision(self):
         x = np.array([[1 + 1e-12, 1.0], [1 - 1e-12, 1 + 3e-12]], dtype=np.float64)

@@ -24,7 +24,21 @@ class TestSizeType(ExtTestCase):
                     continue
                 if name in {"NAME_FIELD_NUMBER"}:
                     continue
-                if name not in {"STRING", "UINT4", "INT4", "FLOAT4E2M1", "INT2", "UINT2"}:
+                if name in {
+                    "STRING",
+                    "UINT4",
+                    "INT4",
+                    "FLOAT4E2M1",
+                    "INT2",
+                    "UINT2",
+                    "FLOAT6E2M3",
+                    "FLOAT6E3M2",
+                }:
+                    with self.assertRaisesRegex(
+                        AssertionError, "Unable to return the element size"
+                    ):
+                        size_type(i)
+                else:
                     size_type(i)
 
                 if name not in {
@@ -34,6 +48,8 @@ class TestSizeType(ExtTestCase):
                     "INT2",
                     "UINT2",
                     "FLOAT4E2M1",
+                    "FLOAT6E2M3",
+                    "FLOAT6E3M2",
                     "FLOAT8E5M2FNUZ",
                     "FLOAT8E5M2",
                     "FLOAT8E4M3FN",

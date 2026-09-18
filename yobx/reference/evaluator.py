@@ -75,6 +75,9 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
     ``new_ops`` accepts :class:`NativeOpKernel` subclasses. Alternatively,
     ``register_custom_kernel(domain, op_type, fn)`` registers a callable with
     signature ``fn(node, *inputs)`` returning an array or a tuple of arrays.
+    Registrations affect future node resolutions. Once resolved, a node retains
+    its kernel across runs and shape changes, even after replacement or removal
+    of the registration. A new evaluator is required to change that kernel.
     """
 
     default_ops: List[type[NativeOpKernel]] = [
@@ -246,12 +249,12 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
                 registered.add(key)
 
     def register_custom_kernel(self, domain, op_type, fn):
-        """Registers an explicit callback, including for attributed function calls."""
+        """Registers a callback for future resolutions, not already-resolved nodes."""
         super().register_custom_kernel(domain, op_type, fn)
         self._registered_callbacks[domain, op_type] = fn
 
     def unregister_custom_kernel(self, domain, op_type):
-        """Unregisters an explicit callback."""
+        """Removes a registration without changing already-resolved kernels."""
         removed = super().unregister_custom_kernel(domain, op_type)
         self._registered_callbacks.pop((domain, op_type), None)
         return removed

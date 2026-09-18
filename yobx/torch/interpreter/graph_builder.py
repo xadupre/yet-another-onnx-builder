@@ -1137,6 +1137,17 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
             name = name.name
         self._known_torch_value[name] = (where, value)
 
+    def set_shape(self, name, shape, allow_zero=False, set_if_more_precise=False):
+        """Normalizes Torch dimensions before passing them to native inference."""
+        normalized = (
+            None
+            if shape is None
+            else tuple(self._normalize_dimension(dimension, add=False) for dimension in shape)
+        )
+        super().set_shape(
+            name, normalized, allow_zero=allow_zero, set_if_more_precise=set_if_more_precise
+        )
+
     def unique_node_name(self, name):
         """Returns a unique native node name."""
         candidate = name

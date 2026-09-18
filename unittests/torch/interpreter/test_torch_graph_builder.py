@@ -104,6 +104,51 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
         self.assertIn("fresh_d0", builder.dynamic_objects)
         self.assertIn("fresh_d1", builder.dynamic_objects)
 
+    def test_set_shape_normalizes_symbolic_dimensions_without_guards(self):
+        """Preserves unbacked symbols and expressions without forcing integer guards."""
+        from torch.fx.experimental.symbolic_shapes import ShapeEnv
+
+        environment = ShapeEnv()
+        dimension = environment.create_unbacked_symint()
+        builder = TorchOnnxLightGraphBuilder(18)
+        builder.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", "width", 3))
+        builder.set_shape("X", (dimension, 2 * dimension, numpy.int64(3)))
+        expected = (str(dimension), str(2 * dimension).replace(" ", ""), 3)
+        self.assertEqual(builder.get_shape("X"), expected)
+        self.assertEqual(builder.get_type("X"), onnx.TensorProto.FLOAT)
+        self.assertEqual(environment.guards, [])
+        builder.set_shape("X", (None, 2 * dimension, 3), set_if_more_precise=True)
+        self.assertEqual(builder.get_shape("X"), expected)
+        with self.assertRaisesRegex(ValueError, "Invalid shape"):
+            builder.set_shape("X", (dimension, 0, 3))
+        builder.set_shape("X", (dimension, 0, 3), allow_zero=True)
+        self.assertEqual(builder.get_shape("X"), (str(dimension), 0, 3))
+        self.assertEqual(environment.guards, [])
+
+    def test_legacy_export_symbolic_intermediate_shapes(self):
+        """Exports and executes dynamic intermediates with the published native builder."""
+        import torch
+        from onnxruntime import InferenceSession
+        from yobx.torch.interpreter.onnx_export import to_onnx
+
+        model = torch.nn.Sequential(torch.nn.Linear(3, 4), torch.nn.Sigmoid()).eval()
+        artifact = to_onnx(
+            model,
+            (torch.randn(2, 3),),
+            input_names=["X"],
+            dynamic_shapes=({0: torch.export.Dim("batch")},),
+        )
+        session = InferenceSession(
+            artifact.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        for batch in (1, 2, 5):
+            with self.subTest(batch=batch):
+                x = torch.randn(batch, 3)
+                actual = session.run(None, {"X": x.numpy()})[0]
+                numpy.testing.assert_allclose(
+                    actual, model(x).detach().numpy(), rtol=1e-5, atol=1e-6
+                )
+
     def test_sequence_input_and_local_function_helpers(self):
         """Declares sequence inputs and exposes native local-function metadata."""
         builder = TorchOnnxLightGraphBuilder(18, input_names=["renamed_sequence"])

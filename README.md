@@ -216,6 +216,11 @@ and the historical
 Subgraphs that redefine names visible in an ancestor scope remain incompatible
 and are rejected as SSA violations. These errors are surfaced rather than hidden
 behind a Python fallback.
+The 0.1.27 native builder also rejects valid omitted optional outputs for
+`MaxPool`, `BatchNormalization`, `Attention`, and `SoftmaxCrossEntropyLoss`.
+This upstream schema-arity issue is tracked in
+[xadupre/onnx-light#4991](https://github.com/xadupre/onnx-light/issues/4991);
+the adapter does not add dummy outputs to conceal it.
 
 ## Comparison with existing ONNX conversion tools
 

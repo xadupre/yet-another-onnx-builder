@@ -11,8 +11,8 @@ but differ in their backend, tensor type, and primary use-case:
 +------------------------------------+---------------------+-----------------+-----------------------------------+
 | Class                              | Backend             | Tensor type     | Best suited for                   |
 +====================================+=====================+=================+===================================+
-| :class:`ExtendedReferenceEvaluator`| onnx reference      | NumPy           | unit-testing, contrib ops, pure   |
-|                                    | (Python)            | ``ndarray``     | Python debugging                  |
+| :class:`ExtendedReferenceEvaluator`| onnx-light          | NumPy           | unit-testing, contrib ops,        |
+|                                    | (native)            | ``ndarray``     | kernel debugging                  |
 +------------------------------------+---------------------+-----------------+-----------------------------------+
 | :class:`OnnxruntimeEvaluator`      | ONNX Runtime        | NumPy or        | debugging ORT execution,          |
 |                                    | (node-by-node or    | PyTorch         | inspecting intermediate results,  |
@@ -28,8 +28,8 @@ All three evaluators accept an ``onnx.ModelProto`` (or filename) and return a
 list of outputs when called via ``run(None, feed_dict)``.  The key
 differences are:
 
-* **ExtendedReferenceEvaluator** — a pure Python, NumPy-based evaluator that
-  extends :class:`onnx.reference.ReferenceEvaluator` with extra kernels for
+* **ExtendedReferenceEvaluator** — a NumPy-facing evaluator that
+  extends :class:`onnx_light.onnx.reference.ReferenceEvaluator` with extra kernels for
   non-standard domains (``com.microsoft``, ``ai.onnx.complex``).  No ONNX
   Runtime installation is required.  Ideal for unit tests and operator
   prototyping.
@@ -53,16 +53,31 @@ ExtendedReferenceEvaluator
 ==========================
 
 :class:`yobx.reference.ExtendedReferenceEvaluator` extends
-:class:`onnx.reference.ReferenceEvaluator` with additional operator kernels
+:class:`onnx_light.onnx.reference.ReferenceEvaluator` with additional operator kernels
 for non-standard domains such as ``com.microsoft`` and ``ai.onnx.complex``.
 
-The standard :class:`onnx.reference.ReferenceEvaluator` only knows about
-operators defined in the ONNX standard.  ONNX Runtime ships many *contrib*
+ONNX Runtime ships many *contrib*
 operators (domain ``com.microsoft``) that are widely used in production
 models — for example ``FusedMatMul``, ``QuickGelu`` and ``Attention``.
 :class:`~yobx.reference.ExtendedReferenceEvaluator` makes it possible to
-run and unit-test such models with pure Python, without requiring a full
+run and unit-test such models with the native onnx-light runtime and explicit
+NumPy callbacks, without requiring a full
 ONNX Runtime installation.
+
+Custom kernel lifetime
+----------------------
+
+``register_custom_kernel(domain, op_type, fn)`` registers a callable with signature
+``fn(node, *inputs)``. Registration, replacement and removal affect only future
+node resolutions. With onnx-light 0.1.27, each resolved node retains its kernel
+across repeated runs and input-shape changes. In particular,
+``unregister_custom_kernel`` returns whether it removed a registration, not
+whether a previously resolved node stopped using that callback.
+
+To replace a kernel that has already run, create a new evaluator and register
+the replacement before its first run. To restore a built-in kernel, create a
+new evaluator without the override. Registrations are local to an evaluator;
+another evaluator does not inherit them.
 
 Built-in operators
 ------------------

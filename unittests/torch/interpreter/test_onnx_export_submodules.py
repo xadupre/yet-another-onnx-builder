@@ -51,7 +51,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             verbose=0,
             inline=False,
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 2)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -97,7 +97,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             function_options=FunctionOptions(merge_allowed=True, external_threshold=0),
             inline=False,
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 2)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -138,7 +138,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             verbose=0,
             inline=False,
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 1)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -203,7 +203,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             inline=False,
             filename=filename,
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 3)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -256,7 +256,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 2)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -322,7 +322,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 3)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -390,7 +390,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 1)
         self.assertEqual(["<locals>_Level2"], [f.name for f in onx.functions])
         ref = ExtendedReferenceEvaluator(onx)
@@ -459,7 +459,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 1)
         self.assertEqual(["<locals>_Level1"], [f.name for f in onx.functions])
         ref = ExtendedReferenceEvaluator(onx)
@@ -515,7 +515,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 2)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -583,7 +583,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 1)
         self.assertEqual(["<locals>_Level2"], [f.name for f in onx.functions])
         ref = ExtendedReferenceEvaluator(onx)
@@ -650,7 +650,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 1)
         self.assertEqual(["<locals>_Level1"], [f.name for f in onx.functions])
         ref = ExtendedReferenceEvaluator(onx)
@@ -701,7 +701,7 @@ class TestOnnxExportSubModules(ExtTestCase):
                 verbose=0,
                 filename=filename2,
             )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertGreater(len(onx.functions), 0)
 
 
