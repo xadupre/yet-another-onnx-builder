@@ -1,8 +1,9 @@
 import subprocess
-from typing import Dict
+from typing import Dict, Union
 import numpy as np
-import onnx
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.numpy_helper as onh
+from ..container import ExportArtifact
 from ..reference import ExtendedReferenceEvaluator as Inference
 from .onnx_helper import onnx_dtype_name, pretty_onnx, get_hidden_inputs
 
@@ -48,7 +49,7 @@ def _make_edge_label(value_info: onnx.ValueInfoProto, multi_line: bool = False) 
     return f"{onnx_dtype_name(itype)}({sshape})"
 
 
-def to_dot(model: onnx.ModelProto) -> str:
+def to_dot(model: Union[onnx.ModelProto, ExportArtifact]) -> str:
     """
     Converts a model into a dot graph.
     Here is an example:
@@ -57,9 +58,9 @@ def to_dot(model: onnx.ModelProto) -> str:
         :script: DOT-SECTION
 
         import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        from yobx._onnx_shim import onnx
+        import onnx_light.onnx.helper as oh
+        import onnx_light.onnx.numpy_helper as onh
         from yobx.helpers.dot_helper import to_dot
 
         TFLOAT = onnx.TensorProto.FLOAT
@@ -89,6 +90,11 @@ def to_dot(model: onnx.ModelProto) -> str:
         dot = to_dot(model)
         print("DOT-SECTION", dot)
     """
+    if isinstance(model, ExportArtifact):
+        if model.proto is None:
+            raise ValueError("The export artifact does not contain an ONNX model.")
+        model = model.proto
+
     _unique: Dict[int, int] = {}
 
     def _mkn(obj: object) -> int:
@@ -99,14 +105,10 @@ def to_dot(model: onnx.ModelProto) -> str:
         _unique[id_obj] = i
         return i
 
-    builder = None
-    try:
-        from ..xshape import BasicShapeBuilder
+    from ..xshape import NativeShapeInference
 
-        builder = BasicShapeBuilder()
-        builder.run_model(model)
-    except Exception:
-        builder = None
+    builder = NativeShapeInference()
+    builder.run_model(model)
 
     op_type_colors = {
         "Shape": "#d2a81f",
@@ -176,8 +178,12 @@ def to_dot(model: onnx.ModelProto) -> str:
             continue
 
         sess = Inference(node)
-        value = sess.run(None, {})[0]  # type: ignore
-        inits.append(onh.from_array(value, name=node.output[0]))
+        value = sess.run(None, {})[0]
+        if not isinstance(value, np.ndarray):
+            raise TypeError(
+                f"Constant {node.output[0]!s} produced {type(value)}, expected ndarray."
+            )
+        inits.append(onh.from_array(value, name=str(node.output[0])))
 
     for init in inits:
         if init.name in name_to_ids:

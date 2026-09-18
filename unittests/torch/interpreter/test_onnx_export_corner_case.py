@@ -4,8 +4,8 @@ import os
 import unittest
 import warnings
 from io import StringIO
-import onnx
-from onnx.reference import ReferenceEvaluator
+from yobx._onnx_shim import onnx
+from onnx_light.onnx.reference import ReferenceEvaluator
 from yobx.ext_test_case import (
     ExtTestCase,
     ignore_warnings,
@@ -145,7 +145,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
             try:
                 InferenceSession(name, providers=["CPUExecutionProvider"])
             except Exception as e:
-                import onnx
+                from yobx._onnx_shim import onnx
 
                 raise AssertionError(
                     f"onnxruntime cannot load the model "
@@ -643,8 +643,8 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @ignore_warnings((UserWarning, DeprecationWarning))
     def test_check_model_weights_transposed(self):
         """check_model_weights detects a transposed initializer."""
-        import onnx.helper as oh
-        from onnx import TensorProto
+        import onnx_light.onnx.helper as oh
+        from onnx_light.onnx import TensorProto
         import torch
 
         class Model(torch.nn.Module):
@@ -686,8 +686,8 @@ class TestOnnxExportCornerCase(ExtTestCase):
     def test_check_model_weights_unknown(self):
         """check_model_weights flags an initializer whose name is not in the model."""
         import numpy as np
-        import onnx.helper as oh
-        from onnx import TensorProto
+        import onnx_light.onnx.helper as oh
+        from onnx_light.onnx import TensorProto
         import torch
 
         class Model(torch.nn.Module):

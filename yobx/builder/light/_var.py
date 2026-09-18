@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Union
 import numpy as np
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 from ._graph import OnnxGraph
 from ._op_var import OpsVar
 from ._op_vars import OpsVars
@@ -150,7 +150,7 @@ class Var(BaseVar, OpsVar):
     def __str__(self) -> str:
         s = self.name
         if self.elem_type is not None:
-            s = f"{s}:{self.elem_type}"
+            s = f"{s}:{int(self.elem_type)}"
         if self.shape is not None:
             s = f"{s}:{list(self.shape)}"
         return s

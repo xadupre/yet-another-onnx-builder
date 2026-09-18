@@ -120,7 +120,7 @@ forwarded verbatim to the selected converter.
      - ``False``
      - When ``True``, the returned artifact's
        :attr:`~yobx.container.ExportArtifact.report` attribute is
-       populated with per-pattern optimization statistics.
+       populated with native optimization statistics.
 
 .. _l-main-to-onnx-dynamic-shapes:
 
@@ -170,7 +170,7 @@ See :ref:`l-design-export-artifact` for the complete API, including how to:
 * access the ONNX proto via ``artifact.proto`` or ``artifact.get_proto()``
 * save the model to disk with ``artifact.save("model.onnx")``
 * reload from disk with ``ExportArtifact.load("model.onnx")``
-* inspect per-pattern optimization statistics via ``artifact.report``
+* inspect native optimization statistics via ``artifact.report``
 
 Examples
 ========

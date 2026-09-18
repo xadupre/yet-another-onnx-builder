@@ -100,7 +100,8 @@ class TestToOnnxReturnOptimizeReport(ExtTestCase):
         self.assertIsNotNone(artifact.report)
         self.assertIsInstance(artifact.report, ExportReport)
         self.assertIsInstance(artifact.report.stats, list)
-        self.assertGreater(len(artifact.report.stats), 0)
+        self.assertEqual(artifact.report.extra["backend"], "onnx-light")
+        self.assertGreaterEqual(artifact.report.extra["rewrites"], 0)
 
     def test_callable_default_report_is_none(self):
         """Report is None by default for callable (numpy function) dispatch."""
@@ -125,7 +126,8 @@ class TestToOnnxReturnOptimizeReport(ExtTestCase):
         artifact = to_onnx(my_func, x, return_optimize_report=True)
         self.assertIsNotNone(artifact.report)
         self.assertIsInstance(artifact.report, ExportReport)
-        self.assertGreater(len(artifact.report.stats), 0)
+        self.assertEqual(artifact.report.extra["backend"], "onnx-light")
+        self.assertGreaterEqual(artifact.report.extra["rewrites"], 0)
 
     @requires_sklearn()
     def test_sklearn_default_report_is_none(self):
@@ -154,7 +156,8 @@ class TestToOnnxReturnOptimizeReport(ExtTestCase):
         artifact = to_onnx(model, (X,), return_optimize_report=True)
         self.assertIsNotNone(artifact.report)
         self.assertIsInstance(artifact.report, ExportReport)
-        self.assertGreater(len(artifact.report.stats), 0)
+        self.assertEqual(artifact.report.extra["backend"], "onnx-light")
+        self.assertGreaterEqual(artifact.report.extra["rewrites"], 0)
 
 
 if __name__ == "__main__":

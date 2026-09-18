@@ -82,35 +82,6 @@ as a fused C++ kernel, avoiding intermediate materialisation.
      - ``"sqeuclidean"``
      - Pairwise squared distances inside RBF / Matérn kernel evaluation
 
-Graph optimizer patterns
--------------------------
-
-The optimizer patterns in :mod:`yobx.xoptim.patterns_ort` fuse sequences
-of standard ONNX nodes into single ``com.microsoft`` kernels:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 30 70
-
-   * - Contrib op
-     - Replaces / fuses
-   * - ``FusedMatMul``
-     - ``MatMul`` + optional transpose or scale attributes
-   * - ``FusedConv``
-     - ``Conv`` followed by ``Relu`` (or other pointwise activations)
-   * - ``BiasGelu``
-     - ``Add(bias) + Gelu``
-   * - ``Gelu``
-     - ``Erf``-based GELU approximation
-   * - ``FastGelu``
-     - ``Tanh``-based GELU approximation
-   * - ``QuickGelu``
-     - ``Sigmoid``-based GELU approximation (``x * σ(αx)``)
-   * - ``SkipSimplifiedLayerNormalization``
-     - ``Add(residual) + SimplifiedLayerNorm``
-   * - ``RotaryEmbedding``
-     - Rotary positional embedding sequence
-
 When to use contrib ops
 ========================
 

@@ -13,7 +13,7 @@ and then flatten it to produce the ONNX-compatible layout.
 from typing import Any, Dict, List
 
 import numpy as np
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 import tensorflow as tf
 
 from ..register import register_tf_op_converter

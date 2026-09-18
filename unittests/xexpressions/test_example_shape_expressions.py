@@ -1,10 +1,10 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape import BasicShapeBuilder
+from yobx.xshape import NativeShapeInference
 from yobx.xexpressions.simplify_expressions import simplify_expression
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -27,7 +27,7 @@ class TestExampleShapeExpressions(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model)
         self.assertEqual(builder.get_shape("X"), ("batch", "seq1"))
         self.assertEqual(builder.get_shape("Y"), ("batch", "seq2"))
@@ -47,12 +47,12 @@ class TestExampleShapeExpressions(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model)
         context = dict(batch=2, seq1=5, seq2=7)
         self.assertEqual(builder.evaluate_shape("Z", context), (2, 12))
 
-    def test_reshape_floor_division_expression(self):
+    def test_reshape_exact_division_expression(self):
         model = oh.make_model(
             oh.make_graph(
                 [oh.make_node("Reshape", ["X", "shape"], ["Xr"])],
@@ -64,9 +64,10 @@ class TestExampleShapeExpressions(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model)
-        self.assertEqual(builder.get_shape("Xr"), ("a", "b", 2, "c//2"))
+        self.assertEqual(builder.get_shape("Xr"), ("a", "b", 2, "c/:2"))
+        self.assertEqual(builder.evaluate_shape("Xr", dict(a=3, b=4, c=6)), (3, 4, 2, 3))
 
     def test_split_ceil_division_expression(self):
         model = oh.make_model(
@@ -88,14 +89,17 @@ class TestExampleShapeExpressions(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model)
         self.assertEqual(builder.get_shape("xy"), ("a", "b+c"))
         self.assertEqual(builder.get_shape("S1"), ("a", "(1+b+c)//2"))
-        self.assertEqual(builder.get_shape("S2"), ("a", "b+c-(1+b+c)//2"))
+        self.assertEqual(builder.get_shape("S2"), ("a", "(b+c)//2"))
         context = dict(a=3, b=4, c=6)
         self.assertEqual(builder.evaluate_shape("S1", context), (3, 5))
         self.assertEqual(builder.evaluate_shape("S2", context), (3, 5))
+        odd_context = dict(a=3, b=4, c=7)
+        self.assertEqual(builder.evaluate_shape("S1", odd_context), (3, 6))
+        self.assertEqual(builder.evaluate_shape("S2", odd_context), (3, 5))
 
     def test_simplify_expressions(self):
         self.assertEqual(simplify_expression("d + f - f"), "d")

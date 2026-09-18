@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from ...xbuilder.graph_builder import GraphBuilder
 from ...xshape._shape_helper import is_static_shape
 from ...xshape.shape_type_compute import set_type_shape_unary_op

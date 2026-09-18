@@ -1,11 +1,11 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.xshape import ShapeBuilder, BasicShapeBuilder
+from yobx.xshape import ShapeBuilder, NativeShapeInference
 
 TFLOAT = onnx.TensorProto.FLOAT
 TFLOAT16 = onnx.TensorProto.FLOAT16
@@ -29,8 +29,8 @@ class TestShapeBuilder(ExtTestCase):
                     lambda me=me: getattr(builder, me)("", None), NotImplementedError
                 )
 
-    def test_basic_shape_builder(self):
-        b = BasicShapeBuilder()
+    def test_native_shape_builder(self):
+        b = NativeShapeInference()
         msg = b.get_debug_msg()
         self.assertIn("--SHAPE--", msg)
 
@@ -61,8 +61,7 @@ class TestShapeBuilder(ExtTestCase):
                 ],
             )
         )
-        onnx.shape_inference.infer_shapes(model)
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model)
         self.assertEqual(builder._input_names, ["X", "Y"])
         self.assertEqual(
@@ -123,7 +122,7 @@ class TestShapeBuilder(ExtTestCase):
             },
         )
         self.assertEqualAny(
-            builder.constants_computed_,
+            {str(t.name): builder.get_constant(str(t.name)) for t in model.graph.initializer},
             {
                 "shape1": np.array([1, 32, 128], dtype=np.int64),
                 "shape2": np.array([15, 128, 64], dtype=np.int64),
@@ -132,18 +131,8 @@ class TestShapeBuilder(ExtTestCase):
                 "zero": np.array([0], dtype=np.int64),
             },
         )
-        self.assertEqual(builder.constraints_, {})
-        self.assertEqual(
-            builder.dynamic_dimensions_,
-            {
-                "D128": {"D128"},
-                "D32": {"D32"},
-                "D64": {"D64"},
-                "batch": {"batch"},
-                "channel": {"channel"},
-            },
-        )
-        self.assertEqual(builder._known_value_shape, {"zero": (0,), "un": (1,)})
+        self.assertEqual(builder.value_as_shape("zero"), (0,))
+        self.assertEqual(builder.value_as_shape("un"), (1,))
         self.assertEqual(builder._output_names, ["Z"])
 
     def test_reshape_reshape(self):
@@ -164,8 +153,7 @@ class TestShapeBuilder(ExtTestCase):
                 ],
             )
         )
-        onnx.shape_inference.infer_shapes(model)
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model)
         self.assertEqual(builder._input_names, ["X"])
         self.assertEqual(
@@ -179,7 +167,7 @@ class TestShapeBuilder(ExtTestCase):
                 "shape2": (3,),
                 "one": (1,),
                 "X": ("a", "b", "c"),
-                "xr": ("a", "b", 2, "c//2"),
+                "xr": ("a", "b", 2, "c/:2"),
                 "xrr": ("a", "b", "c"),
                 "Y": ("a", "b", "c"),
             },
@@ -189,12 +177,10 @@ class TestShapeBuilder(ExtTestCase):
             {"shape1": 7, "shape2": 7, "one": 1, "X": 1, "xr": 1, "xrr": 1, "Y": 1},
         )
         self.assertEqualAny(
-            builder.constants_computed_,
+            {name: builder.get_constant(name) for name in ("shape1", "shape2")},
             {"shape1": np.array([0, 0, 2, -1]), "shape2": np.array([0, 0, -1])},
         )
-        self.assertEqual(builder.constraints_, {})
-        self.assertEqual(builder.dynamic_dimensions_, {"a": {"a"}, "b": {"b"}, "c": {"c"}})
-        self.assertEqual(builder._known_value_shape, {})
+        self.assertEqual(builder.evaluate_shape("xr", {"a": 2, "b": 3, "c": 8}), (2, 3, 2, 4))
         self.assertEqual(builder._output_names, ["Y"])
 
     def test_value_as_shape(self):
@@ -230,8 +216,7 @@ class TestShapeBuilder(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        onnx.shape_inference.infer_shapes(model)
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model)
         self.assertEqual(
             builder._known_value_shape,
@@ -301,11 +286,7 @@ class TestShapeBuilder(ExtTestCase):
                 "Ct": ("batch", 32, "seq", 8),
             },
         )
-        self.assertEqualAny(
-            builder.constants_computed_, {"init328": np.array([32, 8], dtype=np.int64)}
-        )
-        self.assertEqual(builder.constraints_, {})
-        self.assertEqual(builder.dynamic_dimensions_, {"batch": {"batch"}, "seq": {"seq"}})
+        self.assertEqualAny(builder.get_constant("init328"), np.array([32, 8], dtype=np.int64))
         self.assertEqual(builder._output_names, ["At", "Bt", "Ct"])
 
     def test_evaluate_shape(self):
@@ -319,7 +300,7 @@ class TestShapeBuilder(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model)
         self.assertEqual(
             builder._known_shapes,
@@ -351,20 +332,20 @@ class TestShapeBuilder(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=9,
         )
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model)
         builder.update_shapes(model)
-        res = []
+        res = {}
         for info in model.graph.value_info:
             t = info.type.tensor_type
             shape = tuple(d.dim_param or d.dim_value for d in t.shape.dim)
-            res.append((t.elem_type, shape))
-        expected = [
-            (1, ("a", "b+c")),
-            (1, ("a", "(1+b+c)//2")),
-            (1, ("a", "b+c-(1+b+c)//2")),
-            (1, ("a", "b+c")),
-        ]
+            res[str(info.name)] = (t.elem_type, shape)
+        expected = {
+            "xy": (1, ("a", "b+c")),
+            "S1": (1, ("a", "(1+b+c)//2")),
+            "S2": (1, ("a", "(b+c)//2")),
+            "zs": (1, ("a", "b+c")),
+        }
         self.assertEqual(expected, res)
         values = {
             name: builder.evaluate_shape(name, dict(a=3, b=4, c=6))
@@ -394,7 +375,9 @@ class TestShapeBuilder(ExtTestCase):
         )
 
         # onnx shape inference loses the symbolic link for Concat and Reshape outputs
-        inferred = onnx.shape_inference.infer_shapes(model)
+        inferred = onnx.ModelProto()
+        inferred.ParseFromString(model.SerializeToString())
+        onnx.shape_inference.infer_shapes(inferred)
         onnx_shapes = {}
         for vi in list(inferred.graph.value_info) + list(inferred.graph.output):
             t = vi.type.tensor_type
@@ -409,8 +392,8 @@ class TestShapeBuilder(ExtTestCase):
             "onnx infer_shapes should not produce '2*d_model' for concat_out",
         )
 
-        # BasicShapeBuilder tracks symbolic expressions
-        builder = BasicShapeBuilder()
+        # NativeShapeInference tracks symbolic expressions
+        builder = NativeShapeInference()
         builder.run_model(model)
         self.assertEqual(builder._known_shapes["added"], ("batch", "seq", "d_model"))
         self.assertEqual(builder._known_shapes["concat_out"], ("batch", "seq", "2*d_model"))
@@ -428,44 +411,44 @@ class TestShapeBuilder(ExtTestCase):
         return node
 
     def test_get_attribute_with_default_int(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(axis=2)
         self.assertEqual(b.get_attribute_with_default(node, "axis", 0), 2)
 
     def test_get_attribute_with_default_ints(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(perm=[0, 2, 1])
         self.assertEqual(b.get_attribute_with_default(node, "perm", []), [0, 2, 1])
 
     def test_get_attribute_with_default_float(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(alpha=0.5)
         self.assertAlmostEqual(b.get_attribute_with_default(node, "alpha", 1.0), 0.5)
 
     def test_get_attribute_with_default_floats(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(scales=[1.0, 2.0, 3.0])
         self.assertEqual(b.get_attribute_with_default(node, "scales", []), [1.0, 2.0, 3.0])
 
     def test_get_attribute_with_default_string(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(mode=b"constant")
         self.assertEqual(b.get_attribute_with_default(node, "mode", b""), b"constant")
 
     def test_get_attribute_with_default_strings(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(keys=[b"hello", b"world"])
         self.assertEqual(b.get_attribute_with_default(node, "keys", []), [b"hello", b"world"])
 
     def test_get_attribute_with_default_missing(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(axis=1)
         self.assertEqual(b.get_attribute_with_default(node, "missing", 42), 42)
 
     def test_get_attribute_with_default_unsupported_type(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("SomeOp", ["X"], ["Y"])
-        import onnx.numpy_helper as onh
+        import onnx_light.onnx.numpy_helper as onh
         import numpy as np
 
         tensor = onh.from_array(np.array([1.0], dtype=np.float32))
@@ -477,52 +460,52 @@ class TestShapeBuilder(ExtTestCase):
         self.assertRaise(lambda: b.get_attribute_with_default(node, "value", None), TypeError)
 
     def test_get_attributes_with_default_int(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(axis=3)
         self.assertEqual(b.get_attributes_with_default(node, axis=0), {"axis": 3})
 
     def test_get_attributes_with_default_ints(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(perm=[1, 0, 2])
         self.assertEqual(b.get_attributes_with_default(node, perm=[]), {"perm": [1, 0, 2]})
 
     def test_get_attributes_with_default_float(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(alpha=0.25)
         result = b.get_attributes_with_default(node, alpha=1.0)
         self.assertAlmostEqual(result["alpha"], 0.25)
 
     def test_get_attributes_with_default_floats(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(scales=[1.5, 2.5])
         self.assertEqual(b.get_attributes_with_default(node, scales=[]), {"scales": [1.5, 2.5]})
 
     def test_get_attributes_with_default_string(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(mode=b"nearest")
         self.assertEqual(b.get_attributes_with_default(node, mode=b""), {"mode": b"nearest"})
 
     def test_get_attributes_with_default_strings(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = self._make_node_with_attrs(keys=[b"a", b"b", b"c"])
         self.assertEqual(
             b.get_attributes_with_default(node, keys=[]), {"keys": [b"a", b"b", b"c"]}
         )
 
     def test_get_attributes_with_default_uses_default(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("SomeOp", ["X"], ["Y"])
         self.assertEqual(b.get_attributes_with_default(node, axis=5), {"axis": 5})
 
     def test_get_attributes_with_default_none_default_excluded(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("SomeOp", ["X"], ["Y"])
         self.assertEqual(b.get_attributes_with_default(node, axis=None), {})
 
     def test_get_attributes_with_default_unsupported_type(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("SomeOp", ["X"], ["Y"])
-        import onnx.numpy_helper as onh
+        import onnx_light.onnx.numpy_helper as onh
         import numpy as np
 
         tensor = onh.from_array(np.array([1.0], dtype=np.float32))
@@ -534,23 +517,23 @@ class TestShapeBuilder(ExtTestCase):
         self.assertRaise(lambda: b.get_attributes_with_default(node, value=None), TypeError)
 
     def test_pretty_node_none(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         self.assertEqual(b.pretty_node(None), "None")
 
     def test_pretty_node_simple(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Add", ["X", "Y"], ["Z"])
         result = b.pretty_node(node)
         self.assertEqual(result, "Add: X, Y -> Z")
 
     def test_pretty_node_with_domain(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("CustomOp", ["X"], ["Y"], domain="custom.domain")
         result = b.pretty_node(node)
         self.assertEqual(result, "CustomOp[custom.domain]: X -> Y")
 
     def test_pretty_node_with_shape(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Add", ["X", "Y"], ["Z"])
         b.set_type("X", TFLOAT)
         b.set_shape("X", (2, 3))
@@ -565,14 +548,14 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("->", result)
 
     def test_pretty_node_with_shape_missing_info(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Relu", ["X"], ["Y"])
         result = b.pretty_node(node, shape=True)
         self.assertIn("X:-|?", result)
         self.assertIn("Y:-|?", result)
 
     def test_pretty_node_short_false(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Relu", ["X"], ["Y"])
         b.set_type("Y", TFLOAT)
         b.set_shape("Y", (4, 5))
@@ -582,13 +565,13 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("4 x 5", result)
 
     def test_pretty_node_short_false_with_name(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Relu", ["X"], ["Y"], name="relu_node")
         result = b.pretty_node(node, short=False)
         self.assertIn("relu_node", result)
 
     def test_pretty_node_shape_op(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Shape", ["X"], ["shape_out"])
         result = b.pretty_node(node)
         self.assertIn("Shape", result)
@@ -596,7 +579,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("shape_out", result)
 
     def test_pretty_node_shape_op_with_attributes(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Shape", ["X"], ["shape_out"], start=1, end=3)
         result = b.pretty_node(node)
         self.assertIn("Shape", result)
@@ -604,7 +587,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("shape_out", result)
 
     def test_pretty_node_reshape_op(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Reshape", ["data", "shape"], ["reshaped"])
         result = b.pretty_node(node)
         self.assertIn("Reshape", result)
@@ -612,7 +595,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("reshaped", result)
 
     def test_pretty_node_unsqueeze_op(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Unsqueeze", ["X", "axes"], ["Y"])
         result = b.pretty_node(node)
         self.assertIn("Unsqueeze", result)
@@ -620,7 +603,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("Y", result)
 
     def test_pretty_node_squeeze_op(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Squeeze", ["X"], ["Y"])
         result = b.pretty_node(node)
         self.assertIn("Squeeze", result)
@@ -628,7 +611,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("Y", result)
 
     def test_pretty_node_cast_op(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Cast", ["X"], ["Y"], to=TFLOAT)
         result = b.pretty_node(node)
         self.assertIn("Cast", result)
@@ -636,7 +619,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("Y", result)
 
     def test_pretty_node_transpose_op(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Transpose", ["X"], ["Y"], perm=[0, 2, 1])
         result = b.pretty_node(node)
         self.assertIn("Transpose", result)
@@ -644,7 +627,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("Y", result)
 
     def test_pretty_node_shape_op_with_shape_info(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Shape", ["X"], ["shape_out"])
         b.set_type("X", TFLOAT)
         b.set_shape("X", (3, 4))
@@ -656,7 +639,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("->", result)
 
     def test_pretty_node_cast_op_with_shape_info(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Cast", ["X"], ["Y"], to=TFLOAT16)
         b.set_type("X", TFLOAT)
         b.set_shape("X", (2, 3))
@@ -667,7 +650,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("->", result)
 
     def test_pretty_node_transpose_op_with_shape_info(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Transpose", ["X"], ["Y"], perm=[1, 0])
         b.set_type("X", TFLOAT)
         b.set_shape("X", (2, 3))
@@ -679,7 +662,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("->", result)
 
     def test_pretty_node_reshape_op_short_false(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Reshape", ["data", "shape"], ["reshaped"])
         b.set_type("reshaped", TFLOAT)
         b.set_shape("reshaped", (6,))
@@ -689,7 +672,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("6", result)
 
     def test_pretty_node_unsqueeze_op_short_false(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Unsqueeze", ["X", "axes"], ["Y"])
         b.set_type("Y", TFLOAT)
         b.set_shape("Y", (1, 4))
@@ -699,7 +682,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("1 x 4", result)
 
     def test_pretty_node_squeeze_op_short_false(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         node = oh.make_node("Squeeze", ["X"], ["Y"])
         b.set_type("Y", TFLOAT)
         b.set_shape("Y", (4,))
@@ -709,7 +692,7 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("4", result)
 
     def test_get_registered_constraints(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         self.assertEqual(b.get_registered_constraints(), {})
         b.register_constraint_dimension("batch", "s0")
         b.register_constraint_dimension("s0", "batch")
@@ -720,14 +703,14 @@ class TestShapeBuilder(ExtTestCase):
         self.assertIn("batch", constraints["s0"])
 
     def test_get_shape_renamed_without_renaming(self):
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", ("s0", "s1"))
         # Before any renaming, get_shape_renamed falls back to get_shape.
         self.assertEqual(b.get_shape_renamed("X"), ("s0", "s1"))
 
-    def test_improves_dynamic_dimension_naming_basic(self):
-        b = BasicShapeBuilder()
+    def test_native_dimension_constraints(self):
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", ("s0", "s1"))
         b.set_type("Y", TFLOAT)
@@ -737,28 +720,20 @@ class TestShapeBuilder(ExtTestCase):
         b.register_constraint_dimension("s0", "batch")
         b.register_constraint_dimension("seq_length", "s1")
         b.register_constraint_dimension("s1", "seq_length")
-        replacements = b._improves_dynamic_dimension_naming({"batch", "seq_length"})
-        self.assertIn("s0", replacements)
-        self.assertEqual(replacements["s0"], "batch")
-        self.assertIn("s1", replacements)
-        self.assertEqual(replacements["s1"], "seq_length")
-        self.assertEqual(b.get_shape_renamed("X"), ("batch", "seq_length"))
-        self.assertEqual(b.get_shape_renamed("Y"), ("batch", "seq_length"))
+        self.assertTrue(b.context.has_constraint("batch", "s0"))
+        self.assertTrue(b.context.has_constraint("seq_length", "s1"))
+        self.assertEqual(b.get_shape_renamed("X"), ("s0", "s1"))
+        self.assertEqual(b.get_shape_renamed("Y"), ("s0", "s1"))
 
-    def test_improves_dynamic_dimension_naming_no_constraints(self):
-        b = BasicShapeBuilder()
+    def test_native_dimension_names_without_constraints(self):
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", ("s0", "s1"))
-        # With no constraints linking s0/s1 to the original names, no renaming happens
-        # for s0/s1 even though identity mappings are returned for the original names.
-        replacements = b._improves_dynamic_dimension_naming({"batch", "seq_length"})
-        # s0 and s1 are not constrained to batch/seq_length, so they stay unchanged.
-        self.assertNotIn("s0", replacements)
-        self.assertNotIn("s1", replacements)
-        # Falls back to the original shape.
+        self.assertFalse(b.context.has_constraint("s0", "batch"))
+        self.assertFalse(b.context.has_constraint("s1", "seq_length"))
         self.assertEqual(b.get_shape_renamed("X"), ("s0", "s1"))
 
-    def test_improves_dynamic_dimension_naming_from_model(self):
+    def test_native_dimension_names_from_model(self):
         model = oh.make_model(
             oh.make_graph(
                 [oh.make_node("Add", ["X", "Y"], ["Z"])],
@@ -768,44 +743,36 @@ class TestShapeBuilder(ExtTestCase):
             ),
             opset_imports=[oh.make_opsetid("", 18)],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model)
         # The model uses "batch" and "seq" as symbolic names from the start.
         # No additional constraints are needed.
         self.assertEqual(b.get_shape("X"), ("batch", "seq"))
-        # Since these names are already the "originals", renaming is identity.
-        b._improves_dynamic_dimension_naming({"batch", "seq"})
         self.assertEqual(b.get_shape_renamed("Z"), ("batch", "seq"))
 
-    def test_improves_dynamic_dimension_naming_partial(self):
-        b = BasicShapeBuilder()
+    def test_native_dimension_constraints_preserve_static_dimensions(self):
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", ("s0", 128))
         # Only the first dimension has a preferred name.
         b.register_constraint_dimension("batch", "s0")
         b.register_constraint_dimension("s0", "batch")
-        replacements = b._improves_dynamic_dimension_naming({"batch"})
-        self.assertIn("s0", replacements)
-        self.assertEqual(replacements["s0"], "batch")
-        # Static dimension 128 is unchanged.
-        self.assertEqual(b.get_shape_renamed("X"), ("batch", 128))
+        self.assertTrue(b.context.has_constraint("s0", "batch"))
+        self.assertEqual(b.get_shape_renamed("X"), ("s0", 128))
 
-    def test_improves_dynamic_dimension_naming_idempotent(self):
-        b = BasicShapeBuilder()
+    def test_native_dimension_constraints_idempotent(self):
+        b = NativeShapeInference()
         b.set_type("X", TFLOAT)
         b.set_shape("X", ("s0",))
         b.register_constraint_dimension("batch", "s0")
         b.register_constraint_dimension("s0", "batch")
-        b._improves_dynamic_dimension_naming({"batch"})
-        # Calling again should not raise and should return consistent results.
-        b._improves_dynamic_dimension_naming({"batch"})
-        self.assertEqual(b.get_shape_renamed("X"), ("batch",))
+        count = b.context.constraints_size()
+        b.register_constraint_dimension("batch", "s0")
+        self.assertEqual(b.context.constraints_size(), count)
+        self.assertEqual(b.get_shape_renamed("X"), ("s0",))
 
     def test_run_value_info_nonzero_registers_constraint_with_named_output(self):
-        # NonZero introduces an internal dimension name (NEWDIM_nonzero_0).
-        # When the graph output is declared with a user-visible symbolic name,
-        # run_value_info should register a constraint linking the two names and
-        # rename the internal placeholder throughout.
+        # The native engine links its NonZero dimension to the declared output.
         model_named = oh.make_model(
             oh.make_graph(
                 [oh.make_node("NonZero", ["X"], ["nz"])],
@@ -816,15 +783,15 @@ class TestShapeBuilder(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model_named)
 
         # The internal placeholder should have been renamed to the user name.
         self.assertEqual(builder.get_shape("nz"), (2, "nnz"))
         # A constraint linking the internal name to the user name must be registered.
         constraints = builder.get_registered_constraints()
-        self.assertIn("NEWDIM_nonzero_0", constraints)
-        self.assertIn("nnz", constraints["NEWDIM_nonzero_0"])
+        self.assertIn("NonZero_nz_nnz", constraints)
+        self.assertIn("nnz", constraints["NonZero_nz_nnz"])
 
     def test_run_value_info_nonzero_anonymous_output_no_constraint(self):
         # Without named output dimensions, no constraint should be registered
@@ -839,13 +806,13 @@ class TestShapeBuilder(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model_anon)
 
         shape = builder.get_shape("nz")
         self.assertEqual(shape[0], 2)
         self.assertIsInstance(shape[1], str)
-        self.assertIn("NEWDIM_nonzero", shape[1])
+        self.assertIn("NonZero", shape[1])
         self.assertEqual(builder.get_registered_constraints(), {})
 
 

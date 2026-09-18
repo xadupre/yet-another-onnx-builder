@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from imblearn.ensemble import EasyEnsembleClassifier
 from imblearn.pipeline import Pipeline as ImbLearnPipeline
 

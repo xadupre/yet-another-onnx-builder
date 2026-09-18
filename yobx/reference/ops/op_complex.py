@@ -1,8 +1,8 @@
 import numpy as np
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
-class ToComplex(OpRun):
+class ToComplex(NativeOpKernel):
     op_domain = "ai.onnx.complex"
 
     def _run(self, x):
@@ -12,7 +12,7 @@ class ToComplex(OpRun):
         return (x[..., 0] + 1j * x[..., 1],)
 
 
-class ComplexModule(OpRun):
+class ComplexModule(NativeOpKernel):
     op_domain = "ai.onnx.complex"
 
     def _run(self, x):
@@ -23,7 +23,7 @@ class ComplexModule(OpRun):
         return (np.abs(x),)
 
 
-class ComplexMul(OpRun):
+class ComplexMul(NativeOpKernel):
     """Implements ``com.microsoft.ComplexMul``.
 
     Computes element-wise complex multiplication of two tensors whose last
@@ -45,7 +45,7 @@ class ComplexMul(OpRun):
         return (np.stack([c_r, c_i], axis=-1),)
 
 
-class ComplexMulConj(OpRun):
+class ComplexMulConj(NativeOpKernel):
     """Implements ``com.microsoft.ComplexMulConj``.
 
     Computes element-wise complex multiplication of ``A`` with the conjugate of
@@ -67,7 +67,7 @@ class ComplexMulConj(OpRun):
         return (np.stack([c_r, c_i], axis=-1),)
 
 
-class Istft(OpRun):
+class Istft(NativeOpKernel):
     op_domain = "ai.onnx.complex"
 
     def _run(
@@ -99,7 +99,7 @@ class Istft(OpRun):
         length_i = _to_int(length)
         return_complex_b = bool(_to_int(return_complex))
 
-        tx = torch.from_numpy(x)
+        tx = torch.from_numpy(x if x.flags.writeable else x.copy())
         twindow = torch.from_numpy(np.array(window, copy=True)) if window is not None else None
         output = torch.istft(
             tx,
@@ -116,7 +116,7 @@ class Istft(OpRun):
         return (output.detach().cpu().numpy(),)
 
 
-class FftC2r(OpRun):
+class FftC2r(NativeOpKernel):
     op_domain = "ai.onnx.complex"
 
     def _run(self, x, dim, normalization, last_dim_size):
@@ -134,14 +134,14 @@ class FftC2r(OpRun):
                 return [int(v) for v in value]
             return [int(value)]
 
-        tx = torch.from_numpy(x)
+        tx = torch.from_numpy(x if x.flags.writeable else x.copy())
         output = torch.ops.aten._fft_c2r.default(
             tx, _to_dims(dim), _to_int(normalization), _to_int(last_dim_size)
         )
         return (output.detach().cpu().numpy(),)
 
 
-class FftIrfft2(OpRun):
+class FftIrfft2(NativeOpKernel):
     op_domain = "ai.onnx.complex"
 
     def _run(self, x, s, dim, norm):
@@ -164,6 +164,6 @@ class FftIrfft2(OpRun):
         dim_tuple = tuple(_to_dims(dim))
         norm_value = {0: "backward", 1: "forward", 2: "ortho"}[_to_int(norm)]
 
-        tx = torch.from_numpy(x)
+        tx = torch.from_numpy(x if x.flags.writeable else x.copy())
         output = torch.fft.irfft2(tx, s=s_tuple, dim=dim_tuple, norm=norm_value)
         return (output.detach().cpu().numpy(),)

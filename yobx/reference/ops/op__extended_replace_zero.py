@@ -1,7 +1,7 @@
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
-class ReplaceZero(OpRun):
+class ReplaceZero(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, X, by=None, equal=None):

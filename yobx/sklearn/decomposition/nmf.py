@@ -1,9 +1,9 @@
 import numpy as np
 from typing import Dict, List, Union
 
-from onnx import TensorProto
-from onnx.helper import make_graph, make_node, make_tensor_value_info
-import onnx.numpy_helper as onh
+from onnx_light.onnx import TensorProto
+from onnx_light.onnx.helper import make_graph, make_node, make_tensor_value_info
+import onnx_light.onnx.numpy_helper as onh
 
 from sklearn.decomposition import NMF, MiniBatchNMF
 

@@ -1,16 +1,10 @@
 import numpy as np
 import scipy.special as scipy_special
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
-class Attention(OpRun):
+class Attention(NativeOpKernel):
     op_domain = "com.microsoft"
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Fix a bug onnx.reference.ReferenceEvaluator
-        self._schema = None
-        self.attributes_names_ = ["num_heads"]
 
     def _run(self, x, weights, bias, mask_index, past, attention_bias, num_heads=None):
         assert past is None, f"Attention not implemented if past == {past!r}"

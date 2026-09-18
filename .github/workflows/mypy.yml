@@ -23,7 +23,9 @@ jobs:
           python-version: "3.12"
       - name: Install pytorch 2.12
         run: pip install torch==2.12.1+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
-        run: pip install -e ".[category_encoders,imblearn,lightgbm,polars,sklearn,sksurv,spox,statmodels,tensorflow,torch,transformers,xgboost]" mypy
+        run: pip install -e ".[category_encoders,imblearn,lightgbm,polars,sklearn,sksurv,statmodels,tensorflow,torch,transformers,xgboost]" mypy
       - name: Run mypy
         run: mypy yobx

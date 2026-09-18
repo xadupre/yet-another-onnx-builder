@@ -1,5 +1,5 @@
 import textwrap
-from onnx import ModelProto
+from onnx_light.onnx import ModelProto
 from .translator import Translator
 from .inner_emitter import InnerEmitter, InnerEmitterCompact, InnerEmitterShortInitializer
 from .builder_emitter import BuilderEmitter
@@ -13,25 +13,25 @@ def translate_header(api: str = "onnx"):
         return textwrap.dedent("""
             import numpy as np
             import ml_dtypes
-            import onnx
-            import onnx.helper as oh
-            import onnx.numpy_helper as onh
+            from yobx._onnx_shim import onnx
+            import onnx_light.onnx.helper as oh
+            import onnx_light.onnx.numpy_helper as onh
             from yobx.translate.make_helper import make_ref_attribute
             """)
     if api in ("onnx-short", "onnx-compact"):
         return textwrap.dedent("""
             import numpy as np
             import ml_dtypes
-            import onnx
-            import onnx.helper as oh
-            import onnx.numpy_helper as onh
+            from yobx._onnx_shim import onnx
+            import onnx_light.onnx.helper as oh
+            import onnx_light.onnx.numpy_helper as onh
             from yobx.translate.make_helper import make_ref_attribute
             """)
     if api == "light":
         return textwrap.dedent("""
             import numpy as np
             import ml_dtypes
-            import onnx
+            from yobx._onnx_shim import onnx
             from yobx.builder.light import start
             from yobx.translate import translate
             """)
@@ -39,7 +39,7 @@ def translate_header(api: str = "onnx"):
         return textwrap.dedent("""
             import numpy as np
             import ml_dtypes
-            import onnx
+            from yobx._onnx_shim import onnx
             from yobx.xbuilder import GraphBuilder
             """)
     raise ValueError(f"Unexpected value {api!r} for api.")

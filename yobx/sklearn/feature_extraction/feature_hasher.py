@@ -1,8 +1,8 @@
 from typing import Dict, List
 
 import numpy as np
-import onnx
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.numpy_helper as onh
 from sklearn.feature_extraction import FeatureHasher
 
 from ...typing import GraphBuilderExtendedProtocol

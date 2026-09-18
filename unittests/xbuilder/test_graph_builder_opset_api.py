@@ -40,7 +40,7 @@ class TestGraphBuilderOpsetApi(ExtTestCase):
 
     def test_get_opset_missing_exc_true(self):
         g = GraphBuilder(18, ir_version=10)
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(KeyError):
             g.get_opset("unknown.domain", exc=True)
 
     def test_get_opset_missing_exc_false(self):
@@ -65,7 +65,7 @@ class TestGraphBuilderOpsetApi(ExtTestCase):
 
     def test_set_opset_version_mismatch_raises(self):
         g = GraphBuilder({"": 18, "ai.onnx.ml": 3}, ir_version=10)
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(ValueError):
             g.set_opset("ai.onnx.ml", 5)
 
     def test_set_opset_default_version(self):
@@ -90,7 +90,7 @@ class TestGraphBuilderOpsetApi(ExtTestCase):
 
     def test_add_domain_version_mismatch_raises(self):
         g = GraphBuilder({"": 18, "ai.onnx.ml": 3}, ir_version=10)
-        with self.assertRaises(AssertionError):
+        with self.assertRaises(ValueError):
             g.add_domain("ai.onnx.ml", 5)
 
     def test_add_domain_default_version(self):

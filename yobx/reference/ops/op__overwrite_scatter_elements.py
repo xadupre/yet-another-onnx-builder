@@ -1,6 +1,6 @@
 import numpy as np
 
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
 def scatter_elements(data, indices, updates, axis=0, reduction=None):  # type: ignore
@@ -99,7 +99,7 @@ def scatter_elements(data, indices, updates, axis=0, reduction=None):  # type: i
     raise RuntimeError(f"Not implemented for indices.shape={indices.shape} and axis={axis}")
 
 
-class ScatterElements(OpRun):
+class ScatterElements(NativeOpKernel):
     def _run(self, data, indices, updates, axis=None, reduction=None):  # type: ignore
         res = scatter_elements(data, indices, updates, axis=axis, reduction=reduction)
         return (res,)

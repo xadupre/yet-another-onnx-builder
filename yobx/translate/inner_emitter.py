@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
-from onnx import AttributeProto, TensorProto
+from onnx_light.onnx import AttributeProto, TensorProto
 from .base_emitter import BaseEmitter
 from .translator import Translator
 

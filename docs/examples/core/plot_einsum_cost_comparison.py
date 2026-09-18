@@ -45,14 +45,14 @@ from collections import Counter
 
 import matplotlib.pyplot as plt
 import numpy as np
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 import onnxruntime
 import pandas as pd
 
 from yobx.doc import plot_dot
 from yobx.helpers.einsum_helper import decompose_einsum, decompose_einsum_2inputs
-from yobx.xshape import BasicShapeBuilder, InferenceMode
+from yobx.xshape import NativeShapeInference, InferenceMode
 
 # %%
 # Helper: single-node ONNX Einsum model (strategy C)
@@ -221,7 +221,7 @@ for spec in EQUATIONS:
         else:
             # The model was already built with symbolic dims; run cost
             # inference directly (no separate sym_model needed).
-            bld = BasicShapeBuilder()
+            bld = NativeShapeInference()
             cost = bld.run_model(model, inference=InferenceMode.COST)
             # Pick the node whose symbolic formula contains the most dimension
             # products (longest string with '*') as a proxy for the most

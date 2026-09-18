@@ -1,10 +1,10 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 import numpy as np
-from onnx import ValueInfoProto
+from onnx_light.onnx import ValueInfoProto
 import tensorflow as tf
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
-from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
+from ..helpers.onnx_helper import np_dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from .register import get_tf_op_converter
 from .tensorflow_helper import tf_dtype_to_np_dtype
@@ -151,7 +151,7 @@ def to_onnx(
 
     # Populate an ONNX GraphBuilder by walking the concrete-function graph.
     kwargs = (
-        dict(optimization_options=OptimizationOptions(patterns="default+onnxruntime"))
+        dict(optimization_options=OptimizationOptions())
         if "com.microsoft" in dict_target_opset
         else {}
     )
@@ -171,7 +171,7 @@ def to_onnx(
     g = builder_cls(dict_target_opset, **kwargs)  # type: ignore
 
     _convert_concrete_function(cf, g, args, input_specs, verbose, extra_converters or {})
-    if isinstance(g, GraphBuilder):
+    if isinstance(g, GraphBuilder) or getattr(g, "supports_optimization_report", False):
         onx = g.to_onnx(  # type: ignore
             large_model=large_model,
             external_threshold=external_threshold,
@@ -283,8 +283,7 @@ def _convert_concrete_function(
         if var is None:
             # Non-variable capture (e.g. a training-phase boolean); skip.
             continue
-        # Keep the TF variable as-is; numpy conversion is deferred to export time.
-        value = var.value()
+        value = var.numpy()
         name = f"{var.name}[{captured_tensor._unique_id}]"
         initializer_values[name] = value
         assert not g.has_name(name), f"name {name!r} is already taken."
@@ -332,7 +331,9 @@ def _convert_concrete_function(
                 assert not g.has_name(name), f"Input {name!r} is already used{g.get_debug_msg()}"
                 spec = set_input_names[name][1]
                 g.make_tensor_input(
-                    name, tf_dtype_to_np_dtype(spec.dtype), _shape_to_tuple(g, spec.shape)
+                    name,
+                    np_dtype_to_tensor_dtype(np.dtype(tf_dtype_to_np_dtype(spec.dtype))),
+                    _shape_to_tuple(g, spec.shape),
                 )
                 continue
 

@@ -1,10 +1,10 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-import onnx.checker as oc
-from onnx import TensorProto
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
+import onnx_light.onnx.checker as oc
+from onnx_light.onnx import TensorProto
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.graph_builder import GraphBuilder
 from yobx.reference import ExtendedReferenceEvaluator
@@ -12,12 +12,14 @@ from yobx.reference import ExtendedReferenceEvaluator
 
 class TestGraphSimplification(ExtTestCase):
     def call_optimizer(self, onx):
-        gr = GraphBuilder(onx, infer_shapes_options=True)
-        assert hasattr(gr, "_debug_stop")
-        gr._check([], "before unused")
-        gr.remove_unused()
-        gr._check([], "after unused")
-        return gr.to_onnx()
+        gr = GraphBuilder(onx)
+        gr.inner_builder.remove_unused_nodes()
+        gr.inner_builder.remove_identity_nodes()
+        result = gr.to_onnx(optimize=True)
+        self.assertEqual(
+            [str(v.name) for v in onx.graph.output], [str(v.name) for v in result.graph.output]
+        )
+        return result
 
     def test_remove_unused_nodes(self):
         model = onnx.parser.parse_model("""
@@ -140,8 +142,8 @@ class TestGraphSimplification(ExtTestCase):
         )
         model = oh.make_model(graph, opset_imports=opset_imports)
         onx = self.call_optimizer(model)
-        self.assertEqual(["Add", "Sub"], [n.op_type for n in onx.graph.node])
-        oc.check_model(onx)
+        self.assertEqual(["Add", "Sub", "Identity"], [n.op_type for n in onx.graph.node])
+        oc.check_model(onx.proto)
 
     def test_remove_identity_two_paths2(self):
         opset_imports = [oh.make_opsetid("", 12)]
@@ -167,8 +169,8 @@ class TestGraphSimplification(ExtTestCase):
         )
         model = oh.make_model(graph, opset_imports=opset_imports)
         onx = self.call_optimizer(model)
-        self.assertEqual(["Add", "Sub"], [n.op_type for n in onx.graph.node])
-        oc.check_model(onx)
+        self.assertEqual(["Add", "Identity", "Sub"], [n.op_type for n in onx.graph.node])
+        oc.check_model(onx.proto)
 
     def test_remove_identity_two_paths3(self):
         opset_imports = [oh.make_opsetid("", 12)]
@@ -193,8 +195,8 @@ class TestGraphSimplification(ExtTestCase):
         )
         model = oh.make_model(graph, opset_imports=opset_imports)
         onx = self.call_optimizer(model)
-        self.assertEqual(["Add", "Identity"], [n.op_type for n in onx.graph.node])
-        oc.check_model(onx)
+        self.assertEqual(["Add", "Identity", "Identity"], [n.op_type for n in onx.graph.node])
+        oc.check_model(onx.proto)
 
     def test_remove_identity_shadowing(self):
         def _mkv_(name):
@@ -202,7 +204,8 @@ class TestGraphSimplification(ExtTestCase):
             value_info_proto.name = name
             return value_info_proto
 
-        def _make_model():
+        def _make_model(shadowing=True):
+            local_name = "three" if shadowing else "local_three"
             return oh.make_model(
                 oh.make_graph(
                     [
@@ -218,9 +221,10 @@ class TestGraphSimplification(ExtTestCase):
                             ["Z_c"],
                             then_branch=oh.make_graph(
                                 [
-                                    # shadowing
-                                    oh.make_node("Constant", [], ["three"], value_floats=[2.1]),
-                                    oh.make_node("Add", ["X00", "three"], ["Y"]),
+                                    oh.make_node(
+                                        "Constant", [], [local_name], value_floats=[2.1]
+                                    ),
+                                    oh.make_node("Add", ["X00", local_name], ["Y"]),
                                 ],
                                 "then",
                                 [],
@@ -261,42 +265,31 @@ class TestGraphSimplification(ExtTestCase):
             "X": -np.array([1, 2, 3], dtype=np.float32),
             "one": np.array([1], dtype=np.float32),
         }
-        model = _make_model()
+        with self.assertRaisesRegex(ValueError, "three.*SSA shadowing is not allowed"):
+            GraphBuilder(_make_model())
+
+        model = _make_model(shadowing=False)
         ref = ExtendedReferenceEvaluator(model, verbose=0)
         expected = ref.run(None, feeds)[0]
         expected2 = ref.run(None, feeds2)[0]
-        # doc.check_model(model)
         self.dump_onnx("test_remove_identity_shadowing.onnx", model)
 
-        gr = GraphBuilder(model, infer_shapes_options=True)
-        msg = gr.get_debug_msg()
-        self.assertIn("-- 2 INPUTS", msg)
-        self.assertIn("-- 2 INITIALIZERS", msg)
-        self.assertIn("-- 1 OUTPUTS", msg)
-        self.assertEqual({"three"}, gr.shadowing_names())
-        # gr.remove_shadowing()
-        # self.assertEqual({}, gr.shadowing_names())
-        # gr._check([], "before")
-        gr._check([], "identity", shadowing=False)
+        gr = GraphBuilder(model)
+        self.assertEqual(len(gr.inputs), 2)
+        self.assertEqual(len(gr.initializers_dict), 2)
+        self.assertEqual(len(gr.outputs), 1)
         if_node = [n for n in gr.nodes if n.op_type == "If"][0]  # noqa: RUF015
-        else_graph = if_node.attribute[0].g
+        else_graph = next(att.g for att in if_node.attribute if att.name == "else_branch")
         self.assertEqual(else_graph.node[0].input, ["X0", "three"])
         gr.remove_identity_nodes()
         if_node = [n for n in gr.nodes if n.op_type == "If"][0]  # noqa: RUF015
-        else_graph = if_node.attribute[0].g
+        else_graph = next(att.g for att in if_node.attribute if att.name == "else_branch")
         self.assertEqual(else_graph.node[0].input, ["X0", "two"])
-        msg = gr.get_debug_msg()
-        self.assertIn("-- 2 INPUTS", msg)
-        self.assertIn("-- 2 INITIALIZERS", msg)
-        self.assertIn("-- 1 OUTPUTS", msg)
-        self.assertEqual(set(), gr.shadowing_names())
-        gr._check([], "identity", shadowing=True)
-        msg = gr.get_debug_msg()
-        self.assertIn("-- 2 INPUTS", msg)
-        self.assertIn("-- 2 INITIALIZERS", msg)
-        self.assertIn("-- 1 OUTPUTS", msg)
+        self.assertEqual(len(gr.inputs), 2)
+        self.assertEqual(len(gr.initializers_dict), 2)
+        self.assertEqual(len(gr.outputs), 1)
         onx = gr.to_onnx()
-        oc.check_model(onx)
+        oc.check_model(onx.proto)
         self.dump_onnx("test_remove_identity_shadowing.opt.onnx", onx)
 
         ref2 = ExtendedReferenceEvaluator(onx)
@@ -305,9 +298,9 @@ class TestGraphSimplification(ExtTestCase):
         got2 = ref2.run(None, feeds2)[0]
         self.assertEqualAny(expected2, got2)
 
-        model = _make_model()
+        model = _make_model(shadowing=False)
         onx = self.call_optimizer(model)
-        oc.check_model(onx)
+        oc.check_model(onx.proto)
         ref2 = ExtendedReferenceEvaluator(onx)
         got = ref2.run(None, feeds)[0]
         self.assertEqualAny(expected, got)
@@ -414,29 +407,16 @@ class TestGraphSimplification(ExtTestCase):
         expected = ref.run(None, feeds)[0]
         expected2 = ref.run(None, feeds2)[0]
 
-        gr = GraphBuilder(model, infer_shapes_options=True)
-        msg = gr.get_debug_msg()
-        self.assertIn("-- 2 INPUTS", msg)
-        self.assertIn("-- 2 INITIALIZERS", msg)
-        self.assertIn("-- 1 OUTPUTS", msg)
-        self.assertEqual(set(), gr.shadowing_names())
-        # gr.remove_shadowing()
-        # self.assertEqual({}, gr.shadowing_names())
-        # gr._check([], "before")
-        gr._check([], "identity", shadowing=False)
+        gr = GraphBuilder(model)
+        self.assertEqual(len(gr.inputs), 2)
+        self.assertEqual(len(gr.initializers_dict), 2)
+        self.assertEqual(len(gr.outputs), 1)
         gr.remove_identity_nodes()
-        msg = gr.get_debug_msg()
-        self.assertIn("-- 2 INPUTS", msg)
-        self.assertIn("-- 2 INITIALIZERS", msg)
-        self.assertIn("-- 1 OUTPUTS", msg)
-        self.assertEqual(set(), gr.shadowing_names())
-        gr._check([], "identity", shadowing=True)
-        msg = gr.get_debug_msg()
-        self.assertIn("-- 2 INPUTS", msg)
-        self.assertIn("-- 2 INITIALIZERS", msg)
-        self.assertIn("-- 1 OUTPUTS", msg)
+        self.assertEqual(len(gr.inputs), 2)
+        self.assertEqual(len(gr.initializers_dict), 2)
+        self.assertEqual(len(gr.outputs), 1)
         onx = gr.to_onnx()
-        oc.check_model(onx)
+        oc.check_model(onx.proto)
 
         ref2 = ExtendedReferenceEvaluator(onx)
         got = ref2.run(None, feeds)[0]
@@ -446,7 +426,7 @@ class TestGraphSimplification(ExtTestCase):
 
         model = _make_model()
         onx = self.call_optimizer(model)
-        oc.check_model(onx)
+        oc.check_model(onx.proto)
         ref2 = ExtendedReferenceEvaluator(onx)
         got = ref2.run(None, feeds)[0]
         self.assertEqualAny(expected, got)
@@ -469,13 +449,14 @@ class TestGraphSimplification(ExtTestCase):
         model = oh.make_model(graph, opset_imports=opset_imports)
         self.assertEqual(["Shape", "Shape", "Add"], [n.op_type for n in model.graph.node])
 
-        gr = GraphBuilder(model, infer_shapes_options=True)
-        n_removed, _ = gr.remove_duplicated_shape_nodes()
+        gr = GraphBuilder(model)
+        n_removed = gr.inner_builder.remove_duplicate_nodes()
         self.assertEqual(1, n_removed)
-        self.assertEqual(["Shape", "Identity", "Add"], [n.op_type for n in gr.nodes])
+        self.assertEqual(["Shape", "Add"], [n.op_type for n in gr.nodes])
+        self.assertEqual(["s1", "s1"], list(gr.nodes[1].input))
 
         onx = gr.to_onnx()
-        oc.check_model(onx)
+        oc.check_model(onx.proto)
 
         ref = ExtendedReferenceEvaluator(onx)
         x = np.zeros((4, 5), dtype=np.float32)

@@ -1,9 +1,9 @@
 import unittest
 import ml_dtypes
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.helpers._onnx_simple_text_plot import onnx_simple_text_plot
 from yobx.helpers.onnx_helper import (
@@ -732,7 +732,7 @@ class TestOnnxHelper(ExtTestCase):
         )
         new_function = make_subfunction(
             "localf",
-            model.graph.node[:4],
+            list(model.graph.node)[:4],
             opset_imports=model.opset_import,
             output_names=["xm1", "xm2c"],
         )

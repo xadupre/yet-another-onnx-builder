@@ -222,7 +222,7 @@ Or embedded into a larger graph using
     :showcode:
 
     import numpy as np
-    from onnx import TensorProto
+    from onnx_light.onnx import TensorProto
     from yobx.xbuilder import GraphBuilder
     from yobx.xtracing import trace_numpy_function
     from yobx.helpers.onnx_helper import pretty_onnx

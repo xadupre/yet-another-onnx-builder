@@ -1,10 +1,8 @@
-from onnx.reference.op_run import OpRun
-from onnx.reference.ops.op_average_pool import AveragePool_19 as AveragePool
-from onnx.reference.ops.op_dequantize_linear import DequantizeLinear_19 as DequantizeLinear
-from onnx.reference.ops.op_quantize_linear import QuantizeLinear_19 as QuantizeLinear
+from ._native_op import NativeOpKernel
+from ._native_op import evaluate_native_operator
 
 
-class QLinearAveragePool(OpRun):
+class QLinearAveragePool(NativeOpKernel):
     op_domain = "com.microsoft"
 
     def _run(
@@ -26,8 +24,9 @@ class QLinearAveragePool(OpRun):
             None,
             0,
         ), f"QLinearAveragePool not implemented if channels_last={channels_last}"
-        dqx = DequantizeLinear.eval(x, x_scale, x_zero_point)
-        y = AveragePool.eval(
+        (dqx,) = evaluate_native_operator("DequantizeLinear", x, x_scale, x_zero_point)
+        (y,) = evaluate_native_operator(
+            "AveragePool",
             dqx,
             auto_pad=auto_pad,
             ceil_mode=ceil_mode,
@@ -36,5 +35,5 @@ class QLinearAveragePool(OpRun):
             pads=pads,
             strides=strides,
         )
-        qy = QuantizeLinear.eval(y, y_scale, y_zero_point)
+        (qy,) = evaluate_native_operator("QuantizeLinear", y, y_scale, y_zero_point)
         return (qy,)

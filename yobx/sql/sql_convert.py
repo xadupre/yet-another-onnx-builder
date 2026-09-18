@@ -44,8 +44,8 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
-import onnx.numpy_helper as onh
-from onnx import TensorProto
+import onnx_light.onnx.numpy_helper as onh
+from onnx_light.onnx import TensorProto
 
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
@@ -289,7 +289,7 @@ def sql_to_onnx(
     g = builder_cls(target_opset, ir_version=10)
     sts = {"custom_functions": custom_functions or {}}
     sql_to_onnx_graph(g, sts, [], query, input_dtypes, right_input_dtypes=right_input_dtypes)
-    if isinstance(g, GraphBuilder):
+    if isinstance(g, GraphBuilder) or getattr(g, "supports_optimization_report", False):
         artifact = g.to_onnx(
             large_model=large_model,
             external_threshold=external_threshold,
@@ -444,7 +444,7 @@ def parsed_query_to_onnx(
             parsed_query_to_onnx_graph(g, sts, [], single_pq)
     else:
         parsed_query_to_onnx_graph(g, sts, [], pq)
-    if isinstance(g, GraphBuilder):
+    if isinstance(g, GraphBuilder) or getattr(g, "supports_optimization_report", False):
         artifact = g.to_onnx(
             large_model=large_model,
             external_threshold=external_threshold,

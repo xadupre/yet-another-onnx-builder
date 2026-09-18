@@ -5,7 +5,7 @@ Expressions in Shape Computation
 =================================
 
 When an ONNX model contains dynamic (unknown) input dimensions,
-:class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+:class:`NativeShapeInference <yobx.xshape.NativeShapeInference>`
 represents every output dimension as either a plain integer or a symbolic
 string expression built from the names of the input dimensions.
 
@@ -21,7 +21,7 @@ This example walks through several common patterns:
 How it works
 ------------
 
-:class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+:class:`NativeShapeInference <yobx.xshape.NativeShapeInference>`
 walks every node of the ONNX graph in order.  For each node it calls an
 op-specific handler (defined in :mod:`yobx.xshape.shape_type_compute`) that
 derives the output shape from the input shapes.  When a dimension cannot be
@@ -43,7 +43,7 @@ For a deeper description of the design, see the
 See also
 --------
 
-* :class:`yobx.xshape.BasicShapeBuilder` — main implementation
+* :class:`yobx.xshape.NativeShapeInference` — main implementation
 * :func:`yobx.xexpressions.simplify_expression` — expression canonicalisation
 * :func:`yobx.xexpressions.evaluate_expression` — expression evaluation
 * :mod:`yobx.xshape.shape_type_compute` — per-operator shape handlers
@@ -58,12 +58,12 @@ See also
 # ``seq1`` and ``seq2`` are unknown at graph-construction time, the result
 # is the symbolic expression ``"seq1+seq2"``.
 
-import onnx
+from yobx._onnx_shim import onnx
 import numpy as np
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from yobx.xexpressions import simplify_expression
-from yobx.xshape import BasicShapeBuilder
+from yobx.xshape import NativeShapeInference
 
 TFLOAT = onnx.TensorProto.FLOAT
 
@@ -81,7 +81,7 @@ model = oh.make_model(
     ir_version=10,
 )
 
-builder = BasicShapeBuilder()
+builder = NativeShapeInference()
 builder.run_model(model)
 
 print("shape of X :", builder.get_shape("X"))
@@ -120,7 +120,7 @@ model_reshape = oh.make_model(
     ir_version=10,
 )
 
-builder_reshape = BasicShapeBuilder()
+builder_reshape = NativeShapeInference()
 builder_reshape.run_model(model_reshape)
 
 print("shape of X  :", builder_reshape.get_shape("X"))
@@ -156,7 +156,7 @@ model_split = oh.make_model(
     ir_version=10,
 )
 
-builder_split = BasicShapeBuilder()
+builder_split = NativeShapeInference()
 builder_split.run_model(model_split)
 
 print("shape of xy :", builder_split.get_shape("xy"))

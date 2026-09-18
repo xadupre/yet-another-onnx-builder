@@ -1,6 +1,6 @@
 from typing import Callable, List, Optional, Tuple, Union
 from sklearn.base import BaseEstimator
-from ..xbuilder import GraphBuilder
+from .graph_builder import SklearnOnnxLightGraphBuilder
 from ..xbuilder.function_options import FunctionOptions
 from .sklearn_helper import get_output_names, TraceableMixin
 
@@ -17,7 +17,7 @@ def default_ai_onnx_ml(main_opset: int) -> int:
 
 
 def wrap_step_as_function(
-    g: GraphBuilder,
+    g: SklearnOnnxLightGraphBuilder,
     fopts: FunctionOptions,
     estimator: BaseEstimator,
     input_names: List[str],
@@ -40,7 +40,7 @@ def wrap_step_as_function(
     :param name: node-name prefix passed to the converter
     """
     # Create an isolated sub-builder for the function body.
-    sub_g = GraphBuilder(g.opsets, as_function=True)  # type: ignore
+    sub_g = g.empty_copy(as_function=True)
 
     # Use stable, collision-free internal names for the function inputs so that
     # the sub-builder's namespace is never polluted by main-graph names (which
@@ -130,7 +130,7 @@ def wrap_step_as_function(
 
 
 def wrap_step(
-    g: GraphBuilder,
+    g: SklearnOnnxLightGraphBuilder,
     sts,
     fopts: Optional[FunctionOptions],
     is_container: bool,

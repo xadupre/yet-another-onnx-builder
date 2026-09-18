@@ -3,7 +3,7 @@ import os
 import re
 import sys
 import textwrap
-import onnx
+from yobx._onnx_shim import onnx
 from typing import Any, Dict, List, Optional
 from argparse import ArgumentParser, RawTextHelpFormatter, BooleanOptionalAction
 
@@ -487,6 +487,8 @@ def get_parser_print() -> ArgumentParser:
 
 
 def _cmd_print(argv: List[Any]):
+    from .helpers.onnx_helper import pretty_onnx
+
     parser = get_parser_print()
     args = parser.parse_args(argv[1:])
     onx = onnx.load(args.input)
@@ -497,16 +499,15 @@ def _cmd_print(argv: List[Any]):
     elif args.fmt == "raw":
         print(onx)
     elif args.fmt == "pretty":
-        from .helpers.onnx_helper import pretty_onnx
-
         print(pretty_onnx(onx))
     elif args.fmt == "printer":
         print(onnx.printer.to_text(onx))
     elif args.fmt == "shape":
-        from .xshape import BasicShapeBuilder
+        from .xshape import NativeShapeInference
 
-        bs = BasicShapeBuilder()
+        bs = NativeShapeInference()
         bs.run_model(onx)
+        print(pretty_onnx(onx))
         print(bs.get_debug_msg())
     elif args.fmt == "mermaid":
         from .translate import translate

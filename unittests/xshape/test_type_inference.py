@@ -1,8 +1,8 @@
 import unittest
-import onnx
-import onnx.helper as oh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
-from yobx.xshape import BasicShapeBuilder, InferenceMode
+from yobx.xshape import NativeShapeInference, InferenceMode
 from yobx.xshape.type_inference import infer_types
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -267,7 +267,7 @@ class TestRunModelTypeInference(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model, inference=InferenceMode.TYPE)
         self.assertEqual(b.get_type("X"), TFLOAT)
         self.assertEqual(b.get_type("Y"), TFLOAT)
@@ -279,7 +279,7 @@ class TestRunModelTypeInference(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TINT64, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model, inference=InferenceMode.TYPE)
         self.assertEqual(b.get_type("X"), TFLOAT)
         self.assertEqual(b.get_type("Y"), TINT64)
@@ -290,7 +290,7 @@ class TestRunModelTypeInference(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model, inference=InferenceMode.TYPE)
         self.assertEqual(b.input_names, ["X"])
         self.assertEqual(b.output_names, ["Y"])
@@ -302,7 +302,7 @@ class TestRunModelTypeInference(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model, inference=InferenceMode.SHAPE)
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertTrue(b.has_shape("Y"))
@@ -314,7 +314,7 @@ class TestRunModelTypeInference(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model, inference="type")
         self.assertEqual(b.get_type("Y"), TFLOAT)
         self.assertFalse(b.has_shape("Y"))
@@ -340,7 +340,7 @@ class TestRunModelTypeInference(ExtTestCase):
             ir_version=10,
             functions=[func],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         b.run_model(model, inference=InferenceMode.TYPE)
         self.assertEqual(b.get_type("A"), TFLOAT)
         self.assertEqual(b.get_type("B"), TFLOAT)
@@ -351,7 +351,7 @@ class TestRunModelTypeInference(ExtTestCase):
             [_mkv_("X", TFLOAT, [3, 4])],
             [_mkv_("Y", TFLOAT, [3, 4])],
         )
-        b = BasicShapeBuilder()
+        b = NativeShapeInference()
         self.assertRaise(lambda: b.run_model(model, inference="unknown"), ValueError)
 
 

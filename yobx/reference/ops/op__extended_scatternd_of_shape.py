@@ -1,22 +1,24 @@
 import numpy as np
-from onnx.reference.op_run import OpRun
-from onnx.reference.ops.op_scatternd import _scatter_nd_impl
+from ._native_op import NativeOpKernel
+from ._native_op import evaluate_native_operator
 
 
-class ScatterNDOfShape(OpRun):
+class ScatterNDOfShape(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, shape, indices, updates, reduction=None, strategy=None):
         data = np.zeros(shape, dtype=updates.dtype)
-        y = _scatter_nd_impl(data, indices, updates, reduction=reduction)
+        (y,) = evaluate_native_operator("ScatterND", data, indices, updates, reduction=reduction)
         return (y,)
 
 
-class MaskedScatterNDOfShape(OpRun):
+class MaskedScatterNDOfShape(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, shape, indices, updates, reduction=None, maskedValue=None):
         data = np.zeros(shape, dtype=updates.dtype)
         new_updates = np.where(indices == maskedValue, 0, updates)
-        y = _scatter_nd_impl(data, indices, new_updates, reduction=reduction)
+        (y,) = evaluate_native_operator(
+            "ScatterND", data, indices, new_updates, reduction=reduction
+        )
         return (y,)

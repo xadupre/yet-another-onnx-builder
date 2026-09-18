@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.mixture import GaussianMixture
 from sklearn.mixture._base import BaseMixture
 

@@ -1,6 +1,6 @@
 import unittest
-import onnx
-import onnx.helper as oh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
 from yobx.helpers.onnx_helper import (
     element_wise_binary_op_types,

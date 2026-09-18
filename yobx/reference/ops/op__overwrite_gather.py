@@ -1,9 +1,9 @@
 from __future__ import annotations
 import numpy as np
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
-class Gather(OpRun):
+class Gather(NativeOpKernel):
     """Overrides the ONNX reference ``Gather`` op to ensure contiguous arrays.
 
     ONNX 1.20.x has a bug where ``indices.ascontiguousarray()`` is called instead

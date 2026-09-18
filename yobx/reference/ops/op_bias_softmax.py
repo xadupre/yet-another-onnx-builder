@@ -1,8 +1,8 @@
 import numpy as np
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
-class BiasSoftmax(OpRun):
+class BiasSoftmax(NativeOpKernel):
     op_domain = "com.microsoft"
 
     def _run(self, x, y, axis=None, is_inner_broadcast=None):  # type: ignore

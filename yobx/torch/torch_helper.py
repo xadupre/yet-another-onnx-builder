@@ -2,8 +2,8 @@ import sys
 import warnings
 from typing import Any
 import numpy as np
-import onnx
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.numpy_helper as onh
 import torch
 from ..helpers.onnx_helper import onnx_dtype_name, tensor_dtype_to_np_dtype
 

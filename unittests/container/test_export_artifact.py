@@ -8,8 +8,8 @@ import tempfile
 import unittest
 
 import numpy as np
-import onnx
-import onnx.helper as oh
+from onnx_light import onnx
+from onnx_light.onnx import helper as oh
 from yobx.container import ExportArtifact, ExportReport, FunctionPieces
 from yobx.ext_test_case import ExtTestCase, skipif_ci_windows
 
@@ -122,7 +122,7 @@ class TestExportReport(ExtTestCase):
             {"pattern": "p2", "added": 0, "removed": 1, "time_in": 0.02},
         ]
         r = ExportReport(stats=stats, extra={"time_total": 0.42})
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             path = os.path.join(tmp, "report.xlsx")
             r.to_excel(path)
             self.assertTrue(os.path.exists(path))
@@ -151,7 +151,7 @@ class TestExportReport(ExtTestCase):
         bs = BuildStats()
         bs["time_export_write_model"] = 0.5
         r = ExportReport(extra={"k": "v"}, build_stats=bs)
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             path = os.path.join(tmp, "report_bs.xlsx")
             r.to_excel(path)
             self.assertTrue(os.path.exists(path))
@@ -251,7 +251,7 @@ class TestExportReport(ExtTestCase):
 
         r = ExportReport()
         r.compute_node_stats(_make_matmul_model())
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             path = os.path.join(tmp, "report_ns.xlsx")
             r.to_excel(path)
             self.assertTrue(os.path.exists(path))
@@ -364,7 +364,7 @@ class TestExportReport(ExtTestCase):
 
         r = ExportReport()
         r.compute_symbolic_flops(_make_matmul_model())
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             path = os.path.join(tmp, "report_sf.xlsx")
             r.to_excel(path)
             self.assertTrue(os.path.exists(path))
@@ -418,7 +418,7 @@ class TestExportReport(ExtTestCase):
             {"index": 1, "SUCCESS": False, "abs": 1e-3, "rel": 1e-2},
         ]
         r = ExportReport(discrepancies=rows)
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             path = os.path.join(tmp, "report_disc.xlsx")
             r.to_excel(path)
             self.assertTrue(os.path.exists(path))
@@ -439,7 +439,7 @@ class TestExportReport(ExtTestCase):
         import pandas
 
         r = ExportReport(extra={"k": "v"})
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             path = os.path.join(tmp, "report_nodisc.xlsx")
             r.to_excel(path)
             self.assertTrue(os.path.exists(path))
@@ -494,7 +494,7 @@ class TestExportReport(ExtTestCase):
 
     def test_save(self):
         artifact = self._artifact()
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             path = os.path.join(tmp, "model.onnx")
             returned = artifact.save(path)
             self.assertTrue(os.path.exists(path))
@@ -511,7 +511,7 @@ class TestExportReport(ExtTestCase):
 
         artifact = ExportArtifact(proto=onnx.FunctionProto())
 
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             path = os.path.join(tmp, "fn.onnx")
             with self.assertRaises(TypeError):
                 artifact.save(path)
@@ -526,7 +526,7 @@ class TestExportReport(ExtTestCase):
 
     def test_load(self):
         artifact = self._artifact()
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             path = os.path.join(tmp, "model.onnx")
             artifact.save(path)
             loaded = ExportArtifact.load(path)
@@ -567,19 +567,18 @@ class TestExportReport(ExtTestCase):
         np.testing.assert_allclose(total, a + b, rtol=1e-5)
 
     def test_to_onnx_function_returns_artifact(self):
-        from yobx.xbuilder import GraphBuilder, FunctionOptions
         from yobx.reference import ExtendedReferenceEvaluator
 
-        g = GraphBuilder(18, ir_version=9, as_function=True)
-        g.make_tensor_input("X", None, None, False)
-        g.op.Add("X", "X", outputs=["Y"])
-        g.make_tensor_output("Y", indexed=False)
-
-        artifact = g.to_onnx(
-            function_options=FunctionOptions(
-                export_as_function=True, name="double", domain="test_domain"
+        artifact = ExportArtifact(
+            proto=oh.make_function(
+                "test_domain",
+                "double",
+                ["X"],
+                ["Y"],
+                [oh.make_node("Add", ["X", "X"], ["Y"])],
+                [oh.make_opsetid("", 18)],
             ),
-            inline=False,
+            function=FunctionPieces(),
         )
 
         self.assertIsInstance(artifact, ExportArtifact)
@@ -600,24 +599,22 @@ class TestExportReport(ExtTestCase):
         np.testing.assert_allclose(Y, X + X)
 
     def test_to_onnx_function_with_initializers_returns_artifact(self):
-        """to_onnx with export_as_function=True and return_initializer=True."""
-        from yobx.xbuilder import GraphBuilder, FunctionOptions
-
-        g = GraphBuilder(18, ir_version=9, as_function=True)
-        g.make_tensor_input("X", None, None, False)
+        """Stores native function pieces with externally owned initializer values."""
         np_weights = np.arange(6).reshape((2, 3)).astype(np.float32)
-        init = g.make_initializer("weights", np_weights)
-        g.op.MatMul("X", init, outputs=["Y"])
-        g.make_tensor_output("Y", indexed=False)
-
-        artifact = g.to_onnx(
-            function_options=FunctionOptions(
-                export_as_function=True,
-                name="linear",
-                domain="test_domain",
-                return_initializer=True,
+        artifact = ExportArtifact(
+            proto=oh.make_function(
+                "test_domain",
+                "linear",
+                ["X", "weights"],
+                ["Y"],
+                [oh.make_node("MatMul", ["X", "weights"], ["Y"])],
+                [oh.make_opsetid("", 18)],
             ),
-            inline=False,
+            function=FunctionPieces(
+                initializers_name=["weights"],
+                initializers_dict={"weights": np_weights},
+                initializers_renaming={"weights": "weights"},
+            ),
         )
 
         self.assertIsInstance(artifact, ExportArtifact)
@@ -682,7 +679,7 @@ class TestExportReport(ExtTestCase):
         artifact = ExportArtifact(
             proto=_make_matmul_model(), report=ExportReport(extra={"time_total": 0.1})
         )
-        with tempfile.TemporaryDirectory() as tmp:
+        with tempfile.TemporaryDirectory(dir=".") as tmp:
             path = os.path.join(tmp, "model.onnx")
             artifact.save(path)
             excel_path = os.path.join(tmp, "model.xlsx")

@@ -23,6 +23,14 @@ class TestGetOutputNames(ExtTestCase):
         self.y_binary = np.array([0, 1] * 15)
         self.y_multiclass = np.array([0, 1, 2] * 10)
 
+    def test_numerical_comparison_requires_tensor(self):
+        from yobx.sklearn.tests_helper import _assert_close
+
+        values = np.array([1, 2], dtype=np.float32)
+        _assert_close(values, values.copy(), "tensor")
+        with self.assertRaisesRegex(AssertionError, "Expected a tensor output"):
+            _assert_close(values, [values], "sequence")
+
     # ------------------------------------------------------------------ helpers
 
     def _fit(self, cls, *args, **kwargs):

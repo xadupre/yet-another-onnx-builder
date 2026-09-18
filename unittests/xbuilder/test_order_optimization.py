@@ -1,14 +1,13 @@
 import unittest
 from typing import Optional
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-from onnx.checker import check_model
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
+from onnx_light.onnx.checker import check_model
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
-from yobx.xbuilder import OrderAlgorithm
 
 TFLOAT = onnx.TensorProto.FLOAT
 TFLOAT16 = onnx.TensorProto.FLOAT16
@@ -34,7 +33,7 @@ class TestGraphOrderOptimization(ExtTestCase):
                 continue
             if sh.type.tensor_type.elem_type != 0:
                 new_shapes.append(sh)
-        del onx.graph.value_info[:]
+        onx.graph.ClearField("value_info")
         onx.graph.value_info.extend(new_shapes)
 
     def _check_ort_cpu_or_cuda(self, onx):
@@ -134,21 +133,14 @@ class TestGraphOrderOptimization(ExtTestCase):
         check_model(model)
         op_types = [n.op_type for n in model.graph.node]
 
-        verbose = 10
-        gr = GraphBuilder(
-            model,
-            infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=None, verbose=verbose, order=OrderAlgorithm.RANDOM
-            ),
-            verbose=0,
-        )
+        gr = GraphBuilder(model, optimization_options=OptimizationOptions(patterns=[]), verbose=0)
 
         feeds = {"X": self._range(4, 4), "Y": self._range(4, 4)}
         ref = ExtendedReferenceEvaluator(model)
         expected = ref.run(None, feeds)[0]
 
-        opt_onx = gr.to_onnx(optimize=True)
+        gr.inner_builder.move_shape_and_size_nodes()
+        opt_onx = gr.to_onnx(optimize=False)
         new_op_types = [n.op_type for n in opt_onx.graph.node]
         self.assertEqual(len(op_types), len(new_op_types))
 
@@ -197,14 +189,10 @@ class TestGraphOrderOptimization(ExtTestCase):
             self._check_ort_cpu_or_cuda(onx)
 
             gr = GraphBuilder(
-                onx,
-                infer_shapes_options=False,
-                optimization_options=OptimizationOptions(
-                    patterns=None, verbose=10, order=OrderAlgorithm.RANDOM
-                ),
-                verbose=0,
+                onx, optimization_options=OptimizationOptions(patterns=[]), verbose=0
             )
-            onx = gr.to_onnx(optimize=True)
+            gr.inner_builder.move_shape_and_size_nodes()
+            onx = gr.to_onnx(optimize=False)
             self._check_ort_cpu_or_cuda(onx)
 
     @ignore_warnings(RuntimeWarning)
@@ -238,21 +226,14 @@ class TestGraphOrderOptimization(ExtTestCase):
         check_model(model)
         op_types = [n.op_type for n in model.graph.node]
 
-        verbose = 10
-        gr = GraphBuilder(
-            model,
-            infer_shapes_options=True,
-            optimization_options=OptimizationOptions(
-                patterns=None, verbose=verbose, order=OrderAlgorithm.SHAPE, passes=("order",)
-            ),
-            verbose=0,
-        )
+        gr = GraphBuilder(model, optimization_options=OptimizationOptions(patterns=[]), verbose=0)
 
         feeds = {"X": self._range(4, 4), "Y": self._range(4, 4)}
         ref = ExtendedReferenceEvaluator(model)
         expected = ref.run(None, feeds)[0]
 
-        opt_onx = gr.to_onnx(optimize=True)
+        gr.inner_builder.move_shape_and_size_nodes()
+        opt_onx = gr.to_onnx(optimize=False)
         new_op_types = [n.op_type for n in opt_onx.graph.node]
         self.assertEqual(
             [

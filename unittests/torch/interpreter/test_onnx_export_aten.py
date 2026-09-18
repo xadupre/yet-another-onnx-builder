@@ -3,9 +3,9 @@ import os
 import unittest
 from typing import Any, List, Optional
 import numpy as np
-import onnx
-import onnx.helper as oh
-from onnx.checker import check_model
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+from onnx_light.onnx.checker import check_model
 import torch
 from yobx.ext_test_case import (
     ExtTestCase,
@@ -90,7 +90,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = (torch.arange(4 * 3) + 10).reshape((1, -1, 4)).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_roll_neg", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         sess = ExtendedReferenceEvaluator(model_path)
         feeds = dict(zip(sess.input_names, [x.numpy()]))
@@ -109,7 +109,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = (torch.arange(4 * 3) + 10).reshape((1, -1, 4)).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_roll_pos", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         sess = ExtendedReferenceEvaluator(model_path)
         feeds = dict(zip(sess.input_names, [x.numpy()]))
@@ -128,7 +128,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.randn(2, 3, 5).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_cumprod", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         sess = ExtendedReferenceEvaluator(model_path)
         feeds = dict(zip(sess.input_names, [x.numpy()]))
@@ -156,7 +156,7 @@ class TestOnnxExportAten(ExtTestCase):
         model_path = self._call_exporter(
             "test_aten_index_put_3d_nd_case_1", "custom", model, (index, update), strict=True
         )
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -189,7 +189,7 @@ class TestOnnxExportAten(ExtTestCase):
         model_path = self._call_exporter(
             "test_aten_index_put_3d_nd_case_2", "custom", model, (index, update), strict=True
         )
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -218,7 +218,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.randn(1, 2, 3, 4, requires_grad=False)
         expected = model(x)
         model_path = self._call_exporter("test_aten_interpolate_bilinear", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -245,7 +245,7 @@ class TestOnnxExportAten(ExtTestCase):
         model_path = self._call_exporter(
             "test_aten_interpolate_bilinear_antialias", "custom", model, (x,)
         )
-        check_model(model_path)
+        check_model(onnx.load(model_path))
         onx = onnx.load(model_path)
         resizes = [n for n in onx.graph.node if n.op_type == "Resize"]
         self.assertEqual(len(resizes), 1)
@@ -277,7 +277,7 @@ class TestOnnxExportAten(ExtTestCase):
         model_path = self._call_exporter(
             "test_aten_interpolate_bicubic_antialias", "custom", model, (x,)
         )
-        check_model(model_path)
+        check_model(onnx.load(model_path))
         onx = onnx.load(model_path)
         resizes = [n for n in onx.graph.node if n.op_type == "Resize"]
         self.assertEqual(len(resizes), 1)
@@ -311,7 +311,7 @@ class TestOnnxExportAten(ExtTestCase):
         model_path = self._call_exporter(
             "test_aten_nn_functional_bilinear", "custom", model, (x1, x2)
         )
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -340,7 +340,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = (torch.randn(3, 4, requires_grad=False) < 0.4).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_nonzeros_1", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -367,7 +367,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = (torch.randn(3, 4, 5, requires_grad=False) < 0.4).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_nonzeros_1_d3", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -394,7 +394,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = (torch.randn(20, requires_grad=False) < 0.4).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_nonzeros_1_d1", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -421,7 +421,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = (torch.randn(3, 4, requires_grad=False) < 0.4).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_nonzeros_tuple", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -451,7 +451,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = (torch.randn(3, 4, 5, requires_grad=False) < 0.4).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_nonzeros_tuple_d3", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -481,7 +481,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = (torch.randn(34, requires_grad=False) < 0.4).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_nonzeros_tuple_d1", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -565,7 +565,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.randn((2, 2, 8, 8), requires_grad=False)
         expected = model(x)
         model_path = self._call_exporter("test_aten_as_strided", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -595,7 +595,7 @@ class TestOnnxExportAten(ExtTestCase):
         model_path = self._call_exporter(
             "test_aten_as_strided_overlapping", "custom", model, (x,)
         )
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -636,7 +636,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.randn((2, 2, 8, 8), requires_grad=False)
         expected = model(x)
         model_path = self._call_exporter("test_aten_batch_norm_notraining", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -678,7 +678,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.randn((2, 2, 8, 8), requires_grad=False)
         expected = model(x)
         model_path = self._call_exporter("test_aten_batch_norm_training", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -724,7 +724,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.randn((1, 16, 27), requires_grad=False).to(torch.float16)
         expected = model(x)
         model_path = self._call_exporter("test_aten_batch_norm_training16", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -758,7 +758,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.arange(2 * 2 * 8 * 8 * 16).reshape((2, 2, 8, 8, 16)).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_index_tensor_2_5", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -789,7 +789,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.arange(2 * 2 * 8 * 16).reshape((2, 2, 8, 16)).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_index_tensor_2_4", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -818,7 +818,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.arange(128 * 24 * 56 * 56).reshape((128, 24, 56, 56)).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_index_tensor_2_4_1_1", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -850,7 +850,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.arange(2 * 8 * 16).reshape((2, 8, 16)).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_index_tensor_1_3", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -874,7 +874,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.arange(2 * 8 * 16).reshape((2, 8, 16)).to(torch.float32)
         expected = model(x)
         model_path = self._call_exporter("test_aten_fmod", "custom", model, (x,))
-        check_model(model_path)
+        check_model(onnx.load(model_path))
 
         import onnxruntime
 
@@ -1632,7 +1632,7 @@ class TestOnnxExportAten(ExtTestCase):
         domains = [d.domain for d in onx.opset_import]
         # No custom domain should be registered for the default ONNX QDQ ops.
         self.assertEqual(domains, [""])
-        check_model(onx)
+        check_model(onx.proto)
 
     @ignore_warnings(UserWarning)
     def test_aten_index_tensor_rk2_rk4_rk4(self):
@@ -2768,7 +2768,7 @@ class TestOnnxExportAten(ExtTestCase):
             strict=False,
             dynamic_shapes=({1: "b", 2: "c"}, {0: "d"}, {1: "f", 2: "g"}),
         )
-        check_model(model_path)
+        check_model(onnx.load(model_path))
         sess = self.check_ort(model_path)
         feeds = dict(
             zip([i.name for i in sess.get_inputs()], [x.numpy(), index.numpy(), update.numpy()])
@@ -2799,7 +2799,7 @@ class TestOnnxExportAten(ExtTestCase):
             strict=False,
             dynamic_shapes=({0: DYN, 1: DYN}, {0: DYN}, {0: DYN, 1: DYN}),
         )
-        check_model(model_path)
+        check_model(onnx.load(model_path))
         sess = self.check_ort(model_path)
         feeds = dict(zip([i.name for i in sess.get_inputs()], [i.numpy() for i in inputs]))
         got = sess.run(None, feeds)[0]
@@ -2828,7 +2828,7 @@ class TestOnnxExportAten(ExtTestCase):
             strict=False,
             dynamic_shapes=({0: DYN, 1: DYN}, {0: DYN}, {0: DYN, 1: DYN}),
         )
-        check_model(model_path)
+        check_model(onnx.load(model_path))
         sess = self.check_ort(model_path)
         feeds = dict(zip([i.name for i in sess.get_inputs()], [i.numpy() for i in inputs]))
         got = sess.run(None, feeds)[0]
@@ -2857,7 +2857,7 @@ class TestOnnxExportAten(ExtTestCase):
             strict=False,
             dynamic_shapes=({0: DYN, 1: DYN}, {0: DYN}, {0: DYN, 1: DYN}),
         )
-        check_model(model_path)
+        check_model(onnx.load(model_path))
         sess = self.check_ort(model_path)
         feeds = dict(zip([i.name for i in sess.get_inputs()], [i.numpy() for i in inputs]))
         got = sess.run(None, feeds)[0]
@@ -3679,7 +3679,7 @@ class TestOnnxExportAten(ExtTestCase):
             "test_torchvision_deform_conv2d_dynamo_185195", "dynamo", Model().eval(), inputs
         )
         onx = onnx.load(model_path)
-        check_model(onx)
+        check_model(onx.proto)
         self.assertIn(("DeformConv", ""), {(n.op_type, n.domain) for n in onx.graph.node})
 
     def test_aten_histc_float(self):

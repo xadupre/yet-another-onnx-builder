@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 import numpy as np
-from onnx import ValueInfoProto
+from onnx_light.onnx import ValueInfoProto
 from ..typing import GraphBuilderExtendedProtocol
 from .onnx_helper import np_dtype_to_tensor_dtype
 

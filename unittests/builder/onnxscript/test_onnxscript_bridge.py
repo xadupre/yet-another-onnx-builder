@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
-import onnx
-from onnx.checker import check_model
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+from onnx_light.onnx.checker import check_model
+import onnx_light.onnx.numpy_helper as onh
 from yobx.container import ExportArtifact
 from yobx.ext_test_case import ExtTestCase, requires_onnxscript
 from yobx.reference import ExtendedReferenceEvaluator
@@ -222,7 +222,7 @@ class TestOnnxScriptBridge(ExtTestCase):
         self.assertEqual(list(perm_attr.ints), [1, 0])
 
     def test_make_node_with_attribute_proto(self):
-        import onnx.helper as oh
+        import onnx_light.onnx.helper as oh
 
         gr = self._make_builder()
         gr.make_tensor_input("X", onnx.TensorProto.FLOAT, (3, 4))

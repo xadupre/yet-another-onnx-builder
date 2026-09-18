@@ -205,14 +205,15 @@ sphinx_gallery_conf = {
     ),
 }
 
-substring_to_disable = []
+substring_to_disable = ["plot_sklearn_with_spox", "plot_sklearn_with_sklearn_onnx"]
 if int(os.environ.get("UNITTEST_GOING", "0")):
-    substring_to_disable = ["tiny_llm", "examples.transformers.plot_"]
+    substring_to_disable += ["tiny_llm", "examples.transformers.plot_"]
 substring = "|".join(f"({s})" for s in substring_to_disable)
 if substring:
     sphinx_gallery_conf["ignore_pattern"] = f".*({substring}).*"
 
 epkg_dictionary = {
+    "perpetual": "https://perpetual-ml.github.io/perpetual/",
     "aten functions": "https://pytorch.org/cppdocs/api/namespace_at.html#functions",
     "azure pipeline": "https://azure.microsoft.com/en-us/products/devops/pipelines",
     "guard_size_oblivious": "https://docs.pytorch.org/docs/stable/generated/torch.fx.experimental.symbolic_shapes.guard_size_oblivious.html",

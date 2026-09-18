@@ -1,8 +1,8 @@
 import numpy as np
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
-class FusedMatMul(OpRun):
+class FusedMatMul(NativeOpKernel):
     op_domain = "com.microsoft"
 
     def _run(

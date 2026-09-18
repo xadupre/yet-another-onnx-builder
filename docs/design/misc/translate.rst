@@ -81,8 +81,8 @@ The five APIs are exposed through the single convenience function
 .. runpython::
     :showcode:
 
-    import onnx.helper as oh
-    import onnx
+    import onnx_light.onnx.helper as oh
+    from yobx._onnx_shim import onnx
     from yobx.translate import translate
 
     model = oh.make_model(
@@ -149,9 +149,9 @@ stays readable for large weight matrices.
     :showcode:
 
     import numpy as np
-    import onnx.helper as oh
-    import onnx.numpy_helper as onh
-    import onnx
+    import onnx_light.onnx.helper as oh
+    import onnx_light.onnx.numpy_helper as onh
+    from yobx._onnx_shim import onnx
     from yobx.translate import translate
 
     big_w = onh.from_array(np.random.randn(8, 5).astype(np.float32), name="W")
@@ -178,8 +178,8 @@ nodes, inputs, and outputs.
 .. runpython::
     :showcode:
 
-    import onnx.helper as oh
-    import onnx
+    import onnx_light.onnx.helper as oh
+    from yobx._onnx_shim import onnx
     from yobx.translate import translate
 
     model = oh.make_model(
@@ -205,8 +205,8 @@ collapsed to a single ``.``-joined line when ``single_line=True``.
 .. runpython::
     :showcode:
 
-    import onnx.helper as oh
-    import onnx
+    import onnx_light.onnx.helper as oh
+    from yobx._onnx_shim import onnx
     from yobx.translate import translate
 
     model = oh.make_model(
@@ -233,8 +233,8 @@ with ``g.to_onnx()``.
 .. runpython::
     :showcode:
 
-    import onnx.helper as oh
-    import onnx
+    import onnx_light.onnx.helper as oh
+    from yobx._onnx_shim import onnx
     from yobx.translate import translate
 
     model = oh.make_model(
@@ -259,8 +259,8 @@ the original model:
     :showcode:
 
     import numpy as np
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.translate import translate, translate_header
 
     model = oh.make_model(

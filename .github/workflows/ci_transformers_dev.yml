@@ -40,6 +40,8 @@ jobs:
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Install development version of transformers
         run: pip install git+https://github.com/huggingface/transformers.git
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
       - name: pip freeze
@@ -71,6 +73,8 @@ jobs:
         run: pip install --pre --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/nightly/cpu
       - name: Install development version of transformers
         run: pip install git+https://github.com/huggingface/transformers.git
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
       - name: pip freeze

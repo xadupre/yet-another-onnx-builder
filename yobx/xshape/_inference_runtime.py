@@ -1,7 +1,7 @@
 import time
 from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
-import onnx
+from onnx_light import onnx
 from ..helpers import string_type
 from ..helpers.onnx_helper import tensor_dtype_to_np_dtype
 from ..reference import ExtendedReferenceEvaluator
@@ -16,7 +16,7 @@ from .shape_type_compute import set_shape_type_op_any, set_shape_type_custom
 
 
 class _OptimizationOptions:
-    """Default optimization options for :class:`BasicShapeBuilder`."""
+    """Provides default optimization options for legacy runtime helpers."""
 
     constant_size: int = 2**24
 

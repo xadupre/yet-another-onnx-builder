@@ -24,8 +24,8 @@ object to a compact, human-readable text representation.  It works on
 .. runpython::
     :showcode:
 
-    import onnx.helper as oh
-    import onnx
+    import onnx_light.onnx.helper as oh
+    from yobx._onnx_shim import onnx
     from yobx.helpers.onnx_helper import pretty_onnx
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -49,7 +49,7 @@ For a single node, pass ``with_attributes=True`` to include attribute values:
 .. runpython::
     :showcode:
 
-    import onnx.helper as oh
+    import onnx_light.onnx.helper as oh
     from yobx.helpers.onnx_helper import pretty_onnx
 
     node = oh.make_node("Transpose", ["X"], ["Y"], perm=[1, 0, 2])
@@ -107,8 +107,8 @@ recursing into these subgraphs.
 .. runpython::
     :showcode:
 
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.helpers.onnx_helper import enumerate_subgraphs
 
     TFLOAT = onnx.TensorProto.FLOAT

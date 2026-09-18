@@ -6,6 +6,7 @@ from sklearn.kernel_approximation import AdditiveChi2Sampler
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
+from ...xexpressions.operations import dim_mul
 
 # Default sample_interval values taken from sklearn source.
 # See figure 2 c) of "Efficient additive kernels via explicit feature maps"
@@ -141,6 +142,6 @@ def sklearn_additive_chi2_sampler(
     if g.has_shape(X):
         batch_dim = g.get_shape(X)[0]
         n_features = g.get_shape(X)[1]
-        n_out_features = n_features * (2 * sample_steps - 1)
+        n_out_features = None if n_features is None else dim_mul(n_features, 2 * sample_steps - 1)
         g.set_shape(res, (batch_dim, n_out_features))
     return res

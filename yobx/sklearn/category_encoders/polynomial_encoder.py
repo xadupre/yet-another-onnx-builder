@@ -1,7 +1,7 @@
 from typing import Dict, List
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 import pandas as pd
 from category_encoders import PolynomialEncoder
 

@@ -2,9 +2,9 @@ import ctypes
 import sys
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from .onnx_helper import dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
 from . import string_type
 
@@ -458,7 +458,7 @@ def create_onnx_model_from_input_tensors(
         from yobx.helpers.mini_onnx_builder import (
             create_onnx_model_from_input_tensors,
         )
-        import onnx
+        from yobx._onnx_shim import onnx
 
         proto = create_onnx_model_from_input_tensors(
             dict(
@@ -643,7 +643,7 @@ def create_input_tensors_from_onnx_model(
         sess = ExtendedReferenceEvaluator(proto)
         names = sess.output_names
     elif engine == "onnx":
-        from onnx.reference import ReferenceEvaluator
+        from onnx_light.onnx.reference import ReferenceEvaluator
 
         sess = ReferenceEvaluator(proto)  # type: ignore[assignment,arg-type]
         names = sess.output_names

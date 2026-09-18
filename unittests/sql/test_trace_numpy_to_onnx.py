@@ -438,6 +438,26 @@ class TestNumpyArray(ExtTestCase):
         X = np.abs(np.random.randn(4, 3).astype(np.float32)) + 0.1
         self._run(f, X)
 
+    def test_modulo_signs_and_dtypes(self):
+        """Matches NumPy remainder and fmod for signed inputs and exact multiples."""
+        from onnxruntime import InferenceSession
+        from yobx.sql import trace_numpy_to_onnx
+
+        for dtype in (np.float32, np.float64, np.int32, np.int64, np.uint32, np.uint64):
+            unsigned = np.issubdtype(dtype, np.unsignedinteger)
+            left = np.array([6, 5, 5, 6, 0, 0] if unsigned else [-6, -5, 5, 6, 0, 0], dtype=dtype)
+            right = np.array([3] * 6 if unsigned else [3, 3, -3, -3, 3, -3], dtype=dtype)
+            for function in (np.remainder, np.fmod, lambda x, y: x % y):
+                with self.subTest(dtype=dtype, function=function):
+                    artifact = trace_numpy_to_onnx(function, left, right)
+                    session = InferenceSession(
+                        artifact.SerializeToString(), providers=["CPUExecutionProvider"]
+                    )
+                    actual = session.run(None, {"X0": left, "X1": right})[0]
+                    expected = function(left, right)
+                    np.testing.assert_array_equal(actual, expected)
+                    np.testing.assert_array_equal(np.signbit(actual), np.signbit(expected))
+
     # ------------------------------------------------------------------
     # Reverse arithmetic operators
     # ------------------------------------------------------------------

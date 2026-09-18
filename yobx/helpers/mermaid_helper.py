@@ -1,5 +1,5 @@
 from typing import Dict
-import onnx
+from yobx._onnx_shim import onnx
 from .onnx_helper import onnx_dtype_name
 
 
@@ -9,7 +9,7 @@ def to_mermaid(model: onnx.ModelProto) -> str:
 
     The function:
 
-    * uses :class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+    * uses :class:`NativeShapeInference <yobx.xshape.NativeShapeInference>`
       to annotate every edge with its inferred dtype and shape (when available),
     * inlines small scalar constants and 1-D initializers directly onto the node
       label so the graph stays compact,
@@ -23,9 +23,9 @@ def to_mermaid(model: onnx.ModelProto) -> str:
         :showcode:
 
         import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        from yobx._onnx_shim import onnx
+        import onnx_light.onnx.helper as oh
+        import onnx_light.onnx.numpy_helper as onh
         from yobx.helpers.mermaid_helper import to_mermaid
 
         TFLOAT = onnx.TensorProto.FLOAT
@@ -54,9 +54,9 @@ def to_mermaid(model: onnx.ModelProto) -> str:
         :script:
 
         import numpy as np
-        import onnx
-        import onnx.helper as oh
-        import onnx.numpy_helper as onh
+        from yobx._onnx_shim import onnx
+        import onnx_light.onnx.helper as oh
+        import onnx_light.onnx.numpy_helper as onh
         from yobx.helpers.mermaid_helper import to_mermaid
 
         TFLOAT = onnx.TensorProto.FLOAT
@@ -80,9 +80,9 @@ def to_mermaid(model: onnx.ModelProto) -> str:
         )
         print(to_mermaid(model))
     """
-    from ..xshape import BasicShapeBuilder
+    from ..xshape import NativeShapeInference
 
-    builder = BasicShapeBuilder()
+    builder = NativeShapeInference()
     builder.run_model(model)
 
     edge_labels: Dict[str, str] = {}

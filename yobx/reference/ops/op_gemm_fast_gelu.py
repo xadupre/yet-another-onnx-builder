@@ -1,9 +1,9 @@
 import numpy as np
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 from .op_fast_gelu import FastGelu
 
 
-class GemmFastGelu(OpRun):
+class GemmFastGelu(NativeOpKernel):
     """Implements the ``com.microsoft.GemmFastGelu`` operator.
 
     Computes ``FastGelu(A @ B + bias)`` where bias is optional.

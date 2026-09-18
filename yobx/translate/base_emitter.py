@@ -2,7 +2,7 @@ import inspect
 from typing import Any, Dict, List, Optional, Tuple
 from enum import IntEnum
 import numpy as np
-from onnx import AttributeProto
+from onnx_light.onnx import AttributeProto
 
 
 class EventType(IntEnum):

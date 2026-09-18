@@ -629,11 +629,11 @@ def string_type(
         )
         return f"Chat({msg})"
 
-    if obj.__class__.__name__ == "Value":
-        import onnx_ir
-
-        if isinstance(obj, onnx_ir.Value):
-            return f"ir.{obj.__class__.__name__}({obj})"
+    if (
+        obj.__class__.__name__ == "Value"
+        and obj.__class__.__module__.split(".", 1)[0] == "onnx_ir"
+    ):
+        return f"ir.{obj.__class__.__name__}({obj})"
 
     if obj.__class__.__name__.endswith("Type"):
         return f"{obj.__class__.__name__}(...)"
@@ -1287,9 +1287,9 @@ def max_diff(
 
 
 def size_type(dtype: Any) -> int:
-    """Returns the element size for an element type."""
+    """Returns the byte size of a fixed-width element, rejecting packed ONNX types."""
     if isinstance(dtype, int):
-        from onnx import TensorProto
+        from onnx_light.onnx import TensorProto
 
         # It is a TensorProto.DATATYPE
         if dtype in {

@@ -2,9 +2,9 @@ import unittest
 from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import ml_dtypes
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 import torch
 from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings, requires_cuda
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
@@ -475,8 +475,9 @@ class TestTorchOnnxruntimeEvaluator(ExtTestCase):
 
         feeds = {"X": self._range(32, 128), "Y": self._range(3, 5, 128, 64)}
         ref = ExtendedReferenceEvaluator(model, verbose=10)
-        expected, out, _ = self.capture(lambda: ref.run(None, feeds)[0])
-        self.assertIn("Reshape(xm, shape3) -> Z", out)
+        expected = ref.run(None, feeds)[0]
+        # Native diagnostics bypass Python's redirect_stdout.
+        self.assertIn("ai.onnx:Reshape", ref.used_kernels())
 
         ort_eval = OnnxruntimeEvaluator(model, verbose=10, opsets=20)
         got, out, _ = self.capture(lambda: ort_eval.run(None, feeds)[0])

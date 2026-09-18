@@ -8,7 +8,7 @@ onnxruntime.
 
 import unittest
 import numpy as np
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 from onnxruntime import InferenceSession
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder.graph_builder import GraphBuilder

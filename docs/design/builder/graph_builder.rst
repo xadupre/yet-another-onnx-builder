@@ -67,11 +67,6 @@ covers the methods they actually use:
        full torch-exporter surface: rank helpers, device helpers, dynamic-shape
        helpers, sub-builder / local-function support, and miscellaneous
        utilities used by :class:`~yobx.torch.interpreter.FxGraphInterpreter`.
-   * - :class:`GraphBuilderPatternOptimizationProtocol <yobx.typing.GraphBuilderPatternOptimizationProtocol>`
-     - The read-only view of the graph exposed to pattern-optimization authors
-       inside :meth:`~yobx.xoptim.PatternOptimization.match`.  Satisfied by
-       :class:`~yobx.xoptim.GraphBuilderPatternOptimization`, not by
-       :class:`~yobx.xbuilder.GraphBuilder` directly.
 
 The :attr:`~yobx.typing.GraphBuilderExtendedProtocol.op` property returns an
 object that satisfies :class:`OpsetProtocol <yobx.typing.OpsetProtocol>`,
@@ -99,7 +94,7 @@ The simplest workflow is:
     :showcode:
 
     import numpy as np
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.helpers.onnx_helper import pretty_onnx
     from yobx.xbuilder import GraphBuilder
 
@@ -134,8 +129,8 @@ re-optimized.
 .. runpython::
     :showcode:
 
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.xbuilder import GraphBuilder
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -174,7 +169,7 @@ creating a duplicate node.
     :showcode:
 
     import numpy as np
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -191,7 +186,7 @@ creating a duplicate node.
                          indexed=False)
     model = g.to_onnx()
     print("initializer name :", list(g.initializers_dict)[0])
-    print("initializer shape:", list(g.initializers_dict.values())[0].shape)
+    print("initializer shape:", tuple(g.initializers_dict[w_name].dims))
 
 .. _builder-api:
 
@@ -203,6 +198,20 @@ Shape and type tracking
 are registered for every intermediate result as nodes are added, and are used
 during optimization and for populating ``value_info`` in the exported proto.
 See :ref:`l-design-expected-api`.
+
+Native optimization
+===================
+
+.. _l-design-graph-builder-optimization:
+
+``GraphBuilder`` delegates optimization to the native ``onnx-light``
+``GraphGraph`` engine through :class:`~yobx.xbuilder.OptimizationOptions`
+(published as :class:`~yobx.builder.onnxlight.OnnxLightOptimizationOptions`
+in the native bridge).  ``patterns=None`` or ``"default"`` selects the
+wheel's registered standard patterns, an empty sequence disables pattern
+rewrites, and every other value must be an exact registered pattern name.
+Python pattern classes, legacy pattern groups, and historical Python
+registries are no longer supported.
 
 Dynamic shapes
 ==============
@@ -222,7 +231,7 @@ tracked as symbolic dimensions.
 .. runpython::
     :showcode:
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -247,75 +256,70 @@ tracked as symbolic dimensions.
 Optimizations
 =============
 
-:meth:`to_onnx <yobx.xbuilder.GraphBuilder.to_onnx>` runs a sequence of
-optimization passes by default.  The set of passes is controlled by
+:meth:`to_onnx <yobx.xbuilder.GraphBuilder.to_onnx>` delegates optimization to
+the native ``onnx-light`` ``GraphGraph`` engine through
 :class:`OptimizationOptions <yobx.xbuilder.OptimizationOptions>`.
 
-Default passes (in order):
+Only the native pattern selection knobs are exposed here:
 
-.. list-table::
-   :header-rows: 1
-   :widths: 25 75
+* ``patterns=None`` or ``patterns="default"`` selects the wheel's registered
+  standard patterns.
+* ``patterns=[]`` disables rewrites.
+* any other value must be an exact registered pattern name such as
+  ``"TransposeTranspose"`` or ``"MulMulMatMul"``.
+* ``max_iter`` limits the number of native rewrite iterations.
 
-   * - Pass
-     - Effect
-   * - ``remove_unused``
-     - Remove nodes whose outputs are never consumed.
-   * - ``constant_folding``
-     - Evaluate operators such as ``Transpose``, ``Cast``, ``Reshape``,
-       ``Concat``, ``Add``, ``Mul``, etc. when all inputs are constants and
-       fold the result into an initializer.
-   * - ``remove_identity``
-     - Remove ``Identity`` nodes.
-   * - ``remove_duplicated_initializer``
-     - Merge identical constant initializers into a single tensor, removing
-       redundant copies.
-   * - ``patterns``
-     - Apply user-supplied or built-in fusion patterns (e.g.
-       ``"default"`` enables the default set of ONNX-to-ONNX rewrites).
-   * - ``order``
-     - Reorder nodes to reduce peak memory by moving each ``Shape`` / ``Size``
-       node immediately after the node that produces its input
-       (controlled by :class:`OrderAlgorithm <yobx.xbuilder.OrderAlgorithm>`,
-       default ``SHAPE``).
+Python pattern classes, legacy pass flags, and historical reorder /
+constant-folding options are not supported by the native bridge.
+With ``onnx-light>=0.1.25``, dependency ordering and lifetime metadata are
+finalized by the native engine; the adapter does not reorder serialized nodes
+or reconstruct the optimized graph to repair them. Local function imports,
+nested calls, and referenced attributes likewise use the native builder
+without replaying typed function bodies in Python.
 
 .. runpython::
     :showcode:
 
-    import onnx
-    import onnx.helper as oh
-    from yobx.xbuilder import GraphBuilder, OptimizationOptions
-
-    TFLOAT = onnx.TensorProto.FLOAT
-
-    model = oh.make_model(
-        oh.make_graph(
-            [
-                oh.make_node("Identity", ["X"], ["X2"]),
-                oh.make_node("Relu", ["X2"], ["Z"]),
-            ],
-            "id_relu",
-            [oh.make_tensor_value_info("X", TFLOAT, [None, 4])],
-            [oh.make_tensor_value_info("Z", TFLOAT, [None, 4])],
-        ),
-        opset_imports=[oh.make_opsetid("", 18)],
-        ir_version=10,
+    from onnx_light import onnx
+    from onnx_light.onnx import helper
+    from onnx_light.onnx_core.optimization import standard_pattern_names
+    from yobx.builder.onnxlight import (
+        OnnxLightGraphBuilder,
+        OnnxLightOptimizationOptions,
     )
 
-    opts = OptimizationOptions(remove_identity=True)
-    g = GraphBuilder(model, optimization_options=opts)
-    optimized = g.to_onnx()
+    assert "TransposeTranspose" in standard_pattern_names()
+
+    model = helper.make_model(
+        helper.make_graph(
+            [
+                helper.make_node("Transpose", ["X"], ["T"], perm=[1, 0]),
+                helper.make_node("Transpose", ["T"], ["Y"], perm=[1, 0]),
+            ],
+            "transpose_transpose",
+            [helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [2, 3])],
+            [helper.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [2, 3])],
+        ),
+        opset_imports=[helper.make_opsetid("", 18)],
+        ir_version=8,
+    )
+
+    builder = OnnxLightGraphBuilder(
+        model,
+        optimization_options=OnnxLightOptimizationOptions(patterns=["TransposeTranspose"]),
+    )
+    optimized = builder.to_onnx()
     print("nodes before:", len(model.graph.node))
-    print("nodes after :", len(optimized.graph.node))
+    print("nodes after :", len(optimized.proto.graph.node))
 
 Optimization report
 ===================
 
 Passing ``return_optimize_report=True`` to
-:meth:`to_onnx <yobx.xbuilder.GraphBuilder.to_onnx>` makes the method return
-a ``(model, stats)`` tuple instead of just the model.  ``stats`` is a list of
-dictionaries — one entry per optimization pass — that records how many nodes
-were added or removed and how long each pass took.
+:meth:`to_onnx <yobx.xbuilder.GraphBuilder.to_onnx>` returns an
+:class:`~yobx.container.ExportArtifact` whose ``report.stats`` list contains one
+entry per native rewrite.  Each entry records the rewrite name, the number of
+nodes added or removed, and the time spent in that rewrite.
 
 .. list-table::
    :header-rows: 1
@@ -324,20 +328,14 @@ were added or removed and how long each pass took.
    * - Key
      - Description
    * - ``pattern``
-     - Name of the optimization pass (e.g. ``"remove_identity"``,
-       ``"constant_folding"``, ``"TransposeTranspose"`` …).
+     - Native rewrite name such as ``"TransposeTranspose"`` or
+       ``"MulMulMatMul"``.
    * - ``added``
-     - Number of nodes added by this pass.
+     - Number of nodes added by the rewrite.
    * - ``removed``
-     - Number of nodes removed by this pass.
+     - Number of nodes removed by the rewrite.
    * - ``time_in``
-     - Wall-clock time spent in this pass (seconds).
-   * - ``iteration``
-     - Iteration number (only for pattern-based passes).
-   * - ``match_index``
-     - Sequential index of the match within the iteration (pattern passes).
-   * - ``instances``
-     - Number of times the pattern was matched (pattern passes).
+     - Wall-clock time spent in this rewrite (seconds).
 
 The list can be converted to a :class:`pandas.DataFrame` for quick
 exploration:
@@ -346,78 +344,73 @@ exploration:
     :showcode:
 
     import pandas
-    import onnx
-    import onnx.helper as oh
-    from yobx.xbuilder import GraphBuilder, OptimizationOptions
+    from onnx_light import onnx
+    from onnx_light.onnx import helper
+    from yobx.builder.onnxlight import OnnxLightGraphBuilder
 
-    TFLOAT = onnx.TensorProto.FLOAT
-
-    model = oh.make_model(
-        oh.make_graph(
+    model = helper.make_model(
+        helper.make_graph(
             [
-                oh.make_node("Identity", ["X"], ["X2"]),
-                oh.make_node("Transpose", ["X2"], ["T"], perm=[1, 0]),
-                oh.make_node("Transpose", ["T"], ["Z"], perm=[1, 0]),
+                helper.make_node("Identity", ["X"], ["X2"]),
+                helper.make_node("Transpose", ["X2"], ["T"], perm=[1, 0]),
+                helper.make_node("Transpose", ["T"], ["Y"], perm=[1, 0]),
             ],
             "demo",
-            [oh.make_tensor_value_info("X", TFLOAT, [3, 4])],
-            [oh.make_tensor_value_info("Z", TFLOAT, [3, 4])],
+            [helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [3, 4])],
+            [helper.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [3, 4])],
         ),
-        opset_imports=[oh.make_opsetid("", 18)],
-        ir_version=10,
+        opset_imports=[helper.make_opsetid("", 18)],
+        ir_version=8,
     )
 
-    opts = OptimizationOptions(patterns="default")
-    g = GraphBuilder(model, infer_shapes_options=True, optimization_options=opts)
-    optimized = g.to_onnx(return_optimize_report=True)
+    art = OnnxLightGraphBuilder(model).to_onnx(return_optimize_report=True)
 
-    df = pandas.DataFrame(optimized.report.stats)
-    # keep only rows that have numeric added/removed counts
-    df["added"] = df["added"].fillna(0).astype(int)
-    df["removed"] = df["removed"].fillna(0).astype(int)
-    print(df[["pattern", "added", "removed", "time_in"]].to_string(index=False))
+    df = pandas.DataFrame(art.report.stats)
+    if df.empty:
+        print("no rewrites")
+    else:
+        print(df[["pattern", "added", "removed", "time_in"]].to_string(index=False))
     print(f"\nnodes before: {len(model.graph.node)}")
-    print(f"nodes after : {len(optimized.graph.node)}")
+    print(f"nodes after : {len(art.proto.graph.node)}")
 
-The report can be aggregated by pass name:
+The report can be aggregated by rewrite name:
 
 .. runpython::
     :showcode:
 
     import pandas
-    import onnx
-    import onnx.helper as oh
-    from yobx.xbuilder import GraphBuilder, OptimizationOptions
+    from onnx_light import onnx
+    from onnx_light.onnx import helper
+    from yobx.builder.onnxlight import OnnxLightGraphBuilder
 
-    TFLOAT = onnx.TensorProto.FLOAT
-
-    model = oh.make_model(
-        oh.make_graph(
+    model = helper.make_model(
+        helper.make_graph(
             [
-                oh.make_node("Identity", ["X"], ["X2"]),
-                oh.make_node("Transpose", ["X2"], ["T"], perm=[1, 0]),
-                oh.make_node("Transpose", ["T"], ["Z"], perm=[1, 0]),
+                helper.make_node("Identity", ["X"], ["X2"]),
+                helper.make_node("Transpose", ["X2"], ["T"], perm=[1, 0]),
+                helper.make_node("Transpose", ["T"], ["Y"], perm=[1, 0]),
             ],
             "demo",
-            [oh.make_tensor_value_info("X", TFLOAT, [3, 4])],
-            [oh.make_tensor_value_info("Z", TFLOAT, [3, 4])],
+            [helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [3, 4])],
+            [helper.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [3, 4])],
         ),
-        opset_imports=[oh.make_opsetid("", 18)],
-        ir_version=10,
+        opset_imports=[helper.make_opsetid("", 18)],
+        ir_version=8,
     )
 
-    opts = OptimizationOptions(patterns="default")
-    g = GraphBuilder(model, infer_shapes_options=True, optimization_options=opts)
-    art = g.to_onnx(return_optimize_report=True)
+    art = OnnxLightGraphBuilder(model).to_onnx(return_optimize_report=True)
 
     df = pandas.DataFrame(art.report.stats)
-    for c in ["added", "removed"]:
-        df[c] = df[c].fillna(0).astype(int)
-    agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
-    agg = agg[(agg["added"] > 0) | (agg["removed"] > 0)].sort_values(
-        "removed", ascending=False
-    )
-    print(agg.to_string())
+    if df.empty:
+        print("no rewrites")
+    else:
+        for c in ["added", "removed"]:
+            df[c] = df[c].fillna(0).astype(int)
+        agg = df.groupby("pattern")[["added", "removed", "time_in"]].sum()
+        agg = agg[(agg["added"] > 0) | (agg["removed"] > 0)].sort_values(
+            "removed", ascending=False
+        )
+        print(agg.to_string())
 
 Local functions
 ===============
@@ -430,7 +423,7 @@ A sub-graph can be exported as a reusable ONNX local function (a
 .. runpython::
     :showcode:
 
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder, FunctionOptions
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -494,7 +487,7 @@ problems:
      - Prints a message every time a node producing ``<name>`` is added.
 
 In addition,
-:meth:`get_debug_msg <yobx.xshape.shape_builder_impl.BasicShapeBuilder.get_debug_msg>`
+:meth:`get_debug_msg <yobx.xshape.NativeShapeInference.get_debug_msg>`
 returns a detailed text dump of the builder's internal state (known shapes,
 types, ranks, constants, and node list) which can be printed or logged whenever
 an assertion fails.
@@ -506,8 +499,8 @@ outputs) and is useful for quick visual inspection:
 .. runpython::
     :showcode:
 
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.xbuilder import GraphBuilder
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -541,12 +534,8 @@ outputs) and is useful for quick visual inspection:
     formal protocol interfaces satisfied by
     :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>`.
 
-    :class:`GraphBuilderPatternOptimizationProtocol <yobx.typing.GraphBuilderPatternOptimizationProtocol>`
-    — the read-only API exposed to pattern authors; satisfied by
-    :class:`GraphBuilderPatternOptimization <yobx.xoptim.GraphBuilderPatternOptimization>`.
-
     :ref:`l-design-expected-api` — the full list of methods and attributes
     every graph builder must expose for use with :func:`~yobx.sklearn.to_onnx`.
 
-    :ref:`l-design-pattern-optimizer` — how the pattern optimizer uses
-    :class:`GraphBuilderPatternOptimization <yobx.xoptim.GraphBuilderPatternOptimization>`.
+    :ref:`l-design-graph-builder-optimization` — how native optimization
+    selects registered pattern names through :class:`~yobx.xbuilder.OptimizationOptions`.

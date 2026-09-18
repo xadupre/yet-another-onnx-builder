@@ -8,16 +8,16 @@ import sys
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
-import onnx.numpy_helper as onh
-from onnx import FunctionProto, TensorProto, ValueInfoProto
-from onnx.helper import (
+import onnx_light.onnx.numpy_helper as onh
+from onnx_light.onnx import FunctionProto, TensorProto, ValueInfoProto
+from onnx_light.onnx.helper import (
     make_graph,
     make_node,
     make_tensor_sequence_value_info,
     make_tensor_type_proto,
     make_tensor_value_info,
 )
-from onnx.shape_inference import infer_function_output_types
+from onnx_light.onnx.shape_inference import infer_function_output_types
 from ...helpers.onnx_helper import (
     tensor_dtype_to_np_dtype,
     np_dtype_to_tensor_dtype,
@@ -423,6 +423,7 @@ def aten_abs(
     assert g.has_type(x), f"missing type for x={x!r}{g.get_debug_msg()}"
     itype = g.get_type(x)
     if itype in {TensorProto.COMPLEX64, TensorProto.COMPLEX128}:
+        g.add_domain("ai.onnx.complex", 1)
         res = g.anyop.ComplexModule(x, name=name, domain="ai.onnx.complex")
         if not sts:
             rtype = TensorProto.FLOAT32 if itype == TensorProto.COMPLEX64 else TensorProto.DOUBLE
@@ -5357,6 +5358,7 @@ def aten__fftn_onnx(
         # Already complex
         fitype = itype
 
+    g.add_domain("ai.onnx.complex", 1)
     final = g.anyop.ToComplex(normalized, name=name, outputs=outputs, domain="ai.onnx.complex")
     if not sts:
         g.set_type(final, fitype)
@@ -5832,10 +5834,6 @@ def aten_flatten_using_ints(
         res = g.op.Reshape(x, new_shape, outputs=outputs, name=name)
     if not sts:
         g.set_type(res, g.get_type(x))
-        if g.has_shape(x, full=True):
-            g.set_shape(res, (int(np.prod(g.get_shape(x))),))
-        else:
-            g.set_rank(res, 1)
     return res
 
 
@@ -14564,12 +14562,12 @@ def aten_slice_Tensor(
         # One row or something like that.
         return g.op.Identity(x, outputs=outputs)
 
-    assert start is None or g.is_dynamic_dimension(start), (
+    assert start is None or isinstance(start, int) or g.is_dynamic_dimension(start), (
         f"aten_slice_Tensor not implemented for **start**={start!r}, "
         f"end={end!r}, dim={dim!r}, step={step!r} x={x!r}, shape(x)="
         f"{g.get_shape(x) if g.has_shape(x) else '?'}{g.get_debug_msg()}"
     )
-    assert end is None or g.is_dynamic_dimension(end), (
+    assert end is None or isinstance(end, int) or g.is_dynamic_dimension(end), (
         f"aten_slice_Tensor not implemented for start={start!r}, "
         f"**end**={end!r}, dim={dim!r}, x={x!r}, shape(x)="
         f"{g.get_shape(x) if g.has_shape(x) else '?'}{g.get_debug_msg()}"
@@ -14582,8 +14580,8 @@ def aten_slice_Tensor(
         # nothing to do
         return g.op.Identity(x, outputs=outputs)
     inputs = [
-        g.get_dynamic_dimension(start or 0),
-        g.get_dynamic_dimension(end or 9223372036854775807),
+        g.get_dynamic_dimension(0 if start is None else start),
+        g.get_dynamic_dimension(9223372036854775807 if end is None else end),
         np.array([dim], dtype=np.int64),
     ]
     if step is not None and step != 1:
@@ -14591,15 +14589,7 @@ def aten_slice_Tensor(
     res = g.op.Slice(x, *inputs, outputs=outputs, name=name)
     if not sts:
         g.set_type(res, g.get_type(x))
-        if (start is None or is_static_dimension(start)) and (
-            end is None or is_static_dimension(end)
-        ):
-            shape = g.get_shape(x)
-            new_shape = g._apply_slice_to_shape(
-                shape, [slice(start, end, step)], axes=[dim], expand_axes=[]
-            )
-            g.set_shape(res, new_shape)
-        else:
+        if not g.has_rank(res):
             g.set_rank(res, g.get_rank(x))
     return res
 

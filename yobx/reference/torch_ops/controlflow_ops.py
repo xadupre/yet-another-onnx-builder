@@ -1,5 +1,5 @@
 from typing import Any, Dict, Optional
-import onnx
+from onnx_light import onnx
 import torch
 from . import OpRunKernel, OpRunTensor
 

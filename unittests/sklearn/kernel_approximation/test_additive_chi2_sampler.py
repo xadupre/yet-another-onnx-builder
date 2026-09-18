@@ -47,6 +47,27 @@ class TestAdditiveChi2Sampler(ExtTestCase):
     def test_sample_steps_3(self):
         self._run(sample_steps=3)
 
+    def test_unknown_and_symbolic_feature_dimensions(self):
+        from onnx_light import onnx
+        from sklearn.kernel_approximation import AdditiveChi2Sampler
+        from yobx.sklearn.kernel_approximation.additive_chi2_sampler import (
+            sklearn_additive_chi2_sampler,
+        )
+        from yobx.xbuilder import GraphBuilder
+
+        X = self._make_data()
+        estimator = AdditiveChi2Sampler(sample_steps=2).fit(X)
+        for dimension, expected_dimension in ((None, None), ("features", "3*features"), (5, 15)):
+            with self.subTest(dimension=dimension):
+                builder = GraphBuilder(18, ir_version=9)
+                builder.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", dimension))
+                sklearn_additive_chi2_sampler(builder, {}, ["Y"], estimator, "X")
+                self.assertEqual(builder.get_shape("Y"), ("batch", expected_dimension))
+                builder.make_tensor_output("Y")
+                model = builder.to_onnx(optimize=False)
+                result = ExtendedReferenceEvaluator(model).run(None, {"X": X})[0]
+                self.assertEqualArray(estimator.transform(X), result, atol=1e-5)
+
     def test_custom_sample_interval(self):
         self._run(sample_steps=4, sample_interval=0.3)
 

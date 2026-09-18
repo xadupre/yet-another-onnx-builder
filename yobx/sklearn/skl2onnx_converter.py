@@ -5,7 +5,7 @@ import sys
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.base import BaseEstimator
 from ..typing import GraphBuilderExtendedProtocol
 
@@ -113,14 +113,7 @@ def mock_guess_proto_type(data_type):
 
 @contextlib.contextmanager
 def patch_skl2onnx_functions(skl2onnx_op_converter):
-    try:
-        import skl2onnx.common_type  # type: ignore
-
-        wrap = True
-    except ImportError:
-        # maybe it is not needed
-        wrap = False
-
+    """Adapts a callback namespace without importing reference-dependent packages."""
     if skl2onnx_op_converter.__class__.__name__ == "RegisteredConverter":
         module = sys.modules[skl2onnx_op_converter._fct.__module__]
     else:
@@ -131,23 +124,16 @@ def patch_skl2onnx_functions(skl2onnx_op_converter):
         "guess_proto_type": mock_guess_proto_type,
     }
     patched = {}
-    sklearn_patched = {}
     for name, fct in function_to_patch.items():
         if hasattr(module, name):
             mocked = getattr(module, name)
             patched[name] = mocked
             setattr(module, name, fct)
-        if wrap:
-            sklearn_patched[name] = skl2onnx.common_type.data_types.guess_numpy_type  # type: ignore
-            setattr(skl2onnx.common_type.data_types, name, fct)  # type: ignore
-
     try:
         yield
-    except StopIteration:
+    finally:
         for k, v in patched.items():
             setattr(module, k, v)
-        for k, v in sklearn_patched:
-            setattr(skl2onnx.common_type, k, v)  # type: ignore
 
 
 class MockScope:

@@ -7,6 +7,7 @@ from .onnx_export import (
     get_default_aten_as_function,
 )
 from .dispatcher import Dispatcher, ForceDispatcher
+from .graph_builder import TorchOnnxLightGraphBuilder
 
 LOCAL_DOMAIN = "aten_local_function"
 

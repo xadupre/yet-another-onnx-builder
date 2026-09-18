@@ -166,7 +166,6 @@ Next steps
 ----------
 
 * :ref:`l-design-graph-builder` — build and optimize ONNX graphs programmatically.
-* :ref:`l-design-pattern-optimizer-patterns` — pattern-based graph rewriting.
 * :ref:`l-design-shape` — symbolic shape expressions for dynamic shapes.
 * :ref:`l-design-translate` — translate ONNX graphs back to Python code.
 * :doc:`api/index` — full API reference.

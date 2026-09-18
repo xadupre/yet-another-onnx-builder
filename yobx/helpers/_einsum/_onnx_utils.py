@@ -3,7 +3,7 @@ Minimal ONNX graph utilities for the einsum decomposition package.
 """
 
 from typing import Set
-import onnx
+from yobx._onnx_shim import onnx
 
 
 def onnx_remove_node_unused(model: onnx.ModelProto) -> onnx.ModelProto:

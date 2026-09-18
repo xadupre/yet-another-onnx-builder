@@ -4,9 +4,9 @@ import subprocess
 import sys
 from typing import Optional, List, Tuple, Union
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from .helpers.dot_helper import to_dot
 from .container import ExportArtifact
 
@@ -260,7 +260,8 @@ def plot_dot(
     .. plot::
 
         import matplotlib.pyplot as plt
-        import onnx.parser
+        from yobx._onnx_shim import onnx
+        import onnx_light.onnx.parser
         from yobx.doc import plot_dot
 
         model = onnx.parser.parse_model(

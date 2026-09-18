@@ -11,8 +11,8 @@ but differ in their backend, tensor type, and primary use-case:
 +------------------------------------+---------------------+-----------------+-----------------------------------+
 | Class                              | Backend             | Tensor type     | Best suited for                   |
 +====================================+=====================+=================+===================================+
-| :class:`ExtendedReferenceEvaluator`| onnx reference      | NumPy           | unit-testing, contrib ops, pure   |
-|                                    | (Python)            | ``ndarray``     | Python debugging                  |
+| :class:`ExtendedReferenceEvaluator`| onnx-light          | NumPy           | unit-testing, contrib ops,        |
+|                                    | (native)            | ``ndarray``     | kernel debugging                  |
 +------------------------------------+---------------------+-----------------+-----------------------------------+
 | :class:`OnnxruntimeEvaluator`      | ONNX Runtime        | NumPy or        | debugging ORT execution,          |
 |                                    | (node-by-node or    | PyTorch         | inspecting intermediate results,  |
@@ -28,8 +28,8 @@ All three evaluators accept an ``onnx.ModelProto`` (or filename) and return a
 list of outputs when called via ``run(None, feed_dict)``.  The key
 differences are:
 
-* **ExtendedReferenceEvaluator** — a pure Python, NumPy-based evaluator that
-  extends :class:`onnx.reference.ReferenceEvaluator` with extra kernels for
+* **ExtendedReferenceEvaluator** — a NumPy-facing evaluator that
+  extends :class:`onnx_light.onnx.reference.ReferenceEvaluator` with extra kernels for
   non-standard domains (``com.microsoft``, ``ai.onnx.complex``).  No ONNX
   Runtime installation is required.  Ideal for unit tests and operator
   prototyping.
@@ -53,16 +53,43 @@ ExtendedReferenceEvaluator
 ==========================
 
 :class:`yobx.reference.ExtendedReferenceEvaluator` extends
-:class:`onnx.reference.ReferenceEvaluator` with additional operator kernels
+:class:`onnx_light.onnx.reference.ReferenceEvaluator` with additional operator kernels
 for non-standard domains such as ``com.microsoft`` and ``ai.onnx.complex``.
 
-The standard :class:`onnx.reference.ReferenceEvaluator` only knows about
-operators defined in the ONNX standard.  ONNX Runtime ships many *contrib*
+ONNX Runtime ships many *contrib*
 operators (domain ``com.microsoft``) that are widely used in production
 models — for example ``FusedMatMul``, ``QuickGelu`` and ``Attention``.
 :class:`~yobx.reference.ExtendedReferenceEvaluator` makes it possible to
-run and unit-test such models with pure Python, without requiring a full
+run and unit-test such models with the native onnx-light runtime and explicit
+NumPy callbacks, without requiring a full
 ONNX Runtime installation.
+
+Standard-operator dtype coverage
+-------------------------------
+
+Explicit NumPy kernels also cover standard operators whose native wheel kernels
+do not support every required dtype: ``ReduceSum``, ``ReduceProd``, ``Pow``,
+``LessOrEqual``, ``Min``, ``Max``, ``IsInf``, ``NonZero``, ``Clip`` and
+``HardSigmoid``. These registrations are selected before execution; they are
+not exception-triggered fallbacks. Double and integer inputs retain their
+precision. Half-precision and bfloat16 reductions accumulate in float32 and
+return the original dtype. Native graph optimization and constant folding
+remain separate from these evaluator registrations.
+
+Custom kernel lifetime
+----------------------
+
+``register_custom_kernel(domain, op_type, fn)`` registers a callable with signature
+``fn(node, *inputs)``. Registration, replacement and removal affect only future
+node resolutions. With onnx-light 0.1.27, each resolved node retains its kernel
+across repeated runs and input-shape changes. In particular,
+``unregister_custom_kernel`` returns whether it removed a registration, not
+whether a previously resolved node stopped using that callback.
+
+To replace a kernel that has already run, create a new evaluator and register
+the replacement before its first run. To restore a built-in kernel, create a
+new evaluator without the override. Registrations are local to an evaluator;
+another evaluator does not inherit them.
 
 Built-in operators
 ------------------
@@ -119,8 +146,8 @@ standard evaluator also runs here.
     :showcode:
 
     import numpy as np
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.reference import ExtendedReferenceEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -153,8 +180,8 @@ fuses matrix multiplication with optional transposition of either operand.
     :showcode:
 
     import numpy as np
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.reference import ExtendedReferenceEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -179,7 +206,7 @@ fuses matrix multiplication with optional transposition of either operand.
 Adding custom operators
 -----------------------
 
-Pass extra :class:`OpRun <onnx.reference.op_run.OpRun>` subclasses through
+Pass extra :class:`NativeOpKernel <yobx.reference.ops._native_op.NativeOpKernel>` subclasses through
 the ``new_ops`` argument.  They are *merged* with :attr:`default_ops`; you do
 not need to re-list the built-in contrib operators.
 
@@ -187,14 +214,14 @@ not need to re-list the built-in contrib operators.
     :showcode:
 
     import numpy as np
-    import onnx
-    import onnx.helper as oh
-    from onnx.reference.op_run import OpRun
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
+    from yobx.reference.ops._native_op import NativeOpKernel
     from yobx.reference import ExtendedReferenceEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
 
-    class MyCustomOp(OpRun):
+    class MyCustomOp(NativeOpKernel):
         op_domain = "my.domain"
 
         def _run(self, X):
@@ -235,8 +262,8 @@ The ``verbose`` parameter maps to the logging levels used internally by
     :showcode:
 
     import numpy as np
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.reference import ExtendedReferenceEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -311,8 +338,8 @@ The API mirrors :class:`onnx.reference.ReferenceEvaluator`: pass an
     :showcode:
 
     import numpy as np
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -346,8 +373,8 @@ intermediate tensors) to its value.
     :showcode:
 
     import numpy as np
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -386,8 +413,8 @@ not allow intermediate result inspection.
     :showcode:
 
     import numpy as np
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -429,8 +456,8 @@ Basic usage
 .. runpython::
     :showcode:
 
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     import torch
     from yobx.helpers import string_type
     from yobx.reference.torch_evaluator import TorchReferenceEvaluator
@@ -468,8 +495,8 @@ memory is reclaimed.
 .. runpython::
     :showcode:
 
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     import torch
     from yobx.helpers import string_type
     from yobx.reference.torch_evaluator import TorchReferenceEvaluator
@@ -511,8 +538,8 @@ keeping the rest of the graph in PyTorch.
     :showcode:
 
     import numpy as np
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     import torch
     from yobx.helpers import string_type
     from yobx.reference.torch_evaluator import TorchReferenceEvaluator
