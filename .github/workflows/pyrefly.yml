@@ -28,6 +28,8 @@ jobs:
       - name: Install dependencies
         run: pip install -e ".[category_encoders,imblearn,lightgbm,perpetual,polars,sklearn,sksurv,statsmodels,tensorflow,torch,transformers,xgboost]" pyrefly
       - name: Install mbext
-        run: pip install git+https://github.com/xadupre/mbext.git
+        run: |
+          pip install --no-deps git+https://github.com/xadupre/mbext.git
+          python -c "import onnx_light; assert onnx_light.__version__ == '0.1.26'"
       - name: Run pyrefly
         run: pyrefly check
