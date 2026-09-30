@@ -13,9 +13,7 @@ class TestGraphPatternOptimizationSequence(ExtTestCase):
         data = os.path.join(os.path.dirname(__file__), "data", "sequences.onnx")
         model = onnx.load(data)
         builder = GraphBuilder(model)
-        optimizer = GraphGraph(
-            builder, patterns=["SplitToSequenceSequenceAt"], use_global_patterns=False
-        )
+        optimizer = GraphGraph(builder, patterns=["SplitToSequenceSequenceAt"])
         optimizer.optimize()
         optimized = builder.to_model(model.ir_version)
         op_types = [node.op_type for node in optimized.graph.node]

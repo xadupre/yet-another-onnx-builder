@@ -887,7 +887,7 @@ class OnnxLightGraphBuilder:
 
     def is_constant(self, name):
         """Queries constant ownership through native GraphGraph."""
-        return GraphGraph(self.inner_builder, [], use_global_patterns=False).is_constant(name)
+        return GraphGraph(self.inner_builder, False).is_constant(name)
 
     def get_constant(
         self, name, exc=True, computed_value=False, as_shape=False, multiple_outputs=False
@@ -895,7 +895,7 @@ class OnnxLightGraphBuilder:
         """Returns a constant using only the native constant runtime."""
         if multiple_outputs:
             raise NotImplementedError("Multiple-output constant evaluation is not supported.")
-        graph = GraphGraph(self.inner_builder, [], use_global_patterns=False)
+        graph = GraphGraph(self.inner_builder, False)
         if not graph.is_constant(name):
             if exc:
                 raise ValueError(f"{name!r} is not a native constant.")
@@ -1012,7 +1012,7 @@ class OnnxLightGraphBuilder:
         native_report = None
         if optimize:
             rewrites, native_report = GraphGraph(
-                builder, self.optimization_options.pattern_names(), use_global_patterns=False
+                builder, self.optimization_options.pattern_names()
             ).optimize(self.optimization_options.max_iter, report=True)
         model = builder.to_onnx(ir_version=self.ir_version)
         if self._original_model is not None:

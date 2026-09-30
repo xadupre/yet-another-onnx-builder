@@ -2988,9 +2988,8 @@ class TestLoopShapeInference(ExtTestCase):
         result = set_shape_type_op_any_loop(b, node)
         self.assertIsNone(result)
 
-    def test_loop_type_inferred_from_body_graph_when_missing(self):
-        """When body output elem_types are undeclared (0), they should be
-        inferred by propagating types through the body graph nodes."""
+    def test_loop_requires_declared_body_output_types(self):
+        """Rejects Loop body outputs without declared element types."""
         body = oh.make_graph(
             [
                 oh.make_node("Identity", ["cond_in"], ["cond_out"]),
@@ -3021,10 +3020,8 @@ class TestLoopShapeInference(ExtTestCase):
         b.set_shape("cond", ())
         b.set_type("v_in", TFLOAT)
         b.set_shape("v_in", (3, 4))
-        b.run_node(node)
-        # types should be inferred even though undeclared in the body outputs
-        self.assertEqual(b.get_type("v_final"), TFLOAT)
-        self.assertEqual(b.get_type("scan"), TFLOAT)
+        with self.assertRaisesRegex(ValueError, "missing a defined 'elem_type'"):
+            b.run_node(node)
 
 
 if __name__ == "__main__":
