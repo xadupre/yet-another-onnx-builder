@@ -41,8 +41,15 @@ from .ops.op__overwrite_elementwise import (
     NonZero,
     Pow,
 )
-from .ops.op__overwrite_log_softmax import LogSoftmax_1, LogSoftmax_13
-from .ops.op__overwrite_reduce import ReduceMax, ReduceMean, ReduceMin, ReduceProd, ReduceSum
+from .ops.op__overwrite_log_softmax import LogSoftmax_1, LogSoftmax_13, SoftmaxCrossEntropyLoss
+from .ops.op__overwrite_reduce import (
+    ReduceL2,
+    ReduceMax,
+    ReduceMean,
+    ReduceMin,
+    ReduceProd,
+    ReduceSum,
+)
 from .ops.op__overwrite_where import Where
 from .ops.op_attention import Attention
 from .ops.op_bias_softmax import BiasSoftmax
@@ -107,6 +114,8 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         Pow,
         LogSoftmax_1,
         LogSoftmax_13,
+        SoftmaxCrossEntropyLoss,
+        ReduceL2,
         ReduceMax,
         ReduceMean,
         ReduceMin,

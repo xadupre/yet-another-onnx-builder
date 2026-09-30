@@ -1,7 +1,7 @@
 """Implements dtype-preserving LogSoftmax through native runtime callbacks."""
 
 import numpy
-from ._native_op import NativeOpKernel
+from ._native_op import NativeOpKernel, evaluate_native_operator
 
 
 def log_softmax(data, axis):
@@ -35,3 +35,24 @@ class LogSoftmax_13(NativeOpKernel):
 
     def _run(self, data, axis=-1):
         return (log_softmax(data, axis),)
+
+
+class SoftmaxCrossEntropyLoss(NativeOpKernel):
+    """Widens low-precision scores for the native float32 loss kernel."""
+
+    def _run(self, scores, labels, weights=None, reduction="mean", ignore_index=None):
+        dtype = scores.dtype
+        if dtype.name in {"float16", "bfloat16"}:
+            scores = scores.astype(numpy.float32)
+            if weights is not None:
+                weights = weights.astype(numpy.float32)
+        outputs = evaluate_native_operator(
+            "SoftmaxCrossEntropyLoss",
+            scores,
+            labels,
+            weights,
+            output_count=2,
+            reduction=reduction,
+            ignore_index=ignore_index,
+        )
+        return tuple(value.astype(dtype, copy=False) for value in outputs)

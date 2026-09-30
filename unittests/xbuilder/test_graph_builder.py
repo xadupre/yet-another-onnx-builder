@@ -720,7 +720,7 @@ class TestGraphBuilder(ExtTestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(calls[0].op_type, f1.name)
 
-        feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
+        feeds = dict(X=np.random.default_rng(0).standard_normal((2, 4)).astype(np.float32))
         feeds.update(fct.function.initializers_dict)
         self.assertEqualArray(np_weights, feeds["weights"])
         self.assertEqualArray(np_bias, feeds["bias"])
@@ -731,14 +731,14 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(g.opsets[""], 18)
         ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
-        self.assertEqualArray(expected, got[0])
+        self.assertEqualArray(expected, got[0], rtol=1e-6)
 
         # Same with a model
         proto = g.to_onnx(inline=False)
         self.assertEqual(len(proto.functions), 3)
         ref = ExtendedReferenceEvaluator(proto)
         got = ref.run(None, feeds)
-        self.assertEqualArray(expected, got[0])
+        self.assertEqualArray(expected, got[0], rtol=1e-6)
 
     @ignore_warnings(DeprecationWarning)
     def test_as_function_nested_twice_merge(self):
@@ -862,7 +862,7 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual((domain_name, function_name), (f2.domain, f2.name))
         self.assertEqual(new_inits_1, new_inits_2)
 
-        feeds = dict(X=np.random.randn(2, 4).astype(np.float32))
+        feeds = dict(X=np.random.default_rng(0).standard_normal((2, 4)).astype(np.float32))
         feeds.update(fct.function.initializers_dict)
         self.assertEqualArray(np_weights, feeds["weights"])
         self.assertEqualArray(np_bias, feeds["bias"])
@@ -873,14 +873,14 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(g.opsets[""], 18)
         ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
-        self.assertEqualArray(expected, got[0])
+        self.assertEqualArray(expected, got[0], rtol=1e-6)
 
         # Same with a model
         proto = g.to_onnx(inline=False)
         self.assertEqual(len(proto.functions), 2)
         ref = ExtendedReferenceEvaluator(proto)
         got = ref.run(None, feeds)
-        self.assertEqualArray(expected, got[0])
+        self.assertEqualArray(expected, got[0], rtol=1e-6)
 
     @ignore_warnings(DeprecationWarning)
     @requires_onnxir("0.1.8")

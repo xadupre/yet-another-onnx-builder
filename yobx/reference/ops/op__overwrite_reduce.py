@@ -71,3 +71,17 @@ class ReduceProd(ReduceSum):
     """Computes products without converting integer inputs to floating point."""
 
     operation = staticmethod(numpy.prod)
+
+
+class ReduceL2(NativeOpKernel):
+    """Computes Euclidean norms with widened low-precision accumulation."""
+
+    def _run(self, data, axes=None, keepdims=1, noop_with_empty_axes=0):
+        axes = reduction_axes(axes)
+        if axes is None and noop_with_empty_axes:
+            return (data,)
+        values = (
+            data.astype(numpy.float32) if data.dtype.name in {"float16", "bfloat16"} else data
+        )
+        result = numpy.sqrt(numpy.sum(values * values, axis=axes, keepdims=bool(keepdims)))
+        return (result.astype(data.dtype, copy=False),)

@@ -202,6 +202,34 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
                     ).run(None, {"X": x})[0]
                     numpy.testing.assert_array_equal(actual, x.reshape(shape))
 
+    def test_take_preserves_input_and_indices_shapes(self):
+        """Keeps the input shape and propagates scalar or multidimensional indices."""
+        from onnxruntime import InferenceSession
+        from yobx.reference import ExtendedReferenceEvaluator
+        from yobx.torch.interpreter._aten_functions import aten_take
+
+        x = numpy.arange(9, dtype=numpy.float32).reshape(3, 3)
+        for batch in (3, "batch"):
+            for values in (8, [0, -1, 7], [[8, 1], [-2, 4]]):
+                indices = numpy.array(values, dtype=numpy.int64)
+                with self.subTest(batch=batch, indices_shape=indices.shape):
+                    builder = TorchOnnxLightGraphBuilder(18)
+                    builder.make_tensor_input("X", onnx.TensorProto.FLOAT, (batch, 3))
+                    builder.make_tensor_input("indices", onnx.TensorProto.INT64, indices.shape)
+                    aten_take(builder, None, ["Y"], "X", "indices")
+                    builder.make_tensor_output("Y")
+                    self.assertEqual(builder.get_shape("X"), (batch, 3))
+                    self.assertEqual(builder.get_shape("Y"), indices.shape)
+                    artifact = builder.to_onnx()
+                    for evaluator in (
+                        ExtendedReferenceEvaluator(artifact),
+                        InferenceSession(
+                            artifact.SerializeToString(), providers=["CPUExecutionProvider"]
+                        ),
+                    ):
+                        actual = evaluator.run(None, {"X": x, "indices": indices})[0]
+                        numpy.testing.assert_array_equal(actual, numpy.take(x, indices))
+
     def test_legacy_export_symbolic_intermediate_shapes(self):
         """Exports and executes dynamic intermediates with the published native builder."""
         import torch

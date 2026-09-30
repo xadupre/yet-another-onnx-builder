@@ -171,6 +171,118 @@ class TestNativeDtypeKernels(unittest.TestCase):
                     got = self.evaluate(op, x, attributes={"keepdims": 0})
                     self.assert_tensor_equal(got, expected)
 
+    def test_reduce_l2_dtypes_axes_and_empty_inputs(self):
+        for dtype in (numpy.float16, ml_dtypes.bfloat16, numpy.float32, numpy.float64):
+            for opset in (17, 18):
+                for axes in (None, [], [0], [-1], [0, 1]):
+                    for keepdims in (0, 1):
+                        with self.subTest(dtype=dtype, opset=opset, axes=axes, keepdims=keepdims):
+                            x = numpy.array([[300, -400], [0, 0]], dtype=dtype)
+                            attributes = {"keepdims": keepdims}
+                            inputs = [x]
+                            if axes is not None:
+                                if opset < 18:
+                                    attributes["axes"] = axes
+                                else:
+                                    inputs.append(numpy.array(axes, dtype=numpy.int64))
+                            expected = numpy.sqrt(
+                                numpy.sum(
+                                    x.astype(numpy.float64) ** 2,
+                                    axis=tuple(axes) if axes else None,
+                                    keepdims=bool(keepdims),
+                                )
+                            ).astype(dtype)
+                            actual = self.evaluate(
+                                "ReduceL2", *inputs, opset=opset, attributes=attributes
+                            )
+                            self.assert_tensor_equal(actual, numpy.asarray(expected))
+            for x in (
+                numpy.array(-3, dtype=dtype),
+                numpy.empty((2, 0, 3), dtype=dtype),
+                numpy.array([numpy.nan, 1], dtype=dtype),
+            ):
+                self.assert_tensor_equal(
+                    self.evaluate("ReduceL2", x, attributes={"noop_with_empty_axes": 1}), x
+                )
+            empty = numpy.empty((2, 0, 3), dtype=dtype)
+            self.assert_tensor_equal(
+                self.evaluate(
+                    "ReduceL2",
+                    empty,
+                    numpy.array([1], dtype=numpy.int64),
+                    attributes={"keepdims": 0},
+                ),
+                numpy.zeros((2, 3), dtype=dtype),
+            )
+
+    def test_cross_entropy_low_precision(self):
+        for dtype in (numpy.float16, ml_dtypes.bfloat16, numpy.float32):
+            scores = numpy.array(
+                [[[1, 2], [-2, 3], [4, -1]], [[0, 1], [2, 0], [-1, 3]]], dtype=dtype
+            )
+            for reduction in ("none", "sum", "mean"):
+                for weighted in (False, True):
+                    for ignored in (False, True):
+                        for output_count in (1, 2):
+                            with self.subTest(
+                                dtype=dtype,
+                                reduction=reduction,
+                                weighted=weighted,
+                                ignored=ignored,
+                                output_count=output_count,
+                            ):
+                                labels = numpy.array([[0, 2], [1, -100 if ignored else 0]])
+                                weights = numpy.array([0.5, 2, 3], dtype=dtype)
+                                inputs = (
+                                    ["scores", "labels", "weights"]
+                                    if weighted
+                                    else ["scores", "labels"]
+                                )
+                                node = helper.make_node(
+                                    "SoftmaxCrossEntropyLoss",
+                                    inputs,
+                                    ["loss", "log_prob"][:output_count],
+                                    reduction=reduction,
+                                    **({"ignore_index": -100} if ignored else {}),
+                                )
+                                feeds = {"scores": scores, "labels": labels}
+                                if weighted:
+                                    feeds["weights"] = weights
+                                got = ExtendedReferenceEvaluator(node).run(None, feeds)
+                                values = scores.astype(numpy.float64)
+                                log_prob = values - numpy.logaddexp.reduce(
+                                    values, axis=1, keepdims=True
+                                )
+                                valid = labels != -100
+                                indices = numpy.where(valid, labels, 0)
+                                selected = numpy.take_along_axis(
+                                    log_prob, indices[:, None, :], axis=1
+                                ).squeeze(1)
+                                factors = (
+                                    weights.astype(numpy.float64)[indices]
+                                    if weighted
+                                    else (numpy.ones(labels.shape))
+                                )
+                                factors = numpy.where(valid, factors, 0)
+                                expected = -selected * factors
+                                if reduction == "sum":
+                                    expected = expected.sum()
+                                elif reduction == "mean":
+                                    expected = expected.sum() / factors.sum()
+                                expected_outputs = [numpy.asarray(expected, dtype=dtype)]
+                                if output_count == 2:
+                                    expected_outputs.append(log_prob.astype(dtype))
+                                self.assertEqual(len(got), output_count)
+                                for actual, expected_output in zip(got, expected_outputs):
+                                    self.assertEqual(actual.dtype, expected_output.dtype)
+                                    self.assertEqual(actual.shape, expected_output.shape)
+                                    numpy.testing.assert_allclose(
+                                        actual.astype(numpy.float32),
+                                        expected_output.astype(numpy.float32),
+                                        rtol=1e-6 if dtype == numpy.float32 else 0,
+                                        atol=1e-7 if dtype == numpy.float32 else 0,
+                                    )
+
     def test_pow_double_broadcast_and_mixed_exponent(self):
         x = numpy.array([[1 + 1e-12], [1e100], [numpy.nan]], dtype=numpy.float64)
         for dtype in (numpy.float64, numpy.int64):

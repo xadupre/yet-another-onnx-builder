@@ -98,6 +98,8 @@ NO_CONVERTER_OPS: FrozenSet[str] = frozenset(
         "linalg_householder_product",
         "linalg_inv",
         "linalg_inv_ex",
+        "linalg_matrix_sqrth",
+        "linalg_polar",
         "linalg_qr",
         "linalg_solve",
         "linalg_solve_ex",

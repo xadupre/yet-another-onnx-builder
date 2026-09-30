@@ -16372,7 +16372,7 @@ def aten_take(
     indices: T,
     name: str = "take",
 ) -> T:
-    """take"""
+    """Gathers flattened input values with the shape of the indices."""
     res = g.op.Gather(
         g.op.Reshape(x, np.array([-1], dtype=np.int64), name=name),
         indices,
@@ -16381,13 +16381,10 @@ def aten_take(
     )
     if not sts:
         g.set_type(res, g.get_type(x))
-        if g.has_shape(x):
-            shape = g.get_shape(x)
-            g.set_shape(
-                x, (int(np.prod(shape)),) if all_int(shape) else ("x".join(map(str, shape)),)
-            )
-        else:
-            g.set_rank(res, 1)
+        if g.has_shape(indices):
+            g.set_shape(res, g.get_shape(indices))
+        elif g.has_rank(indices):
+            g.set_rank(res, g.get_rank(indices))
     return res
 
 

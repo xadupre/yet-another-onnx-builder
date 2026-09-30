@@ -68,13 +68,18 @@ Standard-operator dtype coverage
 -------------------------------
 
 Explicit NumPy kernels also cover standard operators whose native wheel kernels
-do not support every required dtype: ``ReduceSum``, ``ReduceProd``, ``Pow``,
+do not support every required dtype: ``ReduceSum``, ``ReduceProd``, ``ReduceL2``, ``Pow``,
 ``LessOrEqual``, ``Min``, ``Max``, ``IsInf``, ``NonZero``, ``Clip`` and
 ``HardSigmoid``. These registrations are selected before execution; they are
 not exception-triggered fallbacks. Double and integer inputs retain their
 precision. Half-precision and bfloat16 reductions accumulate in float32 and
 return the original dtype. Native graph optimization and constant folding
 remain separate from these evaluator registrations.
+
+``SoftmaxCrossEntropyLoss`` widens float16 and bfloat16 scores and optional
+weights to float32 before calling the native loss kernel, then restores the
+original dtype for the loss and optional log probabilities. Reductions and
+ignored labels remain handled by the native kernel.
 
 Custom kernel lifetime
 ----------------------
