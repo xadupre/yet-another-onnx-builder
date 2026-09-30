@@ -200,9 +200,7 @@ class TestGraphSimplification(ExtTestCase):
 
     def test_remove_identity_shadowing(self):
         def _mkv_(name):
-            value_info_proto = onnx.ValueInfoProto()
-            value_info_proto.name = name
-            return value_info_proto
+            return oh.make_tensor_value_info(name, TensorProto.FLOAT, ["N"])
 
         def _make_model(shadowing=True):
             local_name = "three" if shadowing else "local_three"
@@ -247,7 +245,7 @@ class TestGraphSimplification(ExtTestCase):
                         oh.make_tensor_value_info("X", TensorProto.FLOAT, ["N"]),
                         oh.make_tensor_value_info("one", TensorProto.FLOAT, ["N"]),
                     ],
-                    [oh.make_tensor_value_info("Z", TensorProto.UNDEFINED, ["N"])],
+                    [oh.make_tensor_value_info("Z", TensorProto.FLOAT, ["N"])],
                     [
                         onh.from_array(np.array([0], dtype=np.float32), name="zero"),
                         onh.from_array(np.array([2], dtype=np.float32), name="two"),
@@ -309,9 +307,7 @@ class TestGraphSimplification(ExtTestCase):
 
     def test_remove_post_shadowing(self):
         def _mkv_(name):
-            value_info_proto = onnx.ValueInfoProto()
-            value_info_proto.name = name
-            return value_info_proto
+            return oh.make_tensor_value_info(name, TensorProto.FLOAT, ["N"])
 
         def _make_model():
             return oh.make_model(
@@ -384,7 +380,7 @@ class TestGraphSimplification(ExtTestCase):
                         oh.make_tensor_value_info("X", TensorProto.FLOAT, ["N"]),
                         oh.make_tensor_value_info("one", TensorProto.FLOAT, ["N"]),
                     ],
-                    [oh.make_tensor_value_info("Z", TensorProto.UNDEFINED, ["N"])],
+                    [oh.make_tensor_value_info("Z", TensorProto.FLOAT, ["N"])],
                     [
                         onh.from_array(np.array([0], dtype=np.float32), name="zero"),
                         onh.from_array(np.array([2], dtype=np.float32), name="two"),

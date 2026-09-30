@@ -1,8 +1,8 @@
 import unittest
 import ml_dtypes
 import numpy
-import torch
 from onnx_light.onnx import AttributeProto, TensorProto, helper, numpy_helper
+from yobx.ext_test_case import requires_torch
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -147,7 +147,10 @@ class TestNativeDtypeKernels(unittest.TestCase):
                     )
                     self.assert_tensor_equal(got, numpy.array([expected], dtype=numpy.int64))
 
+    @requires_torch()
     def test_low_precision_reductions_against_torch(self):
+        import torch
+
         for dtype, torch_dtype in (
             (numpy.float16, torch.float16),
             (ml_dtypes.bfloat16, torch.bfloat16),
@@ -267,7 +270,10 @@ class TestNativeDtypeKernels(unittest.TestCase):
             self.evaluate("Clip", x, None, maximum), numpy.minimum(x, maximum)
         )
 
+    @requires_torch()
     def test_hard_sigmoid_half_bfloat16_against_torch(self):
+        import torch
+
         for dtype, torch_dtype in (
             (numpy.float16, torch.float16),
             (ml_dtypes.bfloat16, torch.bfloat16),
