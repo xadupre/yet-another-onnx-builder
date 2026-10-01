@@ -451,6 +451,20 @@ def requires_cuda(version: str = "", msg: str = "", memory: int = 0):
     return lambda x: x
 
 
+def requires_onnxruntime_cuda(msg: str = ""):
+    """Skips a test if ONNX Runtime CUDA is not available."""
+    if not has_onnxruntime_cuda():
+        return unittest.skip(msg or "ONNX Runtime CUDAExecutionProvider is not available")
+    return lambda x: x
+
+
+def has_onnxruntime_cuda():
+    """Tells whether ONNX Runtime CUDA is available."""
+    import onnxruntime
+
+    return "CUDAExecutionProvider" in onnxruntime.get_available_providers()
+
+
 def requires_onnxir(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx-ir` is not recent enough."""
     try:
