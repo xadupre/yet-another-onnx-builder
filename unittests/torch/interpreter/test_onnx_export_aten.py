@@ -4076,8 +4076,8 @@ class TestOnnxExportAten(ExtTestCase):
             model, (a, b, offs), dynamic_shapes=({0: "M", 1: "K"}, {0: "N", 1: "K"}, {})
         )
         self.dump_onnx("test_aten_grouped_mm_offsets_semi_constant.onnx", onx)
-        self.assertEqual(len(onx.functions), 1)
-        self.assertIn("Split", [n.op_type for n in onx.functions[0].node])
+        self.assertEqual(len(onx.functions), 0)
+        self.assertIn("Split", [n.op_type for n in onx.graph.node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b, offs), atol=1e-4)
 
     def test_aten_max_pool3d(self):

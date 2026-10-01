@@ -111,6 +111,29 @@ def _compatible_ir_version(opsets):
     return max(versions)
 
 
+def _contains_custom_domain_node(graph):
+    """Returns whether a graph contains a node outside native inference domains."""
+    native_domains = {"", "ai.onnx", "ai.onnx.ml", "ai.onnx.preview.training", "ai.onnx.training"}
+    for node in graph.node:
+        if str(node.domain) not in native_domains:
+            return True
+        for attribute in node.attribute:
+            if attribute.HasField("g") and _contains_custom_domain_node(attribute.g):
+                return True
+            if any(_contains_custom_domain_node(child) for child in attribute.graphs):
+                return True
+    return False
+
+
+def _contains_control_flow_subgraph(function):
+    """Returns whether a function body contains an operator subgraph."""
+    return any(
+        attribute.HasField("g") or bool(attribute.graphs)
+        for node in function.node
+        for attribute in node.attribute
+    )
+
+
 class OnnxLightGraphBuilderOpset:
     """Normalizes operator convenience calls and historical axes signatures."""
 
@@ -520,6 +543,18 @@ class OnnxLightGraphBuilder:
             return
         self.set_shape(name, (None,) * value)
 
+    def register_constraint_dimension(self, dimension, value):
+        """Registers a symbolic dimension equality in the native context."""
+        values = value if isinstance(value, set) else {value}
+        for item in values:
+            self.shapes_context.add_constraint(str(dimension), str(item))
+
+    def _apply_slice_to_shape(self, shape, indices, axes, expand_axes):
+        """Computes the output shape produced by static slicing."""
+        from ...xshape._builder_runtime import BuilderRuntime
+
+        return BuilderRuntime._apply_slice_to_shape(self, shape, indices, axes, expand_axes)
+
     def set_type_shape_unary_op(self, name, input_name, itype=None):
         """Copies a tensor annotation entirely within the native context."""
         if itype is not None or self.has_type(input_name):
@@ -698,9 +733,7 @@ class OnnxLightGraphBuilder:
             op_type, normalized_inputs, outputs, domain=domain, name=node_name
         )
         node.attribute.extend(native_attributes)
-        local_function = (
-            self._inner.has_local_function(op_type) and (domain, op_type) in self.functions
-        )
+        local_function = (domain, op_type) in self.functions
         native_inference_domain = domain in {
             "",
             "ai.onnx.ml",
@@ -710,7 +743,17 @@ class OnnxLightGraphBuilder:
         custom_inference = self.shapes_context.has_custom_shape_inference_function(
             domain, op_type
         )
-        if _infer_shapes and not local_function and (native_inference_domain or custom_inference):
+        has_custom_subgraph = any(
+            (attribute.HasField("g") and _contains_custom_domain_node(attribute.g))
+            or any(_contains_custom_domain_node(graph) for graph in attribute.graphs)
+            for attribute in native_attributes
+        )
+        if (
+            _infer_shapes
+            and not local_function
+            and not has_custom_subgraph
+            and (native_inference_domain or custom_inference)
+        ):
             self.shapes_context.compute_shape_node(node)
         self._inner.make_node(
             op_type, normalized_inputs, outputs, domain, node_name, native_attributes
@@ -844,6 +887,16 @@ class OnnxLightGraphBuilder:
                 index += 1
             key = (key[0], f"{key[1]}_{index}")
             function.name = key[1]
+        occupied_names = {name for _, name in functions} | {name for _, name in nested_functions}
+        if key[1] in occupied_names:
+            if not options.rename_allowed:
+                raise ValueError(f"Local function name {key[1]!r} already exists.")
+            base_name = key[1]
+            index = 2
+            while f"{base_name}_{index}" in occupied_names:
+                index += 1
+            key = (key[0], f"{base_name}_{index}")
+            function.name = key[1]
         if not self.has_opset(key[0]):
             self.set_opset(key[0], 1)
         self._synchronize_annotations()
@@ -914,6 +967,25 @@ class OnnxLightGraphBuilder:
             return None
         tensor = graph.get_computed_constant(name)
         if tensor is None:
+            producer = next(
+                (
+                    node
+                    for node in self._inner.to_graph().node
+                    if name in [str(output) for output in node.output]
+                ),
+                None,
+            )
+            if (
+                producer is not None
+                and str(producer.domain) in ("", "ai.onnx")
+                and str(producer.op_type) == "Identity"
+            ):
+                return self.get_constant(
+                    str(producer.input[0]),
+                    exc=exc,
+                    computed_value=computed_value,
+                    as_shape=as_shape,
+                )
             if exc:
                 raise ValueError(f"No native runtime value is available for {name!r}.")
             return None
@@ -1018,7 +1090,9 @@ class OnnxLightGraphBuilder:
     def _export_native(self, optimize, inline):
         """Exports a native model and optional native rewrite statistics."""
         builder = GraphBuilder(self._native_model())
-        if inline:
+        if inline and not any(
+            _contains_control_flow_subgraph(function) for function in builder.to_onnx().functions
+        ):
             builder.inline_local_functions()
         rewrites = []
         native_report = None
@@ -1084,11 +1158,19 @@ class OnnxLightGraphBuilder:
             ):
                 raise ValueError("Function export cannot be combined with model export options.")
             return self._function_artifact(function_options, optimize, inline)
-        if mask_outputs is not None:
-            raise NotImplementedError("Native export does not support output masks.")
         from ...container import ExportArtifact, ExportReport, ExtendedModelContainer
 
         native_model, rewrites, native_report = self._export_native(optimize, inline)
+        if mask_outputs is not None:
+            outputs = list(native_model.graph.output)
+            if len(mask_outputs) != len(outputs):
+                raise ValueError(
+                    f"Output mask has length {len(mask_outputs)}, expected {len(outputs)}."
+                )
+            native_model.graph.ClearField("output")
+            native_model.graph.output.extend(
+                output for output, keep in zip(outputs, mask_outputs) if keep
+            )
         report = None
         if native_report is not None:
             if return_optimize_report:

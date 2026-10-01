@@ -544,7 +544,7 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
     def _dimension_is_declared(self, dimension):
         return any(
             self.has_shape(name) and dimension in self.get_shape(name)
-            for name in self.input_names
+            for name in self._shape_names
         )
 
     def add_stat(self, kind, name):
@@ -1195,6 +1195,12 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         name = str(name).replace(" ", "")
         name = self._dynamic_alias.get(name, name)
         if add and name not in self.dynamic_objects:
+            if isinstance(dimension, str):
+                for token in self._expression_names(name) - {name}:
+                    if token not in self.dynamic_objects and not self._dimension_is_declared(
+                        token
+                    ):
+                        self.add_dynamic_object(token, token, check_tokens=False)
             self.add_dynamic_object(name, dimension, parse=True, check_tokens=False)
         return name
 

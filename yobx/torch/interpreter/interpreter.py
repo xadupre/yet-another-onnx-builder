@@ -116,6 +116,7 @@ class FxGraphInterpreter:
         self.default_values = default_values or {}
         self._debug_aten_as_function = int(os.environ.get("ATENDEBUG", "0"))
         self._cond_func_output_info: Dict[str, List[Any]] = {}
+        self._local_function_names: Dict[str, str] = {}
 
     def register_named_modules(
         self,
@@ -419,7 +420,7 @@ class FxGraphInterpreter:
             )
             if output_names:
                 # If no output, then it cannot be used.
-                self.builder.make_local_function(
+                _, (_, function_name) = self.builder.make_local_function(
                     builder,
                     function_options=FunctionOptions(
                         name=node.name,
@@ -433,8 +434,9 @@ class FxGraphInterpreter:
                     ),
                     optimize=self.optimize_submodules,
                 )
+                self._local_function_names[node.name] = function_name
                 # Store output type/shape info for use when building the If node.
-                self._store_cond_func_output_info(node.name, builder)
+                self._store_cond_func_output_info(function_name, builder)
             return None
 
         if isinstance(init, self.builder.torch.utils._pytree.TreeSpec):
@@ -585,6 +587,31 @@ class FxGraphInterpreter:
                 input_nodes = user_node.args[3]
                 sub_args = []
                 for inp_node in input_nodes:
+                    if isinstance(inp_node, bool):
+                        sub_args.append(
+                            VirtualTensor(name="", dtype=TensorProto.BOOL, shape=(), device=-1)
+                        )
+                        continue
+                    if isinstance(inp_node, int):
+                        sub_args.append(
+                            VirtualTensor(name="", dtype=TensorProto.INT64, shape=(), device=-1)
+                        )
+                        continue
+                    if isinstance(inp_node, float):
+                        sub_args.append(
+                            VirtualTensor(name="", dtype=TensorProto.FLOAT, shape=(), device=-1)
+                        )
+                        continue
+                    if isinstance(inp_node, self.torch.Tensor):
+                        sub_args.append(
+                            VirtualTensor(
+                                name="",
+                                dtype=torch_dtype_to_onnx_dtype(inp_node.dtype),
+                                shape=tuple(inp_node.shape),
+                                device=inp_node.device.index,
+                            )
+                        )
+                        continue
                     if not hasattr(inp_node, "name") or not self.builder.has_type(inp_node.name):
                         sub_args = None
                         break
@@ -1426,7 +1453,7 @@ class FxGraphInterpreter:
             self.builder.make_initializer(name, i, source="_process_arg")
             return name
         if hasattr(i, "name"):
-            return i.name
+            return self._local_function_names.get(i.name, i.name)
         if isinstance(i, self.builder.TracingInt):
             if isinstance(i.value, str) and i.value.startswith("_dyn_"):
                 dyn_names = sorted(
@@ -1461,7 +1488,7 @@ class FxGraphInterpreter:
                     continue
                 if hasattr(el, "name"):
                     # torch.fx.Node
-                    new_list.append(el.name)
+                    new_list.append(self._local_function_names.get(el.name, el.name))
                     continue
                 new_list.append(el)
             return new_list
@@ -2003,6 +2030,12 @@ class FxGraphInterpreter:
                 expression = dimension.value
             else:
                 continue
+            for token in self.builder._expression_names(expression) - {expression}:
+                if (
+                    token not in self.builder.dynamic_objects
+                    and not self.builder._dimension_is_declared(token)
+                ):
+                    self.builder.add_dynamic_object(token, token, check_tokens=False)
             if expression not in self.builder.dynamic_objects:
                 self.builder.add_dynamic_object(expression, dimension, parse=True)
 

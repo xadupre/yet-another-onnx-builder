@@ -14816,11 +14816,11 @@ def _aten_slice_scatter_dynamic(
 ) -> T:
     "slice scatter"
     # step 1
-    assert start is None or g.is_dynamic_dimension(start), (
+    assert start is None or is_static_dimension(start) or g.is_dynamic_dimension(start), (
         f"slice_scatter not implemented for **start**={start}, end={end}, x={x!r}"
         f"{g.get_debug_msg()}"
     )
-    assert end is None or g.is_dynamic_dimension(end), (
+    assert end is None or is_static_dimension(end) or g.is_dynamic_dimension(end), (
         f"slice_scatter not implemented for start={start}, **end**={end}, x={x!r}"
         f"{g.get_debug_msg()}"
     )
@@ -14843,7 +14843,7 @@ def _aten_slice_scatter_dynamic(
             res = g.op.Identity(src, name=name)
             if not sts:
                 g.set_type(res, g.get_type(x))
-                g.set_shape(res, g.set_shape(src))
+                g.set_shape(res, g.get_shape(src))
             return res
         raise AssertionError(
             f"start={start}, end={end}, step={step} is not implemented yet "
@@ -15860,7 +15860,7 @@ def aten_squeeze(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name="squeeze"
 ) -> T:
     "squeeze"
-    return g.op.SqueezeAnyOpset(x, name=name)
+    return g.make_node("Squeeze", [x], outputs=outputs, name=name, _infer_shapes=False)
 
 
 def aten_squeeze_dim(

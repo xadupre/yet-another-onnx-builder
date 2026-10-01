@@ -70,7 +70,7 @@ class YobxOnnxExporter(_OnnxExporterBase):  # type: ignore[valid-type]
     # Transformers checks import names, not distribution names.
     required_packages: List[str] = ["torch", "onnx_light"]
     tested_versions: Dict[str, str] = {"onnx_light": "0.1.24"}
-    min_versions: Dict[str, str] = {"torch": "2.11.0", "onnx_light": "0.1.24"}
+    min_versions: Dict[str, str] = {"torch": "2.11.0"}
 
     def __init__(self, target_opset: Optional[int] = None, **kwargs: Any) -> None:
         if not _transformers_available:

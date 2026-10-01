@@ -2449,7 +2449,7 @@ class CustomTracer(torch.fx.Tracer):
                     current_remove = []
                     seen_nodes = {clone}
                     inplace_functions = []
-                elif aten_name in {"aten::copy_", "aten::fill_.Tensor"}:
+                elif aten_name in {"aten::copy_", "aten::fill_.Scalar", "aten::fill_.Tensor"}:
                     new_node = _macro_new_node_(
                         n, current_remove, set_item_args, inplace_functions
                     )
@@ -2700,7 +2700,7 @@ class CustomTracer(torch.fx.Tracer):
                     "aten::zeros",
                     "expand",
                     "aten::__and__.Tensor",
-                } or not (node_target_name.endswith(("_", "_.Tensor"))):
+                } or not (node_target_name.endswith("_") or "_." in node_target_name):
                     # This node cannot be one inplace modification.
                     # The node is just not used.
                     cls.graph_erase_node(graph, node)
@@ -2753,7 +2753,8 @@ class CustomTracer(torch.fx.Tracer):
                         )
                     return -1
                 assert (
-                    node_target_name in {"aten::copy_", "aten::fill_.Tensor"}
+                    node_target_name
+                    in {"aten::copy_", "aten::fill_.Scalar", "aten::fill_.Tensor"}
                     and len(node.args) == 2
                 ) or node_target_name in {"aten::sigmoid_", "aten::exp_"}, (
                     f"(inplace) Unsupported target {node.target!r}, target_name="
