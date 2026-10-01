@@ -1,4 +1,5 @@
 import unittest
+import importlib.util
 import os
 import sys
 import subprocess
@@ -201,6 +202,9 @@ class TestDocumentationExamples(ExtTestCase):
 
             if not reason and not has_ipython() and "mermaid" in name:
                 reason = "IPython not installed"
+
+            if not reason and importlib.util.find_spec("mermaid") is None and "mermaid" in name:
+                reason = "mermaid-py not installed"
 
             if reason:
 
