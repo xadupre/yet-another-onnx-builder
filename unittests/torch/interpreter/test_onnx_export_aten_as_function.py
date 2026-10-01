@@ -57,9 +57,9 @@ class TestOnnxExportAtenAsFunction(ExtTestCase):
         )
         onx = onnx.load(model_path)
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertEqual(op_types, ["aten_roll_default", "aten_relu_default", "Identity"])
+        self.assertEqual(op_types, ["aten_roll_default", "aten_relu_default"])
         op_domains = [n.domain for n in onx.graph.node]
-        self.assertEqual(op_domains, ["aten", "aten", ""])
+        self.assertEqual(op_domains, ["aten", "aten"])
 
         sess = ExtendedReferenceEvaluator(model_path)
         feeds = dict(zip(sess.input_names, [x.numpy()]))
@@ -87,9 +87,9 @@ class TestOnnxExportAtenAsFunction(ExtTestCase):
         )
         onx = onnx.load(model_path)
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertEqual(op_types, ["aten_roll_default", "aten_relu_default", "Identity"])
+        self.assertEqual(op_types, ["aten_roll_default", "aten_relu_default"])
         op_domains = [n.domain for n in onx.graph.node]
-        self.assertEqual(op_domains, ["aten", "aten", ""])
+        self.assertEqual(op_domains, ["aten", "aten"])
 
         sess = ExtendedReferenceEvaluator(model_path)
         feeds = dict(zip(sess.input_names, [x.numpy()]))

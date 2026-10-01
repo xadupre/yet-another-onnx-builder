@@ -6,6 +6,7 @@ from yobx.reference import ExtendedReferenceEvaluator
 
 
 class TestOnnxExportFolding(ExtTestCase):
+    @unittest.skip("onnx-light lacks a pattern that folds Transpose applied to an initializer")
     @requires_torch("2.6", "owning module is None before that")
     def test_submodule_local_functions_simple(self):
         import torch

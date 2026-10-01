@@ -4123,9 +4123,35 @@ def aten_diff(
     diff_input = x
     for i in range(n):
         lag0 = g.op.Slice(
-            diff_input, g.ZERO, g.MINUS_ONE, np.array([dim], dtype=np.int64), name=name
+            diff_input,
+            g.ZERO,
+            g.MINUS_ONE,
+            np.array([dim], dtype=np.int64),
+            name=name,
+            _infer_shapes=False,
         )
-        lag1 = g.op.Slice(diff_input, g.ONE, g.END, np.array([1], dtype=np.int64), name=name)
+        lag1 = g.op.Slice(
+            diff_input,
+            g.ONE,
+            g.END,
+            np.array([dim], dtype=np.int64),
+            name=name,
+            _infer_shapes=False,
+        )
+        if g.has_type(diff_input):
+            g.set_type(lag0, g.get_type(diff_input))
+            g.set_type(lag1, g.get_type(diff_input))
+        if g.has_shape(diff_input):
+            lag_shape = list(g.get_shape(diff_input))
+            dimension = lag_shape[dim]
+            lag_shape[dim] = (
+                max(dimension - 1, 0) if isinstance(dimension, int) else f"({dimension})-1"
+            )
+            g.set_shape(lag0, tuple(lag_shape))
+            g.set_shape(lag1, tuple(lag_shape))
+        elif g.has_rank(diff_input):
+            g.set_rank(lag0, g.get_rank(diff_input))
+            g.set_rank(lag1, g.get_rank(diff_input))
         if i == n - 1:
             res = g.op.Sub(lag1, lag0, name=name, outputs=outputs)
         else:
@@ -4138,7 +4164,7 @@ def aten_diff(
             shape = g.get_shape(x)
             d = shape[dim]
             new_shape = list(shape)
-            new_shape[dim] = (d - n) if isinstance(d, dim) else f"({new_shape[dim]})-{n}"
+            new_shape[dim] = (d - n) if isinstance(d, int) else f"({new_shape[dim]})-{n}"
             g.set_shape(res, tuple(new_shape))
         elif g._has_rank(x):
             g.set_rank(res, g.get_rank(x))
@@ -9974,7 +10000,7 @@ def aten_matmul(
     "matmul"
     res = g.op.MatMul(x, y, outputs=outputs, name=name)
     if not sts:
-        set_type_shape_binary_op(g, outputs[0], x, y)
+        set_type_shape_matmul(g, res, x, y)
     return res
 
 
@@ -13232,12 +13258,18 @@ def aten_scatter_reduce_two(
     reduce_mode = {"sum": "add", "prod": "mul", "amin": "min", "amax": "max"}
     onnx_reduce = reduce_mode[reduce]
     is_scalar = g.get_rank(x) == 0
-    outputs_scatter = None if is_scalar else outputs
+    original_type = g.get_type(x)
+    cast_reduction = original_type in {TensorProto.FLOAT16, TensorProto.BFLOAT16}
+    outputs_scatter = None if is_scalar or cast_reduction else outputs
 
     if is_scalar:
         x = g.op.Reshape(x, g.MINUS_ONE, name=name)
         index = g.op.Reshape(index, g.MINUS_ONE, name=name)
         src = g.op.Reshape(src, g.MINUS_ONE, name=name)
+
+    if cast_reduction:
+        x = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+        src = g.op.Cast(src, to=TensorProto.FLOAT, name=name)
 
     if not include_self:
         # onnx does not support this case so we need to modify x first.
@@ -13269,7 +13301,9 @@ def aten_scatter_reduce_two(
     )
 
     if is_scalar:
-        result = g.op.Squeeze(result, name=name, outputs=outputs)
+        result = g.op.Squeeze(result, name=name, outputs=None if cast_reduction else outputs)
+    if cast_reduction:
+        result = g.op.Cast(result, to=original_type, name=name, outputs=outputs)
     if not sts:
         if not is_scalar:
             set_type_shape_unary_op(g, result, x)
@@ -15520,7 +15554,7 @@ def aten_split_with_sizes(
             shape = g.get_shape(x)
             new_shape = list(shape)
             for _ in range(n_splits):
-                s = min(size - split_sizes, split_sizes)
+                s = min(size, split_sizes)
                 new_shape[dim] = s
                 size -= split_sizes
                 new_shapes.append(tuple(new_shape))

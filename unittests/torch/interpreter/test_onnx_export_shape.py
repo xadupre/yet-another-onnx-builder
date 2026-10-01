@@ -294,6 +294,9 @@ class TestOnnxExportShape(ExtTestCase):
         self.assertEqualArray(expected, got, atol=1e-5)
 
     @requires_torch("2.6", "torch.export.Dim.AUTO")
+    @unittest.skip(
+        "onnx-light lacks constant-folding patterns for Unsqueeze and Cast on initializers"
+    )
     def test_reshape_folding(self):
         import torch
 

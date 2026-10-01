@@ -1145,7 +1145,8 @@ class FxGraphInterpreter:
 
     def output(self, node):
         """Adds an output to the graph."""
-        output_name = node.name
+        requested_output_names = self.builder.user_defined_output_names
+        output_name = requested_output_names[0] if len(requested_output_names) == 1 else node.name
         if self.builder.verbose > 1:
             print(f"[FxGraphInterpreter-{self._hash()}.output][{output_name}]")
         declared = node.args
@@ -1181,11 +1182,19 @@ class FxGraphInterpreter:
             for i, a in enumerate(output):
                 if a is None:
                     a_name = None
-                    o = self._make_name(node, f"{output_name}_{i}", index=i)
+                    o = (
+                        requested_output_names[i]
+                        if i < len(requested_output_names)
+                        else self._make_name(node, f"{output_name}_{i}", index=i)
+                    )
                     cst = None
                 elif isinstance(a, int):
                     # The model seems to return an integer.
-                    o = self._make_name(node, f"{output_name}_INT_{i}", is_int=True, index=i)
+                    o = (
+                        requested_output_names[i]
+                        if i < len(requested_output_names)
+                        else self._make_name(node, f"{output_name}_INT_{i}", is_int=True, index=i)
+                    )
                     a_name = None
                     cst = self.builder.make_node(
                         "Constant", [], [o], value_int=a, name=".output_INT_{a}"
@@ -1195,7 +1204,11 @@ class FxGraphInterpreter:
                 else:
                     cst = None
                     a_name = a if isinstance(a, str) else a.name
-                    o = self._make_name(node, f"{output_name}_{i}", index=i)
+                    o = (
+                        requested_output_names[i]
+                        if i < len(requested_output_names)
+                        else self._make_name(node, f"{output_name}_{i}", index=i)
+                    )
 
                 if a_name is None:
                     # the gradient may need unused output
@@ -1212,6 +1225,12 @@ class FxGraphInterpreter:
                 else:
                     self.builder.make_node("Identity", [a_name], [o], check=False, name=".output")
                     outputs.append((a_name, o))
+
+        if requested_output_names and len(requested_output_names) != len(outputs):
+            raise ValueError(
+                f"Output count mismatch: {len(requested_output_names)} requested names for "
+                f"{len(outputs)} tensor outputs."
+            )
 
         val = node.meta.get("val", None)
 
@@ -1231,7 +1250,7 @@ class FxGraphInterpreter:
                 val = None
 
         if val is None:
-            for a, o in outputs:
+            for output_index, (a, o) in enumerate(outputs):
                 if a is None:
                     assert not self.builder.is_sequence(o), (
                         f"Output sequences are not implemented but {o!r} is one"
@@ -1279,6 +1298,13 @@ class FxGraphInterpreter:
                             self.builder.make_dynamic_object(d, self.torch.SymInt(d))
                         ns.append(d)
                     shape = tuple(ns)
+                    if self.builder.output_dynamic_shapes is not None:
+                        shape = self.builder.get_input_dynamic_shape(
+                            o,
+                            output_index,
+                            shape,
+                            dynamic_shapes=self.builder.output_dynamic_shapes,
+                        )
 
                 self.builder.make_tensor_output(
                     o,
@@ -1292,8 +1318,15 @@ class FxGraphInterpreter:
 
         if isinstance(val, self.torch.Tensor):
             n_outputs = len(self.builder.outputs)
-            output_name = self._make_name(node, f"{node.name}_{n_outputs}", index=-1)
+            output_name = outputs[0][1]
             shape = val.shape
+            if self.builder.output_dynamic_shapes is not None:
+                shape = self.builder.get_input_dynamic_shape(
+                    output_name,
+                    n_outputs,
+                    shape,
+                    dynamic_shapes=self.builder.output_dynamic_shapes,
+                )
             dtype = _get_type(val.dtype)
             self.builder.make_tensor_output(
                 output_name, dtype, shape, doc_string=f"#B:{node.name}#{n_outputs}"

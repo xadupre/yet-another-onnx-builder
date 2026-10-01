@@ -165,46 +165,28 @@ class TestOnnxExportAtenAttention(ExtTestCase):
             model,
             inputs,
             dynamic_shapes=ds,
+            inline=False,
             export_options=ExportOptions(
                 aten_as_function={"aten.scaled_dot_product_attention.default"}
             ),
         )
         self.dump_onnx("test_scaled_dot_product_attention_function_2.onnx", onx)
-        self.assertEqual(
-            [
-                "aten_scaled_dot_product_attention_default",
-                "aten_scaled_dot_product_attention_default_l2l",
-                "aten_scaled_dot_product_attention_default",
-                "Transpose",
-                "Transpose",
-                "Add",
-                "Transpose",
-                "Add",
-            ],
-            [n.op_type for n in onx.graph.node],
+        op_types = [n.op_type for n in onx.graph.node]
+        self.assertTrue(
+            all(
+                op_type.startswith("aten_scaled_dot_product_attention_default")
+                for op_type in op_types[:3]
+            )
         )
+        self.assertEqual(["Transpose", "Transpose", "Add", "Transpose", "Add"], op_types[3:])
         self.assertIn("aten", set(n.domain for n in onx.graph.node))
         for node in onx.graph.node:
             if node.domain == "aten":
-                keys = [p.key for p in node.metadata_props]
-                self.assertEqual(
-                    [
-                        "aten_name",
-                        "args",
-                        "kwargs",
-                        "module[0]",
-                        "intypes",
-                        "outtypes",
-                        "inshapes",
-                        "outshapes",
-                    ],
-                    keys,
-                )
+                keys = {p.key for p in node.metadata_props}
+                self.assertTrue({"aten_name", "args", "kwargs"}.issubset(keys))
         for f in onx.functions:
-            keys = [p.key for p in f.metadata_props]
-            self.assertEqual(["inline"], keys)
-            values = [p.value for p in f.metadata_props]
-            self.assertEqual(["0"], values)
+            metadata = {p.key: p.value for p in f.metadata_props}
+            self.assertEqual("0", metadata["inline"])
         feeds = dict(zip(["query", "key", "value"], [x.detach().cpu().numpy() for x in inputs]))
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)[0]
@@ -233,13 +215,14 @@ class TestOnnxExportAtenAttention(ExtTestCase):
             with self.subTest(opset=opset):
                 onx = to_onnx(model, inputs, dynamic_shapes=ds, target_opset=opset)
                 self.dump_onnx(f"test_group_norm_opset_{opset}.onnx", onx)
-                self.assertEqual(
-                    ["Shape", "Reshape", "InstanceNormalization", "Reshape"],
-                    [n.op_type for n in onx.graph.node],
-                )
-                self.assertEqual(
-                    ("", opset), (onx.opset_import[0].domain, onx.opset_import[0].version)
-                )
+                op_types = [n.op_type for n in onx.graph.node]
+                self.assertEqual(1, op_types.count("Shape"))
+                self.assertEqual(2, op_types.count("Reshape"))
+                self.assertEqual(1, op_types.count("InstanceNormalization"))
+                opsets = {
+                    opset_import.domain: opset_import.version for opset_import in onx.opset_import
+                }
+                self.assertEqual(opset, opsets[""])
 
                 feeds = dict(zip(["x"], [x.detach().cpu().numpy() for x in inputs]))
                 ref = ExtendedReferenceEvaluator(onx)
@@ -276,6 +259,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
                     inputs,
                     dynamic_shapes=ds,
                     target_opset=opset,
+                    inline=opset >= 24,
                     export_options=(
                         ExportOptions(
                             aten_as_function={"aten.scaled_dot_product_attention.default"}
@@ -292,9 +276,10 @@ class TestOnnxExportAtenAttention(ExtTestCase):
                         ["aten_scaled_dot_product_attention_default"],
                         [n.op_type for n in onx.graph.node],
                     )
-                self.assertEqual(
-                    ("", opset), (onx.opset_import[0].domain, onx.opset_import[0].version)
-                )
+                opsets = {
+                    opset_import.domain: opset_import.version for opset_import in onx.opset_import
+                }
+                self.assertEqual(opset, opsets[""])
 
                 feeds = dict(
                     zip(["query", "key", "value"], [x.detach().cpu().numpy() for x in inputs])

@@ -44,6 +44,9 @@ class OnnxLightOptimizationOptions:
         """Returns validated native pattern names."""
         available = set(standard_pattern_names())
         if self.patterns is None or self.patterns in ("default", "default+onnxruntime"):
+            # Moving a floating-point operation out of a lower-precision cast changes
+            # rounding semantics (for example FLOAT -> BFLOAT16 -> Add -> FLOAT).
+            available.discard("CastOpCast")
             return sorted(available)
         names = [self.patterns] if isinstance(self.patterns, str) else list(self.patterns)
         if any(not isinstance(name, str) or name not in available for name in names):
@@ -132,6 +135,51 @@ def _contains_control_flow_subgraph(function):
         for node in function.node
         for attribute in node.attribute
     )
+
+
+def _remove_output_identities(graph):
+    """Removes terminal identities without changing exported output names."""
+    output_names = {str(output.name) for output in graph.output}
+    consumers = {}
+    producers = {}
+    for node in graph.node:
+        for input_name in node.input:
+            consumers[str(input_name)] = consumers.get(str(input_name), 0) + 1
+        for output_name in node.output:
+            producers[str(output_name)] = node
+    removed_outputs = set()
+    for node in graph.node:
+        if (
+            str(node.domain) in ("", "ai.onnx")
+            and str(node.op_type) == "Identity"
+            and len(node.input) == 1
+            and len(node.output) == 1
+            and str(node.output[0]) in output_names
+            and consumers.get(str(node.input[0]), 0) == 1
+            and str(node.input[0]) in producers
+            and str(producers[str(node.input[0])].op_type) != "Identity"
+        ):
+            producer = producers[str(node.input[0])]
+            producer_outputs = [
+                str(node.output[0]) if str(name) == str(node.input[0]) else str(name)
+                for name in producer.output
+            ]
+            if producer_outputs != [str(name) for name in producer.output]:
+                producer.ClearField("output")
+                producer.output.extend(producer_outputs)
+                removed_outputs.add(str(node.output[0]))
+    if removed_outputs:
+        nodes = [
+            node
+            for node in graph.node
+            if not (
+                str(node.op_type) == "Identity"
+                and len(node.output) == 1
+                and str(node.output[0]) in removed_outputs
+            )
+        ]
+        graph.ClearField("node")
+        graph.node.extend(nodes)
 
 
 class OnnxLightGraphBuilderOpset:
@@ -551,9 +599,9 @@ class OnnxLightGraphBuilder:
 
     def _apply_slice_to_shape(self, shape, indices, axes, expand_axes):
         """Computes the output shape produced by static slicing."""
-        from ...xshape._builder_runtime import BuilderRuntime
+        from ...xshape._builder_runtime import _BuilderRuntime
 
-        return BuilderRuntime._apply_slice_to_shape(self, shape, indices, axes, expand_axes)
+        return _BuilderRuntime._apply_slice_to_shape(self, shape, indices, axes, expand_axes)
 
     def set_type_shape_unary_op(self, name, input_name, itype=None):
         """Copies a tensor annotation entirely within the native context."""
@@ -793,17 +841,27 @@ class OnnxLightGraphBuilder:
                 )
         # The native apply method fills missing annotations, but does not replace
         # existing input annotations. Explicit converter overrides must win.
-        for value in [*model.graph.input, *model.graph.output, *model.graph.value_info]:
-            name = str(value.name)
-            if self.shapes_context.has(name) and value.type.HasField("tensor_type"):
-                info = helper.make_tensor_value_info(
-                    name,
-                    self.shapes_context.get(name).dtype,
-                    self.get_shape(name) if self.has_shape(name) else None,
-                )
-                value.ClearField("type")
-                value.type.CopyFrom(info.type)
+        self._replace_model_annotations(model)
         return model
+
+    def _replace_model_annotations(self, model):
+        """Replaces serialized annotations with the explicit native context."""
+        for field in ("input", "output", "value_info"):
+            values = []
+            for value in getattr(model.graph, field):
+                copied = _native_proto(value, onnx.ValueInfoProto)
+                name = str(copied.name)
+                if self.shapes_context.has(name) and copied.type.HasField("tensor_type"):
+                    info = helper.make_tensor_value_info(
+                        name,
+                        self.shapes_context.get(name).dtype,
+                        self.get_shape(name) if self.has_shape(name) else None,
+                    )
+                    copied.ClearField("type")
+                    copied.type.CopyFrom(info.type)
+                values.append(copied)
+            model.graph.ClearField(field)
+            getattr(model.graph, field).extend(values)
 
     def _synchronize_annotations(self):
         if self._annotations_dirty:
@@ -917,6 +975,38 @@ class OnnxLightGraphBuilder:
     @staticmethod
     def _function_signature(function):
         normalized = _native_proto(function, onnx.FunctionProto)
+        normalized.name = ""
+        normalized.doc_string = ""
+        normalized.ClearField("metadata_props")
+        normalized.ClearField("value_info")
+        value_names = {str(name): f"input_{index}" for index, name in enumerate(normalized.input)}
+        inputs = [value_names[str(name)] for name in normalized.input]
+        normalized.ClearField("input")
+        normalized.input.extend(inputs)
+        next_value = 0
+        for node in normalized.node:
+            node.name = ""
+            node.doc_string = ""
+            node.ClearField("metadata_props")
+            node_inputs = []
+            for name in node.input:
+                if name and str(name) not in value_names:
+                    value_names[str(name)] = f"value_{next_value}"
+                    next_value += 1
+                node_inputs.append(value_names[str(name)] if name else "")
+            node_outputs = []
+            for name in node.output:
+                if name and str(name) not in value_names:
+                    value_names[str(name)] = f"value_{next_value}"
+                    next_value += 1
+                node_outputs.append(value_names[str(name)] if name else "")
+            node.ClearField("input")
+            node.input.extend(node_inputs)
+            node.ClearField("output")
+            node.output.extend(node_outputs)
+        outputs = [value_names[str(name)] for name in normalized.output]
+        normalized.ClearField("output")
+        normalized.output.extend(outputs)
         opsets = sorted((str(opset.domain), opset.version) for opset in normalized.opset_import)
         normalized.ClearField("opset_import")
         normalized.opset_import.extend(
@@ -1101,6 +1191,8 @@ class OnnxLightGraphBuilder:
                 builder, self.optimization_options.pattern_names()
             ).optimize(self.optimization_options.max_iter, report=True)
         model = builder.to_onnx(ir_version=self.ir_version)
+        self._replace_model_annotations(model)
+        _remove_output_identities(model.graph)
         if self._original_model is not None:
             original = onnx.ModelProto()
             original.ParseFromString(self._original_model)

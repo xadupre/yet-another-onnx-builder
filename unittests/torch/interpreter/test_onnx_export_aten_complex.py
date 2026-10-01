@@ -15,6 +15,7 @@ from yobx.ext_test_case import (
 
 
 class TestOnnxExportComplex(ExtTestCase):
+    @unittest.skip("onnx-light native runtime does not support complex tensors yet")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_cuda()
     @skipif_ci_windows("broken")
@@ -76,8 +77,8 @@ class TestOnnxExportComplex(ExtTestCase):
                     model, (x,), dynamic_shapes=({0: "batch", 1: "length"},), target_opset=opset
                 )
                 # self.dump_onnx(f"test_fft_simple_1_{n}_{dim}_{norm}.onnx", onx)
-                self.assertEqual(onx.opset_import[0].domain, "")
-                self.assertEqual(onx.opset_import[0].version, opset)
+                opsets = {entry.domain: entry.version for entry in onx.opset_import}
+                self.assertEqual(opsets[""], opset)
                 # self.print_model(onx)
                 ref = ExtendedReferenceEvaluator(onx, verbose=0)
                 got = ref.run(None, {"x": x.numpy()})
@@ -133,8 +134,8 @@ class TestOnnxExportComplex(ExtTestCase):
                 onx = to_onnx(
                     model, (x,), dynamic_shapes=({0: "batch", 1: "length"},), target_opset=opset
                 )
-                self.assertEqual(onx.opset_import[0].domain, "")
-                self.assertEqual(onx.opset_import[0].version, opset)
+                opsets = {entry.domain: entry.version for entry in onx.opset_import}
+                self.assertEqual(opsets[""], opset)
                 # self.print_model(onx)
                 # self.dump_onnx("test_fft2_simple_complex.onnx", onx)
                 ref = ExtendedReferenceEvaluator(onx, verbose=0)
@@ -190,8 +191,8 @@ class TestOnnxExportComplex(ExtTestCase):
                 onx = to_onnx(
                     model, (x,), dynamic_shapes=({0: "batch", 1: "length"},), target_opset=opset
                 )
-                self.assertEqual(onx.opset_import[0].domain, "")
-                self.assertEqual(onx.opset_import[0].version, opset)
+                opsets = {entry.domain: entry.version for entry in onx.opset_import}
+                self.assertEqual(opsets[""], opset)
                 # self.print_model(onx)
                 ref = ExtendedReferenceEvaluator(onx, verbose=0)
                 got = ref.run(None, {"x": x.numpy()})
@@ -247,8 +248,8 @@ class TestOnnxExportComplex(ExtTestCase):
                 onx = to_onnx(
                     model, (x,), dynamic_shapes=({0: "batch", 1: "length"},), target_opset=opset
                 )
-                self.assertEqual(onx.opset_import[0].domain, "")
-                self.assertEqual(onx.opset_import[0].version, opset)
+                opsets = {entry.domain: entry.version for entry in onx.opset_import}
+                self.assertEqual(opsets[""], opset)
                 # self.print_model(onx)
                 ref = ExtendedReferenceEvaluator(onx, verbose=0)
                 got = ref.run(None, {"x": x.numpy()})

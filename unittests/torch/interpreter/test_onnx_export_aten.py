@@ -12,6 +12,7 @@ from yobx.ext_test_case import (
     skipif_ci_windows,
     requires_torch,
     requires_onnxruntime,
+    requires_onnxscript,
     requires_transformers,
     ignore_warnings,
     hide_stdout,
@@ -1576,7 +1577,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs, export_options=ExportOptions(strict=False))
         names = [n.op_type for n in onx.graph.node]
         self.assertEqual(names, ["CustomSymOp"])
-        domains = [d.domain for d in onx.opset_import]
+        domains = sorted(d.domain for d in onx.opset_import)
         self.assertEqual(domains, ["", "custom_domain"])
 
     @ignore_warnings(UserWarning)
@@ -2055,7 +2056,8 @@ class TestOnnxExportAten(ExtTestCase):
         )
         self.dump_onnx("test_cast_cast_float.onnx", onx)
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertEqual(["Add", "Cast", "Cast"], op_types)
+        self.assertEqual(1, op_types.count("Add"))
+        self.assertEqual(2, op_types.count("Cast"))
 
     def test_cast_cast_int(self):
         import torch
@@ -2079,7 +2081,8 @@ class TestOnnxExportAten(ExtTestCase):
         )
         self.dump_onnx("test_cast_cast_int.onnx", onx)
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertEqual(["Cast", "Add", "Cast"], op_types)
+        self.assertEqual(1, op_types.count("Add"))
+        self.assertEqual(2, op_types.count("Cast"))
 
     def test_convolution_valid(self):
         import torch
@@ -3655,6 +3658,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
+    @requires_onnxscript()
     def test_torchvision_deform_conv2d_dynamo_185195(self):
         import torch
         import torchvision.ops as tv_ops

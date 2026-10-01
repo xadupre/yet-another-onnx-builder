@@ -112,8 +112,25 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         self._sequence_metadata = {}
         self._debug_msg = {"EXEPATH": exe_path}
         self._debug_print_node = set(os.environ.get("PRINTNAME", "").split(",")) - {""}
+        self._flat_dynamic_shapes = self._flatten_dynamic_shape_specification(dynamic_shapes)
         self._register_dynamic_shape_specification(dynamic_shapes)
         self._register_dynamic_shape_specification(output_dynamic_shapes)
+
+    @classmethod
+    def _flatten_dynamic_shape_specification(cls, specification):
+        if isinstance(specification, dict):
+            if all(isinstance(key, int) for key in specification):
+                return [specification]
+            flattened = []
+            for value in specification.values():
+                flattened.extend(cls._flatten_dynamic_shape_specification(value))
+            return flattened
+        if isinstance(specification, (list, tuple)):
+            flattened = []
+            for value in specification:
+                flattened.extend(cls._flatten_dynamic_shape_specification(value))
+            return flattened
+        return [specification]
 
     def _register_dynamic_shape_specification(self, specification, input_name=None):
         if specification is None:
@@ -597,7 +614,9 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
             raise ValueError(f"No example shape is available for input {name!r}.")
         if specification is None:
             return self.verify_dynamic_shape(example_shape, name=name)
-        if isinstance(specification, tuple):
+        if dynamic_shapes is None and input_index < len(self._flat_dynamic_shapes):
+            info = self._flat_dynamic_shapes[input_index]
+        elif isinstance(specification, tuple):
             info = specification[input_index] if input_index < len(specification) else None
         elif isinstance(specification, dict):
             info = specification.get(name)
