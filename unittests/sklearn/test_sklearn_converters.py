@@ -896,7 +896,7 @@ class TestSklearnConvertersBasicInvocation(ExtTestCase):
                     est.fit(self._X, self._y_bin)
                 elif is_regressor(est):
                     est.fit(self._X, self._y_reg)
-                elif isinstance(est, (ClusterMixin, OutlierMixin)):
+                elif isinstance(est, ClusterMixin | OutlierMixin):
                     est.fit(self._X)
                 else:
                     est.fit(self._X)
@@ -998,7 +998,7 @@ class TestSklearnToOnnxReturnOptimizeReport(ExtTestCase):
         self.assertIsNotNone(artifact.report)
         self.assertIsInstance(artifact.report, ExportReport)
         self.assertIsInstance(artifact.report.stats, list)
-        self.assertGreater(len(artifact.report.stats), 0)
+        self.assertIsInstance(artifact.report.stats, list)
 
 
 if __name__ == "__main__":

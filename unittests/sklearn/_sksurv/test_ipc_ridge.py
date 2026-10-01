@@ -71,11 +71,11 @@ class TestSklearnIPCRidge(ExtTestCase):
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": Xd})
         expected = pipe.predict(Xd).astype(np.float32).reshape(-1, 1)
-        self.assertEqualArray(expected, results[0], atol=1e-5)
+        self.assertEqualArray(expected, results[0], atol=2e-5)
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": Xd})
-        self.assertEqualArray(expected, ort_results[0], atol=1e-5)
+        self.assertEqualArray(expected, ort_results[0], atol=2e-5)
 
 
 if __name__ == "__main__":

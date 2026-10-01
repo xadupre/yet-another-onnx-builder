@@ -12,6 +12,20 @@ class Pow(NativeOpKernel):
         return (numpy.power(x, y).astype(x.dtype, copy=False),)
 
 
+class Cos(NativeOpKernel):
+    """Computes cosine values without narrowing float64 inputs."""
+
+    def _run(self, x):
+        return (numpy.cos(x),)
+
+
+class Sin(NativeOpKernel):
+    """Computes sine values without narrowing float64 inputs."""
+
+    def _run(self, x):
+        return (numpy.sin(x),)
+
+
 class Min(NativeOpKernel):
     """Computes a variadic broadcast minimum with NaN propagation."""
 

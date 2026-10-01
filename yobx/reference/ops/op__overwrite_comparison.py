@@ -9,6 +9,13 @@ class Greater(NativeOpKernel):
         return (np.greater(a, b),)
 
 
+class GreaterOrEqual(NativeOpKernel):
+    """Compares broadcast inputs without narrowing float64 or integer values."""
+
+    def _run(self, a, b):
+        return (np.greater_equal(a, b),)
+
+
 class Less(NativeOpKernel):
     """Compares broadcast inputs without narrowing float64 values."""
 

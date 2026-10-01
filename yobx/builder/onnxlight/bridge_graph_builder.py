@@ -75,7 +75,7 @@ def _native_attribute_value(value):
     proto_type = getattr(onnx, type(value).__name__, None)
     if proto_type is not None and hasattr(value, "SerializeToString"):
         return _native_proto(value, proto_type)
-    if isinstance(value, (tuple, list)):
+    if isinstance(value, tuple | list):
         return [_native_attribute_value(item) for item in value]
     return value
 
@@ -251,7 +251,7 @@ class OnnxLightGraphBuilder:
         self.shapes_context = ShapesContext()
         self.op = OnnxLightGraphBuilderOpset(self)
         self.anyop = self.op
-        if isinstance(target_opset_or_existing_proto, (int, dict)):
+        if isinstance(target_opset_or_existing_proto, int | dict):
             opsets = (
                 {"": target_opset_or_existing_proto}
                 if isinstance(target_opset_or_existing_proto, int)
@@ -563,7 +563,7 @@ class OnnxLightGraphBuilder:
         """Declares one or more native tensor outputs."""
         if indexed:
             raise NotImplementedError("Indexed output renaming is not supported.")
-        if isinstance(name, (tuple, list)):
+        if isinstance(name, tuple | list):
             for output in name:
                 self.make_tensor_output(output, elem_type, shape, False, allow_untyped_output)
             return list(name)
@@ -736,6 +736,18 @@ class OnnxLightGraphBuilder:
     def _native_model(self):
         model = self._inner.to_onnx(ir_version=self.ir_version)
         self.shapes_context.apply_inferred_shapes_to_model(model)
+        annotated = {
+            str(value.name)
+            for value in [*model.graph.input, *model.graph.output, *model.graph.value_info]
+        }
+        for name in self.shapes_context.names():
+            if name not in annotated and self.shapes_context.has(name):
+                tensor = self.shapes_context.get(name)
+                model.graph.value_info.append(
+                    helper.make_tensor_value_info(
+                        name, tensor.dtype, self.get_shape(name) if self.has_shape(name) else None
+                    )
+                )
         # The native apply method fills missing annotations, but does not replace
         # existing input annotations. Explicit converter overrides must win.
         for value in [*model.graph.input, *model.graph.output, *model.graph.value_info]:
@@ -752,7 +764,12 @@ class OnnxLightGraphBuilder:
 
     def _synchronize_annotations(self):
         if self._annotations_dirty:
-            self._inner = GraphBuilder(self._native_model())
+            if hasattr(self._inner, "shapes"):
+                inner_shapes = self._inner.shapes
+                for name in self.shapes_context.names():
+                    inner_shapes.set(name, self.shapes_context.get(name))
+            else:
+                self._inner = GraphBuilder(self._native_model())
             self._annotations_dirty = False
 
     def _function_artifact(self, options, optimize, inline):

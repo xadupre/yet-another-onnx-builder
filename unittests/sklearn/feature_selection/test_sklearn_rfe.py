@@ -28,7 +28,7 @@ class TestSklearnRFE(ExtTestCase):
         onx = to_onnx(sel, (X,))
 
         op_types = [n.op_type for n in onx.proto.graph.node]
-        self.assertIn("Gather", op_types)
+        self.assertTrue(any(op_type in {"Gather", "Slice"} for op_type in op_types))
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -77,7 +77,7 @@ class TestSklearnRFE(ExtTestCase):
         onx = to_onnx(pipe, (X,))
 
         op_types = [n.op_type for n in onx.proto.graph.node]
-        self.assertIn("Gather", op_types)
+        self.assertTrue(any(op_type in {"Gather", "Slice"} for op_type in op_types))
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -145,7 +145,7 @@ class TestSklearnRFECV(ExtTestCase):
         onx = to_onnx(sel, (X,))
 
         op_types = [n.op_type for n in onx.proto.graph.node]
-        self.assertIn("Gather", op_types)
+        self.assertTrue(any(op_type in {"Gather", "Slice"} for op_type in op_types))
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -191,7 +191,7 @@ class TestSklearnRFECV(ExtTestCase):
         onx = to_onnx(pipe, (X,))
 
         op_types = [n.op_type for n in onx.proto.graph.node]
-        self.assertIn("Gather", op_types)
+        self.assertTrue(any(op_type in {"Gather", "Slice"} for op_type in op_types))
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

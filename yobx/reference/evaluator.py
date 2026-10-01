@@ -29,17 +29,19 @@ from .ops.op__extended_scatternd_of_shape import MaskedScatterNDOfShape, Scatter
 from .ops.op__extended_transpose_cast import Transpose2DCastFP16, Transpose2DCastFP32
 from .ops.op__extended_tri_matrix import TriMatrix
 from .ops.op__overwrite_argminmax import ArgMax, ArgMin
-from .ops.op__overwrite_comparison import Greater, Less, LessOrEqual
+from .ops.op__overwrite_comparison import Greater, GreaterOrEqual, Less, LessOrEqual
 from .ops.op__overwrite_compress import Compress
 from .ops.op__overwrite_elementwise import (
     Clip_6,
     Clip_11,
+    Cos,
     HardSigmoid,
     IsInf,
     Max,
     Min,
     NonZero,
     Pow,
+    Sin,
 )
 from .ops.op__overwrite_log_softmax import LogSoftmax_1, LogSoftmax_13, SoftmaxCrossEntropyLoss
 from .ops.op__overwrite_reduce import (
@@ -101,17 +103,20 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
         ArgMax,
         ArgMin,
         Greater,
+        GreaterOrEqual,
         Less,
         LessOrEqual,
         Compress,
         Clip_6,
         Clip_11,
+        Cos,
         HardSigmoid,
         IsInf,
         Max,
         Min,
         NonZero,
         Pow,
+        Sin,
         LogSoftmax_1,
         LogSoftmax_13,
         SoftmaxCrossEntropyLoss,
@@ -164,7 +169,7 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
     @staticmethod
     def filter_ops(proto, new_ops, opsets):
         """Selects the highest compatible version of each custom kernel."""
-        if opsets is None and isinstance(proto, (ModelProto, FunctionProto)):
+        if opsets is None and isinstance(proto, ModelProto | FunctionProto):
             opsets = {d.domain: d.version for d in proto.opset_import}
         best = {}
         renamed = set()
@@ -358,6 +363,25 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
             output_names = None
         if feed_inputs is None:
             feed_inputs = {}
+        if not isinstance(self._execution_graph, FunctionProto):
+            declared_inputs = {
+                str(value.name): value.type.tensor_type
+                for value in self._execution_graph.input
+                if value.type.HasField("tensor_type")
+            }
+            feed_inputs = dict(feed_inputs)
+            for name, value in feed_inputs.items():
+                tensor_type = declared_inputs.get(name)
+                if not isinstance(value, numpy.ndarray) or tensor_type is None:
+                    continue
+                dims = tensor_type.shape.dim
+                if (
+                    value.ndim + 1 == len(dims)
+                    and dims
+                    and dims[-1].HasField("dim_value")
+                    and dims[-1].dim_value == 1
+                ):
+                    feed_inputs[name] = value.reshape((*value.shape, 1))
         if self._string_initializers:
             feed_inputs = {**self._string_initializers, **feed_inputs}
         if attributes or (isinstance(self.proto_, FunctionProto) and self._extra_functions):
