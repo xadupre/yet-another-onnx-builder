@@ -764,12 +764,7 @@ class OnnxLightGraphBuilder:
 
     def _synchronize_annotations(self):
         if self._annotations_dirty:
-            if hasattr(self._inner, "shapes"):
-                inner_shapes = self._inner.shapes
-                for name in self.shapes_context.names():
-                    inner_shapes.set(name, self.shapes_context.get(name))
-            else:
-                self._inner = GraphBuilder(self._native_model())
+            self._inner = GraphBuilder(self._native_model())
             self._annotations_dirty = False
 
     def _function_artifact(self, options, optimize, inline):
