@@ -57,12 +57,10 @@ class TestOnnxShim(unittest.TestCase):
         """Prevents shipping obsolete Python matchers or their public interfaces."""
         import yobx
         import yobx.typing
-        from yobx.translate import reverse_graph_builder
 
         package = pathlib.Path(yobx.__file__).parent
         self.assertEqual(list((package / "xoptim").rglob("*.py")), [])
         self.assertFalse(hasattr(yobx.typing, "GraphBuilderPatternOptimizationProtocol"))
-        self.assertFalse(hasattr(reverse_graph_builder, "to_graph_pattern_matching"))
         retired_classes = {
             "PatternOptimization",
             "EasyPatternOptimization",

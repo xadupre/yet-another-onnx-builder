@@ -452,7 +452,7 @@ def demo_mlp_model(filename: str) -> onnx.ModelProto:
         from yobx.helpers.onnx_helper import pretty_onnx
         from yobx.xbuilder import OptimizationOptions
         from yobx.torch.interpreter import to_onnx
-        from yobx.translate import translate
+        from onnx_light.tools import translate
 
 
         class MLP(torch.nn.Module):
@@ -473,7 +473,7 @@ def demo_mlp_model(filename: str) -> onnx.ModelProto:
             MLP(), (x,), input_names=["x"], options=OptimizationOptions(patterns=None)
         )
         print(pretty_onnx(onx))
-        print(translate(onx, api="onnx-short"))
+        print(translate(onx, api="onnx-compact"))
     """
     return oh.make_model(
         oh.make_graph(

@@ -2,9 +2,7 @@ import unittest
 from yobx._onnx_shim import onnx
 import onnx_light.onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase
-from yobx.translate import translate
-from yobx.translate.mermaid_emitter import MermaidEmitter
-from yobx.translate.translator import Translator
+from onnx_light.tools import to_mermaid
 
 
 class TestMermaidEmitter(ExtTestCase):
@@ -33,11 +31,11 @@ class TestMermaidEmitter(ExtTestCase):
             ir_version=9,
             opset_imports=[oh.make_opsetid("", 18)],
         )
-        mermaid = translate(model, api="mermaid")
-        self.assertIn("flowchart TD", mermaid)
-        self.assertIn(":::input", mermaid)
-        self.assertIn(":::output", mermaid)
-        self.assertIn(":::op", mermaid)
+        mermaid = to_mermaid(model)
+        self.assertIn("flowchart TB", mermaid)
+        self.assertIn(":::onnxInput", mermaid)
+        self.assertIn(":::onnxOutput", mermaid)
+        self.assertIn(":::onnxOp", mermaid)
         self.assertIn("LayerNormalization_", mermaid)
         self.assertIn("Add_", mermaid)
         self.assertIn("-->", mermaid)
@@ -58,9 +56,9 @@ class TestMermaidEmitter(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        mermaid = translate(model, api="mermaid")
-        self.assertIn("flowchart TD", mermaid)
-        self.assertIn(":::init", mermaid)
+        mermaid = to_mermaid(model)
+        self.assertIn("flowchart TB", mermaid)
+        self.assertIn(":::onnxInitializer", mermaid)
         self.assertIn("MatMul_", mermaid)
         self.assertIn("Relu_", mermaid)
 
@@ -91,8 +89,8 @@ class TestMermaidEmitter(ExtTestCase):
             ir_version=9,
             opset_imports=[oh.make_opsetid("", 18)],
         )
-        mermaid = translate(model, api="mermaid")
-        self.assertIn("flowchart TD", mermaid)
+        mermaid = to_mermaid(model)
+        self.assertIn("flowchart TB", mermaid)
         self.assertIn("Cast_", mermaid)
         self.assertIn("Add_", mermaid)
 
@@ -123,9 +121,9 @@ class TestMermaidEmitter(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        mermaid = translate(model, api="mermaid")
+        mermaid = to_mermaid(model)
         self.assertIn("If_", mermaid)
-        self.assertIn("-.->", mermaid)
+        self.assertIn(":::onnxOp", mermaid)
 
     def test_classdefs_present(self):
         TFLOAT = onnx.TensorProto.FLOAT
@@ -139,14 +137,14 @@ class TestMermaidEmitter(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        mermaid = translate(model, api="mermaid")
-        self.assertIn("classDef input", mermaid)
-        self.assertIn("classDef init", mermaid)
-        self.assertIn("classDef op", mermaid)
-        self.assertIn("classDef output", mermaid)
+        mermaid = to_mermaid(model)
+        self.assertIn("classDef onnxInput", mermaid)
+        self.assertIn("classDef onnxInitializer", mermaid)
+        self.assertIn("classDef onnxOp", mermaid)
+        self.assertIn("classDef onnxOutput", mermaid)
         # Each classDef must include explicit stroke and text colour so that
         # node borders and labels are visible in both light and dark themes.
-        for cls in ("input", "init", "op", "output"):
+        for cls in ("onnxInput", "onnxInitializer", "onnxOp", "onnxOutput"):
             self.assertIn(f"classDef {cls} fill:#", mermaid)
             # stroke and color must be present in the same classDef line
             lines = [line for line in mermaid.splitlines() if f"classDef {cls} " in line]
@@ -166,11 +164,11 @@ class TestMermaidEmitter(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        mermaid = translate(model, api="mermaid")
+        mermaid = to_mermaid(model)
         # Edge labels should include dtype and shape info
-        self.assertIn("FLOAT", mermaid)
+        self.assertIn("float[3]", mermaid)
 
-    def test_importable_from_translate_package(self):
+    def test_importable_from_onnx_light_tools(self):
         TFLOAT = onnx.TensorProto.FLOAT
         model = oh.make_model(
             oh.make_graph(
@@ -182,11 +180,12 @@ class TestMermaidEmitter(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        mermaid = translate(model, api="mermaid")
-        self.assertIn("flowchart TD", mermaid)
+        mermaid = to_mermaid(model)
+        self.assertIn("flowchart TB", mermaid)
 
-    def test_mermaid_emitter_directly(self):
-        # MermaidEmitter can be used directly with Translator
+    def test_mermaid_graph_directly(self):
+        from onnx_light.tools import to_mermaid_graph
+
         TFLOAT = onnx.TensorProto.FLOAT
         model = oh.make_model(
             oh.make_graph(
@@ -198,16 +197,15 @@ class TestMermaidEmitter(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        emitter = MermaidEmitter()
-        tr = Translator(model, emitter=emitter)
-        mermaid = tr.export(as_str=True)
-        self.assertIn("flowchart TD", mermaid)
+        mermaid = to_mermaid_graph(model.graph)
+        self.assertIn("flowchart TB", mermaid)
         self.assertIn("Relu_", mermaid)
-        self.assertIn(":::input", mermaid)
-        self.assertIn(":::output", mermaid)
+        self.assertIn(":::onnxInput", mermaid)
+        self.assertIn(":::onnxOutput", mermaid)
 
-    def test_translate_api_mermaid(self):
-        # translate(..., api="mermaid") should work
+    def test_yobx_helper_reexports_native_renderer(self):
+        from yobx.helpers.mermaid_helper import to_mermaid as yobx_to_mermaid
+
         TFLOAT = onnx.TensorProto.FLOAT
         model = oh.make_model(
             oh.make_graph(
@@ -219,9 +217,7 @@ class TestMermaidEmitter(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
             ir_version=10,
         )
-        mermaid = translate(model, api="mermaid")
-        self.assertIn("flowchart TD", mermaid)
-        self.assertIn("Relu_", mermaid)
+        self.assertEqual(yobx_to_mermaid(model), to_mermaid(model))
 
 
 if __name__ == "__main__":

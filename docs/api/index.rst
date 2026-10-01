@@ -11,7 +11,6 @@ API
    container/index
    helpers/index
    reference/index
-   translate/index
    xbuilder/index
    xexpressions/index
    xshape/index

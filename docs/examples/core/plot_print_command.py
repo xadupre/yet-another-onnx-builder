@@ -92,7 +92,7 @@ _cmd_print(["print", "dot", tmp])
 # Dumps a `Mermaid <https://mermaid.js.org/>`_ ``flowchart TD`` diagram.
 # Paste the output into the Mermaid live editor or any Markdown renderer that
 # supports Mermaid fenced code blocks to get an interactive graph visualisation
-# (see also :class:`yobx.translate.mermaid_emitter.MermaidEmitter`).
+# (see also :func:`onnx_light.tools.to_mermaid`).
 
 print("python -m yobx print mermaid model.onnx")
 print("-" * 40)

@@ -493,7 +493,7 @@ def _cmd_print(argv: List[Any]):
     args = parser.parse_args(argv[1:])
     onx = onnx.load(args.input)
     if args.fmt == "onnx-compact":
-        from .translate import translate
+        from onnx_light.tools import translate
 
         print(translate(onx, api="onnx-compact"))
     elif args.fmt == "raw":
@@ -510,9 +510,9 @@ def _cmd_print(argv: List[Any]):
         print(pretty_onnx(onx))
         print(bs.get_debug_msg())
     elif args.fmt == "mermaid":
-        from .translate import translate
+        from onnx_light.tools import to_mermaid
 
-        print(translate(onx, api="mermaid"))
+        print(to_mermaid(onx))
     elif args.fmt == "dot":
         from .helpers.dot_helper import to_dot
 
