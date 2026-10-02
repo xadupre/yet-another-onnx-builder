@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 import numpy
 from onnx_light import onnx
 from onnx_light.onnx import helper, numpy_helper
-from onnx_light.onnx.inliner import inline_local_functions, inline_selected_functions
 from onnx_light.onnx_core.graph_builder import GraphBuilder
 from onnx_light.onnx_core.optimization import GraphGraph, standard_pattern_names
 from onnx_light.onnx_core.shape_inference import ShapesContext, SymShape, SymTensor
@@ -328,9 +327,7 @@ class OnnxLightGraphBuilder:
         self._shape_names = set()
         self._annotations_dirty = False
         self._original_model = None
-        self._deferred_custom_nodes = []
-        self._deferred_custom_outputs = set()
-        self._output_doc_strings = {}
+        self._custom_shape_callbacks = {}
         self.shapes_context = ShapesContext()
         self.op = OnnxLightGraphBuilderOpset(self)
         self.anyop = self.op
@@ -409,18 +406,7 @@ class OnnxLightGraphBuilder:
     @property
     def nodes(self):
         """Returns a snapshot of native nodes, not a mutable builder registry."""
-        native_nodes = list(self._inner.to_graph().node)
-        if not self._deferred_custom_nodes:
-            return native_nodes
-        deferred = {}
-        for index, node in self._deferred_custom_nodes:
-            deferred.setdefault(index, []).append(node)
-        nodes = []
-        for index, native_node in enumerate(native_nodes):
-            nodes.extend(deferred.get(index, ()))
-            nodes.append(native_node)
-        nodes.extend(deferred.get(len(native_nodes), ()))
-        return nodes
+        return list(self._inner.to_graph().node)
 
     @property
     def initializers_dict(self):
@@ -825,23 +811,9 @@ class OnnxLightGraphBuilder:
             and ((not local_function and native_inference_domain) or custom_inference)
         ):
             self.shapes_context.compute_shape_node(node)
-        if custom_inference and not native_inference_domain:
-            node_index = len(self._inner.to_onnx(ir_version=self.ir_version).graph.node)
-            self._deferred_custom_nodes.append((node_index, node))
-            for output in outputs:
-                tensor = self.shapes_context.get(output)
-                self._inner.make_input(
-                    helper.make_tensor_value_info(
-                        output,
-                        tensor.dtype,
-                        self.get_shape(output) if self.has_shape(output) else None,
-                    )
-                )
-                self._deferred_custom_outputs.add(output)
-        else:
-            self._inner.make_node(
-                op_type, normalized_inputs, outputs, domain, node_name, native_attributes
-            )
+        self._inner.make_node(
+            op_type, normalized_inputs, outputs, domain, node_name, native_attributes
+        )
         if domain == "com.microsoft" and op_type == "CDist":
             output = outputs[0]
             if self.has_type(normalized_inputs[0]):
@@ -862,25 +834,6 @@ class OnnxLightGraphBuilder:
 
     def _native_model(self):
         model = self._inner.to_onnx(ir_version=self.ir_version)
-        if self._deferred_custom_nodes:
-            inputs = [
-                value
-                for value in model.graph.input
-                if str(value.name) not in self._deferred_custom_outputs
-            ]
-            model.graph.ClearField("input")
-            model.graph.input.extend(inputs)
-            native_nodes = list(model.graph.node)
-            deferred = {}
-            for index, node in self._deferred_custom_nodes:
-                deferred.setdefault(index, []).append(node)
-            nodes = []
-            for index, native_node in enumerate(native_nodes):
-                nodes.extend(deferred.get(index, ()))
-                nodes.append(native_node)
-            nodes.extend(deferred.get(len(native_nodes), ()))
-            model.graph.ClearField("node")
-            model.graph.node.extend(nodes)
         self.shapes_context.apply_inferred_shapes_to_model(model)
         annotated = {
             str(value.name)
@@ -897,9 +850,6 @@ class OnnxLightGraphBuilder:
         # The native apply method fills missing annotations, but does not replace
         # existing input annotations. Explicit converter overrides must win.
         self._replace_model_annotations(model)
-        for value in model.graph.output:
-            if str(value.name) in self._output_doc_strings:
-                value.doc_string = self._output_doc_strings[str(value.name)]
         return model
 
     def _replace_model_annotations(self, model):
@@ -923,9 +873,20 @@ class OnnxLightGraphBuilder:
 
     def _synchronize_annotations(self):
         if self._annotations_dirty:
-            if not self._deferred_custom_nodes:
+            if self._custom_shape_callbacks and hasattr(self._inner, "shapes"):
+                for name in self.shapes_context.names():
+                    if self.shapes_context.has(name):
+                        self._inner.shapes.set(name, self.shapes_context.get(name))
+            else:
                 self._inner = GraphBuilder(self._native_model())
+                self._register_native_shape_callbacks()
             self._annotations_dirty = False
+
+    def _register_native_shape_callbacks(self):
+        if not hasattr(self._inner, "shapes"):
+            return
+        for (domain, op_type), callback in self._custom_shape_callbacks.items():
+            self._inner.shapes.set_custom_shape_inference_function(domain, op_type, callback)
 
     def _function_artifact(self, options, optimize, inline):
         """Exports a native function with constants or explicit parameter inputs."""
@@ -1067,6 +1028,8 @@ class OnnxLightGraphBuilder:
         self.shapes_context.set_custom_shape_inference_function(
             key[0], key[1], infer_local_function
         )
+        self._custom_shape_callbacks[key] = infer_local_function
+        self._register_native_shape_callbacks()
         return self._add_function_initializers(artifact), key
 
     def _add_function_initializers(self, artifact):
@@ -1142,6 +1105,7 @@ class OnnxLightGraphBuilder:
         model.graph.ClearField("node")
         model.graph.node.extend(nodes)
         self._inner = GraphBuilder(model)
+        self._register_native_shape_callbacks()
 
     def is_constant(self, name):
         """Queries constant ownership through native GraphGraph."""
@@ -1283,41 +1247,22 @@ class OnnxLightGraphBuilder:
     def _export_native(self, optimize, inline):
         """Exports a native model and optional native rewrite statistics."""
         model = self._native_model()
-        if self._deferred_custom_nodes:
-            if inline:
-                model = inline_selected_functions(
-                    model,
-                    sorted(
-                        {
-                            (str(node.domain), str(node.op_type))
-                            for _, node in self._deferred_custom_nodes
-                        }
-                    ),
-                )
-            self._replace_model_annotations(model)
-            _remove_output_identities(model.graph)
-            return model, [], None
-        did_inline = inline and not any(
-            _contains_control_flow_subgraph(function) for function in model.functions
+        has_custom_local_calls = any(
+            (str(node.domain), str(node.op_type)) in self._custom_shape_callbacks
+            for node in model.graph.node
         )
-        if did_inline:
-            model = inline_local_functions(model)
-        builder = GraphBuilder(model)
+        builder = self._inner if has_custom_local_calls else GraphBuilder(model)
+        if inline and not any(
+            _contains_control_flow_subgraph(function) for function in builder.to_onnx().functions
+        ):
+            builder.inline_local_functions()
         rewrites = []
         native_report = None
         if optimize:
             rewrites, native_report = GraphGraph(
                 builder, self.optimization_options.pattern_names()
             ).optimize(self.optimization_options.max_iter, report=True)
-        elif did_inline:
-            GraphGraph(builder, []).optimize(1)
         model = builder.to_onnx(ir_version=self.ir_version)
-        if optimize:
-            inference = ShapesContext()
-            for opset in model.opset_import:
-                inference.set_opset_version(str(opset.domain), opset.version)
-            inference.compute_shape_model(model, True)
-            inference.apply_inferred_shapes_to_model(model)
         self._replace_model_annotations(model)
         _remove_output_identities(model.graph)
         if self._original_model is not None:

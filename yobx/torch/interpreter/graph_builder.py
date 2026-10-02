@@ -246,14 +246,12 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         )
         if doc_string:
             names = [name] if isinstance(name, str) else list(name)
-            self._output_doc_strings.update(dict.fromkeys(names, doc_string))
-            if self._deferred_custom_nodes:
-                return result
             model = self._native_model()
             for value in model.graph.output:
                 if str(value.name) in names:
                     value.doc_string = doc_string
             self._inner = NativeGraphBuilder(model)
+            self._register_native_shape_callbacks()
         return result
 
     def make_initializer(
@@ -348,6 +346,7 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
                 for key, value in metadata_props.items()
             )
             self._inner = NativeGraphBuilder(model)
+            self._register_native_shape_callbacks()
         return result
 
     @staticmethod
@@ -960,6 +959,7 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
                 for k, v in metadata_props.items()
             )
             self._inner = NativeGraphBuilder(model)
+            self._register_native_shape_callbacks()
         return initializers, key
 
     def make_nodes(
@@ -1059,6 +1059,7 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
             model = self._native_model()
             model.functions.extend(missing)
             self._inner = NativeGraphBuilder(model)
+            self._register_native_shape_callbacks()
         self.functions_builder.update(builder.functions_builder)
 
     def _copy_output_metadata(self, builder, output_names):
