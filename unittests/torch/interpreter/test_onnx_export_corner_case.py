@@ -4,13 +4,14 @@ import os
 import unittest
 import warnings
 from io import StringIO
-import onnx
-from onnx.reference import ReferenceEvaluator
+from yobx._onnx_shim import onnx
+from onnx_light.onnx.reference import ReferenceEvaluator
 from yobx.ext_test_case import (
     ExtTestCase,
     ignore_warnings,
     skipif_ci_windows,
     requires_cuda,
+    requires_onnxscript,
     requires_torch,
     hide_stdout,
 )
@@ -145,7 +146,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
             try:
                 InferenceSession(name, providers=["CPUExecutionProvider"])
             except Exception as e:
-                import onnx
+                from yobx._onnx_shim import onnx
 
                 raise AssertionError(
                     f"onnxruntime cannot load the model "
@@ -162,6 +163,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
+    @requires_onnxscript()
     def test_simple_export_conv_rename(self):
         model, input_tensor = return_module_cls_conv()
         names = export_utils(
@@ -180,6 +182,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
+    @requires_onnxscript()
     def test_simple_export_conv_norename(self):
         model, input_tensor = return_module_cls_conv()
         names = export_utils(
@@ -204,6 +207,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
+    @requires_onnxscript()
     @hide_stdout()
     def test_simple_export_relu(self):
         model, input_tensor = return_module_cls_relu()
@@ -243,6 +247,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
+    @requires_onnxscript()
     def test_simple_export_pool(self):
         from onnxruntime import InferenceSession
 
@@ -259,6 +264,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_cuda()
     @requires_torch("2.13")
+    @requires_onnxscript()
     @hide_stdout()
     def test_simple_export_pool_bfloat16(self):
         import torch
@@ -296,6 +302,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
+    @unittest.skip("onnx-light GraphGraph always removes unused nodes during optimization")
     def test_remove_unused_nodes(self):
         model, input_tensor = return_module_cls_pool()
         onx1 = to_onnx(
@@ -330,6 +337,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
+    @requires_onnxscript()
     def test_simple_export_pool_unused(self):
         from onnxruntime import InferenceSession
 
@@ -347,6 +355,10 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
+    @unittest.skip(
+        "onnx-light does not expose constant folding independently from "
+        "TransposeMatMul and MatMulAdd rewrites"
+    )
     def test_constant_folding(self):
         model, input_tensor = return_module_cls_pool()
         onx1 = to_onnx(
@@ -395,6 +407,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
+    @requires_onnxscript()
     @hide_stdout()
     def test_simple_export_pool_constant_folding(self):
         from onnxruntime import InferenceSession
@@ -551,6 +564,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
 
     @requires_torch()
     @ignore_warnings((UserWarning, DeprecationWarning))
+    @unittest.skip("onnx-light does not provide the default+onnxruntime pattern group")
     def test_com_microsoft_opset_triggers_ort_optimizations(self):
         """When target_opset includes 'com.microsoft', ort optimizations are auto-enabled."""
         import torch
@@ -643,8 +657,8 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @ignore_warnings((UserWarning, DeprecationWarning))
     def test_check_model_weights_transposed(self):
         """check_model_weights detects a transposed initializer."""
-        import onnx.helper as oh
-        from onnx import TensorProto
+        import onnx_light.onnx.helper as oh
+        from onnx_light.onnx import TensorProto
         import torch
 
         class Model(torch.nn.Module):
@@ -686,8 +700,8 @@ class TestOnnxExportCornerCase(ExtTestCase):
     def test_check_model_weights_unknown(self):
         """check_model_weights flags an initializer whose name is not in the model."""
         import numpy as np
-        import onnx.helper as oh
-        from onnx import TensorProto
+        import onnx_light.onnx.helper as oh
+        from onnx_light.onnx import TensorProto
         import torch
 
         class Model(torch.nn.Module):

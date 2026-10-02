@@ -1,5 +1,5 @@
 import numpy as np
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
 def sigmoid(x):  # type: ignore
@@ -8,11 +8,11 @@ def sigmoid(x):  # type: ignore
     return np.exp(x) / (1 + np.exp(x))
 
 
-class QuickGelu(OpRun):
+class QuickGelu(NativeOpKernel):
     op_domain = "com.microsoft"
 
     def __init__(self, onnx_node, run_params):  # type: ignore
-        OpRun.__init__(self, onnx_node, run_params)
+        NativeOpKernel.__init__(self, onnx_node, run_params)
         self.vf = np.vectorize(sigmoid)
 
     def _run(self, X, alpha=1.0):

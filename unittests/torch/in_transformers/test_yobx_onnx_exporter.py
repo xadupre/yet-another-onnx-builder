@@ -13,6 +13,7 @@ Covers:
 """
 
 import unittest
+from unittest.mock import patch
 
 from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
 
@@ -49,14 +50,32 @@ class TestYobxOnnxExporterImport(ExtTestCase):
         self.assertEqual(exporter._target_opset, 18)
 
     @requires_transformers("5.12")
-    def test_yobx_onnx_exporter_required_packages_no_onnxscript(self):
-        """YobxOnnxExporter must not list onnxscript in required_packages."""
+    def test_yobx_onnx_exporter_required_packages_native_only(self):
+        """Requires native ONNX instead of the reference exporter dependencies."""
         from yobx.torch.in_transformers import YobxOnnxExporter
 
         exporter = YobxOnnxExporter()
         self.assertNotIn("onnxscript", exporter.required_packages)
-        self.assertIn("onnx", exporter.required_packages)
+        self.assertNotIn("onnx", exporter.required_packages)
+        self.assertIn("onnx_light", exporter.required_packages)
         self.assertIn("torch", exporter.required_packages)
+        self.assertNotIn("onnx", exporter.tested_versions)
+        self.assertNotIn("onnx", exporter.min_versions)
+
+    @requires_transformers("5.12")
+    def test_yobx_onnx_exporter_without_reference_packages(self):
+        """Instantiates while rejecting any reference dependency lookup."""
+        import importlib.util
+        from yobx.torch.in_transformers import YobxOnnxExporter
+
+        find_spec = importlib.util.find_spec
+
+        def native_only_spec(name, *args, **kwargs):
+            self.assertNotIn(name.split(".")[0], {"onnx", "onnxscript"})
+            return find_spec(name, *args, **kwargs)
+
+        with patch("importlib.util.find_spec", side_effect=native_only_spec):
+            self.assertIsInstance(YobxOnnxExporter(), YobxOnnxExporter)
 
 
 class TestYobxOnnxExporterExport(ExtTestCase):

@@ -16,9 +16,9 @@ the source code:
 * **Shape / type API** (:ref:`builder-api`) — methods to attach and query
   shape and type metadata on intermediate tensors.
 
-An alternative bridge implementation,
-:class:`OnnxScriptGraphBuilder <yobx.builder.onnxscript.OnnxScriptGraphBuilder>`,
-shows how the same API can be satisfied on top of ``onnxscript``'s IR.
+The native :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>` implements
+this API using ``onnx-light``. The historical onnxscript and spox bridges
+are retired because they require the removed reference ONNX dependency.
 
 When any ``ONNXSTOP*`` variable triggers an exception, the resulting
 **stack trace points to the exact line of converter code** that first
@@ -81,13 +81,13 @@ The snippet below builds the same ``Sub`` / ``Div`` graph emitted by the
     :showcode:
 
     import numpy as np
-    import onnx
+    from yobx._onnx_shim import onnx
     from yobx.xbuilder import GraphBuilder, OptimizationOptions
     from yobx.helpers.onnx_helper import pretty_onnx
 
     TFLOAT = onnx.TensorProto.FLOAT
 
-    opts = OptimizationOptions(constant_folding=False)
+    opts = OptimizationOptions(patterns=[])
     g = GraphBuilder(20, ir_version=10, optimization_options=opts)
     g.make_tensor_input("X", TFLOAT, ("batch", 4))
 
@@ -368,30 +368,26 @@ Alternative implementations
 ===========================
 
 Any class that satisfies the two-part API above can be passed as
-``builder_cls``.  The package ships with:
-
-* :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>` — the default; builds
-  graphs using onnx protobuf objects with built-in optimization passes.
-* :class:`OnnxScriptGraphBuilder
-  <yobx.builder.onnxscript.OnnxScriptGraphBuilder>` — a bridge that
-  satisfies the same API while using the ``onnxscript`` IR internally.
-  Useful when the rest of the pipeline already works with onnxscript.
+``builder_cls`` and must return native ``onnx-light`` protobufs.
+The supported implementation is
+:class:`GraphBuilder <yobx.xbuilder.GraphBuilder>`, which includes native
+optimization passes. The following example selects it explicitly:
 
 .. runpython::
     :showcode:
 
     import numpy as np
-    import onnx
+    from yobx._onnx_shim import onnx
     from sklearn.preprocessing import StandardScaler
     from yobx.sklearn import to_onnx
-    from yobx.builder.onnxscript import OnnxScriptGraphBuilder
+    from yobx.xbuilder import GraphBuilder
     from yobx.helpers.onnx_helper import pretty_onnx
 
     rng = np.random.default_rng(0)
     X = rng.standard_normal((10, 4)).astype(np.float32)
 
     scaler = StandardScaler().fit(X)
-    model = to_onnx(scaler, (X,), builder_cls=OnnxScriptGraphBuilder)
+    model = to_onnx(scaler, (X,), builder_cls=GraphBuilder)
     print(pretty_onnx(model))
 
 .. seealso::

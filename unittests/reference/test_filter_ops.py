@@ -1,6 +1,6 @@
 import unittest
-import onnx.helper as oh
-from onnx.reference.op_run import OpRun
+import onnx_light.onnx.helper as oh
+from yobx.reference.ops._native_op import NativeOpKernel
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
 
@@ -11,7 +11,7 @@ class TestFilterOps(ExtTestCase):
     def test_non_versioned_ops_pass_through(self):
         """Non-versioned ops (no '_<int>' suffix) should pass through unchanged."""
 
-        class NonVersionedOp(OpRun):
+        class NonVersionedOp(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 
@@ -25,7 +25,7 @@ class TestFilterOps(ExtTestCase):
         is created for it because it was not compatible with the declared opset.
         """
 
-        class MyOp_2(OpRun):
+        class MyOp_2(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 
@@ -39,7 +39,7 @@ class TestFilterOps(ExtTestCase):
     def test_versioned_op_within_opset_is_included(self):
         """A versioned op whose version is within the opset version should be included."""
 
-        class MyOp_1(OpRun):
+        class MyOp_1(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 
@@ -51,11 +51,11 @@ class TestFilterOps(ExtTestCase):
     def test_highest_compatible_version_is_selected(self):
         """When multiple versions are compatible, the highest version should be selected."""
 
-        class MyOp_1(OpRun):
+        class MyOp_1(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 
-        class MyOp_2(OpRun):
+        class MyOp_2(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 
@@ -71,11 +71,11 @@ class TestFilterOps(ExtTestCase):
     def test_no_opsets_keeps_highest_version(self):
         """With opsets=None and a plain proto, all versioned ops are kept (highest wins)."""
 
-        class MyOp_1(OpRun):
+        class MyOp_1(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 
-        class MyOp_2(OpRun):
+        class MyOp_2(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 
@@ -88,15 +88,15 @@ class TestFilterOps(ExtTestCase):
     def test_mixed_versioned_and_non_versioned(self):
         """Non-versioned ops are kept as-is; versioned ops are merged by highest version."""
 
-        class OtherOp(OpRun):
+        class OtherOp(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 
-        class MyOp_1(OpRun):
+        class MyOp_1(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 
-        class MyOp_2(OpRun):
+        class MyOp_2(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 
@@ -112,11 +112,11 @@ class TestFilterOps(ExtTestCase):
     def test_opsets_from_model_proto(self):
         """When proto is a ModelProto and opsets=None, opsets are inferred from the model."""
 
-        class MyOp_1(OpRun):
+        class MyOp_1(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 
-        class MyOp_2(OpRun):
+        class MyOp_2(NativeOpKernel):
             op_domain = "test.domain"
             op_schema = None
 

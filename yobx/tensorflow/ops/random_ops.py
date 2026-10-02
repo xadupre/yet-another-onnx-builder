@@ -8,8 +8,8 @@ Random normal
 
 from typing import Any, Dict, List
 
-from onnx import TensorProto
-import onnx.helper as onh
+from onnx_light.onnx import TensorProto
+import onnx_light.onnx.helper as onh
 import tensorflow as tf
 
 from ..register import register_tf_op_converter

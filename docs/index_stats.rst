@@ -18,10 +18,8 @@ With the following versions:
     import ml_dtypes
     import scipy
     import sklearn
-    import onnx
-    import onnx_ir
+    import onnx_light
     import onnxruntime
-    import onnxscript
     import optree
     import tensorflow
     import torch
@@ -36,10 +34,8 @@ With the following versions:
         scipy,
         sklearn,
         optree,
-        onnx,
-        onnx_ir,
+        onnx_light,
         onnxruntime,
-        onnxscript,
         tensorflow,
         torch,
         transformers,

@@ -1,9 +1,9 @@
 import unittest
 from typing import Any, Dict, Optional, Tuple
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 import torch
 from torch._C import _from_dlpack
 from yobx.ext_test_case import (
@@ -11,6 +11,7 @@ from yobx.ext_test_case import (
     hide_stdout,
     requires_onnxruntime_training,
     requires_cuda,
+    requires_onnxruntime_cuda,
 )
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
 from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype
@@ -121,6 +122,7 @@ class TestInferenceSessionTorch(ExtTestCase):
         self.assertEqualArray(expected[0], got[0])
 
     @requires_cuda()
+    @requires_onnxruntime_cuda()
     def test_torch_guess_cuda(self):
         model, feeds, expected = self._get_model()
         feeds = {k: v.to("cuda") for k, v in feeds.items()}
@@ -132,6 +134,7 @@ class TestInferenceSessionTorch(ExtTestCase):
         self.assertEqual(got[0].get_device(), 0)
 
     @requires_cuda()
+    @requires_onnxruntime_cuda()
     @requires_onnxruntime_training(True)
     def test_torch_training_cuda(self):
         model, feeds, expected = self._get_model()
@@ -144,6 +147,7 @@ class TestInferenceSessionTorch(ExtTestCase):
         self.assertEqual(got[0].get_device(), 0)
 
     @requires_cuda()
+    @requires_onnxruntime_cuda()
     def test_torch_notraining_cuda(self):
         model, feeds, expected = self._get_model()
         feeds = {k: v.to("cuda") for k, v in feeds.items()}

@@ -7,10 +7,10 @@ class TestTorchSymIntToStr(ExtTestCase):
     @classmethod
     def setUpClass(cls):
         import torch
-        from yobx.xbuilder import GraphBuilder
+        from yobx.torch.interpreter.graph_builder import TorchOnnxLightGraphBuilder
 
         cls.torch = torch
-        cls.builder = GraphBuilder(18, ir_version=9)
+        cls.builder = TorchOnnxLightGraphBuilder(18, ir_version=9)
 
     def test_str_input(self):
         """A plain string is returned as-is."""
@@ -58,9 +58,9 @@ class TestTorchSymIntToStr(ExtTestCase):
 class TestImproveConstraints(ExtTestCase):
     @classmethod
     def setUpClass(cls):
-        from yobx.xbuilder import GraphBuilder
+        from yobx.torch.interpreter.graph_builder import TorchOnnxLightGraphBuilder
 
-        cls.GraphBuilder = GraphBuilder
+        cls.GraphBuilder = TorchOnnxLightGraphBuilder
 
     def test_improve_constraints_deduces_equivalence(self):
         """_improve_constraints should deduce that seq_length == s70 from
@@ -114,10 +114,10 @@ class TestTorchSymIntTorch(ExtTestCase):
     @classmethod
     def setUpClass(cls):
         import torch
-        from yobx.xbuilder import GraphBuilder
+        from yobx.torch.interpreter.graph_builder import TorchOnnxLightGraphBuilder
 
         cls.torch = torch
-        cls.builder = GraphBuilder(18, ir_version=9)
+        cls.builder = TorchOnnxLightGraphBuilder(18, ir_version=9)
 
     def test_sym_int_str_node(self):
         """A SymInt with a string node returns that string."""
@@ -141,10 +141,9 @@ class TestTorchSymIntTorch(ExtTestCase):
 class TestWrapDimNameAsString(ExtTestCase):
     @classmethod
     def setUpClass(cls):
-        from yobx.xbuilder import GraphBuilder
+        from yobx.xbuilder._wrap_dim import WrapDim
 
-        cls.builder = GraphBuilder(18, ir_version=9)
-        cls.WrapDim = GraphBuilder.WrapDim
+        cls.WrapDim = WrapDim
 
     def test_str_name(self):
         """A plain string name is returned as-is."""
@@ -167,11 +166,10 @@ class TestWrapDimNameAsStringTorch(ExtTestCase):
     @classmethod
     def setUpClass(cls):
         import torch
-        from yobx.xbuilder import GraphBuilder
+        from yobx.xbuilder._wrap_dim import WrapDim
 
         cls.torch = torch
-        cls.builder = GraphBuilder(18, ir_version=9)
-        cls.WrapDim = GraphBuilder.WrapDim
+        cls.WrapDim = WrapDim
 
     def test_torch_dim_name(self):
         """A torch.export.Dim object returns its __name__ attribute."""

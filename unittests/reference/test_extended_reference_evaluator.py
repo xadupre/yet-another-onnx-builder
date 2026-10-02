@@ -1,10 +1,10 @@
 import unittest
 from typing import Optional
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-from yobx.ext_test_case import ExtTestCase, has_cuda
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
+from yobx.ext_test_case import ExtTestCase, has_onnxruntime_cuda
 from yobx.reference import ExtendedReferenceEvaluator
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -86,13 +86,13 @@ class TestReferenceOps(ExtTestCase):
                 ],
                 "name",
                 [
-                    oh.make_tensor_value_info("x", TUINT8, None),
-                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("x", TUINT8, [1, 1, 4, 4]),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, []),
                 ],
-                [oh.make_tensor_value_info("y", TUINT8, None)],
+                [oh.make_tensor_value_info("y", TUINT8, [1, 1, 3, 3])],
             ),
             opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
@@ -137,16 +137,16 @@ class TestReferenceOps(ExtTestCase):
                 ],
                 "name",
                 [
-                    oh.make_tensor_value_info("x", TUINT8, None),
-                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("w", TUINT8, None),
-                    oh.make_tensor_value_info("w_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("w_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("x", TUINT8, [1, 1, 4, 4]),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("w", TUINT8, [1, 1, 2, 2]),
+                    oh.make_tensor_value_info("w_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("w_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, []),
                 ],
-                [oh.make_tensor_value_info("y", TUINT8, None)],
+                [oh.make_tensor_value_info("y", TUINT8, [1, 1, 3, 3])],
             ),
             opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
@@ -194,16 +194,16 @@ class TestReferenceOps(ExtTestCase):
                 ],
                 "name",
                 [
-                    oh.make_tensor_value_info("x", TUINT8, None),
-                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("w", TUINT8, None),
-                    oh.make_tensor_value_info("w_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("w_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("x", TUINT8, [1, 4, 4, 1]),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("w", TUINT8, [1, 1, 2, 2]),
+                    oh.make_tensor_value_info("w_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("w_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, []),
                 ],
-                [oh.make_tensor_value_info("y", TUINT8, None)],
+                [oh.make_tensor_value_info("y", TUINT8, [1, 3, 3, 1])],
             ),
             opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
@@ -252,16 +252,16 @@ class TestReferenceOps(ExtTestCase):
                 ],
                 "name",
                 [
-                    oh.make_tensor_value_info("x", TUINT8, None),
-                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("w", TUINT8, None),
-                    oh.make_tensor_value_info("w_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("w_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("x", TUINT8, [1, 1, 8]),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("w", TUINT8, [1, 1, 3]),
+                    oh.make_tensor_value_info("w_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("w_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, []),
                 ],
-                [oh.make_tensor_value_info("y", TUINT8, None)],
+                [oh.make_tensor_value_info("y", TUINT8, [1, 1, 6])],
             ),
             opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
@@ -309,16 +309,16 @@ class TestReferenceOps(ExtTestCase):
                 ],
                 "name",
                 [
-                    oh.make_tensor_value_info("x", TUINT8, None),
-                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("w", TUINT8, None),
-                    oh.make_tensor_value_info("w_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("w_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("x", TUINT8, [1, 8, 1]),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("w", TUINT8, [1, 1, 3]),
+                    oh.make_tensor_value_info("w_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("w_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, []),
                 ],
-                [oh.make_tensor_value_info("y", TUINT8, None)],
+                [oh.make_tensor_value_info("y", TUINT8, [1, 6, 1])],
             ),
             opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
@@ -698,7 +698,7 @@ class TestReferenceOps(ExtTestCase):
         }
         got = ref.run(None, feeds)
 
-        if not has_cuda():
+        if not has_onnxruntime_cuda():
             return
         import onnxruntime
 

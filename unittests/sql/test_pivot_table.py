@@ -3,6 +3,7 @@
 import unittest
 
 import numpy as np
+from onnx_light.onnx import checker
 
 from yobx.ext_test_case import ExtTestCase, has_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
@@ -16,6 +17,7 @@ def _run(func, dtypes, feeds):
     from yobx.container import ExportArtifact
 
     artifact = dataframe_to_onnx(func, dtypes)
+    checker.check_model(artifact.proto)
     ref = ExtendedReferenceEvaluator(artifact)
     ref_outputs = ref.run(None, feeds)
     if has_onnxruntime():

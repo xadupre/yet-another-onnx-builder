@@ -846,8 +846,9 @@ class TestInputObserver(ExtTestCase):
         self.assertEqual(shapes["option"], None)
         ep = torch.export.export(model, (), kwargs=kwargs, dynamic_shapes=shapes)
         self.assertEqualArray(model(**kwargs), ep.module()(**kwargs))
-        epo = torch.onnx.export(model, (), kwargs=kwargs, dynamic_shapes=shapes)
-        proto = epo.model_proto
+        from yobx.torch.interpreter import to_onnx
+
+        proto = to_onnx(model, (), kwargs=kwargs, dynamic_shapes=shapes).proto
         self.assertEqual(["x", "y"], [i.name for i in proto.graph.input])
 
     def test_io_mixed_args_kwargs_as_dict_2(self):

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 from __future__ import annotations
 import numpy as np
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
 def gather_numpy_2(self: np.ndarray, index: np.ndarray) -> np.ndarray:
@@ -34,7 +34,7 @@ def gather_numpy(self: np.ndarray, dim: int, index: np.ndarray) -> np.ndarray:
     return np.swapaxes(gathered, 0, dim)
 
 
-class GatherElements(OpRun):
+class GatherElements(NativeOpKernel):
     def _run(self, data, indices, axis=None):
         try:
             return (gather_numpy(data, axis, indices),)

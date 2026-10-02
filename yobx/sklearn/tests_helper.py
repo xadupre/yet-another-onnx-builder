@@ -1,5 +1,5 @@
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.datasets import make_classification, make_multilabel_classification, make_regression
 from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator
@@ -295,8 +295,10 @@ def fit_regression_model(
     return model, X_test
 
 
-def _assert_close(expected: np.ndarray, value: np.ndarray, name: str, atol=1e-5):
-    """Assert that two arrays are element-wise close within an absolute tolerance.
+def _assert_close(
+    expected: np.ndarray, value: np.ndarray | list[np.ndarray], name: str, atol=1e-5
+):
+    """Asserts that two arrays are element-wise close within an absolute tolerance.
 
     Checks that *expected* and *value* share the same dtype and shape, then
     verifies that the maximum absolute difference does not exceed *atol*.
@@ -307,9 +309,13 @@ def _assert_close(expected: np.ndarray, value: np.ndarray, name: str, atol=1e-5)
         help identify the failing comparison.
     :param atol: Absolute tolerance for numerical comparison.  Defaults to
         ``1e-5``.
-    :raises AssertionError: If the dtypes differ, the shapes differ, or the
+    :raises AssertionError: If the result is not a tensor, the dtypes differ,
+        the shapes differ, or the
         maximum absolute difference exceeds *atol*.
     """
+    assert isinstance(
+        value, np.ndarray
+    ), f"Expected a tensor output for test name {name!r}, got {type(value)!r}"
     assert (
         expected.dtype == value.dtype
     ), f"Type mismatch between {expected.dtype} and {value.dtype} for test name {name!r}"

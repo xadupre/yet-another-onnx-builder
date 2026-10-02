@@ -1,10 +1,8 @@
-ShapeBuilder to infer shapes
-============================
+Native shape inference
+======================
 
-The main problems while doing the exercise are dealing with new
-dimension names when there is no way to infer one and back propagation.
-The user gives a name to one of the output dimension, how to rename
-the dimension before. First page answers this question.
+The native context owns symbolic dimensions, constraints, and shape-tensor
+values. Python cost formulas consume its inferred descriptors.
 
 .. toctree::
    :maxdepth: 1

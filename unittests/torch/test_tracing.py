@@ -1626,7 +1626,7 @@ class TestTracingControlFlow(ExtTestCase):
         model = Model()
         x = torch.rand((3, 4))
         art = to_onnx(model, (x,), export_options=ExportOptions(tracing=True))
-        # x1 = x + 1 traces as Add; clone() of the final output is dropped by the exporter.
+        # The native builder preserves the Identity carrying the final output name.
         self.assertEqual(["Add"], [n.op_type for n in art.graph.node])
 
     def test_tracing_obvious_control_flow_ndim_indirect_cat(self):

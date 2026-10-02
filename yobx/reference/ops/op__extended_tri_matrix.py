@@ -1,8 +1,8 @@
 import numpy as np
-from onnx.reference.op_run import OpRun
+from ._native_op import NativeOpKernel
 
 
-class TriMatrix(OpRun):
+class TriMatrix(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, shape, csts):

@@ -84,8 +84,8 @@ saves it through :class:`ExtendedModelContainer
     import os
     import tempfile
     import numpy as np
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     from yobx.container import ExtendedModelContainer
 
     # ---- Build a minimal model with one external initializer ----
@@ -144,8 +144,8 @@ a PyTorch model to ONNX and deferring disk writes to a later stage.
     import os
     import tempfile
     import numpy as np
-    import onnx
-    import onnx.helper as oh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
     import torch
     from yobx.container import ExtendedModelContainer
 

@@ -1,5 +1,5 @@
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from typing import Dict, List
 
 from sklearn.preprocessing import KBinsDiscretizer

@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.svm import OneClassSVM
 
 from ..register import register_sklearn_converter

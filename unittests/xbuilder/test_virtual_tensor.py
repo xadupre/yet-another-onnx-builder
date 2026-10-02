@@ -1,5 +1,5 @@
 import unittest
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 from yobx.ext_test_case import ExtTestCase
 from yobx.xbuilder._virtual_tensor import VirtualTensor
 

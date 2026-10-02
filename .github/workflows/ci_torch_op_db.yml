@@ -26,6 +26,8 @@ jobs:
       - name: Install latest stable pytorch
         run: pip install --upgrade torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
         run: pip install -e ".[dev,torch,op-db]"
 

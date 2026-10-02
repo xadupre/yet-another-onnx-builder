@@ -108,6 +108,8 @@ The summary explicitly includes the ``new-tracing`` exporter next to
     piv = df.pivot(index="case", columns="exporter", values="n_nodes")
     print(piv.to_markdown(tablefmt="rst"))
     print()
+    print("``FAIL`` indicates an export or numerical validation failure; see each case above.")
+    print()
 
 .. _l-this-bottom-page-coverage:
 

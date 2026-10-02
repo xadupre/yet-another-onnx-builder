@@ -17,9 +17,11 @@ Logical
 """
 
 from typing import Any, Dict, List
+import numpy
 import tensorflow as tf
 from ..register import register_tf_op_converter
 from ...typing import GraphBuilderExtendedProtocol
+from ...xtracing.numpy_array import NumpyArray
 
 # ---------------------------------------------------------------------------
 # Arithmetic
@@ -96,10 +98,22 @@ def convert_squared_difference(
 def convert_floor_mod(
     g: GraphBuilderExtendedProtocol, sts: Dict[str, Any], outputs: List[str], op: tf.Operation
 ) -> str:
-    """TF ``FloorMod`` → ONNX ``Mod(fmod=0)``."""
-    return g.op.Mod(
-        op.inputs[0].name, op.inputs[1].name, fmod=0, outputs=outputs[:1], name=op.name
-    )
+    """Converts floor modulo with valid floating-point ONNX and divisor-sign semantics."""
+    remainder = NumpyArray(op.inputs[0].name, g) % NumpyArray(op.inputs[1].name, g)
+    result = remainder.name
+    if op.inputs[0].dtype.is_floating:
+        # TensorFlow retains the dividend's sign for exact zero, unlike NumPy.
+        zero = g.op.CastLike(numpy.array(0, dtype=numpy.float32), result)
+        one = g.op.CastLike(numpy.array(1, dtype=numpy.float32), result)
+        negative_dividend = g.op.Less(g.op.Div(one, op.inputs[0].name), zero)
+        is_zero = g.op.Equal(result, zero)
+        negative = g.op.Or(
+            g.op.And(is_zero, negative_dividend),
+            g.op.And(g.op.Not(is_zero), g.op.Less(result, zero)),
+        )
+        direction = g.op.Where(negative, g.op.Neg(one), one)
+        result = g.op.Mul(g.op.Abs(result), direction)
+    return g.op.Identity(result, outputs=outputs[:1], name=op.name)
 
 
 @register_tf_op_converter("TruncateMod")

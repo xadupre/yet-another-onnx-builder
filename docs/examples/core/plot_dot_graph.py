@@ -14,7 +14,7 @@ The function:
   ``MatMul``, ``Reshape``, …),
 * inlines small scalar constants and 1-D initializers whose length is ≤ 9
   directly onto the node label so the graph stays compact,
-* uses :class:`BasicShapeBuilder <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`
+* uses :class:`NativeShapeInference <yobx.xshape.NativeShapeInference>`
   to annotate every edge with its inferred dtype and shape (when available),
 * handles ``Scan`` / ``Loop`` / ``If`` sub-graphs by drawing dotted edges for
   outer-scope values consumed by the sub-graph.
@@ -24,9 +24,9 @@ to any graphviz renderer (``dot -Tsvg``, ``dot -Tpng``, …).
 """
 
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from yobx.doc import plot_dot
 from yobx.helpers.dot_helper import to_dot
 

@@ -38,6 +38,8 @@ jobs:
       - name: Install pytorch 2.12
         run: pip install torch==2.12.1+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
 
+      - uses: ./.github/actions/install-onnx-light
+
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"
 
@@ -100,6 +102,8 @@ jobs:
       - name: Install pytorch 2.12 (macOS)
         if: matrix.torch-version == '2.12' && matrix.os == 'macos-latest'
         run: pip install torch==2.12.1 torchvision torchaudio
+
+      - uses: ./.github/actions/install-onnx-light
 
       - name: Install dependencies
         run: pip install -e ".[dev,torch,transformers]"

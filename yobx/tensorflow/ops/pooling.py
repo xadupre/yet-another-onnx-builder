@@ -118,9 +118,9 @@ def convert_max_pool(
 
     # NHWC → NCHW
     x_nchw = g.op.Transpose(op.inputs[0].name, perm=[0, 3, 1, 2], name=f"{op.name}_in_t")
-    # Apply MaxPool in NCHW; request exactly one output to avoid returning indices
+    # Explicitly omits the optional indices output in the native schema.
     pool_out = f"{op.name}_nchw_out"
-    g.op.MaxPool(x_nchw, outputs=[pool_out], name=f"{op.name}_pool", **pool_kwargs)
+    g.op.MaxPool(x_nchw, outputs=[pool_out, ""], name=f"{op.name}_pool", **pool_kwargs)
     _set_pool_nchw_shape(g, op, x_nchw, pool_out)
     # NCHW → NHWC
     return g.op.Transpose(pool_out, perm=[0, 2, 3, 1], outputs=outputs[:1], name=op.name)

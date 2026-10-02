@@ -1,7 +1,7 @@
 from typing import Dict, List, Tuple
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.isotonic import IsotonicRegression
 

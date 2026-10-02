@@ -31,7 +31,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
 
         # Gather + Sub + Div (scaler) + Concat nodes expected
         op_types = [n.op_type for n in onx.proto.graph.node]
-        self.assertIn("Gather", op_types)
+        self.assertTrue(any(op_type in {"Gather", "Split"} for op_type in op_types))
         self.assertIn("Concat", op_types)
 
         ref = ExtendedReferenceEvaluator(onx)

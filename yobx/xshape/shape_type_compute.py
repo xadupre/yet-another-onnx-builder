@@ -1,8 +1,8 @@
 from collections import Counter
 from typing import Callable, Dict, FrozenSet, List, Optional, Sequence, Tuple
 import numpy as np
-import onnx
-from onnx import NodeProto, TensorProto
+from onnx_light import onnx
+from onnx_light.onnx import NodeProto, TensorProto
 from ..helpers.onnx_helper import pretty_onnx
 from ..xexpressions import simplify_expression
 from ._shape_helper import DYNAMIC_SHAPE, is_static_shape, all_int, all_int_or_str
@@ -169,7 +169,7 @@ def set_shape_type_op_any_attention(g: ShapeBuilder, node: NodeProto):
     if g.has_rank(node.input[0]):
         rk = g.get_rank(node.input[0])
         g.set_rank(node.output[0], rk)
-        for o in node.output[1:]:
+        for o in list(node.output)[1:]:
             if o:
                 g.set_rank(o, 4)
 
@@ -912,7 +912,7 @@ def set_shape_type_op_any_gemm(self: ShapeBuilder, node: NodeProto):
     return set_type_shape_gemm(
         self,
         node.output[0],
-        *node.input[:2],
+        *list(node.input)[:2],
         transA=0 if transA is None else transA.i,
         transB=0 if transB is None else transB.i,
     )
@@ -2530,7 +2530,7 @@ def set_shape_type_op_any(self: ShapeBuilder, node: NodeProto, exc: bool = False
 
 def set_type_shape_fused_matmul(self: ShapeBuilder, node: NodeProto):
     """Sets the output shape for node type FusedMatMul."""
-    x, y = node.input[:2]
+    x, y = list(node.input)[:2]
     transA = self.get_attribute(node, "transA", exc=False)
     transA = transA.i if transA else 0
     transB = self.get_attribute(node, "transB", exc=False)
@@ -2768,8 +2768,8 @@ def set_type_shape_fft_irfft2(self: ShapeBuilder, node: NodeProto):
 
 def set_type_shape_shared_input(self: ShapeBuilder, node: NodeProto):
     """Sets the output shapes for nodes with two outputs sharing the same inputs."""
-    r1 = set_type_shape_binary_op(self, node.output[0], *node.input[:2])
-    r2 = set_type_shape_binary_op(self, node.output[1], *node.input[::2])
+    r1 = set_type_shape_binary_op(self, node.output[0], *list(node.input)[:2])
+    r2 = set_type_shape_binary_op(self, node.output[1], *list(node.input)[::2])
     if r1 or r2:
         return [r1, r2]
 
@@ -2844,7 +2844,7 @@ def set_type_shape_multi_head_attention(self: ShapeBuilder, node: NodeProto):
         assert (
             self.get_rank(node.input[0]) == 3
         ), f"rank(query)={self.get_rank(node.input[0])} != 3{self.get_debug_msg()}"
-        q_shape, _k_shape, _v_shape = [self.get_shape(i) for i in node.input[:3]]
+        q_shape, _k_shape, _v_shape = [self.get_shape(i) for i in list(node.input)[:3]]
         pk_shape = (
             self.get_shape(node.input[6])
             if len(node.input) > 6 and node.input[6] and self.has_shape(node.input[6])
@@ -2860,13 +2860,13 @@ def set_type_shape_multi_head_attention(self: ShapeBuilder, node: NodeProto):
             else:
                 d = simplify_expression(f"({d1})+({d2})")
             shape = (*pk_shape[:2], d, pk_shape[-1])
-            for o in node.output[1:]:
+            for o in list(node.output)[1:]:
                 if o:
                     self.set_shape(o, shape)
                     up.append(shape)
             return up
     self.set_rank(node.output[0], 3)
-    for o in node.output[1:]:
+    for o in list(node.output)[1:]:
         if o:
             self.set_rank(o, 4)
 
@@ -2913,7 +2913,9 @@ set_shape_type_op_any_custom = {
     "FusedMatMulActivation": set_type_shape_fused_matmul,
     "FusedConv": set_shape_type_op_any_conv_max_pool,
     "Gelu": lambda g, node: set_type_shape_unary_op(g, node.output[0], node.input[0]),
-    "GemmFastGelu": lambda g, node: set_type_shape_matmul(g, node.output[0], *node.input[:2]),
+    "GemmFastGelu": lambda g, node: set_type_shape_matmul(
+        g, node.output[0], *list(node.input)[:2]
+    ),
     "GemmaRotaryEmbedding": set_shape_type_op_any_gemma_rotary_embedding,
     "Istft": set_type_shape_istft,
     "MaskedScatterNDOfShape": set_type_shape_scatter_nd_of_shape,

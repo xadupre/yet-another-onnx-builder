@@ -31,15 +31,17 @@ opset ≤ 4 and opset ≥ 5 — exact match.
 ``decision_type == '=='`` with a threshold like ``'0||1||2'``.  ONNX only
 supports single-value ``BRANCH_EQ`` comparisons, so each multi-value
 categorical node is expanded into a chain of single-value checks by
-:func:`_expand_categorical_splits` before flattening.  The memoised DFS in
-:func:`_flatten_lgbm_tree` ensures shared subtree references (the ``left``
-branch of every chain node) are assigned exactly one flat node ID.
+:func:`_expand_categorical_splits` before flattening. Each chain node owns
+its left subtree because ONNX tree ensembles do not permit shared internal
+nodes.
 """
 
+import copy
 from typing import Dict, List, Optional, Tuple
+
 import numpy as np
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 from lightgbm import LGBMRegressor, LGBMClassifier, LGBMRanker
 from ...typing import GraphBuilderExtendedProtocol
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype
@@ -118,14 +120,13 @@ def _expand_categorical_splits(node: dict) -> dict:
           → EQ(feature==0): true→left, false→
               EQ(feature==1): true→left, false→right
 
-    The ``left`` subtree may be shared (same object reference) across multiple
-    EQ chain nodes — this is intentional and handled by the memoised DFS in
-    :func:`_flatten_lgbm_tree`.
+    Every EQ node receives its own copy of the left subtree because ONNX tree
+    ensembles require a tree rather than a DAG with shared internal nodes.
 
     :param node: node dict from ``booster_.dump_model()['tree_info'][i]['tree_structure']``
     :return: new node dict (leaf nodes are returned unchanged)
     """
-    if "leaf_index" in node:
+    if "leaf_index" in node or "leaf_value" in node:
         return node
 
     left = _expand_categorical_splits(node["left_child"])
@@ -147,7 +148,7 @@ def _expand_categorical_splits(node: dict) -> dict:
                 "threshold": float(cat),
                 "decision_type": "==",
                 "default_left": default_left,
-                "left_child": left,  # shared reference — memoised during flatten
+                "left_child": copy.deepcopy(left),
                 "right_child": result,
             }
         return result
@@ -159,10 +160,6 @@ def _flatten_lgbm_tree(tree_structure: dict) -> Tuple[List[dict], List[dict], in
     """Flatten a LightGBM tree structure into sorted flat lists of nodes.
 
     Handles both numerical (``<=``) and categorical (``==``) splits.
-    Shared subtree references introduced by :func:`_expand_categorical_splits`
-    are handled via memoisation on object identity so that each unique node
-    object is assigned exactly one flat ID.
-
     :param tree_structure: expanded root node (output of
         :func:`_expand_categorical_splits`)
     :return: ``(internal_nodes, leaf_nodes, n_internal)`` where

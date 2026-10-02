@@ -25,7 +25,7 @@ The table below summarizes the mapping:
      - Tests
      - CI Workflows
    * - Core / Builder
-     - ``yobx/xbuilder/``, ``yobx/xoptim/``, ``yobx/xshape/``, ``yobx/container/``, ``yobx/helpers/``, ``yobx/reference/``, ``yobx/translate/``
+     - ``yobx/xbuilder/``, ``yobx/builder/onnxlight/``, ``yobx/xshape/``, ``yobx/container/``, ``yobx/helpers/``, ``yobx/reference/``, ``yobx/translate/``
      - ``unittests/`` (excluding library sub-directories)
      - ``core_tests.yml``
    * - scikit-learn (and xgboost, lightgbm, perpetual)
@@ -75,10 +75,9 @@ The core of the library lives in several tightly-coupled sub-packages:
 * ``yobx/xbuilder/`` — :class:`GraphBuilder <yobx.xbuilder.GraphBuilder>`,
   the main API for constructing and optimizing ONNX graphs.
   See :ref:`l-design-graph-builder` for a full description.
-* ``yobx/xoptim/`` — pattern-based graph optimizer and all optimization
-  patterns (``patterns/``, ``patterns_ort/``, ``patterns_ml/``,
-  ``patterns_exp/``).
-  See :ref:`l-design-pattern-optimizer-patterns`.
+* ``yobx/builder/onnxlight/`` — native graph builder bridge that exposes the
+  published ``onnx-light`` ``GraphGraph`` optimizer through
+  :class:`~yobx.xbuilder.OptimizationOptions`.
 * ``yobx/xshape/`` — symbolic shape-expression system used internally by
   ``GraphBuilder``.
   See :ref:`l-design-shape`.

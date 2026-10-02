@@ -264,35 +264,10 @@ def _to_onnx(*args, exporter: str = "yobx", **kwargs):
             os.replace(produced, filename)
         return None
     if exporter in ("dynamo", "onnx-dynamo"):
-        import torch
-
-        # Build a kwargs dict that torch.onnx.export understands.
-        # Keys like "optimization" have no equivalent — skip them.
-        # "filename" maps to the "f" positional-style param of older APIs; the
-        # newer (2.x dynamo) API returns an ExportOutput that must be saved.
-        dynamo_kwargs: dict = {"optimize": False, "dynamo": True}
-        for k, v in kwargs.items():
-            if k == "filename":
-                dynamo_kwargs["f"] = v
-            elif k == "optimization":
-                dynamo_kwargs["optimize"] = v in (
-                    "default",
-                    "ir",
-                    "default+onnxruntime",
-                    "os_ort",
-                )
-            elif k == "verbose":
-                dynamo_kwargs["report"] = True
-            else:
-                dynamo_kwargs[k] = v
-
-        epo = torch.onnx.export(*args, **dynamo_kwargs)
-        if kwargs.get("optimization", "") in ("os_ort", "default+onnxruntime"):
-            from onnxscript.rewriter.ort_fusions import optimize_for_ort
-
-            optimize_for_ort(epo)  # type: ignore
-        # saving is part of the the export
-        return epo
+        raise NotImplementedError(
+            "The dynamo ONNX exporter requires the removed reference ONNX dependency. "
+            "Use exporter='yobx'."
+        )
     raise NotImplementedError(f"exporter={exporter!r} not implemented.")
 
 
@@ -913,7 +888,7 @@ def _export(
 
     # Compute node statistics from the exported ONNX file for the standard output.
     if os.path.exists(filename):
-        import onnx
+        from yobx._onnx_shim import onnx
 
         onx = onnx.load(filename, load_external_data=False)
         counts = Counter(n.op_type for n in onx.graph.node)

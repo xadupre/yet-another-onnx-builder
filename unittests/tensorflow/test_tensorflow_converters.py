@@ -389,11 +389,31 @@ class TestTensorflowBinaryOpConverters(ExtTestCase):
         self.assertIn("Mul", op_types)
 
     def test_floor_mod(self):
-        """TF FloorMod → ONNX Mod(fmod=0)."""
+        """Exports floating-point FloorMod as valid ONNX for both runtimes."""
         a = (np.random.rand(3, 4).astype(np.float32) * 10 + 1).astype(np.float32)
         b = (np.random.rand(3, 4).astype(np.float32) * 3 + 1).astype(np.float32)
-        onx = self._run_binary_op(tf.math.floormod, a, b, disable_ort=True)
+        onx = self._run_binary_op(tf.math.floormod, a, b)
         self.assertIn("Mod", [n.op_type for n in onx.graph.node])
+
+    def test_floor_mod_signs_and_dtypes(self):
+        """Preserves divisor-sign remainders and dividend-sign exact zeros."""
+        from onnx_light.onnx import checker
+
+        for dtype in (np.float32, np.float64, np.int32, np.int64):
+            with self.subTest(dtype=dtype):
+                a = np.array([-7, 7, -7, 7, -4, 4, -0.0, 0.0], dtype=dtype)
+                b = np.array([3, -3, -3, 3, 2, -2, 2, -2], dtype=dtype)
+                artifact = self._run_binary_op(tf.math.floormod, a, b)
+                checker.check_model(artifact.proto)
+                expected = tf.math.floormod(a, b).numpy()
+                feeds = {"X:0": a, "Y:0": b}
+                for result in (
+                    ExtendedReferenceEvaluator(artifact).run(None, feeds)[0],
+                    _ort_run(artifact, feeds),
+                ):
+                    self.assertEqualArray(expected, result, atol=0, rtol=0)
+                    if np.issubdtype(dtype, np.floating):
+                        self.assertEqualArray(np.signbit(expected), np.signbit(result))
 
     def test_truncate_mod(self):
         """TF TruncateMod → ONNX Mod(fmod=1)."""
@@ -1932,7 +1952,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         b = np.array([[0.5, 1.5], [2.5, 3.5]], dtype=np.float16)
         onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
 
-        from onnx import TensorProto
+        from onnx_light.onnx import TensorProto
 
         elem_type = onx.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(elem_type, TensorProto.FLOAT16)
@@ -1953,7 +1973,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         b = np.random.rand(4, 2).astype(np.float16)
         onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
 
-        from onnx import TensorProto
+        from onnx_light.onnx import TensorProto
 
         elem_type = onx.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(elem_type, TensorProto.FLOAT16)
@@ -1994,7 +2014,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         b = np.array([[0.5, 1.5], [2.5, 3.5]], dtype=np.float64)
         onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
 
-        from onnx import TensorProto
+        from onnx_light.onnx import TensorProto
 
         elem_type = onx.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(elem_type, TensorProto.DOUBLE)
@@ -2015,7 +2035,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         b = np.random.rand(4, 2).astype(np.float64)
         onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
 
-        from onnx import TensorProto
+        from onnx_light.onnx import TensorProto
 
         elem_type = onx.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(elem_type, TensorProto.DOUBLE)
@@ -2045,7 +2065,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         b = np.array([[0.5, 1.5], [2.5, 3.5]], dtype=ml_dtypes.bfloat16)
         onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
 
-        from onnx import TensorProto
+        from onnx_light.onnx import TensorProto
 
         elem_type = onx.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(elem_type, TensorProto.BFLOAT16)
@@ -2068,7 +2088,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
         cast_nodes = [n for n in onx.graph.node if n.op_type == "Cast"]
         self.assertTrue(len(cast_nodes) > 0)
 
-        from onnx import TensorProto
+        from onnx_light.onnx import TensorProto
 
         to_attr = next(a for a in cast_nodes[-1].attribute if a.name == "to")
         self.assertEqual(to_attr.i, TensorProto.BFLOAT16)

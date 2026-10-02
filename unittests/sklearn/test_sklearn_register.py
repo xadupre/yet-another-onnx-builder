@@ -69,7 +69,7 @@ class TestSklearnRegister(ExtTestCase):
             "xgboost": (5, 5),
             "lightgbm": (3, 3),
             "perpetual": (2, 2),
-            "category_encoders": (10, 20),
+            "category_encoders": (10, 21),
             "sksurv": (10, 30),
             "statsmodels": (1, 5),
         }

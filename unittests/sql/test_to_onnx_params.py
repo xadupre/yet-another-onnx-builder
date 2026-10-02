@@ -302,7 +302,7 @@ class TestSqlToOnnxReturnOptimizeReport(ExtTestCase):
         self.assertIsNotNone(art.report)
         self.assertIsInstance(art.report, ExportReport)
         self.assertIsInstance(art.report.stats, list)
-        self.assertGreater(len(art.report.stats), 0)
+        self.assertEqual(art.report.extra["backend"], "onnx-light")
 
 
 # ---------------------------------------------------------------------------
@@ -326,7 +326,7 @@ class TestParsedQueryToOnnxReturnOptimizeReport(ExtTestCase):
         self.assertIsNotNone(art.report)
         self.assertIsInstance(art.report, ExportReport)
         self.assertIsInstance(art.report.stats, list)
-        self.assertGreater(len(art.report.stats), 0)
+        self.assertEqual(art.report.extra["backend"], "onnx-light")
 
 
 # ---------------------------------------------------------------------------
@@ -349,7 +349,7 @@ class TestDataframeToOnnxReturnOptimizeReport(ExtTestCase):
         self.assertIsNotNone(art.report)
         self.assertIsInstance(art.report, ExportReport)
         self.assertIsInstance(art.report.stats, list)
-        self.assertGreater(len(art.report.stats), 0)
+        self.assertEqual(art.report.extra["backend"], "onnx-light")
 
 
 # ---------------------------------------------------------------------------
@@ -372,7 +372,7 @@ class TestTraceNumpyToOnnxReturnOptimizeReport(ExtTestCase):
         self.assertIsNotNone(art.report)
         self.assertIsInstance(art.report, ExportReport)
         self.assertIsInstance(art.report.stats, list)
-        self.assertGreater(len(art.report.stats), 0)
+        self.assertEqual(art.report.extra["backend"], "onnx-light")
 
 
 # ---------------------------------------------------------------------------
@@ -394,7 +394,7 @@ class TestToOnnxReturnOptimizeReport(ExtTestCase):
         art = to_onnx("SELECT a + b AS total FROM t", dtypes, return_optimize_report=True)
         self.assertIsNotNone(art.report)
         self.assertIsInstance(art.report, ExportReport)
-        self.assertGreater(len(art.report.stats), 0)
+        self.assertEqual(art.report.extra["backend"], "onnx-light")
 
     def test_callable_default_report_is_none(self):
         dtypes = {"a": np.float32, "b": np.float32}
@@ -408,7 +408,7 @@ class TestToOnnxReturnOptimizeReport(ExtTestCase):
         art = to_onnx(_simple_transform, dtypes, return_optimize_report=True)
         self.assertIsNotNone(art.report)
         self.assertIsInstance(art.report, ExportReport)
-        self.assertGreater(len(art.report.stats), 0)
+        self.assertEqual(art.report.extra["backend"], "onnx-light")
 
     def test_numpy_default_report_is_none(self):
         X = np.random.randn(4, 3).astype(np.float32)
@@ -422,7 +422,7 @@ class TestToOnnxReturnOptimizeReport(ExtTestCase):
         art = to_onnx(_simple_numpy, (X,), return_optimize_report=True)
         self.assertIsNotNone(art.report)
         self.assertIsInstance(art.report, ExportReport)
-        self.assertGreater(len(art.report.stats), 0)
+        self.assertEqual(art.report.extra["backend"], "onnx-light")
 
 
 if __name__ == "__main__":

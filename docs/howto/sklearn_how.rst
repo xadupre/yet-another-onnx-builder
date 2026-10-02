@@ -179,7 +179,7 @@ loaded again later:
 .. code-block:: python
 
     import numpy as np
-    import onnx
+    from yobx._onnx_shim import onnx
     from sklearn.preprocessing import StandardScaler
     from yobx.sklearn import to_onnx
 

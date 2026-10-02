@@ -22,27 +22,27 @@ When input shapes contain **symbolic dimensions** (strings such as ``"batch"`` o
 that can be evaluated once concrete shapes are known.  Static shapes yield plain
 integer counts.
 
-Integration with BasicShapeBuilder
-====================================
+Integration with NativeShapeInference
+======================================
 
-:class:`~yobx.xshape.BasicShapeBuilder` integrates cost inference through the
-:meth:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder.run_model` method.
+:class:`~yobx.xshape.NativeShapeInference` integrates cost inference through the
+:meth:`~yobx.xshape.native_shape_inference.NativeShapeInference.run_model` method.
 Pass ``inference=InferenceMode.COST`` to enable it:
 
 .. code-block:: python
 
-    from yobx.xshape import BasicShapeBuilder, InferenceMode
+    from yobx.xshape import NativeShapeInference, InferenceMode
 
-    builder = BasicShapeBuilder()
+    builder = NativeShapeInference()
     cost_list = builder.run_model(model, inference=InferenceMode.COST)
-    # cost_list: list of (op_type, flops, node) tuples
+    # cost_list: list of (op_type, flops, input_shapes) tuples
 
-Each element of *cost_list* is a ``(op_type, flops, node)`` triple where *flops*
+Each element of *cost_list* is a ``(op_type, flops, input_shapes)`` triple where *flops*
 is either an integer, a symbolic string expression, or ``None`` (unsupported op or
 unknown shapes).
 
 To substitute concrete dimension values and obtain integer FLOPs counts, call
-:meth:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder.evaluate_cost_with_true_inputs`
+:meth:`~yobx.xshape.native_shape_inference.NativeShapeInference.evaluate_cost_with_true_inputs`
 with the actual input tensors:
 
 .. code-block:: python
