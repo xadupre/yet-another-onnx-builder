@@ -264,7 +264,7 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         msg=None,
         parameter_name=None,
     ):
-        """Adds an initializer and preserves its FX name when a parameter is renamed."""
+        """Adds an initializer and preserves an available FX parameter name."""
         initializer_name = super().make_initializer(
             name,
             value,
@@ -274,7 +274,7 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
             msg=msg,
             parameter_name=parameter_name,
         )
-        if name and initializer_name != name:
+        if name and initializer_name != name and not self.has_name(name):
             self.make_node("Identity", [initializer_name], [name], name=f"{name}_parameter_alias")
             return name
         return initializer_name
@@ -425,7 +425,13 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         for left, right in zip(old_shape, shape):
             left = self._normalize_dimension(left, add=False)
             right = self._normalize_dimension(right, add=False)
-            if isinstance(left, int) and isinstance(right, int) and left != right:
+            if (
+                isinstance(left, int)
+                and isinstance(right, int)
+                and left != right
+                and left != 1
+                and right != 1
+            ):
                 raise AssertionError(
                     f"Incompatible shapes for {name!r}: "
                     f"{tuple(old_shape)!r} != {tuple(shape)!r}."
@@ -547,6 +553,8 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
 
     @staticmethod
     def _expression_names(expression):
+        if "#" in expression:
+            return {expression}
         try:
             tree = ast.parse(expression, mode="eval")
         except SyntaxError:
@@ -1220,7 +1228,7 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
                         token
                     ):
                         self.add_dynamic_object(token, token, check_tokens=False)
-            self.add_dynamic_object(name, dimension, parse=True, check_tokens=False)
+            self.add_dynamic_object(name, dimension, check_tokens=False)
         return name
 
     def pretty_text(self, add_fx_graph=False, recursive=True):

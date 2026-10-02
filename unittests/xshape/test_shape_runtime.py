@@ -92,7 +92,7 @@ class TestNativeShapeValues(unittest.TestCase):
                     helper.make_node("Slice", ["X", "start", "end", "axes", "step"], ["Y"]),
                     cost=False,
                 )
-                self.assertIsNone(inference.value_as_shape("Y"))
+                self.assertEqual(inference.value_as_shape("Y"), expected)
                 self.assertEqual(inference.get_shape("Y"), (len(expected),))
 
     def test_squeeze_unsqueeze_scalar(self):

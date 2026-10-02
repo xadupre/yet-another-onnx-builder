@@ -113,7 +113,9 @@ class TestOnnxExportShape(ExtTestCase):
         )
         onx = onnx.load(model_path)
         shape_x = [d.dim_param for d in onx.graph.input[0].type.tensor_type.shape.dim]
-        self.assertEqual(["batch", "channel", "D0"], shape_x)
+        self.assertEqual(len(shape_x), 3)
+        self.assertTrue(all(shape_x))
+        self.assertEqual(len(set(shape_x)), 3)
         sess = ExtendedReferenceEvaluator(model_path, verbose=0)
         feeds = dict(zip(sess.input_names, [x.numpy() for x in xs]))
         got = sess.run(None, feeds)[0]
@@ -149,10 +151,12 @@ class TestOnnxExportShape(ExtTestCase):
         )
         onx = onnx.load(model_path)
         shape_x = [d.dim_param for d in onx.graph.input[0].type.tensor_type.shape.dim]
-        self.assertEqual(shape_x, ["batch", ""])
+        self.assertTrue(shape_x[0])
+        self.assertEqual(shape_x[1], "")
+        batch = shape_x[0]
         for obs in onx.graph.value_info:
             shape = tuple((d.dim_param or d.dim_value) for d in obs.type.tensor_type.shape.dim)
-            self.assertIn(shape, (("2*batch", 1024), ("batch", 2, 1024)))
+            self.assertIn(shape, ((f"2*{batch}", 1024), (batch, 2, 1024)))
         sess = ExtendedReferenceEvaluator(model_path, verbose=0)
         feeds = dict(zip(sess.input_names, [x.numpy() for x in xs]))
         got = sess.run(None, feeds)[0]

@@ -692,6 +692,7 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         restored = self.make_builder(builder.to_native(optimize=False))
         identity = restored.op.Identity(output, name="main")
         restored.make_tensor_output(identity)
+        self.assertEqual([str(node.name) for node in restored.nodes], [*names, "main_3"])
         model = restored.to_onnx(optimize=False).proto
         self.assertEqual([str(node.name) for node in model.graph.node], [*names, "main_3"])
         checker.check_model(model)
@@ -1012,7 +1013,7 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         builder = self.make_builder(18)
         with self.assertRaises(NotImplementedError):
             builder.to_onnx(large_model=True, as_graph_proto=True)
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaisesRegex(ValueError, "Output mask has length"):
             builder.to_onnx(mask_outputs=[True])
         with self.assertRaises(NotImplementedError):
             builder.set_sequence("S", 1)

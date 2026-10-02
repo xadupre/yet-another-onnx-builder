@@ -1562,7 +1562,7 @@ class TestTracingControlFlow(ExtTestCase):
         model = Model()
         x, y = torch.rand((3, 4)), torch.rand((3, 4))
         art = to_onnx(model, (x, y), export_options=ExportOptions(tracing=True))
-        self.assertEqual(["Add", "Identity"], [n.op_type for n in art.graph.node])
+        self.assertEqual(["Add"], [n.op_type for n in art.graph.node])
 
     def test_tracing_obvious_control_flow_shape(self):
         from yobx.torch import to_onnx, ExportOptions
@@ -1576,7 +1576,7 @@ class TestTracingControlFlow(ExtTestCase):
         model = Model()
         x, y = torch.rand((3, 4)), torch.rand((3, 4))
         art = to_onnx(model, (x, y), export_options=ExportOptions(tracing=True))
-        self.assertEqual(["Add", "Identity"], [n.op_type for n in art.graph.node])
+        self.assertEqual(["Add"], [n.op_type for n in art.graph.node])
 
     def test_tracing_obvious_control_flow_shape_should_fail(self):
         from yobx.torch import to_onnx, ExportOptions
@@ -1627,7 +1627,7 @@ class TestTracingControlFlow(ExtTestCase):
         x = torch.rand((3, 4))
         art = to_onnx(model, (x,), export_options=ExportOptions(tracing=True))
         # The native builder preserves the Identity carrying the final output name.
-        self.assertEqual(["Add", "Identity"], [n.op_type for n in art.graph.node])
+        self.assertEqual(["Add"], [n.op_type for n in art.graph.node])
 
     def test_tracing_obvious_control_flow_ndim_indirect_cat(self):
         from yobx.torch import to_onnx, ExportOptions

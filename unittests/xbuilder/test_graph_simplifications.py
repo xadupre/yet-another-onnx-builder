@@ -88,7 +88,7 @@ class TestGraphSimplification(ExtTestCase):
         self.assertEqual(len(onx.graph.node), 2)
         self.assertEqual(onx.graph.node[0].op_type, "Softmax")
         self.assertEqual(onx.graph.node[1].op_type, "Identity")
-        self.assertEqual(len(model.graph.output), 2)
+        self.assertEqual(len(onx.graph.output), 2)
 
     def test_builder(self):
         gr = GraphBuilder(18, ir_version=9)

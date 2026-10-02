@@ -155,6 +155,7 @@ def _remove_output_identities(graph):
             and len(node.input) == 1
             and len(node.output) == 1
             and str(node.output[0]) in output_names
+            and str(node.input[0]) not in output_names
             and consumers.get(str(node.input[0]), 0) == 1
             and str(node.input[0]) in producers
             and str(producers[str(node.input[0])].op_type) != "Identity"
@@ -242,6 +243,12 @@ class OnnxLightGraphBuilderOpset:
 
     def make_node(self, op_type, *inputs, outputs=None, **kwargs):
         """Creates an operator with optional inputs and array initializers."""
+        if op_type in self._axes_versions and "axes" in kwargs:
+            axes = kwargs.pop("axes")
+            if self.builder.main_opset >= self._axes_versions[op_type]:
+                inputs = (*inputs, numpy.asarray(axes, dtype=numpy.int64))
+            else:
+                kwargs["axes"] = numpy.asarray(axes, dtype=numpy.int64).reshape(-1).tolist()
         is_split = op_type == "Split" and self.builder._domain(kwargs.get("domain", "")) == ""
         if outputs is None:
             if is_split:
@@ -1191,6 +1198,8 @@ class OnnxLightGraphBuilder:
                 builder, self.optimization_options.pattern_names()
             ).optimize(self.optimization_options.max_iter, report=True)
         model = builder.to_onnx(ir_version=self.ir_version)
+        if optimize:
+            model = onnx.shape_inference.infer_shapes(model)
         self._replace_model_annotations(model)
         _remove_output_identities(model.graph)
         if self._original_model is not None:

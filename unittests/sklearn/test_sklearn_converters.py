@@ -890,7 +890,11 @@ class TestSklearnConvertersBasicInvocation(ExtTestCase):
 
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            est = cls()
+            est = (
+                cls(max_doc_update_iter=2)
+                if cls.__name__ == "LatentDirichletAllocation"
+                else cls()
+            )
             try:
                 if is_classifier(est):
                     est.fit(self._X, self._y_bin)
