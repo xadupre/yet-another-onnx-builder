@@ -245,8 +245,11 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
             allow_untyped_output=allow_untyped_output,
         )
         if doc_string:
-            model = self._native_model()
             names = [name] if isinstance(name, str) else list(name)
+            self._output_doc_strings.update(dict.fromkeys(names, doc_string))
+            if self._deferred_custom_nodes:
+                return result
+            model = self._native_model()
             for value in model.graph.output:
                 if str(value.name) in names:
                     value.doc_string = doc_string
