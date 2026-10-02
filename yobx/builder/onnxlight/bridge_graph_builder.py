@@ -266,15 +266,12 @@ class OnnxLightGraphBuilderOpset:
             )
             if count != kwargs["num_outputs"]:
                 raise ValueError("Split outputs count must match its num_outputs attribute.")
-        normalized_inputs = [
-            (
-                value.name
-                if isinstance(getattr(value, "name", None), str)
-                and self.builder.has_name(value.name)
-                else value
+        normalized_inputs = []
+        for value in inputs:
+            name = getattr(value, "name", None)
+            normalized_inputs.append(
+                name if isinstance(name, str) and self.builder.has_name(name) else value
             )
-            for value in inputs
-        ]
         return self.builder.make_node(op_type, normalized_inputs, outputs=outputs, **kwargs)
 
 
@@ -610,7 +607,9 @@ class OnnxLightGraphBuilder:
         """Computes the output shape produced by static slicing."""
         from ...xshape._builder_runtime import _BuilderRuntime
 
-        return _BuilderRuntime._apply_slice_to_shape(self, shape, indices, axes, expand_axes)
+        return _BuilderRuntime._apply_slice_to_shape(
+            self, shape, indices, axes, expand_axes  # pyrefly: ignore[bad-argument-type]
+        )
 
     def set_type_shape_unary_op(self, name, input_name, itype=None):
         """Copies a tensor annotation entirely within the native context."""
