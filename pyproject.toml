@@ -19,7 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "black",
+    "black==26.10.0",
     "matplotlib",
     "openpyxl",
     "pandas",
@@ -27,11 +27,11 @@ dev = [
     "py-cpuinfo",
     "pytest-coverage",
     "pytest-subtests",
-    "ruff",
+    "ruff==0.16.10",
     "xlsxwriter",
 ]
 docs = [
-    "black",
+    "black==26.10.0",
     "ipython",
     "matplotlib",
     "mermaid-py",

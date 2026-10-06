@@ -247,7 +247,7 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         )
         if doc_string:
             names = [name] if isinstance(name, str) else list(name)
-            self._output_doc_strings.update({output_name: doc_string for output_name in names})
+            self._output_doc_strings.update(dict.fromkeys(names, doc_string))
         return result
 
     def _native_model(self):
