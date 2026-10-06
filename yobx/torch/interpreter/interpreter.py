@@ -29,6 +29,16 @@ from ._aten_getitem import (
 )
 
 
+def _tensor_device_index(tensor):
+    """Returns a tensor device index without invoking the native get_device binding."""
+    device = tensor.device
+    if device is None:
+        return -1
+    if isinstance(device, int):
+        return device
+    return device.index if device.index is not None else -1
+
+
 class FxGraphInterpreter:
     """
     Interprets a torch graph into an ONNX graph.
@@ -980,7 +990,7 @@ class FxGraphInterpreter:
                     elem_type=example_value.dtype,
                     shape=example_value.shape,
                     users=node.users,
-                    device=example_value.get_device(),
+                    device=_tensor_device_index(example_value),
                 )
             if isinstance(example_value, list) and all(
                 isinstance(t, self.torch.Tensor) for t in example_value
@@ -1026,7 +1036,7 @@ class FxGraphInterpreter:
                         fake_tensor=isinstance(
                             val, self.torch._subclasses.fake_tensor.FakeTensor
                         ),
-                        device=val.get_device(),
+                        device=_tensor_device_index(val),
                     )
             if value is None:
                 if "nn_module_stack" not in node.meta:
@@ -1059,7 +1069,7 @@ class FxGraphInterpreter:
                         shape,
                         users=node.users,
                         fake_tensor=True,
-                        device=val.get_device(),
+                        device=_tensor_device_index(val),
                     )
                 raise RuntimeError(f"value is None, unable to retrieve target {node.target!r}")
             parameter_name = (
@@ -1109,7 +1119,7 @@ class FxGraphInterpreter:
                 elem_type=val.dtype,
                 shape=val.shape,
                 users=node.users,
-                device=val.get_device(),
+                device=_tensor_device_index(val),
             )
 
         raise RuntimeError(
@@ -2141,7 +2151,7 @@ class FxGraphInterpreter:
 
             for i, (v, r) in enumerate(zip(val, res)):
                 if isinstance(v, self.torch.Tensor):
-                    self.builder.set_device(r, v.get_device(), keep_this_device=True)
+                    self.builder.set_device(r, _tensor_device_index(v), keep_this_device=True)
                     dtype = _get_type(v.dtype)
                     if (
                         i >= 1
@@ -2250,7 +2260,7 @@ class FxGraphInterpreter:
                             )
                             if isinstance(v_, self.torch.Tensor):
                                 self.builder.set_type(r_, torch_dtype_to_onnx_dtype(v_.dtype))
-                                self.builder.set_device(r_, v_.get_device())
+                                self.builder.set_device(r_, _tensor_device_index(v_))
                                 shape = tuple(v_.shape)
                                 self._register_shape_dimensions(shape)
                                 if not any(
@@ -2530,7 +2540,7 @@ class FxGraphInterpreter:
                         source_node.name, "call_module", (val[i].dtype, val[i].shape)
                     )
                     if not builder.has_device(name):
-                        builder.set_device(name, val[i].get_device())
+                        builder.set_device(name, _tensor_device_index(val[i]))
                 elif isinstance(val[i], (self.builder.torch.SymInt, self.builder.TracingInt)):
                     self.builder.set_shapes_types(
                         source_node.name,

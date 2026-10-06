@@ -89,6 +89,21 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
                 actual = ReferenceEvaluator(model).run(None, feeds)[0]
                 numpy.testing.assert_array_equal(actual, feeds["A"] @ weights)
 
+    def test_native_optimization_preserves_custom_domain_shapes(self):
+        builder = self.make_builder({"": 18, "com.microsoft": 1})
+        builder.make_tensor_input("A", onnx.TensorProto.FLOAT, ("batch", 4))
+        builder.make_tensor_input("B", onnx.TensorProto.FLOAT, (3, 4))
+        builder.make_node("CDist", ["A", "B"], ["Y"], domain="com.microsoft", metric="euclidean")
+        builder.make_tensor_output("Y")
+        model = builder.to_native(optimize=True)
+        self.assertEqual(
+            ("batch", 3),
+            tuple(
+                dimension.dim_param or dimension.dim_value
+                for dimension in model.graph.output[0].type.tensor_type.shape.dim
+            ),
+        )
+
     def test_native_local_function_merge_and_rename(self):
         from yobx.xbuilder.function_options import FunctionOptions
 

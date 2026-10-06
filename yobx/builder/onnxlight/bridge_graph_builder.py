@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 
 import numpy
 from onnx_light import onnx
-from onnx_light.onnx import helper, inliner, numpy_helper
+from onnx_light.onnx import helper, numpy_helper
 from onnx_light.onnx_core.graph_builder import GraphBuilder
 from onnx_light.onnx_core.optimization import GraphGraph, standard_pattern_names
 from onnx_light.onnx_core.shape_inference import ShapesContext, SymShape, SymTensor
@@ -129,13 +129,50 @@ def _contains_custom_domain_node(graph):
     return False
 
 
-def _contains_control_flow_subgraph(function):
-    """Returns whether a function body contains an operator subgraph."""
+def _contains_registered_call(graph, registrations):
+    """Returns whether a graph or a nested graph calls a registered operator."""
+    for node in graph.node:
+        if (str(node.domain), str(node.op_type)) in registrations:
+            return True
+        for attribute in node.attribute:
+            if attribute.HasField("g") and _contains_registered_call(attribute.g, registrations):
+                return True
+            if any(_contains_registered_call(child, registrations) for child in attribute.graphs):
+                return True
+    return False
+
+
+def _contains_untyped_tensor_annotation(graph):
+    """Returns whether a graph contains a tensor annotation without a dtype."""
+    if any(
+        value.type.HasField("tensor_type") and not value.type.tensor_type.elem_type
+        for value in [*graph.input, *graph.output, *graph.value_info]
+    ):
+        return True
     return any(
-        attribute.HasField("g") or bool(attribute.graphs)
-        for node in function.node
+        (attribute.HasField("g") and _contains_untyped_tensor_annotation(attribute.g))
+        or any(_contains_untyped_tensor_annotation(child) for child in attribute.graphs)
+        for node in graph.node
         for attribute in node.attribute
     )
+
+
+def _remove_shape_release_metadata(graph):
+    """Removes native release hints that misclassify partial shape tensors."""
+    for node in graph.node:
+        metadata = [
+            prop
+            for prop in node.metadata_props
+            if str(prop.key) != "onnx_light.release_after_shape_tag"
+        ]
+        if len(metadata) != len(node.metadata_props):
+            node.ClearField("metadata_props")
+            node.metadata_props.extend(metadata)
+        for attribute in node.attribute:
+            if attribute.HasField("g"):
+                _remove_shape_release_metadata(attribute.g)
+            for child in attribute.graphs:
+                _remove_shape_release_metadata(child)
 
 
 def _remove_output_identities(graph):
@@ -1279,15 +1316,11 @@ class OnnxLightGraphBuilder:
     def _export_native(self, optimize, inline):
         """Exports a native model and optional native rewrite statistics."""
         model = self._native_model()
-        has_custom_local_calls = any(
-            (str(node.domain), str(node.op_type)) in self._custom_shape_callbacks
-            for node in model.graph.node
+        has_custom_local_calls = inline and _contains_registered_call(
+            model.graph, self._custom_shape_callbacks
         )
         builder = self._inner if has_custom_local_calls else GraphBuilder(model)
-        inline_functions = inline and not any(
-            _contains_control_flow_subgraph(function) for function in model.functions
-        )
-        if inline_functions and not has_custom_local_calls:
+        if inline and not has_custom_local_calls:
             builder.inline_local_functions()
         rewrites = []
         native_report = None
@@ -1304,13 +1337,20 @@ class OnnxLightGraphBuilder:
         model.functions.extend(
             function for key, function in self._functions.items() if key not in existing_functions
         )
-        if inline_functions and has_custom_local_calls:
-            model = inliner.inline_local_functions(model)
-        if optimize:
+        if inline and has_custom_local_calls:
+            inline_builder = GraphBuilder(model)
+            inline_builder.inline_local_functions()
+            model = inline_builder.to_onnx(ir_version=self.ir_version)
+        if (
+            optimize
+            and not _contains_custom_domain_node(model.graph)
+            and not _contains_untyped_tensor_annotation(model.graph)
+        ):
             inferred_shapes = ShapesContext()
             inferred_shapes.compute_shape_model(model, True)
             inferred_shapes.apply_inferred_shapes_to_model(model)
         self._replace_model_annotations(model)
+        _remove_shape_release_metadata(model.graph)
         _remove_output_identities(model.graph)
         if self._original_model is not None:
             original = onnx.ModelProto()

@@ -107,17 +107,16 @@ class TestPerpetualRegressor(ExtTestCase):
             StandardScaler(), PerpetualRegressor(budget=0.1, num_threads=1)
         ).fit(X.astype(np.float32), y)
         onx = native_to_onnx(pipeline, X.astype(np.float32))
+        X_test = X.astype(np.float32) + np.float32(0.25)
         # Perpetual 2.1 lacks the sklearn tags required by Pipeline.predict.
         expected = (
             pipeline[-1]
-            .predict(pipeline[0].transform(X.astype(np.float32)))
+            .predict(pipeline[0].transform(X_test))
             .astype(np.float32)
             .reshape((-1, 1))
         )
         for evaluator in (ExtendedReferenceEvaluator(onx), self.check_ort(onx)):
-            self.assertEqualArray(
-                expected, evaluator.run(None, {"X": X.astype(np.float32)})[0], atol=1e-5
-            )
+            self.assertEqualArray(expected, evaluator.run(None, {"X": X_test})[0], atol=1e-5)
 
     def test_unsupported_categorical_splits(self):
         from perpetual import PerpetualRegressor
