@@ -34,7 +34,7 @@ class TestOnnxExportLarge(ExtTestCase):
         prefix,
         model,
         *args,
-        remove_unused=False,
+        remove_unused=True,
         constant_folding=True,
         verbose=0,
         rename_input=True,
