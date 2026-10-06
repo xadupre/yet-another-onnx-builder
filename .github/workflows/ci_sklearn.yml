@@ -192,3 +192,25 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
           flags: sklearn
+
+  sklearn_parity_tests:
+    name: sklearn parity with skl2onnx
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: ./.github/actions/install-onnx-light
+
+      - name: Install dependencies
+        run: |
+          pip install -e ".[dev,sklearn]"
+          pip install skl2onnx
+
+      - name: Run sklearn converter parity tests
+        run: pytest --durations=10 unittests/parity/with_skl2onnx
