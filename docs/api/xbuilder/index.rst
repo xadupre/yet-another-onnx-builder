@@ -10,8 +10,9 @@ Graph construction, shape inference and pattern optimization do not fall back
 to the former Python engines.
 
 Native optimization options select registered pattern names through
-``patterns`` and limit iterations through ``max_iter``. Python pattern objects,
-legacy pattern groups such as ``"default+onnxruntime"``, and unsupported
+``patterns`` and limit iterations through ``max_iter``.
+``"default+onnxruntime"`` remains a compatibility alias for the native default
+patterns. Python pattern objects, other legacy pattern groups, and unsupported
 legacy options raise explicit errors.
 
 The historical ``graph_builder_opset.Opset`` import resolves to the native
