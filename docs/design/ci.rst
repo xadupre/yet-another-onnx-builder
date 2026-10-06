@@ -25,7 +25,7 @@ The table below summarizes the mapping:
      - Tests
      - CI Workflows
    * - Core / Builder
-     - ``yobx/xbuilder/``, ``yobx/builder/onnxlight/``, ``yobx/xshape/``, ``yobx/container/``, ``yobx/helpers/``, ``yobx/reference/``, ``yobx/translate/``
+     - ``yobx/xbuilder/``, ``yobx/builder/onnxlight/``, ``yobx/xshape/``, ``yobx/container/``, ``yobx/helpers/``, ``yobx/reference/``
      - ``unittests/`` (excluding library sub-directories)
      - ``core_tests.yml``
    * - scikit-learn (and xgboost, lightgbm, perpetual)
@@ -89,7 +89,6 @@ The core of the library lives in several tightly-coupled sub-packages:
 * ``yobx/helpers/`` — general ONNX and runtime utilities shared by all
   sub-packages.
 * ``yobx/reference/`` — reference evaluators (``onnxruntime``, ``torch``).
-* ``yobx/translate/`` — translates ONNX graphs back to executable Python.
 
 Tests
 =====

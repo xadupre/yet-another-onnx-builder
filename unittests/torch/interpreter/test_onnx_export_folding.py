@@ -34,7 +34,7 @@ class TestOnnxExportFolding(ExtTestCase):
             inputs,
             optimize=True,
             verbose=0,
-            options=OptimizationOptions(constant_folding={"Transpose"}),
+            options=OptimizationOptions(constant_folding=True),
         )
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, {"x": inputs[0].numpy()})
@@ -46,12 +46,12 @@ class TestOnnxExportFolding(ExtTestCase):
             inputs,
             optimize=True,
             verbose=0,
-            options=OptimizationOptions(constant_folding={"Reshape"}),
+            options=OptimizationOptions(constant_folding=False, patterns=[]),
         )
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, {"x": inputs[0].numpy()})
         self.assertEqualArray(expected, got[0], atol=1e-5)
-        self.assertNotIn("Transpose", [n.op_type for n in onx.graph.node])
+        self.assertIn("Transpose", [n.op_type for n in onx.graph.node])
 
 
 if __name__ == "__main__":

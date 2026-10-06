@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 import numpy
 from onnx_light import onnx
 from onnx_light.onnx import helper, numpy_helper
-from onnx_light.onnx_core.graph_builder import GraphBuilder
+from onnx_light.onnx_core.graph_builder import ConstantFoldingOptions, GraphBuilder
 from onnx_light.onnx_core.optimization import GraphGraph, standard_pattern_names
 from onnx_light.onnx_core.shape_inference import ShapesContext, SymShape, SymTensor
 
@@ -27,11 +27,11 @@ importlib.import_module("onnx_light.onnx_py._onnxpykernels")
 class OnnxLightOptimizationOptions:
     """Configures native GraphGraph rewriting without Python optimizer semantics.
 
-    ``patterns=None`` or ``"default"`` selects the wheel's standard patterns.
-    An empty sequence disables pattern rewrites. Other strings must be exact
-    native pattern names; Python pattern groups and Python patterns are rejected.
-    GraphGraph owns its cleanup, recursive rewriting and constant-folding policy.
-    Weight folding depends on the runtime kernels installed with onnx-light.
+    ``patterns=None``, ``"default"``, or ``"default+onnxruntime"`` selects the
+    wheel's standard patterns. An empty sequence disables pattern rewrites.
+    Other strings must be exact native pattern names. ``constant_folding``
+    controls native folding. GraphGraph owns cleanup and recursive rewriting,
+    so disabling unused-node removal is not supported.
     """
 
     patterns: Optional[Union[str, Sequence[str]]] = None
@@ -60,6 +60,14 @@ class OnnxLightOptimizationOptions:
     def __post_init__(self):
         if not isinstance(self.max_iter, int) or self.max_iter < -1:
             raise ValueError("max_iter must be an integer greater than or equal to -1.")
+        if self.remove_unused is not True:
+            raise ValueError("remove_unused=False is not supported by the native builder.")
+        if not isinstance(self.constant_folding, bool):
+            raise ValueError("constant_folding must be a boolean for the native builder.")
+        if self.verbose != 0:
+            raise ValueError("OptimizationOptions.verbose is not supported by GraphGraph.")
+        if self.processor is not None:
+            raise ValueError("OptimizationOptions.processor is not supported by GraphGraph.")
         self.pattern_names()
 
 
@@ -1325,9 +1333,19 @@ class OnnxLightGraphBuilder:
         rewrites = []
         native_report = None
         if optimize:
-            rewrites, native_report = GraphGraph(
-                builder, self.optimization_options.pattern_names()
-            ).optimize(self.optimization_options.max_iter, report=True)
+            optimizer = GraphGraph(builder, self.optimization_options.pattern_names())
+            if self.optimization_options.constant_folding:
+                rewrites, native_report = optimizer.optimize(
+                    self.optimization_options.max_iter, report=True
+                )
+            else:
+                folding_options = ConstantFoldingOptions()
+                folding_options.enabled = False
+                rewrites, native_report = optimizer.optimize(
+                    self.optimization_options.max_iter,
+                    report=True,
+                    folding_options=folding_options,
+                )
         model = builder.to_onnx(ir_version=self.ir_version)
         if hasattr(builder, "shapes"):
             builder.shapes.apply_inferred_shapes_to_model(model)

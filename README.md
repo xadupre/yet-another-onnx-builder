@@ -121,13 +121,13 @@ build. For example, from this repository on Linux x86-64 with CPython 3.12:
 ```bash
 python3.12 -m venv .venv
 .venv/bin/python -m pip install --only-binary=:all: \
-  https://github.com/xadupre/onnx-light/releases/download/0.1.29/onnx_light-0.1.29-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl \
+  https://github.com/xadupre/onnx-light/releases/download/0.1.30/onnx_light-0.1.30-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl \
   numpy ml_dtypes scipy onnxruntime scikit-learn
 export PYTHONPATH="$PWD"
 ```
 
 For another Python version or platform, select the matching full wheel from
-the [onnx-light release](https://github.com/xadupre/onnx-light/releases/tag/0.1.29).
+the [onnx-light release](https://github.com/xadupre/onnx-light/releases/tag/0.1.30).
 The native backend requires Python 3.12 or newer. Restricting `PYTHONPATH`
 to this repository prevents another onnx-light source checkout from shadowing
 the installed wheel.
@@ -165,6 +165,9 @@ native_model = builder.to_native()
 `to_native()` does not import reference ONNX. Native shapes are available through
 `builder.get_shape(name)` and `builder.shapes_context`. `patterns=None` selects
 the wheel's standard patterns; `patterns=[]` disables pattern rewrites.
+`constant_folding` controls native kernel folding. Unsupported legacy controls
+such as `remove_unused=False`, nonzero optimization verbosity, and processor
+selection raise explicit errors.
 `to_onnx(return_optimize_report=True)` instead returns an `ExportArtifact` with
 native timing and rewrite counts in `artifact.report.extra`.
 
@@ -174,7 +177,8 @@ symbolic-cost reports use `NativeShapeInference`, backed by `ShapesContext`.
 There is no environment-variable switch back to reference ONNX.
 
 Native options and legacy Python optimization options are not interchangeable;
-Python pattern groups such as `"default+onnxruntime"` are rejected. The native
+`"default+onnxruntime"` is accepted as a compatibility alias for the native
+standard patterns. Other Python pattern groups are rejected. The native
 converter bridge does not support sequence metadata or inputs with undeclared
 rank. The base wheel does not provide all
 weight-folding runtime kernels. Extras that installed `onnxscript`, `onnx-ir`,
@@ -202,7 +206,7 @@ Standalone ONNX functions and custom conversion dispatchers are supported.
 Delegation to `torch.onnx.export` through onnxscript and the Spox/onnxscript
 builder bridges are no longer supported.
 
-The project pins the published wheel to **0.1.29**. Local functions, including nested
+The project pins the published wheel to **0.1.30**. Local functions, including nested
 calls and referenced attributes, are imported directly by the native builder.
 Their result descriptors come from native inference, without a separate Python
 replay of typed function bodies. Unused initializers are removed by native cleanup.
@@ -216,19 +220,6 @@ and the historical
 Subgraphs that redefine names visible in an ancestor scope remain incompatible
 and are rejected as SSA violations. These errors are surfaced rather than hidden
 behind a Python fallback.
-The 0.1.27 native builder also rejects valid omitted optional outputs for
-`MaxPool`, `BatchNormalization`, `Attention`, and `SoftmaxCrossEntropyLoss`.
-This upstream schema-arity issue is tracked in
-[xadupre/onnx-light#4991](https://github.com/xadupre/onnx-light/issues/4991);
-the adapter does not add dummy outputs to conceal it.
-Two optimizer correctness defects are also reproduced with the published 0.1.27
-wheel: `Identity` changes `Mul(0.5, 1.0)` to `1.0`
-([xadupre/onnx-light#4992](https://github.com/xadupre/onnx-light/issues/4992)),
-and `ShapeBasedIdentity` removes a `Slice` with a runtime end bound
-([xadupre/onnx-light#4993](https://github.com/xadupre/onnx-light/issues/4993)).
-These affect optimized `smooth_l1_loss` and `masked_scatter` exports, respectively.
-Their unoptimized graphs execute correctly; `optimize=False` avoids those
-rewrites but does not resolve the optional-output construction limitation.
 
 ## Comparison with existing ONNX conversion tools
 

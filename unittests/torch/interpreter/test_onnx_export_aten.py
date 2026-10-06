@@ -64,7 +64,9 @@ class TestOnnxExportAten(ExtTestCase):
                 backed_size_oblivious=False,
             )
             opt_options = (
-                OptimizationOptions(patterns=patterns, processor=processor)
+                OptimizationOptions(
+                    patterns=patterns, processor=None if processor == "CPU" else processor
+                )
                 if patterns or processor != "CPU"
                 else None
             )

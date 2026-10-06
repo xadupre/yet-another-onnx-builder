@@ -507,7 +507,7 @@ def _cmd_print(argv: List[Any]):
 
         bs = NativeShapeInference()
         bs.run_model(onx)
-        print(pretty_onnx(onx))
+        print(pretty_onnx(bs.to_onnx()))
         print(bs.get_debug_msg())
     elif args.fmt == "mermaid":
         from onnx_light.tools import to_mermaid

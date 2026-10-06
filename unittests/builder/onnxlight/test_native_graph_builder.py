@@ -1056,6 +1056,14 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
             OnnxLightOptimizationOptions([object()])
         with self.assertRaises(ValueError):
             OnnxLightOptimizationOptions(max_iter=-2)
+        with self.assertRaisesRegex(ValueError, "remove_unused=False"):
+            OnnxLightOptimizationOptions(remove_unused=False)
+        with self.assertRaisesRegex(ValueError, "constant_folding must be a boolean"):
+            OnnxLightOptimizationOptions(constant_folding={"Transpose"})
+        with self.assertRaisesRegex(ValueError, "verbose"):
+            OnnxLightOptimizationOptions(verbose=1)
+        with self.assertRaisesRegex(ValueError, "processor"):
+            OnnxLightOptimizationOptions(processor="CPU")
         builder = self.make_builder(18)
         with self.assertRaises(NotImplementedError):
             builder.to_onnx(large_model=True, as_graph_proto=True)
