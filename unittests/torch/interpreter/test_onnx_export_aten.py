@@ -12,6 +12,7 @@ from yobx.ext_test_case import (
     skipif_ci_windows,
     requires_torch,
     requires_onnxruntime,
+    requires_onnx_light,
     requires_onnxscript,
     requires_transformers,
     ignore_warnings,
@@ -4012,6 +4013,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.dump_onnx("test_aten_grouped_mm_offsets.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-4)
 
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5168")
     def test_aten_grouped_mm_offsets_no_constant(self):
         import torch
 

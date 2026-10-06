@@ -31,7 +31,7 @@ class TestOnnxShim(unittest.TestCase):
 
         violations = []
         for path in pathlib.Path(yobx.__file__).parent.rglob("*.py"):
-            for node in ast.walk(ast.parse(path.read_text())):
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
                 modules = (
                     [alias.name for alias in node.names]
                     if isinstance(node, ast.Import)
@@ -71,7 +71,7 @@ class TestOnnxShim(unittest.TestCase):
         violations = [
             f"{path}:{node.lineno}:{node.name}"
             for path in package.rglob("*.py")
-            for node in ast.walk(ast.parse(path.read_text()))
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
             if isinstance(node, ast.ClassDef) and node.name in retired_classes
         ]
         self.assertEqual(violations, [])

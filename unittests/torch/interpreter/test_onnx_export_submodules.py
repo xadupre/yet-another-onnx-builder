@@ -4,6 +4,7 @@ from yobx.ext_test_case import (
     ExtTestCase,
     skipif_ci_windows,
     requires_torch,
+    requires_onnx_light,
     requires_transformers,
     ignore_warnings,
 )
@@ -660,6 +661,7 @@ class TestOnnxExportSubModules(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.6", "owning module is None before that")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5167")
     @ignore_warnings(FutureWarning)
     def test_submodule_local_functions_tiny_llm(self):
         """

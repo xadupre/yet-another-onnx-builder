@@ -218,7 +218,7 @@ class TestNativeCommonOps(unittest.TestCase):
                 torch.ops.aten._assert_tensor_metadata.default(
                     x, None, None, x.dtype, device=x.device, layout=x.layout
                 )
-                torch.ops.aten._assert_tensor_metadata.default(x, [x.shape[0], 3], [3, 1])
+                torch.ops.aten._assert_tensor_metadata.default(x, x.shape, [3, 1])
                 return x + 1
 
         artifact = self.check(

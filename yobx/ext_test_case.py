@@ -482,6 +482,19 @@ def requires_onnxir(version: str, msg: str = "") -> Callable:
     return lambda x: x
 
 
+def requires_onnx_light(version: str, msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`onnx-light` is not recent enough."""
+    try:
+        import onnx_light
+    except ImportError:
+        return unittest.skip(msg or "onnx-light not installed")
+
+    if PvVersion(onnx_light.__version__) < PvVersion(version):
+        reason = f"onnx-light version {onnx_light.__version__} < {version}"
+        return unittest.skip(f"{reason}: {msg}" if msg else reason)
+    return lambda x: x
+
+
 def has_sklearn(version: str = "") -> bool:
     "Returns True if torch transformers is available and recent enough."
     try:

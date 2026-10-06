@@ -15894,7 +15894,14 @@ def aten_squeeze(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name="squeeze"
 ) -> T:
     "squeeze"
-    return g.make_node("Squeeze", [x], outputs=outputs, name=name, _infer_shapes=False)
+    result = g.make_node("Squeeze", [x], outputs=outputs, name=name, _infer_shapes=False)
+    if g.has_type(x):
+        g.set_type(result, g.get_type(x))
+    if g.has_shape(x):
+        shape = g.get_shape(x)
+        if all(isinstance(dimension, int) for dimension in shape):
+            g.set_shape(result, tuple(dimension for dimension in shape if dimension != 1))
+    return result
 
 
 def aten_squeeze_dim(

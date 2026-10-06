@@ -17,6 +17,7 @@ from yobx.ext_test_case import (
     hide_stdout,
     ignore_warnings,
     requires_torch,
+    requires_onnx_light,
     requires_transformers,
     skipif_ci_windows,
 )
@@ -124,6 +125,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
     @hide_stdout()
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     def test_tiny_llm_to_onnx_22_opt(self):
         import onnxruntime
 
@@ -195,6 +197,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_to_onnx_24(self):
         import onnxruntime
@@ -268,6 +271,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
     @hide_stdout()
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     def test_tiny_llm_to_onnx_ort_22(self):
         import onnxruntime
 
@@ -388,6 +392,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_default_opset_22(self):
         """
@@ -420,6 +425,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_default_opset_24(self):
         """
@@ -444,6 +450,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22(self):
         """
@@ -577,6 +584,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_to_onnx_24_wrapped(self):
         import onnxruntime
@@ -707,6 +715,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5171")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_to_onnx_autocast_float16_default_onnxruntime(self):
         self.common_test_tiny_llm_to_onnx_autocast_float16("default+onnxruntime", opset=22)
@@ -794,6 +803,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_yobx(self):
         proto = self._export_tiny_llm(
@@ -822,6 +832,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_transformers(self):
         proto = self._export_tiny_llm(
@@ -850,6 +861,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_yobx_2(self):
         proto = self._export_tiny_llm(
@@ -878,6 +890,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_transformers_2(self):
         proto = self._export_tiny_llm(
