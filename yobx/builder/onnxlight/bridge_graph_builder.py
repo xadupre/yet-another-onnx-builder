@@ -325,6 +325,7 @@ class OnnxLightGraphBuilder:
         self._annotations_dirty = False
         self._original_model = None
         self._custom_shape_callbacks = {}
+        self._function_descriptors = {}
         self._functions = {}
         self.shapes_context = ShapesContext()
         self.op = OnnxLightGraphBuilderOpset(self)
@@ -956,6 +957,7 @@ class OnnxLightGraphBuilder:
         artifact = builder._function_artifact(options, optimize, options.inline)
         function = artifact.proto
         key = (str(function.domain), str(function.name))
+        descriptor_signature = self._function_descriptor_signature(builder)
         functions = self.functions
         nested_functions = {
             (str(nested.domain), str(nested.name)): nested
@@ -968,9 +970,11 @@ class OnnxLightGraphBuilder:
                 raise ValueError(f"Conflicting nested local function {nested_key!r}.")
         if key in functions:
             existing = functions[key]
-            if options.merge_allowed and self._function_signature(
-                existing
-            ) == self._function_signature(function):
+            if (
+                options.merge_allowed
+                and self._function_signature(existing) == self._function_signature(function)
+                and self._function_descriptors.get(key) == descriptor_signature
+            ):
                 return self._add_function_initializers(artifact), key
             if not options.rename_allowed:
                 raise ValueError(f"Local function {key!r} already exists.")
@@ -995,6 +999,7 @@ class OnnxLightGraphBuilder:
             if nested_key not in functions:
                 self._functions[nested_key] = nested
         self._functions[key] = function
+        self._function_descriptors[key] = descriptor_signature
         input_shapes = {
             name: builder.get_shape(name)
             for name in builder.input_names
@@ -1092,6 +1097,20 @@ class OnnxLightGraphBuilder:
             helper.make_opsetid(domain, version) for domain, version in opsets
         )
         return normalized.SerializeToString()
+
+    @staticmethod
+    def _function_descriptor_signature(builder):
+        """Returns the positional input and output type/shape contract."""
+
+        def descriptor(name):
+            dtype = int(builder.get_type(name)) if builder.has_type(name) else None
+            shape = tuple(builder.get_shape(name)) if builder.has_shape(name) else None
+            return dtype, shape
+
+        return (
+            tuple(descriptor(name) for name in builder.input_names),
+            tuple(descriptor(name) for name in builder.output_names),
+        )
 
     def inline_functions(self, verbose=0):
         """Inlines local functions using the native graph operation."""

@@ -115,6 +115,37 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         self.assertEqual(renamed, ("custom", "AddBias_2"))
         self.assertEqual(len(builder.functions), 2)
 
+    def test_native_local_function_merge_requires_matching_descriptors(self):
+        from yobx.xbuilder.function_options import FunctionOptions
+
+        def make_function(rows):
+            function = self.make_builder(18, as_function=True)
+            function.make_tensor_input("X", onnx.TensorProto.FLOAT, (rows, 3))
+            function.op.Add("X", numpy.ones(3, dtype=numpy.float32), outputs=["Y"])
+            function.make_tensor_output("Y")
+            return function
+
+        builder = self.make_builder(18)
+        options = FunctionOptions(
+            name="AddBias",
+            domain="custom",
+            merge_allowed=True,
+            rename_allowed=True,
+            move_initializer_to_constant=True,
+        )
+        _, first_key = builder.make_local_function(make_function(2), options)
+        _, second_key = builder.make_local_function(make_function(5), options)
+        self.assertEqual(first_key, ("custom", "AddBias"))
+        self.assertEqual(second_key, ("custom", "AddBias_2"))
+        self.assertEqual(len(builder.functions), 2)
+
+        builder.make_tensor_input("X2", onnx.TensorProto.FLOAT, (2, 3))
+        builder.make_tensor_input("X5", onnx.TensorProto.FLOAT, (5, 3))
+        builder.make_node(first_key[1], ["X2"], ["Y2"], domain=first_key[0])
+        builder.make_node(second_key[1], ["X5"], ["Y5"], domain=second_key[0])
+        self.assertEqual(builder.get_shape("Y2"), (2, 3))
+        self.assertEqual(builder.get_shape("Y5"), (5, 3))
+
     def test_native_nested_functions_and_imported_annotations(self):
         from yobx.xbuilder.function_options import FunctionOptions
 
