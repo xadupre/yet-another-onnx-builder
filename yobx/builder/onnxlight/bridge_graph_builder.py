@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 
 import numpy
 from onnx_light import onnx
-from onnx_light.onnx import helper, numpy_helper
+from onnx_light.onnx import helper, inliner, numpy_helper
 from onnx_light.onnx_core.graph_builder import GraphBuilder
 from onnx_light.onnx_core.optimization import GraphGraph, standard_pattern_names
 from onnx_light.onnx_core.shape_inference import ShapesContext, SymShape, SymTensor
@@ -1265,9 +1265,10 @@ class OnnxLightGraphBuilder:
             for node in model.graph.node
         )
         builder = self._inner if has_custom_local_calls else GraphBuilder(model)
-        if inline and not any(
-            _contains_control_flow_subgraph(function) for function in builder.to_onnx().functions
-        ):
+        inline_functions = inline and not any(
+            _contains_control_flow_subgraph(function) for function in model.functions
+        )
+        if inline_functions and not has_custom_local_calls:
             builder.inline_local_functions()
         rewrites = []
         native_report = None
@@ -1284,6 +1285,8 @@ class OnnxLightGraphBuilder:
         model.functions.extend(
             function for key, function in self._functions.items() if key not in existing_functions
         )
+        if inline_functions and has_custom_local_calls:
+            model = inliner.inline_local_functions(model)
         if optimize:
             inferred_shapes = ShapesContext()
             inferred_shapes.compute_shape_model(model, True)

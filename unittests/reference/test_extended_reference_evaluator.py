@@ -384,6 +384,42 @@ class TestReferenceOps(ExtTestCase):
             got = ref.run(None, {"X": a})
             self.assertEqualArray(expected[0], got[0])
 
+    def test_simplified_layer_normalization_defaults(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "SimplifiedLayerNormalization",
+                        ["X", "scale"],
+                        ["Y", "inv_std_var"],
+                        domain="com.microsoft",
+                    )
+                ],
+                "name",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [2, 3, 4]),
+                    oh.make_tensor_value_info("scale", TFLOAT, [4]),
+                ],
+                [
+                    oh.make_tensor_value_info("Y", TFLOAT, [2, 3, 4]),
+                    oh.make_tensor_value_info("inv_std_var", TFLOAT, [2, 3, 1]),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        feeds = {
+            "X": self._range(2, 3, 4, bias=0.1),
+            "scale": np.array([0.5, 1.0, 1.5, 2.0], dtype=np.float32),
+        }
+        expected_inv_std_var = np.reciprocal(
+            np.sqrt(np.square(feeds["X"]).mean(axis=-1, keepdims=True) + 1.0e-5)
+        )
+        expected = (feeds["X"] * expected_inv_std_var * feeds["scale"], expected_inv_std_var)
+        got = ExtendedReferenceEvaluator(model).run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1.0e-6)
+        self.assertEqualArray(expected[1], got[1], atol=1.0e-6)
+
     def test_scatter_elements_4d(self):
         model = oh.make_model(
             oh.make_graph(
