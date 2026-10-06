@@ -155,7 +155,13 @@ def sklearn_latent_dirichlet_allocation(
     eps = np.array(np.finfo(dtype).eps, dtype=dtype)
 
     # --- initialise gamma = ones((batch_size, n_topics)) ---
-    batch_size = g.op.Shape(X, start=0, end=1, name=f"{name}_batch")
+    x_shape = g.op.Shape(X, name=f"{name}_xshape")
+    batch_size = g.op.Slice(
+        x_shape,
+        np.array([0], dtype=np.int64),
+        np.array([1], dtype=np.int64),
+        name=f"{name}_batch",
+    )
 
     n_topics_arr = np.array([n_topics], dtype=np.int64)
     gamma_shape = g.op.Concat(batch_size, n_topics_arr, axis=0, name=f"{name}_gshape")
