@@ -9,13 +9,14 @@ from yobx.ext_test_case import (
     ExtTestCase,
     ignore_warnings,
     requires_cuda,
+    requires_onnx_light,
     requires_torch,
     skipif_ci_windows,
 )
 
 
 class TestOnnxExportComplex(ExtTestCase):
-    @unittest.skip("onnx-light native runtime does not support complex tensors yet")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5176")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_cuda()
     @skipif_ci_windows("broken")

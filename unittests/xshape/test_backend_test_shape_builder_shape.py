@@ -1,7 +1,9 @@
 """Checks native inference against the published wheel's backend test models."""
 
 import unittest
+import onnx_light
 from onnx_light.onnx.backend import collect_test_cases
+from packaging.version import Version
 
 from yobx.xshape import NativeShapeInference
 
@@ -20,11 +22,10 @@ class TestNativeBackendShapes(unittest.TestCase):
         ):
             for case in collect_test_cases(op):
                 with self.subTest(case=case.name):
-                    if case.name == "test_cc_squeeze_all_singleton":
-                        self.skipTest(
-                            "onnx-light 0.1.27 does not infer Squeeze with an empty "
-                            "axes graph input; omitting the axes input is supported."
-                        )
+                    if case.name == "test_cc_squeeze_all_singleton" and Version(
+                        onnx_light.__version__
+                    ) < Version("0.1.31"):
+                        self.skipTest("xadupre/onnx-light#5175")
                     model = case.model
                     inference = NativeShapeInference()
                     inference.run_model(model)

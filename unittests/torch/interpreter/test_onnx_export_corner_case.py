@@ -11,6 +11,7 @@ from yobx.ext_test_case import (
     ignore_warnings,
     skipif_ci_windows,
     requires_cuda,
+    requires_onnx_light,
     requires_onnxscript,
     requires_torch,
     hide_stdout,
@@ -302,7 +303,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
-    @unittest.skip("onnx-light GraphGraph always removes unused nodes during optimization")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5174")
     def test_remove_unused_nodes(self):
         model, input_tensor = return_module_cls_pool()
         onx1 = to_onnx(
@@ -355,17 +356,13 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
-    @unittest.skip(
-        "onnx-light does not expose constant folding independently from "
-        "TransposeMatMul and MatMulAdd rewrites"
-    )
     def test_constant_folding(self):
         model, input_tensor = return_module_cls_pool()
         onx1 = to_onnx(
             model,
             (input_tensor,),
             input_names=["input"],
-            options=OptimizationOptions(constant_folding=False, patterns=None),
+            options=OptimizationOptions(constant_folding=False, patterns=[]),
         )
         self.assertGreater(
             len(onx1.graph.node),
@@ -564,7 +561,6 @@ class TestOnnxExportCornerCase(ExtTestCase):
 
     @requires_torch()
     @ignore_warnings((UserWarning, DeprecationWarning))
-    @unittest.skip("onnx-light does not provide the default+onnxruntime pattern group")
     def test_com_microsoft_opset_triggers_ort_optimizations(self):
         """When target_opset includes 'com.microsoft', ort optimizations are auto-enabled."""
         import torch
@@ -582,18 +578,12 @@ class TestOnnxExportCornerCase(ExtTestCase):
             Model(), (x, y), target_opset={"": 22, "com.microsoft": 1}, return_builder=True
         )
         builder_ort = onx.builder
-        n_ort = len(builder_ort.optimization_options.patterns)
+        self.assertEqual(builder_ort.optimization_options.patterns, "default+onnxruntime")
 
         # Default opset (integer) should use the standard default patterns.
         onx2 = to_onnx(Model(), (x, y), target_opset=22, return_builder=True)
         builder_default = onx2.builder
-        n_default = len(builder_default.optimization_options.patterns)
-
-        self.assertGreater(
-            n_ort,
-            n_default,
-            "com.microsoft in target_opset should produce more patterns than the default",
-        )
+        self.assertIsNone(builder_default.optimization_options.patterns)
 
     @requires_torch()
     @ignore_warnings((UserWarning, DeprecationWarning))

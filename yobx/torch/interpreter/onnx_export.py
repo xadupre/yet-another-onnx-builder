@@ -1115,7 +1115,11 @@ def to_onnx(
     if target_opset is None:
         target_opset = min(DEFAULT_TARGET_OPSET, onnx_opset_version() - 1)
     if options is None:
-        options = OptimizationOptions()
+        options = (
+            OptimizationOptions(patterns="default+onnxruntime")
+            if isinstance(target_opset, dict) and "com.microsoft" in target_opset
+            else OptimizationOptions()
+        )
     begin = time.perf_counter()
 
     if args is not None and _contains_value_info_proto(args):
