@@ -325,6 +325,7 @@ class OnnxLightGraphBuilder:
         self._annotations_dirty = False
         self._original_model = None
         self._custom_shape_callbacks = {}
+        self._functions = {}
         self.shapes_context = ShapesContext()
         self.op = OnnxLightGraphBuilderOpset(self)
         self.anyop = self.op
@@ -413,10 +414,12 @@ class OnnxLightGraphBuilder:
     @property
     def functions(self):
         """Returns exported native local function definitions."""
-        return {
+        functions = {
             (str(value.domain), str(value.name)): value
             for value in self._inner.to_onnx().functions
         }
+        functions.update(self._functions)
+        return functions
 
     def empty_copy(self, as_function=False):
         """Creates an independent native builder with the same converter options."""
@@ -833,6 +836,12 @@ class OnnxLightGraphBuilder:
 
     def _native_model(self):
         model = self._inner.to_onnx(ir_version=self.ir_version)
+        existing_functions = {
+            (str(function.domain), str(function.name)) for function in model.functions
+        }
+        model.functions.extend(
+            function for key, function in self._functions.items() if key not in existing_functions
+        )
         self.shapes_context.apply_inferred_shapes_to_model(model)
         annotated = {
             str(value.name)
@@ -874,7 +883,7 @@ class OnnxLightGraphBuilder:
         if self._annotations_dirty:
             if self._custom_shape_callbacks and hasattr(self._inner, "shapes"):
                 for name in self.shapes_context.names():
-                    if self.shapes_context.has(name):
+                    if self.has_name(name) and self.shapes_context.has(name):
                         self._inner.shapes.set(name, self.shapes_context.get(name))
             else:
                 self._inner = GraphBuilder(self._native_model())
@@ -916,12 +925,18 @@ class OnnxLightGraphBuilder:
         graph.ClearField("initializer")
         graph.ClearField("node")
         graph.node.extend(nodes)
-        # Function serialization is owned by the native builder. Nested definitions
-        # are returned alongside the proto because FunctionProto cannot contain them.
-        native = GraphBuilder(model)
-        native.set_opset_version(options.domain, self.opsets.get(options.domain, 1))
-        function = native.to_function(options.domain)
-        function.name = options.name
+        opsets = list(model.opset_import)
+        if not any(str(opset.domain) == options.domain for opset in opsets):
+            opsets.append(helper.make_opsetid(options.domain, self.opsets.get(options.domain, 1)))
+        function = helper.make_function(
+            options.domain,
+            options.name,
+            [str(value.name) for value in graph.input],
+            [str(value.name) for value in graph.output],
+            list(graph.node),
+            opsets,
+            value_info=list(graph.value_info),
+        )
         return ExportArtifact(
             proto=function,
             builder=self,
@@ -976,13 +991,10 @@ class OnnxLightGraphBuilder:
             function.name = key[1]
         if not self.has_opset(key[0]):
             self.set_opset(key[0], 1)
-        self._synchronize_annotations()
-        model = self._native_model()
         for nested_key, nested in nested_functions.items():
             if nested_key not in functions:
-                model.functions.append(nested)
-        model.functions.append(function)
-        self._inner = GraphBuilder(model)
+                self._functions[nested_key] = nested
+        self._functions[key] = function
         input_shapes = {
             name: builder.get_shape(name)
             for name in builder.input_names
@@ -1002,7 +1014,7 @@ class OnnxLightGraphBuilder:
                 if formal_name not in input_shapes or not actual_name:
                     continue
                 actual = context.get(str(actual_name))
-                for formal_dim, actual_dim in zip(input_shapes[formal_name], actual.shape):
+                for formal_dim, actual_dim in zip(input_shapes[formal_name], actual.shape.dims()):
                     if isinstance(formal_dim, str):
                         replacements[formal_dim] = actual_dim
             expression_replacements = {name: str(value) for name, value in replacements.items()}
@@ -1022,7 +1034,9 @@ class OnnxLightGraphBuilder:
                         )
                     else:
                         resolved_shape.append(dimension)
-                context.set(str(output_name), SymTensor(dtype, resolved_shape))
+                context.set(
+                    str(output_name), SymTensor(int(dtype), _native_shape(resolved_shape))
+                )
 
         self.shapes_context.set_custom_shape_inference_function(
             key[0], key[1], infer_local_function
@@ -1262,6 +1276,18 @@ class OnnxLightGraphBuilder:
                 builder, self.optimization_options.pattern_names()
             ).optimize(self.optimization_options.max_iter, report=True)
         model = builder.to_onnx(ir_version=self.ir_version)
+        if hasattr(builder, "shapes"):
+            builder.shapes.apply_inferred_shapes_to_model(model)
+        existing_functions = {
+            (str(function.domain), str(function.name)) for function in model.functions
+        }
+        model.functions.extend(
+            function for key, function in self._functions.items() if key not in existing_functions
+        )
+        if optimize:
+            inferred_shapes = ShapesContext()
+            inferred_shapes.compute_shape_model(model, True)
+            inferred_shapes.apply_inferred_shapes_to_model(model)
         self._replace_model_annotations(model)
         _remove_output_identities(model.graph)
         if self._original_model is not None:

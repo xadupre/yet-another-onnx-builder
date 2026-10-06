@@ -414,7 +414,9 @@ def onnx_generate(
         else:
             # KV cache: feed only the single new token; map present outputs
             # back to past inputs by position.
-            feeds = {"input_ids": next_token_id, "attention_mask": attention_mask}
+            feeds = {"input_ids": next_token_id}
+            if "attention_mask" in input_names:
+                feeds["attention_mask"] = attention_mask
             for j, name in enumerate(cache_names):
                 if 1 + j < len(outputs):
                     feeds[name] = outputs[1 + j]

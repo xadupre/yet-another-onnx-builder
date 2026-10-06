@@ -65,6 +65,7 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
             )
         if infer_shapes_options not in (None, False, 0):
             raise ValueError("Native onnx-light shape inference is always enabled.")
+        self._output_doc_strings = {}
         super().__init__(
             target_opset_or_existing_proto,
             ir_version=ir_version,
@@ -246,13 +247,15 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         )
         if doc_string:
             names = [name] if isinstance(name, str) else list(name)
-            model = self._native_model()
-            for value in model.graph.output:
-                if str(value.name) in names:
-                    value.doc_string = doc_string
-            self._inner = NativeGraphBuilder(model)
-            self._register_native_shape_callbacks()
+            self._output_doc_strings.update({output_name: doc_string for output_name in names})
         return result
+
+    def _native_model(self):
+        model = super()._native_model()
+        for value in model.graph.output:
+            if str(value.name) in self._output_doc_strings:
+                value.doc_string = self._output_doc_strings[str(value.name)]
+        return model
 
     def make_initializer(
         self,
