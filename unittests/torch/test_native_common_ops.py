@@ -12,13 +12,13 @@ from yobx.torch.export_options import ExportOptions
 
 
 class TestNativeCommonOps(unittest.TestCase):
-    def export(self, model, args, **kwargs):
+    def export(self, model, args, export_options=None, **kwargs):
         """Exports and checks a model without decomposing the tested ATen calls."""
         artifact = to_onnx(
             model,
             args,
             input_names=[f"X{i}" for i in range(len(args))],
-            export_options=ExportOptions(remove_inplace=False),
+            export_options=export_options or ExportOptions(remove_inplace=False),
             validate_onnx=True,
             **kwargs,
         )
@@ -226,6 +226,7 @@ class TestNativeCommonOps(unittest.TestCase):
             (torch.ones(2, 3),),
             cases=[(torch.randn(5, 3),)],
             dynamic_shapes=({0: "batch"},),
+            export_options=ExportOptions(strict=True, remove_inplace=False),
         )
         self.assertNotIn(
             "_assert_tensor_metadata", [node.op_type for node in artifact.proto.graph.node]
