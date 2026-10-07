@@ -1,10 +1,12 @@
 import unittest
 from typing import Dict, List
+import onnx_light
 import onnx_light.onnx.helper as oh
 import numpy as np
 import onnx_light.onnx.numpy_helper as onh
 from onnx_light.onnx import AttributeProto, FunctionProto, TensorProto, ValueInfoProto
 from onnx_light.onnx_core.shape_inference import SymShape
+from packaging.version import Version
 from yobx.ext_test_case import (
     ExtTestCase,
     hide_stdout,
@@ -1226,6 +1228,9 @@ class TestGraphBuilder(ExtTestCase):
 
     @ignore_warnings(DeprecationWarning)
     @hide_stdout()
+    @unittest.skipIf(
+        Version(onnx_light.__version__) <= Version("0.1.30"), "xadupre/onnx-light#5192"
+    )
     def test_inline_function_with_subgraphs(self):
         def _make_model():
             new_domain = "custom"
@@ -1268,11 +1273,11 @@ class TestGraphBuilder(ExtTestCase):
                     ],
                     "main_graph",
                     [
-                        oh.make_tensor_value_info("X", TensorProto.FLOAT, [None, None]),
-                        oh.make_tensor_value_info("A", TensorProto.FLOAT, [None, None]),
-                        oh.make_tensor_value_info("B", TensorProto.FLOAT, [None, None]),
+                        oh.make_tensor_value_info("X", TensorProto.FLOAT, [3, 3]),
+                        oh.make_tensor_value_info("A", TensorProto.FLOAT, [3, 3]),
+                        oh.make_tensor_value_info("B", TensorProto.FLOAT, [3, 3]),
                     ],
-                    [oh.make_tensor_value_info("Y", TensorProto.FLOAT, None)],
+                    [oh.make_tensor_value_info("Y", TensorProto.FLOAT, [3, 3])],
                 ),
                 opset_imports=[
                     oh.make_opsetid("", 22),
@@ -1291,13 +1296,31 @@ class TestGraphBuilder(ExtTestCase):
             A=np.arange(9).reshape((3, 3)).astype(np.float32),
             B=np.arange(9).reshape((3, 3)).astype(np.float32),
         )
-        ref.run(None, feeds)
+        expected = ref.run(None, feeds)[0]
 
-        with self.assertRaisesRegex(
-            ValueError, "Scan.*outputs|control-flow subgraphs.*not supported"
-        ):
-            gr = GraphBuilder(onnx_model, verbose=5)
-            gr.inline_functions(verbose=1)
+        gr = GraphBuilder(onnx_model, verbose=0)
+        self.assertTrue(all(node is not None for node in gr.nodes))
+        self.assertEqual(len(gr.functions), 2)
+        onx = gr.to_onnx(inline=False)
+        self.assertTrue(all(node is not None for node in gr.nodes))
+        self.dump_onnx("test_inline_function_with_subgraphs.onnx", onx)
+        self.assertEqual(len(onx.functions), 2)
+        gr = GraphBuilder(onnx_model, verbose=5)
+        gr.inline_functions(verbose=1)
+        function_proto = gr.to_onnx(
+            function_options=FunctionOptions(
+                export_as_function=True, name="lr", domain="custom_domain"
+            ),
+            inline=False,
+        )
+        self.assertNotEmpty(function_proto)
+
+        onx = gr.to_onnx(inline=True)
+        self.assertEqual(len(gr.functions), 0)
+        self.assertEqual(len(onx.functions), 0)
+        ref2 = self.check_ort(onx)
+        got = ref2.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
 
     def _get_cdist_implementation_with_ref_attribute(
         self,
@@ -1363,6 +1386,9 @@ class TestGraphBuilder(ExtTestCase):
 
     @ignore_warnings(DeprecationWarning)
     @hide_stdout()
+    @unittest.skipIf(
+        Version(onnx_light.__version__) <= Version("0.1.30"), "xadupre/onnx-light#5192"
+    )
     def test_inline_function_with_subgraphs_with_ref_attribute(self):
         def _make_model():
             new_domain = "custom"
@@ -1411,11 +1437,11 @@ class TestGraphBuilder(ExtTestCase):
                     ],
                     "main_graph",
                     [
-                        oh.make_tensor_value_info("X", TensorProto.FLOAT, [None, None]),
-                        oh.make_tensor_value_info("A", TensorProto.FLOAT, [None, None]),
-                        oh.make_tensor_value_info("B", TensorProto.FLOAT, [None, None]),
+                        oh.make_tensor_value_info("X", TensorProto.FLOAT, [3, 3]),
+                        oh.make_tensor_value_info("A", TensorProto.FLOAT, [3, 3]),
+                        oh.make_tensor_value_info("B", TensorProto.FLOAT, [3, 3]),
                     ],
-                    [oh.make_tensor_value_info("Y", TensorProto.FLOAT, None)],
+                    [oh.make_tensor_value_info("Y", TensorProto.FLOAT, [3, 3])],
                 ),
                 opset_imports=[
                     oh.make_opsetid("", 22),
@@ -1434,13 +1460,24 @@ class TestGraphBuilder(ExtTestCase):
             A=np.arange(9).reshape((3, 3)).astype(np.float32),
             B=np.arange(9).reshape((3, 3)).astype(np.float32),
         )
-        ref.run(None, feeds)
+        expected = ref.run(None, feeds)[0]
 
-        with self.assertRaisesRegex(
-            ValueError, "Scan.*outputs|control-flow subgraphs.*not supported"
-        ):
-            gr = GraphBuilder(onnx_model, verbose=5)
-            gr.inline_functions(verbose=1)
+        gr = GraphBuilder(onnx_model, verbose=0)
+        self.assertTrue(all(node is not None for node in gr.nodes))
+        self.assertEqual(len(gr.functions), 2)
+        onx = gr.to_onnx(inline=False)
+        self.assertTrue(all(node is not None for node in gr.nodes))
+        self.assertEqual(len(onx.functions), 2)
+        gr = GraphBuilder(onnx_model, verbose=5)
+        gr.inline_functions(verbose=1)
+
+        onx = gr.to_onnx(inline=False)
+        self.dump_onnx("test_inline_function_with_subgraphs_with_ref_attribute.onnx", onx)
+        self.assertEqual(len(gr.functions), 0)
+        self.assertEqual(len(onx.functions), 0)
+        ref2 = self.check_ort(onx)
+        got = ref2.run(None, feeds)[0]
+        self.assertEqualArray(expected, got)
 
     @ignore_warnings(DeprecationWarning)
     @hide_stdout()
