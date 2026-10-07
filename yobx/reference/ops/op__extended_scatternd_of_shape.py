@@ -16,9 +16,13 @@ class MaskedScatterNDOfShape(NativeOpKernel):
     op_domain = "yaourt.ortops.fused_kernel.cuda"
 
     def _run(self, shape, indices, updates, reduction=None, maskedValue=None):
+        if maskedValue is None:
+            raise ValueError("MaskedScatterNDOfShape requires maskedValue.")
         data = np.zeros(shape, dtype=updates.dtype)
-        new_updates = np.where(indices == maskedValue, 0, updates)
+        masked = np.any(indices == maskedValue, axis=-1)
+        filtered_indices = indices[~masked]
+        filtered_updates = updates[~masked]
         (y,) = evaluate_native_operator(
-            "ScatterND", data, indices, new_updates, reduction=reduction
+            "ScatterND", data, filtered_indices, filtered_updates, reduction=reduction
         )
         return (y,)

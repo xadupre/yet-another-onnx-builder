@@ -5,7 +5,7 @@ from ._native_op import NativeOpKernel
 class BiasSoftmax(NativeOpKernel):
     op_domain = "com.microsoft"
 
-    def _run(self, x, y, axis=None, is_inner_broadcast=None):  # type: ignore
+    def _run(self, x, y, axis=1, is_inner_broadcast=None):  # type: ignore
         assert (
             is_inner_broadcast == 0
         ), f"Not implemented for is_inner_broadcast={is_inner_broadcast}"

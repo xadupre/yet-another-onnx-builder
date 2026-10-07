@@ -5,7 +5,7 @@ from ._native_op import evaluate_native_operator
 class SkipLayerNormalization(NativeOpKernel):
     op_domain = "com.microsoft"
 
-    def _run(self, x, skip, gamma=None, beta=None, bias=None, epsilon=None):
+    def _run(self, x, skip, gamma=None, beta=None, bias=None, epsilon=1.0e-12):
         add = x + skip
         if bias is not None:
             add = add + bias

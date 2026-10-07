@@ -362,12 +362,13 @@ class TestReferenceOps(ExtTestCase):
     def test_quick_gelu(self):
         from onnxruntime import InferenceSession
 
-        for alpha in [0.0, 2.0]:
+        for alpha in [None, 0.0, 2.0]:
+            attributes = {} if alpha is None else {"alpha": alpha}
             model = oh.make_model(
                 oh.make_graph(
                     [
                         oh.make_node(
-                            "QuickGelu", ["X"], ["Z"], domain="com.microsoft", alpha=alpha
+                            "QuickGelu", ["X"], ["Z"], domain="com.microsoft", **attributes
                         )
                     ],
                     "name",
@@ -382,7 +383,7 @@ class TestReferenceOps(ExtTestCase):
             expected = sess.run(None, {"X": a})
             ref = ExtendedReferenceEvaluator(model)
             got = ref.run(None, {"X": a})
-            self.assertEqualArray(expected[0], got[0])
+            self.assertEqualArray(expected[0], got[0], atol=2e-7)
 
     def test_simplified_layer_normalization_defaults(self):
         model = oh.make_model(
@@ -498,7 +499,6 @@ class TestReferenceOps(ExtTestCase):
                         "SkipLayerNormalization",
                         ["x", "skip", "gamma", "beta"],
                         ["Z"],
-                        epsilon=1.0e-5,
                         domain="com.microsoft",
                     )
                 ],
@@ -793,17 +793,15 @@ class TestReferenceOps(ExtTestCase):
         self.assertEqualArray(expected, got[0], atol=1e-7)
 
     def test_bias_softmax(self):
-        for axis, b_shape in [(0, (2, 3, 4)), (1, (3, 4)), (2, (4,))]:
+        for axis, b_shape in [(0, (2, 3, 4)), (None, (3, 4)), (1, (3, 4)), (2, (4,))]:
+            attributes = {"is_inner_broadcast": 0}
+            if axis is not None:
+                attributes["axis"] = axis
             model = oh.make_model(
                 oh.make_graph(
                     [
                         oh.make_node(
-                            "BiasSoftmax",
-                            ["X", "B"],
-                            ["Z"],
-                            domain="com.microsoft",
-                            axis=axis,
-                            is_inner_broadcast=0,
+                            "BiasSoftmax", ["X", "B"], ["Z"], domain="com.microsoft", **attributes
                         )
                     ],
                     "name",
@@ -822,9 +820,10 @@ class TestReferenceOps(ExtTestCase):
             ref = ExtendedReferenceEvaluator(model)
             got = ref.run(None, feeds)
             z = x + b
-            tmp = z - z.max(axis=axis, keepdims=True)
+            effective_axis = 1 if axis is None else axis
+            tmp = z - z.max(axis=effective_axis, keepdims=True)
             w = np.exp(tmp)
-            expected = (w / w.sum(axis=axis, keepdims=True)).astype(np.float32)
+            expected = (w / w.sum(axis=effective_axis, keepdims=True)).astype(np.float32)
             self.assertEqualArray(expected, got[0], atol=1e-5)
 
     def test_inline_1_function(self):

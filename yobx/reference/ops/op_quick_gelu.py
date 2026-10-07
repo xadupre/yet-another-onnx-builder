@@ -15,7 +15,7 @@ class QuickGelu(NativeOpKernel):
         NativeOpKernel.__init__(self, onnx_node, run_params)
         self.vf = np.vectorize(sigmoid)
 
-    def _run(self, X, alpha=1.0):
+    def _run(self, X, alpha=1.702):
         if len(X.shape) == 0:
             return ((X * sigmoid(X * alpha)).astype(X.dtype),)
         if X.size == 0:

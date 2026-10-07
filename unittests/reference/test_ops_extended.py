@@ -406,6 +406,35 @@ class TestExtendedOpsScatterNDOfShape(ExtTestCase):
         expected[1] += updates[2]
         self.assertEqualArray(expected, got[0])
 
+    def test_masked_scatter_nd_of_shape_without_reduction(self):
+        model = _make_model(
+            [
+                oh.make_node(
+                    "MaskedScatterNDOfShape",
+                    ["shape", "indices", "updates"],
+                    ["out"],
+                    domain=DOMAIN,
+                    reduction="none",
+                    maskedValue=-1,
+                )
+            ],
+            [
+                oh.make_tensor_value_info("shape", TINT64, None),
+                oh.make_tensor_value_info("indices", TINT64, None),
+                oh.make_tensor_value_info("updates", TFLOAT, None),
+            ],
+            [oh.make_tensor_value_info("out", TFLOAT, None)],
+        )
+        shape = np.array([3, 2], dtype=np.int64)
+        indices = np.array([[2], [-1]], dtype=np.int64)
+        updates = np.array([[5, 6], [9, 9]], dtype=np.float32)
+        got = ExtendedReferenceEvaluator(model).run(
+            None, {"shape": shape, "indices": indices, "updates": updates}
+        )
+        expected = np.zeros((3, 2), dtype=np.float32)
+        expected[2] = updates[0]
+        self.assertEqualArray(expected, got[0])
+
 
 class TestExtendedOpsTransposeCast(ExtTestCase):
     """Tests for ops in op__extended_transpose_cast.py."""
