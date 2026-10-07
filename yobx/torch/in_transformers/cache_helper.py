@@ -420,7 +420,7 @@ def make_static_cache(
             f"{key_value_pairs[0][0].shape}"
         ),
     )
-    config = transformers.PreTrainedConfig()
+    config = transformers.PretrainedConfig()
     config.head_dim = key_value_pairs[0][0].shape[-1]
     config.num_attention_heads = key_value_pairs[0][0].shape[1]
     config.num_hidden_layers = len(key_value_pairs)
