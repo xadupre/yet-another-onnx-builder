@@ -1,6 +1,6 @@
 from typing import Dict, List
 
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.feature_extraction.text import CountVectorizer
 
 from ...typing import GraphBuilderExtendedProtocol

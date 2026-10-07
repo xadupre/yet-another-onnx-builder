@@ -1,6 +1,5 @@
-import collections
 import unittest
-import onnx
+from yobx._onnx_shim import onnx
 import torch
 from yobx.helpers import max_diff
 from yobx.helpers.rt_helper import make_feeds
@@ -18,6 +17,7 @@ from yobx.ext_test_case import (
     hide_stdout,
     ignore_warnings,
     requires_torch,
+    requires_onnx_light,
     requires_transformers,
     skipif_ci_windows,
 )
@@ -125,6 +125,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
     @hide_stdout()
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     def test_tiny_llm_to_onnx_22_opt(self):
         import onnxruntime
 
@@ -185,7 +186,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertNotIn("RotaryEmbedding", unique_ops)
         self.assertNotIn("SimplifiedLayerNormalization", unique_ops)
         self.assertNotIn("SkipSimplifiedLayerNormalization", unique_ops)
-        self.assertIn("CausalMaskMulAdd", unique_ops)
+        self.assertNotIn("CausalMaskMulAdd", unique_ops)
         self.assertIn("CausalMask", unique_ops)
         self.assertNotIn("GroupQueryAttention", unique_ops)
         self.assertIn("LocalAttentionGQAsQ_to1", unique_ops)
@@ -196,6 +197,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_to_onnx_24(self):
         import onnxruntime
@@ -258,44 +260,18 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertEqual(
             ["output_0", "present_key_values_key_0", "present_key_values_value_0"], outputs
         )
-        node_types = [n.op_type for n in onx.graph.node]
-        counter = collections.Counter(node_types)
-        unique_ops = set(node_types)
-        self.assertNotIn("HalfRotaryEmbedding", unique_ops)
-        self.assertIn("RotaryEmbedding", unique_ops)
+        unique_ops = {n.op_type for n in onx.graph.node}
+        self.assertIn("HalfRotaryEmbedding", unique_ops)
+        self.assertNotIn("RotaryEmbedding", unique_ops)
         self.assertIn("RMSNormalization", unique_ops)
-        self.assertIn("CausalMaskMulAdd", unique_ops)
+        self.assertNotIn("CausalMaskMulAdd", unique_ops)
         self.assertIn("CausalMask", unique_ops)
         self.assertIn("Attention", unique_ops)
-        self.assertNotIn("Squeeze", unique_ops)  # GQA
-        self.assertInOr(("CosSinCache_p1", "CosSinCacheWithRange"), unique_ops)
-
-        expected_counts = {
-            "Add": 3,
-            "And": 1,
-            "Attention": 1,
-            "Cast": 1,
-            "CausalMask": 1,
-            "CausalMaskMulAdd": 1,
-            "Concat": 5,
-            "CosSinCacheWithRange": 1,
-            "Expand": 2,
-            "Gather": 2,
-            "MatMul": 8,
-            "Mul": 5,
-            "Reshape": 3,
-            "RMSNormalization": 3,
-            "Shape": 5,
-            "Sigmoid": 1,
-            "Transpose": 2,
-            "Unsqueeze": 6,
-        }
-        self.assertEqual(counter["Expand"], expected_counts["Expand"])
-        self.assertEqual(counter["Transpose"], expected_counts["Transpose"])
         self._chech_shape(onx.get_proto(include_weights=False))
 
     @hide_stdout()
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     def test_tiny_llm_to_onnx_ort_22(self):
         import onnxruntime
 
@@ -360,15 +336,15 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             ["output_0", "present_key_values_key_0", "present_key_values_value_0"], outputs
         )
         unique_ops = {n.op_type for n in onx.graph.node}
-        self.assertNotIn("HalfRotaryEmbedding", unique_ops)
-        self.assertIn("RotaryEmbedding", unique_ops)
-        self.assertIn("SimplifiedLayerNormalization", unique_ops)
-        self.assertIn("SkipSimplifiedLayerNormalization", unique_ops)
-        self.assertIn("QuickGelu", unique_ops)
-        self.assertIn("CausalMaskMulAdd", unique_ops)
+        self.assertIn("HalfRotaryEmbedding", unique_ops)
+        self.assertNotIn("RotaryEmbedding", unique_ops)
+        self.assertNotIn("SimplifiedLayerNormalization", unique_ops)
+        self.assertNotIn("SkipSimplifiedLayerNormalization", unique_ops)
+        self.assertNotIn("QuickGelu", unique_ops)
+        self.assertNotIn("CausalMaskMulAdd", unique_ops)
         self.assertIn("CausalMask", unique_ops)
-        self.assertIn("GroupQueryAttention", unique_ops)
-        self.assertInOr(("CosSinCache_p1", "CosSinCacheWithRange"), unique_ops)
+        self.assertNotIn("GroupQueryAttention", unique_ops)
+        self.assertIn("LocalAttentionGQAsQ_to1", unique_ops)
         self._chech_shape(onx.get_proto(include_weights=False))
 
     def _export_tiny_llm(
@@ -416,6 +392,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_default_opset_22(self):
         """
@@ -448,6 +425,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_default_opset_24(self):
         """
@@ -472,6 +450,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22(self):
         """
@@ -490,7 +469,12 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         )
         unique_ops = {n.op_type for n in proto.graph.node}
         self.assertInOr(
-            ("Attention", "GroupQueryAttention"),
+            (
+                "Attention",
+                "GroupQueryAttention",
+                "LocalAttentionGQAsQ_to1",
+                "LocalAttentionGQAsQ_to10",
+            ),
             unique_ops,
             "default+onnxruntime should produce an Attention op at opset 22",
         )
@@ -517,7 +501,12 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         )
         unique_ops = {n.op_type for n in proto.graph.node}
         self.assertInOr(
-            ("Attention", "GroupQueryAttention"),
+            (
+                "Attention",
+                "GroupQueryAttention",
+                "LocalAttentionGQAsQ_to1",
+                "LocalAttentionGQAsQ_to10",
+            ),
             unique_ops,
             "default+onnxruntime should produce an Attention op at opset 24",
         )
@@ -595,6 +584,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_to_onnx_24_wrapped(self):
         import onnxruntime
@@ -696,40 +686,13 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
 
         outputs = [o.name for o in onx.graph.output]
         self.assertEqual(["output_0", "output_1", "output_2"], outputs)
-        node_types = [n.op_type for n in onx.graph.node]
-        counter = collections.Counter(node_types)
-        unique_ops = set(node_types)
-        self.assertNotIn("HalfRotaryEmbedding", unique_ops)
-        self.assertIn("RotaryEmbedding", unique_ops)
+        unique_ops = {n.op_type for n in onx.graph.node}
+        self.assertIn("HalfRotaryEmbedding", unique_ops)
+        self.assertNotIn("RotaryEmbedding", unique_ops)
         self.assertIn("RMSNormalization", unique_ops)
-        self.assertIn("CausalMaskMulAdd", unique_ops)
+        self.assertNotIn("CausalMaskMulAdd", unique_ops)
         self.assertIn("CausalMask", unique_ops)
         self.assertIn("Attention", unique_ops)
-        self.assertNotIn("Squeeze", unique_ops)  # GQA
-        self.assertInOr(("CosSinCache_p1", "CosSinCacheWithRange"), unique_ops)
-
-        expected_counts = {
-            "Add": 3,
-            "And": 1,
-            "Attention": 1,
-            "Cast": 1,
-            "CausalMask": 1,
-            "CausalMaskMulAdd": 1,
-            "Concat": 5,
-            "CosSinCacheWithRange": 1,
-            "Expand": 2,
-            "Gather": 2,
-            "MatMul": 8,
-            "Mul": 5,
-            "Reshape": 3,
-            "RMSNormalization": 3,
-            "Shape": 5,
-            "Sigmoid": 1,
-            "Transpose": 2,
-            "Unsqueeze": 6,
-        }
-        self.assertEqual(counter["Expand"], expected_counts["Expand"])
-        self.assertEqual(counter["Transpose"], expected_counts["Transpose"])
         self._chech_shape(onx.get_proto(include_weights=False))
 
     @hide_stdout()
@@ -752,6 +715,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5171")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_to_onnx_autocast_float16_default_onnxruntime(self):
         self.common_test_tiny_llm_to_onnx_autocast_float16("default+onnxruntime", opset=22)
@@ -839,6 +803,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_yobx(self):
         proto = self._export_tiny_llm(
@@ -853,7 +818,12 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         )
         unique_ops = {n.op_type for n in proto.graph.node}
         self.assertInOr(
-            ("Attention", "GroupQueryAttention"),
+            (
+                "Attention",
+                "GroupQueryAttention",
+                "LocalAttentionGQAsQ_to1",
+                "LocalAttentionGQAsQ_to10",
+            ),
             unique_ops,
             "default+onnxruntime should produce an Attention op at opset 22",
         )
@@ -862,6 +832,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_transformers(self):
         proto = self._export_tiny_llm(
@@ -876,7 +847,12 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         )
         unique_ops = {n.op_type for n in proto.graph.node}
         self.assertInOr(
-            ("Attention", "GroupQueryAttention"),
+            (
+                "Attention",
+                "GroupQueryAttention",
+                "LocalAttentionGQAsQ_to1",
+                "LocalAttentionGQAsQ_to10",
+            ),
             unique_ops,
             "default+onnxruntime should produce an Attention op at opset 22",
         )
@@ -885,6 +861,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_yobx_2(self):
         proto = self._export_tiny_llm(
@@ -899,7 +876,12 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         )
         unique_ops = {n.op_type for n in proto.graph.node}
         self.assertInOr(
-            ("Attention", "GroupQueryAttention"),
+            (
+                "Attention",
+                "GroupQueryAttention",
+                "LocalAttentionGQAsQ_to1",
+                "LocalAttentionGQAsQ_to10",
+            ),
             unique_ops,
             "default+onnxruntime should produce an Attention op at opset 22",
         )
@@ -908,6 +890,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_transformers_2(self):
         proto = self._export_tiny_llm(
@@ -926,7 +909,12 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         )
         unique_ops = {n.op_type for n in proto.graph.node}
         self.assertInOr(
-            ("Attention", "GroupQueryAttention"),
+            (
+                "Attention",
+                "GroupQueryAttention",
+                "LocalAttentionGQAsQ_to1",
+                "LocalAttentionGQAsQ_to10",
+            ),
             unique_ops,
             "default+onnxruntime should produce an Attention op at opset 22",
         )

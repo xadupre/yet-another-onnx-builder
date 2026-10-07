@@ -4,9 +4,9 @@ import subprocess
 import sys
 from typing import Optional, List, Tuple, Union
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from .helpers.dot_helper import to_dot
 from .container import ExportArtifact
 
@@ -260,7 +260,8 @@ def plot_dot(
     .. plot::
 
         import matplotlib.pyplot as plt
-        import onnx.parser
+        from yobx._onnx_shim import onnx
+        import onnx_light.onnx.parser
         from yobx.doc import plot_dot
 
         model = onnx.parser.parse_model(
@@ -451,7 +452,7 @@ def demo_mlp_model(filename: str) -> onnx.ModelProto:
         from yobx.helpers.onnx_helper import pretty_onnx
         from yobx.xbuilder import OptimizationOptions
         from yobx.torch.interpreter import to_onnx
-        from yobx.translate import translate
+        from onnx_light.tools import translate
 
 
         class MLP(torch.nn.Module):
@@ -472,7 +473,7 @@ def demo_mlp_model(filename: str) -> onnx.ModelProto:
             MLP(), (x,), input_names=["x"], options=OptimizationOptions(patterns=None)
         )
         print(pretty_onnx(onx))
-        print(translate(onx, api="onnx-short"))
+        print(translate(onx, api="onnx-compact"))
     """
     return oh.make_model(
         oh.make_graph(

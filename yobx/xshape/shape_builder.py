@@ -1,10 +1,10 @@
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import numpy as np
-import onnx
-import onnx.helper as oh
+from onnx_light import onnx
+from onnx_light.onnx import helper as oh
 from ..helpers import string_type
 from ..helpers.onnx_helper import dtype_to_tensor_dtype
-from ._shape_helper import DYNAMIC_SHAPE
+from ._shape_helper import DYNAMIC_SHAPE, ONNX_SHAPE
 from ..xexpressions import evaluate_expression, simplify_expression
 from ..xexpressions.rename_expressions import rename_dynamic_dimensions, rename_dynamic_expression
 from ..helpers.onnx_helper import (
@@ -24,8 +24,8 @@ class ShapeBuilder:
     """
     API for a class computing shapes in an ONNX model.
 
-    The main implementation is :class:`BasicShapeBuilder
-    <yobx.xshape.shape_builder_impl.BasicShapeBuilder>`.
+    The main implementation is :class:`NativeShapeInference
+    <yobx.xshape.native_shape_inference.NativeShapeInference>`.
     It walks through all the nodes of an ONNX model and infers output shapes
     and types based on the input shapes, using symbolic expressions when the
     exact integer values are not known.
@@ -48,9 +48,9 @@ class ShapeBuilder:
     .. runpython::
         :showcode:
 
-        import onnx
-        import onnx.helper as oh
-        from yobx.xshape import BasicShapeBuilder
+        from onnx_light import onnx
+        import onnx_light.onnx.helper as oh
+        from yobx.xshape import NativeShapeInference
 
         TFLOAT = onnx.TensorProto.FLOAT
 
@@ -69,7 +69,7 @@ class ShapeBuilder:
             ir_version=10,
         )
 
-        builder = BasicShapeBuilder()
+        builder = NativeShapeInference()
         builder.run_model(model)
 
         print("input names :", builder.input_names)
@@ -126,7 +126,7 @@ class ShapeBuilder:
         """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
-    def set_opset(self, name: str, itype: int):
+    def set_opset(self, name: str, version: int):
         """
         Sets the opset version for domain `name`.
 
@@ -139,22 +139,22 @@ class ShapeBuilder:
         """Tells if `name` has a shape."""
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
-    def get_shape(self, name: str) -> DYNAMIC_SHAPE:
+    def get_shape(self, name: str) -> ONNX_SHAPE:
         """
         Returns the shape of result *name* as a tuple.
-        Each dimension is either an integer or a string (symbolic dimension).
+        Each dimension is an integer, a symbolic string, or ``None`` when unknown.
 
         :param name: result name
-        :return: shape as a tuple of integers and/or strings
+        :return: shape as a tuple of integers, strings, and/or ``None``
         """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
-    def set_shape(self, name: str, shape: DYNAMIC_SHAPE):
+    def set_shape(self, name: str, shape: ONNX_SHAPE):
         """
         Sets the shape for result *name*.
 
         :param name: result name
-        :param shape: tuple of integers and/or strings (symbolic dimensions)
+        :param shape: integers, symbolic strings, or ``None`` for unknown dimensions
         """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
@@ -217,12 +217,12 @@ class ShapeBuilder:
         """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
-    def set_device(self, name: str, rank: int):
+    def set_device(self, name: str, device: int):
         """
-        Sets the rank (number of dimensions) for result *name*.
+        Sets the device identifier for result *name*.
 
         :param name: result name
-        :param rank: rank as an integer
+        :param device: device identifier as an integer
         """
         raise NotImplementedError(f"not overloaded in {self.__class__.__name__!r}")
 
@@ -246,7 +246,9 @@ class ShapeBuilder:
         else:
             self.constraints_[dim_name].add(value)
 
-    def register_constraint_dimension(self, dim_name: str, value: Any):
+    def register_constraint_dimension(
+        self, dim_name: str, value: Union[str, int, Set[Union[str, int]]]
+    ):
         """
         Registers a constraint associating a symbolic dimension name with a value.
         This allows to deal backward constraints after a single pass if the model.
@@ -296,7 +298,7 @@ class ShapeBuilder:
             This method accesses ``self._known_shapes`` which must be a
             ``dict`` mapping result names to shape tuples.  This attribute
             is provided by concrete subclasses such as
-            :class:`~yobx.xshape.shape_builder_impl.BasicShapeBuilder`.
+            :class:`~yobx.xshape.native_shape_inference.NativeShapeInference`.
 
         :param original: set of preferred (user-visible) dimension names to
                          try to substitute into the shapes
@@ -604,9 +606,10 @@ class ShapeBuilder:
             return res
         raise AssertionError(f"unexpected values {do_type=}, {do_shape=}")
 
-    def evaluate_shape(self, name: str, context: Dict[str, int]) -> Tuple[int, ...]:
+    def evaluate_shape(self, name: str, context: Dict[str, int]) -> Tuple[Optional[int], ...]:
+        """Evaluates symbolic dimensions and preserves anonymous unknown dimensions."""
         shape = self.get_shape(name)
-        return tuple(evaluate_expression(s, context) for s in shape)
+        return tuple(evaluate_expression(s, context) if isinstance(s, str) else s for s in shape)
 
     def evaluate_dimension_equality_with_constraints(self, d1: str, *args) -> bool:
         """Tells if two dimensions are equal."""

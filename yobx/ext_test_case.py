@@ -451,6 +451,20 @@ def requires_cuda(version: str = "", msg: str = "", memory: int = 0):
     return lambda x: x
 
 
+def requires_onnxruntime_cuda(msg: str = ""):
+    """Skips a test if ONNX Runtime CUDA is not available."""
+    if not has_onnxruntime_cuda():
+        return unittest.skip(msg or "ONNX Runtime CUDAExecutionProvider is not available")
+    return lambda x: x
+
+
+def has_onnxruntime_cuda():
+    """Tells whether ONNX Runtime CUDA is available."""
+    import onnxruntime
+
+    return "CUDAExecutionProvider" in onnxruntime.get_available_providers()
+
+
 def requires_onnxir(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx-ir` is not recent enough."""
     try:
@@ -465,6 +479,19 @@ def requires_onnxir(version: str, msg: str = "") -> Callable:
     if PvVersion(onnx_ir.__version__) < PvVersion(version):
         msg = f"onnx_ir version {onnx_ir.__version__} < {version}: {msg}"
         return unittest.skip(msg)
+    return lambda x: x
+
+
+def requires_onnx_light(version: str, msg: str = "") -> Callable:
+    """Skips a unit test if :epkg:`onnx-light` is not recent enough."""
+    try:
+        import onnx_light
+    except ImportError:
+        return unittest.skip(msg or "onnx-light not installed")
+
+    if PvVersion(onnx_light.__version__) < PvVersion(version):
+        reason = f"onnx-light version {onnx_light.__version__} < {version}"
+        return unittest.skip(f"{reason}: {msg}" if msg else reason)
     return lambda x: x
 
 
@@ -1204,7 +1231,7 @@ def requires_litert(version: str = "", msg: str = "") -> Callable:
 def requires_onnx(version: str, msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnx` is not recent enough."""
     try:
-        import onnx
+        from yobx._onnx_shim import onnx
     except ImportError:
         return unittest.skip(msg or "onnx not installed")
 

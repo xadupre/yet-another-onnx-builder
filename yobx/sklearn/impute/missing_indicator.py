@@ -92,7 +92,7 @@ def sklearn_missing_indicator(
         res = g.op.Gather(mask, idx, axis=1, name=name, outputs=outputs)
 
     # Output type is bool (ONNX type 9).
-    from onnx import TensorProto
+    from onnx_light.onnx import TensorProto
 
     g.set_type(res, TensorProto.BOOL)
     return res

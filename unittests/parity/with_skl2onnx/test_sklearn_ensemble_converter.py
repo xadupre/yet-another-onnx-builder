@@ -1,8 +1,8 @@
 import unittest
 import numpy as np
 import onnxruntime
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 from sklearn.datasets import make_classification, make_regression
 from sklearn.ensemble import (
     ExtraTreesClassifier,
@@ -14,7 +14,7 @@ from sklearn.ensemble import (
 )
 from sklearn.model_selection import train_test_split
 from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_onnx_light
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx, ConvertOptions
 
@@ -130,6 +130,7 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         np.testing.assert_allclose(ort_out, expected, rtol=1e-5, atol=1e-4)
         np.testing.assert_allclose(ref_out, expected, rtol=1e-5, atol=1e-4)
 
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5172")
     def test_model_random_forest_classifier_decision_path(self):
         """Check extra decision_path output for RandomForestClassifier."""
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
@@ -174,6 +175,7 @@ class TestSklearnEnsembleConverters(ExtTestCase):
                 self.assertIsInstance(val, (str, bytes))
                 self.assertTrue(set(str(val)).issubset({"0", "1"}))
 
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5172")
     def test_model_random_forest_regressor_decision_path(self):
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
@@ -209,6 +211,7 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         self.assertEqual(ort_out[1].shape[0], X_test.shape[0])
         self.assertEqual(ort_out[1].shape[1], model.n_estimators)
 
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5172")
     def test_model_extra_trees_classifier_decision_path(self):
         """Check extra decision_path output for ExtraTreesClassifier."""
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
@@ -247,6 +250,7 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         self.assertEqual(ort_out[2].shape[0], X_test.shape[0])
         self.assertEqual(ort_out[2].shape[1], model.n_estimators)
 
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5172")
     def test_model_extra_trees_regressor_decision_path(self):
         """Check extra decision_path output for ExtraTreesRegressor."""
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)

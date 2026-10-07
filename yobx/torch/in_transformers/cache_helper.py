@@ -408,29 +408,24 @@ def make_static_cache(
     }, f"Not implemented when cls_layers={cls_layers!r}"
     key_value_pairs = _preprocess_key_value_pairs(key_value_pairs)
 
-    class _config:
-        def __init__(self):
-            self.head_dim = key_value_pairs[0][0].shape[-1]
-            self.num_attention_heads = key_value_pairs[0][0].shape[1]
-            self.num_hidden_layers = len(key_value_pairs)
-
-        def get_text_config(self, *args, **kwargs):
-            return self
-
     assert max_cache_len is not None, (
         f"max_cache_len={max_cache_len} cannot be setup "
         f"automatically yet from shape {key_value_pairs[0][0].shape}"
     )
     torch._check(
         max_cache_len >= key_value_pairs[0][0].shape[2],
-        (
+        lambda: (
             f"max_cache_len={max_cache_len} cannot be smaller "
             f"shape[2]={key_value_pairs[0][0].shape[2]} in shape "
             f"{key_value_pairs[0][0].shape}"
         ),
     )
+    config = transformers.PretrainedConfig()
+    config.head_dim = key_value_pairs[0][0].shape[-1]
+    config.num_attention_heads = key_value_pairs[0][0].shape[1]
+    config.num_hidden_layers = len(key_value_pairs)
     cache = transformers.cache_utils.StaticCache(
-        config=_config(),  # type: ignore[arg-type]
+        config=config,
         max_batch_size=key_value_pairs[0][0].shape[0],
         device=key_value_pairs[0][0].device,
         dtype=key_value_pairs[0][0].dtype,

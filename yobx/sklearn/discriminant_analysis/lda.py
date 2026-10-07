@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from ..register import register_sklearn_converter
 from ...typing import GraphBuilderExtendedProtocol

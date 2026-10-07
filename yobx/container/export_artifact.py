@@ -3,11 +3,14 @@
 of every :func:`to_onnx` conversion function.
 """
 
-from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
-import onnx
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence, Set, Tuple, Union
+from onnx_light import onnx
 from ..typing import GraphBuilderExtendedProtocol, ExportArtifactProtocol
 from .model_container import ExtendedModelContainer
 from .build_stats import BuildStats
+
+if TYPE_CHECKING:
+    import torch
 
 
 class ExportReport:
@@ -237,7 +240,7 @@ class ExportReport:
                 ],
                 extra={"time_total": 0.42},
             )
-            with tempfile.TemporaryDirectory() as tmp:
+            with tempfile.TemporaryDirectory(dir=".") as tmp:
                 path = os.path.join(tmp, "report.xlsx")
                 report.to_excel(path)
                 print(f"Saved to {os.path.basename(path)!r}")
@@ -307,8 +310,8 @@ class ExportReport:
         .. runpython::
             :showcode:
 
-            import onnx.helper as oh
-            import onnx
+            from onnx_light.onnx import helper as oh
+            from onnx_light import onnx
             from yobx.container import ExportReport
 
             X = oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [4, 8])
@@ -340,7 +343,7 @@ class ExportReport:
     ) -> "ExportReport":
         """Compute per-node symbolic FLOPs from *model* using symbolic shape inference.
 
-        Uses :class:`~yobx.xshape.BasicShapeBuilder` with
+        Uses :class:`~yobx.xshape.NativeShapeInference` with
         ``inference=InferenceMode.COST`` to walk every node and record the
         FLOPs expression.  When the model's input shapes contain symbolic
         dimensions (strings such as ``"batch"`` or ``"seq"``), the returned
@@ -362,14 +365,14 @@ class ExportReport:
 
         :param model: exported ONNX model proto.
         :param verbose: verbosity level passed to
-            :class:`~yobx.xshape.BasicShapeBuilder`.
+            :class:`~yobx.xshape.NativeShapeInference`.
         :return: ``self``, to allow method chaining.
 
         .. runpython::
             :showcode:
 
-            import onnx.helper as oh
-            import onnx
+            from onnx_light.onnx import helper as oh
+            from onnx_light import onnx
             from yobx.container import ExportReport
 
             X = oh.make_tensor_value_info("X", onnx.TensorProto.FLOAT, ["batch", "d"])
@@ -382,9 +385,9 @@ class ExportReport:
             report.compute_symbolic_flops(model)
             print(report.symbolic_flops)
         """
-        from ..xshape import BasicShapeBuilder, InferenceMode
+        from ..xshape import NativeShapeInference, InferenceMode
 
-        bs = BasicShapeBuilder(verbose=verbose)
+        bs = NativeShapeInference(verbose=verbose)
         cost = bs.run_model(model, inference=InferenceMode.COST)
 
         rows = []
@@ -472,6 +475,10 @@ class ExportArtifact(ExportArtifactProtocol):
     container, an :class:`ExportReport` describing the export process,
     and an optional filename.
 
+    The optional :attr:`ep` retains the PyTorch ExportedProgram when a
+    Torch export requests ``return_ep=True``. It is ``None`` otherwise,
+    and does not require importing Torch to construct an artifact.
+
     Args:
         proto : ModelProto | FunctionProto | GraphProto | None
             The ONNX proto produced by the export.  When *large_model* was
@@ -522,18 +529,19 @@ class ExportArtifact(ExportArtifactProtocol):
         builder: Optional[GraphBuilderExtendedProtocol] = None,
         function: Optional["FunctionPieces"] = None,
     ):
-        assert not proto or isinstance(
+        if proto is not None and not isinstance(
             proto, (onnx.ModelProto, onnx.GraphProto, onnx.FunctionProto)
-        ), f"Unexpected type {proto} for proto"
-        assert not container or isinstance(
-            container, ExtendedModelContainer
-        ), f"Unexpected type {proto} for container"
+        ):
+            raise TypeError(f"Expected a native onnx-light proto, not {type(proto)!r}.")
+        if container is not None and not isinstance(container, ExtendedModelContainer):
+            raise TypeError(f"Expected a native model container, not {type(container)!r}.")
         self.proto = proto
         self.container = container
         self.report = report
         self.filename = filename
         self.builder = builder
         self.function = function
+        self.ep: Optional["torch.export.ExportedProgram"] = None
         if self.container and self.container._stats:
             if not self.report:
                 self.report = ExportReport(build_stats=self.container._stats)
@@ -572,7 +580,7 @@ class ExportArtifact(ExportArtifactProtocol):
         :class:`~onnx.ModelProto`.
 
         :param verbose: verbosity level passed to
-            :class:`~yobx.xshape.BasicShapeBuilder`.
+            :class:`~yobx.xshape.NativeShapeInference`.
         :return: ``self``, to allow method chaining.
         """
         if not isinstance(self.proto, onnx.ModelProto):
@@ -583,7 +591,7 @@ class ExportArtifact(ExportArtifactProtocol):
         return self
 
     def save_report(self, onnx_path: str) -> None:
-        """Save the report as an Excel file alongside *onnx_path* when available."""
+        """Saves the report as an Excel file alongside *onnx_path* when available."""
         if self.report is None:
             return
         import os
@@ -598,7 +606,7 @@ class ExportArtifact(ExportArtifactProtocol):
         self.report.to_excel(excel_path)
 
     def save(self, file_path: str, all_tensors_to_one_file: bool = True) -> Any:
-        """Save the exported model to *file_path*.
+        """Saves the exported model to *file_path*.
 
         When a :class:`~yobx.container.ExtendedModelContainer` is present
         (``large_model=True`` was used during export) the model and its
@@ -625,8 +633,6 @@ class ExportArtifact(ExportArtifactProtocol):
             self.filename = file_path
             self.save_report(file_path)
             return result
-        import onnx
-
         if isinstance(self.proto, onnx.ModelProto):
             onnx.save_model(self.proto, file_path)
             self.filename = file_path
@@ -639,13 +645,13 @@ class ExportArtifact(ExportArtifactProtocol):
         )
 
     def get_proto(self, include_weights: bool = True) -> Any:
-        """Return the ONNX proto, optionally with all weights inlined.
+        """Returns the native ONNX proto, optionally with all weights inlined.
 
         When the export was performed with ``large_model=True`` (i.e.
         :attr:`container` is set), the raw :attr:`proto` has
         *external-data* placeholders instead of embedded weight tensors.
         Passing ``include_weights=True`` (the default) uses
-        :meth:`~yobx.container.ExtendedModelContainer.to_ir` to build a
+        :meth:`~yobx.container.ExtendedModelContainer.get_model_with_data` to build a
         fully self-contained :class:`~onnx.ModelProto`.
 
         :param include_weights: when ``True`` (default) embed the large
@@ -672,7 +678,7 @@ class ExportArtifact(ExportArtifactProtocol):
 
     @classmethod
     def load(cls, file_path: str, load_large_initializers: bool = True) -> "ExportArtifact":
-        """Load a saved model from *file_path*.
+        """Loads a saved native model from *file_path*.
 
         If the file references external data (i.e. the model was saved
         with ``large_model=True``) an
@@ -691,10 +697,7 @@ class ExportArtifact(ExportArtifactProtocol):
             artifact = ExportArtifact.load("model.onnx")
             proto = artifact.get_proto()
         """
-        import onnx
-        from onnx.external_data_helper import _get_all_tensors, uses_external_data
-
-        from .model_container import ExtendedModelContainer
+        from .model_container import ExtendedModelContainer, _get_all_tensors, uses_external_data
 
         # Load without external data first to inspect the proto.
         proto = onnx.load(file_path, load_external_data=False)

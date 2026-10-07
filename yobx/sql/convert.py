@@ -238,6 +238,7 @@ def trace_numpy_to_onnx(
     large_model: bool = False,
     external_threshold: int = 1024,
     return_optimize_report: bool = False,
+    builder_cls: Union[type, Callable] = GraphBuilder,
 ) -> ExportArtifact:
     """
     Trace a numpy function and return the equivalent ONNX model.
@@ -282,6 +283,8 @@ def trace_numpy_to_onnx(
         :class:`~yobx.container.ExportArtifact` has its
         :attr:`~yobx.container.ExportArtifact.report` attribute populated with
         per-pattern optimization statistics
+    :param builder_cls: graph-builder class or factory used for tracing.
+        Defaults to :class:`~yobx.xbuilder.GraphBuilder`.
     :return: an :class:`~yobx.container.ExportArtifact` representing the
         traced function.
 
@@ -320,7 +323,7 @@ def trace_numpy_to_onnx(
                 f"input_names has {len(resolved_input_names)} elements."
             )
 
-    g = GraphBuilder(opsets)  # type: ignore
+    g = builder_cls(opsets)
 
     if dynamic_shapes is not None and len(dynamic_shapes) != len(inputs):
         raise ValueError(
@@ -361,10 +364,13 @@ def trace_numpy_to_onnx(
     for out_name in resolved_output_names:
         g.make_tensor_output(out_name, indexed=False, allow_untyped_output=True)
 
-    onx = g.to_onnx(  # type: ignore
-        large_model=large_model,
-        external_threshold=external_threshold,
-        return_optimize_report=return_optimize_report,
+    export_kwargs = (
+        dict(return_optimize_report=return_optimize_report)
+        if isinstance(g, GraphBuilder) or getattr(g, "supports_optimization_report", False)
+        else {}
+    )
+    onx = g.to_onnx(
+        large_model=large_model, external_threshold=external_threshold, **export_kwargs
     )
     return onx
 
@@ -593,6 +599,7 @@ def to_onnx(
                 large_model=large_model,
                 external_threshold=external_threshold,
                 return_optimize_report=return_optimize_report,
+                builder_cls=builder_cls,
             )
             if filename:
                 if verbose:

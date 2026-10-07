@@ -14,12 +14,11 @@ torch
 
     import textwrap
     from yobx.torch import apply_patches_for_model
-    from yobx.torch.in_torch.patches import get_patches
 
-    with apply_patches_for_model(patch_torch=True):
+    with apply_patches_for_model(patch_torch=True) as details:
         link = []
         rows = []
-        for i, patch in enumerate(get_patches()):
+        for i, patch in enumerate(details):
             name = f"patch-torch-{i+1}"
             link.append(f"* :ref:`{name}`")
             rows.extend([

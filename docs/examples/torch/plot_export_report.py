@@ -34,7 +34,7 @@ The six sheets are:
     model and the estimated FLOPs for each type.
 ``symbolic_flops``
     Per-node symbolic FLOPs expressions computed by
-    :class:`~yobx.xshape.BasicShapeBuilder` with ``InferenceMode.COST``.
+    :class:`~yobx.xshape.NativeShapeInference` with ``InferenceMode.COST``.
     When the model's input shapes contain symbolic dimensions the values are
     symbolic arithmetic strings; for fully static shapes they are integers.
 """

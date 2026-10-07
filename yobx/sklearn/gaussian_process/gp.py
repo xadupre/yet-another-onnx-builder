@@ -1,7 +1,7 @@
 from typing import Dict, List, Optional, Tuple, Union
 
 import numpy as np
-import onnx
+from yobx._onnx_shim import onnx
 from scipy.linalg import solve_triangular
 from sklearn.gaussian_process import GaussianProcessClassifier, GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import (

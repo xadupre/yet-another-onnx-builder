@@ -1,9 +1,10 @@
 import unittest
-from onnx.checker import check_model
+from onnx_light.onnx.checker import check_model
 from yobx.ext_test_case import (
     ExtTestCase,
     skipif_ci_windows,
     requires_torch,
+    requires_onnx_light,
     requires_transformers,
     ignore_warnings,
 )
@@ -51,7 +52,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             verbose=0,
             inline=False,
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 2)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -97,7 +98,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             function_options=FunctionOptions(merge_allowed=True, external_threshold=0),
             inline=False,
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 2)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -138,7 +139,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             verbose=0,
             inline=False,
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 1)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -203,7 +204,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             inline=False,
             filename=filename,
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 3)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -256,7 +257,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 2)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -322,7 +323,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 3)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -390,7 +391,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 1)
         self.assertEqual(["<locals>_Level2"], [f.name for f in onx.functions])
         ref = ExtendedReferenceEvaluator(onx)
@@ -459,7 +460,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 1)
         self.assertEqual(["<locals>_Level1"], [f.name for f in onx.functions])
         ref = ExtendedReferenceEvaluator(onx)
@@ -515,7 +516,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 2)
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
@@ -583,7 +584,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 1)
         self.assertEqual(["<locals>_Level2"], [f.name for f in onx.functions])
         ref = ExtendedReferenceEvaluator(onx)
@@ -650,7 +651,7 @@ class TestOnnxExportSubModules(ExtTestCase):
             filename=filename,
             dynamic_shapes=({0: "batch"},),
         )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertEqual(len(onx.functions), 1)
         self.assertEqual(["<locals>_Level1"], [f.name for f in onx.functions])
         ref = ExtendedReferenceEvaluator(onx)
@@ -660,6 +661,7 @@ class TestOnnxExportSubModules(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.6", "owning module is None before that")
     @requires_transformers("5.2")
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5167")
     @ignore_warnings(FutureWarning)
     def test_submodule_local_functions_tiny_llm(self):
         """
@@ -701,7 +703,7 @@ class TestOnnxExportSubModules(ExtTestCase):
                 verbose=0,
                 filename=filename2,
             )
-        check_model(onx)
+        check_model(onx.proto)
         self.assertGreater(len(onx.functions), 0)
 
 

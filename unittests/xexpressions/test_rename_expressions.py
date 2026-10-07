@@ -129,6 +129,11 @@ class TestRenameExpressions(ExtTestCase):
     def test_rename_expression(self):
         self.assertEqual("B+seq_length", rename_expression("s52+seq_length", {"s52": "B"}))
 
+    def test_rename_expression_syntax_error(self):
+        invalid_expr = "12*batch/:getitem"
+        result = rename_expression(invalid_expr, {"batch": "B"})
+        self.assertEqual(invalid_expr, result)
+
     def test_parse_expression_tokens_syntax_error(self):
         # An expression with a SyntaxError should return the expression itself in a set.
         invalid_expr = "a +"

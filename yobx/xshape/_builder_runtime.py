@@ -3,7 +3,7 @@ from itertools import zip_longest
 import os
 from typing import Any, Dict, Generator, List, Tuple
 import numpy as np
-from onnx import NodeProto
+from onnx_light.onnx import NodeProto
 from ..helpers import string_type
 from ..helpers.onnx_helper import (
     dtype_to_tensor_dtype,
@@ -226,21 +226,29 @@ class _BuilderRuntime:
                     f"indices={indices}, axes={axes}){self.get_debug_msg()}"
                 )
                 n = shape[axis]
-                start = index.start or 0
-                end = index.stop or n
-                if isinstance(end, int):
-                    diff = end - start
-                    dim = diff // index.step if index.step else diff
+                step = index.step or 1
+                if isinstance(n, int):
+                    start, end, step = index.indices(n)
+                    dim = len(range(start, end, step))
+                else:
+                    start = index.start or 0
+                    if isinstance(start, int) and start < 0:
+                        start = f"({n})+({start})"
+                    end = index.stop
+                    if end is None or (isinstance(end, int) and end >= 9223372036854775807):
+                        end = n
+                    elif isinstance(end, int) and end < 0:
+                        end = f"({n})+({end})"
+                    diff = f"({end})-({start})"
+                    if step != 1:
+                        diff = f"(({diff})+({step - 1}))//({step})"
+                    dim = simplify_expression(diff)
+                if isinstance(dim, int):
                     dim = max(dim, 0)
                     assert dim >= 0, (
                         f"Negative dim={dim}, axis={axis}, shape={shape}, indices={indices}, "
                         f"axes={axes}, expand_axes={expand_axes}"
                     )
-                else:
-                    dim = f"({n})-({start})"
-                    if index.step and index.step != 1:
-                        dim = f"({dim})//({index.step})"
-                    dim = simplify_expression(dim)
                 new_shape.append(dim)
         elif all_int(indices):
             assert len(axes) == 1, (
@@ -678,7 +686,7 @@ class _BuilderRuntime:
             f"Node {node.op_type} (name={node.name!r}) has not enough "
             f"inputs {node.input}\n{self.pretty_text()}"
         )
-        data, starts, ends = [new_feeds[k] for k in node.input[:3]]
+        data, starts, ends = [new_feeds[k] for k in list(node.input)[:3]]
         axes = new_feeds[node.input[3]] if len(node.input) > 3 and node.input[3] else None
         steps = new_feeds[node.input[4]] if len(node.input) > 4 and node.input[4] else None
 

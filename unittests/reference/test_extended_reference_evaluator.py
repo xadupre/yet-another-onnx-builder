@@ -1,10 +1,10 @@
 import unittest
 from typing import Optional
 import numpy as np
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
-from yobx.ext_test_case import ExtTestCase, has_cuda
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
+from yobx.ext_test_case import ExtTestCase, has_onnxruntime_cuda
 from yobx.reference import ExtendedReferenceEvaluator
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -86,13 +86,13 @@ class TestReferenceOps(ExtTestCase):
                 ],
                 "name",
                 [
-                    oh.make_tensor_value_info("x", TUINT8, None),
-                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("x", TUINT8, [1, 1, 4, 4]),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, []),
                 ],
-                [oh.make_tensor_value_info("y", TUINT8, None)],
+                [oh.make_tensor_value_info("y", TUINT8, [1, 1, 3, 3])],
             ),
             opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
@@ -137,16 +137,16 @@ class TestReferenceOps(ExtTestCase):
                 ],
                 "name",
                 [
-                    oh.make_tensor_value_info("x", TUINT8, None),
-                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("w", TUINT8, None),
-                    oh.make_tensor_value_info("w_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("w_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("x", TUINT8, [1, 1, 4, 4]),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("w", TUINT8, [1, 1, 2, 2]),
+                    oh.make_tensor_value_info("w_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("w_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, []),
                 ],
-                [oh.make_tensor_value_info("y", TUINT8, None)],
+                [oh.make_tensor_value_info("y", TUINT8, [1, 1, 3, 3])],
             ),
             opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
@@ -194,16 +194,16 @@ class TestReferenceOps(ExtTestCase):
                 ],
                 "name",
                 [
-                    oh.make_tensor_value_info("x", TUINT8, None),
-                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("w", TUINT8, None),
-                    oh.make_tensor_value_info("w_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("w_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("x", TUINT8, [1, 4, 4, 1]),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("w", TUINT8, [1, 1, 2, 2]),
+                    oh.make_tensor_value_info("w_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("w_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, []),
                 ],
-                [oh.make_tensor_value_info("y", TUINT8, None)],
+                [oh.make_tensor_value_info("y", TUINT8, [1, 3, 3, 1])],
             ),
             opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
@@ -252,16 +252,16 @@ class TestReferenceOps(ExtTestCase):
                 ],
                 "name",
                 [
-                    oh.make_tensor_value_info("x", TUINT8, None),
-                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("w", TUINT8, None),
-                    oh.make_tensor_value_info("w_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("w_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("x", TUINT8, [1, 1, 8]),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("w", TUINT8, [1, 1, 3]),
+                    oh.make_tensor_value_info("w_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("w_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, []),
                 ],
-                [oh.make_tensor_value_info("y", TUINT8, None)],
+                [oh.make_tensor_value_info("y", TUINT8, [1, 1, 6])],
             ),
             opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
@@ -309,16 +309,16 @@ class TestReferenceOps(ExtTestCase):
                 ],
                 "name",
                 [
-                    oh.make_tensor_value_info("x", TUINT8, None),
-                    oh.make_tensor_value_info("x_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("x_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("w", TUINT8, None),
-                    oh.make_tensor_value_info("w_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("w_zero_point", TUINT8, None),
-                    oh.make_tensor_value_info("y_scale", TFLOAT, None),
-                    oh.make_tensor_value_info("y_zero_point", TUINT8, None),
+                    oh.make_tensor_value_info("x", TUINT8, [1, 8, 1]),
+                    oh.make_tensor_value_info("x_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("x_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("w", TUINT8, [1, 1, 3]),
+                    oh.make_tensor_value_info("w_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("w_zero_point", TUINT8, []),
+                    oh.make_tensor_value_info("y_scale", TFLOAT, []),
+                    oh.make_tensor_value_info("y_zero_point", TUINT8, []),
                 ],
-                [oh.make_tensor_value_info("y", TUINT8, None)],
+                [oh.make_tensor_value_info("y", TUINT8, [1, 6, 1])],
             ),
             opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
             ir_version=9,
@@ -362,12 +362,13 @@ class TestReferenceOps(ExtTestCase):
     def test_quick_gelu(self):
         from onnxruntime import InferenceSession
 
-        for alpha in [0.0, 2.0]:
+        for alpha in [None, 0.0, 2.0]:
+            attributes = {} if alpha is None else {"alpha": alpha}
             model = oh.make_model(
                 oh.make_graph(
                     [
                         oh.make_node(
-                            "QuickGelu", ["X"], ["Z"], domain="com.microsoft", alpha=alpha
+                            "QuickGelu", ["X"], ["Z"], domain="com.microsoft", **attributes
                         )
                     ],
                     "name",
@@ -382,7 +383,43 @@ class TestReferenceOps(ExtTestCase):
             expected = sess.run(None, {"X": a})
             ref = ExtendedReferenceEvaluator(model)
             got = ref.run(None, {"X": a})
-            self.assertEqualArray(expected[0], got[0])
+            self.assertEqualArray(expected[0], got[0], atol=2e-7)
+
+    def test_simplified_layer_normalization_defaults(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "SimplifiedLayerNormalization",
+                        ["X", "scale"],
+                        ["Y", "inv_std_var"],
+                        domain="com.microsoft",
+                    )
+                ],
+                "name",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [2, 3, 4]),
+                    oh.make_tensor_value_info("scale", TFLOAT, [4]),
+                ],
+                [
+                    oh.make_tensor_value_info("Y", TFLOAT, [2, 3, 4]),
+                    oh.make_tensor_value_info("inv_std_var", TFLOAT, [2, 3, 1]),
+                ],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+            ir_version=9,
+        )
+        feeds = {
+            "X": self._range(2, 3, 4, bias=0.1),
+            "scale": np.array([0.5, 1.0, 1.5, 2.0], dtype=np.float32),
+        }
+        expected_inv_std_var = np.reciprocal(
+            np.sqrt(np.square(feeds["X"]).mean(axis=-1, keepdims=True) + 1.0e-5)
+        )
+        expected = (feeds["X"] * expected_inv_std_var * feeds["scale"], expected_inv_std_var)
+        got = ExtendedReferenceEvaluator(model).run(None, feeds)
+        self.assertEqualArray(expected[0], got[0], atol=1.0e-6)
+        self.assertEqualArray(expected[1], got[1], atol=1.0e-6)
 
     def test_scatter_elements_4d(self):
         model = oh.make_model(
@@ -462,7 +499,6 @@ class TestReferenceOps(ExtTestCase):
                         "SkipLayerNormalization",
                         ["x", "skip", "gamma", "beta"],
                         ["Z"],
-                        epsilon=1.0e-5,
                         domain="com.microsoft",
                     )
                 ],
@@ -698,7 +734,7 @@ class TestReferenceOps(ExtTestCase):
         }
         got = ref.run(None, feeds)
 
-        if not has_cuda():
+        if not has_onnxruntime_cuda():
             return
         import onnxruntime
 
@@ -708,18 +744,64 @@ class TestReferenceOps(ExtTestCase):
         expected = sess.run(None, feeds)
         self.assertEqualArrayAny(expected, got, atol=1)
 
+    def test_attention_attributes(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "Attention",
+                        ["X", "weights", "bias", "mask", "", "attention_bias"],
+                        ["Y"],
+                        domain="com.microsoft",
+                        num_heads=1,
+                        unidirectional=1,
+                        qkv_hidden_sizes=[2, 2, 2],
+                        past_present_share_buffer=0,
+                        do_rotary=0,
+                        rotary_embedding_dim=2,
+                        mask_filter_value=-2.0,
+                        scale=1.0,
+                    )
+                ],
+                "attention_attributes",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [1, 2, 2]),
+                    oh.make_tensor_value_info("weights", TFLOAT, [2, 6]),
+                    oh.make_tensor_value_info("bias", TFLOAT, [6]),
+                    oh.make_tensor_value_info("mask", onnx.TensorProto.INT32, [1, 2]),
+                    oh.make_tensor_value_info("attention_bias", TFLOAT, [1, 1, 2, 2]),
+                ],
+                [oh.make_tensor_value_info("Y", TFLOAT, [1, 2, 2])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+        )
+        x = np.array([[[1, 0], [0, 1]]], dtype=np.float32)
+        weights = np.concatenate([np.eye(2, dtype=np.float32)] * 3, axis=1)
+        scores = np.array([[[[1, -2], [0, 1]]]], dtype=np.float32)
+        probabilities = np.exp(scores) / np.exp(scores).sum(axis=-1, keepdims=True)
+        expected = (probabilities @ x[:, None, :, :]).transpose(0, 2, 1, 3).reshape(1, 2, 2)
+        got = ExtendedReferenceEvaluator(model).run(
+            None,
+            {
+                "X": x,
+                "weights": weights,
+                "bias": np.zeros(6, dtype=np.float32),
+                "mask": np.ones((1, 2), dtype=np.int32),
+                "attention_bias": np.zeros((1, 1, 2, 2), dtype=np.float32),
+            },
+        )
+        self.assertEqualArray(expected, got[0], atol=1e-7)
+
     def test_bias_softmax(self):
-        for axis, b_shape in [(0, (2, 3, 4)), (1, (3, 4)), (2, (4,))]:
+        for axis, b_shape in [(0, (2, 3, 4)), (None, (3, 4)), (1, (3, 4)), (2, (4,))]:
+            attributes = {"is_inner_broadcast": 0}
+            if axis is not None:
+                attributes["axis"] = axis
             model = oh.make_model(
                 oh.make_graph(
                     [
                         oh.make_node(
-                            "BiasSoftmax",
-                            ["X", "B"],
-                            ["Z"],
-                            domain="com.microsoft",
-                            axis=axis,
-                            is_inner_broadcast=0,
+                            "BiasSoftmax", ["X", "B"], ["Z"], domain="com.microsoft", **attributes
                         )
                     ],
                     "name",
@@ -738,9 +820,10 @@ class TestReferenceOps(ExtTestCase):
             ref = ExtendedReferenceEvaluator(model)
             got = ref.run(None, feeds)
             z = x + b
-            tmp = z - z.max(axis=axis, keepdims=True)
+            effective_axis = 1 if axis is None else axis
+            tmp = z - z.max(axis=effective_axis, keepdims=True)
             w = np.exp(tmp)
-            expected = (w / w.sum(axis=axis, keepdims=True)).astype(np.float32)
+            expected = (w / w.sum(axis=effective_axis, keepdims=True)).astype(np.float32)
             self.assertEqualArray(expected, got[0], atol=1e-5)
 
     def test_inline_1_function(self):

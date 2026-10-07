@@ -99,7 +99,7 @@ class TestOrdinalEncoder(ExtTestCase):
         onx = to_onnx(enc, (X,))
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
-        self.assertIn("ArgMax", op_types)
+        self.assertTrue(any(op_type in {"ArgMax", "TopK"} for op_type in op_types))
         self.assertIn("Concat", op_types)
 
     def test_ordinal_encoder_in_pipeline(self):

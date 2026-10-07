@@ -114,9 +114,9 @@ string suitable for rendering with `Graphviz <https://graphviz.org/>`_.
     :showcode:
 
     import numpy as np
-    import onnx
-    import onnx.helper as oh
-    import onnx.numpy_helper as onh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
+    import onnx_light.onnx.numpy_helper as onh
     from yobx.helpers.dot_helper import to_dot
 
     TFLOAT = onnx.TensorProto.FLOAT
@@ -153,9 +153,9 @@ The resulting DOT source can be rendered directly in the documentation with the
     :script: DOT-SECTION
 
     import numpy as np
-    import onnx
-    import onnx.helper as oh
-    import onnx.numpy_helper as onh
+    from yobx._onnx_shim import onnx
+    import onnx_light.onnx.helper as oh
+    import onnx_light.onnx.numpy_helper as onh
     from yobx.helpers.dot_helper import to_dot
 
     TFLOAT = onnx.TensorProto.FLOAT

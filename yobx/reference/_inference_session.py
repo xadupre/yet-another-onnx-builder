@@ -1,6 +1,7 @@
 import os
 from typing import Any, Callable, Dict, List, Optional, Union
-import onnx
+from onnx_light import onnx
+from onnx_light.onnx import helper, shape_inference
 import numpy as np
 import onnxruntime
 from onnxruntime.capi import _pybind_state as ORTC
@@ -243,8 +244,8 @@ def investigate_onnxruntime_issue(
         :showcode:
 
         import numpy as np
-        import onnx
-        import onnx.helper as oh
+        from onnx_light import onnx
+        import onnx_light.onnx.helper as oh
         from yobx.reference._inference_session import investigate_onnxruntime_issue
 
         TFLOAT = onnx.TensorProto.FLOAT
@@ -293,7 +294,7 @@ def investigate_onnxruntime_issue(
     if infer_shapes:
         if verbose:
             print("[investigate_onnxruntime_issue] run shape inference")
-        onx = onnx.shape_inference.infer_shapes(onx)
+        onx = shape_inference.infer_shapes(onx)
 
     if isinstance(onnx_to_session, str):
         if onnx_to_session == "cpu_session":
@@ -324,19 +325,26 @@ def investigate_onnxruntime_issue(
                 f"{node.op_type}({', '.join(node.input)}) -> "
                 f"{', '.join(node.output)}"
             )
-        ext = onnx.utils.Extractor(onx)
-        if quiet:
-            try:
-                extracted = ext.extract_model(input_names, node.output)
-            except Exception as e:
-                if verbose > 0:
-                    print(
-                        f"[investigate_onnxruntime_issue] cannot extract "
-                        f"model at node {i} due to {e}"
-                    )
-                return node
-        else:
-            extracted = ext.extract_model(input_names, node.output)
+        # Each iteration diagnoses a graph prefix; a separate graph extractor
+        # is unnecessary, and would lose native proto ownership.
+        extracted = onnx.ModelProto()
+        extracted.CopyFrom(onx)
+        extracted.graph.ClearField("node")
+        extracted.graph.node.extend(list(onx.graph.node)[: i + 1])
+        value_info = {
+            value.name: value
+            for value in [*onx.graph.input, *onx.graph.value_info, *onx.graph.output]
+        }
+        extracted.graph.ClearField("output")
+        extracted.graph.output.extend(
+            (
+                value_info[name]
+                if name in value_info
+                else helper.make_tensor_value_info(name, onnx.TensorProto.UNDEFINED, None)
+            )
+            for name in node.output
+            if name
+        )
 
         if dump_filename:
             if verbose > 1:

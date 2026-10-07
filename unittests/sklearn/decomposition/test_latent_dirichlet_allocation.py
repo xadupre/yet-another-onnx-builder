@@ -14,12 +14,13 @@ class TestLatentDirichletAllocation(ExtTestCase):
         rng = np.random.default_rng(seed)
         return rng.poisson(10, size=(n_samples, n_features)).astype(np.float32)
 
-    def _check_lda(self, lda, X_train, X_test, atol=1e-4):
+    def _check_lda(self, lda, X_train, X_test, atol=1e-4, target_opset=None):
         """Fit *lda*, convert to ONNX, compare transform output."""
         from yobx.sklearn import to_onnx
 
         lda.fit(X_train)
-        onx = to_onnx(lda, (X_test,))
+        options = {} if target_opset is None else {"target_opset": target_opset}
+        onx = to_onnx(lda, (X_test,), **options)
 
         # Reference evaluator
         ref = ExtendedReferenceEvaluator(onx)
@@ -38,6 +39,20 @@ class TestLatentDirichletAllocation(ExtTestCase):
         self.assertEqualArray(np.ones_like(row_sums), row_sums, atol=1e-5)
 
         return onx
+
+    def test_lda_opset13(self):
+        """Converts an LDA model targeting opset 13."""
+        from sklearn.decomposition import LatentDirichletAllocation
+
+        X_train = self._make_data(n_samples=30, n_features=10, seed=10)
+        X_test = self._make_data(n_samples=5, n_features=10, seed=11)
+        lda = LatentDirichletAllocation(
+            n_components=3, max_iter=3, max_doc_update_iter=10, random_state=6
+        )
+        onx = self._check_lda(lda, X_train, X_test, target_opset=13)
+        shape_nodes = [node for node in onx.proto.graph.node if node.op_type == "Shape"]
+        self.assertTrue(shape_nodes)
+        self.assertTrue(all(not node.attribute for node in shape_nodes))
 
     def test_lda_basic(self):
         """Basic LDA conversion with default parameters."""
@@ -96,7 +111,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         onx = self._check_lda(lda, X_train, X_test, atol=1e-4)
 
         # Verify that the ONNX graph operates in float32.
-        import onnx
+        from yobx._onnx_shim import onnx
 
         input_type = onx.proto.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(input_type, onnx.TensorProto.FLOAT)
@@ -115,7 +130,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         onx = self._check_lda(lda, X_train, X_test, atol=1e-6)
 
         # Verify that the ONNX graph operates in float64.
-        import onnx
+        from yobx._onnx_shim import onnx
 
         input_type = onx.proto.graph.input[0].type.tensor_type.elem_type
         self.assertEqual(input_type, onnx.TensorProto.DOUBLE)

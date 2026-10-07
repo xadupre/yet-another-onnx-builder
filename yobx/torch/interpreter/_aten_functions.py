@@ -8,16 +8,16 @@ import sys
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 import numpy as np
-import onnx.numpy_helper as onh
-from onnx import FunctionProto, TensorProto, ValueInfoProto
-from onnx.helper import (
+import onnx_light.onnx.numpy_helper as onh
+from onnx_light.onnx import FunctionProto, TensorProto, ValueInfoProto
+from onnx_light.onnx.helper import (
     make_graph,
     make_node,
     make_tensor_sequence_value_info,
     make_tensor_type_proto,
     make_tensor_value_info,
 )
-from onnx.shape_inference import infer_function_output_types
+from onnx_light.onnx.shape_inference import infer_function_output_types
 from ...helpers.onnx_helper import (
     tensor_dtype_to_np_dtype,
     np_dtype_to_tensor_dtype,
@@ -423,6 +423,7 @@ def aten_abs(
     assert g.has_type(x), f"missing type for x={x!r}{g.get_debug_msg()}"
     itype = g.get_type(x)
     if itype in {TensorProto.COMPLEX64, TensorProto.COMPLEX128}:
+        g.add_domain("ai.onnx.complex", 1)
         res = g.anyop.ComplexModule(x, name=name, domain="ai.onnx.complex")
         if not sts:
             rtype = TensorProto.FLOAT32 if itype == TensorProto.COMPLEX64 else TensorProto.DOUBLE
@@ -4122,9 +4123,35 @@ def aten_diff(
     diff_input = x
     for i in range(n):
         lag0 = g.op.Slice(
-            diff_input, g.ZERO, g.MINUS_ONE, np.array([dim], dtype=np.int64), name=name
+            diff_input,
+            g.ZERO,
+            g.MINUS_ONE,
+            np.array([dim], dtype=np.int64),
+            name=name,
+            _infer_shapes=False,
         )
-        lag1 = g.op.Slice(diff_input, g.ONE, g.END, np.array([1], dtype=np.int64), name=name)
+        lag1 = g.op.Slice(
+            diff_input,
+            g.ONE,
+            g.END,
+            np.array([dim], dtype=np.int64),
+            name=name,
+            _infer_shapes=False,
+        )
+        if g.has_type(diff_input):
+            g.set_type(lag0, g.get_type(diff_input))
+            g.set_type(lag1, g.get_type(diff_input))
+        if g.has_shape(diff_input):
+            lag_shape = list(g.get_shape(diff_input))
+            dimension = lag_shape[dim]
+            lag_shape[dim] = (
+                max(dimension - 1, 0) if isinstance(dimension, int) else f"({dimension})-1"
+            )
+            g.set_shape(lag0, tuple(lag_shape))
+            g.set_shape(lag1, tuple(lag_shape))
+        elif g.has_rank(diff_input):
+            g.set_rank(lag0, g.get_rank(diff_input))
+            g.set_rank(lag1, g.get_rank(diff_input))
         if i == n - 1:
             res = g.op.Sub(lag1, lag0, name=name, outputs=outputs)
         else:
@@ -4137,7 +4164,7 @@ def aten_diff(
             shape = g.get_shape(x)
             d = shape[dim]
             new_shape = list(shape)
-            new_shape[dim] = (d - n) if isinstance(d, dim) else f"({new_shape[dim]})-{n}"
+            new_shape[dim] = (d - n) if isinstance(d, int) else f"({new_shape[dim]})-{n}"
             g.set_shape(res, tuple(new_shape))
         elif g._has_rank(x):
             g.set_rank(res, g.get_rank(x))
@@ -5357,6 +5384,7 @@ def aten__fftn_onnx(
         # Already complex
         fitype = itype
 
+    g.add_domain("ai.onnx.complex", 1)
     final = g.anyop.ToComplex(normalized, name=name, outputs=outputs, domain="ai.onnx.complex")
     if not sts:
         g.set_type(final, fitype)
@@ -5832,10 +5860,6 @@ def aten_flatten_using_ints(
         res = g.op.Reshape(x, new_shape, outputs=outputs, name=name)
     if not sts:
         g.set_type(res, g.get_type(x))
-        if g.has_shape(x, full=True):
-            g.set_shape(res, (int(np.prod(g.get_shape(x))),))
-        else:
-            g.set_rank(res, 1)
     return res
 
 
@@ -9976,7 +10000,7 @@ def aten_matmul(
     "matmul"
     res = g.op.MatMul(x, y, outputs=outputs, name=name)
     if not sts:
-        set_type_shape_binary_op(g, outputs[0], x, y)
+        set_type_shape_matmul(g, res, x, y)
     return res
 
 
@@ -13234,12 +13258,18 @@ def aten_scatter_reduce_two(
     reduce_mode = {"sum": "add", "prod": "mul", "amin": "min", "amax": "max"}
     onnx_reduce = reduce_mode[reduce]
     is_scalar = g.get_rank(x) == 0
-    outputs_scatter = None if is_scalar else outputs
+    original_type = g.get_type(x)
+    cast_reduction = original_type in {TensorProto.FLOAT16, TensorProto.BFLOAT16}
+    outputs_scatter = None if is_scalar or cast_reduction else outputs
 
     if is_scalar:
         x = g.op.Reshape(x, g.MINUS_ONE, name=name)
         index = g.op.Reshape(index, g.MINUS_ONE, name=name)
         src = g.op.Reshape(src, g.MINUS_ONE, name=name)
+
+    if cast_reduction:
+        x = g.op.Cast(x, to=TensorProto.FLOAT, name=name)
+        src = g.op.Cast(src, to=TensorProto.FLOAT, name=name)
 
     if not include_self:
         # onnx does not support this case so we need to modify x first.
@@ -13271,7 +13301,9 @@ def aten_scatter_reduce_two(
     )
 
     if is_scalar:
-        result = g.op.Squeeze(result, name=name, outputs=outputs)
+        result = g.op.Squeeze(result, name=name, outputs=None if cast_reduction else outputs)
+    if cast_reduction:
+        result = g.op.Cast(result, to=original_type, name=name, outputs=outputs)
     if not sts:
         if not is_scalar:
             set_type_shape_unary_op(g, result, x)
@@ -14564,12 +14596,12 @@ def aten_slice_Tensor(
         # One row or something like that.
         return g.op.Identity(x, outputs=outputs)
 
-    assert start is None or g.is_dynamic_dimension(start), (
+    assert start is None or isinstance(start, int) or g.is_dynamic_dimension(start), (
         f"aten_slice_Tensor not implemented for **start**={start!r}, "
         f"end={end!r}, dim={dim!r}, step={step!r} x={x!r}, shape(x)="
         f"{g.get_shape(x) if g.has_shape(x) else '?'}{g.get_debug_msg()}"
     )
-    assert end is None or g.is_dynamic_dimension(end), (
+    assert end is None or isinstance(end, int) or g.is_dynamic_dimension(end), (
         f"aten_slice_Tensor not implemented for start={start!r}, "
         f"**end**={end!r}, dim={dim!r}, x={x!r}, shape(x)="
         f"{g.get_shape(x) if g.has_shape(x) else '?'}{g.get_debug_msg()}"
@@ -14582,8 +14614,8 @@ def aten_slice_Tensor(
         # nothing to do
         return g.op.Identity(x, outputs=outputs)
     inputs = [
-        g.get_dynamic_dimension(start or 0),
-        g.get_dynamic_dimension(end or 9223372036854775807),
+        g.get_dynamic_dimension(0 if start is None else start),
+        g.get_dynamic_dimension(9223372036854775807 if end is None else end),
         np.array([dim], dtype=np.int64),
     ]
     if step is not None and step != 1:
@@ -14591,15 +14623,7 @@ def aten_slice_Tensor(
     res = g.op.Slice(x, *inputs, outputs=outputs, name=name)
     if not sts:
         g.set_type(res, g.get_type(x))
-        if (start is None or is_static_dimension(start)) and (
-            end is None or is_static_dimension(end)
-        ):
-            shape = g.get_shape(x)
-            new_shape = g._apply_slice_to_shape(
-                shape, [slice(start, end, step)], axes=[dim], expand_axes=[]
-            )
-            g.set_shape(res, new_shape)
-        else:
+        if not g.has_rank(res):
             g.set_rank(res, g.get_rank(x))
     return res
 
@@ -14826,11 +14850,11 @@ def _aten_slice_scatter_dynamic(
 ) -> T:
     "slice scatter"
     # step 1
-    assert start is None or g.is_dynamic_dimension(start), (
+    assert start is None or is_static_dimension(start) or g.is_dynamic_dimension(start), (
         f"slice_scatter not implemented for **start**={start}, end={end}, x={x!r}"
         f"{g.get_debug_msg()}"
     )
-    assert end is None or g.is_dynamic_dimension(end), (
+    assert end is None or is_static_dimension(end) or g.is_dynamic_dimension(end), (
         f"slice_scatter not implemented for start={start}, **end**={end}, x={x!r}"
         f"{g.get_debug_msg()}"
     )
@@ -14853,7 +14877,7 @@ def _aten_slice_scatter_dynamic(
             res = g.op.Identity(src, name=name)
             if not sts:
                 g.set_type(res, g.get_type(x))
-                g.set_shape(res, g.set_shape(src))
+                g.set_shape(res, g.get_shape(src))
             return res
         raise AssertionError(
             f"start={start}, end={end}, step={step} is not implemented yet "
@@ -15530,7 +15554,7 @@ def aten_split_with_sizes(
             shape = g.get_shape(x)
             new_shape = list(shape)
             for _ in range(n_splits):
-                s = min(size - split_sizes, split_sizes)
+                s = min(size, split_sizes)
                 new_shape[dim] = s
                 size -= split_sizes
                 new_shapes.append(tuple(new_shape))
@@ -15870,7 +15894,14 @@ def aten_squeeze(
     g: GraphBuilder, sts: Optional[Dict[str, Any]], outputs: List[str], x: T, name="squeeze"
 ) -> T:
     "squeeze"
-    return g.op.SqueezeAnyOpset(x, name=name)
+    result = g.make_node("Squeeze", [x], outputs=outputs, name=name, _infer_shapes=False)
+    if g.has_type(x):
+        g.set_type(result, g.get_type(x))
+    if g.has_shape(x):
+        shape = g.get_shape(x)
+        if all(isinstance(dimension, int) for dimension in shape):
+            g.set_shape(result, tuple(dimension for dimension in shape if dimension != 1))
+    return result
 
 
 def aten_squeeze_dim(
@@ -16382,7 +16413,7 @@ def aten_take(
     indices: T,
     name: str = "take",
 ) -> T:
-    """take"""
+    """Gathers flattened input values with the shape of the indices."""
     res = g.op.Gather(
         g.op.Reshape(x, np.array([-1], dtype=np.int64), name=name),
         indices,
@@ -16391,13 +16422,10 @@ def aten_take(
     )
     if not sts:
         g.set_type(res, g.get_type(x))
-        if g.has_shape(x):
-            shape = g.get_shape(x)
-            g.set_shape(
-                x, (int(np.prod(shape)),) if all_int(shape) else ("x".join(map(str, shape)),)
-            )
-        else:
-            g.set_rank(res, 1)
+        if g.has_shape(indices):
+            g.set_shape(res, g.get_shape(indices))
+        elif g.has_rank(indices):
+            g.set_rank(res, g.get_rank(indices))
     return res
 
 

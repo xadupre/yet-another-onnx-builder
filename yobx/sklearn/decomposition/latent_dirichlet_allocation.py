@@ -161,7 +161,7 @@ def sklearn_latent_dirichlet_allocation(
         np.array([0], dtype=np.int64),
         np.array([1], dtype=np.int64),
         name=f"{name}_batch",
-    )  # 1-D tensor [N]
+    )
 
     n_topics_arr = np.array([n_topics], dtype=np.int64)
     gamma_shape = g.op.Concat(batch_size, n_topics_arr, axis=0, name=f"{name}_gshape")

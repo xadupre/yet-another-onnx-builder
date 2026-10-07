@@ -1,7 +1,7 @@
 import unittest
 import numpy as np
-import onnx
-from onnx import TensorProto
+from yobx._onnx_shim import onnx
+from onnx_light.onnx import TensorProto
 from yobx.ext_test_case import ExtTestCase
 from yobx.builder.light import start, g, OnnxGraph, ProtoType, Var, Vars
 

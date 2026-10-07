@@ -34,7 +34,7 @@ class TestOnnxExportFolding(ExtTestCase):
             inputs,
             optimize=True,
             verbose=0,
-            options=OptimizationOptions(constant_folding={"Transpose"}),
+            options=OptimizationOptions(constant_folding=True),
         )
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, {"x": inputs[0].numpy()})
@@ -46,7 +46,7 @@ class TestOnnxExportFolding(ExtTestCase):
             inputs,
             optimize=True,
             verbose=0,
-            options=OptimizationOptions(constant_folding={"Reshape"}),
+            options=OptimizationOptions(constant_folding=False, patterns=[]),
         )
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, {"x": inputs[0].numpy()})

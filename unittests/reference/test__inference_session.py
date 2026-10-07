@@ -2,9 +2,9 @@ import unittest
 from typing import Any, Dict, Optional, Tuple
 import numpy as np
 import ml_dtypes
-import onnx
-import onnx.helper as oh
-import onnx.numpy_helper as onh
+from onnx_light import onnx
+import onnx_light.onnx.helper as oh
+import onnx_light.onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_torch
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
 from yobx.reference._inference_session import investigate_onnxruntime_issue
@@ -95,6 +95,25 @@ class TestInferenceSession(ExtTestCase):
             verbose=10,
             dump_filename="test_investigate_onnxruntime_issue_numpy.onnx",
         )
+
+    def test_investigate_native_prefix_preserves_model(self):
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        model, feeds, _expected = self._get_model()
+        original = model.SerializeToString()
+        prefixes = []
+
+        def make_session(prefix):
+            prefixes.append(
+                (len(prefix.graph.node), [value.name for value in prefix.graph.output])
+            )
+            return ExtendedReferenceEvaluator(prefix)
+
+        investigate_onnxruntime_issue(
+            model, feeds=feeds, onnx_to_session=make_session, quiet=False, infer_shapes=False
+        )
+        self.assertEqual(prefixes, [(1, ["gggg"]), (2, ["final"])])
+        self.assertEqual(model.SerializeToString(), original)
 
     @hide_stdout()
     def test_investigate_onnxruntime_issue_callable(self):

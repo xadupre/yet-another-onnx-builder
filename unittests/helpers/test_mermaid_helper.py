@@ -1,8 +1,8 @@
 import unittest
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 import numpy as np
-import onnx.numpy_helper as onh
+import onnx_light.onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase
 from yobx.helpers.mermaid_helper import to_mermaid
 
@@ -34,10 +34,10 @@ class TestMermaidHelper(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
         )
         mermaid = to_mermaid(model)
-        self.assertIn("flowchart TD", mermaid)
-        self.assertIn(":::input", mermaid)
-        self.assertIn(":::output", mermaid)
-        self.assertIn(":::op", mermaid)
+        self.assertIn("flowchart TB", mermaid)
+        self.assertIn(":::onnxInput", mermaid)
+        self.assertIn(":::onnxOutput", mermaid)
+        self.assertIn(":::onnxOp", mermaid)
         self.assertIn("LayerNormalization_", mermaid)
         self.assertIn("Add_", mermaid)
         self.assertIn("-->", mermaid)
@@ -56,8 +56,8 @@ class TestMermaidHelper(ExtTestCase):
             ir_version=10,
         )
         mermaid = to_mermaid(model)
-        self.assertIn("flowchart TD", mermaid)
-        self.assertIn(":::init", mermaid)
+        self.assertIn("flowchart TB", mermaid)
+        self.assertIn(":::onnxInitializer", mermaid)
         self.assertIn("MatMul_", mermaid)
         self.assertIn("Relu_", mermaid)
 
@@ -89,7 +89,7 @@ class TestMermaidHelper(ExtTestCase):
             opset_imports=[oh.make_opsetid("", 18)],
         )
         mermaid = to_mermaid(model)
-        self.assertIn("flowchart TD", mermaid)
+        self.assertIn("flowchart TB", mermaid)
         self.assertIn("Cast_", mermaid)
         self.assertIn("Add_", mermaid)
 
@@ -122,7 +122,7 @@ class TestMermaidHelper(ExtTestCase):
         )
         mermaid = to_mermaid(model)
         self.assertIn("If_", mermaid)
-        self.assertIn("-.->", mermaid)
+        self.assertIn(":::onnxOp", mermaid)
 
     def test_classdefs_present(self):
         TFLOAT = onnx.TensorProto.FLOAT
@@ -137,10 +137,10 @@ class TestMermaidHelper(ExtTestCase):
             ir_version=10,
         )
         mermaid = to_mermaid(model)
-        self.assertIn("classDef input", mermaid)
-        self.assertIn("classDef init", mermaid)
-        self.assertIn("classDef op", mermaid)
-        self.assertIn("classDef output", mermaid)
+        self.assertIn("classDef onnxInput", mermaid)
+        self.assertIn("classDef onnxInitializer", mermaid)
+        self.assertIn("classDef onnxOp", mermaid)
+        self.assertIn("classDef onnxOutput", mermaid)
 
     def test_edge_labels_with_shapes(self):
         TFLOAT = onnx.TensorProto.FLOAT
@@ -156,7 +156,7 @@ class TestMermaidHelper(ExtTestCase):
         )
         mermaid = to_mermaid(model)
         # Shape inference should produce edge labels with dtype and shape info
-        self.assertIn("FLOAT", mermaid)
+        self.assertIn("float[3]", mermaid)
 
     def test_scan_node(self):
         TFLOAT = onnx.TensorProto.FLOAT
@@ -202,7 +202,7 @@ class TestMermaidHelper(ExtTestCase):
         )
         mermaid = to_mermaid(model)
         self.assertIn("Scan_", mermaid)
-        self.assertIn("-.->", mermaid)
+        self.assertIn(":::onnxOp", mermaid)
 
 
 if __name__ == "__main__":

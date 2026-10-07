@@ -1,12 +1,20 @@
 import unittest
 import numpy as np
-import onnx.helper as oh
+import onnx_light.onnx.helper as oh
 from yobx.ext_test_case import ExtTestCase, requires_torch
-from yobx.xshape import BasicShapeBuilder
+from yobx.xshape import ShapeBuilder
+from yobx.xshape._builder_runtime import _BuilderRuntime, _ExtraPackages
 
 
-class _TorchShapeBuilder(BasicShapeBuilder):
-    """BasicShapeBuilder extended with a ``torch`` property for runtime tests."""
+class _RuntimeFixture(_BuilderRuntime, _ExtraPackages, ShapeBuilder):
+    """Exercises legacy tensor runtime helpers without constructing a shape engine."""
+
+    def get_debug_msg(self):
+        return ""
+
+
+class _TorchShapeBuilder(_RuntimeFixture):
+    """Provides Torch conversion for the legacy tensor runtime tests."""
 
     def make_torch_tensor_from_np_array(self, x):
         assert self._has_torch, "torch is not available"
@@ -17,7 +25,7 @@ class _TorchShapeBuilder(BasicShapeBuilder):
 
 class TestApplySliceToShape(ExtTestCase):
     def setUp(self):
-        self.b = BasicShapeBuilder()
+        self.b = _RuntimeFixture()
 
     def test_slice_first_axis(self):
         result = self.b._apply_slice_to_shape((10, 4, 5), [slice(0, 3)], [0], [])
@@ -141,7 +149,7 @@ class TestApplyExpand(ExtTestCase):
 
 class TestApplySqueeze(ExtTestCase):
     def setUp(self):
-        self.b = BasicShapeBuilder()
+        self.b = _RuntimeFixture()
 
     def test_squeeze_with_axis_scalar(self):
         node = oh.make_node("Squeeze", ["x", "axes"], ["y"])
@@ -201,7 +209,7 @@ class TestApplySqueeze(ExtTestCase):
 
 class TestApplyUnsqueeze(ExtTestCase):
     def setUp(self):
-        self.b = BasicShapeBuilder()
+        self.b = _RuntimeFixture()
 
     def test_unsqueeze_scalar_axis(self):
         node = oh.make_node("Unsqueeze", ["x", "axes"], ["y"])
@@ -670,7 +678,7 @@ class TestApplySlice(ExtTestCase):
 
 class TestApplyWhere(ExtTestCase):
     def setUp(self):
-        self.b_numpy = BasicShapeBuilder()
+        self.b_numpy = _RuntimeFixture()
         self.b_torch = _TorchShapeBuilder()
 
     def test_where_numpy_1d(self):

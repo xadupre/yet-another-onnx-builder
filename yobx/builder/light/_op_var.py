@@ -66,7 +66,7 @@ class OpsVar:
         if value is None:
             return self.make_node("ConstantOfShape", self)
         import numpy as np
-        from onnx.numpy_helper import from_array
+        from onnx_light.onnx.numpy_helper import from_array
 
         return self.make_node("ConstantOfShape", self, value=from_array(np.array([value])))
 

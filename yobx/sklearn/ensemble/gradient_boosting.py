@@ -26,8 +26,8 @@ or ``'zero'``) are not supported and raise :class:`NotImplementedError`.
 
 from typing import Dict, List, Tuple
 import numpy as np
-import onnx
-import onnx.helper as oh
+from yobx._onnx_shim import onnx
+import onnx_light.onnx.helper as oh
 from sklearn.dummy import DummyClassifier, DummyRegressor
 from sklearn.ensemble import GradientBoostingClassifier, GradientBoostingRegressor
 from ...helpers.onnx_helper import tensor_dtype_to_np_dtype

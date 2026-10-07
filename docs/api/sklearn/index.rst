@@ -14,6 +14,7 @@ yobx.sklearn
 
     convert
     convert_helper
+    graph_builder
     register
     skl2onnx_converter
     sklearn_helper

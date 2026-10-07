@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Callable, Dict, Optional
 
 import numpy as np
-import onnx.numpy_helper as onh
+import onnx_light.onnx.numpy_helper as onh
 
 from ..typing import GraphBuilderExtendedProtocol
 from ..xtracing.tracing import trace_numpy_function

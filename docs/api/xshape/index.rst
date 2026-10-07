@@ -12,13 +12,14 @@ yobx.xshape
     cost_inference
     shape_builder
     shape_builder_impl
+    native_shape_inference
     shape_type_compute
     type_inference
 
-BasicShapeBuilder
-+++++++++++++++++
+NativeShapeInference
+++++++++++++++++++++
 
-.. autoclass:: yobx.xshape.BasicShapeBuilder
+.. autoclass:: yobx.xshape.NativeShapeInference
     :members:
     :no-undoc-members:
 

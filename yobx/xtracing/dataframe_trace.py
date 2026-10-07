@@ -57,7 +57,7 @@ from __future__ import annotations
 from typing import Callable, Dict, List, Optional, Union
 
 import numpy as np
-from onnx import TensorProto
+from onnx_light.onnx import TensorProto
 
 from .parse import (
     AggExpr,

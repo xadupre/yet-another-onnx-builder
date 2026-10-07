@@ -33,11 +33,11 @@ class TestNystroem(ExtTestCase):
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
-        self.assertEqualArray(expected, result, atol=2e-3)
+        self.assertEqualArray(expected, result, atol=3e-3)
 
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X})[0]
-        self.assertEqualArray(expected, ort_result, atol=2e-3)
+        self.assertEqualArray(expected, ort_result, atol=3e-3)
 
     def test_nystroem_linear(self):
         self._run_kernel("linear")

@@ -1,8 +1,7 @@
 import unittest
 import numpy as np
-import onnx
-import onnx.helper
-from onnx import TensorProto
+from yobx._onnx_shim import onnx
+from onnx_light.onnx import TensorProto
 from yobx.ext_test_case import ExtTestCase, requires_torch
 from yobx.helpers.rt_helper import make_feeds
 
@@ -312,6 +311,19 @@ class TestOnnxGenerate(ExtTestCase):
             model, prompt, attention_mask=attn, max_new_tokens=3, eos_token_id=99
         )
         self.assertEqual(tokens.shape, (1, 5))
+        self.assertTrue(np.all(tokens[0, 2:] == 5))
+
+    def test_greedy_with_kv_without_attention_mask(self):
+        """With KV cache: generation omits an attention mask the model does not accept."""
+        from yobx.helpers.rt_helper import onnx_generate
+
+        model = self._make_kv_model(winner_token=5)
+        inputs = [value for index, value in enumerate(model.graph.input) if index != 1]
+        model.graph.ClearField("input")
+        model.graph.input.extend(inputs)
+        prompt = np.array([[1, 2]], dtype=np.int64)
+        tokens = onnx_generate(model, prompt, max_new_tokens=2, eos_token_id=99)
+        self.assertEqual(tokens.shape, (1, 4))
         self.assertTrue(np.all(tokens[0, 2:] == 5))
 
     @requires_torch()

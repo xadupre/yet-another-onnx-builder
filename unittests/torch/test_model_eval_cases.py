@@ -1,5 +1,13 @@
 import unittest
-from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers, ignore_warnings
+from yobx.ext_test_case import (
+    ExtTestCase,
+    has_onnxscript,
+    ignore_warnings,
+    requires_onnxscript,
+    requires_onnx_light,
+    requires_torch,
+    requires_transformers,
+)
 from yobx.torch.testing.model_eval_cases import discover, evaluation
 
 
@@ -26,20 +34,17 @@ class TestModelEvalCases(ExtTestCase):
 
     def test_eval(self):
         d = list(discover().items())[0]  # noqa: RUF015
-        ev = evaluation(
-            quiet=False,
-            cases={d[0]: d[1]},
-            exporters=(
-                "export-strict",
-                "export-nostrict",
-                "custom",
-                "dynamo",
-                "dynamo-ir",
-                "export-tracing",
-                "yobx",
-                "yobx-tracing",
-            ),
-        )
+        exporters = [
+            "export-strict",
+            "export-nostrict",
+            "custom",
+            "export-tracing",
+            "yobx",
+            "yobx-tracing",
+        ]
+        if has_onnxscript():
+            exporters.extend(("dynamo", "dynamo-ir"))
+        ev = evaluation(quiet=False, cases={d[0]: d[1]}, exporters=exporters)
         self.assertIsInstance(ev, list)
         self.assertIsInstance(ev[0], dict)
 
@@ -51,11 +56,13 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_yobx(self):
         evaluation(cases="SignatureListFixedLength", exporters="yobx", quiet=False, dynamic=False)
 
+    @requires_onnxscript()
     def test_run_exporter_dynamo(self):
         evaluation(
             cases="SignatureListFixedLength", exporters="dynamo", quiet=False, dynamic=False
         )
 
+    @requires_onnxscript()
     def test_run_exporter_dynamo_ir(self):
         evaluation(
             cases="SignatureListFixedLength", exporters="dynamo-ir", quiet=False, dynamic=False
@@ -93,9 +100,11 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_regex(self):
         evaluation(cases=".*Aten.*", exporters="custom-strict", quiet=False, dynamic=False)
 
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5168")
     def test_run_exporter_custom_nested_cond(self):
         evaluation(cases="ControlFlowNestCond", exporters="custom", quiet=False, dynamic=False)
 
+    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5168")
     def test_run_exporter_yobx_tracing_cond_nested_module(self):
         evaluation(
             cases="ControlFlowCondNestedModule",
