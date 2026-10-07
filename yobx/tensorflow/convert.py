@@ -1,13 +1,55 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
+import dis
+from types import ModuleType
 import numpy as np
 from onnx_light.onnx import ValueInfoProto
-import tensorflow as tf
 from .. import DEFAULT_TARGET_OPSET
 from ..container import ExportArtifact
 from ..helpers.onnx_helper import np_dtype_to_tensor_dtype, tensor_dtype_to_np_dtype
 from ..xbuilder import GraphBuilder, OptimizationOptions
 from .register import get_tf_op_converter
 from .tensorflow_helper import tf_dtype_to_np_dtype
+
+
+def _is_jax_callable(model) -> bool:
+    """Recognizes JAX callables without importing JAX or tracing TensorFlow."""
+
+    def is_jax(value):
+        modules = (
+            getattr(value, "__module__", ""),
+            type(value).__module__,
+            value.__name__ if isinstance(value, ModuleType) else "",
+        )
+        return any(
+            module.startswith(("jax.", "jaxlib.")) or module in ("jax", "jaxlib")
+            for module in modules
+        )
+
+    if is_jax(model):
+        return True
+    code = getattr(model, "__code__", None)
+    if code is not None:
+        globals_ = getattr(model, "__globals__", {})
+        global_names = {
+            instruction.argval
+            for instruction in dis.get_instructions(model)
+            if instruction.opname in ("LOAD_GLOBAL", "LOAD_NAME")
+        }
+        if any(is_jax(globals_[name]) for name in global_names if name in globals_):
+            return True
+        closure = getattr(model, "__closure__", None)
+        if closure:
+            for cell in closure:
+                try:
+                    value = cell.cell_contents
+                except ValueError:
+                    continue
+                if is_jax(value):
+                    return True
+    wrapped = getattr(model, "__wrapped__", None) or getattr(model, "func", None)
+    if wrapped is not None and wrapped is not model:
+        return _is_jax_callable(wrapped)
+    return False
 
 
 def to_onnx(
@@ -26,6 +68,8 @@ def to_onnx(
 ) -> ExportArtifact:
     """
     Converts a :epkg:`TensorFlow`/:epkg:`Keras` model into ONNX.
+    Recognized JAX callables delegate to :func:`yobx.jax.to_onnx` directly,
+    without TensorFlow graph tracing or jax2tf.
 
     The model is first traced with :func:`get_concrete_function` to obtain the
     actual TensorFlow computation graph.  Each operation in that graph is then
@@ -79,6 +123,31 @@ def to_onnx(
         proto = artifact.proto
         artifact.save("model.onnx")
     """
+
+    def convert_jax():
+        """Delegates JAX conversion without TensorFlow or jax2tf."""
+        from ..jax import to_onnx as jax_to_onnx
+
+        return jax_to_onnx(
+            model,
+            args,
+            input_names=input_names,
+            dynamic_shapes=dynamic_shapes,
+            target_opset=target_opset,
+            builder_cls=builder_cls,
+            verbose=verbose,
+            extra_converters=extra_converters,
+            large_model=large_model,
+            external_threshold=external_threshold,
+            filename=filename,
+            return_optimize_report=return_optimize_report,
+        )
+
+    if _is_jax_callable(model):
+        return convert_jax()
+
+    import tensorflow as tf
+
     from . import register_tensorflow_converters
 
     if isinstance(target_opset, int):
@@ -89,8 +158,6 @@ def to_onnx(
         dict_target_opset = target_opset.copy()
         if "" not in dict_target_opset:
             dict_target_opset[""] = 21
-
-    register_tensorflow_converters()
 
     if input_names is not None and len(input_names) != len(args):
         raise ValueError(f"Length mismatch: {len(args)=} but input_names={input_names!r}")
@@ -109,7 +176,7 @@ def to_onnx(
 
     # Trace the model to obtain a concrete TF computation graph.
     if isinstance(model, tf.types.experimental.ConcreteFunction):
-        # Model is already a ConcreteFunction (e.g. from jax_to_concrete_function).
+        # Model is already a ConcreteFunction supplied by the caller.
         # Use it directly and take the input specs from its signature so the
         # placeholder tensor names in the graph match the lookup in
         # _convert_concrete_function.
@@ -118,36 +185,16 @@ def to_onnx(
     elif hasattr(model, "get_concrete_function"):
         cf = model.get_concrete_function(*input_specs)
     else:
-        # For plain Python callables: try the standard tf.function path first.
-        # JAX functions fail here because they cannot accept TF symbolic tensors
-        # (the tracer raises a TypeError mentioning an "abstract array" or
-        # "SymbolicTensor"). When that happens and JAX is installed, fall back
-        # to jax_to_concrete_function; otherwise, surface a clear ImportError.
+        # JAX callables that cannot be recognized statically can also fail
+        # TensorFlow symbolic tracing. Keep this fallback on the direct route.
         try:
             cf = tf.function(model).get_concrete_function(*input_specs)
-        except TypeError as e:
-            msg = str(e)
-            # Only treat the error as JAX-related if it matches the known
-            # JAX tracing failures.
-            if "abstract array" in msg or "SymbolicTensor" in msg:
-                try:
-                    from .tensorflow_helper import jax_to_concrete_function
-                except ImportError as import_error:
-                    raise ImportError(
-                        "Converting JAX-based models to ONNX requires 'jax' and "
-                        "'jax2tf' to be installed. Please install these "
-                        "dependencies and try again."
-                    ) from import_error
-
-                cf = jax_to_concrete_function(
-                    model, args, input_names=input_names, dynamic_shapes=dynamic_shapes
-                )
-                # Update input_specs to match the concrete function's actual
-                # input signature (jax2tf may rename inputs internally).
-                input_specs = list(cf.structured_input_signature[0])
-            else:
-                # Re-raise non-JAX-related TypeErrors so they are not masked.
+        except TypeError as exc:
+            if "abstract array" not in str(exc) and "SymbolicTensor" not in str(exc):
                 raise
+            return convert_jax()
+
+    register_tensorflow_converters()
 
     # Populate an ONNX GraphBuilder by walking the concrete-function graph.
     kwargs = (
@@ -217,6 +264,8 @@ def _build_input_specs(input_names, args, dynamic_shapes):
     extracted from the proto; ``None`` is used for any dimension that is not
     a positive integer (symbolic or unknown dimensions are treated as dynamic).
     """
+    import tensorflow as tf
+
     specs = []
     for i, (name, arg) in enumerate(zip(input_names, args)):
         if isinstance(arg, ValueInfoProto):
@@ -243,7 +292,7 @@ def _build_input_specs(input_names, args, dynamic_shapes):
     return specs
 
 
-def _shape_to_tuple(g: GraphBuilder, shape: tf.TensorShape) -> Tuple[Union[int, str], ...]:
+def _shape_to_tuple(g: GraphBuilder, shape: Any) -> Tuple[Union[int, str], ...]:
     return tuple(dim if dim is not None else g.unique_dimension_name("dim") for dim in shape)
 
 

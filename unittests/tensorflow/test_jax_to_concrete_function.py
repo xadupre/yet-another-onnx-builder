@@ -52,6 +52,19 @@ class TestJaxToOnnx(ExtTestCase):
         model, _ = self._check(jnp.exp, (x,))
         self.assertTrue(model.graph.input[0].type.tensor_type.shape.dim[0].dim_param)
 
+    def test_tensorflow_entry_point_routes_jax_directly(self):
+        import jax.numpy as jnp
+        from onnxruntime import InferenceSession
+        from yobx.tensorflow import to_onnx
+
+        x = np.ones((4, 3), dtype=np.float32)
+        artifact = to_onnx(jnp.sin, (x,))
+        session = InferenceSession(
+            artifact.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        (result,) = session.run(None, {session.get_inputs()[0].name: x})
+        self.assertEqualArray(np.asarray(jnp.sin(x)), result, atol=1e-5)
+
     def test_multiple_inputs_and_custom_names(self):
         import jax.numpy as jnp
 
@@ -93,6 +106,21 @@ class TestJaxToOnnx(ExtTestCase):
 
         x = np.arange(20, dtype=np.float32).reshape((4, 5))
         self._check(jax.nn.softmax, (x,), dynamic_shapes=({0: "batch"},))
+
+    def test_dynamic_broadcast(self):
+        import jax
+        import jax.numpy as jnp
+
+        def broadcast(x):
+            return jax.lax.broadcast_in_dim(
+                jnp.sum(x, axis=0), x.shape, broadcast_dimensions=(1,)
+            )
+
+        x = np.arange(12, dtype=np.float32).reshape((4, 3))
+        _, session = self._check(broadcast, (x,), dynamic_shapes=({0: "batch"},))
+        larger = np.ones((7, 3), dtype=np.float32)
+        (result,) = session.run(None, {session.get_inputs()[0].name: larger})
+        self.assertEqualArray(np.asarray(broadcast(larger)), result, atol=1e-5)
 
     def test_input_names_length_mismatch(self):
         import jax.numpy as jnp
