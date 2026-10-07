@@ -12,13 +12,13 @@ from yobx.torch.export_options import ExportOptions
 
 
 class TestNativeCommonOps(unittest.TestCase):
-    def export(self, model, args, export_options=None, **kwargs):
+    def export(self, model, args, **kwargs):
         """Exports and checks a model without decomposing the tested ATen calls."""
         artifact = to_onnx(
             model,
             args,
             input_names=[f"X{i}" for i in range(len(args))],
-            export_options=export_options or ExportOptions(remove_inplace=False),
+            export_options=ExportOptions(remove_inplace=False),
             validate_onnx=True,
             **kwargs,
         )
@@ -28,6 +28,9 @@ class TestNativeCommonOps(unittest.TestCase):
     def check(self, model, args, cases=None, **kwargs):
         """Compares native execution with PyTorch, including output dtypes."""
         artifact = self.export(model, args, **kwargs)
+        runtime_model = (
+            model.module() if isinstance(model, torch.export.ExportedProgram) else model
+        )
         options = SessionOptions()
         options.log_severity_level = 3
         session = InferenceSession(
@@ -36,7 +39,7 @@ class TestNativeCommonOps(unittest.TestCase):
             providers=["CPUExecutionProvider"],
         )
         for inputs in cases or [args]:
-            expected = model(*inputs)
+            expected = runtime_model(*inputs)
             expected = (expected,) if isinstance(expected, torch.Tensor) else expected
             actual = session.run(None, {f"X{i}": value.numpy() for i, value in enumerate(inputs)})
             self.assertEqual(len(actual), len(expected))
@@ -218,16 +221,31 @@ class TestNativeCommonOps(unittest.TestCase):
                 torch.ops.aten._assert_tensor_metadata.default(
                     x, None, None, x.dtype, device=x.device, layout=x.layout
                 )
-                torch.ops.aten._assert_tensor_metadata.default(x, x.shape, [3, 1])
                 return x + 1
 
-        artifact = self.check(
-            Model(),
-            (torch.ones(2, 3),),
-            cases=[(torch.randn(5, 3),)],
-            dynamic_shapes=({0: "batch"},),
-            export_options=ExportOptions(strict=True, remove_inplace=False),
+        inputs = (torch.ones(2, 3),)
+        # Torch 2.12 cannot capture this size assertion because its fake kernel
+        # compares a SymInt list directly with torch.Size.
+        program = torch.export.export(
+            Model(), inputs, dynamic_shapes=({0: torch.export.Dim("batch")},)
         )
+        graph = program.graph
+        input_node = next(node for node in graph.nodes if node.op == "placeholder")
+        assertion = next(
+            node
+            for node in graph.nodes
+            if node.target == torch.ops.aten._assert_tensor_metadata.default
+        )
+        with graph.inserting_after(assertion):
+            batch = graph.call_function(torch.ops.aten.sym_size.int, (input_node, 0))
+            batch.meta["val"] = input_node.meta["val"].shape[0]
+        with graph.inserting_after(batch):
+            graph.call_function(
+                torch.ops.aten._assert_tensor_metadata.default, (input_node, [batch, 3], [3, 1])
+            )
+        program.graph_module.recompile()
+
+        artifact = self.check(program, inputs, cases=[(torch.randn(5, 3),)])
         self.assertNotIn(
             "_assert_tensor_metadata", [node.op_type for node in artifact.proto.graph.node]
         )
