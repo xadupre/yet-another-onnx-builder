@@ -1,154 +1,106 @@
-"""
-Unit tests for yobx.tensorflow.tensorflow_helper.jax_to_concrete_function.
-"""
+"""Tests direct JAX-to-ONNX conversion without TensorFlow."""
 
 import unittest
+
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_jax
-from yobx.tensorflow.tensorflow_helper import jax_to_concrete_function
+
+from yobx.ext_test_case import ExtTestCase, has_jax
 
 
-@requires_jax()
-class TestJaxToConcreteFunction(ExtTestCase):
-    def test_simple_elementwise(self):
-        """A JAX sin function converts to a ConcreteFunction and runs."""
-        import jax.numpy as jnp
-        import tensorflow as tf
+@unittest.skipUnless(has_jax(), "jax not installed")
+class TestJaxToOnnx(ExtTestCase):
+    """Checks direct JAX export against JAX's own results."""
 
-        def jax_fn(x):
-            return jnp.sin(x)
+    def _check(self, fn, args, dynamic_shapes=None, input_names=None, atol=1e-5):
+        from onnx_light.onnx import ModelProto
+        from onnxruntime import InferenceSession
+        from yobx.jax import to_onnx
 
-        x = np.random.rand(4, 3).astype(np.float32)
-        cf = jax_to_concrete_function(jax_fn, (x,), dynamic_shapes=({0: "batch"},))
-        self.assertIsInstance(cf, tf.types.experimental.ConcreteFunction)
+        artifact = to_onnx(fn, args, dynamic_shapes=dynamic_shapes, input_names=input_names)
+        self.assertIsInstance(artifact.proto, ModelProto)
+        session = InferenceSession(
+            artifact.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        names = [value.name for value in session.get_inputs()]
+        if input_names is not None:
+            self.assertEqual(names, list(input_names))
+        expected = fn(*args)
+        if not isinstance(expected, (tuple, list)):
+            expected = (expected,)
+        for result, value in zip(session.run(None, dict(zip(names, args))), expected):
+            self.assertEqualArray(np.asarray(value), result, atol=atol)
+        return artifact, session
 
-        result = cf(x).numpy()
-        expected = np.sin(x)
-        self.assertEqualArray(expected, result, atol=1e-6)
-
-    def test_dynamic_batch_default(self):
-        """Without explicit dynamic_shapes, batch dim (axis 0) is made dynamic."""
-        import jax.nn as jnn
-        import tensorflow as tf
-
-        def jax_fn(x):
-            return jnn.relu(x)
-
-        x = np.random.rand(5, 4).astype(np.float32)
-        cf = jax_to_concrete_function(jax_fn, (x,))
-        self.assertIsInstance(cf, tf.types.experimental.ConcreteFunction)
-
-        # The spec should have None for axis 0.
-        spec = cf.structured_input_signature[0][0]
-        self.assertIsNone(spec.shape[0])
-        self.assertEqual(spec.shape[1], 4)
-
-    def test_concrete_function_accepts_different_batch_sizes(self):
-        """ConcreteFunction created with dynamic batch runs on different batch sizes."""
+    def test_elementwise_dynamic_batch(self):
         import jax.numpy as jnp
 
-        def jax_fn(x):
-            return jnp.sin(x)
+        rng = np.random.default_rng(0)
+        x = rng.standard_normal((4, 3)).astype(np.float32)
+        model, session = self._check(jnp.sin, (x,), dynamic_shapes=({0: "batch"},))
+        dim = model.graph.input[0].type.tensor_type.shape.dim[0]
+        self.assertEqual(dim.dim_param, "batch")
+        name = session.get_inputs()[0].name
+        for batch in (2, 7):
+            value = rng.standard_normal((batch, 3)).astype(np.float32)
+            (result,) = session.run(None, {name: value})
+            self.assertEqualArray(np.sin(value), result, atol=1e-5)
 
-        x = np.random.rand(4, 3).astype(np.float32)
-        cf = jax_to_concrete_function(jax_fn, (x,), dynamic_shapes=({0: "batch"},))
-
-        for batch in (2, 7, 10):
-            xi = np.random.rand(batch, 3).astype(np.float32)
-            result = cf(xi).numpy()
-            expected = np.sin(xi)
-            self.assertEqualArray(expected, result, atol=1e-6)
-
-    def test_export_to_onnx_dynamic_shapes(self):
-        """to_onnx() accepts a ConcreteFunction from jax_to_concrete_function.
-
-        With native_serialization=False (the default), jax2tf lowers the JAX
-        computation to standard TensorFlow ops (e.g. Sin, MatMul) which have
-        registered ONNX converters, so the full JAX→ONNX round-trip works.
-        """
-        import jax.numpy as jnp
-        from yobx.tensorflow import to_onnx
-
-        def jax_fn(x):
-            return jnp.sin(x)
-
-        x = np.random.rand(4, 3).astype(np.float32)
-        cf = jax_to_concrete_function(jax_fn, (x,), dynamic_shapes=({0: "batch"},))
-
-        onx = to_onnx(cf, (x,), dynamic_shapes=({0: "batch"},))
-        # Verify the ONNX graph has a dynamic batch dim.
-        inp = onx.graph.input[0]
-        batch_dim = inp.type.tensor_type.shape.dim[0]
-        self.assertNotEqual(batch_dim.dim_value, 4)  # not a fixed static value
-
-    def test_multiple_inputs(self):
-        """JAX fn with two inputs produces a ConcreteFunction with two specs."""
-        import jax.numpy as jnp
-        import tensorflow as tf
-
-        def jax_fn(x, y):
-            return jnp.add(x, y)
-
-        x = np.random.rand(3, 4).astype(np.float32)
-        y = np.random.rand(3, 4).astype(np.float32)
-        cf = jax_to_concrete_function(jax_fn, (x, y), dynamic_shapes=({0: "batch"}, {0: "batch"}))
-        self.assertIsInstance(cf, tf.types.experimental.ConcreteFunction)
-
-        result = cf(x, y).numpy()
-        expected = x + y
-        self.assertEqualArray(expected, result, atol=1e-6)
-
-    def test_custom_input_names(self):
-        """Custom input_names are reflected in the ConcreteFunction specs."""
+    def test_default_dynamic_batch(self):
         import jax.numpy as jnp
 
-        def jax_fn(a):
-            return jnp.exp(a)
+        x = np.ones((4, 3), dtype=np.float32)
+        model, _ = self._check(jnp.exp, (x,))
+        self.assertTrue(model.graph.input[0].type.tensor_type.shape.dim[0].dim_param)
 
-        a = np.random.rand(2, 5).astype(np.float32)
-        cf = jax_to_concrete_function(jax_fn, (a,), input_names=["my_input"])
-
-        spec = cf.structured_input_signature[0][0]
-        self.assertEqual(spec.name, "my_input")
-
-    def test_to_onnx_auto_detects_jax_function(self):
-        """to_onnx() automatically calls jax_to_concrete_function for JAX callables.
-
-        When a plain JAX function is passed as ``model``, ``to_onnx()`` should
-        detect the JAX-specific TypeError and fall back to
-        ``jax_to_concrete_function`` (with native_serialization=False) automatically,
-        producing standard TF ops that can be converted to ONNX.
-        """
+    def test_multiple_inputs_and_custom_names(self):
         import jax.numpy as jnp
-        from yobx.tensorflow import to_onnx
 
-        def jax_fn(x):
-            return jnp.sin(x)
-
-        x = np.random.rand(4, 3).astype(np.float32)
-
-        # Pass the raw JAX function – to_onnx() should auto-detect it and succeed.
-        onx = to_onnx(jax_fn, (x,), dynamic_shapes=({0: "batch"},))
-        inp = onx.graph.input[0]
-        # A dynamic dimension must have dim_param set (symbolic name like "batch"),
-        # not a fixed dim_value; verify the batch axis is not frozen to 4.
-        batch_dim = inp.type.tensor_type.shape.dim[0]
-        self.assertTrue(
-            batch_dim.dim_param != "" or batch_dim.dim_value != 4,
-            f"Expected dynamic batch dim; got dim_value={batch_dim.dim_value}, "
-            f"dim_param={batch_dim.dim_param!r}",
+        x = np.arange(12, dtype=np.float32).reshape((4, 3))
+        y = np.ones((4, 3), dtype=np.float32)
+        self._check(
+            jnp.add,
+            (x, y),
+            dynamic_shapes=({0: "batch"}, {0: "batch"}),
+            input_names=["left", "right"],
         )
 
-    def test_input_names_length_mismatch_raises(self):
-        """Mismatched input_names length raises ValueError."""
+    def test_matrix_multiplication(self):
         import jax.numpy as jnp
 
-        def jax_fn(x):
-            return jnp.sin(x)
+        x = np.arange(12, dtype=np.float32).reshape((4, 3))
+        weights = np.ones((3, 2), dtype=np.float32)
+        self._check(jnp.matmul, (x, weights), dynamic_shapes=({0: "batch"}, {}))
 
-        x = np.random.rand(3, 3).astype(np.float32)
+    def test_small_neural_network(self):
+        import jax
+
+        weights = np.arange(12, dtype=np.float32).reshape((3, 4)) / 10
+        bias = np.ones((4,), dtype=np.float32)
+        output = np.arange(8, dtype=np.float32).reshape((4, 2)) / 10
+
+        def network(x):
+            return jax.nn.relu(x @ weights + bias) @ output
+
+        x = np.ones((5, 3), dtype=np.float32)
+        model, session = self._check(network, (x,), dynamic_shapes=({0: "batch"},))
+        self.assertIn("MatMul", [node.op_type for node in model.graph.node])
+        larger = np.ones((7, 3), dtype=np.float32)
+        (result,) = session.run(None, {session.get_inputs()[0].name: larger})
+        self.assertEqualArray(np.asarray(network(larger)), result, atol=1e-5)
+
+    def test_softmax(self):
+        import jax
+
+        x = np.arange(20, dtype=np.float32).reshape((4, 5))
+        self._check(jax.nn.softmax, (x,), dynamic_shapes=({0: "batch"},))
+
+    def test_input_names_length_mismatch(self):
+        import jax.numpy as jnp
+        from yobx.jax import to_onnx
+
+        x = np.ones((3, 3), dtype=np.float32)
         with self.assertRaises(ValueError):
-            jax_to_concrete_function(jax_fn, (x,), input_names=["a", "b"])
+            to_onnx(jnp.sin, (x,), input_names=["a", "b"])
 
 
 if __name__ == "__main__":

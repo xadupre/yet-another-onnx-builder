@@ -859,11 +859,10 @@ class TestJaxMlpEndToEnd(ExtTestCase):
             self.assertEqualArray(np.asarray(mlp(Xn)), out, atol=1e-5)
 
     def test_softmax(self):
-        """Softmax via explicit jax_to_concrete_function."""
+        """Softmax converts directly from JAX primitives."""
         import jax
 
-        from yobx.tensorflow import to_onnx
-        from yobx.tensorflow.tensorflow_helper import jax_to_concrete_function
+        from yobx.jax import to_onnx
         from onnxruntime import InferenceSession
 
         def jax_softmax(x):
@@ -871,8 +870,7 @@ class TestJaxMlpEndToEnd(ExtTestCase):
 
         rng = np.random.default_rng(42)
         X = rng.standard_normal((6, 10)).astype(np.float32)
-        cf = jax_to_concrete_function(jax_softmax, (X,), dynamic_shapes=({0: "batch"},))
-        onx = to_onnx(cf, (X,), dynamic_shapes=({0: "batch"},))
+        onx = to_onnx(jax_softmax, (X,), dynamic_shapes=({0: "batch"},))
         sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
         (result,) = sess.run(None, {onx.graph.input[0].name: X})
         self.assertEqualArray(np.asarray(jax_softmax(X)), result, atol=1e-5)
