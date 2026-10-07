@@ -744,6 +744,54 @@ class TestReferenceOps(ExtTestCase):
         expected = sess.run(None, feeds)
         self.assertEqualArrayAny(expected, got, atol=1)
 
+    def test_attention_attributes(self):
+        model = oh.make_model(
+            oh.make_graph(
+                [
+                    oh.make_node(
+                        "Attention",
+                        ["X", "weights", "bias", "mask", "", "attention_bias"],
+                        ["Y"],
+                        domain="com.microsoft",
+                        num_heads=1,
+                        unidirectional=1,
+                        qkv_hidden_sizes=[2, 2, 2],
+                        past_present_share_buffer=0,
+                        do_rotary=0,
+                        rotary_embedding_dim=2,
+                        mask_filter_value=-2.0,
+                        scale=1.0,
+                    )
+                ],
+                "attention_attributes",
+                [
+                    oh.make_tensor_value_info("X", TFLOAT, [1, 2, 2]),
+                    oh.make_tensor_value_info("weights", TFLOAT, [2, 6]),
+                    oh.make_tensor_value_info("bias", TFLOAT, [6]),
+                    oh.make_tensor_value_info("mask", onnx.TensorProto.INT32, [1, 2]),
+                    oh.make_tensor_value_info("attention_bias", TFLOAT, [1, 1, 2, 2]),
+                ],
+                [oh.make_tensor_value_info("Y", TFLOAT, [1, 2, 2])],
+            ),
+            opset_imports=[oh.make_opsetid("", 18), oh.make_opsetid("com.microsoft", 1)],
+        )
+        x = np.array([[[1, 0], [0, 1]]], dtype=np.float32)
+        weights = np.concatenate([np.eye(2, dtype=np.float32)] * 3, axis=1)
+        scores = np.array([[[[1, -2], [0, 1]]]], dtype=np.float32)
+        probabilities = np.exp(scores) / np.exp(scores).sum(axis=-1, keepdims=True)
+        expected = (probabilities @ x[:, None, :, :]).transpose(0, 2, 1, 3).reshape(1, 2, 2)
+        got = ExtendedReferenceEvaluator(model).run(
+            None,
+            {
+                "X": x,
+                "weights": weights,
+                "bias": np.zeros(6, dtype=np.float32),
+                "mask": np.ones((1, 2), dtype=np.int32),
+                "attention_bias": np.zeros((1, 1, 2, 2), dtype=np.float32),
+            },
+        )
+        self.assertEqualArray(expected, got[0], atol=1e-7)
+
     def test_bias_softmax(self):
         for axis, b_shape in [(0, (2, 3, 4)), (1, (3, 4)), (2, (4,))]:
             model = oh.make_model(
