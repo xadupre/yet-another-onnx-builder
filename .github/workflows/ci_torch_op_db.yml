@@ -49,7 +49,7 @@ jobs:
       - name: Generate combined coverage XML
         run: coverage xml
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: op-db

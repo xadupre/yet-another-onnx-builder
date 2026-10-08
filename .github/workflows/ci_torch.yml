@@ -107,7 +107,7 @@ jobs:
         # uploads into a single combined report. The 'flags' value here ('coverage')
         # lets you filter/view each source separately in the Codecov UI without
         # preventing them from being merged.
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           flags: coverage
