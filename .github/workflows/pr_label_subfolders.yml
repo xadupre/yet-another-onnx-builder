@@ -52,7 +52,7 @@ jobs:
 
       - name: Post PR comment with impacted subfolders
         if: steps.detect.outputs.count != '0'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           SUBFOLDERS: ${{ steps.detect.outputs.subfolders }}
         with:
@@ -95,7 +95,7 @@ jobs:
 
       - name: Update PR title when exactly one subfolder is impacted
         if: steps.detect.outputs.count == '1'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           SUBFOLDER: ${{ steps.detect.outputs.subfolders }}
         with:
