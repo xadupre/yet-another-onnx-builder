@@ -269,6 +269,10 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         parameter_name=None,
     ):
         """Adds an initializer and preserves an available FX parameter name."""
+        if type(value).__module__.startswith("torch") and hasattr(value, "detach"):
+            value = value.detach().cpu()
+            if not value.is_contiguous():
+                value = value.contiguous()
         initializer_name = super().make_initializer(
             name,
             value,

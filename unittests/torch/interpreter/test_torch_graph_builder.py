@@ -59,6 +59,19 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
         with self.assertRaises(AssertionError):
             builder.register_users("X", [])
 
+    def test_noncontiguous_torch_initializer_uses_copying_fallback(self):
+        """Copies non-contiguous Torch parameters accepted by the exporter adapter."""
+        import torch
+
+        value = torch.arange(15, dtype=torch.float32).reshape(3, 5).T
+        self.assertFalse(value.is_contiguous())
+        builder = TorchOnnxLightGraphBuilder(18)
+        name = builder.make_initializer("weight", value)
+        numpy.testing.assert_array_equal(builder.get_constant(name), value.numpy())
+        self.assertNotEqual(
+            numpy.from_dlpack(builder.initializers_dict[name]).ctypes.data, value.data_ptr()
+        )
+
     def test_make_shape_from_results_static_and_dynamic(self):
         """Builds cached static and dynamic runtime shape tensors."""
         builder = TorchOnnxLightGraphBuilder(18, dynamic_shapes=({0: "batch"},))
