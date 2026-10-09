@@ -57,7 +57,12 @@ def _lower_select_n(state, eqn, args):
     """Lowers a boolean choice between two values."""
     if len(args) != 3:
         raise NotImplementedError("select_n currently supports exactly two choices.")
-    return state.builder.op.Where(args[0], args[2], args[1])
+    selector = args[0]
+    if getattr(eqn.invars[0].aval.dtype, "kind", None) != "b":
+        selector = state.builder.op.Equal(
+            selector, state.constant(eqn.invars[0].aval.dtype.type(1))
+        )
+    return state.builder.op.Where(selector, args[2], args[1])
 
 
 def _lower_identity_or_cast(state, eqn, args):
