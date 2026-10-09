@@ -8,7 +8,7 @@ TensorFlow / JAX Export to ONNX
    :maxdepth: 1
 
 :func:`yobx.tensorflow.to_onnx` converts a :epkg:`TensorFlow`/:epkg:`Keras`
-model — or a :epkg:`JAX` function — into an :class:`onnx.ModelProto`.  The implementation is a
+model into an ONNX model. The implementation is a
 **proof-of-concept** that traces the model with
 :func:`tensorflow.function` / ``get_concrete_function`` and then
 converts each TF operation in the resulting computation graph to its
@@ -83,39 +83,21 @@ Quick example (Keras)
 JAX support
 ===========
 
-:func:`~yobx.tensorflow.to_onnx` also accepts plain :epkg:`JAX` functions.
-When it detects that the callable is a JAX function (TF tracing raises a
-``TypeError`` about abstract arrays), it automatically falls back to
-:func:`~yobx.tensorflow.tensorflow_helper.jax_to_concrete_function`, which
-uses :epkg:`jax2tf` to lower the JAX computation to a
-:class:`~tensorflow.ConcreteFunction` before applying the standard TF→ONNX
-pipeline.
+Use :func:`yobx.jax.to_onnx` for plain :epkg:`JAX` functions. It traces
+JAX primitives directly into an onnx-light graph; TensorFlow and its
+StableHLO deserializer are not involved.
 
 .. code-block:: python
 
     import jax.numpy as jnp
     import numpy as np
-    from yobx.tensorflow import to_onnx
+    from yobx.jax import to_onnx
 
     def jax_fn(x):
         return jnp.sin(x)
 
     X = np.random.rand(5, 4).astype(np.float32)
     onx = to_onnx(jax_fn, (X,))
-
-You can also call
-:func:`~yobx.tensorflow.tensorflow_helper.jax_to_concrete_function`
-explicitly when you want to inspect or reuse the intermediate
-:class:`~tensorflow.ConcreteFunction`:
-
-.. code-block:: python
-
-    from yobx.tensorflow import to_onnx
-    from yobx.tensorflow.tensorflow_helper import jax_to_concrete_function
-    import numpy as np
-
-    cf = jax_to_concrete_function(jax_fn, (X,), dynamic_shapes=({0: "batch"},))
-    onx = to_onnx(cf, (X,), dynamic_shapes=({0: "batch"},))
 
 See :ref:`l-plot-jax-to-onnx` for a complete gallery example.
 

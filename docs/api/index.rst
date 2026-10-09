@@ -21,6 +21,7 @@ API
    :caption: Converters
 
    to_onnx
+   jax/index
    litert/index
    sql/index
    sklearn/index

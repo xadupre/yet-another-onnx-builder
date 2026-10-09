@@ -4,23 +4,14 @@
 Converting a JAX function to ONNX
 ==================================
 
-:func:`yobx.tensorflow.to_onnx` can also convert :epkg:`JAX` functions to
-ONNX.  Under the hood it uses :func:`jax.experimental.jax2tf.convert` to
-lower the JAX computation to a :class:`tensorflow.ConcreteFunction` and then
-applies the same TF→ONNX conversion pipeline used for Keras models.
-
-Alternatively, :func:`yobx.tensorflow.tensorflow_helper.jax_to_concrete_function`
-can be called explicitly to obtain the intermediate
-:class:`~tensorflow.ConcreteFunction` before passing it to
-:func:`~yobx.tensorflow.to_onnx`.
+:func:`yobx.jax.to_onnx` converts :epkg:`JAX` functions directly to
+onnx-light graphs, without requiring TensorFlow.
 
 The workflow is:
 
 1. **Write** a plain JAX function (or wrap a :mod:`flax`/:mod:`equinox` model
    in a function).
-2. Call :func:`yobx.tensorflow.to_onnx` with a representative *dummy input*.
-   The converter detects that the callable is a JAX function and automatically
-   routes it through :func:`~yobx.tensorflow.tensorflow_helper.jax_to_concrete_function`.
+2. Call :func:`yobx.jax.to_onnx` with a representative *dummy input*.
 3. **Run** the exported ONNX model with any ONNX runtime — this example uses
    :epkg:`onnxruntime`.
 4. **Verify** that the ONNX outputs match JAX's own outputs.
@@ -34,16 +25,14 @@ import onnxruntime
 from yobx.doc import plot_dot
 from yobx.helpers import max_diff
 from yobx.helpers.onnx_helper import pretty_onnx
-from yobx.tensorflow import to_onnx
-from yobx.tensorflow.tensorflow_helper import jax_to_concrete_function
+from yobx.jax import to_onnx
 
 # %%
 # 1. Simple element-wise function
 # --------------------------------
 #
 # We start with the simplest possible JAX function: an element-wise
-# ``sin`` applied to a float32 matrix.  :func:`to_onnx` auto-detects that
-# the callable is a JAX function and converts it transparently.
+# ``sin`` applied to a float32 matrix.
 
 rng = np.random.default_rng(0)
 X = rng.standard_normal((5, 4)).astype(np.float32)
@@ -148,12 +137,10 @@ for n in (1, 7, 20):
     print(f"Dynamic-batch model verified for batch sizes {n} ✓ - ", max_diff(expected, out))
 
 # %%
-# 4. Explicit jax_to_concrete_function
-# ---------------------------------------
+# 4. Softmax
+# ----------
 #
-# :func:`~yobx.tensorflow.tensorflow_helper.jax_to_concrete_function` can be
-# called directly when you want to inspect or reuse the intermediate
-# :class:`~tensorflow.ConcreteFunction` before exporting to ONNX.
+# Softmax demonstrates a composite JAX operation.
 
 
 def jax_softmax(x):
@@ -162,8 +149,7 @@ def jax_softmax(x):
 
 X_cls = rng.standard_normal((6, 10)).astype(np.float32)
 
-cf = jax_to_concrete_function(jax_softmax, (X_cls,), dynamic_shapes=({0: "batch"},))
-onx_cls = to_onnx(cf, (X_cls,), dynamic_shapes=({0: "batch"},))
+onx_cls = to_onnx(jax_softmax, (X_cls,), dynamic_shapes=({0: "batch"},))
 
 ref_cls = onnxruntime.InferenceSession(
     onx_cls.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -173,7 +159,7 @@ input_name_cls = ref_cls.get_inputs()[0].name
 
 expected_cls = np.asarray(jax_softmax(X_cls))
 assert np.allclose(expected_cls, result_cls, atol=1e-5), "Softmax mismatch!"
-print("Explicit jax_to_concrete_function verified ✓ - ", max_diff(expected_cls, result_cls))
+print("Softmax verified ✓ - ", max_diff(expected_cls, result_cls))
 
 # %%
 # 5. Visualize the ONNX graph

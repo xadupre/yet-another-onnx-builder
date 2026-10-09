@@ -100,7 +100,7 @@ operations on a DataFrame and compiles them to ONNX directly.
 **deep learning**
 
 +---------------------------------------+------------------------------------------+----------------------------------------+
-| :epkg:`jax` *in progress*             | :func:`yobx.tensorflow.to_onnx`          | :ref:`l-plot-jax-to-onnx`              |
+| :epkg:`jax` *in progress*             | :func:`yobx.jax.to_onnx`                 | :ref:`l-plot-jax-to-onnx`              |
 +---------------------------------------+------------------------------------------+----------------------------------------+
 | :epkg:`tensorflow`                    | :func:`yobx.tensorflow.to_onnx`          | :ref:`l-design-tensorflow-converter`   |
 +---------------------------------------+------------------------------------------+----------------------------------------+
