@@ -1,5 +1,6 @@
 from typing import Any, Callable, Dict, Optional, Sequence, Tuple, Union
 import dis
+from importlib.util import find_spec
 from types import ModuleType
 import numpy as np
 from onnx_light.onnx import ValueInfoProto
@@ -32,7 +33,7 @@ def _is_jax_callable(model) -> bool:
         globals_ = getattr(model, "__globals__", {})
         global_names = {
             instruction.argval
-            for instruction in dis.get_instructions(model)
+            for instruction in dis.get_instructions(code)
             if instruction.opname in ("LOAD_GLOBAL", "LOAD_NAME")
         }
         if any(is_jax(globals_[name]) for name in global_names if name in globals_):
@@ -126,6 +127,8 @@ def to_onnx(
 
     def convert_jax():
         """Delegates JAX conversion without TensorFlow or jax2tf."""
+        if find_spec("jax") is None:
+            raise ImportError("JAX export requires installing the 'jax' extra.")
         from ..jax import to_onnx as jax_to_onnx
 
         return jax_to_onnx(

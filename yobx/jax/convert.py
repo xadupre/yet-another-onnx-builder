@@ -201,32 +201,26 @@ def _lower_reshape(g, value, eqn):
     output_shape = list(_shape(eqn.outvars[0]))
     input_shape = g.get_shape(value)
     dynamic_axes = [axis for axis, size in enumerate(input_shape) if isinstance(size, str)]
-    if dynamic_axes:
-        if len(dynamic_axes) != 1:
-            raise NotImplementedError(
-                "Reshape with multiple dynamic input axes is not supported."
-            )
-        sample_size = _shape(eqn.invars[0])[dynamic_axes[0]]
-        if sample_size == 0:
-            raise NotImplementedError("Reshape cannot infer a zero-sized dynamic dimension.")
-        candidates = [axis for axis, size in enumerate(output_shape) if size == sample_size]
-        if not candidates:
-            candidates = [
-                axis for axis, size in enumerate(output_shape) if size % sample_size == 0
-            ]
-        if not candidates:
-            raise NotImplementedError("Cannot locate dynamic dimension in JAX reshape.")
-        dynamic_axis = candidates[0]
-        same_size = output_shape[dynamic_axis] == sample_size
-        output_shape[dynamic_axis] = -1
+    if not dynamic_axes:
+        return g.op.Reshape(value, np.asarray(output_shape, dtype=np.int64))
+    if len(dynamic_axes) != 1:
+        raise NotImplementedError("Reshape with multiple dynamic input axes is not supported.")
+    sample_size = _shape(eqn.invars[0])[dynamic_axes[0]]
+    if sample_size == 0:
+        raise NotImplementedError("Reshape cannot infer a zero-sized dynamic dimension.")
+    candidates = [axis for axis, size in enumerate(output_shape) if size == sample_size]
+    if not candidates:
+        candidates = [axis for axis, size in enumerate(output_shape) if size % sample_size == 0]
+    if not candidates:
+        raise NotImplementedError("Cannot locate dynamic dimension in JAX reshape.")
+    dynamic_axis = candidates[0]
+    same_size = output_shape[dynamic_axis] == sample_size
+    output_shape[dynamic_axis] = -1
     result = g.op.Reshape(value, np.asarray(output_shape, dtype=np.int64))
-    if dynamic_axes:
-        symbolic = (
-            input_shape[dynamic_axes[0]] if same_size else g.unique_dimension_name("reshape")
-        )
-        declared = list(_shape(eqn.outvars[0]))
-        declared[dynamic_axis] = symbolic
-        g.set_shape(result, tuple(declared))
+    symbolic = input_shape[dynamic_axes[0]] if same_size else g.unique_dimension_name("reshape")
+    declared = list(_shape(eqn.outvars[0]))
+    declared[dynamic_axis] = symbolic
+    g.set_shape(result, tuple(declared))
     return result
 
 
@@ -246,7 +240,9 @@ def _lower_jaxpr(g, closed, inputs, dynamic_sources):
         elif op == "ne":
             result = g.op.Not(g.op.Equal(*args))
         elif op == "dot_general":
-            result = _lower_dot(g, *args, eqn)
+            if len(args) != 2:
+                raise ValueError(f"dot_general expects two inputs, not {len(args)}.")
+            result = _lower_dot(g, args[0], args[1], eqn)
         elif op == "broadcast_in_dim":
             result = _lower_broadcast(g, names, eqn, dynamic_sources)
         elif op in ("reduce_sum", "reduce_max", "reduce_min"):
@@ -293,7 +289,7 @@ def to_onnx(
     input_names: Optional[Sequence[str]] = None,
     dynamic_shapes: Optional[Tuple[Dict[int, str], ...]] = None,
     target_opset: Union[int, Dict[str, int]] = DEFAULT_TARGET_OPSET,
-    builder_cls: type = GraphBuilder,
+    builder_cls: Union[type, Callable] = GraphBuilder,
     verbose: int = 0,
     extra_converters: Optional[Dict[str, Callable]] = None,
     large_model: bool = False,
@@ -312,7 +308,7 @@ def to_onnx(
         target_opset: ONNX opset version or domain-to-version mapping.
         builder_cls: Native graph builder class.
         verbose: Builder verbosity.
-        extra_converters: Unsupported TensorFlow converter overrides.
+        extra_converters: Reserved for signature compatibility. It must be ``None``.
         large_model: Enables external tensor storage.
         external_threshold: Minimum number of elements stored externally.
         filename: Optional path to save the resulting artifact.
@@ -334,20 +330,21 @@ def to_onnx(
         raise ValueError("input_names must contain one distinct name for every input.")
     if dynamic_shapes is not None and len(dynamic_shapes) != len(arrays):
         raise ValueError("dynamic_shapes must contain one axis mapping for every input.")
-    if extra_converters:
-        raise ValueError("TensorFlow extra_converters cannot be applied to a JAX model.")
+    if extra_converters is not None:
+        raise ValueError("extra_converters is reserved and must be None for JAX conversion.")
     opsets = {"": target_opset} if isinstance(target_opset, int) else dict(target_opset)
     opsets.setdefault("", DEFAULT_TARGET_OPSET)
     closed = jax.make_jaxpr(model)(*arrays)
     for array, var in zip(arrays, closed.jaxpr.invars):
-        if array.dtype != np.dtype(var.aval.dtype):
+        aval: Any = var.aval
+        if array.dtype != np.dtype(aval.dtype):
             raise TypeError(
-                f"JAX traced input dtype {var.aval.dtype} differs from sample dtype "
+                f"JAX traced input dtype {aval.dtype} differs from sample dtype "
                 f"{array.dtype}; enable the required JAX dtype before converting."
             )
     g = builder_cls(opsets, verbose=verbose)
-    dynamic_sources = {}
-    static_sizes = set()
+    dynamic_sources: Dict[int, Optional[Tuple[str, int, str]]] = {}
+    static_sizes: set[int] = set()
     for i, (name, array) in enumerate(zip(input_names, arrays)):
         shape = list(array.shape)
         axes = ({0: "batch"} if shape else {}) if dynamic_shapes is None else dynamic_shapes[i]
@@ -365,8 +362,9 @@ def to_onnx(
             sample_size = array.shape[axis]
             if sample_size not in dynamic_sources:
                 dynamic_sources[sample_size] = (name, axis, dimension)
-            elif dynamic_sources[sample_size] is not None:
-                if dynamic_sources[sample_size][2] != dimension:
+            else:
+                source_info = dynamic_sources[sample_size]
+                if source_info is not None and source_info[2] != dimension:
                     dynamic_sources[sample_size] = None
         g.make_tensor_input(name, np_dtype_to_tensor_dtype(array.dtype), tuple(shape))
     for size in static_sizes.intersection(dynamic_sources):
