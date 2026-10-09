@@ -31,7 +31,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python 3.13
         uses: actions/setup-python@v7
         with:
@@ -82,7 +82,7 @@ jobs:
           - jax-version: "0.10"
             tensorflow-version: "2.20"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v7
         with:
