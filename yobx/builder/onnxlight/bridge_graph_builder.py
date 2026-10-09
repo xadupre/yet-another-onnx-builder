@@ -2,6 +2,7 @@
 
 import contextlib
 import importlib
+import sys
 from dataclasses import dataclass
 from functools import partial
 from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
@@ -372,6 +373,7 @@ class OnnxLightGraphBuilder:
         self._custom_shape_callbacks = {}
         self._function_descriptors = {}
         self._functions = {}
+        self._borrowed_sources = []
         self.shapes_context = ShapesContext()
         self.op = OnnxLightGraphBuilderOpset(self)
         self.anyop = self.op
@@ -736,21 +738,32 @@ class OnnxLightGraphBuilder:
         msg=None,
         parameter_name=None,
     ):
-        """Adds an initializer after converting it to a native tensor."""
+        """Adds an initializer, borrowing supported NumPy and PyTorch storage."""
         if parameter_name:
             name = parameter_name
         if not name or (self.has_name(name) and give_unique_name):
             name = self.unique_name(name or "init")
         elif self.has_name(name):
             raise ValueError(f"Initializer name {name!r} already exists.")
+        borrowed = False
+        borrowed_source = None
         if type(value).__module__.startswith("torch") and hasattr(value, "detach"):
-            from ...helpers.mini_onnx_builder import proto_from_array
-
             fake_tensor_type = importlib.import_module("torch._subclasses.fake_tensor").FakeTensor
             if isinstance(value, fake_tensor_type) or value.is_meta:
                 raise NotImplementedError("Native initializers require concrete tensor storage.")
-            value = proto_from_array(value.detach().cpu(), name=name)
-        if isinstance(value, onnx.TensorProto):
+            torch = importlib.import_module("torch")
+            if (
+                value.device.type != "cpu"
+                or value.layout != torch.strided
+                or not value.is_contiguous()
+            ):
+                raise ValueError(
+                    "Native PyTorch initializers require a contiguous, strided CPU tensor."
+                )
+            borrowed_source = value.detach() if value.requires_grad else value
+            tensor = onnx.TensorProto.from_dlpack(borrowed_source, name=name)
+            borrowed = True
+        elif isinstance(value, onnx.TensorProto):
             tensor = _native_proto(value, onnx.TensorProto)
             tensor.name = name
         else:
@@ -762,11 +775,67 @@ class OnnxLightGraphBuilder:
                 value = numpy.array(value, dtype=numpy.float32)
             if not isinstance(value, numpy.ndarray):
                 raise TypeError(f"Unsupported initializer value {type(value)!r}.")
-            tensor = numpy_helper.from_array(value, name=name)
-        self._inner.make_initializer(tensor)
-        self.shapes_context.compute_shape_graph(
-            helper.make_graph([], "initializer", [], [], [tensor])
-        )
+            if not value.dtype.isnative:
+                value = value.astype(value.dtype.newbyteorder("="))
+            if (
+                value.flags.c_contiguous
+                and value.flags.aligned
+                and sys.byteorder == "little"
+                and value.dtype.isnative
+                and value.dtype.name
+                in {
+                    "bool",
+                    "int8",
+                    "int16",
+                    "int32",
+                    "int64",
+                    "uint8",
+                    "uint16",
+                    "uint32",
+                    "uint64",
+                    "float16",
+                    "float32",
+                    "float64",
+                    "complex64",
+                    "complex128",
+                }
+            ):
+                tensor = onnx.TensorProto(
+                    name=name,
+                    dims=value.shape,
+                    data_type=helper.np_dtype_to_tensor_dtype(value.dtype),
+                )
+                set_raw_data_from_buffer = getattr(tensor, "_set_raw_data_from_buffer", None)
+                if set_raw_data_from_buffer is None:
+                    tensor = numpy_helper.from_array(value, name=name)
+                else:
+                    set_raw_data_from_buffer(value)
+                    borrowed = True
+            else:
+                tensor = numpy_helper.from_array(value, name=name)
+        # Native inference and folding require owned raw_data for small shape constants.
+        if (
+            borrowed
+            and (not tensor.dims or (len(tensor.dims) == 1 and tensor.dims[0] <= 64))
+            and tensor.data_type
+            in {
+                onnx.TensorProto.INT8,
+                onnx.TensorProto.INT16,
+                onnx.TensorProto.INT32,
+                onnx.TensorProto.INT64,
+                onnx.TensorProto.UINT8,
+                onnx.TensorProto.UINT16,
+                onnx.TensorProto.UINT32,
+                onnx.TensorProto.UINT64,
+            }
+        ):
+            tensor = numpy_helper.from_array(numpy.from_dlpack(tensor), name=name)
+            borrowed = False
+        shape_graph = helper.make_graph([], "initializer", [], [], [tensor])
+        self._inner.make_initializer_move(tensor)
+        if borrowed and borrowed_source is not None and borrowed_source is not value:
+            self._borrowed_sources.append(borrowed_source)
+        self.shapes_context.compute_shape_graph(shape_graph)
         self._shape_names.add(name)
         return name
 

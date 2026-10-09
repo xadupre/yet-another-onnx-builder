@@ -162,6 +162,21 @@ builder.make_tensor_output(output)
 native_model = builder.to_native()
 ```
 
+Supported C-contiguous, aligned, native little-endian NumPy weights borrow their
+source storage; unsupported NumPy layouts and dtypes use a copying fallback.
+Dense, contiguous CPU PyTorch weights use DLPack
+without a NumPy intermediate. Other PyTorch devices, layouts, strides and
+unsupported DLPack dtypes raise an error rather than silently copying.
+Keep borrowed storage unchanged while building and running the model: mutations
+are visible through the initializer, and resizing or reallocating it is unsafe.
+The builder and unoptimized exported native model retain the allocation
+independently. Integer scalar and short shape-vector initializers use a small
+owned snapshot so native shape inference and optimization can inspect their values.
+To measure peak resident memory during registration, run
+`PYTHONPATH=. python unittests/builder/onnxlight/benchmark_initializer_memory.py numpy`
+or use `torch` instead (optionally with `--megabytes 256`). Run each backend
+in a fresh process to compare peaks.
+
 `to_native()` does not import reference ONNX. Native shapes are available through
 `builder.get_shape(name)` and `builder.shapes_context`. `patterns=None` selects
 the wheel's standard patterns; `patterns=[]` disables pattern rewrites.

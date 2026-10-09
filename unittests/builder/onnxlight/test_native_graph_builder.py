@@ -2,12 +2,14 @@
 
 import importlib.util
 import importlib.metadata
+import gc
 import os
 from pathlib import Path
 import subprocess
 import sys
 import textwrap
 import unittest
+import weakref
 
 import numpy
 from onnx_light import onnx
@@ -723,6 +725,129 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
             scoped = builder.unique_name("shape")
         self.assertEqual(scoped, "step__nested__shape")
         self.assertEqual(builder.unique_name("fresh"), "fresh")
+
+    def test_numpy_initializer_borrowed_storage_and_lifetime(self):
+        values = numpy.arange(12, dtype=numpy.float32).reshape(3, 4)
+        pointer = values.ctypes.data
+        released = []
+        source = weakref.ref(values, lambda _: released.append(True))
+        builder = self.make_builder(18)
+        builder.make_initializer("weight", values)
+        self.assertEqual(
+            numpy.from_dlpack(builder.initializers_dict["weight"]).ctypes.data, pointer
+        )
+        builder.make_tensor_output("weight")
+        del values
+        gc.collect()
+        self.assertIsNotNone(source())
+        model = builder.to_native(optimize=False)
+        self.assertEqual(numpy.from_dlpack(model.graph.initializer[0]).ctypes.data, pointer)
+        checker.check_model(model)
+        serialized = onnx.ModelProto()
+        serialized.ParseFromString(model.SerializeToString())
+        numpy.testing.assert_array_equal(
+            ReferenceEvaluator(serialized).run(None, {})[0],
+            numpy.arange(12, dtype=numpy.float32).reshape(3, 4),
+        )
+        del builder
+        gc.collect()
+        self.assertIsNotNone(source())
+        del model, serialized
+        gc.collect()
+        self.assertIsNone(source())
+        self.assertEqual(released, [True])
+
+    def test_numpy_initializer_unsupported_layout_copies(self):
+        values = numpy.arange(12, dtype=numpy.float32)[::2]
+        builder = self.make_builder(18)
+        builder.make_initializer("weight", values)
+        self.assertNotEqual(
+            numpy.from_dlpack(builder.initializers_dict["weight"]).ctypes.data, values.ctypes.data
+        )
+        numpy.testing.assert_array_equal(builder.get_constant("weight"), values)
+        big_endian = numpy.array([2, 3], dtype=">i4")
+        builder.make_initializer("big_endian", big_endian)
+        numpy.testing.assert_array_equal(builder.get_constant("big_endian"), big_endian)
+
+    def test_small_integer_initializer_supports_shape_inference_chain(self):
+        builder = self.make_builder(18)
+        builder.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 3))
+        axes = builder.make_initializer("axes", numpy.array([1], dtype=numpy.int32))
+        axes_i64 = builder.op.Cast(axes, to=onnx.TensorProto.INT64)
+        axes_1d = builder.op.Reshape(axes_i64, numpy.array([-1], dtype=numpy.int64))
+        output = builder.op.ReduceMean("X", axes_1d, keepdims=0)
+        self.assertEqual(builder.get_rank(output), 1)
+
+    @unittest.skipUnless(importlib.util.find_spec("torch"), "PyTorch is not installed")
+    def test_torch_initializer_borrowed_storage_and_lifetime(self):
+        import torch
+
+        values = torch.arange(12, dtype=torch.float32).reshape(3, 4)
+        pointer = values.data_ptr()
+        released = []
+        source = weakref.ref(values, lambda _: released.append(True))
+        builder = self.make_builder(18)
+        builder.make_initializer("weight", values)
+        self.assertEqual(
+            numpy.from_dlpack(builder.initializers_dict["weight"]).ctypes.data, pointer
+        )
+        builder.make_tensor_output("weight")
+        del values
+        gc.collect()
+        self.assertIsNotNone(source())
+        model = builder.to_native(optimize=False)
+        self.assertEqual(numpy.from_dlpack(model.graph.initializer[0]).ctypes.data, pointer)
+        checker.check_model(model)
+        serialized = onnx.ModelProto()
+        serialized.ParseFromString(model.SerializeToString())
+        numpy.testing.assert_array_equal(
+            ReferenceEvaluator(serialized).run(None, {})[0],
+            numpy.arange(12, dtype=numpy.float32).reshape(3, 4),
+        )
+        del builder
+        gc.collect()
+        self.assertIsNotNone(source())
+        del model, serialized
+        gc.collect()
+        self.assertIsNone(source())
+        self.assertEqual(released, [True])
+
+    @unittest.skipUnless(importlib.util.find_spec("torch"), "PyTorch is not installed")
+    def test_torch_initializer_unsupported_layout_rejected(self):
+        import torch
+
+        builder = self.make_builder(18)
+        with self.assertRaisesRegex(ValueError, "contiguous, strided CPU"):
+            builder.make_initializer("weight", torch.arange(12).reshape(3, 4)[:, ::2])
+        with self.assertRaisesRegex(ValueError, "contiguous, strided CPU"):
+            builder.make_initializer("weight", torch.eye(3).to_sparse())
+        with self.assertRaisesRegex(ValueError, "unsupported dtype"):
+            builder.make_initializer("weight", torch.empty(3, dtype=torch.float4_e2m1fn_x2))
+
+    @unittest.skipUnless(importlib.util.find_spec("torch"), "PyTorch is not installed")
+    def test_torch_gradient_initializer_retains_detached_source(self):
+        import torch
+
+        values = torch.arange(4, dtype=torch.float32, requires_grad=True)
+        source = weakref.ref(values)
+        pointer = values.data_ptr()
+        builder = self.make_builder(18)
+        builder.make_initializer("weight", values)
+        self.assertEqual(len(builder._borrowed_sources), 1)
+        retained = builder._borrowed_sources[0]
+        self.assertFalse(retained.requires_grad)
+        self.assertIsNone(retained.grad_fn)
+        self.assertEqual(retained.data_ptr(), pointer)
+        del values
+        gc.collect()
+        self.assertIsNone(source())
+        model = builder.to_native(optimize=False)
+        self.assertEqual(numpy.from_dlpack(model.graph.initializer[0]).ctypes.data, pointer)
+        del builder
+        gc.collect()
+        numpy.testing.assert_array_equal(
+            numpy.from_dlpack(model.graph.initializer[0]), numpy.arange(4, dtype=numpy.float32)
+        )
 
     def test_requested_node_names_are_unique(self):
         builder = self.make_builder(18, ir_version=8)

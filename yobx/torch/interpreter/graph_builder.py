@@ -1,6 +1,7 @@
 """Implements the onnx-light graph builder adapter used by Torch exporters."""
 
 import ast
+import importlib
 import os
 
 import numpy
@@ -269,6 +270,11 @@ class TorchOnnxLightGraphBuilder(OnnxLightGraphBuilder):
         parameter_name=None,
     ):
         """Adds an initializer and preserves an available FX parameter name."""
+        if type(value).__module__.startswith("torch") and hasattr(value, "detach"):
+            value = value.detach().cpu()
+            torch = importlib.import_module("torch")
+            if value.layout == torch.strided and not value.is_contiguous():
+                value = value.contiguous()
         initializer_name = super().make_initializer(
             name,
             value,
