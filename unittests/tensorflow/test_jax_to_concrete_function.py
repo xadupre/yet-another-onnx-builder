@@ -107,6 +107,12 @@ class TestJaxToOnnx(ExtTestCase):
         x = np.arange(20, dtype=np.float32).reshape((4, 5))
         self._check(jax.nn.softmax, (x,), dynamic_shapes=({0: "batch"},))
 
+    def test_standard_deviation(self):
+        import jax.numpy as jnp
+
+        x = np.arange(20, dtype=np.float32).reshape((4, 5))
+        self._check(jnp.std, (x,), dynamic_shapes=({0: "batch"},))
+
     def test_dynamic_broadcast(self):
         import jax
         import jax.numpy as jnp

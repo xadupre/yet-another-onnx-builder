@@ -1,13 +1,16 @@
 .. _l-design-tensorflow-supported-jax-ops:
 
-====================
-Supported JAX Ops
-====================
+================================
+TensorFlow StableHLO JAX Support
+================================
 
-When a JAX function is converted to ONNX via
-:func:`~yobx.tensorflow.to_onnx`, the JAX computation is first lowered to a
-``XlaCallModule`` TensorFlow op whose payload contains a *StableHLO* MLIR
-module.  The converter parses that module op-by-op and maps each
+This page documents the StableHLO compatibility path used for JAX functions
+embedded in TensorFlow ``XlaCallModule`` operators. Plain JAX functions should
+instead be converted with :func:`yobx.jax.to_onnx`, which lowers JAX primitives
+directly without TensorFlow.
+
+In the compatibility path, the JAX computation is stored as a *StableHLO* MLIR
+module. The TensorFlow converter parses that module op-by-op and maps each
 ``stablehlo.*`` operator to an ONNX node.
 
 The tables below list every ``stablehlo`` op name (after stripping the
@@ -136,8 +139,8 @@ and do not go through :func:`~yobx.tensorflow.ops.jax_ops.get_jax_cvt`:
         print(f"     - {onnx_cell}")
     print()
 
-Adding a new JAX op mapping
-----------------------------
+Adding a StableHLO op mapping
+-----------------------------
 
 To add support for an additional ``stablehlo`` unary op:
 
