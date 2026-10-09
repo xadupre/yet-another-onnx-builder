@@ -81,7 +81,7 @@ jobs:
           pytest --cov=yobx --cov-report=xml --durations=10 unittests/litert
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
