@@ -746,6 +746,7 @@ class OnnxLightGraphBuilder:
         elif self.has_name(name):
             raise ValueError(f"Initializer name {name!r} already exists.")
         borrowed = False
+        borrowed_source = None
         if type(value).__module__.startswith("torch") and hasattr(value, "detach"):
             fake_tensor_type = importlib.import_module("torch._subclasses.fake_tensor").FakeTensor
             if isinstance(value, fake_tensor_type) or value.is_meta:
@@ -759,9 +760,8 @@ class OnnxLightGraphBuilder:
                 raise ValueError(
                     "Native PyTorch initializers require a contiguous, strided CPU tensor."
                 )
-            tensor = onnx.TensorProto.from_dlpack(
-                value.detach() if value.requires_grad else value, name=name
-            )
+            borrowed_source = value.detach() if value.requires_grad else value
+            tensor = onnx.TensorProto.from_dlpack(borrowed_source, name=name)
             borrowed = True
         elif isinstance(value, onnx.TensorProto):
             tensor = _native_proto(value, onnx.TensorProto)
@@ -805,8 +805,12 @@ class OnnxLightGraphBuilder:
                     dims=value.shape,
                     data_type=helper.np_dtype_to_tensor_dtype(value.dtype),
                 )
-                tensor._set_raw_data_from_buffer(value)
-                borrowed = True
+                set_raw_data_from_buffer = getattr(tensor, "_set_raw_data_from_buffer", None)
+                if set_raw_data_from_buffer is None:
+                    tensor = numpy_helper.from_array(value, name=name)
+                else:
+                    set_raw_data_from_buffer(value)
+                    borrowed = True
             else:
                 tensor = numpy_helper.from_array(value, name=name)
         # Native inference and folding require owned raw_data for small shape constants.
@@ -829,8 +833,8 @@ class OnnxLightGraphBuilder:
             borrowed = False
         shape_graph = helper.make_graph([], "initializer", [], [], [tensor])
         self._inner.make_initializer_move(tensor)
-        if borrowed and type(value).__module__.startswith("torch") and value.requires_grad:
-            self._borrowed_sources.append(value)
+        if borrowed and borrowed_source is not None and borrowed_source is not value:
+            self._borrowed_sources.append(borrowed_source)
         self.shapes_context.compute_shape_graph(shape_graph)
         self._shape_names.add(name)
         return name

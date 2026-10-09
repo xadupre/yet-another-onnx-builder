@@ -72,6 +72,14 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
             numpy.from_dlpack(builder.initializers_dict[name]).ctypes.data, value.data_ptr()
         )
 
+    def test_sparse_torch_initializer_is_explicitly_rejected(self):
+        """Passes sparse tensors to the native initializer layout validation."""
+        import torch
+
+        builder = TorchOnnxLightGraphBuilder(18)
+        with self.assertRaisesRegex(ValueError, "contiguous, strided CPU"):
+            builder.make_initializer("weight", torch.eye(3).to_sparse())
+
     def test_make_shape_from_results_static_and_dynamic(self):
         """Builds cached static and dynamic runtime shape tensors."""
         builder = TorchOnnxLightGraphBuilder(18, dynamic_shapes=({0: "batch"},))

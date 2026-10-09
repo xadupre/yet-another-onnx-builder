@@ -825,7 +825,7 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
             builder.make_initializer("weight", torch.empty(3, dtype=torch.float4_e2m1fn_x2))
 
     @unittest.skipUnless(importlib.util.find_spec("torch"), "PyTorch is not installed")
-    def test_torch_gradient_initializer_keeps_source_until_builder_destruction(self):
+    def test_torch_gradient_initializer_retains_detached_source(self):
         import torch
 
         values = torch.arange(4, dtype=torch.float32, requires_grad=True)
@@ -833,14 +833,18 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         pointer = values.data_ptr()
         builder = self.make_builder(18)
         builder.make_initializer("weight", values)
+        self.assertEqual(len(builder._borrowed_sources), 1)
+        retained = builder._borrowed_sources[0]
+        self.assertFalse(retained.requires_grad)
+        self.assertIsNone(retained.grad_fn)
+        self.assertEqual(retained.data_ptr(), pointer)
         del values
         gc.collect()
-        self.assertIsNotNone(source())
+        self.assertIsNone(source())
         model = builder.to_native(optimize=False)
         self.assertEqual(numpy.from_dlpack(model.graph.initializer[0]).ctypes.data, pointer)
         del builder
         gc.collect()
-        self.assertIsNone(source())
         numpy.testing.assert_array_equal(
             numpy.from_dlpack(model.graph.initializer[0]), numpy.arange(4, dtype=numpy.float32)
         )
