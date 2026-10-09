@@ -114,7 +114,7 @@ class NativeTorchInterpreter:
         return value
 
     def initializer(self, name, value):
-        """Copies parameter or constant storage into a native tensor initializer."""
+        """Adds a parameter or constant as a native tensor initializer."""
         if isinstance(value, torch.Tensor):
             from torch._subclasses.fake_tensor import FakeTensor
 
@@ -122,7 +122,9 @@ class NativeTorchInterpreter:
                 raise NotImplementedError(
                     "Native Torch export requires concrete parameter storage."
                 )
-            value = proto_from_array(value.detach().cpu(), name=name)
+            value = value.detach().cpu()
+            if value.layout != torch.strided or not value.is_contiguous():
+                value = proto_from_array(value, name=name)
         return self.builder.make_initializer(name, value)
 
     def tensor(self, value, dtype=None):

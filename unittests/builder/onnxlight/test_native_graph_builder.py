@@ -769,6 +769,15 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         builder.make_initializer("big_endian", big_endian)
         numpy.testing.assert_array_equal(builder.get_constant("big_endian"), big_endian)
 
+    def test_small_integer_initializer_supports_shape_inference_chain(self):
+        builder = self.make_builder(18)
+        builder.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 3))
+        axes = builder.make_initializer("axes", numpy.array([1], dtype=numpy.int32))
+        axes_i64 = builder.op.Cast(axes, to=onnx.TensorProto.INT64)
+        axes_1d = builder.op.Reshape(axes_i64, numpy.array([-1], dtype=numpy.int64))
+        output = builder.op.ReduceMean("X", axes_1d, keepdims=0)
+        self.assertEqual(builder.get_rank(output), 1)
+
     @unittest.skipUnless(importlib.util.find_spec("torch"), "PyTorch is not installed")
     def test_torch_initializer_borrowed_storage_and_lifetime(self):
         import torch

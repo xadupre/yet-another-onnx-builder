@@ -71,6 +71,31 @@ class TestNativeTorchExport(unittest.TestCase):
             actual = session.run(None, {"X": x.numpy()})[0]
             numpy.testing.assert_allclose(actual, model(x).detach().numpy(), rtol=1e-5, atol=1e-6)
 
+    def test_linear_parameters_borrow_torch_storage(self):
+        import gc
+        import torch
+        from yobx.torch.interpreter.native_export import to_onnx
+
+        model = torch.nn.Linear(4, 3).eval()
+        weight_pointer = model.weight.data_ptr()
+        bias_pointer = model.bias.data_ptr()
+        artifact = to_onnx(
+            model, (torch.randn(2, 4),), input_names=["X"], return_builder=True, optimize=False
+        )
+        pointers = {
+            name: numpy.from_dlpack(value).ctypes.data
+            for name, value in artifact.builder.initializers_dict.items()
+        }
+        self.assertIn(weight_pointer, pointers.values())
+        self.assertIn(bias_pointer, pointers.values())
+        del model
+        gc.collect()
+        exported_pointers = {
+            numpy.from_dlpack(value).ctypes.data for value in artifact.proto.graph.initializer
+        }
+        self.assertIn(weight_pointer, exported_pointers)
+        self.assertIn(bias_pointer, exported_pointers)
+
     def test_linear_vector_and_batched_double(self):
         import torch
         from yobx.torch.interpreter.native_export import to_onnx

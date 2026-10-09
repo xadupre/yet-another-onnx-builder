@@ -6,7 +6,7 @@ PYTHONPATH=. python unittests/builder/onnxlight/benchmark_initializer_memory.py 
 """
 
 import argparse
-import resource
+import sys
 
 import numpy
 
@@ -15,6 +15,10 @@ from yobx.builder.onnxlight import OnnxLightGraphBuilder
 
 def main():
     """Measures the peak RSS increase above the allocated source weight."""
+    if sys.platform == "win32":
+        raise RuntimeError("This benchmark requires a Unix resource module.")
+    import resource
+
     parser = argparse.ArgumentParser()
     parser.add_argument("backend", choices=("numpy", "torch"))
     parser.add_argument("--megabytes", type=int, default=256)
@@ -33,7 +37,8 @@ def main():
     registered = numpy.from_dlpack(builder.initializers_dict["weight"]).ctypes.data
     assert registered == pointer
     peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
-    delta_mib = (peak - baseline) / 1024
+    units_per_mib = 1024**2 if sys.platform == "darwin" else 1024
+    delta_mib = (peak - baseline) / units_per_mib
     print(f"{args.backend}: peak RSS increase during registration: {delta_mib:.1f} MiB")
 
 

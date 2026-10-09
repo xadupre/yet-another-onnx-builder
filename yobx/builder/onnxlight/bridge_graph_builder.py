@@ -374,7 +374,6 @@ class OnnxLightGraphBuilder:
         self._function_descriptors = {}
         self._functions = {}
         self._borrowed_sources = []
-        self._shape_initializer_copies = {}
         self.shapes_context = ShapesContext()
         self.op = OnnxLightGraphBuilderOpset(self)
         self.anyop = self.op
@@ -810,8 +809,7 @@ class OnnxLightGraphBuilder:
                 borrowed = True
             else:
                 tensor = numpy_helper.from_array(value, name=name)
-        shape_tensor = tensor
-        # Native inference and folding read owned raw_data for small shape constants.
+        # Native inference and folding require owned raw_data for small shape constants.
         if (
             borrowed
             and (not tensor.dims or (len(tensor.dims) == 1 and tensor.dims[0] <= 64))
@@ -827,11 +825,10 @@ class OnnxLightGraphBuilder:
                 onnx.TensorProto.UINT64,
             }
         ):
-            shape_tensor = numpy_helper.from_array(numpy.from_dlpack(tensor), name=name)
-        shape_graph = helper.make_graph([], "initializer", [], [], [shape_tensor])
+            tensor = numpy_helper.from_array(numpy.from_dlpack(tensor), name=name)
+            borrowed = False
+        shape_graph = helper.make_graph([], "initializer", [], [], [tensor])
         self._inner.make_initializer_move(tensor)
-        if shape_tensor is not tensor:
-            self._shape_initializer_copies[name] = shape_tensor
         if borrowed and type(value).__module__.startswith("torch") and value.requires_grad:
             self._borrowed_sources.append(value)
         self.shapes_context.compute_shape_graph(shape_graph)
@@ -1392,11 +1389,6 @@ class OnnxLightGraphBuilder:
     def _export_native(self, optimize, inline):
         """Exports a native model and optional native rewrite statistics."""
         model = self._native_model()
-        if optimize:
-            for tensor in model.graph.initializer:
-                copy = self._shape_initializer_copies.get(str(tensor.name))
-                if copy is not None:
-                    tensor.CopyFrom(copy)
         has_custom_local_calls = inline and _contains_registered_call(
             model.graph, self._custom_shape_callbacks
         )
