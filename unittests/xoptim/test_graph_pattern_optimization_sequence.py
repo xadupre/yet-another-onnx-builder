@@ -1,6 +1,8 @@
 import os
 import unittest
 
+import onnx_light
+import pytest
 from onnx_light import onnx
 from onnx_light.onnx_core.graph_builder import GraphBuilder
 from onnx_light.onnx_core.optimization import GraphGraph
@@ -9,6 +11,11 @@ from yobx.ext_test_case import ExtTestCase
 
 
 class TestGraphPatternOptimizationSequence(ExtTestCase):
+    @pytest.mark.xfail(
+        onnx_light.__version__ == "0.1.31",
+        reason="onnx-light 0.1.31 emits a Split whose sizes do not cover the input dimension",
+        strict=True,
+    )
     def test_sequences_split(self):
         data = os.path.join(os.path.dirname(__file__), "data", "sequences.onnx")
         model = onnx.load(data)

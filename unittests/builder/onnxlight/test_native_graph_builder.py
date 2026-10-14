@@ -49,6 +49,29 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
             "X_dim_0",
         )
 
+    def test_remove_unused_option(self):
+        from yobx.builder.onnxlight import OnnxLightOptimizationOptions
+
+        for remove_unused in (False, True):
+            for constant_folding in (False, True):
+                with self.subTest(remove_unused=remove_unused, constant_folding=constant_folding):
+                    builder = self.make_builder(
+                        18,
+                        optimization_options=OnnxLightOptimizationOptions(
+                            patterns=[],
+                            remove_unused=remove_unused,
+                            constant_folding=constant_folding,
+                        ),
+                    )
+                    builder.make_tensor_input("X", onnx.TensorProto.FLOAT, (2, 3))
+                    builder.op.Abs("X", outputs=["unused"])
+                    builder.op.Identity("X", outputs=["Y"])
+                    builder.make_tensor_output("Y")
+                    op_types = [node.op_type for node in builder.to_native().graph.node]
+                    self.assertEqual(
+                        op_types, ["Identity"] if remove_unused else ["Abs", "Identity"]
+                    )
+
     def test_converter_metadata_and_scalar_initializers(self):
         builder = self.make_builder(18)
         builder.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 4), device=-1)
@@ -1206,8 +1229,8 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
             OnnxLightOptimizationOptions([object()])
         with self.assertRaises(ValueError):
             OnnxLightOptimizationOptions(max_iter=-2)
-        with self.assertRaisesRegex(ValueError, "remove_unused=False"):
-            OnnxLightOptimizationOptions(remove_unused=False)
+        with self.assertRaisesRegex(ValueError, "remove_unused must be a boolean"):
+            OnnxLightOptimizationOptions(remove_unused=None)
         with self.assertRaisesRegex(ValueError, "constant_folding must be a boolean"):
             OnnxLightOptimizationOptions(constant_folding={"Transpose"})
         with self.assertRaisesRegex(ValueError, "verbose"):
