@@ -392,6 +392,12 @@ class OnnxLightGraphBuilder:
             self.ir_version = ir_version or 0
         elif isinstance(target_opset_or_existing_proto, onnx.ModelProto):
             model = _native_proto(target_opset_or_existing_proto, onnx.ModelProto)
+            for value in [*model.graph.input, *model.graph.output, *model.graph.value_info]:
+                if not value.type.HasField("tensor_type"):
+                    continue
+                for index, dim in enumerate(value.type.tensor_type.shape.dim):
+                    if not dim.HasField("dim_value") and not dim.HasField("dim_param"):
+                        dim.dim_param = f"{value.name}_dim_{index}"
             for value in model.graph.input:
                 if value.type.HasField("tensor_type") and not value.type.tensor_type.HasField(
                     "shape"
