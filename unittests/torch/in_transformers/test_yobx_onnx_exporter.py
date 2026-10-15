@@ -60,7 +60,7 @@ class TestYobxOnnxExporterImport(ExtTestCase):
         self.assertIn("onnx_light", exporter.required_packages)
         self.assertIn("torch", exporter.required_packages)
         self.assertNotIn("onnx", exporter.tested_versions)
-        self.assertEqual(exporter.tested_versions["onnx_light"], "0.1.31")
+        self.assertEqual(exporter.tested_versions["onnx_light"], "0.1.32")
         self.assertNotIn("onnx", exporter.min_versions)
 
     @requires_transformers("5.12")

@@ -1,9 +1,7 @@
-name: Install native ONNX wheel
-description: Installs the full published onnx-light wheel for the active Python interpreter.
+name: Install native ONNX package
+description: Builds and installs onnx-light from its main branch.
 runs:
   using: composite
   steps:
     - shell: bash
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: python .github/scripts/install_onnx_light.py
+      run: python -m pip install "onnx-light @ git+https://github.com/xadupre/onnx-light.git@main"
