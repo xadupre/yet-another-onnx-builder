@@ -154,6 +154,145 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
             ),
         )
 
+    def test_inlining_preserves_native_rotary_fusions(self):
+        from yobx.builder.onnxlight import OnnxLightOptimizationOptions
+        from yobx.xbuilder.function_options import FunctionOptions
+
+        values = numpy.arange(48, dtype=numpy.float32).reshape(1, 2, 3, 8) / 48
+        cos_half = numpy.full((1, 1, 3, 4), 0.8, dtype=numpy.float32)
+        sin_half = numpy.full((1, 1, 3, 4), 0.6, dtype=numpy.float32)
+        cosine = numpy.concatenate([cos_half, cos_half], axis=-1)
+        sine = numpy.concatenate([sin_half, sin_half], axis=-1)
+        rotated = numpy.concatenate([-values[..., 4:], values[..., :4]], axis=-1)
+        expected = values * cosine + rotated * sine
+        feeds = {"X": values, "cos_half": cos_half, "sin_half": sin_half}
+
+        for standard in (False, True):
+            with self.subTest(standard=standard):
+                patterns = ["FunctionHalfRotaryEmbedding"]
+                if standard:
+                    patterns.append("RotaryEmbedding")
+                builder = self.make_builder(
+                    24, optimization_options=OnnxLightOptimizationOptions(patterns)
+                )
+                builder.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 2, 3, 8))
+                for name in ("cos_half", "sin_half"):
+                    builder.make_tensor_input(name, onnx.TensorProto.FLOAT, ("batch", 1, 3, 4))
+                cos = builder.op.Concat("cos_half", "cos_half", axis=-1)
+                sin = builder.op.Concat("sin_half", "sin_half", axis=-1)
+                left, right = builder.op.Split(
+                    "X", numpy.array([4, 4], dtype=numpy.int64), axis=-1, outputs=2
+                )
+                rotation = builder.op.Concat(builder.op.Neg(right), left, axis=-1)
+                output = builder.op.Add(builder.op.Mul("X", cos), builder.op.Mul(rotation, sin))
+                function = self.make_builder(24, as_function=True)
+                function.make_tensor_input("X", onnx.TensorProto.FLOAT, ("batch", 2, 3, 8))
+                function.op.Identity("X", outputs=["Y"])
+                function.make_tensor_output("Y")
+                _, key = builder.make_local_function(
+                    function, FunctionOptions(name="PassThrough", domain="custom")
+                )
+                builder.make_node(key[1], [output], ["Y"], domain=key[0])
+                builder.make_tensor_output("Y")
+
+                artifact = builder.to_onnx(inline=True, return_optimize_report=True)
+                model = artifact.proto
+                checker.check_model(model)
+                op_types = [node.op_type for node in model.graph.node]
+                self.assertIn("RotaryEmbedding" if standard else "HalfRotaryEmbedding", op_types)
+                self.assertNotIn("PassThrough", op_types)
+                self.assertFalse(any(f.name == "PassThrough" for f in model.functions))
+                if not standard:
+                    self.assertTrue(any(f.name == "HalfRotaryEmbedding" for f in model.functions))
+                applied = {row["pattern"] for row in artifact.report.stats}
+                self.assertTrue(set(patterns).issubset(applied))
+                actual = ReferenceEvaluator(model).run(None, feeds)[0]
+                numpy.testing.assert_allclose(actual, expected, rtol=1e-6, atol=1e-6)
+                repeated = builder.to_native(inline=True)
+                self.assertIn(
+                    "RotaryEmbedding" if standard else "HalfRotaryEmbedding",
+                    [node.op_type for node in repeated.graph.node],
+                )
+                checker.check_model(repeated)
+                numpy.testing.assert_allclose(
+                    ReferenceEvaluator(repeated).run(None, feeds)[0],
+                    expected,
+                    rtol=1e-6,
+                    atol=1e-6,
+                )
+                outer = self.make_builder(24)
+                for name, shape in (
+                    ("X", ("batch", 2, 3, 8)),
+                    ("cos_half", ("batch", 1, 3, 4)),
+                    ("sin_half", ("batch", 1, 3, 4)),
+                ):
+                    outer.make_tensor_input(name, onnx.TensorProto.FLOAT, shape)
+                _, key = outer.make_local_function(
+                    builder, FunctionOptions(name="FusedRotary", domain="custom"), optimize=True
+                )
+                outer.make_node(key[1], list(feeds), ["Y"], domain=key[0])
+                outer.make_tensor_output("Y")
+                nested = outer.to_native(inline=False, optimize=False)
+                checker.check_model(nested)
+                if not standard:
+                    self.assertTrue(
+                        any(f.name == "HalfRotaryEmbedding" for f in nested.functions)
+                    )
+                numpy.testing.assert_allclose(
+                    ReferenceEvaluator(nested).run(None, feeds)[0], expected, rtol=1e-6, atol=1e-6
+                )
+
+    def test_inlining_preserves_native_attention_fusion(self):
+        from yobx.builder.onnxlight import OnnxLightOptimizationOptions
+        from yobx.xbuilder.function_options import FunctionOptions
+
+        builder = self.make_builder(
+            24, optimization_options=OnnxLightOptimizationOptions(["FunctionAttention"])
+        )
+        builder.make_tensor_input("Q", onnx.TensorProto.FLOAT, (1, 2, 3, 4))
+        for name in ("K", "V"):
+            builder.make_tensor_input(name, onnx.TensorProto.FLOAT, (1, 2, 5, 4))
+        builder.make_tensor_input("mask", onnx.TensorProto.BOOL, (1, 1, 3, 5))
+        scale = numpy.array([0.5], dtype=numpy.float32)
+        zero = numpy.array([0], dtype=numpy.float32)
+        scores = builder.op.MatMul(
+            builder.op.Mul("Q", scale),
+            builder.op.Transpose(builder.op.Mul("K", scale), perm=[0, 1, 3, 2]),
+        )
+        bias = builder.op.Where("mask", zero, numpy.array([-numpy.inf], dtype=numpy.float32))
+        probabilities = builder.op.Softmax(builder.op.Add(scores, bias), axis=-1)
+        filtered = builder.op.Where(builder.op.IsNaN(probabilities), zero, probabilities)
+        output = builder.op.MatMul(filtered, "V")
+        function = self.make_builder(24, as_function=True)
+        function.make_tensor_input("X", onnx.TensorProto.FLOAT, (1, 2, 3, 4))
+        function.op.Identity("X", outputs=["Y"])
+        function.make_tensor_output("Y")
+        _, key = builder.make_local_function(
+            function, FunctionOptions(name="PassThrough", domain="custom")
+        )
+        builder.make_node(key[1], [output], ["Y"], domain=key[0])
+        builder.make_tensor_output("Y")
+
+        artifact = builder.to_onnx(inline=True, return_optimize_report=True)
+        checker.check_model(artifact.proto)
+        self.assertIn("FunctionAttention", {row["pattern"] for row in artifact.report.stats})
+        self.assertTrue(any(f.name.startswith("LocalAttention") for f in artifact.functions))
+        self.assertFalse(any(f.name == "PassThrough" for f in artifact.functions))
+        feeds = {
+            "Q": numpy.arange(24, dtype=numpy.float32).reshape(1, 2, 3, 4) / 24,
+            "K": numpy.arange(40, dtype=numpy.float32).reshape(1, 2, 5, 4) / 40,
+            "V": numpy.arange(40, dtype=numpy.float32).reshape(1, 2, 5, 4) / 20,
+            "mask": numpy.ones((1, 1, 3, 5), dtype=numpy.bool_),
+        }
+        feeds["mask"][..., 0, -1] = False
+        scores = (feeds["Q"] * scale) @ numpy.swapaxes(feeds["K"] * scale, -1, -2)
+        scores = numpy.where(feeds["mask"], scores, -numpy.inf)
+        probabilities = numpy.exp(scores - scores.max(axis=-1, keepdims=True))
+        probabilities /= probabilities.sum(axis=-1, keepdims=True)
+        expected = probabilities @ feeds["V"]
+        actual = ReferenceEvaluator(artifact.proto).run(None, feeds)[0]
+        numpy.testing.assert_allclose(actual, expected, rtol=1e-6, atol=1e-6)
+
     def test_native_local_function_merge_and_rename(self):
         from yobx.xbuilder.function_options import FunctionOptions
 

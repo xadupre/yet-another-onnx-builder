@@ -99,28 +99,41 @@ and CI file.
 See :ref:`l-design-env-variables` for a reference of all environment variables
 that can be set to control test execution and enable extra diagnostic output.
 
-Native regressions awaiting onnx-light 0.1.33
--------------------------------------------
+Native fusion coverage and remaining regressions
+-----------------------------------------------
 
 Tests previously skipped pending ``onnx-light 0.1.33`` are exercised with the
 currently required ``0.1.32`` release. Nested conditional functions and dynamic
 grouped matrix multiplication work with that release. The grouped matrix
 multiplication test checks both retained and inlined ``Scan`` functions.
-At opset 24, Tiny-LLM shape tests check the standard ``Attention`` and
-``RMSNormalization`` operators rather than requiring a local function.
+Tiny-LLM fusion tests use opset 24 and run without version-based expected
+failures, including float16 exports and transformer patches. They check the
+standard ``Attention`` and ``RMSNormalization`` operators and a retained native
+rotary fusion.
+
+Native Attention and RotaryEmbedding patterns already exist in ``0.1.32``.
+The export bridge previously expanded optimizer-generated functions again
+when inlining converter functions, undoing these fusions. It now inlines only
+the original converter functions and retains functions introduced by native
+optimization, including their nested dependencies. Shape inference expands a
+copy of the model without removing fusions from the exported model.
+
+Focused numerical regressions check the native rewrite reports for
+``FunctionAttention``, ``FunctionHalfRotaryEmbedding`` and ``RotaryEmbedding``,
+including repeated exports and nested function exports. The standard
+``RotaryEmbedding`` pattern requires unshared doubled cosine/sine caches.
+Tiny-LLM shares caches between query and key and may instead retain the native
+``HalfRotaryEmbedding`` function.
 
 The remaining native failures use conditional ``pytest.mark.xfail`` markers,
 not version-based skips. Their expected exception types and upstream issues are
 recorded alongside the tests:
 
 * Tiny-LLM submodule export still turns an unknown dimension into ``INT64_MAX``
-  (``xadupre/onnx-light#5167``).
-* Several Tiny-LLM optimization variants still miss rotary or attention fusions
-  (``xadupre/onnx-light#5169``).
-* Some float16 exports still reject local operators in the ``intermediate``
-  domain (``xadupre/onnx-light#5171``).
+  (``xadupre/onnx-light#5298``).
 * The sequence-splitting optimization emits split sizes that do not cover the
-  input dimension. The regression also checks numerical outputs.
+  input dimension (``xadupre/onnx-light#5299``). The regression also checks
+  numerical outputs.
 
 These markers use ``strict=True``: an unexpected pass requires removing the
 marker, and a different exception type remains a failure. At version ``0.1.33``

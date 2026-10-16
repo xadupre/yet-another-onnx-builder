@@ -665,7 +665,7 @@ class TestOnnxExportSubModules(ExtTestCase):
     @requires_transformers("5.2")
     @pytest.mark.xfail(
         Version(onnx_light.__version__) < Version("0.1.33"),
-        reason="xadupre/onnx-light#5167: unknown dimension becomes INT64_MAX",
+        reason="xadupre/onnx-light#5298: unknown dimension becomes INT64_MAX",
         raises=ValueError,
         strict=True,
     )

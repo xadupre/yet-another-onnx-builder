@@ -16,7 +16,7 @@ from yobx.ext_test_case import ExtTestCase
 class TestGraphPatternOptimizationSequence(ExtTestCase):
     @pytest.mark.xfail(
         Version(onnx_light.__version__) < Version("0.1.33"),
-        reason="onnx-light emits a Split whose sizes do not cover the input dimension",
+        reason="xadupre/onnx-light#5299: Split sizes do not cover the input dimension",
         raises=ValueError,
         strict=True,
     )
