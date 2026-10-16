@@ -4,7 +4,6 @@ from yobx.ext_test_case import (
     has_onnxscript,
     ignore_warnings,
     requires_onnxscript,
-    requires_onnx_light,
     requires_torch,
     requires_transformers,
 )
@@ -100,18 +99,22 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_regex(self):
         evaluation(cases=".*Aten.*", exporters="custom-strict", quiet=False, dynamic=False)
 
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5168")
     def test_run_exporter_custom_nested_cond(self):
-        evaluation(cases="ControlFlowNestCond", exporters="custom", quiet=False, dynamic=False)
+        results = evaluation(
+            cases="ControlFlowNestCond", exporters="custom", quiet=False, dynamic=False
+        )
+        self.assertEqual(1, len(results))
+        self.assertEqual(1, results[0]["success"])
 
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5168")
     def test_run_exporter_yobx_tracing_cond_nested_module(self):
-        evaluation(
+        results = evaluation(
             cases="ControlFlowCondNestedModule",
             exporters="yobx-tracing",
             quiet=False,
             dynamic=False,
         )
+        self.assertEqual(1, len(results))
+        self.assertEqual(1, results[0]["success"])
 
     def test_run_exporter_yobx_tracing_cond(self):
         evaluation(cases="ControlFlowCond", exporters="yobx-tracing", quiet=False, dynamic=False)

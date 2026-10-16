@@ -1,4 +1,7 @@
 import unittest
+import onnx_light
+import pytest
+from packaging.version import Version
 from yobx._onnx_shim import onnx
 import torch
 from yobx.helpers import max_diff
@@ -17,7 +20,6 @@ from yobx.ext_test_case import (
     hide_stdout,
     ignore_warnings,
     requires_torch,
-    requires_onnx_light,
     requires_transformers,
     skipif_ci_windows,
 )
@@ -123,9 +125,14 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertNotIn("GroupQueryAttention", unique_ops)
         # self._chech_shape(onx.get_proto(include_weights=False))
 
+    @pytest.mark.xfail(
+        Version(onnx_light.__version__) < Version("0.1.33"),
+        reason="xadupre/onnx-light#5169: missing rotary and attention fusions",
+        raises=AssertionError,
+        strict=True,
+    )
     @hide_stdout()
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     def test_tiny_llm_to_onnx_22_opt(self):
         import onnxruntime
 
@@ -193,11 +200,16 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         # not working yet
         # self._chech_shape(onx.get_proto(include_weights=False))
 
+    @pytest.mark.xfail(
+        Version(onnx_light.__version__) < Version("0.1.33"),
+        reason="xadupre/onnx-light#5169: missing rotary fusion",
+        raises=AssertionError,
+        strict=True,
+    )
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_to_onnx_24(self):
         import onnxruntime
@@ -269,9 +281,14 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertIn("Attention", unique_ops)
         self._chech_shape(onx.get_proto(include_weights=False))
 
+    @pytest.mark.xfail(
+        Version(onnx_light.__version__) < Version("0.1.33"),
+        reason="xadupre/onnx-light#5169: missing rotary and attention fusions",
+        raises=AssertionError,
+        strict=True,
+    )
     @hide_stdout()
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     def test_tiny_llm_to_onnx_ort_22(self):
         import onnxruntime
 
@@ -313,23 +330,22 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             torch.tensor([[1, 1, 1, 0]], dtype=torch.int64),
             torch.tensor([[1, 0, 1, 1]], dtype=torch.int64),
         ):
-            with self.subTest(attention_mask=mask.tolist()):
-                problem = dict(
-                    input_ids=torch.tensor([[24320]], dtype=torch.int64),
-                    attention_mask=mask,
-                    past_key_values=make_dynamic_cache(
-                        [
-                            torch.rand((1, 1, 3, 96), dtype=torch.float32),
-                            torch.rand((1, 1, 3, 96), dtype=torch.float32),
-                        ]
-                    ),
-                )
+            problem = dict(
+                input_ids=torch.tensor([[24320]], dtype=torch.int64),
+                attention_mask=mask,
+                past_key_values=make_dynamic_cache(
+                    [
+                        torch.rand((1, 1, 3, 96), dtype=torch.float32),
+                        torch.rand((1, 1, 3, 96), dtype=torch.float32),
+                    ]
+                ),
+            )
 
-                expected = model(**torch_deepcopy(problem))
-                feeds = make_feeds(sess, problem, use_numpy=True)
-                got = sess.run(None, feeds)
-                diff = max_diff(expected, got)
-                assert diff["abs"] <= 1e-5, f"diff={diff}"
+            expected = model(**torch_deepcopy(problem))
+            feeds = make_feeds(sess, problem, use_numpy=True)
+            got = sess.run(None, feeds)
+            diff = max_diff(expected, got)
+            assert diff["abs"] <= 1e-5, f"attention_mask={mask.tolist()}, diff={diff}"
 
         outputs = [o.name for o in onx.graph.output]
         self.assertEqual(
@@ -388,11 +404,16 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         # to_onnx returns ModelProto when large_model=False (the default)
         return onx
 
+    @pytest.mark.xfail(
+        Version(onnx_light.__version__) < Version("0.1.33"),
+        reason="xadupre/onnx-light#5169: missing local attention function",
+        raises=AssertionError,
+        strict=True,
+    )
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_default_opset_22(self):
         """
@@ -425,13 +446,12 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_default_opset_24(self):
         """
         Checks that ``arnir0/Tiny-LLM`` is exported at opset 24 with type/shape
-        information on every node output, and that ``patterns="default"``
-        produces at least one local function (e.g. a fused attention function).
+        information on every node output and standard attention and RMS
+        normalization fusions.
         """
         proto = self._export_tiny_llm(opset=24, patterns="default")
         missing = self._get_missing_shapes(proto)
@@ -440,17 +460,20 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             missing,
             f"Some node outputs are missing shape info at opset 24 / default: {missing}",
         )
-        self.assertGreater(
-            len(proto.functions),
-            0,
-            "default optimization should produce at least one local function at opset 24",
-        )
+        unique_ops = {n.op_type for n in proto.graph.node}
+        self.assertIn("Attention", unique_ops)
+        self.assertIn("RMSNormalization", unique_ops)
 
+    @pytest.mark.xfail(
+        Version(onnx_light.__version__) < Version("0.1.33"),
+        reason="xadupre/onnx-light#5169: missing attention fusion",
+        raises=AssertionError,
+        strict=True,
+    )
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22(self):
         """
@@ -483,7 +506,6 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_24(self):
         """
@@ -581,11 +603,16 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertNotIn("GroupQueryAttention", unique_ops)
         # self._chech_shape(onx.get_proto(include_weights=False))
 
+    @pytest.mark.xfail(
+        Version(onnx_light.__version__) < Version("0.1.33"),
+        reason="xadupre/onnx-light#5169: missing rotary fusion",
+        raises=AssertionError,
+        strict=True,
+    )
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_to_onnx_24_wrapped(self):
         import onnxruntime
@@ -712,11 +739,16 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     def test_tiny_llm_to_onnx_autocast_float16_default(self):
         self.common_test_tiny_llm_to_onnx_autocast_float16("default")
 
+    @pytest.mark.xfail(
+        Version(onnx_light.__version__) < Version("0.1.33"),
+        reason="xadupre/onnx-light#5171: unsupported intermediate::LocalAttention",
+        raises=ValueError,
+        strict=True,
+    )
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5171")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_to_onnx_autocast_float16_default_onnxruntime(self):
         self.common_test_tiny_llm_to_onnx_autocast_float16("default+onnxruntime", opset=22)
@@ -800,11 +832,16 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertIsNotNone(proto)
         self.assertGreater(len(proto.graph.node), 0)
 
+    @pytest.mark.xfail(
+        Version(onnx_light.__version__) < Version("0.1.33"),
+        reason="xadupre/onnx-light#5169: missing attention fusion",
+        raises=AssertionError,
+        strict=True,
+    )
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_yobx(self):
         proto = self._export_tiny_llm(
@@ -829,11 +866,16 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             "default+onnxruntime should produce an Attention op at opset 22",
         )
 
+    @pytest.mark.xfail(
+        Version(onnx_light.__version__) < Version("0.1.33"),
+        reason="xadupre/onnx-light#5171: unsupported intermediate::CosSinCache",
+        raises=ValueError,
+        strict=True,
+    )
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_transformers(self):
         proto = self._export_tiny_llm(
@@ -858,11 +900,16 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             "default+onnxruntime should produce an Attention op at opset 22",
         )
 
+    @pytest.mark.xfail(
+        Version(onnx_light.__version__) < Version("0.1.33"),
+        reason="xadupre/onnx-light#5169: missing attention fusion",
+        raises=AssertionError,
+        strict=True,
+    )
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_yobx_2(self):
         proto = self._export_tiny_llm(
@@ -887,11 +934,16 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             "default+onnxruntime should produce an Attention op at opset 22",
         )
 
+    @pytest.mark.xfail(
+        Version(onnx_light.__version__) < Version("0.1.33"),
+        reason="xadupre/onnx-light#5171: unsupported intermediate::CosSinCache",
+        raises=ValueError,
+        strict=True,
+    )
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
     @requires_transformers("5.2")
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5169")
     @ignore_warnings(FutureWarning)
     def test_tiny_llm_shape_ort_opset_22_fp16_patch_transformers_2(self):
         proto = self._export_tiny_llm(
