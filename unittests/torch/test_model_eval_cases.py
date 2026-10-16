@@ -100,11 +100,11 @@ class TestModelEvalCases(ExtTestCase):
     def test_run_exporter_regex(self):
         evaluation(cases=".*Aten.*", exporters="custom-strict", quiet=False, dynamic=False)
 
-    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5168")
+    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5168")
     def test_run_exporter_custom_nested_cond(self):
         evaluation(cases="ControlFlowNestCond", exporters="custom", quiet=False, dynamic=False)
 
-    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5168")
+    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5168")
     def test_run_exporter_yobx_tracing_cond_nested_module(self):
         evaluation(
             cases="ControlFlowCondNestedModule",
