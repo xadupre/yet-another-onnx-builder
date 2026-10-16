@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 import numpy
 from onnx_light import onnx
 from onnx_light.onnx import helper, numpy_helper
+from onnx_light.onnx.inliner import inline_local_functions
 from onnx_light.onnx_core.graph_builder import ConstantFoldingOptions, GraphBuilder
 from onnx_light.onnx_core.optimization import GraphGraph, standard_pattern_names
 from onnx_light.onnx_core.shape_inference import ShapesContext, SymShape, SymTensor
@@ -151,16 +152,22 @@ def _contains_registered_call(graph, registrations):
     return False
 
 
-def _contains_untyped_tensor_annotation(graph):
+def _contains_untyped_tensor_annotation(graph, inputs_only=False):
     """Returns whether a graph contains a tensor annotation without a dtype."""
+    annotations = graph.input if inputs_only else [*graph.input, *graph.output, *graph.value_info]
     if any(
         value.type.HasField("tensor_type") and not value.type.tensor_type.elem_type
-        for value in [*graph.input, *graph.output, *graph.value_info]
+        for value in annotations
     ):
         return True
     return any(
-        (attribute.HasField("g") and _contains_untyped_tensor_annotation(attribute.g))
-        or any(_contains_untyped_tensor_annotation(child) for child in attribute.graphs)
+        (
+            attribute.HasField("g")
+            and _contains_untyped_tensor_annotation(attribute.g, inputs_only)
+        )
+        or any(
+            _contains_untyped_tensor_annotation(child, inputs_only) for child in attribute.graphs
+        )
         for node in graph.node
         for attribute in node.attribute
     )
@@ -409,6 +416,10 @@ class OnnxLightGraphBuilder:
                         f"{str(value.name)!r}."
                     )
             self._original_model = model.SerializeToString()
+            self._functions.update(
+                ((str(function.domain), str(function.name)), function)
+                for function in model.functions
+            )
             self.ir_version = ir_version or model.ir_version
             self._inner = GraphBuilder(model)
             self._node_names.update(str(node.name) for node in model.graph.node if node.name)
@@ -1067,7 +1078,7 @@ class OnnxLightGraphBuilder:
                 initializers_name=list(promoted),
                 initializers_dict=promoted,
                 initializers_renaming={name: name for name in promoted},
-                nested_functions=list(self.functions.values()) if not inline else [],
+                nested_functions=list(model.functions),
             ),
         )
 
@@ -1237,6 +1248,13 @@ class OnnxLightGraphBuilder:
     def inline_functions(self, verbose=0):
         """Inlines local functions using the native graph operation."""
         count = self.inner_builder.inline_local_functions()
+        remaining = {
+            (str(function.domain), str(function.name))
+            for function in self.inner_builder.to_onnx().functions
+        } | self._custom_shape_callbacks.keys()
+        self._functions = {
+            key: function for key, function in self._functions.items() if key in remaining
+        }
         return count
 
     def remove_unused(self):
@@ -1401,6 +1419,7 @@ class OnnxLightGraphBuilder:
     def _export_native(self, optimize, inline):
         """Exports a native model and optional native rewrite statistics."""
         model = self._native_model()
+        original_functions = list(self._functions)
         has_custom_local_calls = inline and _contains_registered_call(
             model.graph, self._custom_shape_callbacks
         )
@@ -1432,20 +1451,28 @@ class OnnxLightGraphBuilder:
         existing_functions = {
             (str(function.domain), str(function.name)) for function in model.functions
         }
-        model.functions.extend(
-            function for key, function in self._functions.items() if key not in existing_functions
-        )
+        if not inline or has_custom_local_calls:
+            model.functions.extend(
+                function
+                for key, function in self._functions.items()
+                if key not in existing_functions
+            )
         if inline and has_custom_local_calls:
             inline_builder = GraphBuilder(model)
-            inline_builder.inline_local_functions()
+            inline_builder.inline_local_functions(include=original_functions)
             model = inline_builder.to_onnx(ir_version=self.ir_version)
+        # Expanding a copy infers local-function outputs without undoing native fusions.
+        expand_for_inference = bool(model.functions) or has_custom_local_calls
+        inference_model = inline_local_functions(model) if optimize and model.functions else model
         if (
             optimize
-            and not _contains_custom_domain_node(model.graph)
-            and not _contains_untyped_tensor_annotation(model.graph)
+            and not _contains_custom_domain_node(inference_model.graph)
+            and not _contains_untyped_tensor_annotation(
+                inference_model.graph, inputs_only=expand_for_inference
+            )
         ):
             inferred_shapes = ShapesContext()
-            inferred_shapes.compute_shape_model(model, True)
+            inferred_shapes.compute_shape_model(inference_model, not expand_for_inference)
             inferred_shapes.apply_inferred_shapes_to_model(model)
         self._replace_model_annotations(model)
         _remove_shape_release_metadata(model.graph)
@@ -1478,6 +1505,9 @@ class OnnxLightGraphBuilder:
         and the explicitly requested or imported IR version. Otherwise it uses
         the native wheel's default IR version, unlike :meth:`to_onnx`, which
         selects a compatible IR version for the declared opsets.
+
+        Inlining expands converter functions but preserves functions introduced
+        by native optimization.
 
         Returns:
             An ``onnx_light.onnx.ModelProto``.

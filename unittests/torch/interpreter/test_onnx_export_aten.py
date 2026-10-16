@@ -12,7 +12,6 @@ from yobx.ext_test_case import (
     skipif_ci_windows,
     requires_torch,
     requires_onnxruntime,
-    requires_onnx_light,
     requires_onnxscript,
     requires_transformers,
     ignore_warnings,
@@ -4015,7 +4014,6 @@ class TestOnnxExportAten(ExtTestCase):
         self.dump_onnx("test_aten_grouped_mm_offsets.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-4)
 
-    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5168")
     def test_aten_grouped_mm_offsets_no_constant(self):
         import torch
 
@@ -4044,13 +4042,22 @@ class TestOnnxExportAten(ExtTestCase):
         ep = torch.export.export(model, (a, b, offs))
         names = [str(n.target) for n in ep.graph.nodes]
         self.assertIn("aten._grouped_mm.default", names)
-        onx = to_onnx(
-            model, (a, b, offs), dynamic_shapes=({0: "M", 1: "K"}, {0: "N", 1: "K"}, {0: "S"})
-        )
-        self.assertEqual(len(onx.functions), 1)
-        self.assertIn("Scan", [n.op_type for n in onx.functions[0].node])
-        self.dump_onnx("test_aten_grouped_mm_offsets_no_constant.onnx", onx)
-        self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b, offs), atol=1e-4)
+        for inline in (False, True):
+            with self.subTest(inline=inline):
+                onx = to_onnx(
+                    model,
+                    (a, b, offs),
+                    dynamic_shapes=({0: "M", 1: "K"}, {0: "N", 1: "K"}, {0: "S"}),
+                    inline=inline,
+                )
+                check_model(onx.proto)
+                self.assertEqual(0 if inline else 1, len(onx.functions))
+                nodes = onx.graph.node if inline else onx.functions[0].node
+                self.assertIn("Scan", [n.op_type for n in nodes])
+                self.dump_onnx(
+                    f"test_aten_grouped_mm_offsets_no_constant_inline_{inline}.onnx", onx
+                )
+                self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b, offs), atol=1e-4)
 
     def test_aten_grouped_mm_offsets_semi_constant(self):
         import torch
