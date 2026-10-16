@@ -4015,7 +4015,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.dump_onnx("test_aten_grouped_mm_offsets.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-4)
 
-    @requires_onnx_light("0.1.31", "xadupre/onnx-light#5168")
+    @requires_onnx_light("0.1.33", "xadupre/onnx-light#5168")
     def test_aten_grouped_mm_offsets_no_constant(self):
         import torch
 

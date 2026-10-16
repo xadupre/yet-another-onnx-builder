@@ -392,6 +392,9 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
                     "Intermediate outputs of wrapped function calls are not supported."
                 )
             function = self.proto_
+            opset_imports = list(function.opset_import)
+            if not any(op.domain == function.domain for op in opset_imports):
+                opset_imports.append(helper.make_opsetid(function.domain, 1))
             model = helper.make_model(
                 helper.make_graph(
                     [
@@ -408,7 +411,7 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
                     [helper.make_tensor_value_info(name, 0, None) for name in function.output],
                 ),
                 functions=[*self._extra_functions, function],
-                opset_imports=[*function.opset_import, helper.make_opsetid(function.domain, 1)],
+                opset_imports=opset_imports,
             )
             evaluator = ReferenceEvaluator(model, **self._native_options)
             for (domain, op_type), fn in self._registered_callbacks.items():
