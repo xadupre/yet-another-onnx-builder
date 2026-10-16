@@ -16,6 +16,34 @@ TDOUBLE = onnx.TensorProto.DOUBLE
 
 
 class TestReferenceOps(ExtTestCase):
+    def test_function_with_nested_function_opset_imports(self):
+        nested = oh.make_function(
+            "custom",
+            "Nested",
+            ["X"],
+            ["Y"],
+            [oh.make_node("Identity", ["X"], ["Y"])],
+            [oh.make_opsetid("", 18)],
+        )
+        for includes_own_domain in (False, True):
+            with self.subTest(includes_own_domain=includes_own_domain):
+                imports = [oh.make_opsetid("", 18), oh.make_opsetid("custom", 1)]
+                if includes_own_domain:
+                    imports.append(oh.make_opsetid("mine", 1))
+                function = oh.make_function(
+                    "mine",
+                    "Main",
+                    ["X"],
+                    ["Y"],
+                    [oh.make_node("Nested", ["X"], ["Y"], domain="custom")],
+                    imports,
+                )
+                value = np.array([1, 2], dtype=np.float32)
+                got = ExtendedReferenceEvaluator(function, functions=[nested]).run(
+                    None, {"X": value}
+                )
+                self.assertEqualArray(value, got[0])
+
     def _range(self, *shape, bias: Optional[float] = None):
         n = np.prod(shape)
         x = np.arange(n).astype(np.float32) / n

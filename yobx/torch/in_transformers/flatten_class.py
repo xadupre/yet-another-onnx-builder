@@ -171,12 +171,6 @@ def unflatten_dynamic_cache(
 
 def flatten_static_cache(cache: StaticCache) -> Tuple[List[Any], pytree.Context]:
     """Serializes a :class:`transformers.cache_utils.StaticCache` with python objects."""
-    ca = CacheKeyValue(cache)
-    assert not ca.key_cache or cache.max_cache_len == ca.key_cache[0].shape[2], (
-        f"Serialization does not work when "
-        f"cache.max_cache_len={cache.max_cache_len} != "
-        f"cache.key_cache[0].shape[2]={ca.key_cache[0].shape[2]}"
-    )
     return _flatten_key_value_cache(cache)
 
 

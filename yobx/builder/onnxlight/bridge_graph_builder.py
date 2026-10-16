@@ -32,7 +32,7 @@ class OnnxLightOptimizationOptions:
     wheel's standard patterns. An empty sequence disables pattern rewrites.
     Other strings must be exact native pattern names. ``constant_folding``
     controls native folding. GraphGraph owns cleanup and recursive rewriting,
-    so disabling unused-node removal is not supported.
+    and unused-node removal can be controlled independently.
     """
 
     patterns: Optional[Union[str, Sequence[str]]] = None
@@ -61,8 +61,8 @@ class OnnxLightOptimizationOptions:
     def __post_init__(self):
         if not isinstance(self.max_iter, int) or self.max_iter < -1:
             raise ValueError("max_iter must be an integer greater than or equal to -1.")
-        if self.remove_unused is not True:
-            raise ValueError("remove_unused=False is not supported by the native builder.")
+        if not isinstance(self.remove_unused, bool):
+            raise ValueError("OptimizationOptions.remove_unused must be a boolean.")
         if not isinstance(self.constant_folding, bool):
             raise ValueError("constant_folding must be a boolean for the native builder.")
         if self.verbose != 0:
@@ -392,6 +392,14 @@ class OnnxLightGraphBuilder:
             self.ir_version = ir_version or 0
         elif isinstance(target_opset_or_existing_proto, onnx.ModelProto):
             model = _native_proto(target_opset_or_existing_proto, onnx.ModelProto)
+            for value in [*model.graph.input, *model.graph.output, *model.graph.value_info]:
+                if not value.type.HasField("tensor_type") or not value.type.tensor_type.HasField(
+                    "shape"
+                ):
+                    continue
+                for index, dim in enumerate(value.type.tensor_type.shape.dim):
+                    if not dim.HasField("dim_value") and not dim.HasField("dim_param"):
+                        dim.dim_param = f"{value.name}_dim_{index}"
             for value in model.graph.input:
                 if value.type.HasField("tensor_type") and not value.type.tensor_type.HasField(
                     "shape"
@@ -1405,7 +1413,9 @@ class OnnxLightGraphBuilder:
             optimizer = GraphGraph(builder, self.optimization_options.pattern_names())
             if self.optimization_options.constant_folding:
                 rewrites, native_report = optimizer.optimize(
-                    self.optimization_options.max_iter, report=True
+                    self.optimization_options.max_iter,
+                    report=True,
+                    remove_unused=self.optimization_options.remove_unused,
                 )
             else:
                 folding_options = ConstantFoldingOptions()
@@ -1414,6 +1424,7 @@ class OnnxLightGraphBuilder:
                     self.optimization_options.max_iter,
                     report=True,
                     folding_options=folding_options,
+                    remove_unused=self.optimization_options.remove_unused,
                 )
         model = builder.to_onnx(ir_version=self.ir_version)
         if hasattr(builder, "shapes"):
