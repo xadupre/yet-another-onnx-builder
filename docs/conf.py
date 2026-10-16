@@ -213,6 +213,7 @@ if substring:
     sphinx_gallery_conf["ignore_pattern"] = f".*({substring}).*"
 
 epkg_dictionary = {
+    "onnx-light": "https://github.com/xadupre/onnx-light",
     "perpetual": "https://perpetual-ml.github.io/perpetual/",
     "aten functions": "https://pytorch.org/cppdocs/api/namespace_at.html#functions",
     "azure pipeline": "https://azure.microsoft.com/en-us/products/devops/pipelines",
