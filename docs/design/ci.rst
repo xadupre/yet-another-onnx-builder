@@ -117,6 +117,9 @@ when inlining converter functions, undoing these fusions. It now inlines only
 the original converter functions and retains functions introduced by native
 optimization, including their nested dependencies. Shape inference expands a
 copy of the model without removing fusions from the exported model.
+Selective inlining uses the native graph operation to keep function opsets and
+value-lifetime metadata consistent. Explicit inlining also removes discarded
+imported definitions from the bridge's function registry.
 
 Focused numerical regressions check the native rewrite reports for
 ``FunctionAttention``, ``FunctionHalfRotaryEmbedding`` and ``RotaryEmbedding``,

@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any, Optional, Sequence, Union
 import numpy
 from onnx_light import onnx
 from onnx_light.onnx import helper, numpy_helper
-from onnx_light.onnx.inliner import inline_local_functions, inline_selected_functions
+from onnx_light.onnx.inliner import inline_local_functions
 from onnx_light.onnx_core.graph_builder import ConstantFoldingOptions, GraphBuilder
 from onnx_light.onnx_core.optimization import GraphGraph, standard_pattern_names
 from onnx_light.onnx_core.shape_inference import ShapesContext, SymShape, SymTensor
@@ -1248,6 +1248,13 @@ class OnnxLightGraphBuilder:
     def inline_functions(self, verbose=0):
         """Inlines local functions using the native graph operation."""
         count = self.inner_builder.inline_local_functions()
+        remaining = {
+            (str(function.domain), str(function.name))
+            for function in self.inner_builder.to_onnx().functions
+        } | self._custom_shape_callbacks.keys()
+        self._functions = {
+            key: function for key, function in self._functions.items() if key in remaining
+        }
         return count
 
     def remove_unused(self):
@@ -1451,7 +1458,9 @@ class OnnxLightGraphBuilder:
                 if key not in existing_functions
             )
         if inline and has_custom_local_calls:
-            model = inline_selected_functions(model, original_functions)
+            inline_builder = GraphBuilder(model)
+            inline_builder.inline_local_functions(include=original_functions)
+            model = inline_builder.to_onnx(ir_version=self.ir_version)
         # Expanding a copy infers local-function outputs without undoing native fusions.
         expand_for_inference = bool(model.functions) or has_custom_local_calls
         inference_model = inline_local_functions(model) if optimize and model.functions else model
