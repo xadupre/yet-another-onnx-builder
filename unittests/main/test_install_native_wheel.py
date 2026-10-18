@@ -1,7 +1,9 @@
 """Tests binary-only wheel selection without downloading or building packages."""
 
+import ast
 import pathlib
 import runpy
+import tomllib
 import unittest
 from pip._vendor.packaging.tags import Tag
 
@@ -17,6 +19,26 @@ class TestNativeWheelSelection(unittest.TestCase):
     def asset(self, filename):
         """Creates a release asset descriptor."""
         return {"name": filename, "browser_download_url": f"https://example.com/{filename}"}
+
+    def test_default_version(self):
+        """Keeps the wheel installer aligned with the required release."""
+        root = pathlib.Path(__file__).resolve().parents[2]
+        project = tomllib.loads((root / "pyproject.toml").read_text())
+        self.assertIn("onnx-light==0.1.33", project["project"]["dependencies"])
+        script = ast.parse((root / ".github/scripts/install_onnx_light.py").read_text())
+        defaults = [
+            keyword.value.value
+            for node in ast.walk(script)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "add_argument"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and node.args[0].value == "--version"
+            for keyword in node.keywords
+            if keyword.arg == "default"
+        ]
+        self.assertEqual(defaults, ["0.1.33"])
 
     def test_full_wheel_only(self):
         """Excludes reduced builds and source archives."""

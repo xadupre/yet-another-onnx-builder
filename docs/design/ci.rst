@@ -103,7 +103,7 @@ Native fusion coverage and remaining regressions
 -----------------------------------------------
 
 Tests previously skipped pending ``onnx-light 0.1.33`` are exercised with the
-currently required ``0.1.32`` release. Nested conditional functions and dynamic
+currently required ``0.1.33`` release. Nested conditional functions and dynamic
 grouped matrix multiplication work with that release. The grouped matrix
 multiplication test checks both retained and inlined ``Scan`` functions.
 Tiny-LLM fusion tests use opset 24 and run without version-based expected
@@ -128,17 +128,13 @@ including repeated exports and nested function exports. The standard
 Tiny-LLM shares caches between query and key and may instead retain the native
 ``HalfRotaryEmbedding`` function.
 
-The remaining native failures use conditional ``pytest.mark.xfail`` markers,
-not version-based skips. Their expected exception types and upstream issues are
-recorded alongside the tests:
+The native regressions fixed in ``0.1.33`` run without expected failures:
 
-* Tiny-LLM submodule export still turns an unknown dimension into ``INT64_MAX``
+* Tiny-LLM submodule export preserves unknown dimensions instead of ``INT64_MAX``
   (``xadupre/onnx-light#5298``).
-* The sequence-splitting optimization emits split sizes that do not cover the
-  input dimension (``xadupre/onnx-light#5299``). The regression also checks
-  numerical outputs.
+* The sequence-splitting optimization emits split sizes that cover the input
+  dimension (``xadupre/onnx-light#5299``). The regression also checks numerical
+  outputs.
 
-These markers use ``strict=True``: an unexpected pass requires removing the
-marker, and a different exception type remains a failure. At version ``0.1.33``
-or later the markers no longer allow failures. Use ``pytest -rxX`` to display
-the expected failures when running these tests.
+Their conditional ``pytest.mark.xfail`` markers apply only to older releases;
+the required ``0.1.33`` release no longer allows these failures.
