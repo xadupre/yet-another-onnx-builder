@@ -1,4 +1,5 @@
 import unittest
+from onnx_light.onnx.defs import onnx_opset_version
 from contextlib import redirect_stdout
 from io import StringIO
 from yobx.ext_test_case import ExtTestCase
@@ -12,11 +13,17 @@ from yobx._command_lines_parser import (
     get_parser_render_gallery,
     get_parser_run_doc_examples,
     get_parser_stats,
+    get_parser_validate,
     process_outputname,
 )
 
 
 class TestCommandLines(ExtTestCase):
+    def test_parser_validate_opset(self):
+        parser = get_parser_validate()
+        self.assertEqual(parser.parse_args(["-m", "model"]).opset, onnx_opset_version())
+        self.assertEqual(parser.parse_args(["-m", "model", "--opset", "18"]).opset, 18)
+
     def test_process_outputname(self):
         self.assertEqual("ggg.g", process_outputname("ggg.g", "hhh.h"))
         self.assertEqual("hhh.ggg.h", process_outputname("+.ggg", "hhh.h"))

@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import os
 
 from .patch import TransformersPatchEnum, coerce_transformers_patch
+from ..convert import DEFAULT_TARGET_OPSET
 
 DEFAULT_PROMPT = "Continue: it rains, what should I do?"
 """Default text prompt used when validating text-generation models."""
@@ -971,7 +972,7 @@ def validate_model(
     optimization: Optional[str] = "default",
     verbose: int = 0,
     dump_folder: Optional[str] = None,
-    opset: int = 22,
+    opset: int = DEFAULT_TARGET_OPSET,
     dtype: Optional[str] = None,
     device: Optional[str] = None,
     max_new_tokens: int = 10,
@@ -1019,7 +1020,7 @@ def validate_model(
         input and output tensor shapes for every discrepancy row.
     :param dump_folder: When given, all artefacts (ONNX file, export logs …)
         are saved under this directory.
-    :param opset: ONNX opset version to target (default 22).
+    :param opset: ONNX opset version to target (defaults to the latest available).
     :param dtype: Cast the model (and inputs) to this dtype before exporting,
         e.g. ``"float16"``.  ``None`` keeps the default (``float32``).
     :param device: Run on this device, e.g. ``"cpu"`` or ``"cuda"``.

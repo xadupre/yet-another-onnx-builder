@@ -7,6 +7,8 @@ under the "Opset API" section.
 """
 
 import unittest
+from onnx_light.onnx import TensorProto
+from onnx_light.onnx.defs import onnx_opset_version
 from yobx.builder.light import OnnxGraph, start
 from yobx.ext_test_case import ExtTestCase
 
@@ -17,6 +19,17 @@ class TestLightOpsetApi(ExtTestCase):
     # ------------------------------------------------------------------
     # main_opset
     # ------------------------------------------------------------------
+
+    def test_main_opset_default(self):
+        g = OnnxGraph()
+        self.assertEqual(g.main_opset, onnx_opset_version())
+        inp = g.make_input("X", TensorProto.FLOAT, [None, 4])
+        node = g.make_node("Identity", inp, domain="")
+        g.make_output(node.output[0], TensorProto.FLOAT, [None, 4])
+        model = g.to_onnx()
+        self.assertEqual(
+            {o.domain: o.version for o in model.opset_import}[""], onnx_opset_version()
+        )
 
     def test_main_opset_explicit(self):
         g = OnnxGraph(opset=18)

@@ -151,7 +151,7 @@ def to_onnx(
             raise TypeError(f"target_opset must be a dictionary or an integer not {target_opset}")
         dict_target_opset = target_opset.copy()
         if "" not in dict_target_opset:
-            dict_target_opset[""] = 21
+            dict_target_opset[""] = DEFAULT_TARGET_OPSET
         if "ai.onnx.ml" not in dict_target_opset:
             dict_target_opset["ai.onnx.ml"] = default_ai_onnx_ml(dict_target_opset[""])
     if type(final_estimator).__module__.startswith("perpetual"):

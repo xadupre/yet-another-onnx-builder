@@ -4,11 +4,35 @@ Unit tests for the top-level :func:`yobx.to_onnx` dispatcher.
 
 import unittest
 import numpy as np
+from onnx_light.onnx.defs import onnx_opset_version
 from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_torch
 
 
 class TestToOnnxDispatcher(ExtTestCase):
     """Verify that :func:`yobx.to_onnx` dispatches to the correct backend."""
+
+    def test_default_target_opset(self):
+        from yobx import DEFAULT_TARGET_OPSET
+
+        self.assertEqual(DEFAULT_TARGET_OPSET, onnx_opset_version())
+
+    def test_sql_target_opset(self):
+        from yobx import sql, to_onnx
+
+        for convert in (to_onnx, sql.to_onnx):
+            for kwargs, expected in (
+                ({}, onnx_opset_version()),
+                ({"target_opset": 18}, 18),
+                ({"target_opset": {"": 18}}, 18),
+            ):
+                with self.subTest(convert=convert.__module__, kwargs=kwargs):
+                    artifact = convert(
+                        "SELECT a + b AS total FROM t",
+                        {"a": np.float32, "b": np.float32},
+                        **kwargs,
+                    )
+                    opsets = {o.domain: o.version for o in artifact.proto.opset_import}
+                    self.assertEqual(opsets[""], expected)
 
     def test_unsupported_type_raises(self):
         """Passing an unsupported object should raise TypeError."""
@@ -29,9 +53,18 @@ class TestToOnnxDispatcher(ExtTestCase):
         y = X[:, 0] + X[:, 1]
         model = LinearRegression().fit(X, y)
 
-        artifact = to_onnx(model, (X,))
-        self.assertIsInstance(artifact, ExportArtifact)
-        self.assertIsNotNone(artifact.proto)
+        for kwargs, expected in (
+            ({}, onnx_opset_version()),
+            ({"target_opset": {"ai.onnx.ml": 3}}, onnx_opset_version()),
+            ({"target_opset": 18}, 18),
+        ):
+            with self.subTest(kwargs=kwargs):
+                artifact = to_onnx(model, (X,), **kwargs)
+                self.assertIsInstance(artifact, ExportArtifact)
+                self.assertIsNotNone(artifact.proto)
+                self.assertEqual(
+                    {o.domain: o.version for o in artifact.proto.opset_import}[""], expected
+                )
 
     def test_dispatch_sql_string(self):
         """A plain SQL string is dispatched to yobx.sql.to_onnx."""
@@ -61,6 +94,7 @@ class TestToOnnxDispatcher(ExtTestCase):
         import torch
         from yobx import to_onnx
         from yobx.container import ExportArtifact
+        from yobx.torch import interpreter
 
         class Neuron(torch.nn.Module):
             def __init__(self):
@@ -72,9 +106,15 @@ class TestToOnnxDispatcher(ExtTestCase):
 
         model = Neuron()
         x = torch.randn(3, 4)
-        artifact = to_onnx(model, (x,))
-        self.assertIsInstance(artifact, ExportArtifact)
-        self.assertIsNotNone(artifact.proto)
+        for convert in (to_onnx, interpreter.to_onnx):
+            with self.subTest(convert=convert.__module__):
+                artifact = convert(model, (x,))
+                self.assertIsInstance(artifact, ExportArtifact)
+                self.assertIsNotNone(artifact.proto)
+                self.assertEqual(
+                    {o.domain: o.version for o in artifact.proto.opset_import}[""],
+                    onnx_opset_version(),
+                )
 
 
 class TestToOnnxReturnOptimizeReport(ExtTestCase):

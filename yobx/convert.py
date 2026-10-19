@@ -4,9 +4,10 @@ Top-level dispatcher that routes a model to the appropriate backend converter.
 
 import os
 from typing import Any, Dict, Optional, Sequence, Union
+from onnx_light.onnx.defs import onnx_opset_version
 
 #: Default ONNX opset version targeted by all converters.
-DEFAULT_TARGET_OPSET = 21
+DEFAULT_TARGET_OPSET = onnx_opset_version()
 
 
 def to_onnx(

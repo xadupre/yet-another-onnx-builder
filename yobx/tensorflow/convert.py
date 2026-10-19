@@ -160,7 +160,7 @@ def to_onnx(
             raise TypeError(f"target_opset must be a dictionary or an integer not {target_opset}")
         dict_target_opset = target_opset.copy()
         if "" not in dict_target_opset:
-            dict_target_opset[""] = 21
+            dict_target_opset[""] = DEFAULT_TARGET_OPSET
 
     if input_names is not None and len(input_names) != len(args):
         raise ValueError(f"Length mismatch: {len(args)=} but input_names={input_names!r}")
