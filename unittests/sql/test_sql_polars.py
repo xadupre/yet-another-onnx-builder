@@ -21,6 +21,8 @@ def _ort_run(onx, feeds):
     from yobx.container import ExportArtifact
 
     proto = onx.proto if isinstance(onx, ExportArtifact) else onx
+    assert {o.domain: o.version for o in proto.opset_import}[""] == 21
+    assert proto.ir_version == 10
     sess = InferenceSession(proto.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)
 
@@ -191,7 +193,7 @@ class TestLazyframeToOnnx(ExtTestCase):
         from yobx.sql import lazyframe_to_onnx
         from yobx.reference import ExtendedReferenceEvaluator
 
-        artifact = lazyframe_to_onnx(lf, input_dtypes)
+        artifact = lazyframe_to_onnx(lf, input_dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         ref_outputs = ref.run(None, feeds)
         if has_onnxruntime():

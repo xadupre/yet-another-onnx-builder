@@ -14,6 +14,8 @@ def _ort_run(onx, feeds):
     from yobx.container import ExportArtifact
 
     proto = onx.proto if isinstance(onx, ExportArtifact) else onx
+    assert {o.domain: o.version for o in proto.opset_import}[""] == 21
+    assert proto.ir_version == 10
     sess = InferenceSession(proto.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)
 
@@ -25,7 +27,7 @@ def _ort_run(onx, feeds):
 
 def _run(func, dtypes, feeds):
     """Trace *func*, convert to ONNX, run with reference evaluator."""
-    artifact = dataframe_to_onnx(func, dtypes)
+    artifact = dataframe_to_onnx(func, dtypes, target_opset=21)
     ref = ExtendedReferenceEvaluator(artifact)
     ref_outputs = ref.run(None, feeds)
     if has_onnxruntime():
@@ -337,7 +339,7 @@ class TestDataframeToOnnx(ExtTestCase):
 
 def _run_multi(func, dtypes_list, feeds):
     """Trace *func* with a list of dtype dicts, convert to ONNX, run."""
-    artifact = dataframe_to_onnx(func, dtypes_list)
+    artifact = dataframe_to_onnx(func, dtypes_list, target_opset=21)
     ref = ExtendedReferenceEvaluator(artifact)
     ref_outputs = ref.run(None, feeds)
     if has_onnxruntime():

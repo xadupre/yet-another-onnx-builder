@@ -16,7 +16,7 @@ def _run(func, dtypes, feeds):
     """
     from yobx.container import ExportArtifact
 
-    artifact = dataframe_to_onnx(func, dtypes)
+    artifact = dataframe_to_onnx(func, dtypes, target_opset=21)
     checker.check_model(artifact.proto)
     ref = ExtendedReferenceEvaluator(artifact)
     ref_outputs = ref.run(None, feeds)
@@ -24,6 +24,8 @@ def _run(func, dtypes, feeds):
         from onnxruntime import InferenceSession
 
         proto = artifact.proto if isinstance(artifact, ExportArtifact) else artifact
+        assert {o.domain: o.version for o in proto.opset_import}[""] == 21
+        assert proto.ir_version == 10
         sess = InferenceSession(proto.SerializeToString(), providers=["CPUExecutionProvider"])
         ort_outputs = sess.run(None, feeds)
         assert len(ref_outputs) == len(ort_outputs)

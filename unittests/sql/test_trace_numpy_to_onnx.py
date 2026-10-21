@@ -340,7 +340,8 @@ class TestNumpyArray(ExtTestCase):
             return np.sqrt(np.abs(X) + np.float32(1))
 
         X = np.random.randn(4, 3).astype(np.float32)
-        onx = trace_numpy_to_onnx(f, X)
+        onx = trace_numpy_to_onnx(f, X, target_opset=21)
+        self.assertEqual(onx.proto.ir_version, 10)
         sess = self.check_ort(onx)
         got = sess.run(None, {"X": X})[0]
         expected = f(X)
@@ -449,7 +450,8 @@ class TestNumpyArray(ExtTestCase):
             right = np.array([3] * 6 if unsigned else [3, 3, -3, -3, 3, -3], dtype=dtype)
             for function in (np.remainder, np.fmod, lambda x, y: x % y):
                 with self.subTest(dtype=dtype, function=function):
-                    artifact = trace_numpy_to_onnx(function, left, right)
+                    artifact = trace_numpy_to_onnx(function, left, right, target_opset=21)
+                    self.assertEqual(artifact.proto.ir_version, 10)
                     session = InferenceSession(
                         artifact.SerializeToString(), providers=["CPUExecutionProvider"]
                     )

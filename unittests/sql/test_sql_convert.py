@@ -11,11 +11,13 @@ from yobx.sql import sql_to_onnx, sql_to_onnx_graph
 
 
 def _ort_run(onx, feeds):
-    """Run *onx* with onnxruntime and return outputs. Skip if ORT is not installed."""
+    """Runs *onx* with ONNX Runtime using supported opset and IR versions."""
     from onnxruntime import InferenceSession
     from yobx.container import ExportArtifact
 
     proto = onx.proto if isinstance(onx, ExportArtifact) else onx
+    assert {o.domain: o.version for o in proto.opset_import}[""] == 21
+    assert proto.ir_version == 10
     sess = InferenceSession(proto.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)
 
@@ -25,7 +27,7 @@ class TestSqlToOnnxSelect(ExtTestCase):
 
     def _run(self, query, dtypes, feeds, *, right_dtypes=None):
         """Convert *query*, run with reference evaluator and (when available) ORT."""
-        onx = sql_to_onnx(query, dtypes, right_input_dtypes=right_dtypes)
+        onx = sql_to_onnx(query, dtypes, right_input_dtypes=right_dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         ref_outputs = ref.run(None, feeds)
         if has_onnxruntime():
@@ -132,7 +134,7 @@ class TestSqlToOnnxFilter(ExtTestCase):
     """Tests for the WHERE / filter clause conversion."""
 
     def _run(self, query, dtypes, feeds):
-        onx = sql_to_onnx(query, dtypes)
+        onx = sql_to_onnx(query, dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         ref_outputs = ref.run(None, feeds)
         if has_onnxruntime():
@@ -219,7 +221,7 @@ class TestSqlToOnnxGroupBy(ExtTestCase):
     """Tests for the GROUP BY clause conversion."""
 
     def _run(self, query, dtypes, feeds):
-        onx = sql_to_onnx(query, dtypes)
+        onx = sql_to_onnx(query, dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         ref_outputs = ref.run(None, feeds)
         if has_onnxruntime():
@@ -491,7 +493,7 @@ class TestSqlToOnnxSubquery(ExtTestCase):
 
     def _run(self, query, dtypes, feeds):
         """Convert *query*, run with reference evaluator and (when available) ORT."""
-        onx = sql_to_onnx(query, dtypes)
+        onx = sql_to_onnx(query, dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         ref_outputs = ref.run(None, feeds)
         if has_onnxruntime():
@@ -568,7 +570,7 @@ class TestSqlToOnnxJoin(ExtTestCase):
     """Tests for ``JOIN … ON …`` conversion — single and multi-column keys."""
 
     def _run(self, query, dtypes, feeds, *, right_dtypes=None):
-        onx = sql_to_onnx(query, dtypes, right_input_dtypes=right_dtypes)
+        onx = sql_to_onnx(query, dtypes, right_input_dtypes=right_dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         ref_outputs = ref.run(None, feeds)
         if has_onnxruntime():
@@ -755,7 +757,7 @@ class TestSqlToOnnxTracerJoin(ExtTestCase):
     def _run_tracer(self, func, dtypes_list, feeds):
         from yobx.sql import dataframe_to_onnx
 
-        artifact = dataframe_to_onnx(func, dtypes_list)
+        artifact = dataframe_to_onnx(func, dtypes_list, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         model_feeds = {k: v for k, v in feeds.items() if k in artifact.input_names}
         outputs = ref.run(None, model_feeds)
