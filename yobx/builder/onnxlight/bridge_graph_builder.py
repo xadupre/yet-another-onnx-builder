@@ -175,22 +175,28 @@ def _contains_untyped_tensor_annotation(graph, inputs_only=False):
     )
 
 
-def _remove_shape_release_metadata(graph):
-    """Removes native release hints that misclassify partial shape tensors."""
+def _remove_execution_metadata(graph):
+    """Drops lifetime hints invalidated by rewrites, inlining and output renaming."""
+    execution_keys = {
+        "onnx_light.release_after",
+        "onnx_light.release_after_shape_tag",
+        "onnx_light.inplace_reuse",
+    }
     for node in graph.node:
         metadata = [
-            prop
+            (str(prop.key), str(prop.value))
             for prop in node.metadata_props
-            if str(prop.key) != "onnx_light.release_after_shape_tag"
+            if str(prop.key) not in execution_keys
         ]
         if len(metadata) != len(node.metadata_props):
             node.ClearField("metadata_props")
-            node.metadata_props.extend(metadata)
+            for key, value in metadata:
+                node.metadata_props.add(key=key, value=value)
         for attribute in node.attribute:
             if attribute.HasField("g"):
-                _remove_shape_release_metadata(attribute.g)
+                _remove_execution_metadata(attribute.g)
             for child in attribute.graphs:
-                _remove_shape_release_metadata(child)
+                _remove_execution_metadata(child)
 
 
 def _remove_float_bounds_metadata(graph):
@@ -1465,23 +1471,22 @@ class OnnxLightGraphBuilder:
         native_report = None
         if optimize:
             optimizer = GraphGraph(builder, self.optimization_options.pattern_names())
+            folding_options = ConstantFoldingOptions()
+            folding_options.enabled = self.optimization_options.constant_folding
+            if folding_options.enabled and any(
+                builder.shapes.get(name).dtype == onnx.TensorProto.BFLOAT16
+                for name in builder.shapes.names()
+            ):
+                # onnx-light 0.2.0's Where kernel cannot evaluate BFLOAT16.
+                folding_options.excluded_ops = {("", "Where")}
+            rewrites, native_report = optimizer.optimize(
+                self.optimization_options.max_iter,
+                report=True,
+                folding_options=folding_options,
+                remove_unused=self.optimization_options.remove_unused,
+            )
             if self.optimization_options.constant_folding:
-                rewrites, native_report = optimizer.optimize(
-                    self.optimization_options.max_iter,
-                    report=True,
-                    remove_unused=self.optimization_options.remove_unused,
-                )
-            else:
-                folding_options = ConstantFoldingOptions()
-                folding_options.enabled = False
-                rewrites, native_report = optimizer.optimize(
-                    self.optimization_options.max_iter,
-                    report=True,
-                    folding_options=folding_options,
-                    remove_unused=self.optimization_options.remove_unused,
-                )
-            if self.optimization_options.constant_folding:
-                builder.constant_fold()
+                builder.constant_fold(folding_options)
             builder.remove_identity_nodes()
             if self.optimization_options.remove_unused:
                 builder.remove_unused_nodes()
@@ -1530,8 +1535,10 @@ class OnnxLightGraphBuilder:
             inferred_shapes.apply_inferred_shapes_to_model(model)
         self._replace_model_annotations(model)
         _remove_float_bounds_metadata(model.graph)
-        _remove_shape_release_metadata(model.graph)
         _remove_output_identities(model.graph)
+        _remove_execution_metadata(model.graph)
+        for function in model.functions:
+            _remove_execution_metadata(function)
         if self._original_model is not None:
             original = onnx.ModelProto()
             original.ParseFromString(self._original_model)

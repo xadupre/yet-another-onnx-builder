@@ -225,6 +225,16 @@ After rewriting, the bridge folds newly introduced constant expressions when
 nodes when ``remove_unused=True``. Floating-point ``min``/``max`` metadata
 emitted by the native engine is discarded because its rounded bounds can
 contradict the actual folded tensor values. Tensor types and shapes are retained.
+Execution lifetime and in-place-reuse hints are also removed from the exported
+graphs and local functions, since rewrites and renaming can make them stale.
+
+For graphs containing bfloat16 tensors, ``Where`` is excluded from constant
+folding because its native kernel in onnx-light 0.2.0 does not support that
+dtype. Other constant folding remains enabled.
+
+Native inlining may retain local functions whose operator-domain opset versions
+differ from the model's. These functions keep their own opset imports; inspecting
+the exported operators must also include their bodies.
 
 Dynamic shapes
 ==============

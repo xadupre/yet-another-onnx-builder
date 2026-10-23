@@ -97,6 +97,37 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         actual = ReferenceEvaluator(model).run(None, {})[0]
         numpy.testing.assert_array_equal(actual, numpy.asarray(3.14, dtype=numpy.float32))
 
+    def test_constant_where_bfloat16(self):
+        from ml_dtypes import bfloat16
+        from yobx.builder.onnxlight import OnnxLightOptimizationOptions
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        for dtype in (numpy.float32, bfloat16):
+            with self.subTest(dtype=dtype):
+                builder = self.make_builder(
+                    18, optimization_options=OnnxLightOptimizationOptions(patterns=[])
+                )
+                builder.make_tensor_input("X", onnx.TensorProto.FLOAT, (2,))
+                builder.op.Where(
+                    numpy.array([True, False]),
+                    numpy.array([1, 2], dtype=dtype),
+                    numpy.array([-3, -4], dtype=dtype),
+                    outputs=["selected"],
+                )
+                builder.op.Cast("selected", to=onnx.TensorProto.FLOAT, outputs=["converted"])
+                builder.op.Add("X", "converted", outputs=["Y"])
+                builder.make_tensor_output("Y")
+                model = builder.to_native()
+                self.assertEqual(
+                    any(node.op_type == "Where" for node in model.graph.node), dtype is bfloat16
+                )
+                actual = ExtendedReferenceEvaluator(model).run(
+                    None, {"X": numpy.array([10, 20], dtype=numpy.float32)}
+                )[0]
+                numpy.testing.assert_array_equal(
+                    actual, numpy.array([11, 16], dtype=numpy.float32)
+                )
+
     def test_native_function_export_constants_and_parameters(self):
         from yobx.xbuilder.function_options import FunctionOptions
 
@@ -121,6 +152,36 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
                 numpy.testing.assert_array_equal(actual, feeds["X"] @ weights)
                 self.assertEqual(len(artifact.proto.input), 2 if return_initializer else 1)
         self.assertEqual(len(builder.initializers_dict), 1)
+
+    def test_export_removes_stale_execution_hints(self):
+        from onnx_light.onnx import helper
+
+        first = helper.make_node("Sin", ["X"], ["intermediate"])
+        first.metadata_props.add(key="onnx_light.release_after", value="X")
+        first.metadata_props.add(key="onnx_light.inplace_reuse", value="0:0:equal")
+        first.metadata_props.add(key="custom-note", value="preserved")
+        model = helper.make_model(
+            helper.make_graph(
+                [first, helper.make_node("Add", ["intermediate", "X"], ["Y"])],
+                "stale_release",
+                [helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [2])],
+                [helper.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [2])],
+            ),
+            opset_imports=[helper.make_opsetid("", 18)],
+        )
+        for optimize in (False, True):
+            with self.subTest(optimize=optimize):
+                exported = self.make_builder(model).to_native(optimize=optimize)
+                metadata = {
+                    str(prop.key): str(prop.value)
+                    for prop in exported.graph.node[0].metadata_props
+                }
+                self.assertEqual(metadata["custom-note"], "preserved")
+                self.assertNotIn("onnx_light.release_after", metadata)
+                self.assertNotIn("onnx_light.inplace_reuse", metadata)
+                x = numpy.array([0.25, 0.5], dtype=numpy.float32)
+                actual = ReferenceEvaluator(exported).run(None, {"X": x})[0]
+                numpy.testing.assert_allclose(actual, numpy.sin(x) + x)
 
     def test_native_local_function_converter_registration(self):
         from yobx.xbuilder.function_options import FunctionOptions
