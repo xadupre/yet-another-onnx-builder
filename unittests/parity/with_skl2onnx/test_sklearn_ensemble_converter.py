@@ -13,10 +13,10 @@ from sklearn.ensemble import (
     RandomForestRegressor,
 )
 from sklearn.model_selection import train_test_split
-from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
 from yobx.ext_test_case import ExtTestCase, requires_onnx_light
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx, ConvertOptions
+from unittests.parity.with_skl2onnx._common import TARGET_OPSET
 
 
 class TestSklearnEnsembleConverters(ExtTestCase):

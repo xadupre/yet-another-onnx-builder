@@ -11,10 +11,10 @@ from sklearn.tree import (
     ExtraTreeClassifier,
     ExtraTreeRegressor,
 )
-from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
 from yobx.sklearn import to_onnx, ConvertOptions
 from yobx.ext_test_case import ExtTestCase
 from yobx.reference import ExtendedReferenceEvaluator
+from unittests.parity.with_skl2onnx._common import TARGET_OPSET
 
 
 class TestSklearnTreeConverters(ExtTestCase):

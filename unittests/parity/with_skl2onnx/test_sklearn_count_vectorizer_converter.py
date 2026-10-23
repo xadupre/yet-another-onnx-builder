@@ -7,6 +7,7 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
+from unittests.parity.with_skl2onnx._common import TARGET_OPSET
 
 # Corpus from sklearn-onnx's test suite (natural-language sentences with
 # punctuation so that sklearn's default word-boundary regex tokenizer is
@@ -60,7 +61,7 @@ class TestSklearnCountVectorizerConverter(ExtTestCase):
         cv = CountVectorizer(ngram_range=(1, 1))
         cv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(cv)
-        onx = to_onnx(cv, (X,))
+        onx = to_onnx(cv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -79,7 +80,7 @@ class TestSklearnCountVectorizerConverter(ExtTestCase):
         cv = CountVectorizer(ngram_range=(2, 2))
         cv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(cv)
-        onx = to_onnx(cv, (X,))
+        onx = to_onnx(cv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -98,7 +99,7 @@ class TestSklearnCountVectorizerConverter(ExtTestCase):
         cv = CountVectorizer(ngram_range=(1, 2))
         cv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(cv)
-        onx = to_onnx(cv, (X,))
+        onx = to_onnx(cv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -117,7 +118,7 @@ class TestSklearnCountVectorizerConverter(ExtTestCase):
         cv = CountVectorizer(ngram_range=(1, 3))
         cv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(cv)
-        onx = to_onnx(cv, (X,))
+        onx = to_onnx(cv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -140,7 +141,7 @@ class TestSklearnCountVectorizerConverter(ExtTestCase):
         cv = CountVectorizer(binary=True)
         cv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(cv)
-        onx = to_onnx(cv, (X,))
+        onx = to_onnx(cv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -170,7 +171,7 @@ class TestSklearnCountVectorizerConverter(ExtTestCase):
             "WZZ ZZ Is this the first document?",
         ]
         X = _sklearn_tokenize(cv, oov_docs)
-        onx = to_onnx(cv, (X,))
+        onx = to_onnx(cv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -195,7 +196,7 @@ class TestSklearnCountVectorizerConverter(ExtTestCase):
 
         test_docs = [_SKL2ONNX_CORPUS[2], " "]
         X = _sklearn_tokenize(cv, test_docs)
-        onx = to_onnx(cv, (X,))
+        onx = to_onnx(cv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -217,7 +218,7 @@ class TestSklearnCountVectorizerConverter(ExtTestCase):
 
         test_docs = [*_SKL2ONNX_CORPUS, ""]
         X = _sklearn_tokenize(cv, test_docs)
-        onx = to_onnx(cv, (X,))
+        onx = to_onnx(cv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]

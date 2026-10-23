@@ -4,6 +4,7 @@ from yobx.ext_test_case import ExtTestCase, requires_onnx_light, requires_sklear
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.typing import GraphBuilderExtendedProtocol
 from yobx.sklearn import to_onnx
+from unittests.parity.with_skl2onnx._common import TARGET_OPSET
 
 
 @requires_sklearn("1.4")
@@ -72,7 +73,12 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
         )
         mlp.fit(X, y)
 
-        onx = to_onnx(mlp, (X,), extra_converters={MLPClassifier: convert_sklearn_mlp_classifier})
+        onx = to_onnx(
+            mlp,
+            (X,),
+            target_opset=TARGET_OPSET,
+            extra_converters={MLPClassifier: convert_sklearn_mlp_classifier},
+        )
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
@@ -109,7 +115,9 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
 
         skl2onnx_fn = get_converter(sklearn_operator_name_map[MLPClassifier])
         converter = wrap_skl2onnx_converter(skl2onnx_fn)
-        onx = to_onnx(mlp, (X,), extra_converters={MLPClassifier: converter})
+        onx = to_onnx(
+            mlp, (X,), target_opset=TARGET_OPSET, extra_converters={MLPClassifier: converter}
+        )
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
@@ -142,7 +150,9 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
 
         skl2onnx_fn = get_converter(sklearn_operator_name_map[LinearRegression])
         converter = wrap_skl2onnx_converter(skl2onnx_fn)
-        onx = to_onnx(reg, (X,), extra_converters={LinearRegression: converter})
+        onx = to_onnx(
+            reg, (X,), target_opset=TARGET_OPSET, extra_converters={LinearRegression: converter}
+        )
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

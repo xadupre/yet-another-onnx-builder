@@ -10,6 +10,7 @@ the scenarios covered there.
 import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from unittests.parity.with_skl2onnx._common import TARGET_OPSET
 
 
 @requires_sklearn("1.4")
@@ -29,7 +30,7 @@ class TestSklearnOnnxRadiusNeighborsRegressor(ExtTestCase):
         model = RadiusNeighborsRegressor()
         model.fit(X, y)
 
-        onx = to_onnx(model, (X[:1],))
+        onx = to_onnx(model, (X[:1],), target_opset=TARGET_OPSET)
 
         sess = self.check_ort(onx)
         # Use only points from the training set (radius ensures neighbours exist)
@@ -50,7 +51,7 @@ class TestSklearnOnnxRadiusNeighborsRegressor(ExtTestCase):
         model = RadiusNeighborsRegressor(radius=2.0)
         model.fit(X, y)
 
-        onx = to_onnx(model, (X[:1],))
+        onx = to_onnx(model, (X[:1],), target_opset=TARGET_OPSET)
 
         sess = self.check_ort(onx)
         # Points within training set — should produce valid predictions
@@ -71,7 +72,7 @@ class TestSklearnOnnxRadiusNeighborsRegressor(ExtTestCase):
         model = RadiusNeighborsRegressor(radius=2.0)
         model.fit(X, y)
 
-        onx = to_onnx(model, (X[:1],))
+        onx = to_onnx(model, (X[:1],), target_opset=TARGET_OPSET)
 
         sess = self.check_ort(onx)
         got = sess.run(None, {"X": X[:7]})[0]
@@ -92,7 +93,7 @@ class TestSklearnOnnxRadiusNeighborsRegressor(ExtTestCase):
         model = RadiusNeighborsRegressor(algorithm="brute")
         model.fit(X, y)
 
-        onx = to_onnx(model, (X[:1],))
+        onx = to_onnx(model, (X[:1],), target_opset=TARGET_OPSET)
 
         sess = self.check_ort(onx)
         got = sess.run(None, {"X": X})[0]
@@ -117,7 +118,7 @@ class TestSklearnOnnxRadiusNeighborsRegressor(ExtTestCase):
         model = RadiusNeighborsRegressor(weights="distance", algorithm="brute", radius=100)
         model.fit(X, y)
 
-        onx = to_onnx(model, (X[:1],))
+        onx = to_onnx(model, (X[:1],), target_opset=TARGET_OPSET)
 
         sess = self.check_ort(onx)
         got = sess.run(None, {"X": X})[0]
@@ -140,7 +141,7 @@ class TestSklearnOnnxRadiusNeighborsRegressor(ExtTestCase):
         model = RadiusNeighborsRegressor(weights="distance", algorithm="brute", radius=100)
         model.fit(X, y)
 
-        onx = to_onnx(model, (X[:1],))
+        onx = to_onnx(model, (X[:1],), target_opset=TARGET_OPSET)
 
         sess = self.check_ort(onx)
         got = sess.run(None, {"X": X})[0]
@@ -167,7 +168,7 @@ class TestSklearnOnnxRadiusNeighborsClassifier(ExtTestCase):
         model = RadiusNeighborsClassifier()
         model.fit(X, y)
 
-        onx = to_onnx(model, (X[:1],))
+        onx = to_onnx(model, (X[:1],), target_opset=TARGET_OPSET)
 
         sess = self.check_ort(onx)
         got = sess.run(None, {"X": X})[0]
@@ -187,7 +188,7 @@ class TestSklearnOnnxRadiusNeighborsClassifier(ExtTestCase):
         model = RadiusNeighborsClassifier()
         model.fit(X, y)
 
-        onx = to_onnx(model, (X[:1],))
+        onx = to_onnx(model, (X[:1],), target_opset=TARGET_OPSET)
 
         sess = self.check_ort(onx)
         got = sess.run(None, {"X": X[:5]})[0]
@@ -211,7 +212,7 @@ class TestSklearnOnnxRadiusNeighborsClassifier(ExtTestCase):
         model = RadiusNeighborsClassifier(algorithm="brute", weights="distance")
         model.fit(X[:13], y[:13])
 
-        onx = to_onnx(model, (X[:1],))
+        onx = to_onnx(model, (X[:1],), target_opset=TARGET_OPSET)
 
         sess = self.check_ort(onx)
         got = sess.run(None, {"X": X[:11]})[0]
@@ -232,7 +233,7 @@ class TestSklearnOnnxRadiusNeighborsClassifier(ExtTestCase):
         model = RadiusNeighborsClassifier(algorithm="brute", weights="uniform")
         model.fit(X[:13], y[:13])
 
-        onx = to_onnx(model, (X[:1],))
+        onx = to_onnx(model, (X[:1],), target_opset=TARGET_OPSET)
 
         sess = self.check_ort(onx)
         got = sess.run(None, {"X": X[:11]})[0]
