@@ -23,7 +23,7 @@ class TestMeanShift(ExtTestCase):
         ms = MeanShift()
         ms.fit(X)
 
-        onx = to_onnx(ms, (X,))
+        onx = to_onnx(ms, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMin", op_types)
@@ -49,7 +49,7 @@ class TestMeanShift(ExtTestCase):
         ms = MeanShift()
         ms.fit(X)
 
-        onx = to_onnx(ms, (X,))
+        onx = to_onnx(ms, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -76,7 +76,7 @@ class TestMeanShift(ExtTestCase):
         ms = MeanShift()
         ms.fit(X)
 
-        onx = to_onnx(ms, (X,))
+        onx = to_onnx(ms, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -101,7 +101,7 @@ class TestMeanShift(ExtTestCase):
         ms = MeanShift()
         ms.fit(X)
 
-        onx = to_onnx(ms, (X,))
+        onx = to_onnx(ms, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -125,7 +125,7 @@ class TestMeanShift(ExtTestCase):
         ms = MeanShift(bandwidth=1.5)
         ms.fit(X)
 
-        onx = to_onnx(ms, (X,))
+        onx = to_onnx(ms, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -145,7 +145,7 @@ class TestMeanShift(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("ms", MeanShift())])
         pipe.fit(X)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

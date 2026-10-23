@@ -31,7 +31,7 @@ class TestSklearnLinearSVC(ExtTestCase):
             Xd = X.astype(dtype)
             clf = LinearSVC(random_state=42, max_iter=5000)
             clf.fit(Xd, y)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
@@ -53,7 +53,7 @@ class TestSklearnLinearSVC(ExtTestCase):
             [("scaler", StandardScaler()), ("clf", LinearSVC(random_state=42, max_iter=5000))]
         )
         pipe.fit(Xd, self._y_bin)
-        onx = to_onnx(pipe, (Xd,))
+        onx = to_onnx(pipe, (Xd,), target_opset=21)
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": Xd})
         self.assertEqualArray(pipe.predict(Xd), ort_results[0])
@@ -72,7 +72,7 @@ class TestSklearnLinearSVR(ExtTestCase):
             Xd = X.astype(dtype)
             reg = LinearSVR(random_state=42, max_iter=5000)
             reg.fit(Xd, y)
-            onx = to_onnx(reg, (Xd,))
+            onx = to_onnx(reg, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
@@ -91,7 +91,7 @@ class TestSklearnLinearSVR(ExtTestCase):
             [("scaler", StandardScaler()), ("reg", LinearSVR(random_state=42, max_iter=5000))]
         )
         pipe.fit(Xd, self._y)
-        onx = to_onnx(pipe, (Xd,))
+        onx = to_onnx(pipe, (Xd,), target_opset=21)
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": Xd})
         expected = pipe.predict(Xd).reshape(-1, 1).astype(np.float32)
@@ -112,7 +112,7 @@ class TestSklearnSVC(ExtTestCase):
     def _check_svc(self, X, y, probability=False, kernel="rbf", atol=1e-4):
         clf = SVC(kernel=kernel, probability=probability, random_state=42)
         clf.fit(X, y)
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         expected_n_outputs = 2 if probability else 1
         output_names = [o.name for o in onx.proto.graph.output]
@@ -154,7 +154,7 @@ class TestSklearnSVC(ExtTestCase):
         clf = SVC(kernel="rbf", probability=True, random_state=42)
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", clf)])
         pipe.fit(self._X_bin, self._y_bin)
-        onx = to_onnx(pipe, (self._X_bin,))
+        onx = to_onnx(pipe, (self._X_bin,), target_opset=21)
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": self._X_bin})
         self.assertEqualArray(pipe.predict(self._X_bin), ort_results[0])
@@ -174,7 +174,7 @@ class TestSklearnNuSVC(ExtTestCase):
     def _check_nusvc(self, X, y, probability=False, atol=1e-4):
         clf = NuSVC(probability=probability, random_state=42)
         clf.fit(X, y)
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         expected_n_outputs = 2 if probability else 1
         output_names = [o.name for o in onx.proto.graph.output]
@@ -210,7 +210,7 @@ class TestSklearnSVR(ExtTestCase):
     def _check_svr(self, X, y, kernel="rbf", atol=1e-4):
         reg = SVR(kernel=kernel)
         reg.fit(X, y)
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 1)
@@ -233,7 +233,7 @@ class TestSklearnSVR(ExtTestCase):
         reg = SVR(kernel="rbf")
         pipe = Pipeline([("scaler", StandardScaler()), ("reg", reg)])
         pipe.fit(self._X, self._y)
-        onx = to_onnx(pipe, (self._X,))
+        onx = to_onnx(pipe, (self._X,), target_opset=21)
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": self._X})
         expected = pipe.predict(self._X).astype(np.float32)
@@ -249,7 +249,7 @@ class TestSklearnNuSVR(ExtTestCase):
     def _check_nusvr(self, X, y, kernel="rbf", atol=1e-4):
         reg = NuSVR(kernel=kernel)
         reg.fit(X, y)
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 1)

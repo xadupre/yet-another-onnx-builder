@@ -35,7 +35,7 @@ class TestSklearnQuadraticDiscriminantAnalysis(ExtTestCase):
             Xd = X.astype(dtype)
             qda = QuadraticDiscriminantAnalysis()
             qda.fit(Xd, y)
-            onx = to_onnx(qda, (Xd,))
+            onx = to_onnx(qda, (Xd,), target_opset=21)
 
             # Two outputs: label and probabilities
             output_names = [o.name for o in onx.proto.graph.output]
@@ -81,7 +81,7 @@ class TestSklearnQuadraticDiscriminantAnalysis(ExtTestCase):
             Xd = X.astype(dtype)
             qda = QuadraticDiscriminantAnalysis(reg_param=0.1)
             qda.fit(Xd, y)
-            onx = to_onnx(qda, (Xd,))
+            onx = to_onnx(qda, (Xd,), target_opset=21)
             sess = self.check_ort(onx)
             ort_results = sess.run(None, {"X": Xd})
             self.assertEqualArray(qda.predict(Xd), ort_results[0])
@@ -95,7 +95,7 @@ class TestSklearnQuadraticDiscriminantAnalysis(ExtTestCase):
                 [("scaler", StandardScaler()), ("clf", QuadraticDiscriminantAnalysis())]
             )
             pipe.fit(Xd, y)
-            onx = to_onnx(pipe, (Xd,))
+            onx = to_onnx(pipe, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})

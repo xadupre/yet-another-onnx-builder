@@ -19,7 +19,7 @@ class TestFactorAnalysis(ExtTestCase):
         fa = FactorAnalysis(n_components=2)
         fa.fit(X)
 
-        onx = to_onnx(fa, (X,))
+        onx = to_onnx(fa, (X,), target_opset=21)
 
         # Check that Sub (centering) and MatMul (projection) are present.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -45,7 +45,7 @@ class TestFactorAnalysis(ExtTestCase):
         fa = FactorAnalysis(n_components=2)
         fa.fit(X)
 
-        onx = to_onnx(fa, (X,))
+        onx = to_onnx(fa, (X,), target_opset=21)
 
         # Check that Sub (centering) and MatMul (projection) are present.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -71,7 +71,7 @@ class TestFactorAnalysis(ExtTestCase):
         fa = FactorAnalysis(n_components=3)
         fa.fit(X)
 
-        onx = to_onnx(fa, (X,))
+        onx = to_onnx(fa, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -95,7 +95,7 @@ class TestFactorAnalysis(ExtTestCase):
         pipe = Pipeline([("fa", FactorAnalysis(n_components=3)), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)

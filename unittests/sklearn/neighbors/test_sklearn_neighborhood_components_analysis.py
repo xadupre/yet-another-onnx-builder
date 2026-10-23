@@ -21,7 +21,7 @@ class TestNeighborhoodComponentsAnalysis(ExtTestCase):
         nca = NeighborhoodComponentsAnalysis(n_components=2, random_state=0)
         nca.fit(X, y)
 
-        onx = to_onnx(nca, (X,))
+        onx = to_onnx(nca, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("MatMul", op_types)
@@ -48,7 +48,7 @@ class TestNeighborhoodComponentsAnalysis(ExtTestCase):
         nca = NeighborhoodComponentsAnalysis(n_components=2, random_state=0)
         nca.fit(X, y)
 
-        onx = to_onnx(nca, (X,))
+        onx = to_onnx(nca, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -73,7 +73,7 @@ class TestNeighborhoodComponentsAnalysis(ExtTestCase):
         nca = NeighborhoodComponentsAnalysis(n_components=3, random_state=0)
         nca.fit(X, y)
 
-        onx = to_onnx(nca, (X,))
+        onx = to_onnx(nca, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -94,7 +94,7 @@ class TestNeighborhoodComponentsAnalysis(ExtTestCase):
         nca = NeighborhoodComponentsAnalysis(n_components=2, random_state=0)
         nca.fit(X, y)
 
-        onx = to_onnx(nca, (X,))
+        onx = to_onnx(nca, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

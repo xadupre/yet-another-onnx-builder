@@ -46,7 +46,7 @@ mlp = MLPClassifier(hidden_layer_sizes=(4,), activation="relu", max_iter=2000)
 mlp.fit(X, y)
 
 converter = wrap_skl2onnx_converter(convert_sklearn_mlp_classifier)
-artifact = to_onnx(mlp, (X,), extra_converters={MLPClassifier: converter})
+artifact = to_onnx(mlp, (X,), target_opset=21, extra_converters={MLPClassifier: converter})
 
 ref_b = onnxruntime.InferenceSession(
     artifact.SerializeToString(), providers=["CPUExecutionProvider"]

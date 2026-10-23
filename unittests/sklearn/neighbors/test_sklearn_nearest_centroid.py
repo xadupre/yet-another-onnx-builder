@@ -21,7 +21,7 @@ class TestNearestCentroid(ExtTestCase):
         clf = NearestCentroid()
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMin", op_types)
@@ -52,7 +52,7 @@ class TestNearestCentroid(ExtTestCase):
         clf = NearestCentroid()
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -76,7 +76,7 @@ class TestNearestCentroid(ExtTestCase):
         clf = NearestCentroid(metric="manhattan")
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -100,7 +100,7 @@ class TestNearestCentroid(ExtTestCase):
         clf = NearestCentroid()
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -132,7 +132,7 @@ class TestNearestCentroid(ExtTestCase):
         if np.allclose(clf.class_prior_, clf.class_prior_[0]):
             return  # pragma: no cover
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMax", op_types)
@@ -160,7 +160,7 @@ class TestNearestCentroid(ExtTestCase):
         clf = NearestCentroid(shrink_threshold=0.5)
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

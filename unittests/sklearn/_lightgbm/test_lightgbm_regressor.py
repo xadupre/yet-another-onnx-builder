@@ -25,7 +25,7 @@ class TestLGBMRegressor(ExtTestCase):
         reg = LGBMRegressor(n_estimators=5, max_depth=3, random_state=0, verbose=-1)
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -56,7 +56,7 @@ class TestLGBMRegressor(ExtTestCase):
         )
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Exp", op_types)
@@ -84,7 +84,7 @@ class TestLGBMRegressor(ExtTestCase):
         )
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Exp", op_types)
@@ -154,7 +154,7 @@ class TestLGBMRegressor(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
         predictions = results[0]
@@ -181,7 +181,7 @@ class TestLGBMRegressor(ExtTestCase):
         )
         reg.fit(X, y, categorical_feature=[3])
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
         predictions = results[0]

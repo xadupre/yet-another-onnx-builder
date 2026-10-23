@@ -19,7 +19,7 @@ class TestLocallyLinearEmbedding(ExtTestCase):
         lle = LocallyLinearEmbedding(n_components=2, n_neighbors=5)
         lle.fit(X)
 
-        onx = to_onnx(lle, (X,))
+        onx = to_onnx(lle, (X,), target_opset=21)
 
         # Verify key ops are present
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -49,7 +49,7 @@ class TestLocallyLinearEmbedding(ExtTestCase):
         lle = LocallyLinearEmbedding(n_components=2, n_neighbors=7)
         lle.fit(X_train)
 
-        onx = to_onnx(lle, (X_train,))
+        onx = to_onnx(lle, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_test})[0]
@@ -69,7 +69,7 @@ class TestLocallyLinearEmbedding(ExtTestCase):
         lle = LocallyLinearEmbedding(n_components=1, n_neighbors=4)
         lle.fit(X)
 
-        onx = to_onnx(lle, (X,))
+        onx = to_onnx(lle, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -91,7 +91,7 @@ class TestLocallyLinearEmbedding(ExtTestCase):
         lle = LocallyLinearEmbedding(n_components=2, n_neighbors=6)
         lle.fit(X_train)
 
-        onx = to_onnx(lle, (X_train,))
+        onx = to_onnx(lle, (X_train,), target_opset=21)
 
         expected = lle.transform(X_test).astype(np.float32)
 
@@ -118,7 +118,7 @@ class TestLocallyLinearEmbedding(ExtTestCase):
         lle = LocallyLinearEmbedding(n_components=2, n_neighbors=6)
         lle.fit(X_train)
 
-        onx = to_onnx(lle, (X_train,))
+        onx = to_onnx(lle, (X_train,), target_opset=21)
 
         expected = lle.transform(X_test)
 
@@ -136,7 +136,7 @@ class TestLocallyLinearEmbedding(ExtTestCase):
         lle = LocallyLinearEmbedding(n_components=3, n_neighbors=10)
         lle.fit(X)
 
-        onx = to_onnx(lle, (X,))
+        onx = to_onnx(lle, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]

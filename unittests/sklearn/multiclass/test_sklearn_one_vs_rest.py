@@ -29,7 +29,7 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         clf = OneVsRestClassifier(LogisticRegression(max_iter=200))
         clf.fit(self._X_bin, self._y_bin)
 
-        onx = to_onnx(clf, (self._X_bin,))
+        onx = to_onnx(clf, (self._X_bin,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X_bin})
@@ -50,7 +50,7 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         clf = OneVsRestClassifier(LogisticRegression(max_iter=200))
         clf.fit(self._X_multi, self._y_multi)
 
-        onx = to_onnx(clf, (self._X_multi,))
+        onx = to_onnx(clf, (self._X_multi,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X_multi})
@@ -72,7 +72,7 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         clf = OneVsRestClassifier(LogisticRegression(max_iter=200))
         clf.fit(X64, self._y_multi)
 
-        onx = to_onnx(clf, (X64,))
+        onx = to_onnx(clf, (X64,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X64})
@@ -98,7 +98,7 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         )
         pipe.fit(self._X_multi, self._y_multi)
 
-        onx = to_onnx(pipe, (self._X_multi,))
+        onx = to_onnx(pipe, (self._X_multi,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X_multi})
@@ -180,7 +180,7 @@ class TestSklearnOneVsRestClassifier(ExtTestCase):
         clf = OneVsRestClassifier(LogisticRegression(max_iter=200))
         clf.fit(self._X_multi, self._y_multi)
 
-        onx = to_onnx(clf, (self._X_multi,))
+        onx = to_onnx(clf, (self._X_multi,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         # One Gemm per sub-estimator (3 for 3 classes)

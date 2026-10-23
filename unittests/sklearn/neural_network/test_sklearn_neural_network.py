@@ -20,7 +20,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
         mlp.fit(X, y)
 
-        onx = to_onnx(mlp, (X,))
+        onx = to_onnx(mlp, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -48,7 +48,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
         mlp.fit(X, y)
 
-        onx = to_onnx(mlp, (X,))
+        onx = to_onnx(mlp, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -76,7 +76,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         mlp = MLPClassifier(hidden_layer_sizes=(8, 4), max_iter=500, random_state=0)
         mlp.fit(X, y)
 
-        onx = to_onnx(mlp, (X,))
+        onx = to_onnx(mlp, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -100,7 +100,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         )
         mlp.fit(X, y)
 
-        onx = to_onnx(mlp, (X,))
+        onx = to_onnx(mlp, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Tanh", op_types)
@@ -125,7 +125,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         mlp = MLPRegressor(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
         mlp.fit(X, y)
 
-        onx = to_onnx(mlp, (X,))
+        onx = to_onnx(mlp, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -149,7 +149,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
         mlp.fit(X, y)
 
-        onx = to_onnx(mlp, (X,))
+        onx = to_onnx(mlp, (X,), target_opset=21)
 
         self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
 
@@ -173,7 +173,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         mlp = MLPClassifier(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
         mlp.fit(X, y)
 
-        onx = to_onnx(mlp, (X,))
+        onx = to_onnx(mlp, (X,), target_opset=21)
 
         self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
 
@@ -197,7 +197,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         mlp = MLPRegressor(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
         mlp.fit(X, y)
 
-        onx = to_onnx(mlp, (X,))
+        onx = to_onnx(mlp, (X,), target_opset=21)
 
         self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
 
@@ -218,7 +218,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         mlp = MLPRegressor(hidden_layer_sizes=(4,), max_iter=500, random_state=0)
         mlp.fit(X, y)
 
-        onx = to_onnx(mlp, (X,))
+        onx = to_onnx(mlp, (X,), target_opset=21)
 
         self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
 
@@ -244,7 +244,7 @@ class TestSklearnNeuralNetworkConverters(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)

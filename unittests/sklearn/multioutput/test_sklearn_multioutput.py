@@ -26,7 +26,7 @@ class TestSklearnMultiOutputRegressor(ExtTestCase):
         reg = MultiOutputRegressor(Ridge())
         reg.fit(self._X, self._y)
 
-        onx = to_onnx(reg, (self._X,))
+        onx = to_onnx(reg, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -45,7 +45,7 @@ class TestSklearnMultiOutputRegressor(ExtTestCase):
         reg = MultiOutputRegressor(Ridge())
         reg.fit(self._X, y3)
 
-        onx = to_onnx(reg, (self._X,))
+        onx = to_onnx(reg, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -62,7 +62,7 @@ class TestSklearnMultiOutputRegressor(ExtTestCase):
         reg = MultiOutputRegressor(Ridge())
         reg.fit(X64, y64)
 
-        onx = to_onnx(reg, (X64,))
+        onx = to_onnx(reg, (X64,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X64})
@@ -76,7 +76,7 @@ class TestSklearnMultiOutputRegressor(ExtTestCase):
         reg = MultiOutputRegressor(DecisionTreeRegressor(max_depth=2, random_state=0))
         reg.fit(self._X, self._y)
 
-        onx = to_onnx(reg, (self._X,))
+        onx = to_onnx(reg, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -90,7 +90,7 @@ class TestSklearnMultiOutputRegressor(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("reg", MultiOutputRegressor(Ridge()))])
         pipe.fit(self._X, self._y)
 
-        onx = to_onnx(pipe, (self._X,))
+        onx = to_onnx(pipe, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -104,7 +104,7 @@ class TestSklearnMultiOutputRegressor(ExtTestCase):
         reg = MultiOutputRegressor(Ridge())
         reg.fit(self._X, self._y)
 
-        onx = to_onnx(reg, (self._X,))
+        onx = to_onnx(reg, (self._X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         # One Gemm per sub-estimator (Ridge → Gemm)
@@ -127,7 +127,7 @@ class TestSklearnMultiOutputClassifier(ExtTestCase):
         clf = MultiOutputClassifier(LogisticRegression(max_iter=200))
         clf.fit(self._X, self._y)
 
-        onx = to_onnx(clf, (self._X,))
+        onx = to_onnx(clf, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -156,7 +156,7 @@ class TestSklearnMultiOutputClassifier(ExtTestCase):
         clf = MultiOutputClassifier(LogisticRegression(max_iter=200))
         clf.fit(X64, self._y)
 
-        onx = to_onnx(clf, (X64,))
+        onx = to_onnx(clf, (X64,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X64})
@@ -174,7 +174,7 @@ class TestSklearnMultiOutputClassifier(ExtTestCase):
         clf = MultiOutputClassifier(DecisionTreeClassifier(max_depth=2, random_state=0))
         clf.fit(self._X, self._y)
 
-        onx = to_onnx(clf, (self._X,))
+        onx = to_onnx(clf, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -193,7 +193,7 @@ class TestSklearnMultiOutputClassifier(ExtTestCase):
         )
         pipe.fit(self._X, self._y)
 
-        onx = to_onnx(pipe, (self._X,))
+        onx = to_onnx(pipe, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -221,7 +221,7 @@ class TestSklearnMultiOutputClassifier(ExtTestCase):
         clf = MultiOutputClassifier(LogisticRegression(max_iter=200))
         clf.fit(self._X, self._y)
 
-        onx = to_onnx(clf, (self._X,))
+        onx = to_onnx(clf, (self._X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         # One Gemm per sub-estimator (LogisticRegression → Gemm)

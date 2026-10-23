@@ -65,7 +65,7 @@ reg.fit(X_train, y_train)
 
 X_test = rng.standard_normal((20, n_features)).astype(np.float32)
 
-onx = to_onnx(reg, (X_test[:1],))
+onx = to_onnx(reg, (X_test[:1],), target_opset=21)
 
 print(f"\nONNX model opset : {onx.opset_import[0].version}")
 print(f"Number of nodes  : {len(onx.graph.node)}")
@@ -93,7 +93,7 @@ print("\nPredictions match ✓")
 pipe = Pipeline([("scaler", StandardScaler()), ("reg", IPCRidge(alpha=0.5))])
 pipe.fit(X_train, y_train)
 
-onx_pipe = to_onnx(pipe, (X_test[:1],))
+onx_pipe = to_onnx(pipe, (X_test[:1],), target_opset=21)
 
 print(f"\nPipeline ONNX nodes: {[n.op_type for n in onx_pipe.graph.node]}")
 

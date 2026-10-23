@@ -48,6 +48,7 @@ class TestNativeTorchExport(unittest.TestCase):
         artifact = to_onnx(
             model,
             (torch.randn(2, 4),),
+            target_opset=21,
             input_names=["X"],
             output_names=["Y"],
             dynamic_shapes=({0: "batch"},),
@@ -80,7 +81,12 @@ class TestNativeTorchExport(unittest.TestCase):
         weight_pointer = model.weight.data_ptr()
         bias_pointer = model.bias.data_ptr()
         artifact = to_onnx(
-            model, (torch.randn(2, 4),), input_names=["X"], return_builder=True, optimize=False
+            model,
+            (torch.randn(2, 4),),
+            target_opset=21,
+            input_names=["X"],
+            return_builder=True,
+            optimize=False,
         )
         pointers = {
             name: numpy.from_dlpack(value).ctypes.data
@@ -104,7 +110,7 @@ class TestNativeTorchExport(unittest.TestCase):
         for shape in ((4,), (2, 5, 4)):
             with self.subTest(shape=shape):
                 x = torch.randn(shape, dtype=torch.float64)
-                artifact = to_onnx(model, (x,), input_names=["X"])
+                artifact = to_onnx(model, (x,), target_opset=21, input_names=["X"])
                 actual = self.session(artifact.proto).run(None, {"X": x.numpy()})[0]
                 numpy.testing.assert_allclose(
                     actual, model(x).detach().numpy(), rtol=1e-12, atol=1e-12
@@ -124,12 +130,12 @@ class TestNativeTorchExport(unittest.TestCase):
         x = torch.randn(2, 3)
         options = ExportOptions(remove_inplace=False)
         program = torch.export.export(Model(), (x, 2))
-        artifact = to_onnx(program, validate_onnx=True, export_options=options)
+        artifact = to_onnx(program, target_opset=21, validate_onnx=True, export_options=options)
         self.assertIsNone(artifact.ep)
         spec = program.graph_signature.input_specs[-1]
         spec.arg = SymIntArgument(name=spec.arg.name)
         with self.assertRaisesRegex(NotImplementedError, "does not support user input"):
-            to_onnx(program, export_options=options)
+            to_onnx(program, target_opset=21, export_options=options)
 
         program = torch.export.export(torch.nn.Linear(3, 2), (x,))
         spec = next(
@@ -139,7 +145,7 @@ class TestNativeTorchExport(unittest.TestCase):
         )
         spec.target = None
         with self.assertRaisesRegex(ValueError, "has no target"):
-            to_onnx(program, export_options=options)
+            to_onnx(program, target_opset=21, export_options=options)
 
     def test_native_transpose_pattern(self):
         import torch
@@ -152,8 +158,10 @@ class TestNativeTorchExport(unittest.TestCase):
 
         options = OnnxLightOptimizationOptions(["TransposeTranspose"])
         x = torch.randn(2, 3)
-        plain = to_onnx(Model(), (x,), input_names=["X"], options=options, optimize=False)
-        optimized = to_onnx(Model(), (x,), input_names=["X"], options=options)
+        plain = to_onnx(
+            Model(), (x,), target_opset=21, input_names=["X"], options=options, optimize=False
+        )
+        optimized = to_onnx(Model(), (x,), target_opset=21, input_names=["X"], options=options)
         self.assertEqual(
             [str(n.op_type) for n in plain.proto.graph.node], ["Transpose", "Transpose"]
         )
@@ -175,6 +183,7 @@ class TestNativeTorchExport(unittest.TestCase):
         artifact = to_onnx(
             Model(),
             (torch.randn(2, 3, 4),),
+            target_opset=21,
             input_names=["X"],
             dynamic_shapes=({0: torch.export.Dim("batch")},),
         )
@@ -201,6 +210,7 @@ class TestNativeTorchExport(unittest.TestCase):
         artifact = to_onnx(
             Conditional(),
             (torch.tensor(True), torch.randn(2, 3)),
+            target_opset=21,
             input_names=["predicate", "X"],
             dynamic_shapes=(None, {0: "batch"}),
         )
@@ -221,6 +231,7 @@ class TestNativeTorchExport(unittest.TestCase):
         artifact = to_onnx(
             SymbolicConditional(),
             (torch.randn(2, 3),),
+            target_opset=21,
             input_names=["X"],
             dynamic_shapes=({0: "batch"},),
         )
@@ -242,6 +253,7 @@ class TestNativeTorchExport(unittest.TestCase):
                 artifact = to_onnx(
                     model,
                     (x,),
+                    target_opset=21,
                     input_names=["X"],
                     as_function=True,
                     function_options=FunctionOptions(
@@ -283,7 +295,9 @@ class TestNativeTorchExport(unittest.TestCase):
         x = torch.randn(4, 3)
         for backend in (None, "onnx-light"):
             with self.subTest(backend=backend):
-                artifact = to_onnx(model, (x,), input_names=["X"], graph_backend=backend)
+                artifact = to_onnx(
+                    model, (x,), target_opset=21, input_names=["X"], graph_backend=backend
+                )
                 self.assertIsInstance(artifact.builder, TorchOnnxLightGraphBuilder)
                 actual = self.session(artifact.proto).run(None, {"X": x.numpy()})[0]
                 numpy.testing.assert_allclose(
@@ -307,7 +321,11 @@ class TestNativeTorchExport(unittest.TestCase):
                 x = torch.tensor([1.0, 2.0], dtype=left_dtype)
                 y = torch.tensor([1.0 + 2**-40, 2.0], dtype=right_dtype)
                 artifact = to_onnx(
-                    Compare(), (x, y), input_names=["X", "Y"], graph_backend="onnx-light"
+                    Compare(),
+                    (x, y),
+                    target_opset=21,
+                    input_names=["X", "Y"],
+                    graph_backend="onnx-light",
                 )
                 actual = self.session(artifact.proto).run(None, {"X": x.numpy(), "Y": y.numpy()})
                 for result, expected in zip(actual, Compare()(x, y)):
@@ -332,7 +350,9 @@ class TestNativeTorchExport(unittest.TestCase):
                 return relu if target is torch.ops.aten.relu.default else None
 
         x = torch.randn(2, 3)
-        artifact = to_onnx(torch.nn.ReLU(), (x,), input_names=["X"], dispatcher=Dispatcher())
+        artifact = to_onnx(
+            torch.nn.ReLU(), (x,), target_opset=21, input_names=["X"], dispatcher=Dispatcher()
+        )
         self.assertEqual(calls, [True])
         numpy.testing.assert_array_equal(
             self.session(artifact.proto).run(None, {"X": x.numpy()})[0], torch.relu(x).numpy()
@@ -346,7 +366,7 @@ class TestNativeTorchExport(unittest.TestCase):
 
         model = torch.nn.Linear(4, 3)
         x = torch.randn(2, 4)
-        artifact = to_onnx(model, (x,), input_names=["weight"])
+        artifact = to_onnx(model, (x,), target_opset=21, input_names=["weight"])
         actual = self.session(artifact.proto).run(None, {"weight": x.numpy()})[0]
         numpy.testing.assert_allclose(actual, model(x).detach().numpy(), rtol=1e-5, atol=1e-6)
 
@@ -354,7 +374,7 @@ class TestNativeTorchExport(unittest.TestCase):
             def forward(self, x):
                 return x, x + 1, x
 
-        artifact = to_onnx(Repeat(), (x,), input_names=["X"], validate_onnx=True)
+        artifact = to_onnx(Repeat(), (x,), target_opset=21, input_names=["X"], validate_onnx=True)
         self.assertEqual(len(set(artifact.output_names)), 3)
         actual = self.session(artifact.proto).run(None, {"X": x.numpy()})
         for value, expected in zip(actual, Repeat()(x)):
@@ -368,7 +388,11 @@ class TestNativeTorchExport(unittest.TestCase):
             torch.nn.Conv2d(2, 3, 3, padding=1), torch.nn.Sigmoid()
         ).eval()
         artifact = to_onnx(
-            model, (torch.randn(2, 2, 5, 5),), input_names=["X"], dynamic_shapes=({0: "batch"},)
+            model,
+            (torch.randn(2, 2, 5, 5),),
+            target_opset=21,
+            input_names=["X"],
+            dynamic_shapes=({0: "batch"},),
         )
         x = torch.randn(3, 2, 5, 5)
         actual = self.session(artifact.proto).run(None, {"X": x.numpy()})[0]
@@ -386,6 +410,7 @@ class TestNativeTorchExport(unittest.TestCase):
         artifact = to_onnx(
             Model(),
             (x,),
+            target_opset=21,
             kwargs={"y": y, "scale": 2},
             input_names=["X", "Y"],
             output_names=["result"],
@@ -399,7 +424,7 @@ class TestNativeTorchExport(unittest.TestCase):
                 return x + 0.5
 
         x = torch.arange(4, dtype=torch.int64)
-        artifact = to_onnx(Promote(), (x,), input_names=["X"])
+        artifact = to_onnx(Promote(), (x,), target_opset=21, input_names=["X"])
         actual = self.session(artifact.proto).run(None, {"X": x.numpy()})[0]
         numpy.testing.assert_array_equal(actual, Promote()(x).numpy())
 
@@ -411,7 +436,9 @@ class TestNativeTorchExport(unittest.TestCase):
         model = torch.nn.Linear(4, 3).eval()
         x = torch.randn(2, 4)
         program = torch.export.export(model, (x,))
-        artifact = to_onnx(program, input_names=["X"], large_model=True, external_threshold=0)
+        artifact = to_onnx(
+            program, target_opset=21, input_names=["X"], large_model=True, external_threshold=0
+        )
         self.assertIsNotNone(artifact.container)
         with tempfile.TemporaryDirectory(dir=".") as directory:
             path = os.path.join(directory, "torch.onnx")
@@ -429,27 +456,27 @@ class TestNativeTorchExport(unittest.TestCase):
         x = torch.randn(2, 3)
         model = torch.nn.ReLU()
         with self.assertRaisesRegex(NotImplementedError, "submodule"):
-            to_onnx(model, (x,), export_modules_as_functions=True)
+            to_onnx(model, (x,), target_opset=21, export_modules_as_functions=True)
         with self.assertRaisesRegex(NotImplementedError, "torch.export.export only"):
-            to_onnx(model, (x,), export_options=ExportOptions(tracing=True))
+            to_onnx(model, (x,), target_opset=21, export_options=ExportOptions(tracing=True))
         with self.assertRaisesRegex(TypeError, "OnnxLightOptimizationOptions"):
-            to_onnx(model, (x,), options=object())
+            to_onnx(model, (x,), target_opset=21, options=object())
         with self.assertRaisesRegex(NotImplementedError, "flat arguments"):
-            to_onnx(model, ((x,),))
+            to_onnx(model, ((x,),), target_opset=21)
 
         class Mutate(torch.nn.Module):
             def forward(self, x):
                 return x.add_(1)
 
         with self.assertRaisesRegex(NotImplementedError, "mutations"):
-            to_onnx(Mutate(), (x,))
+            to_onnx(Mutate(), (x,), target_opset=21)
 
         class Unsupported(torch.nn.Module):
             def forward(self, x):
                 return torch.linalg.svd(x)
 
         with self.assertRaisesRegex(NotImplementedError, "no Python builder"):
-            to_onnx(Unsupported(), (x,))
+            to_onnx(Unsupported(), (x,), target_opset=21)
 
     def test_subprocess_blocks_legacy_engines(self):
         code = textwrap.dedent("""
@@ -495,7 +522,12 @@ class TestNativeTorchExport(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, "-c", code],
             cwd=root,
-            env={**os.environ, "PYTHONPATH": str(root)},
+            env={
+                **os.environ,
+                "PYTHONPATH": os.pathsep.join(
+                    filter(None, (str(root), os.environ.get("PYTHONPATH")))
+                ),
+            },
             capture_output=True,
             text=True,
             timeout=120,

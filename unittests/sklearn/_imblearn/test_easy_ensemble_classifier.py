@@ -27,7 +27,7 @@ class TestSklearnEasyEnsembleClassifier(ExtTestCase):
             Xd = X.astype(dtype)
             clf = EasyEnsembleClassifier(random_state=0, **kwargs)
             clf.fit(Xd, y)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -74,7 +74,7 @@ class TestSklearnEasyEnsembleClassifier(ExtTestCase):
                 random_state=0,
             )
             clf.fit(Xd, self._y_bin)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
@@ -89,7 +89,7 @@ class TestSklearnEasyEnsembleClassifier(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", clf)])
         pipe.fit(Xd, y)
 
-        onx = to_onnx(pipe, (Xd,))
+        onx = to_onnx(pipe, (Xd,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": Xd})
         expected_label = pipe.predict(Xd)

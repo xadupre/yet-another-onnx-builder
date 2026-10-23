@@ -18,7 +18,7 @@ class TestRobustScaler(ExtTestCase):
         rs = RobustScaler()
         rs.fit(X)
 
-        onx = to_onnx(rs, (X,))
+        onx = to_onnx(rs, (X,), target_opset=21)
 
         # Default settings use Sub + Div
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -43,7 +43,7 @@ class TestRobustScaler(ExtTestCase):
         rs = RobustScaler(with_centering=False)
         rs.fit(X)
 
-        onx = to_onnx(rs, (X,))
+        onx = to_onnx(rs, (X,), target_opset=21)
 
         # No centering means no Sub node
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -67,7 +67,7 @@ class TestRobustScaler(ExtTestCase):
         rs = RobustScaler(with_scaling=False)
         rs.fit(X)
 
-        onx = to_onnx(rs, (X,))
+        onx = to_onnx(rs, (X,), target_opset=21)
 
         # No scaling means no Div node
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -94,7 +94,7 @@ class TestRobustScaler(ExtTestCase):
         pipe = Pipeline([("scaler", RobustScaler()), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)

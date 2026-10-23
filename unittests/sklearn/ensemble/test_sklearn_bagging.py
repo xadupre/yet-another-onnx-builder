@@ -30,7 +30,7 @@ class TestSklearnBaggingRegressor(ExtTestCase):
                 estimator=DecisionTreeRegressor(random_state=0), random_state=0, **kwargs
             )
             reg.fit(Xd, yd)
-            onx = to_onnx(reg, (Xd,))
+            onx = to_onnx(reg, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
@@ -61,7 +61,7 @@ class TestSklearnBaggingRegressor(ExtTestCase):
             yd = self._y.astype(dtype)
             reg = BaggingRegressor(estimator=LinearRegression(), n_estimators=5, random_state=0)
             reg.fit(Xd, yd)
-            onx = to_onnx(reg, (Xd,))
+            onx = to_onnx(reg, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
@@ -78,7 +78,7 @@ class TestSklearnBaggingRegressor(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("reg", reg)])
         pipe.fit(Xd, self._y)
 
-        onx = to_onnx(pipe, (Xd,))
+        onx = to_onnx(pipe, (Xd,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": Xd})
         expected_pred = pipe.predict(Xd).astype(np.float32)
@@ -104,7 +104,7 @@ class TestSklearnBaggingClassifier(ExtTestCase):
                 estimator=DecisionTreeClassifier(random_state=0), random_state=0, **kwargs
             )
             clf.fit(Xd, y)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -146,7 +146,7 @@ class TestSklearnBaggingClassifier(ExtTestCase):
                 random_state=0,
             )
             clf.fit(Xd, self._y_bin)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
@@ -163,7 +163,7 @@ class TestSklearnBaggingClassifier(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", clf)])
         pipe.fit(Xd, y)
 
-        onx = to_onnx(pipe, (Xd,))
+        onx = to_onnx(pipe, (Xd,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": Xd})
         expected_label = pipe.predict(Xd)

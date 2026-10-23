@@ -6,6 +6,7 @@ from yobx.sklearn import to_onnx
 
 def native_to_onnx(estimator, X, **kwargs):
     """Converts while rejecting Perpetual's exporter and reference ONNX imports."""
+    kwargs.setdefault("target_opset", 21)
     original_import = builtins.__import__
     perpetual_estimator = estimator[-1] if isinstance(estimator, Pipeline) else estimator
 

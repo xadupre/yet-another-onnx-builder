@@ -18,7 +18,7 @@ class TestEllipticEnvelope(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         estimator.fit(X)
-        onx = to_onnx(estimator, (X,))
+        onx = to_onnx(estimator, (X,), target_opset=21)
 
         output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -60,7 +60,7 @@ class TestEllipticEnvelope(ExtTestCase):
         X = rng.standard_normal((40, 3)).astype(np.float64)
         ee = EllipticEnvelope(random_state=2)
         ee.fit(X)
-        onx = to_onnx(ee, (X,))
+        onx = to_onnx(ee, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -79,7 +79,7 @@ class TestEllipticEnvelope(ExtTestCase):
         X = self._make_data(seed=3)
         ee = EllipticEnvelope(random_state=3)
         ee.fit(X)
-        onx = to_onnx(ee, (X,))
+        onx = to_onnx(ee, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("MatMul", op_types)
@@ -96,7 +96,7 @@ class TestEllipticEnvelope(ExtTestCase):
         X = rng.standard_normal((60, 4)).astype(np.float32)
         pipe = Pipeline([("scaler", StandardScaler()), ("ee", EllipticEnvelope(random_state=4))])
         pipe.fit(X)
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

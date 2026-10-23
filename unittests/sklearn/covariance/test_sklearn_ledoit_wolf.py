@@ -18,7 +18,7 @@ class TestLedoitWolf(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         estimator.fit(X)
-        onx = to_onnx(estimator, (X,))
+        onx = to_onnx(estimator, (X,), target_opset=21)
 
         output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
@@ -54,7 +54,7 @@ class TestLedoitWolf(ExtTestCase):
         X = rng.standard_normal((40, 3)).astype(np.float32)
         lw = LedoitWolf()
         lw.fit(X)
-        onx = to_onnx(lw, (X,))
+        onx = to_onnx(lw, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -75,7 +75,7 @@ class TestLedoitWolf(ExtTestCase):
         X = rng.standard_normal((40, 3)).astype(np.float64)
         lw = LedoitWolf()
         lw.fit(X)
-        onx = to_onnx(lw, (X,))
+        onx = to_onnx(lw, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -95,7 +95,7 @@ class TestLedoitWolf(ExtTestCase):
         X = self._make_data(seed=3)
         lw = LedoitWolf()
         lw.fit(X)
-        onx = to_onnx(lw, (X,))
+        onx = to_onnx(lw, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
@@ -113,7 +113,7 @@ class TestLedoitWolf(ExtTestCase):
         X = rng.standard_normal((60, 4)).astype(np.float32)
         pipe = Pipeline([("scaler", StandardScaler()), ("lw", LedoitWolf())])
         pipe.fit(X)
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

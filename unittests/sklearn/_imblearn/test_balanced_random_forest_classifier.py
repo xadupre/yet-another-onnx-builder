@@ -26,7 +26,7 @@ class TestSklearnBalancedRandomForestClassifier(ExtTestCase):
             Xd = X.astype(dtype)
             clf = BalancedRandomForestClassifier(random_state=0, **kwargs)
             clf.fit(Xd, y)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -67,7 +67,7 @@ class TestSklearnBalancedRandomForestClassifier(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", clf)])
         pipe.fit(Xd, y)
 
-        onx = to_onnx(pipe, (Xd,))
+        onx = to_onnx(pipe, (Xd,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": Xd})
         expected_label = pipe.predict(Xd)
@@ -96,7 +96,9 @@ class TestSklearnBalancedRandomForestClassifier(ExtTestCase):
         y = self._y_bin
         clf = BalancedRandomForestClassifier(n_estimators=3, random_state=0)
         clf.fit(Xd, y)
-        onx = to_onnx(clf, (Xd,), convert_options=ConvertOptions(decision_path=True))
+        onx = to_onnx(
+            clf, (Xd,), target_opset=21, convert_options=ConvertOptions(decision_path=True)
+        )
         self.assertEqual(len(onx.proto.graph.output), 3)
 
     def test_classifier_decision_leaf(self):
@@ -105,7 +107,9 @@ class TestSklearnBalancedRandomForestClassifier(ExtTestCase):
         y = self._y_bin
         clf = BalancedRandomForestClassifier(n_estimators=3, random_state=0)
         clf.fit(Xd, y)
-        onx = to_onnx(clf, (Xd,), convert_options=ConvertOptions(decision_leaf=True))
+        onx = to_onnx(
+            clf, (Xd,), target_opset=21, convert_options=ConvertOptions(decision_leaf=True)
+        )
         self.assertEqual(len(onx.proto.graph.output), 3)
 
 

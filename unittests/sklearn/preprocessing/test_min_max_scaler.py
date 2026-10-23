@@ -18,7 +18,7 @@ class TestMinMaxScaler(ExtTestCase):
         mms = MinMaxScaler()
         mms.fit(X)
 
-        onx = to_onnx(mms, (X,))
+        onx = to_onnx(mms, (X,), target_opset=21)
 
         # Check graph structure: default (0,1) range uses Sub + Div + Identity
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -43,7 +43,7 @@ class TestMinMaxScaler(ExtTestCase):
         mms = MinMaxScaler(feature_range=(-1, 1))
         mms.fit(X)
 
-        onx = to_onnx(mms, (X,))
+        onx = to_onnx(mms, (X,), target_opset=21)
 
         # Non-default feature_range adds Mul + Add on top of Sub + Div
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -72,7 +72,7 @@ class TestMinMaxScaler(ExtTestCase):
         pipe = Pipeline([("scaler", MinMaxScaler()), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)

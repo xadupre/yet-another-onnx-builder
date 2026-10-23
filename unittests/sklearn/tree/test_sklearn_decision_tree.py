@@ -13,7 +13,7 @@ from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx, ConvertOptions
 
-from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
+TARGET_OPSET = 21
 
 
 @requires_sklearn("1.4")
@@ -627,7 +627,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeClassifier(max_depth=5, random_state=0)
         dt.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(dt, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -654,7 +654,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeClassifier(max_depth=5, random_state=0)
         dt.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(dt, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -682,7 +682,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeRegressor(max_depth=5, random_state=0)
         dt.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(dt, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -706,7 +706,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = DecisionTreeRegressor(max_depth=5, random_state=0)
         dt.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(dt, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -840,7 +840,7 @@ class TestSklearnDecisionTree(ExtTestCase):
         dt = ExtraTreeRegressor(max_depth=5, random_state=0)
         dt.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(dt, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -984,7 +984,7 @@ class TestConvertOptionsHas(ExtTestCase):
 
         # "main__clf" is the full converter node name for the step named "clf"
         opts = ConvertOptions(decision_leaf={"main__clf"})
-        onx = to_onnx(pipe, (X,), convert_options=opts)
+        onx = to_onnx(pipe, (X,), target_opset=21, convert_options=opts)
         # label + proba + decision_leaf = 3 outputs
         self.assertEqual(len(onx.graph.output), 3)
 
@@ -1001,7 +1001,7 @@ class TestConvertOptionsHas(ExtTestCase):
 
         # "other__clf" does not match any step node name in this pipeline
         opts = ConvertOptions(decision_leaf={"other__clf"})
-        onx = to_onnx(pipe, (X,), convert_options=opts)
+        onx = to_onnx(pipe, (X,), target_opset=21, convert_options=opts)
         # label + proba only = 2 outputs (no decision_leaf)
         self.assertEqual(len(onx.graph.output), 2)
 

@@ -213,4 +213,4 @@ jobs:
           pip install skl2onnx
 
       - name: Run sklearn converter parity tests
-        run: pytest --durations=10 unittests/parity/with_skl2onnx
+        run: python -m pytest --durations=10 unittests/parity/with_skl2onnx

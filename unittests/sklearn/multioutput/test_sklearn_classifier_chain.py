@@ -32,7 +32,7 @@ class TestSklearnClassifierChain(ExtTestCase):
         cc = ClassifierChain(LogisticRegression(max_iter=200))
         cc.fit(self._X, self._y)
 
-        onx = to_onnx(cc, (self._X,))
+        onx = to_onnx(cc, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -52,7 +52,7 @@ class TestSklearnClassifierChain(ExtTestCase):
         cc = ClassifierChain(LogisticRegression(max_iter=200))
         cc.fit(X64, self._y)
 
-        onx = to_onnx(cc, (X64,))
+        onx = to_onnx(cc, (X64,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X64})
@@ -69,7 +69,7 @@ class TestSklearnClassifierChain(ExtTestCase):
         cc = ClassifierChain(LogisticRegression(max_iter=200), order=[2, 0, 1])
         cc.fit(self._X, self._y)
 
-        onx = to_onnx(cc, (self._X,))
+        onx = to_onnx(cc, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -87,7 +87,7 @@ class TestSklearnClassifierChain(ExtTestCase):
         cc = ClassifierChain(LogisticRegression(max_iter=200), order=[2, 0, 1])
         cc.fit(X64, self._y)
 
-        onx = to_onnx(cc, (X64,))
+        onx = to_onnx(cc, (X64,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X64})
@@ -104,7 +104,7 @@ class TestSklearnClassifierChain(ExtTestCase):
         cc = ClassifierChain(LogisticRegression(max_iter=200), order="random", random_state=42)
         cc.fit(self._X, self._y)
 
-        onx = to_onnx(cc, (self._X,))
+        onx = to_onnx(cc, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -121,7 +121,7 @@ class TestSklearnClassifierChain(ExtTestCase):
         cc = ClassifierChain(DecisionTreeClassifier(max_depth=2, random_state=0))
         cc.fit(self._X, self._y)
 
-        onx = to_onnx(cc, (self._X,))
+        onx = to_onnx(cc, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -140,7 +140,7 @@ class TestSklearnClassifierChain(ExtTestCase):
         )
         pipe.fit(self._X, self._y)
 
-        onx = to_onnx(pipe, (self._X,))
+        onx = to_onnx(pipe, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -157,7 +157,7 @@ class TestSklearnClassifierChain(ExtTestCase):
         cc = ClassifierChain(LogisticRegression(max_iter=200))
         cc.fit(self._X, self._y)
 
-        onx = to_onnx(cc, (self._X,))
+        onx = to_onnx(cc, (self._X,), target_opset=21)
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": self._X})
@@ -174,7 +174,7 @@ class TestSklearnClassifierChain(ExtTestCase):
         cc = ClassifierChain(LogisticRegression(max_iter=200))
         cc.fit(self._X, self._y)
 
-        onx = to_onnx(cc, (self._X,))
+        onx = to_onnx(cc, (self._X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         # One Gemm per sub-estimator (LogisticRegression → Gemm)

@@ -39,6 +39,7 @@ def export_utils(
     onx = to_onnx(
         model,
         tuple(args),
+        target_opset=21,
         input_names=[f"input{i}" for i in range(len(args))],
         options=OptimizationOptions(
             remove_unused=remove_unused,

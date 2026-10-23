@@ -27,7 +27,7 @@ class TestTfidfVectorizer(ExtTestCase):
         tv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(tv, (X_padded,))
+        onx = to_onnx(tv, (X_padded,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TfIdfVectorizer", op_types)
@@ -53,7 +53,7 @@ class TestTfidfVectorizer(ExtTestCase):
         tv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(tv, (X_padded,))
+        onx = to_onnx(tv, (X_padded,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_padded})[0]
@@ -74,7 +74,7 @@ class TestTfidfVectorizer(ExtTestCase):
         tv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(tv, (X_padded,))
+        onx = to_onnx(tv, (X_padded,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Log", op_types)
@@ -99,7 +99,7 @@ class TestTfidfVectorizer(ExtTestCase):
         tv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(tv, (X_padded,))
+        onx = to_onnx(tv, (X_padded,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceL1", op_types)
@@ -123,7 +123,7 @@ class TestTfidfVectorizer(ExtTestCase):
         tv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(tv, (X_padded,))
+        onx = to_onnx(tv, (X_padded,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_padded})[0]
@@ -144,7 +144,7 @@ class TestTfidfVectorizer(ExtTestCase):
         tv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(tv, (X_padded,))
+        onx = to_onnx(tv, (X_padded,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_padded})[0]
@@ -165,7 +165,7 @@ class TestTfidfVectorizer(ExtTestCase):
         tv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(tv, (X_padded,))
+        onx = to_onnx(tv, (X_padded,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_padded})[0]
@@ -187,7 +187,7 @@ class TestTfidfVectorizer(ExtTestCase):
 
         X_padded = np.array([list("hello"), list("world")], dtype=object)
         with self.assertRaises(NotImplementedError):
-            to_onnx(tv, (X_padded,))
+            to_onnx(tv, (X_padded,), target_opset=21)
 
     def test_raises_for_non_string_input(self):
         """Float input must raise NotImplementedError."""
@@ -200,7 +200,7 @@ class TestTfidfVectorizer(ExtTestCase):
 
         X_float = np.zeros((2, 2), dtype=np.float32)
         with self.assertRaises(NotImplementedError):
-            to_onnx(tv, (X_float,))
+            to_onnx(tv, (X_float,), target_opset=21)
 
     def test_low_opset_raises(self):
         """norm='l2' or 'l1' with opset < 18 must raise NotImplementedError."""

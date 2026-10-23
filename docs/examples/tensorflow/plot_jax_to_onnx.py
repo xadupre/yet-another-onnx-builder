@@ -42,7 +42,7 @@ def jax_sin(x):
     return jnp.sin(x)
 
 
-onx_sin = to_onnx(jax_sin, (X,))
+onx_sin = to_onnx(jax_sin, (X,), target_opset=21)
 
 print("Opset            :", onx_sin.opset_import[0].version)
 print("Number of nodes  :", len(onx_sin.graph.node))
@@ -88,7 +88,7 @@ def jax_mlp(x):
 
 
 X_mlp = rng.standard_normal((10, 8)).astype(np.float32)
-onx_mlp = to_onnx(jax_mlp, (X_mlp,))
+onx_mlp = to_onnx(jax_mlp, (X_mlp,), target_opset=21)
 
 op_types = [n.op_type for n in onx_mlp.graph.node]
 print("\nOp-types in the MLP graph:", op_types)
@@ -118,7 +118,7 @@ print("MLP predictions match ✓ - ", max_diff(expected_mlp, result_mlp))
 # By default :func:`to_onnx` marks axis 0 as a dynamic (symbolic) batch
 # dimension.  The converted model runs correctly for any batch size.
 
-onx_dyn = to_onnx(jax_mlp, (X_mlp,), dynamic_shapes=({0: "batch"},))
+onx_dyn = to_onnx(jax_mlp, (X_mlp,), target_opset=21, dynamic_shapes=({0: "batch"},))
 
 input_shape = onx_dyn.graph.input[0].type.tensor_type.shape
 batch_dim = input_shape.dim[0]
@@ -149,7 +149,7 @@ def jax_softmax(x):
 
 X_cls = rng.standard_normal((6, 10)).astype(np.float32)
 
-onx_cls = to_onnx(jax_softmax, (X_cls,), dynamic_shapes=({0: "batch"},))
+onx_cls = to_onnx(jax_softmax, (X_cls,), target_opset=21, dynamic_shapes=({0: "batch"},))
 
 ref_cls = onnxruntime.InferenceSession(
     onx_cls.SerializeToString(), providers=["CPUExecutionProvider"]

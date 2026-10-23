@@ -24,7 +24,7 @@ class TestTfidfTransformer(ExtTestCase):
         tt = TfidfTransformer()
         tt.fit(X)
 
-        onx = to_onnx(tt, (X,))
+        onx = to_onnx(tt, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Mul", op_types)
@@ -48,7 +48,7 @@ class TestTfidfTransformer(ExtTestCase):
         tt = TfidfTransformer()
         tt.fit(X)
 
-        onx = to_onnx(tt, (X,))
+        onx = to_onnx(tt, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -68,7 +68,7 @@ class TestTfidfTransformer(ExtTestCase):
         tt = TfidfTransformer(use_idf=False, norm="l2")
         tt.fit(X)
 
-        onx = to_onnx(tt, (X,))
+        onx = to_onnx(tt, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -90,7 +90,7 @@ class TestTfidfTransformer(ExtTestCase):
         tt = TfidfTransformer(use_idf=True, norm="l2", sublinear_tf=True)
         tt.fit(X)
 
-        onx = to_onnx(tt, (X,))
+        onx = to_onnx(tt, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Log", op_types)
@@ -114,7 +114,7 @@ class TestTfidfTransformer(ExtTestCase):
         tt = TfidfTransformer(use_idf=True, norm="l1", sublinear_tf=False)
         tt.fit(X)
 
-        onx = to_onnx(tt, (X,))
+        onx = to_onnx(tt, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceL1", op_types)
@@ -137,7 +137,7 @@ class TestTfidfTransformer(ExtTestCase):
         tt = TfidfTransformer(use_idf=True, norm=None, sublinear_tf=False)
         tt.fit(X)
 
-        onx = to_onnx(tt, (X,))
+        onx = to_onnx(tt, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -157,7 +157,7 @@ class TestTfidfTransformer(ExtTestCase):
         tt = TfidfTransformer(use_idf=False, norm=None, sublinear_tf=True)
         tt.fit(X)
 
-        onx = to_onnx(tt, (X,))
+        onx = to_onnx(tt, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -179,7 +179,7 @@ class TestTfidfTransformer(ExtTestCase):
         tt = TfidfTransformer(use_idf=True, norm="l2", sublinear_tf=False)
         tt.fit(X)
 
-        onx = to_onnx(tt, (X,))
+        onx = to_onnx(tt, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -199,7 +199,7 @@ class TestTfidfTransformer(ExtTestCase):
         tt = TfidfTransformer(use_idf=True, norm="l2", smooth_idf=False)
         tt.fit(X)
 
-        onx = to_onnx(tt, (X,))
+        onx = to_onnx(tt, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]

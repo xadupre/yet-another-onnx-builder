@@ -14,7 +14,7 @@ class TestGaussianMixture(ExtTestCase):
         """Helper: convert, run reference + ORT, compare to sklearn."""
         from yobx.sklearn import to_onnx
 
-        onx = to_onnx(gm, (X,))
+        onx = to_onnx(gm, (X,), target_opset=21)
 
         expected_labels = gm.predict(X).astype(np.int64)
         expected_proba = gm.predict_proba(X).astype(np.float32)
@@ -90,7 +90,7 @@ class TestGaussianMixture(ExtTestCase):
         )
         pipe.fit(X)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         expected_labels = pipe.predict(X).astype(np.int64)
 
@@ -111,7 +111,7 @@ class TestGaussianMixture(ExtTestCase):
         gm = GaussianMixture(n_components=2, covariance_type="full", random_state=0)
         gm.fit(X)
 
-        onx = to_onnx(gm, (X,))
+        onx = to_onnx(gm, (X,), target_opset=21)
         op_types = {n.op_type for n in onx.proto.graph.node}
         self.assertIn("MatMul", op_types)
         self.assertIn("Softmax", op_types)

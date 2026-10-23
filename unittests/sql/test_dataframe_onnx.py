@@ -690,7 +690,7 @@ class TestMultiDataframe(ExtTestCase):
 
         a = np.array([1.0, 2.0], dtype=np.float32)
         b = np.array([3.0, 4.0], dtype=np.float32)
-        artifact = to_onnx(transform, [{"a": np.float32}, {"b": np.float32}])
+        artifact = to_onnx(transform, [{"a": np.float32}, {"b": np.float32}], target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         (total,) = ref.run(None, {"a": a, "b": b})
         np.testing.assert_allclose(total, a + b)
@@ -709,7 +709,7 @@ class TestMultiDataframe(ExtTestCase):
         def transform(traced_df1, traced_df2):
             return traced_df1.select([(traced_df1["a"] + traced_df2["b"]).alias("total")])
 
-        artifact = to_onnx(transform, (df1, df2))
+        artifact = to_onnx(transform, (df1, df2), target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0], dtype=np.float32)
         b = np.array([3.0, 4.0], dtype=np.float32)
@@ -753,7 +753,7 @@ class TestMultiDataframe(ExtTestCase):
                 [(traced_df1["a"] + traced_df2["b"] + traced_df3["c"]).alias("total")]
             )
 
-        artifact = to_onnx(transform, (df1, df2, df3))
+        artifact = to_onnx(transform, (df1, df2, df3), target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0], dtype=np.float32)
         b = np.array([3.0, 4.0], dtype=np.float32)
@@ -769,7 +769,7 @@ class TestMultiDataframe(ExtTestCase):
             return np.sqrt(np.abs(x) + 1)
 
         x = np.array([1.0, -2.0, 3.0], dtype=np.float32)
-        artifact = to_onnx(my_func, (x,))
+        artifact = to_onnx(my_func, (x,), target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         (result,) = ref.run(None, {"X": x})
         np.testing.assert_allclose(result, my_func(x), rtol=1e-5)
@@ -782,7 +782,7 @@ class TestMultiDataframe(ExtTestCase):
             return x + 1.0
 
         x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
-        artifact = to_onnx(my_func, x)
+        artifact = to_onnx(my_func, x, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         (result,) = ref.run(None, {"X": x})
         np.testing.assert_allclose(result, x + 1.0)
@@ -796,7 +796,7 @@ class TestMultiDataframe(ExtTestCase):
 
         x = np.array([1.0, 2.0, 3.0], dtype=np.float32)
         y = np.array([4.0, 5.0, 6.0], dtype=np.float32)
-        artifact = to_onnx(my_func, (x, y))
+        artifact = to_onnx(my_func, (x, y), target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         (result,) = ref.run(None, {"X0": x, "X1": y})
         np.testing.assert_allclose(result, x + y)
@@ -1003,7 +1003,7 @@ class TestMultipleOutputDataframes(ExtTestCase):
             out2 = df.select([(df["x"] * 2).alias("x_times_2")])
             return out1, out2
 
-        artifact = to_onnx(transform, {"x": np.float32})
+        artifact = to_onnx(transform, {"x": np.float32}, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         x = np.array([5.0, 6.0], dtype=np.float32)
         results = ref.run(None, {"x": x})
@@ -1336,7 +1336,7 @@ class TestInputDtypesAsDataFrame(ExtTestCase):
         if df is None:
             self.skipTest("pandas not available")
 
-        artifact = to_onnx("SELECT a + b AS total FROM t WHERE a > 0", df)
+        artifact = to_onnx("SELECT a + b AS total FROM t WHERE a > 0", df, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
@@ -1355,7 +1355,7 @@ class TestInputDtypesAsDataFrame(ExtTestCase):
             traced_df = traced_df.filter(traced_df["a"] > 0)
             return traced_df.select([(traced_df["a"] + traced_df["b"]).alias("total")])
 
-        artifact = to_onnx(transform, df)
+        artifact = to_onnx(transform, df, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
@@ -1377,7 +1377,7 @@ class TestInputDtypesAsDataFrame(ExtTestCase):
         def transform(traced_df1, traced_df2):
             return traced_df1.select([(traced_df1["a"] + traced_df2["b"]).alias("total")])
 
-        artifact = to_onnx(transform, [df1, df2])
+        artifact = to_onnx(transform, [df1, df2], target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0], dtype=np.float32)
         b = np.array([3.0, 4.0], dtype=np.float32)
@@ -1397,7 +1397,7 @@ class TestInputDtypesAsDataFrame(ExtTestCase):
             return traced_df.select([(traced_df["a"] + traced_df["b"]).alias("total")])
 
         # tuple wrapping a single DataFrame — should behave identically to passing df directly
-        artifact = to_onnx(transform, (df,))
+        artifact = to_onnx(transform, (df,), target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, -2.0, 3.0], dtype=np.float32)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
@@ -1419,7 +1419,7 @@ class TestInputDtypesAsDataFrame(ExtTestCase):
         def transform(traced_df1, traced_df2):
             return traced_df1.select([(traced_df1["a"] + traced_df2["b"]).alias("total")])
 
-        artifact = to_onnx(transform, (df1, df2))
+        artifact = to_onnx(transform, (df1, df2), target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0], dtype=np.float32)
         b = np.array([3.0, 4.0], dtype=np.float32)

@@ -69,7 +69,7 @@ for name, step in pipe.steps:
 # step in the pipeline will use :epkg:`spox` opset modules to emit
 # the ONNX nodes.
 
-onx = to_onnx(pipe, (X_train[:1],), builder_cls=SpoxGraphBuilder)
+onx = to_onnx(pipe, (X_train[:1],), target_opset=21, builder_cls=SpoxGraphBuilder)
 
 print(f"\nONNX opset  : {onx.opset_import[0].version}")
 print("Node types  :", [n.op_type for n in onx.graph.node])
@@ -113,7 +113,7 @@ pipe_mc = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(max
 pipe_mc.fit(X_mc, y_mc)
 
 X_test_mc = rng.standard_normal((30, 4)).astype(np.float32)
-onx_mc = to_onnx(pipe_mc, (X_test_mc[:1],), builder_cls=SpoxGraphBuilder)
+onx_mc = to_onnx(pipe_mc, (X_test_mc[:1],), target_opset=21, builder_cls=SpoxGraphBuilder)
 
 ref_mc = onnxruntime.InferenceSession(
     onx_mc.SerializeToString(), providers=["CPUExecutionProvider"]

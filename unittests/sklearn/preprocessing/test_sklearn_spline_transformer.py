@@ -19,7 +19,7 @@ class TestSplineTransformer(ExtTestCase):
         st = SplineTransformer(n_knots=4, degree=3)
         st.fit(X)
 
-        onx = to_onnx(st, (X,))
+        onx = to_onnx(st, (X,), target_opset=21)
 
         # Check graph structure includes polynomial evaluation ops.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -45,7 +45,7 @@ class TestSplineTransformer(ExtTestCase):
         st = SplineTransformer(n_knots=4, degree=3, include_bias=False)
         st.fit(X)
 
-        onx = to_onnx(st, (X,))
+        onx = to_onnx(st, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -66,7 +66,7 @@ class TestSplineTransformer(ExtTestCase):
         st = SplineTransformer(n_knots=5, degree=1)
         st.fit(X)
 
-        onx = to_onnx(st, (X,))
+        onx = to_onnx(st, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -82,7 +82,7 @@ class TestSplineTransformer(ExtTestCase):
         st = SplineTransformer(n_knots=4, degree=2)
         st.fit(X)
 
-        onx = to_onnx(st, (X,))
+        onx = to_onnx(st, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -99,7 +99,7 @@ class TestSplineTransformer(ExtTestCase):
         st = SplineTransformer(n_knots=4, degree=3, extrapolation="constant")
         st.fit(X_fit)
 
-        onx = to_onnx(st, (X_fit,))
+        onx = to_onnx(st, (X_fit,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_test})[0]
@@ -119,7 +119,7 @@ class TestSplineTransformer(ExtTestCase):
         st = SplineTransformer(n_knots=4, degree=3, extrapolation="continue")
         st.fit(X)
 
-        onx = to_onnx(st, (X,))
+        onx = to_onnx(st, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -135,7 +135,7 @@ class TestSplineTransformer(ExtTestCase):
         st = SplineTransformer(n_knots=5, degree=3)
         st.fit(X)
 
-        onx = to_onnx(st, (X,))
+        onx = to_onnx(st, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -151,7 +151,7 @@ class TestSplineTransformer(ExtTestCase):
         st = SplineTransformer(n_knots=4, degree=3)
         st.fit(X)
 
-        onx = to_onnx(st, (X,))
+        onx = to_onnx(st, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -174,7 +174,7 @@ class TestSplineTransformer(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -194,7 +194,7 @@ class TestSplineTransformer(ExtTestCase):
         st.fit(X)
 
         with self.assertRaises(NotImplementedError):
-            to_onnx(st, (X,))
+            to_onnx(st, (X,), target_opset=21)
 
 
 if __name__ == "__main__":

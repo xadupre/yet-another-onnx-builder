@@ -17,7 +17,7 @@ class TestOrdinalEncoder(ExtTestCase):
     def _run_test(self, enc, X_train, X_test, dtype):
         from yobx.sklearn import to_onnx
 
-        onx = to_onnx(enc, (X_train,))
+        onx = to_onnx(enc, (X_train,), target_opset=21)
 
         expected = enc.transform(X_test).astype(dtype)
 
@@ -96,7 +96,7 @@ class TestOrdinalEncoder(ExtTestCase):
         enc = OrdinalEncoder()
         enc.fit(X)
 
-        onx = to_onnx(enc, (X,))
+        onx = to_onnx(enc, (X,), target_opset=21)
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
         self.assertTrue(any(op_type in {"ArgMax", "TopK"} for op_type in op_types))
@@ -114,7 +114,7 @@ class TestOrdinalEncoder(ExtTestCase):
         pipe = Pipeline([("enc", OrdinalEncoder()), ("reg", LinearRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X})[0]
 
@@ -131,7 +131,7 @@ class TestOrdinalEncoder(ExtTestCase):
         enc = OrdinalEncoder(handle_unknown="use_encoded_value", unknown_value=-1)
         enc.fit(X_train)
 
-        onx = to_onnx(enc, (X_train,))
+        onx = to_onnx(enc, (X_train,), target_opset=21)
         expected = enc.transform(X_test)
 
         sess = self.check_ort(onx)
@@ -147,7 +147,7 @@ class TestOrdinalEncoder(ExtTestCase):
         enc = OrdinalEncoder()
         enc.fit(X)
 
-        onx = to_onnx(enc, (X,))
+        onx = to_onnx(enc, (X,), target_opset=21)
         expected = enc.transform(X)
 
         sess = self.check_ort(onx)

@@ -270,7 +270,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est = HistGradientBoostingRegressor(max_iter=5, max_depth=3, random_state=0)
         est.fit(X, y)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
         expected = est.predict(X).astype(np.float32).reshape(-1, 1)
@@ -284,7 +284,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est = HistGradientBoostingClassifier(max_iter=5, max_depth=3, random_state=1)
         est.fit(X, y)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
@@ -313,7 +313,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est.fit(X, y)
 
         with self.assertRaises(NotImplementedError):
-            to_onnx(est, (X,))
+            to_onnx(est, (X,), target_opset=21)
 
     # ------------------------------------------------------------------ #
     # Random tensor discrepancy tests                                      #
@@ -329,7 +329,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est = HistGradientBoostingRegressor(max_iter=10, max_depth=3, random_state=0)
         est.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(est, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -353,7 +353,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est = HistGradientBoostingRegressor(max_iter=10, max_depth=3, random_state=0)
         est.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(est, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -377,7 +377,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est = HistGradientBoostingClassifier(max_iter=10, max_depth=3, random_state=0)
         est.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(est, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -404,7 +404,7 @@ class TestSklearnHistGradientBoosting(ExtTestCase):
         est = HistGradientBoostingClassifier(max_iter=10, max_depth=3, random_state=0)
         est.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(est, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)

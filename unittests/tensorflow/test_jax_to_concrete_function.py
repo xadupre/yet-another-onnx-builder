@@ -16,7 +16,9 @@ class TestJaxToOnnx(ExtTestCase):
         from onnxruntime import InferenceSession
         from yobx.jax import to_onnx
 
-        artifact = to_onnx(fn, args, dynamic_shapes=dynamic_shapes, input_names=input_names)
+        artifact = to_onnx(
+            fn, args, target_opset=21, dynamic_shapes=dynamic_shapes, input_names=input_names
+        )
         self.assertIsInstance(artifact.proto, ModelProto)
         session = InferenceSession(
             artifact.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -58,7 +60,7 @@ class TestJaxToOnnx(ExtTestCase):
         from yobx.tensorflow import to_onnx
 
         x = np.ones((4, 3), dtype=np.float32)
-        artifact = to_onnx(jnp.sin, (x,))
+        artifact = to_onnx(jnp.sin, (x,), target_opset=21)
         session = InferenceSession(
             artifact.SerializeToString(), providers=["CPUExecutionProvider"]
         )
@@ -134,7 +136,7 @@ class TestJaxToOnnx(ExtTestCase):
 
         x = np.ones((3, 3), dtype=np.float32)
         with self.assertRaises(ValueError):
-            to_onnx(jnp.sin, (x,), input_names=["a", "b"])
+            to_onnx(jnp.sin, (x,), target_opset=21, input_names=["a", "b"])
 
 
 if __name__ == "__main__":

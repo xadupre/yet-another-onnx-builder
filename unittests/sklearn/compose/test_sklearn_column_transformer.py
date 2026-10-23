@@ -27,7 +27,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
         )
         ct.fit(X)
 
-        onx = to_onnx(ct, (X,))
+        onx = to_onnx(ct, (X,), target_opset=21)
 
         # Gather + Sub + Div (scaler) + Concat nodes expected
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -52,7 +52,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
         )
         ct.fit(X)
 
-        onx = to_onnx(ct, (X,))
+        onx = to_onnx(ct, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -72,7 +72,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
         )
         ct.fit(X)
 
-        onx = to_onnx(ct, (X,))
+        onx = to_onnx(ct, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -91,7 +91,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
         ct = ColumnTransformer([("scaler", StandardScaler(), [0, 1])], remainder="passthrough")
         ct.fit(X)
 
-        onx = to_onnx(ct, (X,))
+        onx = to_onnx(ct, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -113,7 +113,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
         )
         ct.fit(X)
 
-        onx = to_onnx(ct, (X,))
+        onx = to_onnx(ct, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -148,7 +148,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
         )
         ct.fit(df)
 
-        onx = to_onnx(ct, (df,))
+        onx = to_onnx(ct, (df,), target_opset=21)
 
         graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
         for col in ["age", "income", "score", "balance"]:
@@ -189,7 +189,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
         pipe = Pipeline([("preprocessor", ct), ("clf", LogisticRegression())])
         pipe.fit(df, y)
 
-        onx = to_onnx(pipe, (df,))
+        onx = to_onnx(pipe, (df,), target_opset=21)
 
         graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
         for col in ["age", "income", "score", "balance"]:
@@ -221,7 +221,7 @@ class TestSklearnColumnTransformer(ExtTestCase):
         pipe = Pipeline([("preprocessor", ct), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -261,7 +261,10 @@ class TestSklearnColumnTransformerConvertOptions(ExtTestCase):
         """ConvertOptions(decision_leaf=True) should add a leaf-index output when a
         Pipeline combines a ColumnTransformer preprocessor with a DecisionTreeClassifier."""
         onx = to_onnx(
-            self.pipe, (self.X_train,), convert_options=ConvertOptions(decision_leaf=True)
+            self.pipe,
+            (self.X_train,),
+            target_opset=21,
+            convert_options=ConvertOptions(decision_leaf=True),
         )
 
         # Three outputs: label, probabilities, decision_leaf
@@ -296,7 +299,10 @@ class TestSklearnColumnTransformerConvertOptions(ExtTestCase):
         """ConvertOptions(decision_path=True) should add a path-string output when a
         Pipeline combines a ColumnTransformer preprocessor with a DecisionTreeClassifier."""
         onx = to_onnx(
-            self.pipe, (self.X_train,), convert_options=ConvertOptions(decision_path=True)
+            self.pipe,
+            (self.X_train,),
+            target_opset=21,
+            convert_options=ConvertOptions(decision_path=True),
         )
 
         # Three outputs: label, probabilities, decision_path

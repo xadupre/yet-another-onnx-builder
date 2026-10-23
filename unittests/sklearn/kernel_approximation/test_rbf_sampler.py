@@ -24,7 +24,7 @@ class TestRBFSampler(ExtTestCase):
         est = RBFSampler(random_state=0, **rbf_kwargs)
         est.fit(X)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=21)
 
         expected = est.transform(X).astype(np.float32)
 
@@ -55,7 +55,7 @@ class TestRBFSampler(ExtTestCase):
         est = RBFSampler(gamma=0.1, n_components=10, random_state=0)
         est.fit(X)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=21)
 
         expected = est.transform(X)
         ref = ExtendedReferenceEvaluator(onx)
@@ -74,7 +74,7 @@ class TestRBFSampler(ExtTestCase):
         est = RBFSampler(gamma=0.5, n_components=12, random_state=0)
         est.fit(X_train)
 
-        onx = to_onnx(est, (X_train,))
+        onx = to_onnx(est, (X_train,), target_opset=21)
 
         expected = est.transform(X_test).astype(np.float32)
         ref = ExtendedReferenceEvaluator(onx)

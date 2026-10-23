@@ -26,7 +26,7 @@ class TestNMF(ExtTestCase):
         nmf = NMF(n_components=3, solver="mu", max_iter=200, random_state=0, tol=0.0)
         nmf.fit(X)
 
-        onx = to_onnx(nmf, (X,))
+        onx = to_onnx(nmf, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("MatMul", op_types)
@@ -50,7 +50,7 @@ class TestNMF(ExtTestCase):
         nmf = NMF(n_components=2, solver="mu", max_iter=200, random_state=0, tol=0.0)
         nmf.fit(X)
 
-        onx = to_onnx(nmf, (X,))
+        onx = to_onnx(nmf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -70,7 +70,7 @@ class TestNMF(ExtTestCase):
         nmf = NMF(n_components=4, solver="mu", max_iter=200, random_state=0, tol=0.0)
         nmf.fit(X)
 
-        onx = to_onnx(nmf, (X,))
+        onx = to_onnx(nmf, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         expected = nmf.transform(X).astype(np.float32)
@@ -84,7 +84,7 @@ class TestNMF(ExtTestCase):
         nmf = NMF(n_components=1, solver="mu", max_iter=200, random_state=0, tol=0.0)
         nmf.fit(X)
 
-        onx = to_onnx(nmf, (X,))
+        onx = to_onnx(nmf, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         expected = nmf.transform(X).astype(np.float32)
@@ -100,7 +100,7 @@ class TestNMF(ExtTestCase):
         nmf.fit(X)
 
         with self.assertRaises(NotImplementedError):
-            to_onnx(nmf, (X,))
+            to_onnx(nmf, (X,), target_opset=21)
 
     def test_nmf_pipeline(self):
         from sklearn.decomposition import NMF
@@ -119,7 +119,7 @@ class TestNMF(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0].ravel()
         expected = pipe.predict(X).astype(np.float32)
@@ -137,7 +137,7 @@ class TestNMF(ExtTestCase):
         nmf = MiniBatchNMF(n_components=3, random_state=0, tol=0.0, max_no_improvement=None)
         nmf.fit(X)
 
-        onx = to_onnx(nmf, (X,))
+        onx = to_onnx(nmf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -157,7 +157,7 @@ class TestNMF(ExtTestCase):
         nmf = MiniBatchNMF(n_components=2, random_state=0, tol=0.0, max_no_improvement=None)
         nmf.fit(X)
 
-        onx = to_onnx(nmf, (X,))
+        onx = to_onnx(nmf, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         expected = nmf.transform(X)

@@ -25,7 +25,7 @@ class TestKernelPCA(ExtTestCase):
         kpca = KernelPCA(n_components=n_components, kernel=kernel, **kpca_kwargs)
         kpca.fit(X)
 
-        onx = to_onnx(kpca, (X,))
+        onx = to_onnx(kpca, (X,), target_opset=21)
 
         expected = kpca.transform(X).astype(np.float32)
 
@@ -64,7 +64,7 @@ class TestKernelPCA(ExtTestCase):
         kpca = KernelPCA(n_components=2, kernel="rbf", gamma=0.1)
         kpca.fit(X)
 
-        onx = to_onnx(kpca, (X,))
+        onx = to_onnx(kpca, (X,), target_opset=21)
 
         expected = kpca.transform(X)
         ref = ExtendedReferenceEvaluator(onx)
@@ -86,7 +86,7 @@ class TestKernelPCA(ExtTestCase):
         kpca.fit(K)
 
         with self.assertRaises(NotImplementedError):
-            to_onnx(kpca, (K,))
+            to_onnx(kpca, (K,), target_opset=21)
 
     def test_kernel_pca_unsupported_callable(self):
         from sklearn.decomposition import KernelPCA
@@ -97,7 +97,7 @@ class TestKernelPCA(ExtTestCase):
         kpca.fit(X)
 
         with self.assertRaises(NotImplementedError):
-            to_onnx(kpca, (X,))
+            to_onnx(kpca, (X,), target_opset=21)
 
     def test_kernel_pca_out_of_sample(self):
         """Verify that the converter works on data *not* seen during fitting."""
@@ -111,7 +111,7 @@ class TestKernelPCA(ExtTestCase):
         kpca = KernelPCA(n_components=2, kernel="rbf", gamma=0.5)
         kpca.fit(X_train)
 
-        onx = to_onnx(kpca, (X_train,))
+        onx = to_onnx(kpca, (X_train,), target_opset=21)
 
         expected = kpca.transform(X_test).astype(np.float32)
         ref = ExtendedReferenceEvaluator(onx)

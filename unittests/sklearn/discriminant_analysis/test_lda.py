@@ -26,7 +26,7 @@ class TestSklearnLinearDiscriminantAnalysis(ExtTestCase):
             Xd = X.astype(dtype)
             lda = LinearDiscriminantAnalysis()
             lda.fit(Xd, y)
-            onx = to_onnx(lda, (Xd,))
+            onx = to_onnx(lda, (Xd,), target_opset=21)
 
             # Two outputs: label and probabilities
             output_names = [o.name for o in onx.proto.graph.output]
@@ -61,7 +61,7 @@ class TestSklearnLinearDiscriminantAnalysis(ExtTestCase):
             pipe = Pipeline([("scaler", StandardScaler()), ("clf", LinearDiscriminantAnalysis())])
             pipe.fit(Xd, y)
 
-            onx = to_onnx(pipe, (Xd,))
+            onx = to_onnx(pipe, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})

@@ -27,7 +27,7 @@ class TestNystroem(ExtTestCase):
         )
         est.fit(X)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=21)
 
         expected = est.transform(X).astype(np.float32)
 
@@ -70,7 +70,7 @@ class TestNystroem(ExtTestCase):
         est = Nystroem(n_components=8, kernel="rbf", gamma=0.1, random_state=0)
         est.fit(X)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=21)
 
         expected = est.transform(X)
         ref = ExtendedReferenceEvaluator(onx)
@@ -93,7 +93,7 @@ class TestNystroem(ExtTestCase):
         est = Nystroem(n_components=10, kernel="rbf", gamma=0.5, random_state=0)
         est.fit(X_train)
 
-        onx = to_onnx(est, (X_train,))
+        onx = to_onnx(est, (X_train,), target_opset=21)
 
         expected = est.transform(X_test).astype(np.float32)
         ref = ExtendedReferenceEvaluator(onx)
@@ -113,7 +113,7 @@ class TestNystroem(ExtTestCase):
         est.fit(X)
 
         with self.assertRaises(NotImplementedError):
-            to_onnx(est, (X,))
+            to_onnx(est, (X,), target_opset=21)
 
 
 if __name__ == "__main__":

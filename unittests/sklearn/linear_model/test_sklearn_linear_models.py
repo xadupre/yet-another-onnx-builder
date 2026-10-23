@@ -61,7 +61,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
             Xd = X.astype(dtype)
             est = clone(estimator)
             est.fit(Xd, y)
-            onx = to_onnx(est, (Xd,))
+            onx = to_onnx(est, (Xd,), target_opset=21)
 
             op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Gemm", op_types)
@@ -199,7 +199,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
             m = MultiTaskLasso()
             m.fit(Xd, y)
 
-            onx = to_onnx(m, (Xd,))
+            onx = to_onnx(m, (Xd,), target_opset=21)
             op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Gemm", op_types)
 
@@ -220,7 +220,7 @@ class TestSklearnLinearRegressorConverters(ExtTestCase):
             m = MultiTaskElasticNet()
             m.fit(Xd, y)
 
-            onx = to_onnx(m, (Xd,))
+            onx = to_onnx(m, (Xd,), target_opset=21)
             ref = ExtendedReferenceEvaluator(onx)
             result = ref.run(None, {"X": Xd})[0]
             expected = m.predict(Xd).astype(dtype)
@@ -247,7 +247,7 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
             y = self._y
             est = clone(estimator)
             est.fit(X, y)
-            onx = to_onnx(est, (X,))
+            onx = to_onnx(est, (X,), target_opset=21)
 
             op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Gemm", op_types)
@@ -286,7 +286,7 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
             y = self._y
             m = TweedieRegressor(power=0)
             m.fit(X, y)
-            onx = to_onnx(m, (X,))
+            onx = to_onnx(m, (X,), target_opset=21)
             op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Gemm", op_types)
             self.assertNotIn("Exp", op_types)
@@ -298,7 +298,7 @@ class TestSklearnGLMRegressorConverters(ExtTestCase):
             y = self._y
             m = PoissonRegressor()
             m.fit(X, y)
-            onx = to_onnx(m, (X,))
+            onx = to_onnx(m, (X,), target_opset=21)
             op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Exp", op_types)
 
@@ -318,7 +318,7 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
             Xd = X.astype(dtype)
             est = clone(estimator)
             est.fit(Xd, y)
-            onx = to_onnx(est, (Xd,))
+            onx = to_onnx(est, (Xd,), target_opset=21)
 
             # Should only produce a single (label) output
             output_names = [o.name for o in onx.proto.graph.output]
@@ -376,7 +376,7 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
             m = SGDClassifier(loss="log_loss", random_state=0, max_iter=1000)
             m.fit(Xd, self._y_bin)
 
-            onx = to_onnx(m, (Xd,))
+            onx = to_onnx(m, (Xd,), target_opset=21)
 
             # Should produce two outputs: label + probabilities
             output_names = [o.name for o in onx.proto.graph.output]
@@ -403,7 +403,7 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
             m = SGDClassifier(loss="log_loss", random_state=0, max_iter=1000)
             m.fit(Xd, self._y_multi)
 
-            onx = to_onnx(m, (Xd,))
+            onx = to_onnx(m, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -430,7 +430,7 @@ class TestSklearnLinearClassifierConverters(ExtTestCase):
             pipe = Pipeline([("scaler", StandardScaler()), ("clf", RidgeClassifier())])
             pipe.fit(Xd, y)
 
-            onx = to_onnx(pipe, (Xd,))
+            onx = to_onnx(pipe, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})

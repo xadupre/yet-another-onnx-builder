@@ -18,7 +18,7 @@ class TestMaxAbsScaler(ExtTestCase):
         mas = MaxAbsScaler()
         mas.fit(X)
 
-        onx = to_onnx(mas, (X,))
+        onx = to_onnx(mas, (X,), target_opset=21)
 
         # Check graph structure: single Div node
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -42,7 +42,7 @@ class TestMaxAbsScaler(ExtTestCase):
         mas = MaxAbsScaler()
         mas.fit(X)
 
-        onx = to_onnx(mas, (X,))
+        onx = to_onnx(mas, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -60,7 +60,7 @@ class TestMaxAbsScaler(ExtTestCase):
         pipe = Pipeline([("scaler", MaxAbsScaler()), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Div", op_types)

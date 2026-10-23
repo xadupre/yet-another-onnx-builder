@@ -22,7 +22,7 @@ class TestKernelCenterer(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         K_test_d = K_test.astype(dtype)
-        onx = to_onnx(estimator, (K_test_d,))
+        onx = to_onnx(estimator, (K_test_d,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": K_test_d})[0]
@@ -83,7 +83,7 @@ class TestKernelCenterer(ExtTestCase):
         kc = KernelCenterer()
         kc.fit(K_train)
 
-        onx = to_onnx(kc, (K_test,))
+        onx = to_onnx(kc, (K_test,), target_opset=21)
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
         self.assertIn("Div", op_types)
@@ -101,7 +101,7 @@ class TestKernelCenterer(ExtTestCase):
         kc = KernelCenterer()
         kc.fit(K_train)
 
-        onx = to_onnx(kc, (K_train_f32,))
+        onx = to_onnx(kc, (K_train_f32,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": K_train_f32})[0]

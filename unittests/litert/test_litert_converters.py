@@ -286,7 +286,7 @@ class TestLiteRTEndToEnd(ExtTestCase):
 
         model_bytes = _make_sample_tflite_model()
         X = np.zeros((1, 4), dtype=np.float32)
-        onx = to_onnx(model_bytes, (X,), input_names=["x"])
+        onx = to_onnx(model_bytes, (X,), target_opset=21, input_names=["x"])
 
         # Graph must contain a Relu node.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -307,7 +307,7 @@ class TestLiteRTEndToEnd(ExtTestCase):
         model_bytes = _make_sample_tflite_model()
         X = np.zeros((1, 4), dtype=np.float32)
         with self.assertRaises(ValueError):
-            to_onnx(model_bytes, (X,), input_names=["a", "b"])
+            to_onnx(model_bytes, (X,), target_opset=21, input_names=["a", "b"])
 
     def test_to_onnx_subgraph_out_of_range_raises(self):
         """to_onnx() raises ValueError for an invalid subgraph_index."""
@@ -316,7 +316,7 @@ class TestLiteRTEndToEnd(ExtTestCase):
         model_bytes = _make_sample_tflite_model()
         X = np.zeros((1, 4), dtype=np.float32)
         with self.assertRaises(ValueError):
-            to_onnx(model_bytes, (X,), subgraph_index=5)
+            to_onnx(model_bytes, (X,), target_opset=21, subgraph_index=5)
 
     def test_to_onnx_from_file(self, tmp_path=None):
         """to_onnx() accepts a file path as well as raw bytes."""
@@ -331,7 +331,7 @@ class TestLiteRTEndToEnd(ExtTestCase):
             path = fh.name
         try:
             X = np.zeros((1, 4), dtype=np.float32)
-            onx = to_onnx(path, (X,), input_names=["x"])
+            onx = to_onnx(path, (X,), target_opset=21, input_names=["x"])
             op_types = [n.op_type for n in onx.proto.graph.node]
             self.assertIn("Relu", op_types)
         finally:
@@ -344,7 +344,9 @@ class TestLiteRTEndToEnd(ExtTestCase):
 
         model_bytes = _make_sample_tflite_model()
         X = np.zeros((1, 4), dtype=np.float32)
-        artifact = to_onnx(model_bytes, [(X,)], input_names=[["x"]], subgraph_index=None)
+        artifact = to_onnx(
+            model_bytes, [(X,)], target_opset=21, input_names=[["x"]], subgraph_index=None
+        )
 
         self.assertIsInstance(artifact, ExportArtifact)
         op_types = [n.op_type for n in artifact.proto.graph.node]
@@ -361,7 +363,7 @@ class TestLiteRTEndToEnd(ExtTestCase):
         # Provide per-subgraph dummy inputs.
         X0 = np.random.default_rng(0).standard_normal((1, 4)).astype(np.float32)
         X1 = np.random.default_rng(1).standard_normal((1, 3)).astype(np.float32)
-        artifact = to_onnx(model_bytes, [(X0,), (X1,)], subgraph_index=None)
+        artifact = to_onnx(model_bytes, [(X0,), (X1,)], target_opset=21, subgraph_index=None)
 
         # Must be a single artifact, not a list.
         self.assertIsInstance(artifact, ExportArtifact)
@@ -393,7 +395,7 @@ class TestLiteRTEndToEnd(ExtTestCase):
         from yobx.container import ExportArtifact
 
         model_bytes = _make_multi_subgraph_tflite_model()
-        artifact = to_onnx(model_bytes, subgraph_index=None)
+        artifact = to_onnx(model_bytes, target_opset=21, subgraph_index=None)
 
         self.assertIsInstance(artifact, ExportArtifact)
         # Two inputs and two outputs from the two merged subgraphs.
@@ -408,6 +410,7 @@ class TestLiteRTEndToEnd(ExtTestCase):
         with self.assertRaises(ValueError):
             to_onnx(
                 model_bytes,
+                target_opset=21,
                 subgraph_index=None,
                 input_names=[["a", "b"], ["c"]],  # sg0 has 1 input, not 2
             )

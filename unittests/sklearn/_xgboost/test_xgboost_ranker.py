@@ -27,7 +27,7 @@ class TestXGBoostRanker(ExtTestCase):
         ranker = XGBRanker(n_estimators=5, max_depth=3, random_state=0)
         ranker.fit(X, y, group=group)
 
-        onx = to_onnx(ranker, (X,))
+        onx = to_onnx(ranker, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -54,7 +54,7 @@ class TestXGBoostRanker(ExtTestCase):
         ranker = XGBRanker(n_estimators=5, max_depth=3, random_state=0, objective="rank:ndcg")
         ranker.fit(X, y, group=group)
 
-        onx = to_onnx(ranker, (X,))
+        onx = to_onnx(ranker, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertNotIn("Exp", op_types)
@@ -84,7 +84,7 @@ class TestXGBoostRanker(ExtTestCase):
         ranker.objective = "unknown:obj"
         try:
             with self.assertRaises(NotImplementedError):
-                to_onnx(ranker, (X,))
+                to_onnx(ranker, (X,), target_opset=21)
         finally:
             ranker.objective = original_objective
 
@@ -137,7 +137,7 @@ class TestXGBoostRanker(ExtTestCase):
         )
         pipe.fit(X, y, ranker__group=group)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
         predictions = results[0]

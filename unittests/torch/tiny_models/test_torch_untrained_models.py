@@ -870,7 +870,7 @@ class TestTinyGraniteMoeHybridModel(ExtTestCase):
             apply_patches_for_model(patch_transformers=True, model=model),
             self.assertRaises(AttributeError),
         ):
-            to_onnx(model, kwargs=inputs, dynamic_shapes=ds, verbose=0)
+            to_onnx(model, target_opset=21, kwargs=inputs, dynamic_shapes=ds, verbose=0)
 
 
 if __name__ == "__main__":

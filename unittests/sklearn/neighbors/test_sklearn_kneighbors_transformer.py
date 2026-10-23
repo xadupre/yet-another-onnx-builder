@@ -21,7 +21,7 @@ class TestKNeighborsTransformer(ExtTestCase):
         est = KNeighborsTransformer(n_neighbors=3, mode="distance")
         est.fit(X_train)
 
-        onx = to_onnx(est, (X_train,))
+        onx = to_onnx(est, (X_train,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TopK", op_types)
@@ -52,7 +52,7 @@ class TestKNeighborsTransformer(ExtTestCase):
         est = KNeighborsTransformer(n_neighbors=3, mode="connectivity")
         est.fit(X)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -76,7 +76,7 @@ class TestKNeighborsTransformer(ExtTestCase):
         est = KNeighborsTransformer(n_neighbors=3, mode="connectivity")
         est.fit(X_train)
 
-        onx = to_onnx(est, (X_train,))
+        onx = to_onnx(est, (X_train,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TopK", op_types)
@@ -108,7 +108,7 @@ class TestKNeighborsTransformer(ExtTestCase):
         est = KNeighborsTransformer(n_neighbors=3, mode="connectivity")
         est.fit(X_train)
 
-        onx = to_onnx(est, (X_train,))
+        onx = to_onnx(est, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_new})
@@ -136,7 +136,7 @@ class TestKNeighborsTransformer(ExtTestCase):
         est = KNeighborsTransformer(n_neighbors=3, mode="distance")
         est.fit(X_train)
 
-        onx = to_onnx(est, (X_train,))
+        onx = to_onnx(est, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_new})
@@ -167,7 +167,7 @@ class TestKNeighborsTransformer(ExtTestCase):
                 est = KNeighborsTransformer(n_neighbors=4, mode=mode)
                 est.fit(X_train)
 
-                onx = to_onnx(est, (X_train,))
+                onx = to_onnx(est, (X_train,), target_opset=21)
 
                 sess = self.check_ort(onx)
                 ort_results = sess.run(None, {"X": X_new})
@@ -184,7 +184,7 @@ class TestKNeighborsTransformer(ExtTestCase):
         est = KNeighborsTransformer(n_neighbors=4, mode="connectivity")
         est.fit(X)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=21)
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X})
@@ -214,7 +214,7 @@ class TestKNeighborsTransformer(ExtTestCase):
                 est = KNeighborsTransformer(n_neighbors=k, mode="distance")
                 est.fit(X_train)
 
-                onx = to_onnx(est, (X_train,))
+                onx = to_onnx(est, (X_train,), target_opset=21)
                 sess = self.check_ort(onx)
                 # Use new data so no self-distance precision issues
                 ort_results = sess.run(None, {"X": X_new})
@@ -273,7 +273,7 @@ class TestKNeighborsTransformer(ExtTestCase):
                 )
                 est.fit(X_train)
 
-                onx = to_onnx(est, (X_train,))
+                onx = to_onnx(est, (X_train,), target_opset=21)
                 sess = self.check_ort(onx)
                 # Use new data to avoid self-distance precision issues
                 ort_results = sess.run(None, {"X": X_new})

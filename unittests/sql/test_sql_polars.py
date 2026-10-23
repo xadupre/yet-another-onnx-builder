@@ -386,7 +386,7 @@ class TestLazyframeToOnnx(ExtTestCase):
         lf = pl.LazyFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
         lf = lf.select([(pl.col("a") + pl.col("b")).alias("total")])
         dtypes = {"a": np.float64, "b": np.float64}
-        artifact = to_onnx(lf, dtypes)
+        artifact = to_onnx(lf, dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0, 3.0], dtype=np.float64)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float64)
@@ -408,7 +408,7 @@ class TestToOnnxSqlString(ExtTestCase):
         from yobx.reference import ExtendedReferenceEvaluator
 
         dtypes = {"a": np.float64, "b": np.float64}
-        artifact = to_onnx("SELECT a + b AS total FROM t", dtypes)
+        artifact = to_onnx("SELECT a + b AS total FROM t", dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0, 3.0], dtype=np.float64)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float64)
@@ -422,7 +422,10 @@ class TestToOnnxSqlString(ExtTestCase):
 
         dtypes = {"a": np.float64}
         artifact = to_onnx(
-            "SELECT my_sqrt(a) AS r FROM t", dtypes, custom_functions={"my_sqrt": np.sqrt}
+            "SELECT my_sqrt(a) AS r FROM t",
+            dtypes,
+            target_opset=21,
+            custom_functions={"my_sqrt": np.sqrt},
         )
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 4.0, 9.0], dtype=np.float64)
@@ -435,7 +438,7 @@ class TestToOnnxSqlString(ExtTestCase):
         from yobx.reference import ExtendedReferenceEvaluator
 
         dtypes = {"a": np.float64, "b": np.float64}
-        artifact = to_onnx("SELECT a + b AS total FROM t WHERE a > 0", dtypes)
+        artifact = to_onnx("SELECT a + b AS total FROM t WHERE a > 0", dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, -2.0, 3.0], dtype=np.float64)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float64)

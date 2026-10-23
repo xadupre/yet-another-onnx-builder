@@ -25,7 +25,7 @@ class TestXGBoostRegressor(ExtTestCase):
         reg = XGBRegressor(n_estimators=5, max_depth=3, random_state=0)
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -53,7 +53,7 @@ class TestXGBoostRegressor(ExtTestCase):
         reg = XGBRegressor(n_estimators=5, max_depth=3, random_state=0, objective="reg:logistic")
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sigmoid", op_types)
@@ -79,7 +79,7 @@ class TestXGBoostRegressor(ExtTestCase):
         reg = XGBRegressor(n_estimators=5, max_depth=3, random_state=0, objective="count:poisson")
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Exp", op_types)
@@ -115,7 +115,7 @@ class TestXGBoostRegressor(ExtTestCase):
         )
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sigmoid", op_types)
@@ -183,7 +183,7 @@ class TestXGBoostRegressor(ExtTestCase):
         )
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         predictions = ref.run(None, {"X": X})[0]
@@ -249,7 +249,7 @@ class TestXGBoostRegressor(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
         predictions = results[0]

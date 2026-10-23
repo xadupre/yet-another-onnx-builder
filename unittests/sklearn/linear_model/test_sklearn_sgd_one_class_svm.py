@@ -37,7 +37,7 @@ class TestSklearnSGDOneClassSVM(ExtTestCase):
         X = self._X.astype(dtype)
         clf = SGDOneClassSVM(nu=0.1, random_state=42, max_iter=1000)
         clf.fit(X)
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(
@@ -70,7 +70,7 @@ class TestSklearnSGDOneClassSVM(ExtTestCase):
             ]
         )
         pipe.fit(X)
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")

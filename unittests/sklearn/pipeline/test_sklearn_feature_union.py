@@ -20,7 +20,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
         fu = FeatureUnion([("std", StandardScaler()), ("mm", MinMaxScaler())])
         fu.fit(X)
 
-        onx = to_onnx(fu, (X,))
+        onx = to_onnx(fu, (X,), target_opset=21)
 
         # Both transformers run on full X and are concatenated
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -42,7 +42,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
         fu = FeatureUnion([("std", StandardScaler())])
         fu.fit(X)
 
-        onx = to_onnx(fu, (X,))
+        onx = to_onnx(fu, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -58,7 +58,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
         fu = FeatureUnion([("std", StandardScaler()), ("drop", "drop")])
         fu.fit(X)
 
-        onx = to_onnx(fu, (X,))
+        onx = to_onnx(fu, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -82,7 +82,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
         pipe = Pipeline([("features", fu), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -105,7 +105,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
         outer = FeatureUnion([("inner", inner), ("std2", StandardScaler())])
         outer.fit(X)
 
-        onx = to_onnx(outer, (X,))
+        onx = to_onnx(outer, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -128,7 +128,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
             move_initializer_to_constant=True,
             export_as_function=True,
         )
-        onx = to_onnx(fu, (X,), function_options=fopts)
+        onx = to_onnx(fu, (X,), target_opset=21, function_options=fopts)
 
         # Both sub-transformers must appear as local functions.
         func_names = [f.name for f in onx.proto.functions]
@@ -167,7 +167,7 @@ class TestSklearnFeatureUnion(ExtTestCase):
             move_initializer_to_constant=True,
             export_as_function=True,
         )
-        onx = to_onnx(pipe, (X,), function_options=fopts)
+        onx = to_onnx(pipe, (X,), target_opset=21, function_options=fopts)
 
         func_names = [f.name for f in onx.proto.functions]
         self.assertIn("StandardScaler", func_names)

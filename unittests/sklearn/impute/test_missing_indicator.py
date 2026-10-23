@@ -14,7 +14,7 @@ class TestMissingIndicator(ExtTestCase):
         mi = MissingIndicator()
         mi.fit(X)
 
-        onx = to_onnx(mi, (X,))
+        onx = to_onnx(mi, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("IsNaN", op_types)
@@ -36,7 +36,7 @@ class TestMissingIndicator(ExtTestCase):
         mi = MissingIndicator()
         mi.fit(X)
 
-        onx = to_onnx(mi, (X,))
+        onx = to_onnx(mi, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("IsNaN", op_types)
@@ -58,7 +58,7 @@ class TestMissingIndicator(ExtTestCase):
         mi = MissingIndicator(features="all")
         mi.fit(X)
 
-        onx = to_onnx(mi, (X,))
+        onx = to_onnx(mi, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -77,7 +77,7 @@ class TestMissingIndicator(ExtTestCase):
         mi = MissingIndicator(features="all")
         mi.fit(X)
 
-        onx = to_onnx(mi, (X,))
+        onx = to_onnx(mi, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -99,7 +99,7 @@ class TestMissingIndicator(ExtTestCase):
         # features_ should only contain column 0
         self.assertEqual(list(mi.features_), [0])
 
-        onx = to_onnx(mi, (X,))
+        onx = to_onnx(mi, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(any(op_type in {"Gather", "Slice"} for op_type in op_types))
@@ -123,7 +123,7 @@ class TestMissingIndicator(ExtTestCase):
         mi.fit(X)
         self.assertEqual(list(mi.features_), [0])
 
-        onx = to_onnx(mi, (X,))
+        onx = to_onnx(mi, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -142,7 +142,7 @@ class TestMissingIndicator(ExtTestCase):
         mi = MissingIndicator(missing_values=-1)
         mi.fit(X)
 
-        onx = to_onnx(mi, (X,))
+        onx = to_onnx(mi, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
@@ -165,7 +165,7 @@ class TestMissingIndicator(ExtTestCase):
         mi = MissingIndicator(missing_values=-1)
         mi.fit(X)
 
-        onx = to_onnx(mi, (X,))
+        onx = to_onnx(mi, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)

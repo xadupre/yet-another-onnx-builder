@@ -19,7 +19,7 @@ class TestIncrementalPCA(ExtTestCase):
         ipca = IncrementalPCA(n_components=2)
         ipca.fit(X)
 
-        onx = to_onnx(ipca, (X,))
+        onx = to_onnx(ipca, (X,), target_opset=21)
 
         # Check that Sub (centering) and MatMul (projection) are present.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -45,7 +45,7 @@ class TestIncrementalPCA(ExtTestCase):
         ipca = IncrementalPCA()
         ipca.fit(X)
 
-        onx = to_onnx(ipca, (X,))
+        onx = to_onnx(ipca, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -65,7 +65,7 @@ class TestIncrementalPCA(ExtTestCase):
         ipca = IncrementalPCA(n_components=2, whiten=True)
         ipca.fit(X)
 
-        onx = to_onnx(ipca, (X,))
+        onx = to_onnx(ipca, (X,), target_opset=21)
 
         # Whitening adds a Div node.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -93,7 +93,7 @@ class TestIncrementalPCA(ExtTestCase):
         ipca.partial_fit(X[:15])
         ipca.partial_fit(X[15:])
 
-        onx = to_onnx(ipca, (X,))
+        onx = to_onnx(ipca, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]

@@ -36,7 +36,7 @@ class TestSklearnKernelRidge(ExtTestCase):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 estimator.fit(X, y)
-            onx = to_onnx(estimator, (Xd,))
+            onx = to_onnx(estimator, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
@@ -109,7 +109,7 @@ class TestSklearnKernelRidge(ExtTestCase):
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             est.fit(X32, self._y.astype(np.float32))
-        onx = to_onnx(est, (X32,))
+        onx = to_onnx(est, (X32,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X32})
         expected = est.predict(X32).astype(np.float32)

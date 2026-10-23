@@ -48,7 +48,7 @@ class TestStatsmodelsGLMConverter(ExtTestCase):
             self.assertEqualArray(expected_sm, wrapper_pred, atol=atol)
 
             # Convert to ONNX
-            onx = to_onnx(wrapper, (Xd,))
+            onx = to_onnx(wrapper, (Xd,), target_opset=21)
             op_types = {n.op_type for n in onx.graph.node}
             self.assertIn("Gemm", op_types)
 

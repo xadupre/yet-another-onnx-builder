@@ -20,7 +20,7 @@ class TestSparsePCA(ExtTestCase):
         sp = SparsePCA(n_components=3, ridge_alpha=0.01, random_state=0)
         sp.fit(X)
 
-        onx = to_onnx(sp, (X,))
+        onx = to_onnx(sp, (X,), target_opset=21)
 
         # Check that Sub (centering) and MatMul (projection) are present.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -46,7 +46,7 @@ class TestSparsePCA(ExtTestCase):
         sp = SparsePCA(n_components=3, ridge_alpha=0.01, random_state=0)
         sp.fit(X)
 
-        onx = to_onnx(sp, (X,))
+        onx = to_onnx(sp, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -66,7 +66,7 @@ class TestSparsePCA(ExtTestCase):
         sp = SparsePCA(n_components=2, ridge_alpha=0.1, random_state=0)
         sp.fit(X)
 
-        onx = to_onnx(sp, (X,))
+        onx = to_onnx(sp, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -86,7 +86,7 @@ class TestSparsePCA(ExtTestCase):
         mbsp = MiniBatchSparsePCA(n_components=3, ridge_alpha=0.01, random_state=0)
         mbsp.fit(X)
 
-        onx = to_onnx(mbsp, (X,))
+        onx = to_onnx(mbsp, (X,), target_opset=21)
 
         # Check that Sub (centering) and MatMul (projection) are present.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -112,7 +112,7 @@ class TestSparsePCA(ExtTestCase):
         mbsp = MiniBatchSparsePCA(n_components=3, ridge_alpha=0.01, random_state=0)
         mbsp.fit(X)
 
-        onx = to_onnx(mbsp, (X,))
+        onx = to_onnx(mbsp, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -141,7 +141,7 @@ class TestSparsePCA(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)

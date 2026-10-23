@@ -23,7 +23,7 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
             Xd = X.astype(dtype)
             clf = AdaBoostClassifier(n_estimators=n_estimators, random_state=0)
             clf.fit(Xd, y)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -65,7 +65,7 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
             pipe = Pipeline([("scaler", StandardScaler()), ("clf", clf)])
             pipe.fit(Xd, y)
 
-            onx = to_onnx(pipe, (Xd,))
+            onx = to_onnx(pipe, (Xd,), target_opset=21)
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
             expected_label = pipe.predict(Xd)
@@ -87,7 +87,7 @@ class TestSklearnAdaBoostClassifier(ExtTestCase):
                 estimator=DecisionTreeClassifier(max_depth=2), n_estimators=5, random_state=0
             )
             clf.fit(Xd, y)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
@@ -115,7 +115,7 @@ class TestSklearnAdaBoostRegressor(ExtTestCase):
             yd = y.astype(dtype)
             reg = AdaBoostRegressor(n_estimators=n_estimators, random_state=0)
             reg.fit(Xd, yd)
-            onx = to_onnx(reg, (Xd,))
+            onx = to_onnx(reg, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
@@ -146,7 +146,7 @@ class TestSklearnAdaBoostRegressor(ExtTestCase):
             pipe = Pipeline([("scaler", StandardScaler()), ("reg", reg)])
             pipe.fit(Xd, yd)
 
-            onx = to_onnx(pipe, (Xd,))
+            onx = to_onnx(pipe, (Xd,), target_opset=21)
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
             expected_pred = pipe.predict(Xd).astype(dtype)
@@ -164,7 +164,7 @@ class TestSklearnAdaBoostRegressor(ExtTestCase):
                 estimator=DecisionTreeRegressor(max_depth=2), n_estimators=5, random_state=0
             )
             reg.fit(Xd, yd)
-            onx = to_onnx(reg, (Xd,))
+            onx = to_onnx(reg, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})

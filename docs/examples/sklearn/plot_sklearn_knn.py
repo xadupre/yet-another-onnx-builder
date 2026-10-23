@@ -64,7 +64,7 @@ clf.fit(X, y)
 # converter uses built-in ONNX operators only and the resulting model is
 # portable across any ONNX runtime.
 
-onx_std = to_onnx(clf, (X,))
+onx_std = to_onnx(clf, (X,), target_opset=21)
 op_types_std = {(n.op_type, n.domain or "") for n in onx_std.graph.node}
 print("Standard path nodes:", sorted({t for t, _ in op_types_std}))
 assert ("CDist", "com.microsoft") not in op_types_std
@@ -117,7 +117,7 @@ y_r = (X_r[:, 0] * 3 + X_r[:, 1]).astype(np.float32)
 reg = KNeighborsRegressor(n_neighbors=5)
 reg.fit(X_r, y_r)
 
-onx_reg = to_onnx(reg, (X_r,))  # uses opset 18 by default
+onx_reg = to_onnx(reg, (X_r,), target_opset=21)
 
 ref_reg = onnxruntime.InferenceSession(
     onx_reg.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -137,7 +137,7 @@ print("Regressor predictions match sklearn ✓")
 pipe = Pipeline([("scaler", StandardScaler()), ("clf", KNeighborsClassifier(n_neighbors=5))])
 pipe.fit(X, y)
 
-onx_pipe = to_onnx(pipe, (X,))
+onx_pipe = to_onnx(pipe, (X,), target_opset=21)
 ref_pipe = onnxruntime.InferenceSession(
     onx_pipe.SerializeToString(), providers=["CPUExecutionProvider"]
 )

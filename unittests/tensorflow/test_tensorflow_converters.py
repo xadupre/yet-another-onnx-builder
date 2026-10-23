@@ -23,7 +23,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         """Dense layer with no activation (linear) converts to MatMul+Add."""
         model = tf.keras.Sequential([tf.keras.layers.Dense(4, input_shape=(3,))])
         X = np.random.rand(5, 3).astype(np.float32)
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
@@ -46,7 +46,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         )
         X = np.random.rand(6, 4).astype(np.float32)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
@@ -70,7 +70,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         )
         X = np.random.rand(4, 3).astype(np.float32)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Sigmoid", op_types)
@@ -94,7 +94,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         def fn(t):
             return tf.nn.elu(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Elu", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -108,7 +108,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         def fn(t):
             return tf.nn.selu(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Selu", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -122,7 +122,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         def fn(t):
             return tf.nn.leaky_relu(t, alpha=0.2)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("LeakyRelu", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -140,7 +140,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         X = np.random.rand(5, 4).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
@@ -167,7 +167,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         X = np.random.rand(7, 3).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,), dynamic_shapes=({0: "batch"},))
+        onx = to_onnx(model, (X,), target_opset=21, dynamic_shapes=({0: "batch"},))
 
         input_shape = onx.graph.input[0].type.tensor_type.shape
         # The first dimension should be dynamic (a dim_param, not a fixed dim_value).
@@ -196,7 +196,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         X = np.random.rand(5, 3).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         input_name = onx.graph.input[0].name
         feeds = {input_name: X}
@@ -224,7 +224,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
             return tf.nn.relu(tf.matmul(x, W) + b)
 
         X = np.random.rand(5, 3).astype(np.float32)
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Gemm", op_types)
@@ -260,7 +260,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
 
         model = LinearRelu()
         X = np.random.rand(5, 3).astype(np.float32)
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Gemm", op_types)
@@ -290,7 +290,9 @@ class TestTensorflowBaseConverters(ExtTestCase):
             called.append(True)
             return g.op.Relu(op.inputs[0].name, outputs=outputs, name="custom_relu")
 
-        onx = to_onnx(model, (X,), extra_converters={"Relu": custom_relu_converter})
+        onx = to_onnx(
+            model, (X,), target_opset=21, extra_converters={"Relu": custom_relu_converter}
+        )
 
         self.assertTrue(called, "custom Relu converter was not called")
         op_types = [n.op_type for n in onx.graph.node]
@@ -319,7 +321,7 @@ class TestTensorflowBinaryOpConverters(ExtTestCase):
         def model(x, y):
             return tf_fn(x, y)
 
-        onx = to_onnx(model, (a, b), input_names=["X", "Y"])
+        onx = to_onnx(model, (a, b), target_opset=21, input_names=["X", "Y"])
         expected = model(a, b).numpy()
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -491,7 +493,7 @@ class TestTensorflowBinaryOpConverters(ExtTestCase):
 
         from yobx.tensorflow import to_onnx as _to_onnx
 
-        onx = _to_onnx(model, (a,), input_names=["X"])
+        onx = _to_onnx(model, (a,), target_opset=21, input_names=["X"])
         expected = model(a).numpy()
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -522,7 +524,7 @@ class TestTensorflowBinaryOpConverters(ExtTestCase):
 
         model = tf.keras.Sequential([tf.keras.layers.Dense(4, input_shape=(3,))])
         X = np.random.rand(5, 3).astype(np.float32)
-        artifact = to_onnx(model, (X,), large_model=True)
+        artifact = to_onnx(model, (X,), target_opset=21, large_model=True)
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertIsInstance(artifact.container, ExtendedModelContainer)
 
@@ -538,7 +540,7 @@ class TestTensorflowUnaryOpConverters(ExtTestCase):
         def model(inp):
             return tf_fn(inp)
 
-        onx = to_onnx(model, (x,), input_names=["X"])
+        onx = to_onnx(model, (x,), target_opset=21, input_names=["X"])
         expected = model(x).numpy()
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -710,7 +712,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         def fn(t):
             return tf.pad(t, [[0, 0], [1, 1], [1, 1], [0, 0]])
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Pad", [n.op_type for n in onx.graph.node])
 
         expected = fn(x).numpy()
@@ -729,7 +731,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         def fn(t):
             return tf.pad(t, [[0, 0], [1, 1], [1, 1], [0, 0]], constant_values=-1.0)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Pad", [n.op_type for n in onx.graph.node])
 
         expected = fn(x).numpy()
@@ -748,7 +750,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         def fn(t):
             return tf.pad(t, [[0, 0], [1, 1], [1, 1], [0, 0]], mode="REFLECT")
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Pad", [n.op_type for n in onx.graph.node])
 
         expected = fn(x).numpy()
@@ -767,7 +769,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         self.assertIn("Pad", [n.op_type for n in onx.graph.node])
 
         input_name = onx.graph.input[0].name
@@ -792,7 +794,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         X = np.random.rand(2, 8, 8, 4).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         self.assertIn("MaxPool", [n.op_type for n in onx.graph.node])
 
         input_name = onx.graph.input[0].name
@@ -813,7 +815,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         X = np.random.rand(2, 8, 8, 4).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         self.assertIn("MaxPool", [n.op_type for n in onx.graph.node])
 
         input_name = onx.graph.input[0].name
@@ -834,7 +836,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         X = np.random.rand(2, 8, 8, 4).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         self.assertIn("MaxPool", [n.op_type for n in onx.graph.node])
 
         input_name = onx.graph.input[0].name
@@ -859,7 +861,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         X = np.random.rand(2, 8, 8, 4).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         self.assertIn("AveragePool", [n.op_type for n in onx.graph.node])
 
         input_name = onx.graph.input[0].name
@@ -880,7 +882,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         X = np.random.rand(2, 8, 8, 4).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         self.assertIn("AveragePool", [n.op_type for n in onx.graph.node])
 
         input_name = onx.graph.input[0].name
@@ -905,7 +907,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         self.assertIn("Conv", [n.op_type for n in onx.graph.node])
 
         input_name = onx.graph.input[0].name
@@ -926,7 +928,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         self.assertIn("Conv", [n.op_type for n in onx.graph.node])
 
         input_name = onx.graph.input[0].name
@@ -947,7 +949,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         self.assertIn("Conv", [n.op_type for n in onx.graph.node])
 
         input_name = onx.graph.input[0].name
@@ -973,7 +975,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         self.assertIn("Conv", [n.op_type for n in onx.graph.node])
 
         input_name = onx.graph.input[0].name
@@ -999,7 +1001,7 @@ class TestTensorflowConvPoolPadConverters(ExtTestCase):
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         expected = model(X).numpy()
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Conv", op_types)
         self.assertIn("Relu", op_types)
@@ -1027,7 +1029,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.acosh(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Acosh", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1041,7 +1043,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.asinh(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Asinh", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1055,7 +1057,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.atanh(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Atanh", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1073,7 +1075,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.erf(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Erf", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1087,7 +1089,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.erfc(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result, atol=1e-5)
@@ -1100,7 +1102,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.log1p(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result, atol=1e-5)
@@ -1113,7 +1115,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.expm1(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result, atol=1e-5)
@@ -1126,7 +1128,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.softplus(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Softplus", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1140,7 +1142,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.softsign(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Softsign", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1154,7 +1156,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.rint(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result, atol=1e-6)
@@ -1171,7 +1173,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.reduce_sum(t, axis=1)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("ReduceSum", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1185,7 +1187,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.reduce_sum(t, axis=1, keepdims=True)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result, atol=1e-5)
@@ -1198,7 +1200,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.reduce_max(t, axis=1)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("ReduceMax", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1212,7 +1214,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.reduce_min(t, axis=1)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("ReduceMin", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1226,7 +1228,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.reduce_mean(t, axis=1)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("ReduceMean", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1240,7 +1242,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.reduce_prod(t, axis=1)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("ReduceProd", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1254,7 +1256,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.reduce_variance(t, axis=1)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result, atol=1e-5)
@@ -1267,7 +1269,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.reduce_variance(t, axis=1, keepdims=True)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result, atol=1e-5)
@@ -1280,7 +1282,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.reduce_std(t, axis=1)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result, atol=1e-5)
@@ -1293,7 +1295,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.reduce_std(t, axis=1, keepdims=True)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result, atol=1e-5)
@@ -1306,7 +1308,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.cumsum(t, axis=1)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("CumSum", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1320,7 +1322,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.cumsum(t, axis=1, exclusive=True)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result, atol=1e-5)
@@ -1337,7 +1339,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.argmax(t, axis=1)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("ArgMax", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1351,7 +1353,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.argmin(t, axis=1)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("ArgMin", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1369,7 +1371,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.top_k(t, k=3).values
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("TopK", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1387,7 +1389,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.is_nan(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("IsNaN", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1401,7 +1403,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.is_inf(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("IsInf", [n.op_type for n in onx.graph.node])
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
@@ -1415,7 +1417,7 @@ class TestTensorflowMathConverters(ExtTestCase):
         def fn(t):
             return tf.math.is_finite(t)
 
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         expected = fn(x).numpy()
         result = _ort_run(onx, {"X:0": x})
         self.assertEqualArray(expected, result)
@@ -1432,7 +1434,7 @@ class TestTensorflowNnOpConverters(ExtTestCase):
         def model(inp):
             return tf_fn(inp)
 
-        onx = to_onnx(model, (x,), input_names=["X"])
+        onx = to_onnx(model, (x,), target_opset=21, input_names=["X"])
         expected = model(x).numpy()
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -1465,7 +1467,7 @@ class TestTensorflowNnOpConverters(ExtTestCase):
         def model(inp):
             return tf.nn.leaky_relu(inp, alpha=0.2)
 
-        onx = to_onnx(model, (x,), input_names=["X"])
+        onx = to_onnx(model, (x,), target_opset=21, input_names=["X"])
         expected = model(x).numpy()
 
         ref = ExtendedReferenceEvaluator(onx)
@@ -1504,7 +1506,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
         X = np.random.rand(4, 3).astype(np.float32)
         model(X, training=False)  # build the model
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         input_name = onx.graph.input[0].name
         feeds = {input_name: X}
 
@@ -1525,7 +1527,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         model(X, training=False)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         input_name = onx.graph.input[0].name
         feeds = {input_name: X}
 
@@ -1543,7 +1545,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
         X = np.random.rand(4, 4).astype(np.float32)
         model(X, training=False)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         input_name = onx.graph.input[0].name
         feeds = {input_name: X}
 
@@ -1561,7 +1563,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
         X = np.random.rand(3, 4, 4).astype(np.float32)
         model(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         input_name = onx.graph.input[0].name
         feeds = {input_name: X}
 
@@ -1584,7 +1586,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         model(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         input_name = onx.graph.input[0].name
         feeds = {input_name: X}
 
@@ -1604,7 +1606,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
         X = np.random.rand(3, 4, 4).astype(np.float32)
         model(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         input_name = onx.graph.input[0].name
         feeds = {input_name: X}
 
@@ -1622,7 +1624,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
         X = np.random.rand(3, 8, 8, 4).astype(np.float32)
         model(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         self.assertIn("ReduceMean", [n.op_type for n in onx.graph.node])
 
         input_name = onx.graph.input[0].name
@@ -1646,7 +1648,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
         X = np.random.rand(2, 8, 8, 3).astype(np.float32)
         model(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         input_name = onx.graph.input[0].name
         feeds = {input_name: X}
 
@@ -1667,7 +1669,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
 
         a = np.random.rand(3, 4).astype(np.float32)
         b = np.random.rand(3, 8).astype(np.float32)
-        onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
+        onx = to_onnx(fn, (a, b), target_opset=21, input_names=["X", "Y"])
         self.assertIn("Concat", [n.op_type for n in onx.graph.node])
 
         expected = fn(a, b).numpy()
@@ -1683,7 +1685,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
 
         a = np.random.rand(2, 4).astype(np.float32)
         b = np.random.rand(3, 4).astype(np.float32)
-        onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
+        onx = to_onnx(fn, (a, b), target_opset=21, input_names=["X", "Y"])
         self.assertIn("Concat", [n.op_type for n in onx.graph.node])
 
         expected = fn(a, b).numpy()
@@ -1700,7 +1702,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
         a = np.random.rand(3, 2).astype(np.float32)
         b = np.random.rand(3, 3).astype(np.float32)
         c = np.random.rand(3, 4).astype(np.float32)
-        onx = to_onnx(fn, (a, b, c), input_names=["X", "Y", "Z"])
+        onx = to_onnx(fn, (a, b, c), target_opset=21, input_names=["X", "Y", "Z"])
         self.assertIn("Concat", [n.op_type for n in onx.graph.node])
 
         expected = fn(a, b, c).numpy()
@@ -1720,7 +1722,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
 
         params = np.random.rand(5, 4).astype(np.float32)
         indices = np.array([1, 3, 2, 0], dtype=np.int32)
-        onx = to_onnx(fn, (params, indices), input_names=["params", "indices"])
+        onx = to_onnx(fn, (params, indices), target_opset=21, input_names=["params", "indices"])
         self.assertIn("Gather", [n.op_type for n in onx.graph.node])
 
         inp_names = [i.name for i in onx.graph.input]
@@ -1737,7 +1739,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
 
         params = np.random.rand(3, 5).astype(np.float32)
         indices = np.array([0, 2, 4], dtype=np.int32)
-        onx = to_onnx(fn, (params, indices), input_names=["params", "indices"])
+        onx = to_onnx(fn, (params, indices), target_opset=21, input_names=["params", "indices"])
         self.assertIn("Gather", [n.op_type for n in onx.graph.node])
 
         inp_names = [i.name for i in onx.graph.input]
@@ -1757,7 +1759,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
             return tf.expand_dims(x, axis=1)
 
         x = np.random.rand(3, 4).astype(np.float32)
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Unsqueeze", [n.op_type for n in onx.graph.node])
 
         expected = fn(x).numpy()
@@ -1773,7 +1775,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
             return tf.expand_dims(x, axis=0)
 
         x = np.random.rand(3, 4).astype(np.float32)
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
 
         expected = fn(x).numpy()
         ort_result = _ort_run(onx, {"X:0": x})
@@ -1787,7 +1789,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
             return tf.expand_dims(x, axis=-1)
 
         x = np.random.rand(3, 4).astype(np.float32)
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
 
         expected = fn(x).numpy()
         ort_result = _ort_run(onx, {"X:0": x})
@@ -1806,7 +1808,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
             return tf.cast(x, tf.float64)
 
         x = np.random.rand(3, 4).astype(np.float32)
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Cast", [n.op_type for n in onx.graph.node])
 
         expected = fn(x).numpy()
@@ -1822,7 +1824,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
             return tf.cast(x, tf.int32)
 
         x = np.array([[1.7, 2.3, 3.9], [4.0, 5.1, 6.8]], dtype=np.float32)
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Cast", [n.op_type for n in onx.graph.node])
 
         expected = fn(x).numpy()
@@ -1841,7 +1843,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
         X = np.random.rand(5, 3).astype(np.float32)
         model(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
         self.assertIn("Tanh", op_types)
@@ -1861,7 +1863,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
         X = np.random.rand(5, 3).astype(np.float32)
         model(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Softmax", op_types)
 
@@ -1885,7 +1887,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
 
         x = np.random.rand(3, 4).astype(np.float32)
         b = np.random.rand(4).astype(np.float32)
-        onx = to_onnx(fn, (x, b), input_names=["X", "B"])
+        onx = to_onnx(fn, (x, b), target_opset=21, input_names=["X", "B"])
         self.assertIn("Add", [n.op_type for n in onx.graph.node])
 
         expected = fn(x, b).numpy()
@@ -1904,7 +1906,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
             return tf.clip_by_value(x, 0.0, 1.0)
 
         x = np.random.rand(3, 4).astype(np.float32) * 2 - 0.5
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
 
         expected = fn(x).numpy()
         ort_result = _ort_run(onx, {"X:0": x})
@@ -1922,7 +1924,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
             return tf.math.reduce_std(x, axis=1)
 
         x = np.random.rand(3, 8).astype(np.float32)
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
 
         expected = fn(x).numpy()
         ort_result = _ort_run(onx, {"X:0": x})
@@ -1950,7 +1952,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
 
         a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float16)
         b = np.array([[0.5, 1.5], [2.5, 3.5]], dtype=np.float16)
-        onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
+        onx = to_onnx(fn, (a, b), target_opset=21, input_names=["X", "Y"])
 
         from onnx_light.onnx import TensorProto
 
@@ -1971,7 +1973,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
 
         a = np.random.rand(3, 4).astype(np.float16)
         b = np.random.rand(4, 2).astype(np.float16)
-        onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
+        onx = to_onnx(fn, (a, b), target_opset=21, input_names=["X", "Y"])
 
         from onnx_light.onnx import TensorProto
 
@@ -1991,7 +1993,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
             return tf.cast(x, tf.float16)
 
         x = np.random.rand(3, 4).astype(np.float32)
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
         self.assertIn("Cast", [n.op_type for n in onx.graph.node])
 
         expected = fn(x).numpy()
@@ -2012,7 +2014,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
 
         a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float64)
         b = np.array([[0.5, 1.5], [2.5, 3.5]], dtype=np.float64)
-        onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
+        onx = to_onnx(fn, (a, b), target_opset=21, input_names=["X", "Y"])
 
         from onnx_light.onnx import TensorProto
 
@@ -2033,7 +2035,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
 
         a = np.random.rand(3, 4).astype(np.float64)
         b = np.random.rand(4, 2).astype(np.float64)
-        onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
+        onx = to_onnx(fn, (a, b), target_opset=21, input_names=["X", "Y"])
 
         from onnx_light.onnx import TensorProto
 
@@ -2063,7 +2065,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
 
         a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=ml_dtypes.bfloat16)
         b = np.array([[0.5, 1.5], [2.5, 3.5]], dtype=ml_dtypes.bfloat16)
-        onx = to_onnx(fn, (a, b), input_names=["X", "Y"])
+        onx = to_onnx(fn, (a, b), target_opset=21, input_names=["X", "Y"])
 
         from onnx_light.onnx import TensorProto
 
@@ -2083,7 +2085,7 @@ class TestTensorflowDtypeSupport(ExtTestCase):
             return tf.cast(x, tf.bfloat16)
 
         x = np.random.rand(3, 4).astype(np.float32)
-        onx = to_onnx(fn, (x,))
+        onx = to_onnx(fn, (x,), target_opset=21)
 
         cast_nodes = [n for n in onx.graph.node if n.op_type == "Cast"]
         self.assertTrue(len(cast_nodes) > 0)

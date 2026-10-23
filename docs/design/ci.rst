@@ -99,6 +99,16 @@ and CI file.
 See :ref:`l-design-env-variables` for a reference of all environment variables
 that can be set to control test execution and enable extra diagnostic output.
 
+ONNX Runtime compatibility
+--------------------------
+
+Conversion defaults track the latest opset exposed by ``onnx-light``, which can
+be newer than the opset or IR version supported by ONNX Runtime. Execution tests
+and runnable examples therefore request an explicit runtime-compatible opset
+(usually opset 21, which produces IR version 10). Tests of newer operators keep
+their explicit versions. Default-selection tests separately check the latest
+opset without passing those models to ONNX Runtime.
+
 Native fusion coverage and remaining regressions
 -----------------------------------------------
 

@@ -19,7 +19,7 @@ class TestKMeans(ExtTestCase):
         km = KMeans(n_clusters=3, random_state=0, n_init=10)
         km.fit(X)
 
-        onx = to_onnx(km, (X,))
+        onx = to_onnx(km, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMin", op_types)
@@ -45,7 +45,7 @@ class TestKMeans(ExtTestCase):
         km = KMeans(n_clusters=4, random_state=1, n_init=10)
         km.fit(X)
 
-        onx = to_onnx(km, (X,))
+        onx = to_onnx(km, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -67,7 +67,7 @@ class TestKMeans(ExtTestCase):
         km = KMeans(n_clusters=2, random_state=0, n_init=10)
         km.fit(X)
 
-        onx = to_onnx(km, (X,))
+        onx = to_onnx(km, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -92,7 +92,7 @@ class TestKMeans(ExtTestCase):
         )
         pipe.fit(X)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

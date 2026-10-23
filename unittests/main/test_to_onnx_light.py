@@ -62,6 +62,10 @@ class TestNativeBackendConversion(unittest.TestCase):
         """Runs the serialized model with ONNX Runtime."""
         from onnxruntime import InferenceSession
 
+        self.assertLessEqual(artifact.proto.ir_version, 10)
+        self.assertLessEqual(
+            next(o.version for o in artifact.proto.opset_import if o.domain == ""), 21
+        )
         session = InferenceSession(
             artifact.proto.SerializeToString(), providers=["CPUExecutionProvider"]
         )
@@ -74,6 +78,7 @@ class TestNativeBackendConversion(unittest.TestCase):
         artifact = to_onnx(
             "SELECT a + b AS total FROM t",
             {"a": np.float32, "b": np.float32},
+            target_opset=21,
             return_optimize_report=True,
         )
         self.assertIsInstance(artifact.builder.inner_builder, GraphBuilder)
@@ -92,7 +97,7 @@ class TestNativeBackendConversion(unittest.TestCase):
             return np.sqrt(np.abs(x) + np.float32(1))
 
         x = np.array([-1, 2, 3], dtype=np.float32)
-        artifact = to_onnx(transform, x, graph_backend="onnx-light")
+        artifact = to_onnx(transform, x, target_opset=21, graph_backend="onnx-light")
         actual = self.run_model(artifact, {"X": x})
         np.testing.assert_allclose(actual[0], transform(x), rtol=1e-6)
 
@@ -105,6 +110,7 @@ class TestNativeBackendConversion(unittest.TestCase):
         artifact = to_onnx(
             transform,
             {"a": np.float32, "b": np.float32},
+            target_opset=21,
             graph_backend="onnx-light",
             return_optimize_report=True,
         )

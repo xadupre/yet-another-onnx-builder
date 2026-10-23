@@ -21,7 +21,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         kbd = KBinsDiscretizer(n_bins=3, encode="ordinal", strategy="uniform")
         kbd.fit(X)
 
-        onx = to_onnx(kbd, (X,))
+        onx = to_onnx(kbd, (X,), target_opset=21)
 
         # Graph should use GreaterOrEqual and ReduceSum for bin indexing
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -45,7 +45,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         kbd = KBinsDiscretizer(n_bins=4, encode="ordinal", strategy="quantile")
         kbd.fit(X)
 
-        onx = to_onnx(kbd, (X,))
+        onx = to_onnx(kbd, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         expected = kbd.transform(X).astype(np.float32)
@@ -63,7 +63,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         kbd = KBinsDiscretizer(n_bins=[2, 4], encode="ordinal", strategy="uniform")
         kbd.fit(X)
 
-        onx = to_onnx(kbd, (X,))
+        onx = to_onnx(kbd, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         expected = kbd.transform(X).astype(np.float32)
@@ -81,7 +81,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         kbd = KBinsDiscretizer(n_bins=3, encode="onehot-dense", strategy="uniform")
         kbd.fit(X)
 
-        onx = to_onnx(kbd, (X,))
+        onx = to_onnx(kbd, (X,), target_opset=21)
 
         # Graph should contain OneHot and Concat nodes
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -105,7 +105,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         kbd = KBinsDiscretizer(n_bins=[2, 4], encode="onehot-dense", strategy="uniform")
         kbd.fit(X)
 
-        onx = to_onnx(kbd, (X,))
+        onx = to_onnx(kbd, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         expected = kbd.transform(X).astype(np.float32)
@@ -123,7 +123,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         kbd = KBinsDiscretizer(n_bins=3, encode="onehot", strategy="uniform")
         kbd.fit(X)
 
-        onx = to_onnx(kbd, (X,))
+        onx = to_onnx(kbd, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         # sklearn 'onehot' returns a sparse matrix; convert to dense for comparison
@@ -141,7 +141,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         X = self._make_data()
         kbd = KBinsDiscretizer(n_bins=3, encode="ordinal", strategy="uniform")
         kbd.fit(X)
-        onx = to_onnx(kbd, (X,))
+        onx = to_onnx(kbd, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         self.assertEqual(result.shape, (5, 2))
@@ -153,7 +153,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         X = self._make_data()
         kbd = KBinsDiscretizer(n_bins=3, encode="onehot-dense", strategy="uniform")
         kbd.fit(X)
-        onx = to_onnx(kbd, (X,))
+        onx = to_onnx(kbd, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         # 2 features × 3 bins = 6 one-hot columns
@@ -166,7 +166,7 @@ class TestKBinsDiscretizer(ExtTestCase):
         X = np.array([[1], [3], [5], [7], [9]], dtype=np.float32)
         kbd = KBinsDiscretizer(n_bins=3, encode="ordinal", strategy="uniform")
         kbd.fit(X)
-        onx = to_onnx(kbd, (X,))
+        onx = to_onnx(kbd, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
         expected = kbd.transform(X).astype(np.float32)

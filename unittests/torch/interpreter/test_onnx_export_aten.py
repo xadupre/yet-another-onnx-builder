@@ -72,6 +72,7 @@ class TestOnnxExportAten(ExtTestCase):
             to_onnx(
                 model,
                 inputs,
+                target_opset=21,
                 filename=filename,
                 export_options=export_options,
                 verbose=verbose,
@@ -1501,6 +1502,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             xs,
+            target_opset=21,
             dynamic_shapes=({0: DYN, 1: DYN}, {0: DYN, 1: DYN}, {0: DYN, 1: DYN}),
             export_options=ExportOptions(aten_as_function=set()),
         )
@@ -1535,6 +1537,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             xs,
+            target_opset=21,
             dynamic_shapes=({0: DYN}, {0: DYN, 1: DYN}, {0: DYN, 1: DYN}),
             export_options=ExportOptions(aten_as_function=set()),
         )
@@ -1576,7 +1579,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((3, 3)), torch.tensor([1], dtype=torch.int64))
         model.eval()
-        onx = to_onnx(model, inputs, export_options=ExportOptions(strict=False))
+        onx = to_onnx(model, inputs, target_opset=21, export_options=ExportOptions(strict=False))
         names = [n.op_type for n in onx.graph.node]
         self.assertEqual(names, ["CustomSymOp"])
         domains = sorted(d.domain for d in onx.opset_import)
@@ -1619,7 +1622,7 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model().eval()
         inputs = (torch.randn(2, 3),)
-        onx = to_onnx(model, inputs, export_options=ExportOptions(strict=False))
+        onx = to_onnx(model, inputs, target_opset=21, export_options=ExportOptions(strict=False))
         names = [n.op_type for n in onx.graph.node]
         self.assertEqual(
             names,
@@ -1831,7 +1834,9 @@ class TestOnnxExportAten(ExtTestCase):
         expected = model(*inputs)
 
         # static
-        onx = to_onnx(model, inputs, dynamic_shapes=({3: "M"}, {3: "N"}), verbose=0)
+        onx = to_onnx(
+            model, inputs, target_opset=21, dynamic_shapes=({3: "M"}, {3: "N"}), verbose=0
+        )
         self.dump_onnx("test_getitem_index_put1.onnx", onx)
         feeds = dict(zip(["x", "value"], [x.detach().cpu().numpy() for x in inputs]))
         ref = ExtendedReferenceEvaluator(onx, verbose=0)
@@ -1859,7 +1864,9 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         expected = model(*inputs)
 
-        onx = to_onnx(model, inputs, dynamic_shapes=({3: "M"}, {3: "N"}), verbose=0)
+        onx = to_onnx(
+            model, inputs, target_opset=21, dynamic_shapes=({3: "M"}, {3: "N"}), verbose=0
+        )
         self.dump_onnx("test_getitem_index_put2.onnx", onx)
         feeds = dict(zip(["x", "value"], [x.detach().cpu().numpy() for x in inputs]))
         ref = ExtendedReferenceEvaluator(onx, verbose=0)
@@ -1888,7 +1895,11 @@ class TestOnnxExportAten(ExtTestCase):
         expected = model(*inputs)
 
         onx = to_onnx(
-            model, inputs, dynamic_shapes=({2: "M1", 3: "M1"}, {2: "N1", 3: "N2"}), verbose=0
+            model,
+            inputs,
+            target_opset=21,
+            dynamic_shapes=({2: "M1", 3: "M1"}, {2: "N1", 3: "N2"}),
+            verbose=0,
         )
         self.dump_onnx("test_getitem_index_put3.onnx", onx)
         feeds = dict(zip(["x", "value"], [x.detach().cpu().numpy() for x in inputs]))
@@ -1924,6 +1935,7 @@ class TestOnnxExportAten(ExtTestCase):
             onx = to_onnx(
                 model,
                 inputs,
+                target_opset=21,
                 dynamic_shapes=({0: "A", 1: "B"}, {1: "D"}, {0: "E"}),
                 verbose=0,
                 export_options=ExportOptions(aten_as_function=set()),
@@ -1964,7 +1976,7 @@ class TestOnnxExportAten(ExtTestCase):
             torch.fx.experimental._config.patch(backed_size_oblivious=True),
         ):
             ep = torch.export.export(model, inputs, dynamic_shapes=use_dyn_not_str(dynshapes))
-            onx = to_onnx(ep, dynamic_shapes=dynshapes, verbose=0)
+            onx = to_onnx(ep, target_opset=21, dynamic_shapes=dynshapes, verbose=0)
         self.dump_onnx("test_index_Tensor_21_2_oblivious.onnx", onx)
         feeds = dict(zip(["x", "ind1", "ind2"], [x.detach().cpu().numpy() for x in inputs]))
         ref = ExtendedReferenceEvaluator(onx, verbose=0)
@@ -2013,6 +2025,7 @@ class TestOnnxExportAten(ExtTestCase):
                 expected = Model(dimension)(**feeds)
                 onx = to_onnx(
                     Model(dimension),
+                    target_opset=21,
                     kwargs=feeds,
                     dynamic_shapes={
                         "update": {0: "dn"},
@@ -2052,6 +2065,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=({0: "A", 1: "B"},),
             verbose=0,
             options=OptimizationOptions(patterns="default", verbose=0),
@@ -2077,6 +2091,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=({0: "A", 1: "B"},),
             verbose=0,
             options=OptimizationOptions(patterns="default", verbose=0),
@@ -2119,7 +2134,11 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.float32)
 
         onx = to_onnx(
-            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
+            model,
+            inputs,
+            target_opset=21,
+            verbose=0,
+            options=OptimizationOptions(patterns="default", verbose=0),
         )
         self.dump_onnx("test_convolution_valid.onnx", onx)
         op_types = [n.op_type for n in onx.graph.node]
@@ -2166,6 +2185,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=({0: "A", 1: "B"},),
             verbose=0,
             options=OptimizationOptions(patterns="default", verbose=0),
@@ -2191,6 +2211,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=({0: "A", 1: "B"},),
             verbose=0,
             options=OptimizationOptions(patterns="default", verbose=0),
@@ -2219,6 +2240,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=({0: "A", 1: "B"}, {0: "C"}),
             verbose=0,
             options=OptimizationOptions(patterns="default", verbose=0),
@@ -2247,6 +2269,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=({0: "A", 1: "B"}, {0: "C"}),
             verbose=0,
             options=OptimizationOptions(patterns="default", verbose=0),
@@ -2275,6 +2298,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=({0: "A", 1: "B"}, {0: "C"}),
             verbose=0,
             options=OptimizationOptions(patterns="default", verbose=0),
@@ -2304,6 +2328,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=({0: "A", 1: "B"}, {0: "C"}),
             verbose=0,
             options=OptimizationOptions(patterns="default", verbose=0),
@@ -2336,6 +2361,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=({0: "A", 1: "B"}, {0: "C"}),
             verbose=0,
             options=OptimizationOptions(patterns="default", verbose=0),
@@ -2493,7 +2519,11 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.float32)
 
         onx = to_onnx(
-            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
+            model,
+            inputs,
+            target_opset=21,
+            verbose=0,
+            options=OptimizationOptions(patterns="default", verbose=0),
         )
         self.dump_onnx("test_index_copy.onnx", onx)
         feeds = dict(
@@ -2527,6 +2557,7 @@ class TestOnnxExportAten(ExtTestCase):
             onx = to_onnx(
                 model,
                 inputs,
+                target_opset=21,
                 verbose=0,
                 options=OptimizationOptions(patterns="default", verbose=0),
             )
@@ -2559,7 +2590,11 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.float32)
 
         onx = to_onnx(
-            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
+            model,
+            inputs,
+            target_opset=21,
+            verbose=0,
+            options=OptimizationOptions(patterns="default", verbose=0),
         )
         self.dump_onnx("test_index_add_d1.onnx", onx)
         feeds = dict(
@@ -2587,7 +2622,11 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.int64)
 
         onx = to_onnx(
-            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
+            model,
+            inputs,
+            target_opset=21,
+            verbose=0,
+            options=OptimizationOptions(patterns="default", verbose=0),
         )
         self.dump_onnx("test_onx_hot_d1.onnx", onx)
         feeds = dict(
@@ -2610,7 +2649,11 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.int64)
 
         onx = to_onnx(
-            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
+            model,
+            inputs,
+            target_opset=21,
+            verbose=0,
+            options=OptimizationOptions(patterns="default", verbose=0),
         )
         self.dump_onnx("test_onx_hot_d2.onnx", onx)
         feeds = dict(
@@ -2633,7 +2676,11 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.int64)
 
         onx = to_onnx(
-            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
+            model,
+            inputs,
+            target_opset=21,
+            verbose=0,
+            options=OptimizationOptions(patterns="default", verbose=0),
         )
         self.dump_onnx("test_expand.onnx", onx)
         feeds = dict(
@@ -2664,7 +2711,11 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.int64)
 
         onx = to_onnx(
-            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
+            model,
+            inputs,
+            target_opset=21,
+            verbose=0,
+            options=OptimizationOptions(patterns="default", verbose=0),
         )
         self.dump_onnx("test_diff.onnx", onx)
         feeds = dict(
@@ -2698,7 +2749,11 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(expected.dtype, torch.int64)
 
         onx = to_onnx(
-            model, inputs, verbose=0, options=OptimizationOptions(patterns="default", verbose=0)
+            model,
+            inputs,
+            target_opset=21,
+            verbose=0,
+            options=OptimizationOptions(patterns="default", verbose=0),
         )
         self.dump_onnx("test_diff_prepend.onnx", onx)
         feeds = dict(
@@ -2731,6 +2786,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             verbose=0,
             dynamic_shapes=({1: torch.export.Dim.DYNAMIC},),
             options=OptimizationOptions(patterns="default", verbose=0),
@@ -2902,6 +2958,7 @@ class TestOnnxExportAten(ExtTestCase):
             onx = to_onnx(
                 model,
                 (x, index, update),
+                target_opset=21,
                 dynamic_shapes=ds,
                 export_options=ExportOptions(aten_as_function=set()),
             )
@@ -2937,6 +2994,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             (x, index, update),
+            target_opset=21,
             dynamic_shapes=ds,
             export_options=ExportOptions(aten_as_function=set()),
         )
@@ -2971,6 +3029,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             (x, index, update),
+            target_opset=21,
             dynamic_shapes=({0: DYN, 1: DYN}, {0: DYN}, {0: DYN, 1: DYN}),
             export_options=ExportOptions(aten_as_function=set()),
         )
@@ -3004,6 +3063,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             (x, index, update),
+            target_opset=21,
             dynamic_shapes=({0: DYN, 1: DYN}, {1: DYN}, {0: DYN, 1: DYN}),
             export_options=ExportOptions(aten_as_function=set()),
         )
@@ -3033,7 +3093,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.zeros((6, 5), dtype=torch.float32)
         expected = model(x)
         DYN = torch.export.Dim.DYNAMIC
-        onx = to_onnx(model, (x,), dynamic_shapes=({0: DYN, 1: DYN},))
+        onx = to_onnx(model, (x,), target_opset=21, dynamic_shapes=({0: DYN, 1: DYN},))
         self.dump_onnx("test_aten_inplace_add.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x,))
 
@@ -3049,7 +3109,7 @@ class TestOnnxExportAten(ExtTestCase):
         expected = model(x)
         self.assertEqual(x.shape, expected.shape)
         DYN = torch.export.Dim.DYNAMIC
-        onx = to_onnx(model, (x,), dynamic_shapes=({0: DYN, 1: DYN},))
+        onx = to_onnx(model, (x,), target_opset=21, dynamic_shapes=({0: DYN, 1: DYN},))
         self.dump_onnx("test_aten_flip.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x,))
 
@@ -3064,7 +3124,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         x = torch.zeros((6, 5), dtype=torch.float32)
         expected = model(x)
-        onx = to_onnx(model, (x,))
+        onx = to_onnx(model, (x,), target_opset=21)
         self.dump_onnx("test_aten_unbind.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x,))
 
@@ -3080,7 +3140,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.zeros((6, 5), dtype=torch.float32)
         expected = model(x)
         DYN = torch.export.Dim.DYNAMIC
-        onx = to_onnx(model, (x,), dynamic_shapes=({0: DYN},))
+        onx = to_onnx(model, (x,), target_opset=21, dynamic_shapes=({0: DYN},))
         self.dump_onnx("test_aten_unbind_dynamic.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x,))
 
@@ -3099,7 +3159,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.zeros((6, 5), dtype=torch.float32)
         DYN = torch.export.Dim.DYNAMIC
         with self.assertRaises(ValueError):
-            to_onnx(model, (x,), dynamic_shapes=({0: DYN, 1: DYN},))
+            to_onnx(model, (x,), target_opset=21, dynamic_shapes=({0: DYN, 1: DYN},))
 
     def test_aten_unique_consecutive(self):
         import torch
@@ -3114,6 +3174,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             (x,),
+            target_opset=21,
             dynamic_shapes=({0: "length"},),
             export_options=ExportOptions(
                 save_ep=self.get_dump_file("test_aten_unique_consecutive.ep")
@@ -3135,6 +3196,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             (x,),
+            target_opset=21,
             dynamic_shapes=({0: "length"},),
             export_options=ExportOptions(
                 save_ep=self.get_dump_file("test_aten_unique_consecutive_32.ep")
@@ -3156,6 +3218,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             (x,),
+            target_opset=21,
             dynamic_shapes=({0: "length"},),
             export_options=ExportOptions(
                 save_ep=self.get_dump_file("test_aten_unique_consecutive_return.ep")
@@ -3177,6 +3240,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             (x,),
+            target_opset=21,
             dynamic_shapes=({0: "length"},),
             export_options=ExportOptions(
                 save_ep=self.get_dump_file("test_aten_unique_consecutive_return_32.ep")
@@ -3207,7 +3271,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         x = torch.arange(18, dtype=torch.float32).reshape((-1, 6))
         expected = model(x)
-        onx = to_onnx(model, (x,), dynamic_shapes=({0: "length"},))
+        onx = to_onnx(model, (x,), target_opset=21, dynamic_shapes=({0: "length"},))
         self.assertIn("Split", [n.op_type for n in onx.graph.node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
 
@@ -3222,7 +3286,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         x = torch.arange(18, dtype=torch.float32).reshape((-1, 6))
         expected = model(x)
-        onx = to_onnx(model, (x,), dynamic_shapes=({0: "length"},))
+        onx = to_onnx(model, (x,), target_opset=21, dynamic_shapes=({0: "length"},))
         self.assertIn("Split", [n.op_type for n in onx.graph.node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
 
@@ -3238,7 +3302,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         x = torch.arange(18, dtype=torch.float32).reshape((-1, 6))
         expected = model(x)
-        onx = to_onnx(model, (x,), dynamic_shapes=({0: "length"},))
+        onx = to_onnx(model, (x,), target_opset=21, dynamic_shapes=({0: "length"},))
         self.dump_onnx("test_aten_split_str_sizes.onnx", onx)
         self.assertIn("Split", [n.op_type for n in onx.graph.node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
@@ -3255,7 +3319,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         x = torch.arange(18, dtype=torch.float32).reshape((-1, 6))
         expected = model(x)
-        onx = to_onnx(model, (x,), dynamic_shapes=({0: "length"},))
+        onx = to_onnx(model, (x,), target_opset=21, dynamic_shapes=({0: "length"},))
         self.dump_onnx("test_aten_split_str_sizes2.onnx", onx)
         self.assertIn("Split", [n.op_type for n in onx.graph.node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
@@ -3270,7 +3334,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         x = torch.arange(12, dtype=torch.float32).reshape((6, 2))
         expected = model(x)
-        onx = to_onnx(model, (x,))
+        onx = to_onnx(model, (x,), target_opset=21)
         self.dump_onnx("test_aten_tensor_split_sections.onnx", onx)
         self.assertIn("Split", [n.op_type for n in onx.graph.node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
@@ -3285,7 +3349,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         x = torch.arange(21, dtype=torch.float32).reshape((7, 3))
         expected = model(x)
-        onx = to_onnx(model, (x,))
+        onx = to_onnx(model, (x,), target_opset=21)
         self.dump_onnx("test_aten_tensor_split_sections_unequal.onnx", onx)
         self.assertIn("Split", [n.op_type for n in onx.graph.node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
@@ -3300,7 +3364,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         x = torch.arange(18, dtype=torch.float32).reshape((6, 3))
         expected = model(x)
-        onx = to_onnx(model, (x,))
+        onx = to_onnx(model, (x,), target_opset=21)
         self.dump_onnx("test_aten_tensor_split_indices.onnx", onx)
         self.assertIn("Split", [n.op_type for n in onx.graph.node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
@@ -3341,7 +3405,7 @@ class TestOnnxExportAten(ExtTestCase):
         expected = model(x)
         with apply_patches_for_model(patch_torch=True):
             # see https://github.com/pytorch/pytorch/issues/170548
-            onx = to_onnx(model, (x,), dynamic_shapes=({0: "length"},))
+            onx = to_onnx(model, (x,), target_opset=21, dynamic_shapes=({0: "length"},))
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
 
     @skipif_ci_windows("does not work on windows")
@@ -3380,7 +3444,7 @@ class TestOnnxExportAten(ExtTestCase):
         expected = model(x)
         with apply_patches_for_model(patch_torch=True):
             # see https://github.com/pytorch/pytorch/issues/170548
-            onx = to_onnx(model, (x,), dynamic_shapes=({0: "length"},))
+            onx = to_onnx(model, (x,), target_opset=21, dynamic_shapes=({0: "length"},))
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x,))
 
     def test_aten_index_put_where_not_the_same_shape(self):
@@ -3400,7 +3464,7 @@ class TestOnnxExportAten(ExtTestCase):
         )
         inputs[1][::2] = True
         expected = model(*inputs)
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_index_put_bool_mask_row_values(self):
@@ -3419,7 +3483,7 @@ class TestOnnxExportAten(ExtTestCase):
             torch.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0], [7.0, 8.0, 9.0]]),
         )
         expected = model(*inputs)
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_movedim1(self):
@@ -3432,7 +3496,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((1, 2, 3, 4), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_movedim10(self):
@@ -3445,7 +3509,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((1, 2, 3, 4), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_movedim11(self):
@@ -3458,7 +3522,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((1, 2, 3, 4), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_movedim2(self):
@@ -3471,7 +3535,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((1, 2, 3, 4), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_add_batch_dim11(self):
@@ -3505,7 +3569,7 @@ class TestOnnxExportAten(ExtTestCase):
         )
 
         with apply_patches_for_model(patch_torch=True, model=model):
-            onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
+            onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_fused_rms(self):
@@ -3523,7 +3587,7 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model()
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
     def test_aten_fused_rms_none(self):
@@ -3539,7 +3603,7 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model()
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
     def test_aten_fused_rms_none_float16(self):
@@ -3555,7 +3619,7 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model()
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
     def test_aten_rms_norm_float16_ort_optim(self):
@@ -3617,7 +3681,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         expected = model(*torch_deepcopy(inputs))
         # to_onnx raises AssertionError without the _aten_getitem fix
-        onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
     def test_identity_model(self):
@@ -3633,7 +3697,7 @@ class TestOnnxExportAten(ExtTestCase):
 
         model = Model()
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs, dynamic_shapes=dynamic)
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=dynamic)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
     def test_weird_model(self):
@@ -3657,7 +3721,7 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.randn(1, 3, 16, 112, 112),)
         model = X(tv_models.video.r2plus1d_18())
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
     @requires_onnxscript()
@@ -3698,7 +3762,7 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = ((torch.arange(20) / 10).to(torch.float32),)
         model = Model()
         expected = model(*inputs)
-        onx = to_onnx(model, inputs, dynamic_shapes=({0: "batch"},))
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=({0: "batch"},))
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
         sess = self._check_with_ort(onx)
         for k in range(101):
@@ -3718,7 +3782,7 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.tensor([0, 1, 1, 3, 2, 1], dtype=torch.int64),)
         model = Model()
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs, dynamic_shapes=({0: "length"},))
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=({0: "length"},))
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_bincount_default_minlength(self):
@@ -3731,7 +3795,7 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.tensor([2, 2, 2], dtype=torch.int64),)
         model = Model()
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs, dynamic_shapes=({0: "length"},))
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=({0: "length"},))
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_bincount_empty_input(self):
@@ -3744,7 +3808,7 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = (torch.tensor([], dtype=torch.int64),)
         model = Model()
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs, dynamic_shapes=({0: "length"},))
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=({0: "length"},))
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_histc_float_bigger(self):
@@ -3757,7 +3821,7 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = ((torch.arange(20) / 10).to(torch.float32),)
         model = Model()
         expected = model(*inputs)
-        onx = to_onnx(model, inputs, dynamic_shapes=({0: "batch"},))
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=({0: "batch"},))
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
 
     @unittest.skip("won't fix: see https://github.com/pytorch/pytorch/issues/174668")
@@ -3785,7 +3849,7 @@ class TestOnnxExportAten(ExtTestCase):
             ((torch.tensor(keep, dtype=torch.float16) - 1).reshape((-1, 10)),),
         ]
         model = Model()
-        onx = to_onnx(model, inputs[1], dynamic_shapes=({0: "batch"},))
+        onx = to_onnx(model, inputs[1], target_opset=21, dynamic_shapes=({0: "batch"},))
         sess = self._check_with_ort(onx)
         for i in range(len(inputs)):
             with self.subTest(i=i):
@@ -3839,7 +3903,7 @@ class TestOnnxExportAten(ExtTestCase):
             ((torch.tensor(keep, dtype=torch.float32) - 1).reshape((-1, 10)),),
         ]
         model = Model()
-        onx = to_onnx(model, inputs[1], dynamic_shapes=({0: "batch"},))
+        onx = to_onnx(model, inputs[1], target_opset=21, dynamic_shapes=({0: "batch"},))
         sess = self._check_with_ort(onx)
         for i in range(len(inputs)):
             with self.subTest(i=i):
@@ -3878,7 +3942,7 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = ((torch.arange(20) / 10).to(torch.float16),)
         model = Model()
         expected = model(*inputs)
-        onx = to_onnx(model, inputs, dynamic_shapes=({0: "batch"},))
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=({0: "batch"},))
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
         sess = self._check_with_ort(onx)
         for k in range(101):
@@ -3901,6 +3965,7 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=({0: "batch"},),
             export_options=ExportOptions(aten_as_function=set()),
             optimize=True,
@@ -3926,7 +3991,7 @@ class TestOnnxExportAten(ExtTestCase):
         inputs = ((torch.arange(20) / 10).to(torch.int64),)
         model = Model()
         expected = model(*inputs)
-        onx = to_onnx(model, inputs, dynamic_shapes=({0: "batch"},))
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=({0: "batch"},))
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-4)
         sess = self._check_with_ort(onx)
         for k in range(101):
@@ -3974,6 +4039,7 @@ class TestOnnxExportAten(ExtTestCase):
                 onx = to_onnx(
                     model,
                     (a, b),
+                    target_opset=21,
                     dynamic_shapes=({0: "G", 1: "M", 2: "K"}, {0: "G", 1: "N", 2: "K"}),
                 )
                 self.dump_onnx(f"test_aten_grouped_mm_no_offset_{dtype}.onnx", onx)
@@ -4010,7 +4076,9 @@ class TestOnnxExportAten(ExtTestCase):
         ep = torch.export.export(model, (a, b))
         names = [str(n.target) for n in ep.graph.nodes]
         self.assertIn("aten._grouped_mm.default", names)
-        onx = to_onnx(model, (a, b), dynamic_shapes=({0: "M", 1: "K"}, {0: "N", 1: "K"}))
+        onx = to_onnx(
+            model, (a, b), target_opset=21, dynamic_shapes=({0: "M", 1: "K"}, {0: "N", 1: "K"})
+        )
         self.dump_onnx("test_aten_grouped_mm_offsets.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-4)
 
@@ -4047,6 +4115,7 @@ class TestOnnxExportAten(ExtTestCase):
                 onx = to_onnx(
                     model,
                     (a, b, offs),
+                    target_opset=21,
                     dynamic_shapes=({0: "M", 1: "K"}, {0: "N", 1: "K"}, {0: "S"}),
                     inline=inline,
                 )
@@ -4088,7 +4157,10 @@ class TestOnnxExportAten(ExtTestCase):
         names = [str(n.target) for n in ep.graph.nodes]
         self.assertIn("aten._grouped_mm.default", names)
         onx = to_onnx(
-            model, (a, b, offs), dynamic_shapes=({0: "M", 1: "K"}, {0: "N", 1: "K"}, {})
+            model,
+            (a, b, offs),
+            target_opset=21,
+            dynamic_shapes=({0: "M", 1: "K"}, {0: "N", 1: "K"}, {}),
         )
         self.dump_onnx("test_aten_grouped_mm_offsets_semi_constant.onnx", onx)
         self.assertEqual(len(onx.functions), 0)
@@ -4105,7 +4177,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((2, 4, 6, 6, 6), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_avg_pool3d(self):
@@ -4118,7 +4190,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((2, 4, 6, 6, 6), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_avg_pool2d_ceil_count_include_pad_opset18(self):
@@ -4164,7 +4236,7 @@ class TestOnnxExportAten(ExtTestCase):
             torch.rand((5, 4), dtype=torch.float32),
         )
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_all_dim(self):
@@ -4177,7 +4249,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.tensor([[True, False, True], [True, True, True]]),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_or(self):
@@ -4193,7 +4265,7 @@ class TestOnnxExportAten(ExtTestCase):
             torch.tensor([True, True, False, False]),
         )
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_any(self):
@@ -4206,7 +4278,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.tensor([False, True, False]),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_any_dim(self):
@@ -4219,7 +4291,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.tensor([[False, True], [False, False]]),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_argmax(self):
@@ -4232,7 +4304,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((3, 5), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_argmin(self):
@@ -4245,7 +4317,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((3, 5), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
     def test_aten_arg_reductions_shape(self):
@@ -4279,7 +4351,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((3, 4), dtype=torch.float32) * 0.9,)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_asinh(self):
@@ -4292,7 +4364,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((3, 4), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_atan(self):
@@ -4305,7 +4377,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((3, 4), dtype=torch.float32),)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_atanh(self):
@@ -4318,7 +4390,7 @@ class TestOnnxExportAten(ExtTestCase):
         model = Model()
         inputs = (torch.rand((3, 4), dtype=torch.float32) * 0.9,)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_atan2(self):
@@ -4334,7 +4406,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.tensor([0.0, -1.0, 0.0, 1.0, 1.0, -1.0, 0.0])
         inputs = (y, x)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     def test_aten_div_tensor_mode_trunc_float(self):
@@ -4348,7 +4420,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.tensor([-7.0, -7.0, 7.0, 7.0])
         y = torch.tensor([2.0, -2.0, 2.0, -2.0])
         expected = model(x, y)
-        onx = to_onnx(model, (x, y))
+        onx = to_onnx(model, (x, y), target_opset=21)
         self.dump_onnx("test_aten_div_tensor_mode_trunc_float.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x, y))
 
@@ -4363,7 +4435,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.tensor([-7, -7, 7, 7], dtype=torch.int64)
         y = torch.tensor([2, -2, 2, -2], dtype=torch.int64)
         expected = model(x, y)
-        onx = to_onnx(model, (x, y))
+        onx = to_onnx(model, (x, y), target_opset=21)
         self.dump_onnx("test_aten_div_tensor_mode_trunc_int.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, (expected,), (x, y))
 
@@ -4382,7 +4454,7 @@ class TestOnnxExportAten(ExtTestCase):
         )
         inputs = (x,)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Transpose", op_types)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
@@ -4400,7 +4472,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.arange(1, 1 + 8, dtype=torch.float32).reshape(1, 8, 1, 1)
         inputs = (x,)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("DepthToSpace", op_types)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
@@ -4426,7 +4498,7 @@ class TestOnnxExportAten(ExtTestCase):
         x = torch.arange(1, 1 + 2 * 4 * 4, dtype=torch.float32).reshape(1, 2, 4, 4)
         inputs = (x,)
         expected = model(*torch_deepcopy(inputs))
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Transpose", op_types)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)

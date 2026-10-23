@@ -432,7 +432,7 @@ class TestJaxBinaryOpsEndToEnd(ExtTestCase):
         from onnxruntime import InferenceSession
         from yobx.tensorflow import to_onnx
 
-        onx = to_onnx(jax_fn, (x, y))
+        onx = to_onnx(jax_fn, (x, y), target_opset=21)
         sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
         input_names = [i.name for i in onx.graph.input]
         (result,) = sess.run(None, {input_names[0]: x, input_names[1]: y})
@@ -555,7 +555,7 @@ class TestJaxUnaryOpsEndToEnd(ExtTestCase):
         from onnxruntime import InferenceSession
         from yobx.tensorflow import to_onnx
 
-        onx = to_onnx(jax_fn, (x,), dynamic_shapes=({0: "batch"},))
+        onx = to_onnx(jax_fn, (x,), target_opset=21, dynamic_shapes=({0: "batch"},))
         sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
         input_name = onx.graph.input[0].name
         result = sess.run(None, {input_name: x})[0]
@@ -800,7 +800,7 @@ class TestJaxMlpEndToEnd(ExtTestCase):
         kwargs = {}
         if dynamic_shapes is not None:
             kwargs["dynamic_shapes"] = dynamic_shapes
-        onx = to_onnx(jax_fn, (x,), **kwargs)
+        onx = to_onnx(jax_fn, (x,), target_opset=21, **kwargs)
         sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
         input_name = onx.graph.input[0].name
         (result,) = sess.run(None, {input_name: x})
@@ -870,7 +870,7 @@ class TestJaxMlpEndToEnd(ExtTestCase):
 
         rng = np.random.default_rng(42)
         X = rng.standard_normal((6, 10)).astype(np.float32)
-        onx = to_onnx(jax_softmax, (X,), dynamic_shapes=({0: "batch"},))
+        onx = to_onnx(jax_softmax, (X,), target_opset=21, dynamic_shapes=({0: "batch"},))
         sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
         (result,) = sess.run(None, {onx.graph.input[0].name: X})
         self.assertEqualArray(np.asarray(jax_softmax(X)), result, atol=1e-5)
