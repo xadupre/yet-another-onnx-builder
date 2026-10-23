@@ -1177,9 +1177,15 @@ def aten_argmax(
     "argmax"
     if dim is None:
         xf = g.op.Reshape(x, g.MINUS_ONE)
-        res = g.op.SqueezeAnyOpset(
-            g.op.ArgMax(xf, keepdims=(1 if keepdim else 0)), outputs=outputs, name="argmax"
-        )
+        if keepdim and g.get_rank(x):
+            res = g.op.Reshape(
+                g.op.ArgMax(xf, keepdims=0),
+                np.ones(g.get_rank(x), dtype=np.int64),
+                outputs=outputs,
+                name="argmax",
+            )
+        else:
+            res = g.op.ArgMax(xf, keepdims=0, outputs=outputs, name="argmax")
     elif isinstance(dim, int):
         res = g.op.ArgMax(
             x, axis=dim, keepdims=1 if keepdim else 0, outputs=outputs, name="argmax"
@@ -1187,14 +1193,8 @@ def aten_argmax(
     else:
         raise RuntimeError(f"Unexpected type {type(dim)} for dim")
     if not sts:
+        set_type_shape_reduce_op(g, res, x, int(keepdim), None if dim is None else (dim,))
         g.set_type(res, TensorProto.INT64)
-        if dim is None:
-            g.set_shape(res, (1,))
-        elif g.has_shape(x):
-            sh = g.get_shape(x)
-            g.set_shape(res, (sh[dim],))
-        else:
-            g.set_rank(res, 1)
     return res
 
 
@@ -1209,9 +1209,15 @@ def aten_argmin(
     "argmin"
     if dim is None:
         xf = g.op.Reshape(x, g.MINUS_ONE)
-        res = g.op.SqueezeAnyOpset(
-            g.op.ArgMin(xf, keepdims=(1 if keepdim else 0)), outputs=outputs, name="argmin"
-        )
+        if keepdim and g.get_rank(x):
+            res = g.op.Reshape(
+                g.op.ArgMin(xf, keepdims=0),
+                np.ones(g.get_rank(x), dtype=np.int64),
+                outputs=outputs,
+                name="argmin",
+            )
+        else:
+            res = g.op.ArgMin(xf, keepdims=0, outputs=outputs, name="argmin")
     elif isinstance(dim, int):
         res = g.op.ArgMin(
             x, axis=dim, keepdims=1 if keepdim else 0, outputs=outputs, name="argmin"
@@ -1219,14 +1225,8 @@ def aten_argmin(
     else:
         raise RuntimeError(f"Unexpected type {type(dim)} for dim")
     if not sts:
+        set_type_shape_reduce_op(g, res, x, int(keepdim), None if dim is None else (dim,))
         g.set_type(res, TensorProto.INT64)
-        if dim is None:
-            g.set_shape(res, (1,))
-        elif g.has_shape(x):
-            sh = g.get_shape(x)
-            g.set_shape(res, (sh[dim],))
-        else:
-            g.set_rank(res, 1)
     return res
 
 
@@ -6996,11 +6996,6 @@ def aten__grouped_mm(
         g.set_shape(starts, new_shape)
         g.set_shape(ends, new_shape)
 
-    def mkv(name):
-        value_info_proto = ValueInfoProto()
-        value_info_proto.name = name
-        return value_info_proto
-
     body = make_graph(
         [
             make_node(
@@ -7015,8 +7010,17 @@ def aten__grouped_mm(
             make_node("MatMul", ["mpa", "mpb"], ["mmu"], name=g.unique_node_name(name)),
         ],
         "graph_grouped_mm",
-        [mkv("start"), mkv("end")],
-        [mkv("mmu")],
+        [
+            make_tensor_value_info("start", off_itype, [1]),
+            make_tensor_value_info("end", off_itype, [1]),
+        ],
+        [
+            make_tensor_value_info(
+                "mmu",
+                TensorProto.FLOAT if dtype_a == TensorProto.BFLOAT16 else dtype_a,
+                [None, None],
+            )
+        ],
         [
             onh.from_array(np.array([-1], dtype=off_dtype), name="mm_last"),
             onh.from_array(np.array([-2], dtype=off_dtype), name="mm_before_last"),

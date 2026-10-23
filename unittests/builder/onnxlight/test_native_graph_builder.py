@@ -87,6 +87,81 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         with self.assertRaises(TypeError):
             builder.set_device("Y", "cuda")
 
+    def test_folded_float_constant_roundtrip(self):
+        builder = self.make_builder(18)
+        builder.op.Constant(value_float=3.14, outputs=["Y"])
+        builder.make_tensor_output("Y")
+        model = builder.to_native()
+        self.assertEqual(len(model.graph.node), 0)
+        model = self.make_builder(model).to_native()
+        actual = ReferenceEvaluator(model).run(None, {})[0]
+        numpy.testing.assert_array_equal(actual, numpy.asarray(3.14, dtype=numpy.float32))
+
+    def test_constant_where_bfloat16(self):
+        from ml_dtypes import bfloat16
+        from yobx.builder.onnxlight import OnnxLightOptimizationOptions
+        from yobx.reference import ExtendedReferenceEvaluator
+
+        for dtype in (numpy.float32, bfloat16):
+            with self.subTest(dtype=dtype):
+                builder = self.make_builder(
+                    18, optimization_options=OnnxLightOptimizationOptions(patterns=[])
+                )
+                builder.make_tensor_input("X", onnx.TensorProto.FLOAT, (2,))
+                builder.op.Where(
+                    numpy.array([True, False]),
+                    numpy.array([1, 2], dtype=dtype),
+                    numpy.array([-3, -4], dtype=dtype),
+                    outputs=["selected"],
+                )
+                builder.op.Cast("selected", to=onnx.TensorProto.FLOAT, outputs=["converted"])
+                builder.op.Add("X", "converted", outputs=["Y"])
+                builder.make_tensor_output("Y")
+                model = builder.to_native()
+                self.assertEqual(
+                    any(node.op_type == "Where" for node in model.graph.node), dtype is bfloat16
+                )
+                actual = ExtendedReferenceEvaluator(model).run(
+                    None, {"X": numpy.array([10, 20], dtype=numpy.float32)}
+                )[0]
+                numpy.testing.assert_array_equal(
+                    actual, numpy.array([11, 16], dtype=numpy.float32)
+                )
+
+    def test_constant_reduce_prod_dtype_support(self):
+        import onnxruntime
+        from yobx.builder.onnxlight import OnnxLightOptimizationOptions
+
+        for dtype, tensor_type in (
+            (numpy.float32, onnx.TensorProto.FLOAT),
+            (numpy.int64, onnx.TensorProto.INT64),
+        ):
+            with self.subTest(dtype=dtype):
+                builder = self.make_builder(
+                    18,
+                    ir_version=10,
+                    optimization_options=OnnxLightOptimizationOptions(patterns=[]),
+                )
+                builder.make_tensor_input("X", tensor_type, (2,))
+                builder.op.ReduceProd(
+                    numpy.array([2, 3, 4], dtype=dtype),
+                    numpy.array([0], dtype=numpy.int64),
+                    outputs=["product"],
+                    keepdims=0,
+                )
+                builder.op.Add("X", "product", outputs=["Y"])
+                builder.make_tensor_output("Y")
+                model = builder.to_native()
+                self.assertEqual(
+                    any(node.op_type == "ReduceProd" for node in model.graph.node),
+                    dtype is numpy.int64,
+                )
+                session = onnxruntime.InferenceSession(
+                    model.SerializeToString(), providers=["CPUExecutionProvider"]
+                )
+                actual = session.run(None, {"X": numpy.array([1, 2], dtype=dtype)})[0]
+                numpy.testing.assert_array_equal(actual, numpy.array([25, 26], dtype=dtype))
+
     def test_native_function_export_constants_and_parameters(self):
         from yobx.xbuilder.function_options import FunctionOptions
 
@@ -111,6 +186,36 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
                 numpy.testing.assert_array_equal(actual, feeds["X"] @ weights)
                 self.assertEqual(len(artifact.proto.input), 2 if return_initializer else 1)
         self.assertEqual(len(builder.initializers_dict), 1)
+
+    def test_export_removes_stale_execution_hints(self):
+        from onnx_light.onnx import helper
+
+        first = helper.make_node("Sin", ["X"], ["intermediate"])
+        first.metadata_props.add(key="onnx_light.release_after", value="X")
+        first.metadata_props.add(key="onnx_light.inplace_reuse", value="0:0:equal")
+        first.metadata_props.add(key="custom-note", value="preserved")
+        model = helper.make_model(
+            helper.make_graph(
+                [first, helper.make_node("Add", ["intermediate", "X"], ["Y"])],
+                "stale_release",
+                [helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [2])],
+                [helper.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [2])],
+            ),
+            opset_imports=[helper.make_opsetid("", 18)],
+        )
+        for optimize in (False, True):
+            with self.subTest(optimize=optimize):
+                exported = self.make_builder(model).to_native(optimize=optimize)
+                metadata = {
+                    str(prop.key): str(prop.value)
+                    for prop in exported.graph.node[0].metadata_props
+                }
+                self.assertEqual(metadata["custom-note"], "preserved")
+                self.assertNotIn("onnx_light.release_after", metadata)
+                self.assertNotIn("onnx_light.inplace_reuse", metadata)
+                x = numpy.array([0.25, 0.5], dtype=numpy.float32)
+                actual = ReferenceEvaluator(exported).run(None, {"X": x})[0]
+                numpy.testing.assert_allclose(actual, numpy.sin(x) + x)
 
     def test_native_local_function_converter_registration(self):
         from yobx.xbuilder.function_options import FunctionOptions
@@ -714,7 +819,10 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, "-c", code],
             cwd=root,
-            env={**os.environ, "PYTHONPATH": str(root)},
+            env={
+                **os.environ,
+                "PYTHONPATH": os.pathsep.join([str(root), os.environ.get("PYTHONPATH", "")]),
+            },
             capture_output=True,
             text=True,
             timeout=60,
@@ -761,7 +869,10 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
             """)
         result = subprocess.run(
             [sys.executable, "-c", code],
-            env={**os.environ, "PYTHONPATH": os.getcwd()},
+            env={
+                **os.environ,
+                "PYTHONPATH": os.pathsep.join([os.getcwd(), os.environ.get("PYTHONPATH", "")]),
+            },
             capture_output=True,
             text=True,
             check=False,
@@ -851,6 +962,33 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         self.assertEqual(source.SerializeToString(), original_bytes)
         self.assertEqual(len(builder.to_onnx(optimize=False).proto.graph.node), 2)
         checker.check_model(artifact.proto)
+
+    def test_native_pattern_report_aggregates_rewrites(self):
+        from yobx.builder.onnxlight import OnnxLightOptimizationOptions
+
+        for constant_folding in (False, True):
+            with self.subTest(constant_folding=constant_folding):
+                builder = self.make_builder(
+                    18,
+                    optimization_options=OnnxLightOptimizationOptions(
+                        ["TransposeTranspose"], constant_folding=constant_folding
+                    ),
+                )
+                for index in range(2):
+                    name = f"X{index}"
+                    builder.make_tensor_input(name, 1, (2, 3))
+                    transposed = builder.op.Transpose(name, perm=[1, 0])
+                    output = builder.op.Transpose(transposed, perm=[1, 0])
+                    builder.make_tensor_output(output)
+                artifact = builder.to_onnx(return_optimize_report=True)
+                self.assertEqual(artifact.report.extra["rewrites"], 2)
+                self.assertEqual(len(artifact.report.stats), 1)
+                row = artifact.report.stats[0]
+                self.assertEqual(row["pattern"], "TransposeTranspose")
+                self.assertEqual(row["added"], 2)
+                self.assertEqual(row["removed"], 4)
+                self.assertGreater(row["time_in"], 0)
+                checker.check_model(artifact.proto)
 
     def test_empty_patterns_are_really_empty(self):
         from yobx.builder.onnxlight import OnnxLightOptimizationOptions

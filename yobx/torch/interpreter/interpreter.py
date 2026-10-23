@@ -430,13 +430,14 @@ class FxGraphInterpreter:
             )
             if output_names:
                 # If no output, then it cannot be used.
+                # Control-flow callers pass only operands, not lifted initializers.
                 _, (_, function_name) = self.builder.make_local_function(
                     builder,
                     function_options=FunctionOptions(
                         name=node.name,
                         domain=self.builder.local_domain,
                         export_as_function=True,
-                        return_initializer=True,
+                        return_initializer=False,
                         move_initializer_to_constant=self.function_options.move_initializer_to_constant,
                         external_threshold=self.function_options.external_threshold,
                         merge_allowed=self.function_options.merge_allowed,

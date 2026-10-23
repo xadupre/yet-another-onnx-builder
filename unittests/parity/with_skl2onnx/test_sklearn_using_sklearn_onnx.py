@@ -50,10 +50,9 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
             )
             # sklearn chooses the lowest opset equivalent to the current ones
             # given the nodes it contains. We need to overwrite that.
-            del onx.opset_import[:]
-            d = onx.opset_import.add()
-            d.domain = ""
-            d.version = g.main_opset
+            for opset in onx.opset_import:
+                if opset.domain in ("", "ai.onnx"):
+                    opset.version = g.main_opset
             builder = g.__class__(onx)
 
             f_options = FunctionOptions(
@@ -74,7 +73,12 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
 
         onx = to_onnx(mlp, (X,), extra_converters={MLPClassifier: convert_sklearn_mlp_classifier})
 
-        op_types = [n.op_type for n in onx.graph.node]
+        # The native inliner preserves functions whose ML opset differs from the model's.
+        op_types = [
+            n.op_type
+            for nodes in [onx.graph.node, *(f.node for f in onx.functions)]
+            for n in nodes
+        ]
         self.assertIn("MatMul", op_types)
         self.assertIn("Sigmoid", op_types)
 

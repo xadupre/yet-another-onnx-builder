@@ -65,11 +65,14 @@ class TestGraphPatternCombination(ExtTestCase):
         )
 
     def _optimize(self, model):
+        # onnx-light 0.2.0 canonicalizes identities at optimization entry.
+        cast_builder = GraphBuilder(
+            model, optimization_options=OptimizationOptions(patterns=["Cast"])
+        )
         builder = GraphBuilder(
-            model,
+            cast_builder.to_onnx(optimize=True).proto,
             optimization_options=OptimizationOptions(
                 patterns=[
-                    "Cast",
                     "ReshapeMatMulReshape",
                     "UnsqueezeUnsqueeze",
                     "MatMulReshape2Of3",

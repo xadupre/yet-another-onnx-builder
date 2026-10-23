@@ -1293,7 +1293,7 @@ class TestSqueezeAnyOpset(ExtTestCase):
 
     def test_squeeze_any_opset_one_input(self):
         gr = _builder()
-        gr.make_tensor_input("X", TFLOAT, (None, None, None))
+        gr.make_tensor_input("X", TFLOAT, (1, 1, 1))
         out = gr.op.SqueezeAnyOpset("X", outputs=["Y"])
         gr.make_tensor_output(out, TFLOAT, (), indexed=False)
         onx = gr.to_onnx()
