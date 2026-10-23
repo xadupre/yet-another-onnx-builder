@@ -28,7 +28,7 @@ class TestOnnxExportTransformers(ExtTestCase):
         model = Model()
         expected = model(a, b, offs)
         torch.export.export(model, (a, b, offs))
-        onx = to_onnx(model, (a, b, offs), dynamic_shapes=({0: "G"}, {}, {}))
+        onx = to_onnx(model, (a, b, offs), target_opset=21, dynamic_shapes=({0: "G"}, {}, {}))
         self.dump_onnx("test_aten_transformers_grouped_mm_no_offset.onnx", onx)
         ref = ExtendedReferenceEvaluator(onx, verbose=0)
         got = ref.run(None, dict(a=a.numpy(), b=b.numpy(), offs=offs.numpy()))

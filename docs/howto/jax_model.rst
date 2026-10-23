@@ -63,7 +63,7 @@ Run the ONNX model with :epkg:`onnxruntime` and compare against JAX outputs:
         return h @ W2 + b2
 
     X = np.random.default_rng(0).standard_normal((10, 8)).astype(np.float32)
-    onx = to_onnx(jax_mlp, (X,))
+    onx = to_onnx(jax_mlp, (X,), target_opset=21)
     sess = onnxruntime.InferenceSession(
         onx.SerializeToString(), providers=["CPUExecutionProvider"]
     )

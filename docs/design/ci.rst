@@ -108,6 +108,10 @@ and runnable examples therefore request an explicit runtime-compatible opset
 (usually opset 21, which produces IR version 10). Tests of newer operators keep
 their explicit versions. Default-selection tests separately check the latest
 opset without passing those models to ONNX Runtime.
+The same explicit version is needed in shared tracing helpers and in tests
+that execute through ``InputObserver.check_discrepancies`` or
+``validate_model(do_run=True)``. These paths still create ONNX Runtime sessions,
+even when the test does not instantiate a session directly.
 
 Native fusion coverage and remaining regressions
 -----------------------------------------------

@@ -63,7 +63,7 @@ original Keras model:
     rng = np.random.default_rng(0)
     X_train = rng.standard_normal((20, 6)).astype(np.float32)
     _ = model(X_train)  # initialize model weights
-    onx = to_onnx(model, (X_train[:1],))
+    onx = to_onnx(model, (X_train[:1],), target_opset=21)
 
     X_test = rng.standard_normal((7, 6)).astype(np.float32)
     expected = model(X_test).numpy()

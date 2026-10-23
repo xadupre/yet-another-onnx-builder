@@ -609,7 +609,10 @@ class TestExportOptions(ExtTestCase):
         )
         expected = model(x)
         artifact = to_onnx(
-            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+            model,
+            (x,),
+            target_opset=21,
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=1e-5)
 
@@ -639,7 +642,10 @@ class TestExportOptions(ExtTestCase):
                 model = model_cls()
                 expected = model(x)
                 artifact = to_onnx(
-                    model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+                    model,
+                    (x,),
+                    target_opset=21,
+                    export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
                 )
                 # PyTorch and ONNX Resize implement compatible but not
                 # bit-identical antialiased downsampling filters.
@@ -661,7 +667,10 @@ class TestExportOptions(ExtTestCase):
         z = torch.rand(2, 3, dtype=torch.float32)
         expected = model(x, y, z)
         artifact = to_onnx(
-            model, (x, y, z), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+            model,
+            (x, y, z),
+            target_opset=21,
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x, y, z), atol=1e-5)
 
@@ -678,7 +687,10 @@ class TestExportOptions(ExtTestCase):
         y = torch.tensor([[1.0, float("nan")], [0.0, 2.0]], dtype=torch.float32)
         expected = model(x, y)
         artifact = to_onnx(
-            model, (x, y), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+            model,
+            (x, y),
+            target_opset=21,
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x, y), atol=1e-5)
 
@@ -694,7 +706,10 @@ class TestExportOptions(ExtTestCase):
         x = torch.tensor([0, 1, 1, 3, 2, 1], dtype=torch.int64)
         expected = model(x)
         artifact = to_onnx(
-            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+            model,
+            (x,),
+            target_opset=21,
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=0)
 
@@ -711,7 +726,10 @@ class TestExportOptions(ExtTestCase):
 
         expected = model(x)
         artifact = to_onnx(
-            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+            model,
+            (x,),
+            target_opset=21,
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=0)
 
@@ -727,7 +745,10 @@ class TestExportOptions(ExtTestCase):
         x = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
         expected = model(x)
         artifact = to_onnx(
-            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+            model,
+            (x,),
+            target_opset=21,
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=1e-6)
 
@@ -743,7 +764,10 @@ class TestExportOptions(ExtTestCase):
         x = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float64)
         expected = model(x)
         artifact = to_onnx(
-            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+            model,
+            (x,),
+            target_opset=21,
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=1e-6)
 
@@ -759,7 +783,10 @@ class TestExportOptions(ExtTestCase):
         x = torch.tensor([[1.0, 2.0], [3.0, 4.0]], dtype=torch.float32)
         expected = model(x)
         artifact = to_onnx(
-            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+            model,
+            (x,),
+            target_opset=21,
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=0)
 
@@ -775,7 +802,10 @@ class TestExportOptions(ExtTestCase):
         x = torch.tensor([[1.0, 0.0], [3.0, 0.0]], dtype=torch.float32)
         expected = model(x)
         artifact = to_onnx(
-            model, (x,), export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+            model,
+            (x,),
+            target_opset=21,
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )
         self.assert_conversion_with_ort_on_cpu(artifact.proto, expected, (x,), atol=0)
 
