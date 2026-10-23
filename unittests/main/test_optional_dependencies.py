@@ -25,6 +25,19 @@ class TestOptionalDependencies(unittest.TestCase):
         """Requires the updated polars release in its optional extra."""
         self.assertEqual(self.extras["polars"], ["polars>=2.0.0"])
 
+    def test_torch_version(self):
+        """Requires the latest supported PyTorch release."""
+        self.assertEqual(
+            [dep for dep in self.extras["torch"] if dep.startswith("torch")], ["torch>=2.14.1"]
+        )
+
+    def test_transformers_version(self):
+        """Requires the latest supported Transformers release."""
+        self.assertEqual(
+            [dep for dep in self.extras["transformers"] if dep.startswith("transformers")],
+            ["transformers>=5.20.2"],
+        )
+
     def test_scikit_learn_versions(self):
         """Requires the updated scikit-learn release in every relevant extra."""
         for extra in (

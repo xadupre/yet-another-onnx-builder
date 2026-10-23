@@ -67,12 +67,12 @@ torch = [
     "accelerate",
     "optree",
     "sentencepiece",
-    "torch>=2.11",
+    "torch>=2.14.1",
 ]
 transformers = [    
     "huggingface_hub",
     "scikit-learn>=1.9.1",  # one function requires it to compute ROC curve
-    "transformers>=4.45",
+    "transformers>=5.20.2",
 ]
 xgboost = ["scikit-learn>=1.9.1", "xgboost>=3.0"]
 op-db = ["expecttest"]
