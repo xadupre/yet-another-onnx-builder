@@ -1,4 +1,4 @@
-"""Tests dataframe dependency version requirements."""
+"""Tests optional dependency version requirements."""
 
 import pathlib
 import tomllib
@@ -24,6 +24,25 @@ class TestOptionalDependencies(unittest.TestCase):
     def test_polars_version(self):
         """Requires the updated polars release in its optional extra."""
         self.assertEqual(self.extras["polars"], ["polars>=2.0.0"])
+
+    def test_scikit_learn_versions(self):
+        """Requires the updated scikit-learn release in every relevant extra."""
+        for extra in (
+            "category_encoders",
+            "imblearn",
+            "lightgbm",
+            "perpetual",
+            "sklearn",
+            "sksurv",
+            "statsmodels",
+            "transformers",
+            "xgboost",
+        ):
+            with self.subTest(extra=extra):
+                self.assertEqual(
+                    [dep for dep in self.extras[extra] if dep.startswith("scikit-learn")],
+                    ["scikit-learn>=1.9.1"],
+                )
 
 
 if __name__ == "__main__":
