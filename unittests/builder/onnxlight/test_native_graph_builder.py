@@ -128,6 +128,40 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
                     actual, numpy.array([11, 16], dtype=numpy.float32)
                 )
 
+    def test_constant_reduce_prod_dtype_support(self):
+        import onnxruntime
+        from yobx.builder.onnxlight import OnnxLightOptimizationOptions
+
+        for dtype, tensor_type in (
+            (numpy.float32, onnx.TensorProto.FLOAT),
+            (numpy.int64, onnx.TensorProto.INT64),
+        ):
+            with self.subTest(dtype=dtype):
+                builder = self.make_builder(
+                    18,
+                    ir_version=10,
+                    optimization_options=OnnxLightOptimizationOptions(patterns=[]),
+                )
+                builder.make_tensor_input("X", tensor_type, (2,))
+                builder.op.ReduceProd(
+                    numpy.array([2, 3, 4], dtype=dtype),
+                    numpy.array([0], dtype=numpy.int64),
+                    outputs=["product"],
+                    keepdims=0,
+                )
+                builder.op.Add("X", "product", outputs=["Y"])
+                builder.make_tensor_output("Y")
+                model = builder.to_native()
+                self.assertEqual(
+                    any(node.op_type == "ReduceProd" for node in model.graph.node),
+                    dtype is numpy.int64,
+                )
+                session = onnxruntime.InferenceSession(
+                    model.SerializeToString(), providers=["CPUExecutionProvider"]
+                )
+                actual = session.run(None, {"X": numpy.array([1, 2], dtype=dtype)})[0]
+                numpy.testing.assert_array_equal(actual, numpy.array([25, 26], dtype=dtype))
+
     def test_native_function_export_constants_and_parameters(self):
         from yobx.xbuilder.function_options import FunctionOptions
 

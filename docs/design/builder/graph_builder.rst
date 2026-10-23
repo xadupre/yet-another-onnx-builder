@@ -230,7 +230,9 @@ graphs and local functions, since rewrites and renaming can make them stale.
 
 For graphs containing bfloat16 tensors, ``Where`` is excluded from constant
 folding because its native kernel in onnx-light 0.2.0 does not support that
-dtype. Other constant folding remains enabled.
+dtype. ``ReduceProd`` is likewise excluded when a reduction input is not
+float32, since its 0.2.0 kernel only supports float32. Float32-only reductions
+and other supported operators still undergo constant folding.
 
 Native inlining may retain local functions whose operator-domain opset versions
 differ from the model's. These functions keep their own opset imports; inspecting

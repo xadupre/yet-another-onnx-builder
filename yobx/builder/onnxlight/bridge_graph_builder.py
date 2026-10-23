@@ -1479,6 +1479,15 @@ class OnnxLightGraphBuilder:
             ):
                 # onnx-light 0.2.0's Where kernel cannot evaluate BFLOAT16.
                 folding_options.excluded_ops = {("", "Where")}
+            if folding_options.enabled and any(
+                node.op_type == "ReduceProd"
+                and node.domain in ("", "ai.onnx")
+                and builder.shapes.has(str(node.input[0]))
+                and builder.shapes.get(str(node.input[0])).dtype != onnx.TensorProto.FLOAT
+                for node in builder.to_graph().node
+            ):
+                # onnx-light 0.2.0's ReduceProd kernel only accepts FLOAT.
+                folding_options.excluded_ops |= {("", "ReduceProd")}
             rewrites, native_report = optimizer.optimize(
                 self.optimization_options.max_iter,
                 report=True,

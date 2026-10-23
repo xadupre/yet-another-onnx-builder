@@ -6996,11 +6996,6 @@ def aten__grouped_mm(
         g.set_shape(starts, new_shape)
         g.set_shape(ends, new_shape)
 
-    def mkv(name):
-        value_info_proto = ValueInfoProto()
-        value_info_proto.name = name
-        return value_info_proto
-
     body = make_graph(
         [
             make_node(
@@ -7015,8 +7010,17 @@ def aten__grouped_mm(
             make_node("MatMul", ["mpa", "mpb"], ["mmu"], name=g.unique_node_name(name)),
         ],
         "graph_grouped_mm",
-        [mkv("start"), mkv("end")],
-        [mkv("mmu")],
+        [
+            make_tensor_value_info("start", off_itype, [1]),
+            make_tensor_value_info("end", off_itype, [1]),
+        ],
+        [
+            make_tensor_value_info(
+                "mmu",
+                TensorProto.FLOAT if dtype_a == TensorProto.BFLOAT16 else dtype_a,
+                [None, None],
+            )
+        ],
         [
             onh.from_array(np.array([-1], dtype=off_dtype), name="mm_last"),
             onh.from_array(np.array([-2], dtype=off_dtype), name="mm_before_last"),

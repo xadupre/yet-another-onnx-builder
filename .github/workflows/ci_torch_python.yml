@@ -113,4 +113,4 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest --durations=10 --ignore=unittests/parity --ignore=unittests/sklearn --ignore=unittests/sql --ignore=unittests/tensorflow --ignore=unittests/torch/coverage
+          pytest -v --durations=10 --ignore=unittests/parity --ignore=unittests/sklearn --ignore=unittests/sql --ignore=unittests/tensorflow --ignore=unittests/torch/coverage
