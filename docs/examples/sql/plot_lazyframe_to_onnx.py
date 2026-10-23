@@ -37,12 +37,13 @@ from yobx.sql import lazyframe_to_onnx
 # The simplest case: select a computed column from two source columns.
 # ``input_dtypes`` maps each **source** column name to its numpy dtype;
 # only columns that actually appear in the plan need to be listed.
+# Opset 21 is used explicitly for ONNX Runtime compatibility.
 
 lf_add = pl.LazyFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
 lf_add = lf_add.select([(pl.col("a") + pl.col("b")).alias("total")])
 
 dtypes = {"a": np.float64, "b": np.float64}
-artifact_add = lazyframe_to_onnx(lf_add, dtypes)
+artifact_add = lazyframe_to_onnx(lf_add, dtypes, target_opset=21)
 
 a = np.array([1.0, 2.0, 3.0], dtype=np.float64)
 b = np.array([4.0, 5.0, 6.0], dtype=np.float64)
@@ -67,7 +68,7 @@ print(pretty_onnx(artifact_add.proto))
 lf_where = pl.LazyFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
 lf_where = lf_where.filter(pl.col("a") > 1.5).select([pl.col("a"), pl.col("b")])
 
-artifact_where = lazyframe_to_onnx(lf_where, dtypes)
+artifact_where = lazyframe_to_onnx(lf_where, dtypes, target_opset=21)
 sess = onnxruntime.InferenceSession(
     artifact_where.SerializeToString(), providers=["CPUExecutionProvider"]
 )
@@ -94,7 +95,7 @@ lf_agg = pl.LazyFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
 lf_agg = lf_agg.select([pl.col("a").sum().alias("s"), pl.col("b").mean().alias("m")])
 
 dtypes_agg = {"a": np.float64, "b": np.float64}
-artifact_agg = lazyframe_to_onnx(lf_agg, dtypes_agg)
+artifact_agg = lazyframe_to_onnx(lf_agg, dtypes_agg, target_opset=21)
 sess = onnxruntime.InferenceSession(
     artifact_agg.SerializeToString(), providers=["CPUExecutionProvider"]
 )
@@ -126,7 +127,7 @@ lf_combined = lf_combined.filter(pl.col("a") > 0).select(
 a2 = np.array([1.0, -2.0, 3.0], dtype=np.float64)
 b2 = np.array([4.0, 5.0, 6.0], dtype=np.float64)
 
-artifact_combined = lazyframe_to_onnx(lf_combined, dtypes)
+artifact_combined = lazyframe_to_onnx(lf_combined, dtypes, target_opset=21)
 sess = onnxruntime.InferenceSession(
     artifact_combined.SerializeToString(), providers=["CPUExecutionProvider"]
 )
