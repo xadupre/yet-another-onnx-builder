@@ -19,7 +19,7 @@ class TestFastICA(ExtTestCase):
         ica = FastICA(n_components=2, whiten="unit-variance", random_state=0)
         ica.fit(X)
 
-        onx = to_onnx(ica, (X,))
+        onx = to_onnx(ica, (X,), target_opset=21)
 
         # Check that Sub (centering) and MatMul (projection) are present.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -45,7 +45,7 @@ class TestFastICA(ExtTestCase):
         ica = FastICA(n_components=2, whiten="unit-variance", random_state=0)
         ica.fit(X)
 
-        onx = to_onnx(ica, (X,))
+        onx = to_onnx(ica, (X,), target_opset=21)
 
         # Check that Sub (centering) and MatMul (projection) are present.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -72,7 +72,7 @@ class TestFastICA(ExtTestCase):
         ica = FastICA(whiten=False, random_state=0)
         ica.fit(X)
 
-        onx = to_onnx(ica, (X,))
+        onx = to_onnx(ica, (X,), target_opset=21)
 
         # Check that Sub (centering) is NOT present when whiten=False.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -107,7 +107,7 @@ class TestFastICA(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)

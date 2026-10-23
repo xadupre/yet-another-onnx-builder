@@ -42,7 +42,7 @@ def _run_yobx(fn, *arrays, dynamic_shapes=None):
     kwargs = {}
     if dynamic_shapes is not None:
         kwargs["dynamic_shapes"] = dynamic_shapes
-    artifact = to_onnx(fn, tuple(arrays), **kwargs)
+    artifact = to_onnx(fn, tuple(arrays), target_opset=21, **kwargs)
     sess = InferenceSession(artifact.SerializeToString(), providers=["CPUExecutionProvider"])
     input_names = [i.name for i in sess.get_inputs()]
     outputs = sess.run(None, dict(zip(input_names, arrays)))

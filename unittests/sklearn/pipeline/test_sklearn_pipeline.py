@@ -24,7 +24,7 @@ class TestSklearnPipeline(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         # Every intermediate tensor name produced during "scaler" step conversion
         # should include the step prefix.
@@ -44,7 +44,7 @@ class TestSklearnPipeline(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -74,7 +74,10 @@ class TestSklearnPipelineConvertOptions(ExtTestCase):
         """ConvertOptions(decision_leaf=True) should add a leaf-index output for a Pipeline
         ending with a DecisionTreeClassifier."""
         onx = to_onnx(
-            self.pipe, (self.X_train,), convert_options=ConvertOptions(decision_leaf=True)
+            self.pipe,
+            (self.X_train,),
+            target_opset=21,
+            convert_options=ConvertOptions(decision_leaf=True),
         )
 
         # Three outputs: label, probabilities, decision_leaf
@@ -109,7 +112,10 @@ class TestSklearnPipelineConvertOptions(ExtTestCase):
         """ConvertOptions(decision_path=True) should add a binary
         path-string output for a Pipeline ending with a DecisionTreeClassifier."""
         onx = to_onnx(
-            self.pipe, (self.X_train,), convert_options=ConvertOptions(decision_path=True)
+            self.pipe,
+            (self.X_train,),
+            target_opset=21,
+            convert_options=ConvertOptions(decision_path=True),
         )
 
         # Three outputs: label, probabilities, decision_path

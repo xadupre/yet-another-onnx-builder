@@ -19,7 +19,7 @@ class TestPCA(ExtTestCase):
         pca = PCA(n_components=2)
         pca.fit(X)
 
-        onx = to_onnx(pca, (X,))
+        onx = to_onnx(pca, (X,), target_opset=21)
 
         # Check that Sub (centering) and MatMul (projection) are present.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -45,7 +45,7 @@ class TestPCA(ExtTestCase):
         pca = PCA()
         pca.fit(X)
 
-        onx = to_onnx(pca, (X,))
+        onx = to_onnx(pca, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -69,7 +69,7 @@ class TestPCA(ExtTestCase):
         pipe = Pipeline([("pca", PCA(n_components=3)), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)

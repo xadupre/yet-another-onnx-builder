@@ -36,7 +36,7 @@ class OnnxGraph:
     Accumulates nodes, inputs, outputs and initializers needed to build
     an ONNX graph using a fluent API.
 
-    :param opset: main opset version (defaults to ``onnx_opset_version() - 1``)
+    :param opset: main opset version (defaults to ``onnx_opset_version()``)
     :param opsets: additional opsets as ``{domain: version}``
     :param ir_version: ONNX IR version; only applied to ModelProto outputs
     :param proto_type: :class:`ProtoType` - ``MODEL`` (default) or ``GRAPH``
@@ -93,7 +93,7 @@ class OnnxGraph:
     @property
     def main_opset(self) -> int:
         """Returns the opset version for the main ONNX domain (``""``)."""
-        return self.opset if self.opset is not None else onnx_opset_version() - 1
+        return self.opset if self.opset is not None else onnx_opset_version()
 
     def has_opset(self, domain: str) -> int:
         """
@@ -385,7 +385,7 @@ class OnnxGraph:
         )
         if self.proto_type == ProtoType.GRAPH:
             return graph
-        opsets = [make_opsetid("", self.opset or onnx_opset_version() - 1)]
+        opsets = [make_opsetid("", self.main_opset)]
         if self.opsets:
             for k, v in self.opsets.items():
                 if k != "":

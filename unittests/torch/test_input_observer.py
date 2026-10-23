@@ -693,6 +693,7 @@ class TestInputObserver(ExtTestCase):
         to_onnx(
             model,
             observer.infer_arguments(),
+            target_opset=21,
             dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
             filename=proto_name,
         )
@@ -724,6 +725,7 @@ class TestInputObserver(ExtTestCase):
         to_onnx(
             model,
             observer.infer_arguments(),
+            target_opset=21,
             dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
             filename=proto_name,
         )

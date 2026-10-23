@@ -49,6 +49,7 @@ class TestOnnxExportLarge(ExtTestCase):
         large_onx = to_onnx(
             model,
             tuple(args),
+            target_opset=21,
             input_names=["input"] if rename_input else None,
             options=OptimizationOptions(
                 remove_unused=remove_unused,
@@ -218,6 +219,7 @@ class TestOnnxExportLarge(ExtTestCase):
         onx = to_onnx(
             model,
             (x, batch),
+            target_opset=21,
             dynamic_shapes={"x": {0: "num_nodes"}, "batch": {0: "num_nodes"}},
             export_options=ExportOptions(decomposition_table="all"),
         )

@@ -44,7 +44,7 @@ class TestLGBMModel(ExtTestCase):
         )
         model.fit(X, y)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -106,7 +106,7 @@ class TestLGBMModel(ExtTestCase):
         )
         model.fit(X, y)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Exp", op_types)
@@ -139,7 +139,7 @@ class TestLGBMModel(ExtTestCase):
         )
         model.fit(X, y)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sigmoid", op_types)
@@ -210,7 +210,7 @@ class TestLGBMModel(ExtTestCase):
         )
         model.fit(X, y)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Softmax", op_types)

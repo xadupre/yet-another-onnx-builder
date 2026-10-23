@@ -1510,6 +1510,7 @@ class TestGraphTracerTorchCheck(ExtTestCase):
         artifact = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=dynamic_shapes,
             export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )

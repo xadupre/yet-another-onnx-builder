@@ -23,7 +23,7 @@ class TestSklearnOneClassSVM(ExtTestCase):
             Xd = X.astype(dtype)
             clf = OneClassSVM(kernel=kernel)
             clf.fit(Xd)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -42,7 +42,7 @@ class TestSklearnOneClassSVM(ExtTestCase):
     def test_one_class_svm_rbf_float32(self):
         clf = OneClassSVM(kernel="rbf")
         clf.fit(self._X)
-        onx = to_onnx(clf, (self._X,))
+        onx = to_onnx(clf, (self._X,), target_opset=21)
 
         output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 2)
@@ -59,7 +59,7 @@ class TestSklearnOneClassSVM(ExtTestCase):
         Xd = self._X.astype(np.float64)
         clf = OneClassSVM(kernel="rbf")
         clf.fit(Xd)
-        onx = to_onnx(clf, (Xd,))
+        onx = to_onnx(clf, (Xd,), target_opset=21)
 
         output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 2)
@@ -77,7 +77,7 @@ class TestSklearnOneClassSVM(ExtTestCase):
             Xd = self._X.astype(dtype)
             clf = OneClassSVM(kernel="linear")
             clf.fit(Xd)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2)
@@ -109,7 +109,7 @@ class TestSklearnOneClassSVM(ExtTestCase):
             Xd = self._X.astype(dtype)
             pipe = Pipeline([("scaler", StandardScaler()), ("clf", OneClassSVM(kernel="rbf"))])
             pipe.fit(Xd)
-            onx = to_onnx(pipe, (Xd,))
+            onx = to_onnx(pipe, (Xd,), target_opset=21)
 
             sess = self.check_ort(onx)
             ort_results = sess.run(None, {"X": Xd})

@@ -33,7 +33,7 @@ class TestTensorflowToOnnxValueInfoProto(ExtTestCase):
 
         value = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
         spec = onnx.helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [2, 2])
-        artifact = to_onnx(model, (spec,), builder_cls=NativeArrayBuilder)
+        artifact = to_onnx(model, (spec,), target_opset=21, builder_cls=NativeArrayBuilder)
         onnx.checker.check_model(artifact.proto)
         expected = model(value).numpy()
         feeds = {"X:0": value}
@@ -53,7 +53,7 @@ class TestTensorflowToOnnxValueInfoProto(ExtTestCase):
                 def model(x):
                     return tf.shape(x, out_type=dtype), tf.stack([x, x + 0.25], axis=1)
 
-                artifact = to_onnx(model, (spec,))
+                artifact = to_onnx(model, (spec,), target_opset=21)
                 onnx.checker.check_model(artifact.proto)
                 expected = [output.numpy() for output in model(value)]
                 feeds = {"X:0": value}
@@ -73,7 +73,7 @@ class TestTensorflowToOnnxValueInfoProto(ExtTestCase):
         X = np.random.rand(5, 3).astype(np.float32)
 
         vip = onnx.helper.make_tensor_value_info("my_input", onnx.TensorProto.FLOAT, [None, 3])
-        onx = to_onnx(model, (vip,))
+        onx = to_onnx(model, (vip,), target_opset=21)
 
         # The graph input must carry the name from the ValueInfoProto.
         self.assertEqual(onx.graph.input[0].name, "my_input:0")
@@ -92,7 +92,7 @@ class TestTensorflowToOnnxValueInfoProto(ExtTestCase):
         X = np.random.rand(5, 3).astype(np.float32)
 
         vip = onnx.helper.make_tensor_value_info("my_input", onnx.TensorProto.FLOAT, [None, 3])
-        onx = to_onnx(model, (vip,), input_names=["override_name"])
+        onx = to_onnx(model, (vip,), target_opset=21, input_names=["override_name"])
 
         self.assertEqual(onx.graph.input[0].name, "override_name:0")
 

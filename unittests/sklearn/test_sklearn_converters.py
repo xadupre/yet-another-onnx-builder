@@ -22,7 +22,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         ss = StandardScaler()
         ss.fit(X)
 
-        onx = to_onnx(ss, (X,))
+        onx = to_onnx(ss, (X,), target_opset=21)
 
         # Check graph structure
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -47,7 +47,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         lr = LogisticRegression()
         lr.fit(X_scaled, y)
 
-        onx = to_onnx(lr, (X,))
+        onx = to_onnx(lr, (X,), target_opset=21)
 
         # Check graph structure
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -74,7 +74,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         lr = LogisticRegression(max_iter=200)
         lr.fit(X, y)
 
-        onx = to_onnx(lr, (X,))
+        onx = to_onnx(lr, (X,), target_opset=21)
 
         # Check graph structure
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -102,7 +102,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         # Check graph contains nodes from both steps
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -131,7 +131,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler())])
         pipe.fit(X)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -149,7 +149,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(max_iter=200))])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -194,7 +194,12 @@ class TestSklearnBaseConverters(ExtTestCase):
         est = ScaleByConstant(scale=3.0)
         est.fit(X)
 
-        onx = to_onnx(est, (X,), extra_converters={ScaleByConstant: convert_scale_by_constant})
+        onx = to_onnx(
+            est,
+            (X,),
+            target_opset=21,
+            extra_converters={ScaleByConstant: convert_scale_by_constant},
+        )
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Mul", op_types)
@@ -226,7 +231,9 @@ class TestSklearnBaseConverters(ExtTestCase):
         ss = StandardScaler()
         ss.fit(X)
 
-        onx = to_onnx(ss, (X,), extra_converters={StandardScaler: custom_scaler_converter})
+        onx = to_onnx(
+            ss, (X,), target_opset=21, extra_converters={StandardScaler: custom_scaler_converter}
+        )
 
         self.assertTrue(called, "custom converter was not called")
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -243,7 +250,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         estimator = NoOpEstimator().fit(np.zeros((4, 2), dtype=np.float32))
         X = np.zeros((4, 2), dtype=np.float32)
         with self.assertRaises(NotFittedError) as cm:
-            to_onnx(estimator, (X,))
+            to_onnx(estimator, (X,), target_opset=21)
         self.assertIn("transform", str(cm.exception))
         self.assertIn("predict", str(cm.exception))
 
@@ -253,7 +260,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         rf = RandomForestClassifier(n_estimators=5, random_state=0)
         rf.fit(X, y)
 
-        onx = to_onnx(rf, (X,))
+        onx = to_onnx(rf, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
@@ -374,7 +381,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TreeEnsemble", op_types)
@@ -394,7 +401,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         ss = StandardScaler()
         ss.fit(X)
 
-        artifact = to_onnx(ss, (X,), large_model=True)
+        artifact = to_onnx(ss, (X,), target_opset=21, large_model=True)
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertIsInstance(artifact.container, ExtendedModelContainer)
 
@@ -409,7 +416,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         lr = LogisticRegression()
         lr.fit(X_scaled, y)
 
-        artifact = to_onnx(lr, (X,), large_model=True)
+        artifact = to_onnx(lr, (X,), target_opset=21, large_model=True)
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertIsInstance(artifact.container, ExtendedModelContainer)
 
@@ -463,7 +470,7 @@ class TestSklearnBaseConverters(ExtTestCase):
         extra = {ClipTransformer: convert_clip_transformer}
 
         # Without convert_options: single output
-        onx_plain = to_onnx(transformer, (X,), extra_converters=extra)
+        onx_plain = to_onnx(transformer, (X,), target_opset=21, extra_converters=extra)
         self.assertEqual(1, len(onx_plain.proto.graph.output))
 
         ref_plain = ExtendedReferenceEvaluator(onx_plain)
@@ -474,7 +481,11 @@ class TestSklearnBaseConverters(ExtTestCase):
 
         # With clip_mask=True: two outputs
         onx_mask = to_onnx(
-            transformer, (X,), extra_converters=extra, convert_options=ClipOptions(clip_mask=True)
+            transformer,
+            (X,),
+            target_opset=21,
+            extra_converters=extra,
+            convert_options=ClipOptions(clip_mask=True),
         )
         self.assertEqual(2, len(onx_mask.proto.graph.output))
 
@@ -568,7 +579,7 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
         ss.fit(X)
 
         vip = onnx.helper.make_tensor_value_info("features", onnx.TensorProto.FLOAT, ["N", 2])
-        onx = to_onnx(ss, (vip,))
+        onx = to_onnx(ss, (vip,), target_opset=21)
 
         # The ONNX graph input must use the name from the ValueInfoProto.
         self.assertEqual(onx.proto.graph.input[0].name, "features")
@@ -590,7 +601,7 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
         ss.fit(X)
 
         vip = onnx.helper.make_tensor_value_info("features", onnx.TensorProto.FLOAT, ["N", 2])
-        onx = to_onnx(ss, (vip,), input_names=["my_input"])
+        onx = to_onnx(ss, (vip,), target_opset=21, input_names=["my_input"])
 
         self.assertEqual(onx.proto.graph.input[0].name, "my_input")
 
@@ -609,7 +620,7 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
         pipe.fit(X, y)
 
         vip = onnx.helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [None, 2])
-        onx = to_onnx(pipe, (vip,))
+        onx = to_onnx(pipe, (vip,), target_opset=21)
 
         self.assertEqual(onx.proto.graph.input[0].name, "X")
 
@@ -630,7 +641,7 @@ class TestSklearnToOnnxValueInfoProto(ExtTestCase):
         pipe.fit(X, y)
 
         vip = onnx.helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [None, 2])
-        onx = to_onnx(pipe, (vip,), verbose=1)
+        onx = to_onnx(pipe, (vip,), target_opset=21, verbose=1)
 
         self.assertEqual(onx.proto.graph.input[0].name, "X")
 
@@ -649,7 +660,7 @@ class TestSklearnToOnnxTupleSpec(ExtTestCase):
         ss = StandardScaler()
         ss.fit(X)
 
-        onx = to_onnx(ss, (("features", np.float32, ("N", 2)),))
+        onx = to_onnx(ss, (("features", np.float32, ("N", 2)),), target_opset=21)
 
         # The ONNX graph input must use the name from the tuple.
         self.assertEqual(onx.proto.graph.input[0].name, "features")
@@ -668,7 +679,9 @@ class TestSklearnToOnnxTupleSpec(ExtTestCase):
         ss = StandardScaler()
         ss.fit(X)
 
-        onx = to_onnx(ss, (("features", np.float32, ("N", 2)),), input_names=["my_input"])
+        onx = to_onnx(
+            ss, (("features", np.float32, ("N", 2)),), target_opset=21, input_names=["my_input"]
+        )
 
         self.assertEqual(onx.proto.graph.input[0].name, "my_input")
 
@@ -685,7 +698,7 @@ class TestSklearnToOnnxTupleSpec(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("reg", LinearRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (("X", np.float32, ("N", 2)),))
+        onx = to_onnx(pipe, (("X", np.float32, ("N", 2)),), target_opset=21)
 
         self.assertEqual(onx.proto.graph.input[0].name, "X")
 
@@ -700,7 +713,7 @@ class TestSklearnToOnnxTupleSpec(ExtTestCase):
         ss = StandardScaler()
         ss.fit(X)
 
-        onx = to_onnx(ss, (("X", np.float32, (4, 2)),))
+        onx = to_onnx(ss, (("X", np.float32, (4, 2)),), target_opset=21)
 
         shape = onx.proto.graph.input[0].type.tensor_type.shape
         self.assertEqual(shape.dim[0].dim_value, 4)
@@ -725,7 +738,7 @@ class TestSklearnToOnnxDataFrame(ExtTestCase):
         ss = StandardScaler()
         ss.fit(df)
 
-        onx = to_onnx(ss, (df,))
+        onx = to_onnx(ss, (df,), target_opset=21)
 
         # ONNX graph should have two 1-D float32 inputs named after the columns.
         graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
@@ -753,7 +766,7 @@ class TestSklearnToOnnxDataFrame(ExtTestCase):
         ss = StandardScaler()
         ss.fit(df)
 
-        onx = to_onnx(ss, (df,))
+        onx = to_onnx(ss, (df,), target_opset=21)
 
         graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
         self.assertIn("a", graph_inputs)
@@ -771,7 +784,7 @@ class TestSklearnToOnnxDataFrame(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression())])
         pipe.fit(df, y)
 
-        onx = to_onnx(pipe, (df,))
+        onx = to_onnx(pipe, (df,), target_opset=21)
 
         # ONNX graph should have per-column inputs.
         graph_inputs = {inp.name: inp for inp in onx.proto.graph.input}
@@ -966,7 +979,9 @@ class TestSklearnConvertersBasicInvocation(ExtTestCase):
 
         X = np.array([[1, 2], [3, 4]], dtype=np.float32)
         est = _DoubleTransformer().fit(X)
-        onx = to_onnx(est, (X,), extra_converters={_DoubleTransformer: _double_converter})
+        onx = to_onnx(
+            est, (X,), target_opset=21, extra_converters={_DoubleTransformer: _double_converter}
+        )
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -985,7 +1000,7 @@ class TestSklearnToOnnxReturnOptimizeReport(ExtTestCase):
         ss = StandardScaler()
         ss.fit(X)
 
-        artifact = to_onnx(ss, (X,))
+        artifact = to_onnx(ss, (X,), target_opset=21)
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertIsNone(artifact.report)
 
@@ -997,7 +1012,7 @@ class TestSklearnToOnnxReturnOptimizeReport(ExtTestCase):
         ss = StandardScaler()
         ss.fit(X)
 
-        artifact = to_onnx(ss, (X,), return_optimize_report=True)
+        artifact = to_onnx(ss, (X,), target_opset=21, return_optimize_report=True)
         self.assertIsInstance(artifact, ExportArtifact)
         self.assertIsNotNone(artifact.report)
         self.assertIsInstance(artifact.report, ExportReport)

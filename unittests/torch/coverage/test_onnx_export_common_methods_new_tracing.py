@@ -255,7 +255,10 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
         )
 
         onx = to_onnx(
-            model, inputs, export_options=ExportOptions(tracing=TracingMode.NEW_TRACING)
+            model,
+            inputs,
+            target_opset=21,
+            export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )
         numpy_inputs = [to_numpy(t) for t in inputs]
 

@@ -18,9 +18,11 @@ from yobx.xtracing.parse import ColumnRef, SelectOp, parse_sql
 
 
 def _ort_run(onx, feeds):
-    """Run *onx* with onnxruntime and return outputs. Skip if ORT is not installed."""
+    """Runs *onx* with ONNX Runtime using supported opset and IR versions."""
     from onnxruntime import InferenceSession
 
+    assert {o.domain: o.version for o in onx.proto.opset_import}[""] == 21
+    assert onx.proto.ir_version == 10
     sess = InferenceSession(onx.proto.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)
 
@@ -72,7 +74,7 @@ class TestCustomFunctionSelect(ExtTestCase):
     """Tests for using custom Python functions in SELECT clauses."""
 
     def _run(self, query, dtypes, feeds, custom_functions=None):
-        onx = sql_to_onnx(query, dtypes, custom_functions=custom_functions)
+        onx = sql_to_onnx(query, dtypes, custom_functions=custom_functions, target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         ref_outputs = ref.run(None, feeds)
         if has_onnxruntime():
@@ -155,7 +157,7 @@ class TestCustomFunctionWhere(ExtTestCase):
     """Tests for using custom Python functions in WHERE clauses."""
 
     def _run(self, query, dtypes, feeds, custom_functions=None):
-        onx = sql_to_onnx(query, dtypes, custom_functions=custom_functions)
+        onx = sql_to_onnx(query, dtypes, custom_functions=custom_functions, target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         ref_outputs = ref.run(None, feeds)
         if has_onnxruntime():

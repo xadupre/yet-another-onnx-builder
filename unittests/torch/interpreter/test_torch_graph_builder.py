@@ -261,6 +261,7 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
         artifact = to_onnx(
             model,
             (torch.randn(2, 3),),
+            target_opset=21,
             input_names=["X"],
             dynamic_shapes=({0: torch.export.Dim("batch")},),
         )
@@ -288,7 +289,7 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
 
         model = Model()
         x = torch.arange(18, dtype=torch.float32).reshape(6, 3)
-        artifact = to_onnx(model, (x, torch.tensor([1, 4])))
+        artifact = to_onnx(model, (x, torch.tensor([1, 4])), target_opset=21)
         evaluators = (
             InferenceSession(artifact.SerializeToString(), providers=["CPUExecutionProvider"]),
             ExtendedReferenceEvaluator(artifact),

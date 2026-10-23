@@ -20,7 +20,7 @@ class TestPLSSVD(ExtTestCase):
         pls = PLSSVD(n_components=2)
         pls.fit(X, y)
 
-        onx = to_onnx(pls, (X,))
+        onx = to_onnx(pls, (X,), target_opset=21)
 
         # Check that Sub (centering) and Div (scaling) are present.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -48,7 +48,7 @@ class TestPLSSVD(ExtTestCase):
         pls = PLSSVD(n_components=2)
         pls.fit(X, y)
 
-        onx = to_onnx(pls, (X,))
+        onx = to_onnx(pls, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -73,7 +73,7 @@ class TestPLSSVD(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("pls", PLSSVD(n_components=2))])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]

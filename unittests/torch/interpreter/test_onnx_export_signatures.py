@@ -617,7 +617,7 @@ class TestOnnxExportSignatures(ExtTestCase):
         ep = torch.export.export(Model(), inputs, dynamic_shapes=({0: DYN, 1: DYN}, DYN))
         self.assertNotEmpty(ep)
         self.assertEqualArray(expected, ep.module()(*inputs))
-        onx = to_onnx(Model(), inputs, dynamic_shapes=({0: DYN, 1: DYN}, DYN))
+        onx = to_onnx(Model(), inputs, target_opset=21, dynamic_shapes=({0: DYN, 1: DYN}, DYN))
         self.assertEqual(2, len(onx.graph.input))
         ref = ExtendedReferenceEvaluator(onx)
         feeds = dict(

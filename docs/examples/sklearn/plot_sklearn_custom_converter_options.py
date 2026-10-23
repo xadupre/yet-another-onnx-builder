@@ -164,7 +164,10 @@ transformer = ClipTransformer(clip_min=-0.5, clip_max=0.5).fit(X_train)
 # Without any ``convert_options`` the model produces a single output.
 
 onx_plain = to_onnx(
-    transformer, (X_train,), extra_converters={ClipTransformer: convert_clip_transformer}
+    transformer,
+    (X_train,),
+    target_opset=21,
+    extra_converters={ClipTransformer: convert_clip_transformer},
 )
 
 print("=== Plain conversion (no clip_mask) ===")
@@ -191,6 +194,7 @@ clip_opts = ClipOptions(clip_mask=True)
 onx_with_mask = to_onnx(
     transformer,
     (X_train,),
+    target_opset=21,
     extra_converters={ClipTransformer: convert_clip_transformer},
     convert_options=clip_opts,
 )

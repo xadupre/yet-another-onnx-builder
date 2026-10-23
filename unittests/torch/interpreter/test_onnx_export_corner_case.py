@@ -111,6 +111,7 @@ def export_utils(
     onx = to_onnx(
         model,
         tuple(args),
+        target_opset=21,
         input_names=["input"] if rename_input else None,
         options=OptimizationOptions(
             remove_unused=remove_unused,
@@ -242,7 +243,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
         x = torch.rand(1, 200, 204, 3)
         window_size = torch.tensor(8)
         expected = model(x, window_size)
-        onx = to_onnx(model, (x, window_size))
+        onx = to_onnx(model, (x, window_size), target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, (x, window_size))
 
     @skipif_ci_windows("torch dynamo not supported on windows")
@@ -309,12 +310,14 @@ class TestOnnxExportCornerCase(ExtTestCase):
         onx1 = to_onnx(
             model,
             (input_tensor,),
+            target_opset=21,
             input_names=["input"],
             options=OptimizationOptions(remove_unused=False, patterns=None),
         )
         onx2 = to_onnx(
             model,
             (input_tensor,),
+            target_opset=21,
             input_names=["input"],
             options=OptimizationOptions(remove_unused=True),
         )
@@ -361,6 +364,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
         onx1 = to_onnx(
             model,
             (input_tensor,),
+            target_opset=21,
             input_names=["input"],
             options=OptimizationOptions(constant_folding=False, patterns=[]),
         )
@@ -376,6 +380,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
         onx2 = to_onnx(
             model,
             (input_tensor,),
+            target_opset=21,
             input_names=["input"],
             options=OptimizationOptions(constant_folding=True, patterns=None),
         )
@@ -470,7 +475,9 @@ class TestOnnxExportCornerCase(ExtTestCase):
         s = StringIO()
         with contextlib.redirect_stdout(s):
             self.assertRaise(
-                lambda: to_onnx(model, (x,), input_names=["x"], dispatcher=dispatcher),
+                lambda: to_onnx(
+                    model, (x,), target_opset=21, input_names=["x"], dispatcher=dispatcher
+                ),
                 NotFoundUTError,
             )
         self.assertIn("[Dispatcher.find_function]", s.getvalue())
@@ -504,7 +511,9 @@ class TestOnnxExportCornerCase(ExtTestCase):
         s = StringIO()
         with contextlib.redirect_stdout(s):
             self.assertRaise(
-                lambda: to_onnx(model, (x,), input_names=["x"], dispatcher=dispatcher),
+                lambda: to_onnx(
+                    model, (x,), target_opset=21, input_names=["x"], dispatcher=dispatcher
+                ),
                 NotFoundUTError,
             )
         self.assertIn("[Dispatcher.find_function]", s.getvalue())
@@ -628,7 +637,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
 
         model = Model()
         x = torch.randn(2, 4)
-        onx = to_onnx(model, (x,), optimize=False)
+        onx = to_onnx(model, (x,), target_opset=21, optimize=False)
         results = check_model_weights(model, onx)
         by_name = {name: (status, orig_shape) for name, status, orig_shape in results}
         self.assertIn("linear.weight", by_name)
@@ -661,7 +670,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
 
         model = Model()
         x = torch.randn(2, 4)
-        onx = to_onnx(model, (x,), optimize=False)
+        onx = to_onnx(model, (x,), target_opset=21, optimize=False)
 
         # Manually transpose the initializer to simulate a folded Transpose node.
         weight = dict(model.named_parameters())["linear.weight"].detach().numpy()
@@ -704,7 +713,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
 
         model = Model()
         x = torch.randn(2, 4)
-        onx = to_onnx(model, (x,), optimize=False)
+        onx = to_onnx(model, (x,), target_opset=21, optimize=False)
 
         # Rename the initializer to something not in the model.
         extra = oh.make_tensor(

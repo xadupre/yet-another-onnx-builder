@@ -20,7 +20,7 @@ class TestSklearnDummyRegressor(ExtTestCase):
         for dtype in (np.float32, np.float64):
             Xd = X.astype(dtype)
             estimator.fit(Xd, self._y)
-            onx = to_onnx(estimator, (Xd,))
+            onx = to_onnx(estimator, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
@@ -53,7 +53,7 @@ class TestSklearnDummyRegressor(ExtTestCase):
             Xd = X.astype(dtype)
             reg = DummyRegressor(strategy="mean")
             reg.fit(Xd, y_multi)
-            onx = to_onnx(reg, (Xd,))
+            onx = to_onnx(reg, (Xd,), target_opset=21)
 
             expected = reg.predict(Xd).astype(dtype)
             ref = ExtendedReferenceEvaluator(onx)
@@ -75,7 +75,7 @@ class TestSklearnDummyClassifier(ExtTestCase):
         for dtype in (np.float32, np.float64):
             Xd = X.astype(dtype)
             estimator.fit(Xd, y)
-            onx = to_onnx(estimator, (Xd,))
+            onx = to_onnx(estimator, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -115,7 +115,7 @@ class TestSklearnDummyClassifier(ExtTestCase):
             clf = DummyClassifier(strategy=strategy)
             clf.fit(self._X, self._y)
             with self.assertRaises(NotImplementedError):
-                to_onnx(clf, (self._X,))
+                to_onnx(clf, (self._X,), target_opset=21)
 
 
 if __name__ == "__main__":

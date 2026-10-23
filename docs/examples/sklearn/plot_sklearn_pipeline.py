@@ -65,7 +65,7 @@ for name, step in pipe.steps:
 # (a NumPy array) so it can infer the input dtype and shape.
 # The first axis is automatically treated as the batch dimension.
 
-onx = to_onnx(pipe, (X_train[:1],))
+onx = to_onnx(pipe, (X_train[:1],), target_opset=21)
 
 print(f"\nONNX model opset : {onx.opset_import[0].version}")
 print(f"Number of nodes  : {len(onx.graph.node)}")
@@ -115,7 +115,7 @@ pipe_mc = Pipeline([("scaler", StandardScaler()), ("clf", LogisticRegression(max
 pipe_mc.fit(X_mc, y_mc)
 
 X_test_mc = rng.standard_normal((30, 4)).astype(np.float32)
-onx_mc = to_onnx(pipe_mc, (X_test_mc[:1],))
+onx_mc = to_onnx(pipe_mc, (X_test_mc[:1],), target_opset=21)
 
 ref_mc = onnxruntime.InferenceSession(
     onx_mc.SerializeToString(), providers=["CPUExecutionProvider"]

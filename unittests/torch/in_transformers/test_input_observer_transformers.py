@@ -31,7 +31,11 @@ class TestInputObserverTransformers(ExtTestCase):
             ds = observer.infer_dynamic_shapes(set_batch_dimension_for=True)
 
             onx = to_onnx(
-                model.model.layers[0].self_attn, args=(), kwargs=kwargs, dynamic_shapes=ds
+                model.model.layers[0].self_attn,
+                target_opset=21,
+                args=(),
+                kwargs=kwargs,
+                dynamic_shapes=ds,
             )
 
             data = observer.check_discrepancies(onx, progress_bar=False)

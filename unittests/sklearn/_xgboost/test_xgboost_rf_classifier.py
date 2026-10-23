@@ -31,7 +31,7 @@ class TestXGBoostRFClassifier(ExtTestCase):
         clf = XGBRFClassifier(n_estimators=5, max_depth=3, random_state=0)
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -60,7 +60,7 @@ class TestXGBoostRFClassifier(ExtTestCase):
         clf = XGBRFClassifier(n_estimators=5, max_depth=3, random_state=0)
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -167,7 +167,7 @@ class TestXGBoostRFClassifier(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]

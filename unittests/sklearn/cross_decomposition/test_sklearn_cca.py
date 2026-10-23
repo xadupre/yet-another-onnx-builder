@@ -20,7 +20,7 @@ class TestSklearnCCA(ExtTestCase):
         cca = CCA(n_components=2)
         cca.fit(X, Y)
 
-        onx = to_onnx(cca, (X,))
+        onx = to_onnx(cca, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
@@ -47,7 +47,7 @@ class TestSklearnCCA(ExtTestCase):
         cca = CCA(n_components=2)
         cca.fit(X, Y)
 
-        onx = to_onnx(cca, (X,))
+        onx = to_onnx(cca, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -72,7 +72,7 @@ class TestSklearnCCA(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("cca", CCA(n_components=2))])
         pipe.fit(X, Y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]

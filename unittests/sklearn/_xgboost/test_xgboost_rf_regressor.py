@@ -25,7 +25,7 @@ class TestXGBoostRFRegressor(ExtTestCase):
         reg = XGBRFRegressor(n_estimators=5, max_depth=3, random_state=0)
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -87,7 +87,7 @@ class TestXGBoostRFRegressor(ExtTestCase):
         )
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sigmoid", op_types)
@@ -119,7 +119,7 @@ class TestXGBoostRFRegressor(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
         predictions = results[0]

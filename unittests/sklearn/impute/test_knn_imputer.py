@@ -19,7 +19,7 @@ class TestKNNImputer(ExtTestCase):
         imp = KNNImputer(n_neighbors=2, weights="uniform")
         imp.fit(X)
 
-        onx = to_onnx(imp, (X,))
+        onx = to_onnx(imp, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -39,7 +39,7 @@ class TestKNNImputer(ExtTestCase):
         imp = KNNImputer(n_neighbors=2, weights="distance")
         imp.fit(X)
 
-        onx = to_onnx(imp, (X,))
+        onx = to_onnx(imp, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -59,7 +59,7 @@ class TestKNNImputer(ExtTestCase):
         imp = KNNImputer(n_neighbors=2)
         imp.fit(X)
 
-        onx = to_onnx(imp, (X,))
+        onx = to_onnx(imp, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -80,7 +80,7 @@ class TestKNNImputer(ExtTestCase):
         imp = KNNImputer(n_neighbors=2)
         imp.fit(X_train)
 
-        onx = to_onnx(imp, (X_test,))
+        onx = to_onnx(imp, (X_test,), target_opset=21)
 
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_test})[0]
@@ -102,7 +102,7 @@ class TestKNNImputer(ExtTestCase):
         imp = KNNImputer(n_neighbors=3)
         imp.fit(X)
 
-        onx = to_onnx(imp, (X,))
+        onx = to_onnx(imp, (X,), target_opset=21)
 
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X})[0]
@@ -118,7 +118,7 @@ class TestKNNImputer(ExtTestCase):
         imp = KNNImputer(n_neighbors=1)
         imp.fit(X)
 
-        onx = to_onnx(imp, (X,))
+        onx = to_onnx(imp, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -143,7 +143,7 @@ class TestKNNImputer(ExtTestCase):
         imp = KNNImputer(n_neighbors=5, weights="distance")
         imp.fit(X)
 
-        onx = to_onnx(imp, (X,))
+        onx = to_onnx(imp, (X,), target_opset=21)
 
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X})[0]
@@ -225,7 +225,7 @@ class TestKNNImputer(ExtTestCase):
         imp.fit(X)
 
         with self.assertRaises(NotImplementedError):
-            to_onnx(imp, (X,))
+            to_onnx(imp, (X,), target_opset=21)
 
     def test_knn_imputer_pipeline(self):
         """KNNImputer inside a pipeline followed by a classifier."""
@@ -239,7 +239,7 @@ class TestKNNImputer(ExtTestCase):
         pipe = Pipeline([("imp", KNNImputer(n_neighbors=2)), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

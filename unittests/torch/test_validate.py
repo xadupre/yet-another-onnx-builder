@@ -375,6 +375,7 @@ class TestValidateModel(ExtTestCase):
         try:
             _summary, data = validate_model(
                 "arnir0/Tiny-LLM",
+                opset=21,
                 tokenized_inputs=tokenized,
                 random_weights=True,
                 max_new_tokens=3,
@@ -409,6 +410,7 @@ class TestValidateModel(ExtTestCase):
         try:
             _summary, data = validate_model(
                 "arnir0/Tiny-LLM",
+                opset=21,
                 tokenized_inputs=tokenized,
                 random_weights=True,
                 max_new_tokens=3,
@@ -462,6 +464,7 @@ class TestValidateModel(ExtTestCase):
         }
         _summary, data = validate_model(
             "arnir0/Tiny-LLM",
+            opset=21,
             tokenized_inputs=tokenized,
             random_weights=True,
             max_new_tokens=3,
@@ -489,6 +492,7 @@ class TestValidateModel(ExtTestCase):
         }
         summary, data = validate_model(
             "arnir0/Tiny-LLM",
+            opset=21,
             tokenized_inputs=tokenized,
             random_weights=True,
             max_new_tokens=3,
@@ -520,6 +524,7 @@ class TestValidateModel(ExtTestCase):
         }
         summary, _data = validate_model(
             "arnir0/Tiny-LLM",
+            opset=21,
             tokenized_inputs=tokenized,
             random_weights=True,
             max_new_tokens=3,
@@ -551,6 +556,7 @@ class TestValidateModel(ExtTestCase):
         with tempfile.TemporaryDirectory() as tmp:
             _summary, data = validate_model(
                 "arnir0/Tiny-LLM",
+                opset=21,
                 tokenized_inputs=tokenized,
                 random_weights=True,
                 max_new_tokens=3,

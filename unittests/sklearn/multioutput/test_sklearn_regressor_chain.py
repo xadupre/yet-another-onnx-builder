@@ -26,7 +26,7 @@ class TestSklearnRegressorChain(ExtTestCase):
         rc = RegressorChain(Ridge())
         rc.fit(self._X, self._y)
 
-        onx = to_onnx(rc, (self._X,))
+        onx = to_onnx(rc, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -46,7 +46,7 @@ class TestSklearnRegressorChain(ExtTestCase):
         rc = RegressorChain(Ridge())
         rc.fit(X64, y64)
 
-        onx = to_onnx(rc, (X64,))
+        onx = to_onnx(rc, (X64,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X64})
@@ -64,7 +64,7 @@ class TestSklearnRegressorChain(ExtTestCase):
         rc = RegressorChain(Ridge(), order=[2, 0, 1])
         rc.fit(self._X, self._y)
 
-        onx = to_onnx(rc, (self._X,))
+        onx = to_onnx(rc, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -84,7 +84,7 @@ class TestSklearnRegressorChain(ExtTestCase):
         rc = RegressorChain(Ridge(), order=[2, 0, 1])
         rc.fit(X64, y64)
 
-        onx = to_onnx(rc, (X64,))
+        onx = to_onnx(rc, (X64,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X64})
@@ -99,7 +99,7 @@ class TestSklearnRegressorChain(ExtTestCase):
         rc = RegressorChain(Ridge())
         rc.fit(self._X, y2)
 
-        onx = to_onnx(rc, (self._X,))
+        onx = to_onnx(rc, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -114,7 +114,7 @@ class TestSklearnRegressorChain(ExtTestCase):
         rc = RegressorChain(DecisionTreeRegressor(max_depth=2, random_state=0))
         rc.fit(self._X, self._y)
 
-        onx = to_onnx(rc, (self._X,))
+        onx = to_onnx(rc, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -128,7 +128,7 @@ class TestSklearnRegressorChain(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("rc", RegressorChain(Ridge()))])
         pipe.fit(self._X, self._y)
 
-        onx = to_onnx(pipe, (self._X,))
+        onx = to_onnx(pipe, (self._X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X})
@@ -142,7 +142,7 @@ class TestSklearnRegressorChain(ExtTestCase):
         rc = RegressorChain(Ridge())
         rc.fit(self._X, self._y)
 
-        onx = to_onnx(rc, (self._X,))
+        onx = to_onnx(rc, (self._X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         # Three sub-estimators → three Gemm nodes (Ridge → Gemm)
@@ -157,7 +157,7 @@ class TestSklearnRegressorChain(ExtTestCase):
         rc = RegressorChain(Ridge(), order=[2, 0, 1])
         rc.fit(self._X, self._y)
 
-        onx = to_onnx(rc, (self._X,))
+        onx = to_onnx(rc, (self._X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         # Three sub-estimators → three Gemm nodes

@@ -18,7 +18,7 @@ class TestPolynomialFeatures(ExtTestCase):
         pf = PolynomialFeatures(degree=2)
         pf.fit(X)
 
-        onx = to_onnx(pf, (X,))
+        onx = to_onnx(pf, (X,), target_opset=21)
 
         # Verify graph contains expected ops
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -46,7 +46,7 @@ class TestPolynomialFeatures(ExtTestCase):
         pf = PolynomialFeatures(degree=1)
         pf.fit(X)
 
-        onx = to_onnx(pf, (X,))
+        onx = to_onnx(pf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -65,7 +65,7 @@ class TestPolynomialFeatures(ExtTestCase):
         pf = PolynomialFeatures(degree=2, include_bias=False)
         pf.fit(X)
 
-        onx = to_onnx(pf, (X,))
+        onx = to_onnx(pf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -84,7 +84,7 @@ class TestPolynomialFeatures(ExtTestCase):
         pf = PolynomialFeatures(degree=2, interaction_only=True)
         pf.fit(X)
 
-        onx = to_onnx(pf, (X,))
+        onx = to_onnx(pf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -103,7 +103,7 @@ class TestPolynomialFeatures(ExtTestCase):
         pf = PolynomialFeatures(degree=3)
         pf.fit(X)
 
-        onx = to_onnx(pf, (X,))
+        onx = to_onnx(pf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -123,7 +123,7 @@ class TestPolynomialFeatures(ExtTestCase):
         pf = PolynomialFeatures(degree=2)
         pf.fit(X)
 
-        onx = to_onnx(pf, (X,))
+        onx = to_onnx(pf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -145,7 +145,7 @@ class TestPolynomialFeatures(ExtTestCase):
         pipe = Pipeline([("poly", PolynomialFeatures(degree=2)), ("lr", LinearRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]

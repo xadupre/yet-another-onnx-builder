@@ -19,7 +19,7 @@ class TestTruncatedSVD(ExtTestCase):
         svd = TruncatedSVD(n_components=2)
         svd.fit(X)
 
-        onx = to_onnx(svd, (X,))
+        onx = to_onnx(svd, (X,), target_opset=21)
 
         # TruncatedSVD does not centre the data, so there should be no Sub node.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -45,7 +45,7 @@ class TestTruncatedSVD(ExtTestCase):
         svd = TruncatedSVD(n_components=3)
         svd.fit(X)
 
-        onx = to_onnx(svd, (X,))
+        onx = to_onnx(svd, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -69,7 +69,7 @@ class TestTruncatedSVD(ExtTestCase):
         pipe = Pipeline([("svd", TruncatedSVD(n_components=3)), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("MatMul", op_types)

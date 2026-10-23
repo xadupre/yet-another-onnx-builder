@@ -38,7 +38,7 @@ class TestSklearnLocalOutlierFactor(ExtTestCase):
         Xtest = X_test.astype(dtype)
         clf = LocalOutlierFactor(n_neighbors=n_neighbors, novelty=True, **kwargs)
         clf.fit(Xd)
-        onx = to_onnx(clf, (Xd,))
+        onx = to_onnx(clf, (Xd,), target_opset=21)
 
         output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -96,7 +96,7 @@ class TestSklearnLocalOutlierFactor(ExtTestCase):
         clf = LocalOutlierFactor(n_neighbors=3, novelty=False)
         clf.fit(Xd)
         with self.assertRaises(ValueError):
-            to_onnx(clf, (Xd,))
+            to_onnx(clf, (Xd,), target_opset=21)
 
     # ── pipeline ─────────────────────────────────────────────────────────────
 
@@ -108,7 +108,7 @@ class TestSklearnLocalOutlierFactor(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", clf)])
         pipe.fit(Xd)
 
-        onx = to_onnx(pipe, (Xd,))
+        onx = to_onnx(pipe, (Xd,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": Xtest})
@@ -127,7 +127,7 @@ class TestSklearnLocalOutlierFactor(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("clf", clf)])
         pipe.fit(Xd)
 
-        onx = to_onnx(pipe, (Xd,))
+        onx = to_onnx(pipe, (Xd,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": Xtest})

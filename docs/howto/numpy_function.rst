@@ -83,7 +83,7 @@ numpy implementation.
     X_sample = rng.standard_normal((8, 4)).astype(np.float32)
     X_test = rng.standard_normal((5, 4)).astype(np.float32)
 
-    onx = trace_numpy_to_onnx(normalize_rows, X_sample)
+    onx = trace_numpy_to_onnx(normalize_rows, X_sample, target_opset=21)
     sess = onnxruntime.InferenceSession(
         onx.SerializeToString(), providers=["CPUExecutionProvider"]
     )

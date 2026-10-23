@@ -53,7 +53,7 @@ rf = RandomForestClassifier(n_estimators=3, max_depth=3, random_state=0).fit(X_t
 # *i*-th character is ``'1'`` when node *i* was visited and ``'0'`` otherwise.
 
 opts_path = ConvertOptions(decision_path=True)
-onx_dt_path = to_onnx(dt, (X_train,), convert_options=opts_path)
+onx_dt_path = to_onnx(dt, (X_train,), target_opset=21, convert_options=opts_path)
 
 print("=== DecisionTreeClassifier with decision_path ===")
 print(f"Model outputs: {[o.name for o in onx_dt_path.graph.output]}")
@@ -87,7 +87,7 @@ print("Labels, probabilities, and decision paths match sklearn ✓")
 # :meth:`~sklearn.tree.DecisionTreeClassifier.apply`.
 
 opts_leaf = ConvertOptions(decision_leaf=True)
-onx_dt_leaf = to_onnx(dt, (X_train,), convert_options=opts_leaf)
+onx_dt_leaf = to_onnx(dt, (X_train,), target_opset=21, convert_options=opts_leaf)
 
 print("\n=== DecisionTreeClassifier with decision_leaf ===")
 print(f"Model outputs: {[o.name for o in onx_dt_leaf.graph.output]}")
@@ -116,7 +116,7 @@ print("Labels, probabilities, and leaf indices match sklearn ✓")
 
 n_estimators = rf.n_estimators
 opts_leaf_rf = ConvertOptions(decision_leaf=True)
-onx_rf_leaf = to_onnx(rf, (X_train,), convert_options=opts_leaf_rf)
+onx_rf_leaf = to_onnx(rf, (X_train,), target_opset=21, convert_options=opts_leaf_rf)
 
 print("\n=== RandomForestClassifier with decision_leaf ===")
 print(f"Model outputs: {[o.name for o in onx_rf_leaf.graph.output]}")
@@ -146,7 +146,7 @@ print("Labels, probabilities, and leaf indices match sklearn ✓")
 # forest with *k* trees the output shape is ``(N, k)``.
 
 opts_path_rf = ConvertOptions(decision_path=True)
-onx_rf_path = to_onnx(rf, (X_train,), convert_options=opts_path_rf)
+onx_rf_path = to_onnx(rf, (X_train,), target_opset=21, convert_options=opts_path_rf)
 
 print("\n=== RandomForestClassifier with decision_path ===")
 print(f"Model outputs: {[o.name for o in onx_rf_path.graph.output]}")

@@ -34,7 +34,7 @@ class TestSklearnCalibratedClassifierCV(ExtTestCase):
         """Convert, run, and compare outputs for both float32 and float64."""
         for dtype in (np.float32, np.float64):
             Xd = X.astype(dtype)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -87,7 +87,7 @@ class TestSklearnCalibratedClassifierCV(ExtTestCase):
                 ("clf", CalibratedClassifierCV(LogisticRegression(), cv=2)),
             ]
         ).fit(X, y)
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
         sess = self.check_ort(onx)
         ort_labels = sess.run(None, {"X": X})[0]
         self.assertEqualArray(pipe.predict(X), ort_labels)
@@ -103,7 +103,7 @@ class TestSklearnCalibratedClassifierCV(ExtTestCase):
         clf = CalibratedClassifierCV(base, method="sigmoid", ensemble=False).fit(X_train, y_train)
 
         expected = clf.predict_proba(X_test).astype(X_test.dtype)
-        onx = to_onnx(clf, (X_test,))
+        onx = to_onnx(clf, (X_test,), target_opset=21)
         got = self.check_ort(onx).run(None, {"X": X_test})[1]
 
         self.assertEqualArray(expected, got, atol=1e-5)
@@ -119,7 +119,7 @@ class TestSklearnCalibratedClassifierCV(ExtTestCase):
         clf = CalibratedClassifierCV(base, method="sigmoid", ensemble=True).fit(X_train, y_train)
 
         expected = clf.predict_proba(X_test).astype(X_test.dtype)
-        onx = to_onnx(clf, (X_test,))
+        onx = to_onnx(clf, (X_test,), target_opset=21)
         got = self.check_ort(onx).run(None, {"X": X_test})[1]
 
         self.assertEqualArray(expected, got, atol=1e-5)

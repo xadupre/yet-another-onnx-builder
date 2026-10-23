@@ -18,7 +18,7 @@ class TestBinarizer(ExtTestCase):
         binarizer = Binarizer()
         binarizer.fit(X)
 
-        onx = to_onnx(binarizer, (X,))
+        onx = to_onnx(binarizer, (X,), target_opset=21)
 
         # Check graph structure: should use Greater + Cast
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -42,7 +42,7 @@ class TestBinarizer(ExtTestCase):
         binarizer = Binarizer(threshold=1.0)
         binarizer.fit(X)
 
-        onx = to_onnx(binarizer, (X,))
+        onx = to_onnx(binarizer, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -62,7 +62,7 @@ class TestBinarizer(ExtTestCase):
         binarizer = Binarizer(threshold=0.3)
         binarizer.fit(X)
 
-        onx = to_onnx(binarizer, (X,))
+        onx = to_onnx(binarizer, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -86,7 +86,7 @@ class TestBinarizer(ExtTestCase):
         pipe = Pipeline([("bin", Binarizer(threshold=0.0)), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Greater", op_types)

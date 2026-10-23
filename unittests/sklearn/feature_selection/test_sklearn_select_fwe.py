@@ -24,7 +24,7 @@ class TestSelectFwe(ExtTestCase):
         sel = SelectFwe(score_func=f_classif, alpha=0.05)
         sel.fit(X, y)
 
-        onx = to_onnx(sel, (X,))
+        onx = to_onnx(sel, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(any(op_type in {"Gather", "Slice"} for op_type in op_types))
@@ -46,7 +46,7 @@ class TestSelectFwe(ExtTestCase):
         sel = SelectFwe(score_func=f_classif, alpha=0.05)
         sel.fit(X, y)
 
-        onx = to_onnx(sel, (X,))
+        onx = to_onnx(sel, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -65,7 +65,7 @@ class TestSelectFwe(ExtTestCase):
         sel = SelectFwe(score_func=f_classif, alpha=0.5)
         sel.fit(X, y)
 
-        onx = to_onnx(sel, (X,))
+        onx = to_onnx(sel, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -88,7 +88,7 @@ class TestSelectFwe(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Gather", op_types)
@@ -119,7 +119,7 @@ class TestSelectFwe(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

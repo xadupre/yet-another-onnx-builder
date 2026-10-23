@@ -52,7 +52,7 @@ class TestTensorflowActivationsConverterParity(ExtTestCase):
             Absolute tolerance for the output comparison.
         """
         # ---- yobx conversion ----
-        onx_yobx = to_onnx(tf_fn, (X,))
+        onx_yobx = to_onnx(tf_fn, (X,), target_opset=21)
         yobx_input_name = onx_yobx.graph.input[0].name
         yobx_out = _ort_run(onx_yobx, {yobx_input_name: X})[0]
 

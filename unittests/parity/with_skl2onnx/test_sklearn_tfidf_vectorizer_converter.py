@@ -7,6 +7,7 @@ import unittest
 import numpy as np
 from yobx.ext_test_case import ExtTestCase, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
+from unittests.parity.with_skl2onnx._common import TARGET_OPSET
 
 # Corpus from sklearn-onnx's test suite (natural-language sentences with
 # punctuation so that sklearn's default word-boundary regex tokenizer is
@@ -60,7 +61,7 @@ class TestSklearnTfidfVectorizerConverter(ExtTestCase):
         tv = TfidfVectorizer(ngram_range=(1, 1), norm=None)
         tv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(tv)
-        onx = to_onnx(tv, (X,))
+        onx = to_onnx(tv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -79,7 +80,7 @@ class TestSklearnTfidfVectorizerConverter(ExtTestCase):
         tv = TfidfVectorizer(ngram_range=(2, 2), norm=None)
         tv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(tv)
-        onx = to_onnx(tv, (X,))
+        onx = to_onnx(tv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -98,7 +99,7 @@ class TestSklearnTfidfVectorizerConverter(ExtTestCase):
         tv = TfidfVectorizer(ngram_range=(1, 2), norm=None)
         tv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(tv)
-        onx = to_onnx(tv, (X,))
+        onx = to_onnx(tv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -117,7 +118,7 @@ class TestSklearnTfidfVectorizerConverter(ExtTestCase):
         tv = TfidfVectorizer(ngram_range=(1, 2), norm="l1")
         tv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(tv)
-        onx = to_onnx(tv, (X,))
+        onx = to_onnx(tv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -136,7 +137,7 @@ class TestSklearnTfidfVectorizerConverter(ExtTestCase):
         tv = TfidfVectorizer(ngram_range=(1, 2), norm="l2")
         tv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(tv)
-        onx = to_onnx(tv, (X,))
+        onx = to_onnx(tv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -155,7 +156,7 @@ class TestSklearnTfidfVectorizerConverter(ExtTestCase):
         tv = TfidfVectorizer(ngram_range=(1, 3), norm=None)
         tv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(tv)
-        onx = to_onnx(tv, (X,))
+        onx = to_onnx(tv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -178,7 +179,7 @@ class TestSklearnTfidfVectorizerConverter(ExtTestCase):
         tv = TfidfVectorizer(binary=True)
         tv.fit(_SKL2ONNX_CORPUS)
         X = self._tokenize(tv)
-        onx = to_onnx(tv, (X,))
+        onx = to_onnx(tv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -208,7 +209,7 @@ class TestSklearnTfidfVectorizerConverter(ExtTestCase):
             "WZZ ZZ Is this the first document?",
         ]
         X = _sklearn_tokenize(tv, oov_docs)
-        onx = to_onnx(tv, (X,))
+        onx = to_onnx(tv, (X,), target_opset=TARGET_OPSET)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]

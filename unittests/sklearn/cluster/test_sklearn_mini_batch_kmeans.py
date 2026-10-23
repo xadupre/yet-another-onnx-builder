@@ -23,7 +23,7 @@ class TestMiniBatchKMeans(ExtTestCase):
         km = MiniBatchKMeans(n_clusters=3, random_state=0, n_init=10)
         km.fit(X)
 
-        onx = to_onnx(km, (X,))
+        onx = to_onnx(km, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMin", op_types)
@@ -49,7 +49,7 @@ class TestMiniBatchKMeans(ExtTestCase):
         km = MiniBatchKMeans(n_clusters=3, random_state=0, n_init=10)
         km.fit(X)
 
-        onx = to_onnx(km, (X,))
+        onx = to_onnx(km, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -75,7 +75,7 @@ class TestMiniBatchKMeans(ExtTestCase):
         km = MiniBatchKMeans(n_clusters=4, random_state=1, n_init=10)
         km.fit(X)
 
-        onx = to_onnx(km, (X,))
+        onx = to_onnx(km, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -97,7 +97,7 @@ class TestMiniBatchKMeans(ExtTestCase):
         km = MiniBatchKMeans(n_clusters=4, random_state=1, n_init=10)
         km.fit(X)
 
-        onx = to_onnx(km, (X,))
+        onx = to_onnx(km, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -130,7 +130,7 @@ class TestMiniBatchKMeans(ExtTestCase):
         )
         pipe.fit(X)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

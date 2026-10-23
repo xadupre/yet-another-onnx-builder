@@ -19,7 +19,7 @@ class TestBirch(ExtTestCase):
         model = Birch(n_clusters=3)
         model.fit(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMin", op_types)
@@ -45,7 +45,7 @@ class TestBirch(ExtTestCase):
         model = Birch(n_clusters=4)
         model.fit(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -70,7 +70,7 @@ class TestBirch(ExtTestCase):
         model = Birch(n_clusters=2)
         model.fit(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -109,7 +109,7 @@ class TestBirch(ExtTestCase):
                 X = X32.astype(dtype)
                 model = Birch(n_clusters=3)
                 model.fit(X)
-                onx = to_onnx(model, (X,))
+                onx = to_onnx(model, (X,), target_opset=21)
 
                 ref = ExtendedReferenceEvaluator(onx)
                 results = ref.run(None, {"X": X})
@@ -133,7 +133,7 @@ class TestBirch(ExtTestCase):
                 X = X32.astype(dtype)
                 model = Birch(n_clusters=4)
                 model.fit(X)
-                onx = to_onnx(model, (X,))
+                onx = to_onnx(model, (X,), target_opset=21)
 
                 ref = ExtendedReferenceEvaluator(onx)
                 results = ref.run(None, {"X": X})
@@ -181,7 +181,7 @@ class TestBirch(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("birch", Birch(n_clusters=3))])
         pipe.fit(X)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

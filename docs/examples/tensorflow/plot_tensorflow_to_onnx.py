@@ -58,7 +58,7 @@ rng = np.random.default_rng(0)
 X = rng.standard_normal((5, 4)).astype(np.float32)
 
 model_linear = tf.keras.Sequential([tf.keras.layers.Dense(3, input_shape=(4,))])
-onx_linear = to_onnx(model_linear, (X,))
+onx_linear = to_onnx(model_linear, (X,), target_opset=21)
 
 print("Opset            :", onx_linear.opset_import[0].version)
 print("Number of nodes  :", len(onx_linear.graph.node))
@@ -106,7 +106,7 @@ mlp = tf.keras.Sequential(
 )
 _ = mlp(X_train)
 
-onx_mlp = to_onnx(mlp, (X_train[:1],))
+onx_mlp = to_onnx(mlp, (X_train[:1],), target_opset=21)
 
 op_types = [n.op_type for n in onx_mlp.graph.node]
 print("\nOp-types in the MLP graph:", op_types)
@@ -136,7 +136,7 @@ print("MLP predictions match ✓")
 # explicitly to name the dynamic axis, which is useful when deploying the
 # model with variable-length batches.
 
-onx_dyn = to_onnx(mlp, (X_train[:1],), dynamic_shapes=({0: "batch"},))
+onx_dyn = to_onnx(mlp, (X_train[:1],), target_opset=21, dynamic_shapes=({0: "batch"},))
 
 input_shape = onx_dyn.graph.input[0].type.tensor_type.shape
 batch_dim = input_shape.dim[0]
@@ -176,7 +176,9 @@ def custom_relu_converter(g, sts, outputs, op):
     )
 
 
-onx_custom = to_onnx(mlp, (X_train[:1],), extra_converters={"Relu": custom_relu_converter})
+onx_custom = to_onnx(
+    mlp, (X_train[:1],), target_opset=21, extra_converters={"Relu": custom_relu_converter}
+)
 
 custom_op_types = [n.op_type for n in onx_custom.graph.node]
 print("\nOp-types with custom converter:", custom_op_types)

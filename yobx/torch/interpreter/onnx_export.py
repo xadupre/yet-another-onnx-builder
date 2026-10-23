@@ -6,7 +6,6 @@ import time
 import warnings
 from typing import Any, Callable, Dict, List, Optional, Sequence, Set, Tuple, Union
 from onnx_light.onnx import ModelProto, ValueInfoProto
-from onnx_light.onnx.defs import onnx_opset_version
 from yobx.container.model_container import ModelContainer
 from ...container import ExportArtifact, ExportReport
 from ...helpers import string_type
@@ -1113,7 +1112,7 @@ def to_onnx(
     from ... import DEFAULT_TARGET_OPSET
 
     if target_opset is None:
-        target_opset = min(DEFAULT_TARGET_OPSET, onnx_opset_version() - 1)
+        target_opset = DEFAULT_TARGET_OPSET
     if options is None:
         options = (
             OptimizationOptions(patterns="default+onnxruntime")

@@ -23,7 +23,7 @@ class TestPowerTransformer(ExtTestCase):
         pt = PowerTransformer()
         pt.fit(X)
 
-        onx = to_onnx(pt, (X,))
+        onx = to_onnx(pt, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -43,7 +43,7 @@ class TestPowerTransformer(ExtTestCase):
         pt = PowerTransformer(standardize=False)
         pt.fit(X)
 
-        onx = to_onnx(pt, (X,))
+        onx = to_onnx(pt, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -63,7 +63,7 @@ class TestPowerTransformer(ExtTestCase):
         pt = PowerTransformer(method="box-cox")
         pt.fit(X)
 
-        onx = to_onnx(pt, (X,))
+        onx = to_onnx(pt, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -83,7 +83,7 @@ class TestPowerTransformer(ExtTestCase):
         pt = PowerTransformer(method="box-cox", standardize=False)
         pt.fit(X)
 
-        onx = to_onnx(pt, (X,))
+        onx = to_onnx(pt, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -105,7 +105,7 @@ class TestPowerTransformer(ExtTestCase):
         y = (X[:, 0] > 0).astype(np.int64)
         pipe = Pipeline([("pt", PowerTransformer()), ("clf", LogisticRegression())]).fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

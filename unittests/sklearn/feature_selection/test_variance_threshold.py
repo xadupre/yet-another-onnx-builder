@@ -25,7 +25,7 @@ class TestVarianceThreshold(ExtTestCase):
         sel = VarianceThreshold(threshold=0.1)
         sel.fit(X)
 
-        onx = to_onnx(sel, (X,))
+        onx = to_onnx(sel, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(any(op_type in {"Gather", "Slice"} for op_type in op_types))
@@ -47,7 +47,7 @@ class TestVarianceThreshold(ExtTestCase):
         sel = VarianceThreshold(threshold=0.1)
         sel.fit(X)
 
-        onx = to_onnx(sel, (X,))
+        onx = to_onnx(sel, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -69,7 +69,7 @@ class TestVarianceThreshold(ExtTestCase):
         sel = VarianceThreshold()
         sel.fit(X)
 
-        onx = to_onnx(sel, (X,))
+        onx = to_onnx(sel, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -88,7 +88,7 @@ class TestVarianceThreshold(ExtTestCase):
         sel = VarianceThreshold(threshold=0.0)
         sel.fit(X)
 
-        onx = to_onnx(sel, (X,))
+        onx = to_onnx(sel, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -108,7 +108,7 @@ class TestVarianceThreshold(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Gather", op_types)
@@ -140,7 +140,7 @@ class TestVarianceThreshold(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

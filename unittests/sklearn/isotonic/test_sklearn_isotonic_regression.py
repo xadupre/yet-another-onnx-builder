@@ -23,7 +23,7 @@ class TestIsotonicRegressionConverter(ExtTestCase):
             estimator.fit(Xd, y)
 
             # Test with 1D input
-            onx = to_onnx(estimator, (Xd,))
+            onx = to_onnx(estimator, (Xd,), target_opset=21)
             ref = ExtendedReferenceEvaluator(onx)
             result = ref.run(None, {"X": Xd})[0]
             expected = estimator.predict(Xd).astype(dtype)
@@ -35,7 +35,7 @@ class TestIsotonicRegressionConverter(ExtTestCase):
 
             # Test with 2D input (N, 1)
             Xd_2d = Xd.reshape(-1, 1)
-            onx_2d = to_onnx(estimator, (Xd_2d,))
+            onx_2d = to_onnx(estimator, (Xd_2d,), target_opset=21)
             ref_2d = ExtendedReferenceEvaluator(onx_2d)
             result_2d = ref_2d.run(None, {"X": Xd_2d})[0]
             self.assertEqualArray(expected, result_2d, atol=atol)
@@ -67,7 +67,7 @@ class TestIsotonicRegressionConverter(ExtTestCase):
         ir.fit(X_train, y_train)
 
         X_test = np.array([0.0, 1.0, 5.0, 9.0, 10.0], dtype=np.float32)
-        onx = to_onnx(ir, (X_test,))
+        onx = to_onnx(ir, (X_test,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_test})[0]
@@ -89,7 +89,7 @@ class TestIsotonicRegressionConverter(ExtTestCase):
         ir.fit(X_train, y_train)
 
         X_test = np.array([1.5, 3.0, 5.5, 8.0], dtype=np.float32)
-        onx = to_onnx(ir, (X_test,))
+        onx = to_onnx(ir, (X_test,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_test})[0]
@@ -114,7 +114,7 @@ class TestIsotonicRegressionConverter(ExtTestCase):
         self.assertEqual(len(ir.X_thresholds_), 1)
 
         X_test = np.array([1.0, 3.0, 5.0], dtype=np.float32)
-        onx = to_onnx(ir, (X_test,))
+        onx = to_onnx(ir, (X_test,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_test})[0]
@@ -137,7 +137,7 @@ class TestIsotonicRegressionConverter(ExtTestCase):
         ir.fit(X_train, y_train)
 
         X_test = np.sort(rng.standard_normal(10)).astype(np.float64)
-        onx = to_onnx(ir, (X_test,))
+        onx = to_onnx(ir, (X_test,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_test})[0]

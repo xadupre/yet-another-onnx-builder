@@ -31,7 +31,7 @@ class TestLGBMClassifier(ExtTestCase):
         clf = LGBMClassifier(n_estimators=5, max_depth=3, random_state=0, verbose=-1)
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -60,7 +60,7 @@ class TestLGBMClassifier(ExtTestCase):
         clf = LGBMClassifier(n_estimators=5, max_depth=3, random_state=0, verbose=-1)
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -166,7 +166,7 @@ class TestLGBMClassifier(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
         label, proba = results[0], results[1]
@@ -198,7 +198,7 @@ class TestLGBMClassifier(ExtTestCase):
         )
         clf.fit(X, y, categorical_feature=[3])
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
         sess = self.check_ort(onx)
         results = sess.run(None, {"X": X})
         label, proba = results[0], results[1]
@@ -218,7 +218,7 @@ class TestLGBMClassifier(ExtTestCase):
         )
         clf.fit(X, y, categorical_feature=[3])
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
         sess = self.check_ort(onx)
         results = sess.run(None, {"X": X})
         label, proba = results[0], results[1]

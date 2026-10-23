@@ -18,7 +18,7 @@ class TestOneHotEncoder(ExtTestCase):
         enc = OneHotEncoder(handle_unknown="ignore")
         enc.fit(X)
 
-        onx = to_onnx(enc, (X,))
+        onx = to_onnx(enc, (X,), target_opset=21)
 
         # Check graph contains Equal and Cast nodes
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -44,7 +44,7 @@ class TestOneHotEncoder(ExtTestCase):
         enc = OneHotEncoder(handle_unknown="ignore")
         enc.fit(X)
 
-        onx = to_onnx(enc, (X,))
+        onx = to_onnx(enc, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -63,7 +63,7 @@ class TestOneHotEncoder(ExtTestCase):
         enc = OneHotEncoder(drop="first", handle_unknown="ignore")
         enc.fit(X)
 
-        onx = to_onnx(enc, (X,))
+        onx = to_onnx(enc, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
@@ -87,7 +87,7 @@ class TestOneHotEncoder(ExtTestCase):
         enc = OneHotEncoder(drop="if_binary", handle_unknown="ignore")
         enc.fit(X)
 
-        onx = to_onnx(enc, (X,))
+        onx = to_onnx(enc, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -108,7 +108,7 @@ class TestOneHotEncoder(ExtTestCase):
         enc = OneHotEncoder(handle_unknown="ignore")
         enc.fit(X_train)
 
-        onx = to_onnx(enc, (X_train,))
+        onx = to_onnx(enc, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_test})[0]
@@ -132,7 +132,7 @@ class TestOneHotEncoder(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
@@ -161,7 +161,7 @@ class TestOneHotEncoder(ExtTestCase):
         enc = OneHotEncoder(sparse_output=False)
         enc.fit(X)
 
-        onx = to_onnx(enc, (X,))
+        onx = to_onnx(enc, (X,), target_opset=21)
         expected = enc.transform(X)
 
         sess = self.check_ort(onx)
@@ -177,7 +177,7 @@ class TestOneHotEncoder(ExtTestCase):
         enc = OneHotEncoder(sparse_output=False, dtype=np.float32)
         enc.fit(X)
 
-        onx = to_onnx(enc, (X,))
+        onx = to_onnx(enc, (X,), target_opset=21)
         expected = enc.transform(X)
 
         sess = self.check_ort(onx)
@@ -193,7 +193,7 @@ class TestOneHotEncoder(ExtTestCase):
         enc = OneHotEncoder(sparse_output=False)
         enc.fit(X)
 
-        onx = to_onnx(enc, (X,))
+        onx = to_onnx(enc, (X,), target_opset=21)
         expected = enc.transform(X)
 
         sess = self.check_ort(onx)

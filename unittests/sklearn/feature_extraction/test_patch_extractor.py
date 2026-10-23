@@ -22,7 +22,7 @@ class TestPatchExtractor(ExtTestCase):
         pe = PatchExtractor(patch_size=(3, 3))
         pe.fit(X)
 
-        onx = to_onnx(pe, (X,))
+        onx = to_onnx(pe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Slice", op_types)
@@ -45,7 +45,7 @@ class TestPatchExtractor(ExtTestCase):
         pe = PatchExtractor(patch_size=(3, 3))
         pe.fit(X)
 
-        onx = to_onnx(pe, (X,))
+        onx = to_onnx(pe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -64,7 +64,7 @@ class TestPatchExtractor(ExtTestCase):
         pe = PatchExtractor(patch_size=(2, 2))
         pe.fit(X)
 
-        onx = to_onnx(pe, (X,))
+        onx = to_onnx(pe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -80,7 +80,7 @@ class TestPatchExtractor(ExtTestCase):
         pe = PatchExtractor(patch_size=(4, 4))
         pe.fit(X)
 
-        onx = to_onnx(pe, (X,))
+        onx = to_onnx(pe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -97,7 +97,7 @@ class TestPatchExtractor(ExtTestCase):
         pe = PatchExtractor(patch_size=(ph, pw))
         pe.fit(X)
 
-        onx = to_onnx(pe, (X,))
+        onx = to_onnx(pe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -114,7 +114,7 @@ class TestPatchExtractor(ExtTestCase):
         pe = PatchExtractor(patch_size=(3, 4))
         pe.fit(X)
 
-        onx = to_onnx(pe, (X,))
+        onx = to_onnx(pe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -135,7 +135,7 @@ class TestPatchExtractor(ExtTestCase):
         pe.fit(X)
 
         with self.assertRaises(NotImplementedError):
-            to_onnx(pe, (X,))
+            to_onnx(pe, (X,), target_opset=21)
 
 
 if __name__ == "__main__":

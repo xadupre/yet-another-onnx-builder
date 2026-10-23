@@ -17,6 +17,7 @@ class TestOnnxExportAtenTracing(ExtTestCase):
         return to_onnx(
             model,
             inputs,
+            target_opset=21,
             export_options=ExportOptions(tracing=True),
             dynamic_shapes=dynamic_shapes,
         )

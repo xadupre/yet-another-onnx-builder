@@ -19,7 +19,7 @@ class TestGaussianRandomProjection(ExtTestCase):
         proj = GaussianRandomProjection(n_components=4, random_state=0)
         proj.fit(X)
 
-        onx = to_onnx(proj, (X,))
+        onx = to_onnx(proj, (X,), target_opset=21)
 
         # Check that a MatMul (projection) node is present.
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -44,7 +44,7 @@ class TestGaussianRandomProjection(ExtTestCase):
         proj = GaussianRandomProjection(n_components=3, random_state=1)
         proj.fit(X)
 
-        onx = to_onnx(proj, (X,))
+        onx = to_onnx(proj, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -69,7 +69,7 @@ class TestGaussianRandomProjection(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

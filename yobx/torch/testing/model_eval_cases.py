@@ -374,6 +374,7 @@ def _make_exporter_onnx(
                 art = to_onnx(
                     model,
                     inputs,
+                    target_opset=21,
                     dynamic_shapes=dynamic_shapes,
                     export_options=ExportOptions(**opts),
                     return_builder=True,
@@ -386,6 +387,7 @@ def _make_exporter_onnx(
                     art = to_onnx(
                         model,
                         inputs,
+                        target_opset=21,
                         dynamic_shapes=dynamic_shapes,
                         export_options=ExportOptions(**opts),
                         return_builder=True,

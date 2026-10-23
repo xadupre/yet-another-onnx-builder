@@ -35,7 +35,7 @@ class TestSklearnOutputCodeClassifier(ExtTestCase):
         )
         clf.fit(self._X_bin, self._y_bin)
 
-        onx = to_onnx(clf, (self._X_bin,))
+        onx = to_onnx(clf, (self._X_bin,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X_bin})
@@ -54,7 +54,7 @@ class TestSklearnOutputCodeClassifier(ExtTestCase):
         )
         clf.fit(self._X_multi, self._y_multi)
 
-        onx = to_onnx(clf, (self._X_multi,))
+        onx = to_onnx(clf, (self._X_multi,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X_multi})
@@ -75,7 +75,7 @@ class TestSklearnOutputCodeClassifier(ExtTestCase):
         )
         clf.fit(X64, self._y_multi)
 
-        onx = to_onnx(clf, (X64,))
+        onx = to_onnx(clf, (X64,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X64})
@@ -105,7 +105,7 @@ class TestSklearnOutputCodeClassifier(ExtTestCase):
         )
         pipe.fit(self._X_multi, self._y_multi)
 
-        onx = to_onnx(pipe, (self._X_multi,))
+        onx = to_onnx(pipe, (self._X_multi,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": self._X_multi})

@@ -6,6 +6,7 @@ import textwrap
 from yobx._onnx_shim import onnx
 from typing import Any, Dict, List, Optional
 from argparse import ArgumentParser, RawTextHelpFormatter, BooleanOptionalAction
+from .convert import DEFAULT_TARGET_OPSET
 
 
 def process_outputname(output_name: str, input_name: str) -> str:
@@ -807,7 +808,10 @@ def get_parser_validate() -> ArgumentParser:
         help="Catch exceptions and report them in the summary instead of re-raising.",
     )
     parser.add_argument(
-        "--opset", default=22, type=int, help="ONNX opset version to target (default: 22)."
+        "--opset",
+        default=DEFAULT_TARGET_OPSET,
+        type=int,
+        help=f"ONNX opset version to target (default: {DEFAULT_TARGET_OPSET}).",
     )
     parser.add_argument(
         "--dtype",

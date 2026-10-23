@@ -96,10 +96,12 @@ forwarded verbatim to the selected converter.
        See :ref:`l-main-to-onnx-dynamic-shapes` below for the
        backend-specific formats.
    * - ``target_opset``
-     - ``21``
+     - Latest available
      - ONNX opset version to target.  Either an integer for the default
        domain, or a ``Dict[str, int]`` mapping domain names to opset
        versions (e.g. ``{"": 21, "com.microsoft": 1}``).
+       Defaults to the latest opset supported by the installed ``onnx-light``.
+       Runtimes may support an older opset; pass an explicit version when needed.
    * - ``verbose``
      - ``0``
      - Verbosity level (0 = silent).

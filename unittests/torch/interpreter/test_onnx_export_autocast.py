@@ -50,7 +50,7 @@ class TestOnnxExportAutocast(ExtTestCase):
         x = torch.randn(3, 4)
         inputs = (x,)
         expected = model(x)
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
     @skipif_ci_windows("torch dynamo not supported on windows")
@@ -73,7 +73,7 @@ class TestOnnxExportAutocast(ExtTestCase):
         x = torch.randn(3, 4)
         inputs = (x,)
         expected = model(x).float()
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         # The ONNX output is float16; cast to float32 for comparison.
         import numpy as np
         import onnxruntime
@@ -105,7 +105,7 @@ class TestOnnxExportAutocast(ExtTestCase):
         x = torch.randn(2, 4)
         inputs = (x,)
         expected = model(x).float()
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
         import numpy as np
         import onnxruntime
 
@@ -142,7 +142,7 @@ class TestOnnxExportAutocast(ExtTestCase):
         model = Model()
         x = torch.randn(3, 4)
         inputs = (x,)
-        onx = to_onnx(model, inputs, verbose=10)
+        onx = to_onnx(model, inputs, target_opset=21, verbose=10)
 
         # Inline local functions so every Cast node is visible in the flat graph.
         flat = inline_local_functions(onx.proto)
@@ -180,7 +180,7 @@ class TestOnnxExportAutocast(ExtTestCase):
         model = Model()
         x = torch.randn(2, 4)
         inputs = (x,)
-        onx = to_onnx(model, inputs)
+        onx = to_onnx(model, inputs, target_opset=21)
 
         # 1. Check that a Cast to float16 is present anywhere in the model.
         flat = inline_local_functions(onx.proto)

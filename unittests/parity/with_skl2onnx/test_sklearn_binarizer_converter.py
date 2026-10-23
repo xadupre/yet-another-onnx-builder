@@ -3,10 +3,10 @@ import numpy as np
 from sklearn.preprocessing import Binarizer
 from yobx._onnx_shim import onnx
 import onnx_light.onnx.helper as oh
-from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
 from yobx.ext_test_case import ExtTestCase
 from yobx.sklearn import to_onnx
 from yobx.sklearn.tests_helper import dump_data_and_model
+from unittests.parity.with_skl2onnx._common import TARGET_OPSET
 
 
 class TestSklearnBinarizer(ExtTestCase):

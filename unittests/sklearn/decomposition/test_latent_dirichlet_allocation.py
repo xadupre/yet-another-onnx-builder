@@ -19,8 +19,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         lda.fit(X_train)
-        options = {} if target_opset is None else {"target_opset": target_opset}
-        onx = to_onnx(lda, (X_test,), **options)
+        onx = to_onnx(lda, (X_test,), target_opset=21 if target_opset is None else target_opset)
 
         # Reference evaluator
         ref = ExtendedReferenceEvaluator(onx)
@@ -148,7 +147,7 @@ class TestLatentDirichletAllocation(ExtTestCase):
             n_components=n_topics, max_iter=3, max_doc_update_iter=10, random_state=4
         )
         lda.fit(X_train)
-        onx = to_onnx(lda, (X_test,))
+        onx = to_onnx(lda, (X_test,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_test})[0]

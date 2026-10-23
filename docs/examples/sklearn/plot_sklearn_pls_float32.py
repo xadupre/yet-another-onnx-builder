@@ -117,7 +117,7 @@ print("_x_mean dtype :", pls._x_mean.dtype)  # float64
 # still use ``float64`` internally when ``predict`` is called.
 
 X_f32 = X.astype(np.float32)
-onx_f32 = to_onnx(pls, (X_f32[:1],))
+onx_f32 = to_onnx(pls, (X_f32[:1],), target_opset=21)
 
 sess_f32 = onnxruntime.InferenceSession(
     onx_f32.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -144,7 +144,7 @@ print(f"Max absolute difference (float32 ONNX vs sklearn): {max_diff_f32:.6e}")
 # The ONNX graph will now produce predictions that agree with scikit-learn up
 # to floating-point round-off (typically < 1e-10 for PLS).
 
-onx_f64 = to_onnx(pls, (X[:1],))  # X is already float64
+onx_f64 = to_onnx(pls, (X[:1],), target_opset=21)  # X is already float64
 
 sess_f64 = onnxruntime.InferenceSession(
     onx_f64.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -199,7 +199,7 @@ pls2.fit(X2, Y2)
 
 # float32 export
 X2_f32 = X2.astype(np.float32)
-onx2_f32 = to_onnx(pls2, (X2_f32[:1],))
+onx2_f32 = to_onnx(pls2, (X2_f32[:1],), target_opset=21)
 sess2_f32 = onnxruntime.InferenceSession(
     onx2_f32.SerializeToString(), providers=["CPUExecutionProvider"]
 )
@@ -208,7 +208,7 @@ pred2_sk = pls2.predict(X2)
 diff2_f32 = float(np.abs(pred2_onnx_f32 - pred2_sk).max())
 
 # float64 export
-onx2_f64 = to_onnx(pls2, (X2[:1],))
+onx2_f64 = to_onnx(pls2, (X2[:1],), target_opset=21)
 sess2_f64 = onnxruntime.InferenceSession(
     onx2_f64.SerializeToString(), providers=["CPUExecutionProvider"]
 )

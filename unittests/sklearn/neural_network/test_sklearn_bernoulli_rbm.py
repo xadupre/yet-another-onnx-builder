@@ -22,7 +22,7 @@ class TestSklearnBernoulliRBM(ExtTestCase):
         rbm = BernoulliRBM(n_components=4, n_iter=5, random_state=0)
         rbm.fit(X)
 
-        onx = to_onnx(rbm, (X,))
+        onx = to_onnx(rbm, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertTrue(
@@ -47,7 +47,7 @@ class TestSklearnBernoulliRBM(ExtTestCase):
         rbm = BernoulliRBM(n_components=4, n_iter=5, random_state=0)
         rbm.fit(X)
 
-        onx = to_onnx(rbm, (X,))
+        onx = to_onnx(rbm, (X,), target_opset=21)
 
         self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
 
@@ -69,7 +69,7 @@ class TestSklearnBernoulliRBM(ExtTestCase):
         rbm = BernoulliRBM(n_components=n_components, n_iter=5, random_state=0)
         rbm.fit(X)
 
-        onx = to_onnx(rbm, (X,))
+        onx = to_onnx(rbm, (X,), target_opset=21)
 
         self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
 
@@ -86,7 +86,7 @@ class TestSklearnBernoulliRBM(ExtTestCase):
         rbm = BernoulliRBM(n_components=n_components, n_iter=5, random_state=0)
         rbm.fit(X)
 
-        onx = to_onnx(rbm, (X,))
+        onx = to_onnx(rbm, (X,), target_opset=21)
 
         self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
 
@@ -102,7 +102,7 @@ class TestSklearnBernoulliRBM(ExtTestCase):
         rbm = BernoulliRBM(n_components=8, n_iter=5, random_state=0)
         rbm.fit(X)
 
-        onx = to_onnx(rbm, (X,))
+        onx = to_onnx(rbm, (X,), target_opset=21)
 
         self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 1)  # FLOAT
 
@@ -120,7 +120,7 @@ class TestSklearnBernoulliRBM(ExtTestCase):
         rbm = BernoulliRBM(n_components=8, n_iter=5, random_state=0)
         rbm.fit(X)
 
-        onx = to_onnx(rbm, (X,))
+        onx = to_onnx(rbm, (X,), target_opset=21)
 
         self.assertEqual(onx.proto.graph.input[0].type.tensor_type.elem_type, 11)  # DOUBLE
 

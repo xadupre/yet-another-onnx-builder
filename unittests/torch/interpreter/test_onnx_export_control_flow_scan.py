@@ -30,7 +30,11 @@ class TestOnnxExportControlFlow(ExtTestCase):
         for optimize in [False, True]:
             with self.subTest(optimize=optimize):
                 onx = to_onnx(
-                    model, (x,), optimize=optimize, export_options=ExportOptions(strict=False)
+                    model,
+                    (x,),
+                    target_opset=21,
+                    optimize=optimize,
+                    export_options=ExportOptions(strict=False),
                 )
                 self.dump_onnx(f"test_scan_1_{optimize}.onnx", onx)
                 names = [(f.domain, f.name) for f in onx.functions]
@@ -82,7 +86,11 @@ class TestOnnxExportControlFlow(ExtTestCase):
         for optimize in [False, True]:
             with self.subTest(optimize=optimize):
                 onx = to_onnx(
-                    model, (x,), optimize=optimize, export_options=ExportOptions(strict=False)
+                    model,
+                    (x,),
+                    target_opset=21,
+                    optimize=optimize,
+                    export_options=ExportOptions(strict=False),
                 )
                 names = [(f.domain, f.name) for f in onx.functions]
                 self.assertEqual(len(names), len(set(names)))
@@ -138,6 +146,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                 onx = to_onnx(
                     model,
                     (x,),
+                    target_opset=21,
                     optimize=optimize,
                     dynamic_shapes={"x": {0: batch}},
                     export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
@@ -186,6 +195,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                 onx = to_onnx(
                     model,
                     (x,),
+                    target_opset=21,
                     optimize=optimize,
                     export_options=ExportOptions(decomposition_table="default", strict=False),
                 )
@@ -232,6 +242,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                 onx = to_onnx(
                     model,
                     (x,),
+                    target_opset=21,
                     optimize=optimize,
                     export_options=ExportOptions(decomposition_table="default", strict=False),
                     inline=False,
@@ -283,6 +294,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                 onx = to_onnx(
                     model,
                     (x,),
+                    target_opset=21,
                     optimize=optimize,
                     export_options=ExportOptions(decomposition_table="default", tracing=True),
                 )
@@ -327,6 +339,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                 onx = to_onnx(
                     model,
                     (x,),
+                    target_opset=21,
                     optimize=optimize,
                     export_options=ExportOptions(decomposition_table="default", tracing=True),
                     inline=False,
@@ -381,6 +394,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
             onx = to_onnx(
                 model,
                 inputs[0],
+                target_opset=21,
                 optimize=optimize,
                 dynamic_shapes=ds,
                 export_options=ExportOptions(decomposition_table="default", strict=False),
@@ -451,6 +465,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
             onx = to_onnx(
                 model,
                 inputs[0],
+                target_opset=21,
                 optimize=optimize,
                 dynamic_shapes=ds,
                 export_options=ExportOptions(decomposition_table="default", strict=False),
@@ -538,6 +553,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         to_onnx(
             model,
             (x, y),
+            target_opset=21,
             filename=name2,
             dynamic_shapes={"images": {0: "batch", 1: "maxdim"}, "position": {0: "batch"}},
             verbose=0,
@@ -563,6 +579,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         to_onnx(
             model,
             (x, y),
+            target_opset=21,
             filename=name2,
             dynamic_shapes={"images": {0: "batch", 1: "maxdim"}, "position": {0: "batch"}},
             export_options=ExportOptions(decomposition_table="default", tracing=True),
@@ -587,6 +604,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         onx = to_onnx(
             model,
             (x, y),
+            target_opset=21,
             dynamic_shapes={"images": {0: DYN, 1: DYN}, "position": {0: DYN}},
             export_options=ExportOptions(tracing=TracingMode.NEW_TRACING),
         )

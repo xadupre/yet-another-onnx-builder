@@ -30,7 +30,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
 
         # case 1: input_x=x
 
-        onx = to_onnx(model, kwargs=dict(input_x=x), verbose=0)
+        onx = to_onnx(model, target_opset=21, kwargs=dict(input_x=x), verbose=0)
         names = [i.name for i in onx.graph.input]
         self.assertEqual(names, ["input_x"])
         feeds = dict(input_x=x.detach().numpy())
@@ -46,7 +46,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
 
         # case 2: input_x=y
 
-        onx = to_onnx(model, kwargs=dict(input_y=x), verbose=0)
+        onx = to_onnx(model, target_opset=21, kwargs=dict(input_y=x), verbose=0)
         names = [i.name for i in onx.graph.input]
         self.assertEqual(names, ["input_y"])
         feeds = dict(input_y=x.detach().numpy())
@@ -62,7 +62,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
 
         # case 3: input_x=x, input_y=y
 
-        onx = to_onnx(model, kwargs=dict(input_x=x, input_y=y), verbose=0)
+        onx = to_onnx(model, target_opset=21, kwargs=dict(input_x=x, input_y=y), verbose=0)
         names = [i.name for i in onx.graph.input]
         self.assertEqual(names, ["input_x", "input_y"])
         feeds = dict(input_x=x.detach().numpy(), input_y=y.detach().numpy())
@@ -89,7 +89,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
         list_yz = [torch.rand(1024, 1024), torch.rand(1024, 1024)]
         model = RawTest()
 
-        onx = to_onnx(model, (x, list_yz))
+        onx = to_onnx(model, (x, list_yz), target_opset=21)
         names = [i.name for i in onx.graph.input]
         feeds = dict(zip(names, [_.detach().numpy() for _ in [x, *list_yz]]))
         shapes = [
@@ -119,6 +119,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
         onx = to_onnx(
             model,
             (x, list_yz),
+            target_opset=21,
             dynamic_shapes={"x": {0: batch}, "list_yz": [{0: batch}, {0: batch}]},
         )
         names = [i.name for i in onx.graph.input]
@@ -152,6 +153,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
         onx = to_onnx(
             model,
             (x, *list_yz),
+            target_opset=21,
             dynamic_shapes=({0: batch}, {0: batch}, {0: batch}),
             export_options=ExportOptions(tracing=True),
         )
@@ -192,6 +194,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
         onx = to_onnx(
             model,
             (x, list_yz),
+            target_opset=21,
             dynamic_shapes=({0: batch}, [{0: batch}, {0: batch}]),
             export_options=ExportOptions(tracing=True),
             verbose=10,
@@ -232,7 +235,11 @@ class TestOnnxExportInputDictList(ExtTestCase):
 
         batch = torch.export.Dim("batch", min=1, max=2048)
         onx = to_onnx(
-            model, (x,), dynamic_shapes=({0: batch},), export_options=ExportOptions(tracing=True)
+            model,
+            (x,),
+            target_opset=21,
+            dynamic_shapes=({0: batch},),
+            export_options=ExportOptions(tracing=True),
         )
         from yobx._onnx_shim import onnx
 

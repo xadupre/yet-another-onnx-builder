@@ -18,7 +18,7 @@ class TestNormalizer(ExtTestCase):
         normalizer = Normalizer()  # default norm='l2'
         normalizer.fit(X)
 
-        onx = to_onnx(normalizer, (X,))
+        onx = to_onnx(normalizer, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceL2", op_types)
@@ -40,7 +40,7 @@ class TestNormalizer(ExtTestCase):
         normalizer = Normalizer(norm="l1")
         normalizer.fit(X)
 
-        onx = to_onnx(normalizer, (X,))
+        onx = to_onnx(normalizer, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceL1", op_types)
@@ -62,7 +62,7 @@ class TestNormalizer(ExtTestCase):
         normalizer = Normalizer(norm="max")
         normalizer.fit(X)
 
-        onx = to_onnx(normalizer, (X,))
+        onx = to_onnx(normalizer, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceMax", op_types)
@@ -86,7 +86,7 @@ class TestNormalizer(ExtTestCase):
             normalizer = Normalizer(norm=norm)
             normalizer.fit(X)
 
-            onx = to_onnx(normalizer, (X,))
+            onx = to_onnx(normalizer, (X,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             result = ref.run(None, {"X": X})[0]
@@ -106,7 +106,7 @@ class TestNormalizer(ExtTestCase):
         normalizer = Normalizer(norm="l2")
         normalizer.fit(X)
 
-        onx = to_onnx(normalizer, (X,))
+        onx = to_onnx(normalizer, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -130,7 +130,7 @@ class TestNormalizer(ExtTestCase):
         pipe = Pipeline([("norm", Normalizer(norm="l2")), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceL2", op_types)

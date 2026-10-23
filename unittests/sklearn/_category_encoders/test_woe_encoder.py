@@ -30,7 +30,7 @@ class TestWOEEncoder(ExtTestCase):
         X_np = X_df.values.astype(dtype)
         X_df_typed = pd.DataFrame(X_np, columns=X_df.columns)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
 
         expected = enc.transform(X_df_typed).values.astype(dtype)
 
@@ -97,7 +97,7 @@ class TestWOEEncoder(ExtTestCase):
         )
         X_np = X_test_df.values.astype(dtype)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -116,7 +116,7 @@ class TestWOEEncoder(ExtTestCase):
         enc.fit(X_df, y)
 
         X_np = X_df.values.astype(np.float32)
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -136,7 +136,7 @@ class TestWOEEncoder(ExtTestCase):
         pipe.fit(X_df, y_f)
 
         X_np = X_df[:8].values.astype(np.float32)
-        onx = to_onnx(pipe, (X_np,))
+        onx = to_onnx(pipe, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -156,7 +156,7 @@ class TestWOEEncoder(ExtTestCase):
         enc.fit(X_df, y)
         X_np = X_df.values  # dtype=object
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 

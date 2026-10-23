@@ -19,7 +19,7 @@ class TestFeatureAgglomeration(ExtTestCase):
         model = FeatureAgglomeration(n_clusters=3)
         model.fit(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("MatMul", op_types)
@@ -43,7 +43,7 @@ class TestFeatureAgglomeration(ExtTestCase):
         model = FeatureAgglomeration(n_clusters=3)
         model.fit(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         (result,) = ref.run(None, {"X": X})
@@ -66,7 +66,7 @@ class TestFeatureAgglomeration(ExtTestCase):
                 X = X32.astype(dtype)
                 model = FeatureAgglomeration(n_clusters=2)
                 model.fit(X)
-                onx = to_onnx(model, (X,))
+                onx = to_onnx(model, (X,), target_opset=21)
 
                 ref = ExtendedReferenceEvaluator(onx)
                 (result,) = ref.run(None, {"X": X})
@@ -87,7 +87,7 @@ class TestFeatureAgglomeration(ExtTestCase):
         model = FeatureAgglomeration(n_clusters=3, pooling_func=np.max)
         model.fit(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceMax", op_types)
@@ -111,7 +111,7 @@ class TestFeatureAgglomeration(ExtTestCase):
         model = FeatureAgglomeration(n_clusters=3, pooling_func=np.min)
         model.fit(X)
 
-        onx = to_onnx(model, (X,))
+        onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceMin", op_types)
@@ -138,7 +138,7 @@ class TestFeatureAgglomeration(ExtTestCase):
                     X = X32.astype(dtype)
                     model = FeatureAgglomeration(n_clusters=3, pooling_func=pf)
                     model.fit(X)
-                    onx = to_onnx(model, (X,))
+                    onx = to_onnx(model, (X,), target_opset=21)
 
                     ref = ExtendedReferenceEvaluator(onx)
                     (result,) = ref.run(None, {"X": X})
@@ -163,7 +163,7 @@ class TestFeatureAgglomeration(ExtTestCase):
         )
         pipe.fit(X)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         (result,) = ref.run(None, {"X": X})
@@ -185,7 +185,7 @@ class TestFeatureAgglomeration(ExtTestCase):
         model.fit(X)
 
         with self.assertRaises(NotImplementedError):
-            to_onnx(model, (X,))
+            to_onnx(model, (X,), target_opset=21)
 
 
 if __name__ == "__main__":

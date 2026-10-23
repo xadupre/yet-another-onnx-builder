@@ -21,7 +21,7 @@ class TestPLSRegression(ExtTestCase):
         pls = PLSRegression(n_components=2)
         pls.fit(X, y)
 
-        onx = to_onnx(pls, (X,))
+        onx = to_onnx(pls, (X,), target_opset=21)
 
         # Check that Sub (centering) is present and a linear transform (MatMul or
         # fused Gemm) is present.
@@ -53,7 +53,7 @@ class TestPLSRegression(ExtTestCase):
         pls = PLSRegression(n_components=3)
         pls.fit(X, y)
 
-        onx = to_onnx(pls, (X,))
+        onx = to_onnx(pls, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -76,7 +76,7 @@ class TestPLSRegression(ExtTestCase):
         pls = PLSRegression(n_components=2)
         pls.fit(X, y)
 
-        onx = to_onnx(pls, (X,))
+        onx = to_onnx(pls, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -99,7 +99,7 @@ class TestPLSRegression(ExtTestCase):
         pls = PLSRegression(n_components=3)
         pls.fit(X, y)
 
-        onx = to_onnx(pls, (X,))
+        onx = to_onnx(pls, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -125,7 +125,7 @@ class TestPLSRegression(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("pls", PLSRegression(n_components=3))])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]

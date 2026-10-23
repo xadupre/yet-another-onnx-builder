@@ -1320,7 +1320,9 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         for estimator in estimators:
             with self.subTest(estimator=type(estimator).__name__):
                 estimator.fit(x, y)
-                artifact = to_onnx(estimator, (x,), builder_cls=OnnxLightGraphBuilder)
+                artifact = to_onnx(
+                    estimator, (x,), target_opset=21, builder_cls=OnnxLightGraphBuilder
+                )
                 names = [str(node.name) for node in artifact.proto.graph.node if node.name]
                 self.assertEqual(len(names), len(set(names)))
                 session = InferenceSession(
@@ -1491,7 +1493,7 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
             return numpy.sqrt(numpy.abs(x) + numpy.float32(1))
 
         x = numpy.array([-1, 2, 3], dtype=numpy.float32)
-        artifact = to_onnx(transform, x, builder_cls=OnnxLightGraphBuilder)
+        artifact = to_onnx(transform, x, target_opset=21, builder_cls=OnnxLightGraphBuilder)
         checker.check_model(artifact.proto)
         actual = ReferenceEvaluator(artifact.proto).run(None, {"X": x})[0]
         numpy.testing.assert_allclose(actual, transform(x), rtol=1e-6)

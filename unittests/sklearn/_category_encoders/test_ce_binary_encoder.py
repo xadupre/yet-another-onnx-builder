@@ -29,7 +29,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         X_np = X_df.values.astype(dtype)
         X_df_typed = pd.DataFrame(X_np, columns=X_df.columns)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
 
         expected = enc.transform(X_df_typed).values.astype(dtype)
 
@@ -90,7 +90,7 @@ class TestCEBinaryEncoder(ExtTestCase):
 
         X_np = X_df.values.astype(np.float32)
         X_df_typed = pd.DataFrame(X_np, columns=X_df.columns)
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -112,7 +112,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         X_test = pd.DataFrame({"cat": [0.0, 1.0, 99.0], "num": [1.0, 2.0, 3.0]})
         X_np = X_test.values.astype(np.float32)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -134,7 +134,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         X_test = pd.DataFrame({"cat": [0.0, 99.0, 1.0], "num": [1.0, 2.0, 3.0]})
         X_np = X_test.values.astype(np.float32)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -158,7 +158,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         X_test = pd.DataFrame({"cat": [0.0, np.nan, 2.0], "num": [1.0, 2.0, 3.0]})
         X_np = X_test.values.astype(np.float32)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -180,7 +180,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         X_test = pd.DataFrame({"cat": [0.0, np.nan, 2.0], "num": [1.0, 2.0, 3.0]})
         X_np = X_test.values.astype(np.float32)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -204,7 +204,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         pipe.fit(X_df, y_f)
 
         X_np = X_df[:8].values.astype(np.float32)
-        onx = to_onnx(pipe, (X_np,))
+        onx = to_onnx(pipe, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -223,7 +223,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         enc.fit(X_df)
         X_np = X_df.values  # dtype=object (string array)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -240,7 +240,7 @@ class TestCEBinaryEncoder(ExtTestCase):
         enc.fit(X_df)
         X_np = X_df.values
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 

@@ -628,7 +628,7 @@ class TestSklearnRandomForest(ExtTestCase):
         rf = RandomForestClassifier(n_estimators=10, max_depth=4, random_state=0)
         rf.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(rf, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -655,7 +655,7 @@ class TestSklearnRandomForest(ExtTestCase):
         rf = RandomForestClassifier(n_estimators=10, max_depth=4, random_state=0)
         rf.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(rf, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -684,7 +684,7 @@ class TestSklearnRandomForest(ExtTestCase):
         rf = RandomForestRegressor(n_estimators=10, max_depth=4, random_state=0)
         rf.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(rf, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)
@@ -708,7 +708,7 @@ class TestSklearnRandomForest(ExtTestCase):
         rf = RandomForestRegressor(n_estimators=10, max_depth=4, random_state=0)
         rf.fit(X_train, y_train)
 
-        for opset_kw in [{}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
+        for opset_kw in [{"target_opset": 21}, {"target_opset": {"": 20, "ai.onnx.ml": 5}}]:
             onx = to_onnx(rf, (X_train,), **opset_kw)
 
             ref = ExtendedReferenceEvaluator(onx)

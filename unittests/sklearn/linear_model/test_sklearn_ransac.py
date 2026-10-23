@@ -28,7 +28,7 @@ class TestSklearnRANSACRegressor(ExtTestCase):
             kwargs = {} if min_samples is None else {"min_samples": min_samples}
             reg = RANSACRegressor(estimator=estimator, random_state=0, **kwargs)
             reg.fit(Xd, yd)
-            onx = to_onnx(reg, (Xd,))
+            onx = to_onnx(reg, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
@@ -69,7 +69,7 @@ class TestSklearnRANSACRegressor(ExtTestCase):
         pipe = Pipeline([("scaler", StandardScaler()), ("reg", reg)])
         pipe.fit(Xd, self._y)
 
-        onx = to_onnx(pipe, (Xd,))
+        onx = to_onnx(pipe, (Xd,), target_opset=21)
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": Xd})
         expected_pred = pipe.predict(Xd).astype(np.float32)

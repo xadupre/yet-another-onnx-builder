@@ -61,6 +61,7 @@ class TestOnnxExportShape(ExtTestCase):
                     to_onnx(
                         model,
                         inputs,
+                        target_opset=21,
                         filename=filename,
                         export_options=export_options,
                         verbose=verbose,
@@ -74,6 +75,7 @@ class TestOnnxExportShape(ExtTestCase):
                 to_onnx(
                     model,
                     inputs,
+                    target_opset=21,
                     filename=filename,
                     export_options=export_options,
                     verbose=verbose,

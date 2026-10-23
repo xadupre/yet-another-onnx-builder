@@ -26,7 +26,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
         clf = RadiusNeighborsClassifier(radius=2.0)
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Greater", op_types)
@@ -54,7 +54,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
         clf = RadiusNeighborsClassifier(radius=2.0)
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -78,7 +78,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
         clf = RadiusNeighborsClassifier(radius=2.0)
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -106,7 +106,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
         clf = RadiusNeighborsClassifier(radius=2.0)
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -138,7 +138,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
             ]
         )
 
-        onx = to_onnx(clf, (X_train,))
+        onx = to_onnx(clf, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_test})
@@ -165,7 +165,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
 
         X_test = np.array([[100.0, 100.0, 100.0, 100.0]], dtype=np.float32)
 
-        onx = to_onnx(clf, (X_train,))
+        onx = to_onnx(clf, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_test})
@@ -193,7 +193,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -251,7 +251,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
                 clf = RadiusNeighborsClassifier(radius=2.0, metric=metric, **kwargs)
                 clf.fit(X, y)
 
-                onx = to_onnx(clf, (X,))
+                onx = to_onnx(clf, (X,), target_opset=21)
 
                 sess = self.check_ort(onx)
                 ort_results = sess.run(None, {"X": X})
@@ -285,7 +285,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
         clf = RadiusNeighborsClassifier(radius=2.0, weights="distance")
         clf.fit(X, y)
 
-        onx = to_onnx(clf, (X,))
+        onx = to_onnx(clf, (X,), target_opset=21)
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X})
@@ -306,7 +306,7 @@ class TestRadiusNeighborsRegressor(ExtTestCase):
         reg = RadiusNeighborsRegressor(radius=2.0)
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Greater", op_types)
@@ -335,7 +335,7 @@ class TestRadiusNeighborsRegressor(ExtTestCase):
         reg = RadiusNeighborsRegressor(radius=2.0)
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -363,7 +363,7 @@ class TestRadiusNeighborsRegressor(ExtTestCase):
         )
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -418,7 +418,7 @@ class TestRadiusNeighborsRegressor(ExtTestCase):
                 reg = RadiusNeighborsRegressor(radius=2.0, metric=metric, **kwargs)
                 reg.fit(X, y)
 
-                onx = to_onnx(reg, (X,))
+                onx = to_onnx(reg, (X,), target_opset=21)
 
                 sess = self.check_ort(onx)
                 ort_results = sess.run(None, {"X": X})
@@ -440,7 +440,7 @@ class TestRadiusNeighborsRegressor(ExtTestCase):
         # A point far from all training data should produce NaN
         X_outlier = np.array([[100.0, 100.0, 100.0, 100.0]], dtype=np.float32)
 
-        onx = to_onnx(reg, (X_train,))
+        onx = to_onnx(reg, (X_train,), target_opset=21)
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X_outlier})
@@ -473,7 +473,7 @@ class TestRadiusNeighborsRegressor(ExtTestCase):
         reg = RadiusNeighborsRegressor(radius=2.0, weights="distance")
         reg.fit(X, y)
 
-        onx = to_onnx(reg, (X,))
+        onx = to_onnx(reg, (X,), target_opset=21)
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X})

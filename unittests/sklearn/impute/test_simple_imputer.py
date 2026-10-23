@@ -14,7 +14,7 @@ class TestSimpleImputer(ExtTestCase):
         imp = SimpleImputer(strategy="mean")
         imp.fit(X)
 
-        onx = to_onnx(imp, (X,))
+        onx = to_onnx(imp, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("IsNaN", op_types)
@@ -37,7 +37,7 @@ class TestSimpleImputer(ExtTestCase):
         imp = SimpleImputer(strategy="median")
         imp.fit(X)
 
-        onx = to_onnx(imp, (X,))
+        onx = to_onnx(imp, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -56,7 +56,7 @@ class TestSimpleImputer(ExtTestCase):
         imp = SimpleImputer(strategy="most_frequent")
         imp.fit(X)
 
-        onx = to_onnx(imp, (X,))
+        onx = to_onnx(imp, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -75,7 +75,7 @@ class TestSimpleImputer(ExtTestCase):
         imp = SimpleImputer(strategy="constant", fill_value=0.0)
         imp.fit(X)
 
-        onx = to_onnx(imp, (X,))
+        onx = to_onnx(imp, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -94,7 +94,7 @@ class TestSimpleImputer(ExtTestCase):
         imp = SimpleImputer(missing_values=-1, strategy="mean")
         imp.fit(X)
 
-        onx = to_onnx(imp, (X,))
+        onx = to_onnx(imp, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Equal", op_types)
@@ -119,7 +119,7 @@ class TestSimpleImputer(ExtTestCase):
         imp.fit(X)
 
         with self.assertRaises(NotImplementedError):
-            to_onnx(imp, (X,))
+            to_onnx(imp, (X,), target_opset=21)
 
     def test_pipeline_simple_imputer_logistic_regression(self):
         from sklearn.impute import SimpleImputer
@@ -132,7 +132,7 @@ class TestSimpleImputer(ExtTestCase):
         pipe = Pipeline([("imp", SimpleImputer(strategy="mean")), ("clf", LogisticRegression())])
         pipe.fit(X, y)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("IsNaN", op_types)

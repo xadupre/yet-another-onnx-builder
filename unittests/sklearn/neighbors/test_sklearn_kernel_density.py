@@ -23,7 +23,7 @@ class TestKernelDensity(ExtTestCase):
         kde = KernelDensity(bandwidth=1.0, kernel="gaussian")
         kde.fit(X)
 
-        onx = to_onnx(kde, (X,))
+        onx = to_onnx(kde, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceLogSumExp", op_types)
@@ -48,7 +48,7 @@ class TestKernelDensity(ExtTestCase):
         kde = KernelDensity(bandwidth=1.0, kernel="gaussian")
         kde.fit(X)
 
-        onx = to_onnx(kde, (X,))
+        onx = to_onnx(kde, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -75,7 +75,7 @@ class TestKernelDensity(ExtTestCase):
         kde = KernelDensity(bandwidth=1.5, kernel="tophat")
         kde.fit(X_train)
 
-        onx = to_onnx(kde, (X_train,))
+        onx = to_onnx(kde, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_test})
@@ -98,7 +98,7 @@ class TestKernelDensity(ExtTestCase):
         kde = KernelDensity(bandwidth=1.5, kernel="tophat")
         kde.fit(X_train)
 
-        onx = to_onnx(kde, (X_train,))
+        onx = to_onnx(kde, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_test})
@@ -125,7 +125,7 @@ class TestKernelDensity(ExtTestCase):
         kde = KernelDensity(bandwidth=2.0, kernel="epanechnikov")
         kde.fit(X_train)
 
-        onx = to_onnx(kde, (X_train,))
+        onx = to_onnx(kde, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_test})
@@ -148,7 +148,7 @@ class TestKernelDensity(ExtTestCase):
         kde = KernelDensity(bandwidth=2.0, kernel="epanechnikov")
         kde.fit(X_train)
 
-        onx = to_onnx(kde, (X_train,))
+        onx = to_onnx(kde, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_test})
@@ -175,7 +175,7 @@ class TestKernelDensity(ExtTestCase):
         kde = KernelDensity(bandwidth=1.0, kernel="exponential")
         kde.fit(X_train)
 
-        onx = to_onnx(kde, (X_train,))
+        onx = to_onnx(kde, (X_train,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ReduceLogSumExp", op_types)
@@ -201,7 +201,7 @@ class TestKernelDensity(ExtTestCase):
         kde = KernelDensity(bandwidth=1.0, kernel="exponential")
         kde.fit(X_train)
 
-        onx = to_onnx(kde, (X_train,))
+        onx = to_onnx(kde, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_test})
@@ -228,7 +228,7 @@ class TestKernelDensity(ExtTestCase):
         kde = KernelDensity(bandwidth=2.0, kernel="linear")
         kde.fit(X_train)
 
-        onx = to_onnx(kde, (X_train,))
+        onx = to_onnx(kde, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_test})
@@ -251,7 +251,7 @@ class TestKernelDensity(ExtTestCase):
         kde = KernelDensity(bandwidth=2.0, kernel="linear")
         kde.fit(X_train)
 
-        onx = to_onnx(kde, (X_train,))
+        onx = to_onnx(kde, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_test})
@@ -333,7 +333,7 @@ class TestKernelDensity(ExtTestCase):
         )
         pipe.fit(X_train)
 
-        onx = to_onnx(pipe, (X_train,))
+        onx = to_onnx(pipe, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_test})
@@ -360,7 +360,7 @@ class TestKernelDensity(ExtTestCase):
         kde = KernelDensity(bandwidth=0.5, kernel="gaussian")
         kde.fit(X_train)
 
-        onx = to_onnx(kde, (X_train,))
+        onx = to_onnx(kde, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X_test})

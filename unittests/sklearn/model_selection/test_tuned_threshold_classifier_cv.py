@@ -25,7 +25,7 @@ class TestSklearnTunedThresholdClassifierCV(ExtTestCase):
         """Convert, run, and compare classifier outputs."""
         for dtype in dtypes:
             Xd = X.astype(dtype)
-            onx = to_onnx(clf, (Xd,))
+            onx = to_onnx(clf, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")

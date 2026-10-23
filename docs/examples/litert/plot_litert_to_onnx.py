@@ -74,7 +74,7 @@ for i, op in enumerate(sg.operators):
 
 X = np.random.default_rng(0).standard_normal((1, 4)).astype(np.float32)
 
-onx = to_onnx(model_bytes, (X,), input_names=["input"])
+onx = to_onnx(model_bytes, (X,), target_opset=21, input_names=["input"])
 
 print(f"\nONNX opset version : {onx.opset_import[0].version}")
 print(f"Number of nodes    : {len(onx.graph.node)}")
@@ -139,6 +139,7 @@ def custom_relu6(g, sts, outputs, op):
 onx_custom = to_onnx(
     model_bytes,
     (X,),
+    target_opset=21,
     input_names=["input"],
     extra_converters={BuiltinOperator.RELU: custom_relu6},
 )

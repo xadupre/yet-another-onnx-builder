@@ -15,7 +15,7 @@ class TestCEOneHotEncoder(ExtTestCase):
     def _run_test(self, enc, X_df, X_np, atol=1e-6):
         from yobx.sklearn import to_onnx
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
 
         expected = enc.transform(X_df).values.astype(X_np.dtype)
 
@@ -91,7 +91,7 @@ class TestCEOneHotEncoder(ExtTestCase):
         X_test = pd.DataFrame({"cat": [0.0, 1.0, 99.0], "num": [1.0, 2.0, 3.0]})
         X_np = X_test.values.astype(np.float32)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -110,7 +110,7 @@ class TestCEOneHotEncoder(ExtTestCase):
         X_test = pd.DataFrame({"cat": [0.0, 99.0, np.nan], "num": [1.0, 2.0, 3.0]})
         X_np = X_test.values.astype(np.float32)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -132,7 +132,7 @@ class TestCEOneHotEncoder(ExtTestCase):
         X_test = pd.DataFrame({"cat": [0.0, np.nan, 1.0], "num": [1.0, 2.0, 3.0]})
         X_np = X_test.values.astype(np.float32)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -161,7 +161,7 @@ class TestCEOneHotEncoder(ExtTestCase):
         pipe.fit(X_df, y)
 
         X_np = X_df.values.astype(np.float32)
-        onx = to_onnx(pipe, (X_np,))
+        onx = to_onnx(pipe, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -180,7 +180,7 @@ class TestCEOneHotEncoder(ExtTestCase):
         enc.fit(X_df)
         X_np = X_df.values  # dtype=object (string array)
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 
@@ -197,7 +197,7 @@ class TestCEOneHotEncoder(ExtTestCase):
         enc.fit(X_df)
         X_np = X_df.values
 
-        onx = to_onnx(enc, (X_np,))
+        onx = to_onnx(enc, (X_np,), target_opset=21)
         sess = self.check_ort(onx)
         ort_result = sess.run(None, {"X": X_np})[0]
 

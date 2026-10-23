@@ -97,7 +97,7 @@ outputs with :epkg:`scikit-learn`'s own predictions:
         [("scaler", StandardScaler()), ("clf", LogisticRegression())]
     ).fit(X_train, y_train)
 
-    onx = to_onnx(pipe, (X_train[:1],))
+    onx = to_onnx(pipe, (X_train[:1],), target_opset=21)
 
     # Run with onnxruntime
     X_test = rng.standard_normal((20, 4)).astype(np.float32)
@@ -284,6 +284,7 @@ function and pass it via ``extra_converters``:
     onx = to_onnx(
         transformer,
         (X[:1],),
+        target_opset=21,
         extra_converters={ClipTransformer: convert_clip},
     )
     print(pretty_onnx(onx))
@@ -332,7 +333,7 @@ custom converter is required.
     rng = np.random.default_rng(0)
     X = rng.standard_normal((20, 4)).astype(np.float32)
     transformer = FunctionTransformer(func=log1p_abs).fit(X)
-    onx = to_onnx(transformer, (X[:1],))
+    onx = to_onnx(transformer, (X[:1],), target_opset=21)
     print(pretty_onnx(onx))
 
     sess = onnxruntime.InferenceSession(

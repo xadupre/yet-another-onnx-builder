@@ -104,7 +104,7 @@ Wrap the DataFrame logic in a custom transformer inheriting from
     )
     pipe = Pipeline([("features", AddTotalTransformer()), ("scale", StandardScaler())]).fit(train_df)
 
-    onx = to_onnx(pipe, (train_df,))
+    onx = to_onnx(pipe, (train_df,), target_opset=21)
 
     test_df = pd.DataFrame(
         {

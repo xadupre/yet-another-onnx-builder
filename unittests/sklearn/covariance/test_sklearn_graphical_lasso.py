@@ -18,7 +18,7 @@ class TestGraphicalLasso(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         estimator.fit(X)
-        onx = to_onnx(estimator, (X,))
+        onx = to_onnx(estimator, (X,), target_opset=21)
 
         output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
@@ -48,7 +48,7 @@ class TestGraphicalLasso(ExtTestCase):
         X = rng.standard_normal((60, 4)).astype(np.float64)
         gl = GraphicalLasso(assume_centered=True)
         gl.fit(X)
-        onx = to_onnx(gl, (X,))
+        onx = to_onnx(gl, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -69,7 +69,7 @@ class TestGraphicalLasso(ExtTestCase):
         X = rng.standard_normal((60, 4)).astype(np.float64)
         gl = GraphicalLasso()
         gl.fit(X)
-        onx = to_onnx(gl, (X,))
+        onx = to_onnx(gl, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -89,7 +89,7 @@ class TestGraphicalLasso(ExtTestCase):
         X = self._make_data(seed=3)
         gl = GraphicalLasso()
         gl.fit(X)
-        onx = to_onnx(gl, (X,))
+        onx = to_onnx(gl, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)
@@ -107,7 +107,7 @@ class TestGraphicalLasso(ExtTestCase):
         X = rng.standard_normal((60, 4)).astype(np.float32)
         pipe = Pipeline([("scaler", StandardScaler()), ("gl", GraphicalLasso())])
         pipe.fit(X)
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -134,7 +134,7 @@ class TestGraphicalLassoCV(ExtTestCase):
         from yobx.sklearn import to_onnx
 
         estimator.fit(X)
-        onx = to_onnx(estimator, (X,))
+        onx = to_onnx(estimator, (X,), target_opset=21)
 
         output_names = [o.name for o in onx.proto.graph.output]
         self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
@@ -164,7 +164,7 @@ class TestGraphicalLassoCV(ExtTestCase):
         X = rng.standard_normal((60, 4)).astype(np.float64)
         glcv = GraphicalLassoCV()
         glcv.fit(X)
-        onx = to_onnx(glcv, (X,))
+        onx = to_onnx(glcv, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -184,7 +184,7 @@ class TestGraphicalLassoCV(ExtTestCase):
         X = self._make_data(seed=2)
         glcv = GraphicalLassoCV()
         glcv.fit(X)
-        onx = to_onnx(glcv, (X,))
+        onx = to_onnx(glcv, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("Sub", op_types)

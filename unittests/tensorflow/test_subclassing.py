@@ -162,7 +162,7 @@ class TestSubclassingModels(ExtTestCase):
         data = np.random.rand(2, 32, 32, 1).astype(np.float32)
         _ = lenet(data)  # build the model
 
-        onx = to_onnx(lenet, (data,))
+        onx = to_onnx(lenet, (data,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Conv", op_types)
@@ -185,7 +185,7 @@ class TestSubclassingModels(ExtTestCase):
         np_input = np.random.normal(size=(2, 20)).astype(np.float32)
         _ = mlp(np_input)  # build the model
 
-        onx = to_onnx(mlp, (np_input,))
+        onx = to_onnx(mlp, (np_input,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
@@ -215,7 +215,7 @@ class TestSubclassingModels(ExtTestCase):
         x = np.random.normal(size=(3, 2, 20)).astype(np.float32)
         y = np.random.normal(size=(3, 2, 20)).astype(np.float32)
 
-        onx = to_onnx(op_func, (x, y), input_names=["X", "Y"])
+        onx = to_onnx(op_func, (x, y), target_opset=21, input_names=["X", "Y"])
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("MatMul", op_types)
@@ -242,7 +242,7 @@ class TestSubclassingModels(ExtTestCase):
         x = np.random.normal(size=(7, original_dim)).astype(np.float32)
         _ = vae(x)  # build the model
 
-        onx = to_onnx(vae, (x,))
+        onx = to_onnx(vae, (x,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("RandomNormalLike", op_types)
@@ -273,7 +273,7 @@ class TestSubclassingModels(ExtTestCase):
 
         const_in = np.array([2, 4, 6, 8, 10]).astype(np.int32)
 
-        onx = to_onnx(tf_where_fn, (const_in,))
+        onx = to_onnx(tf_where_fn, (const_in,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
         self.assertIn("Where", op_types)

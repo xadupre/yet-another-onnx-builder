@@ -47,7 +47,7 @@ km.fit(X)
 # 2. Convert to ONNX
 # ------------------
 
-onx = to_onnx(km, (X,))
+onx = to_onnx(km, (X,), target_opset=21)
 print(f"ONNX model inputs : {[i.name for i in onx.graph.input]}")
 print(f"ONNX model outputs: {[o.name for o in onx.graph.output]}")
 
@@ -82,7 +82,7 @@ pipe = Pipeline(
 )
 pipe.fit(X)
 
-onx_pipe = to_onnx(pipe, (X,))
+onx_pipe = to_onnx(pipe, (X,), target_opset=21)
 
 ref_pipe = onnxruntime.InferenceSession(
     onx_pipe.SerializeToString(), providers=["CPUExecutionProvider"]

@@ -143,7 +143,7 @@ Both paths produce identical results
 
     birch = Birch(n_clusters=3, threshold=0.5).fit(X)
 
-    onx_std = to_onnx(birch, (X,))
+    onx_std = to_onnx(birch, (X,), target_opset=18)
     onx_cd = to_onnx(birch, (X,), target_opset={"": 18, "com.microsoft": 1})
 
     ref_std = onnxruntime.InferenceSession(

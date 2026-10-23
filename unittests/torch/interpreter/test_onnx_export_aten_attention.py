@@ -27,7 +27,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
         ds = (ds1, ds1, ds1)
 
         options = ExportOptions(aten_as_function=False)
-        onx = to_onnx(model, inputs, dynamic_shapes=ds, export_options=options)
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=ds, export_options=options)
         self.assertNotIn(
             "aten_scaled_dot_product_attention_default", {n.op_type for n in onx.graph.node}
         )
@@ -68,7 +68,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
         ds = (ds1, ds1, ds1)
 
         options = ExportOptions(aten_as_function=False)
-        onx = to_onnx(model, inputs, dynamic_shapes=ds, export_options=options)
+        onx = to_onnx(model, inputs, target_opset=21, dynamic_shapes=ds, export_options=options)
         self.assertNotIn(
             "aten_scaled_dot_product_attention_default", [n.op_type for n in onx.graph.node]
         )
@@ -109,6 +109,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=ds,
             inline=False,
             export_options=ExportOptions(
@@ -164,6 +165,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
         onx = to_onnx(
             model,
             inputs,
+            target_opset=21,
             dynamic_shapes=ds,
             inline=False,
             export_options=ExportOptions(

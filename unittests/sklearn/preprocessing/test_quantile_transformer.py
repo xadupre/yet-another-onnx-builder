@@ -23,7 +23,7 @@ class TestQuantileTransformer(ExtTestCase):
         qt.fit(X)
 
         X_test = X[:8]
-        onx = to_onnx(qt, (X_test,))
+        onx = to_onnx(qt, (X_test,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_test})[0]
@@ -44,7 +44,7 @@ class TestQuantileTransformer(ExtTestCase):
         qt.fit(X)
 
         X_test = X[:8]
-        onx = to_onnx(qt, (X_test,))
+        onx = to_onnx(qt, (X_test,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_test})[0]
@@ -67,7 +67,7 @@ class TestQuantileTransformer(ExtTestCase):
 
         # Include values outside the training range.
         X_test = np.vstack([X_train[:3], np.array([[-100.0, 100.0]], dtype=np.float32)])
-        onx = to_onnx(qt, (X_test,))
+        onx = to_onnx(qt, (X_test,), target_opset=21)
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X_test})[0]
@@ -85,7 +85,7 @@ class TestQuantileTransformer(ExtTestCase):
         qt.fit(X)
 
         X_test = X[:5]
-        onx = to_onnx(qt, (X_test,))
+        onx = to_onnx(qt, (X_test,), target_opset=21)
 
         sess = self.check_ort(onx)
         result = sess.run(None, {"X": X_test})[0]
@@ -110,7 +110,7 @@ class TestQuantileTransformer(ExtTestCase):
         pipe.fit(X, y)
 
         X_test = X[:5]
-        onx = to_onnx(pipe, (X_test,))
+        onx = to_onnx(pipe, (X_test,), target_opset=21)
 
         sess = self.check_ort(onx)
         ort_results = sess.run(None, {"X": X_test})

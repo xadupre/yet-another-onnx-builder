@@ -101,7 +101,7 @@ fopts = FunctionOptions(
 # ``StandardScaler`` in domain ``myapp``.  The main graph has only one node —
 # a call to that function — instead of the usual ``Sub``/``Div`` operators.
 
-onx_scaler = to_onnx(scaler, (X[:1],), function_options=fopts)
+onx_scaler = to_onnx(scaler, (X[:1],), target_opset=21, function_options=fopts)
 
 print("=== Standalone StandardScaler ===")
 print(f"Local functions : {[(f.name, f.domain) for f in onx_scaler.functions]}")
@@ -123,7 +123,7 @@ print("Numerical output matches sklearn ✓")
 # The ``Pipeline`` container itself is **not** wrapped; each step gets its own
 # ``FunctionProto``.  The main graph chains two function-call nodes.
 
-onx_pipe = to_onnx(pipe, (X[:1],), function_options=fopts)
+onx_pipe = to_onnx(pipe, (X[:1],), target_opset=21, function_options=fopts)
 
 print("\n=== Pipeline ===")
 print(f"Local functions : {[f.name for f in onx_pipe.functions]}")
@@ -150,7 +150,7 @@ print("Pipeline labels and probabilities match sklearn ✓")
 # The orchestration logic (``Gather`` + ``Concat``) stays in the main graph;
 # only the two leaf transformers become functions.
 
-onx_ct = to_onnx(ct, (X[:1],), function_options=fopts)
+onx_ct = to_onnx(ct, (X[:1],), target_opset=21, function_options=fopts)
 
 print("\n=== ColumnTransformer ===")
 print(f"Local functions : {[f.name for f in onx_ct.functions]}")
@@ -175,7 +175,7 @@ print("ColumnTransformer output matches sklearn ✓")
 # The flat graph (default) inlines all operators.  The function graph keeps
 # the structure clean in the main graph proto.
 
-onx_pipe_ct = to_onnx(pipe_ct, (X[:1],), function_options=fopts)
+onx_pipe_ct = to_onnx(pipe_ct, (X[:1],), target_opset=21, function_options=fopts)
 print("\n=== Pipeline and ColumnTransformer ===")
 print(f"Local functions : {[f.name for f in onx_pipe_ct.functions]}")
 ct_ops = [n.op_type for n in onx_pipe_ct.graph.node]

@@ -37,7 +37,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 estimator.fit(X, y)  # always fit in float64
-            onx = to_onnx(estimator, (Xd,))
+            onx = to_onnx(estimator, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 1, f"Expected 1 output, got {output_names}")
@@ -58,7 +58,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore")
                 estimator.fit(X, y)  # always fit in float64
-            onx = to_onnx(estimator, (Xd,))
+            onx = to_onnx(estimator, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -192,7 +192,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
         gpc = GaussianProcessClassifier(multi_class="one_vs_one", random_state=0)
         gpc.fit(self._X, self._y_multi)
         with self.assertRaises(NotImplementedError):
-            to_onnx(gpc, (self._X.astype(np.float32),))
+            to_onnx(gpc, (self._X.astype(np.float32),), target_opset=21)
 
     def test_gpr_unsupported_kernel_raises(self):
         """GPR with an unsupported kernel type should raise NotImplementedError."""
@@ -201,7 +201,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
         gpr = GaussianProcessRegressor(kernel=ExpSineSquared(), optimizer=None)
         gpr.fit(self._X, self._y_reg)
         with self.assertRaises(NotImplementedError):
-            to_onnx(gpr, (self._X.astype(np.float32),))
+            to_onnx(gpr, (self._X.astype(np.float32),), target_opset=21)
 
     # ── com.microsoft CDist path ───────────────────────────────────────────────
 

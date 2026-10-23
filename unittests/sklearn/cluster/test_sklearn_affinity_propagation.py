@@ -19,7 +19,7 @@ class TestAffinityPropagation(ExtTestCase):
         ap = AffinityPropagation(random_state=0)
         ap.fit(X)
 
-        onx = to_onnx(ap, (X,))
+        onx = to_onnx(ap, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("ArgMin", op_types)
@@ -46,7 +46,7 @@ class TestAffinityPropagation(ExtTestCase):
         ap = AffinityPropagation(random_state=1)
         ap.fit(X)
 
-        onx = to_onnx(ap, (X,))
+        onx = to_onnx(ap, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -71,7 +71,7 @@ class TestAffinityPropagation(ExtTestCase):
         ap = AffinityPropagation(damping=0.7, random_state=0)
         ap.fit(X)
 
-        onx = to_onnx(ap, (X,))
+        onx = to_onnx(ap, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})
@@ -93,7 +93,7 @@ class TestAffinityPropagation(ExtTestCase):
         )
         pipe.fit(X)
 
-        onx = to_onnx(pipe, (X,))
+        onx = to_onnx(pipe, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         results = ref.run(None, {"X": X})

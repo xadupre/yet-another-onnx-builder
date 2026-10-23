@@ -19,7 +19,7 @@ class TestIsomap(ExtTestCase):
         iso = Isomap(n_components=2, n_neighbors=5)
         iso.fit(X)
 
-        onx = to_onnx(iso, (X,))
+        onx = to_onnx(iso, (X,), target_opset=21)
 
         # Verify key ops are present
         op_types = [n.op_type for n in onx.proto.graph.node]
@@ -49,7 +49,7 @@ class TestIsomap(ExtTestCase):
         iso = Isomap(n_components=3, n_neighbors=7)
         iso.fit(X_train)
 
-        onx = to_onnx(iso, (X_train,))
+        onx = to_onnx(iso, (X_train,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_test})[0]
@@ -69,7 +69,7 @@ class TestIsomap(ExtTestCase):
         iso = Isomap(n_components=1, n_neighbors=4)
         iso.fit(X)
 
-        onx = to_onnx(iso, (X,))
+        onx = to_onnx(iso, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]
@@ -90,7 +90,7 @@ class TestIsomap(ExtTestCase):
         iso = Isomap(n_components=2, n_neighbors=5)
         iso.fit(X)
 
-        onx = to_onnx(iso, (X,))
+        onx = to_onnx(iso, (X,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X})[0]

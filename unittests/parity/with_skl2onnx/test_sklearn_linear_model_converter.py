@@ -5,10 +5,10 @@ import onnx_light.onnx.helper as oh
 from sklearn.datasets import make_classification, make_regression
 from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge
 from sklearn.model_selection import train_test_split
-from yobx import DEFAULT_TARGET_OPSET as TARGET_OPSET
 from yobx.ext_test_case import ExtTestCase
 from yobx.sklearn.tests_helper import dump_data_and_model
 from yobx.sklearn import to_onnx
+from unittests.parity.with_skl2onnx._common import TARGET_OPSET
 import onnxruntime
 
 

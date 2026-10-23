@@ -95,7 +95,7 @@ for step_name, step in pipe.steps:
 # are resolved to integer positions via ``feature_names_in_`` that
 # scikit-learn sets during ``fit``.
 
-onx = to_onnx(pipe, (df,))
+onx = to_onnx(pipe, (df,), target_opset=21)
 
 print("\nONNX graph inputs:")
 for inp in onx.proto.graph.input:
@@ -139,7 +139,7 @@ print("\nAll predictions match ✓")
 #
 # The same pattern works when converting only the preprocessing part.
 
-onx_ct = to_onnx(ct, (df,))
+onx_ct = to_onnx(ct, (df,), target_opset=21)
 
 print("\nColumnTransformer ONNX inputs:")
 for inp in onx_ct.proto.graph.input:

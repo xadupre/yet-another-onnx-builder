@@ -26,7 +26,7 @@ class TestAdditiveChi2Sampler(ExtTestCase):
         )
         est.fit(X)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=21)
 
         expected = est.transform(X).astype(dtype)
 
@@ -81,7 +81,7 @@ class TestAdditiveChi2Sampler(ExtTestCase):
         est = AdditiveChi2Sampler(sample_steps=2)
         est.fit(X)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=21)
 
         expected = est.transform(X)
 
@@ -99,7 +99,7 @@ class TestAdditiveChi2Sampler(ExtTestCase):
         est = AdditiveChi2Sampler(sample_steps=2)
         est.fit(X)
 
-        onx = to_onnx(est, (X,))
+        onx = to_onnx(est, (X,), target_opset=21)
 
         expected = est.transform(X).astype(np.float32)
 
@@ -123,7 +123,7 @@ class TestAdditiveChi2Sampler(ExtTestCase):
         est = AdditiveChi2Sampler(sample_steps=2)
         est.fit(X_train)
 
-        onx = to_onnx(est, (X_train,))
+        onx = to_onnx(est, (X_train,), target_opset=21)
 
         expected = est.transform(X_test).astype(np.float32)
         ref = ExtendedReferenceEvaluator(onx)

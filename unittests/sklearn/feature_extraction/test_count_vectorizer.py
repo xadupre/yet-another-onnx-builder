@@ -27,7 +27,7 @@ class TestCountVectorizer(ExtTestCase):
         cv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(cv, (X_padded,))
+        onx = to_onnx(cv, (X_padded,), target_opset=21)
 
         op_types = [n.op_type for n in onx.proto.graph.node]
         self.assertIn("TfIdfVectorizer", op_types)
@@ -51,7 +51,7 @@ class TestCountVectorizer(ExtTestCase):
         cv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(cv, (X_padded,))
+        onx = to_onnx(cv, (X_padded,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_padded})[0]
@@ -72,7 +72,7 @@ class TestCountVectorizer(ExtTestCase):
         cv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(cv, (X_padded,))
+        onx = to_onnx(cv, (X_padded,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_padded})[0]
@@ -93,7 +93,7 @@ class TestCountVectorizer(ExtTestCase):
         cv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(cv, (X_padded,))
+        onx = to_onnx(cv, (X_padded,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_padded})[0]
@@ -114,7 +114,7 @@ class TestCountVectorizer(ExtTestCase):
         cv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(cv, (X_padded,))
+        onx = to_onnx(cv, (X_padded,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_padded})[0]
@@ -139,7 +139,7 @@ class TestCountVectorizer(ExtTestCase):
         cv.fit(texts)
 
         X_padded = _pad_tokens(texts)
-        onx = to_onnx(cv, (X_padded,))
+        onx = to_onnx(cv, (X_padded,), target_opset=21)
 
         ref = ExtendedReferenceEvaluator(onx)
         result = ref.run(None, {"X": X_padded})[0]
@@ -161,7 +161,7 @@ class TestCountVectorizer(ExtTestCase):
 
         X_padded = _pad_tokens(texts, tokenize=list)
         with self.assertRaises(NotImplementedError):
-            to_onnx(cv, (X_padded,))
+            to_onnx(cv, (X_padded,), target_opset=21)
 
     def test_raises_for_non_string_input(self):
         """Float input must raise NotImplementedError."""
@@ -174,7 +174,7 @@ class TestCountVectorizer(ExtTestCase):
 
         X_float = np.zeros((2, 2), dtype=np.float32)
         with self.assertRaises(NotImplementedError):
-            to_onnx(cv, (X_float,))
+            to_onnx(cv, (X_float,), target_opset=21)
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ from yobx.torch.export_options import ExportOptions
 class TestNativeCommonOps(unittest.TestCase):
     def export(self, model, args, **kwargs):
         """Exports and checks a model without decomposing the tested ATen calls."""
+        kwargs.setdefault("target_opset", 21)
         artifact = to_onnx(
             model,
             args,

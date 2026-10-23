@@ -262,7 +262,7 @@ def _make_export_test(op: Any, dtype: torch.dtype) -> Callable:
             expected if isinstance(expected, (tuple, list)) else (expected,)
         )
 
-        onx = to_onnx(model, inputs, export_options=ExportOptions(tracing=True))
+        onx = to_onnx(model, inputs, target_opset=21, export_options=ExportOptions(tracing=True))
         numpy_inputs = [to_numpy(t) for t in inputs]
 
         ref = ExtendedReferenceEvaluator(onx.proto)

@@ -21,6 +21,8 @@ def _ort_run(onx, feeds):
     from yobx.container import ExportArtifact
 
     proto = onx.proto if isinstance(onx, ExportArtifact) else onx
+    assert {o.domain: o.version for o in proto.opset_import}[""] == 21
+    assert proto.ir_version == 10
     sess = InferenceSession(proto.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)
 
@@ -191,7 +193,7 @@ class TestLazyframeToOnnx(ExtTestCase):
         from yobx.sql import lazyframe_to_onnx
         from yobx.reference import ExtendedReferenceEvaluator
 
-        artifact = lazyframe_to_onnx(lf, input_dtypes)
+        artifact = lazyframe_to_onnx(lf, input_dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         ref_outputs = ref.run(None, feeds)
         if has_onnxruntime():
@@ -384,7 +386,7 @@ class TestLazyframeToOnnx(ExtTestCase):
         lf = pl.LazyFrame({"a": [1.0, 2.0, 3.0], "b": [4.0, 5.0, 6.0]})
         lf = lf.select([(pl.col("a") + pl.col("b")).alias("total")])
         dtypes = {"a": np.float64, "b": np.float64}
-        artifact = to_onnx(lf, dtypes)
+        artifact = to_onnx(lf, dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0, 3.0], dtype=np.float64)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float64)
@@ -406,7 +408,7 @@ class TestToOnnxSqlString(ExtTestCase):
         from yobx.reference import ExtendedReferenceEvaluator
 
         dtypes = {"a": np.float64, "b": np.float64}
-        artifact = to_onnx("SELECT a + b AS total FROM t", dtypes)
+        artifact = to_onnx("SELECT a + b AS total FROM t", dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 2.0, 3.0], dtype=np.float64)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float64)
@@ -420,7 +422,10 @@ class TestToOnnxSqlString(ExtTestCase):
 
         dtypes = {"a": np.float64}
         artifact = to_onnx(
-            "SELECT my_sqrt(a) AS r FROM t", dtypes, custom_functions={"my_sqrt": np.sqrt}
+            "SELECT my_sqrt(a) AS r FROM t",
+            dtypes,
+            target_opset=21,
+            custom_functions={"my_sqrt": np.sqrt},
         )
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, 4.0, 9.0], dtype=np.float64)
@@ -433,7 +438,7 @@ class TestToOnnxSqlString(ExtTestCase):
         from yobx.reference import ExtendedReferenceEvaluator
 
         dtypes = {"a": np.float64, "b": np.float64}
-        artifact = to_onnx("SELECT a + b AS total FROM t WHERE a > 0", dtypes)
+        artifact = to_onnx("SELECT a + b AS total FROM t WHERE a > 0", dtypes, target_opset=21)
         ref = ExtendedReferenceEvaluator(artifact)
         a = np.array([1.0, -2.0, 3.0], dtype=np.float64)
         b = np.array([4.0, 5.0, 6.0], dtype=np.float64)

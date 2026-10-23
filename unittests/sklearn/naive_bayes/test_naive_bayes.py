@@ -32,7 +32,7 @@ class TestSklearnNaiveBayes(ExtTestCase):
         for dtype in (np.float32, np.float64):
             Xd = X.astype(dtype)
             estimator.fit(Xd, y)
-            onx = to_onnx(estimator, (Xd,))
+            onx = to_onnx(estimator, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -57,7 +57,7 @@ class TestSklearnNaiveBayes(ExtTestCase):
         for dtype in (np.float32, np.float64):
             Xd = X.astype(dtype)
             estimator.fit(X, y)
-            onx = to_onnx(estimator, (Xd,))
+            onx = to_onnx(estimator, (Xd,), target_opset=21)
 
             output_names = [o.name for o in onx.proto.graph.output]
             self.assertEqual(len(output_names), 2, f"Expected 2 outputs, got {output_names}")
@@ -91,7 +91,7 @@ class TestSklearnNaiveBayes(ExtTestCase):
             y = self._y_multi
             pipe = Pipeline([("scaler", StandardScaler()), ("clf", GaussianNB())])
             pipe.fit(Xd, y)
-            onx = to_onnx(pipe, (Xd,))
+            onx = to_onnx(pipe, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
@@ -118,7 +118,7 @@ class TestSklearnNaiveBayes(ExtTestCase):
             Xd = X.astype(dtype)
             pipe = Pipeline([("scaler", MinMaxScaler()), ("clf", MultinomialNB())])
             pipe.fit(Xd, y)
-            onx = to_onnx(pipe, (Xd,))
+            onx = to_onnx(pipe, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
@@ -152,7 +152,7 @@ class TestSklearnNaiveBayes(ExtTestCase):
             y = self._y_multi
             pipe = Pipeline([("scaler", StandardScaler()), ("clf", BernoulliNB(binarize=None))])
             pipe.fit(Xd, y)
-            onx = to_onnx(pipe, (Xd,))
+            onx = to_onnx(pipe, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
@@ -179,7 +179,7 @@ class TestSklearnNaiveBayes(ExtTestCase):
             Xd = X.astype(dtype)
             pipe = Pipeline([("scaler", MinMaxScaler()), ("clf", ComplementNB())])
             pipe.fit(Xd, y)
-            onx = to_onnx(pipe, (Xd,))
+            onx = to_onnx(pipe, (Xd,), target_opset=21)
 
             ref = ExtendedReferenceEvaluator(onx)
             results = ref.run(None, {"X": Xd})
