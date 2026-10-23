@@ -4248,6 +4248,27 @@ class TestOnnxExportAten(ExtTestCase):
         onx = to_onnx(model, inputs)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs)
 
+    def test_aten_arg_reductions_shape(self):
+        import torch
+        from onnx_light.onnx import TensorProto
+        from yobx.torch.interpreter._aten_functions import aten_argmax, aten_argmin
+        from yobx.torch.interpreter.graph_builder import TorchOnnxLightGraphBuilder
+
+        x = torch.arange(24, dtype=torch.float32).reshape(2, 3, 4)
+        for lower, reference in ((aten_argmax, torch.argmax), (aten_argmin, torch.argmin)):
+            for dim in (None, 1, -1):
+                for keepdim in (False, True):
+                    with self.subTest(operator=lower.__name__, dim=dim, keepdim=keepdim):
+                        builder = TorchOnnxLightGraphBuilder(18)
+                        builder.make_tensor_input("X", TensorProto.FLOAT, tuple(x.shape))
+                        result = lower(builder, None, ["Y"], "X", dim, keepdim)
+                        expected = reference(x, dim=dim, keepdim=keepdim)
+                        self.assertEqual(builder.get_shape(result), tuple(expected.shape))
+                        builder.make_tensor_output(result)
+                        self.assert_conversion_with_ort_on_cpu(
+                            builder.to_onnx(optimize=False), expected, (x,)
+                        )
+
     def test_aten_asin(self):
         import torch
 

@@ -926,7 +926,9 @@ class TestPostProcessExportedProgram(ExtTestCase):
             (),
             False,
         )
-        g.make_tensor_output(output, torch_dtype_to_onnx_dtype(torch.float16), (2, 4))
+        g.make_tensor_output(
+            output, torch_dtype_to_onnx_dtype(torch.float16), (x.shape[0], y.shape[1])
+        )
         self._assert_reference_conversion(
             g.to_onnx(optimize=False), self._scaled_mm_reference(inputs), inputs, atol=1e-2
         )

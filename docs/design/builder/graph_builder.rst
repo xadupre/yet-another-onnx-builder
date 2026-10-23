@@ -213,6 +213,31 @@ rewrites, and every other value must be an exact registered pattern name.
 Python pattern classes, legacy pattern groups, and historical Python
 registries are no longer supported.
 
+The default selection excludes ``CastOpCast`` to preserve lower-precision
+rounding and ``Reshape2Of3`` because version 0.2.0 can produce incompatible
+broadcasts when merging expanded operands. Explicit pattern names still
+allow opting into either rewrite. Native causal-mask fusion is conditional:
+supported masks may remain as boolean comparisons instead of ``CausalMask``
+local functions.
+
+After rewriting, the bridge folds newly introduced constant expressions when
+``constant_folding=True``, removes redundant identities, and removes unused
+nodes when ``remove_unused=True``. Floating-point ``min``/``max`` metadata
+emitted by the native engine is discarded because its rounded bounds can
+contradict the actual folded tensor values. Tensor types and shapes are retained.
+Execution lifetime and in-place-reuse hints are also removed from the exported
+graphs and local functions, since rewrites and renaming can make them stale.
+
+For graphs containing bfloat16 tensors, ``Where`` is excluded from constant
+folding because its native kernel in onnx-light 0.2.0 does not support that
+dtype. ``ReduceProd`` is likewise excluded when a reduction input is not
+float32, since its 0.2.0 kernel only supports float32. Float32-only reductions
+and other supported operators still undergo constant folding.
+
+Native inlining may retain local functions whose operator-domain opset versions
+differ from the model's. These functions keep their own opset imports; inspecting
+the exported operators must also include their bodies.
+
 Dynamic shapes
 ==============
 

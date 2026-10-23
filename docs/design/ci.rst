@@ -103,9 +103,11 @@ Native fusion coverage and remaining regressions
 -----------------------------------------------
 
 Tests previously skipped pending ``onnx-light 0.1.33`` are exercised with the
-currently required ``0.1.33`` release. Nested conditional functions and dynamic
+currently required ``0.2.0`` release. Nested conditional functions and dynamic
 grouped matrix multiplication work with that release. The grouped matrix
 multiplication test checks both retained and inlined ``Scan`` functions.
+The reshape/MatMul composition tests run Cast elimination before the fusion
+pass because ``0.2.0`` canonicalizes Identity nodes at optimization entry.
 Tiny-LLM fusion tests use opset 24 and run without version-based expected
 failures, including float16 exports and transformer patches. They check the
 standard ``Attention`` and ``RMSNormalization`` operators and a retained native
@@ -137,4 +139,4 @@ The native regressions fixed in ``0.1.33`` run without expected failures:
   outputs.
 
 Their conditional ``pytest.mark.xfail`` markers apply only to older releases;
-the required ``0.1.33`` release no longer allows these failures.
+the required ``0.2.0`` release no longer allows these failures.

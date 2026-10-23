@@ -23,7 +23,7 @@ The function is traced through the DataFrame API and compiled into ONNX.
     from yobx.sql import to_onnx
 
     def add_total(df):
-        if hasattr(df, "select"):
+        if not isinstance(df, pd.DataFrame):
             return df.select({"total": df["a"] + df["b"]})
         return (df["a"] + df["b"]).to_frame(name="total")
 
@@ -50,7 +50,7 @@ one traced frame per input DataFrame.
     from yobx.sql import to_onnx
 
     def join_like(left, right):
-        if hasattr(left, "join"):
+        if not isinstance(left, pd.DataFrame):
             merged = left.join(right, left_key="id", right_key="id")
             return merged.select({"total": merged["a"] + merged["b"]})
         merged = pd.merge(left, right, on="id")
@@ -91,7 +91,7 @@ Wrap the DataFrame logic in a custom transformer inheriting from
             return self
 
         def transform(self, df):
-            if hasattr(df, "select"):
+            if not isinstance(df, pd.DataFrame):
                 return df.select({"total": df["a"] + df["b"]})
             return (df["a"] + df["b"]).to_frame(name="total")
 
