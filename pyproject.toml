@@ -27,7 +27,7 @@ dev = [
     "py-cpuinfo",
     "pytest-coverage",
     "pytest-subtests",
-    "ruff==0.17.0",
+    "ruff==0.17.1",
     "xlsxwriter",
 ]
 docs = [
