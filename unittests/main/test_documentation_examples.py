@@ -13,6 +13,9 @@ from yobx import __file__ as yobx_file
 from yobx.ext_test_case import (
     ExtTestCase,
     requires_sklearn,
+    requires_matplotlib,
+    requires_onnxruntime,
+    requires_pandas,
     is_windows,
     ignore_errors,
     has_ipython,
@@ -65,6 +68,20 @@ class TestDocumentationExamples(ExtTestCase):
     def test_expected_api_rst_examples(self):
         output = self.run_rst_examples("design/sklearn/expected_api.rst")
         self.assertIn("Sub(X,", output)
+
+    @requires_matplotlib()
+    @requires_onnxruntime("1.24")
+    @requires_pandas()
+    @unittest.skipUnless(importlib.util.find_spec("polars"), "polars not installed")
+    def test_sql_gallery_examples(self):
+        fold = os.path.join(ROOT, "docs", "examples", "sql")
+        for name in (
+            "plot_lazyframe_to_onnx.py",
+            "plot_sql_to_onnx.py",
+            "plot_polars_three_joins_to_onnx.py",
+        ):
+            with self.subTest(example=name):
+                self.assertEqual(self.run_test(fold, name), 1)
 
     def run_test(self, fold: str, name: str, verbose=0) -> int:
         ppath = os.environ.get("PYTHONPATH", "")

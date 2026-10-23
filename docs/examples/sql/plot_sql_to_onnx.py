@@ -58,12 +58,13 @@ def run(onx, feeds):
 #
 # The simplest query selects two columns and computes their element-wise sum.
 # Each column in *input_dtypes* becomes a separate ONNX graph input.
+# Opset 21 is used explicitly for ONNX Runtime compatibility.
 
 dtypes = {"a": np.float32, "b": np.float32}
 a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
 b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
 
-onx_add = sql_to_onnx("SELECT a + b AS total FROM t", dtypes)
+onx_add = sql_to_onnx("SELECT a + b AS total FROM t", dtypes, target_opset=21)
 
 (total,) = run(onx_add, {"a": a, "b": b})
 print("a + b =", total)
@@ -82,7 +83,7 @@ print(pretty_onnx(onx_add))
 # The ``WHERE`` clause is translated to a boolean mask followed by
 # ``Compress`` nodes that select only the matching rows from every column.
 
-onx_where = sql_to_onnx("SELECT a, b FROM t WHERE a > 1.5", dtypes)
+onx_where = sql_to_onnx("SELECT a, b FROM t WHERE a > 1.5", dtypes, target_opset=21)
 a_filt, b_filt = run(onx_where, {"a": a, "b": b})
 
 print("rows where a > 1.5:")
@@ -101,7 +102,7 @@ print(pretty_onnx(onx_where))
 # ``SUM``, ``AVG``, ``MIN``, and ``MAX`` in the SELECT list are emitted as
 # ``ReduceSum``, ``ReduceMean``, ``ReduceMin``, and ``ReduceMax`` ONNX nodes.
 
-onx_agg = sql_to_onnx("SELECT SUM(a) AS s, AVG(b) AS m FROM t", dtypes)
+onx_agg = sql_to_onnx("SELECT SUM(a) AS s, AVG(b) AS m FROM t", dtypes, target_opset=21)
 s_arr, m_arr = run(onx_agg, {"a": a, "b": b})
 s = float(s_arr)
 m = float(m_arr)
@@ -121,7 +122,7 @@ print(pretty_onnx(onx_agg))
 #
 # Filters and expressions can be combined freely.
 
-onx_combined = sql_to_onnx("SELECT a + b AS total FROM t WHERE a > 0", dtypes)
+onx_combined = sql_to_onnx("SELECT a + b AS total FROM t WHERE a > 0", dtypes, target_opset=21)
 a2 = np.array([1.0, -2.0, 3.0], dtype=np.float32)
 b2 = np.array([4.0, 5.0, 6.0], dtype=np.float32)
 
@@ -157,7 +158,10 @@ dtypes_a = {"a": np.float32}
 a3 = np.array([4.0, -1.0, 9.0, 0.0], dtype=np.float32)
 
 onx_func = sql_to_onnx(
-    "SELECT clip_sqrt(a) AS r FROM t", dtypes_a, custom_functions={"clip_sqrt": clip_sqrt}
+    "SELECT clip_sqrt(a) AS r FROM t",
+    dtypes_a,
+    custom_functions={"clip_sqrt": clip_sqrt},
+    target_opset=21,
 )
 
 (r,) = run(onx_func, {"a": a3})
@@ -177,7 +181,10 @@ print(pretty_onnx(onx_func))
 # Custom functions also work in ``WHERE`` predicates.
 
 onx_where_func = sql_to_onnx(
-    "SELECT a FROM t WHERE clip_sqrt(a) > 1", dtypes_a, custom_functions={"clip_sqrt": clip_sqrt}
+    "SELECT a FROM t WHERE clip_sqrt(a) > 1",
+    dtypes_a,
+    custom_functions={"clip_sqrt": clip_sqrt},
+    target_opset=21,
 )
 
 (a_filt2,) = run(onx_where_func, {"a": a3})
@@ -204,7 +211,10 @@ def weighted_sum(x, y, alpha=0.5):
 
 dtypes_ab = {"a": np.float32, "b": np.float32}
 onx_ws = sql_to_onnx(
-    "SELECT wsum(a, b) AS ws FROM t", dtypes_ab, custom_functions={"wsum": weighted_sum}
+    "SELECT wsum(a, b) AS ws FROM t",
+    dtypes_ab,
+    custom_functions={"wsum": weighted_sum},
+    target_opset=21,
 )
 
 (ws,) = run(onx_ws, {"a": a, "b": b})

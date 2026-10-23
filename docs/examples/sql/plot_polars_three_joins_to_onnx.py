@@ -171,7 +171,7 @@ def transform_pandas(orders, customers, products, warehouses):
 
 
 artifact_pandas = dataframe_to_onnx(
-    transform_pandas, [pd_orders, pd_customers, pd_products, pd_warehouses]
+    transform_pandas, [pd_orders, pd_customers, pd_products, pd_warehouses], target_opset=21
 )
 
 print("(pandas) ONNX input names :", artifact_pandas.input_names)
@@ -236,6 +236,7 @@ def transform(orders, customers, products, warehouses):
 # :func:`~yobx.sql.dataframe_to_onnx` traces *transform* and emits a
 # self-contained ONNX model.  The ``input_dtypes`` list describes each of the
 # four input tables in the same order as the function arguments.
+# Opset 21 is used explicitly for ONNX Runtime compatibility.
 
 dtypes_orders = {
     "order_id": np.int64,
@@ -249,7 +250,9 @@ dtypes_products = {"pid": np.int64, "unit_price": np.float32}
 dtypes_warehouses = {"wid": np.int64, "shipping_cost": np.float32}
 
 artifact = dataframe_to_onnx(
-    transform, [dtypes_orders, dtypes_customers, dtypes_products, dtypes_warehouses]
+    transform,
+    [dtypes_orders, dtypes_customers, dtypes_products, dtypes_warehouses],
+    target_opset=21,
 )
 
 print("ONNX input names :", artifact.input_names)
