@@ -50,6 +50,8 @@ class OnnxLightOptimizationOptions:
             # Moving a floating-point operation out of a lower-precision cast changes
             # rounding semantics (for example FLOAT -> BFLOAT16 -> Add -> FLOAT).
             available.discard("CastOpCast")
+            # 0.2.0 can merge reshapes whose expanded operands cannot broadcast.
+            available.discard("Reshape2Of3")
             return sorted(available)
         names = [self.patterns] if isinstance(self.patterns, str) else list(self.patterns)
         if any(not isinstance(name, str) or name not in available for name in names):
@@ -189,6 +191,37 @@ def _remove_shape_release_metadata(graph):
                 _remove_shape_release_metadata(attribute.g)
             for child in attribute.graphs:
                 _remove_shape_release_metadata(child)
+
+
+def _remove_float_bounds_metadata(graph):
+    """Drops rounded native bounds that can contradict folded floating constants."""
+    floating_types = {
+        onnx.TensorProto.FLOAT,
+        onnx.TensorProto.DOUBLE,
+        onnx.TensorProto.FLOAT16,
+        onnx.TensorProto.BFLOAT16,
+    }
+    for value in [*graph.input, *graph.output, *graph.value_info]:
+        if (
+            value.type.HasField("tensor_type")
+            and value.type.tensor_type.HasField("elem_type")
+            and value.type.tensor_type.elem_type in floating_types
+        ):
+            metadata = [
+                (str(prop.key), str(prop.value))
+                for prop in value.metadata_props
+                if str(prop.key) not in ("min", "max")
+            ]
+            if len(metadata) != len(value.metadata_props):
+                value.ClearField("metadata_props")
+                for key, entry in metadata:
+                    value.metadata_props.add(key=key, value=entry)
+    for node in graph.node:
+        for attribute in node.attribute:
+            if attribute.HasField("g"):
+                _remove_float_bounds_metadata(attribute.g)
+            for child in attribute.graphs:
+                _remove_float_bounds_metadata(child)
 
 
 def _remove_output_identities(graph):
@@ -1129,6 +1162,8 @@ class OnnxLightGraphBuilder:
         if not self.has_opset(key[0]):
             self.set_opset(key[0], 1)
         for nested_key, nested in nested_functions.items():
+            if not self.has_opset(nested_key[0]):
+                self.set_opset(nested_key[0], 1)
             if nested_key not in functions:
                 self._functions[nested_key] = nested
         self._functions[key] = function
@@ -1426,7 +1461,7 @@ class OnnxLightGraphBuilder:
         builder = self._inner if has_custom_local_calls else GraphBuilder(model)
         if inline and not has_custom_local_calls:
             builder.inline_local_functions()
-        rewrites = []
+        rewrites = onnx.RewritingProto()
         native_report = None
         if optimize:
             optimizer = GraphGraph(builder, self.optimization_options.pattern_names())
@@ -1445,9 +1480,15 @@ class OnnxLightGraphBuilder:
                     folding_options=folding_options,
                     remove_unused=self.optimization_options.remove_unused,
                 )
+            if self.optimization_options.constant_folding:
+                builder.constant_fold()
+            builder.remove_identity_nodes()
+            if self.optimization_options.remove_unused:
+                builder.remove_unused_nodes()
         model = builder.to_onnx(ir_version=self.ir_version)
         if hasattr(builder, "shapes"):
             builder.shapes.apply_inferred_shapes_to_model(model)
+        _remove_float_bounds_metadata(model.graph)
         existing_functions = {
             (str(function.domain), str(function.name)) for function in model.functions
         }
@@ -1458,9 +1499,22 @@ class OnnxLightGraphBuilder:
                 if key not in existing_functions
             )
         if inline and has_custom_local_calls:
-            inline_builder = GraphBuilder(model)
-            inline_builder.inline_local_functions(include=original_functions)
-            model = inline_builder.to_onnx(ir_version=self.ir_version)
+            # Inline before re-inferring untyped subgraph outputs; importing this
+            # intermediate model into GraphBuilder would require their types.
+            inline_model = _native_proto(model, onnx.ModelProto)
+            inline_model.ClearField("functions")
+            inline_model.functions.extend(
+                function
+                for function in model.functions
+                if (str(function.domain), str(function.name)) in original_functions
+            )
+            expanded_model = inline_local_functions(inline_model)
+            expanded_model.functions.extend(
+                function
+                for function in model.functions
+                if (str(function.domain), str(function.name)) not in original_functions
+            )
+            model = expanded_model
         # Expanding a copy infers local-function outputs without undoing native fusions.
         expand_for_inference = bool(model.functions) or has_custom_local_calls
         inference_model = inline_local_functions(model) if optimize and model.functions else model
@@ -1475,6 +1529,7 @@ class OnnxLightGraphBuilder:
             inferred_shapes.compute_shape_model(inference_model, not expand_for_inference)
             inferred_shapes.apply_inferred_shapes_to_model(model)
         self._replace_model_annotations(model)
+        _remove_float_bounds_metadata(model.graph)
         _remove_shape_release_metadata(model.graph)
         _remove_output_identities(model.graph)
         if self._original_model is not None:
@@ -1553,12 +1608,10 @@ class OnnxLightGraphBuilder:
         report = None
         if native_report is not None:
             if return_optimize_report:
-                stats = {}
+                stats: dict[str, dict[str, int | float]] = {}
                 for rewrite in rewrites.rewrites:
                     name = str(rewrite.pattern_name)
-                    row = stats.setdefault(
-                        name, {"pattern": name, "added": 0, "removed": 0, "time_in": 0.0}
-                    )
+                    row = stats.setdefault(name, {"added": 0, "removed": 0, "time_in": 0.0})
                     row["added"] += len(rewrite.added_nodes)
                     row["removed"] += len(rewrite.matched_nodes)
                 for pattern in native_report.patterns:
@@ -1567,7 +1620,7 @@ class OnnxLightGraphBuilder:
                             pattern.match_time_ns + pattern.apply_time_ns
                         ) / 1e9
                 report = ExportReport(
-                    stats=list(stats.values()),
+                    stats=[{"pattern": name, **row} for name, row in stats.items()],
                     extra={
                         "backend": "onnx-light",
                         **{

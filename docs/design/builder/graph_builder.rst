@@ -213,6 +213,19 @@ rewrites, and every other value must be an exact registered pattern name.
 Python pattern classes, legacy pattern groups, and historical Python
 registries are no longer supported.
 
+The default selection excludes ``CastOpCast`` to preserve lower-precision
+rounding and ``Reshape2Of3`` because version 0.2.0 can produce incompatible
+broadcasts when merging expanded operands. Explicit pattern names still
+allow opting into either rewrite. Native causal-mask fusion is conditional:
+supported masks may remain as boolean comparisons instead of ``CausalMask``
+local functions.
+
+After rewriting, the bridge folds newly introduced constant expressions when
+``constant_folding=True``, removes redundant identities, and removes unused
+nodes when ``remove_unused=True``. Floating-point ``min``/``max`` metadata
+emitted by the native engine is discarded because its rounded bounds can
+contradict the actual folded tensor values. Tensor types and shapes are retained.
+
 Dynamic shapes
 ==============
 

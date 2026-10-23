@@ -185,7 +185,8 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertNotIn("SimplifiedLayerNormalization", unique_ops)
         self.assertNotIn("SkipSimplifiedLayerNormalization", unique_ops)
         self.assertNotIn("CausalMaskMulAdd", unique_ops)
-        self.assertIn("CausalMask", unique_ops)
+        # Native 0.2.0 also supports the unfused boolean causal-mask decomposition.
+        self.assertInOr(("CausalMask", "LessOrEqual"), unique_ops)
         self.assertNotIn("GroupQueryAttention", unique_ops)
         self.assertIn("Attention", unique_ops)
         # not working yet
@@ -261,7 +262,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertInOr(("HalfRotaryEmbedding", "RotaryEmbedding"), unique_ops)
         self.assertIn("RMSNormalization", unique_ops)
         self.assertNotIn("CausalMaskMulAdd", unique_ops)
-        self.assertIn("CausalMask", unique_ops)
+        self.assertInOr(("CausalMask", "LessOrEqual"), unique_ops)
         self.assertIn("Attention", unique_ops)
         self._chech_shape(onx.get_proto(include_weights=False))
 
@@ -336,7 +337,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertNotIn("SkipSimplifiedLayerNormalization", unique_ops)
         self.assertNotIn("QuickGelu", unique_ops)
         self.assertNotIn("CausalMaskMulAdd", unique_ops)
-        self.assertIn("CausalMask", unique_ops)
+        self.assertInOr(("CausalMask", "LessOrEqual"), unique_ops)
         self.assertNotIn("GroupQueryAttention", unique_ops)
         self.assertIn("Attention", unique_ops)
         self._chech_shape(onx.get_proto(include_weights=False))
@@ -646,7 +647,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertInOr(("HalfRotaryEmbedding", "RotaryEmbedding"), unique_ops)
         self.assertIn("RMSNormalization", unique_ops)
         self.assertNotIn("CausalMaskMulAdd", unique_ops)
-        self.assertIn("CausalMask", unique_ops)
+        self.assertInOr(("CausalMask", "LessOrEqual"), unique_ops)
         self.assertIn("Attention", unique_ops)
         self._chech_shape(onx.get_proto(include_weights=False))
 

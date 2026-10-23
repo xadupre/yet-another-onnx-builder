@@ -87,6 +87,16 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         with self.assertRaises(TypeError):
             builder.set_device("Y", "cuda")
 
+    def test_folded_float_constant_roundtrip(self):
+        builder = self.make_builder(18)
+        builder.op.Constant(value_float=3.14, outputs=["Y"])
+        builder.make_tensor_output("Y")
+        model = builder.to_native()
+        self.assertEqual(len(model.graph.node), 0)
+        model = self.make_builder(model).to_native()
+        actual = ReferenceEvaluator(model).run(None, {})[0]
+        numpy.testing.assert_array_equal(actual, numpy.asarray(3.14, dtype=numpy.float32))
+
     def test_native_function_export_constants_and_parameters(self):
         from yobx.xbuilder.function_options import FunctionOptions
 
@@ -714,7 +724,10 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         result = subprocess.run(
             [sys.executable, "-c", code],
             cwd=root,
-            env={**os.environ, "PYTHONPATH": str(root)},
+            env={
+                **os.environ,
+                "PYTHONPATH": os.pathsep.join([str(root), os.environ.get("PYTHONPATH", "")]),
+            },
             capture_output=True,
             text=True,
             timeout=60,
@@ -761,7 +774,10 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
             """)
         result = subprocess.run(
             [sys.executable, "-c", code],
-            env={**os.environ, "PYTHONPATH": os.getcwd()},
+            env={
+                **os.environ,
+                "PYTHONPATH": os.pathsep.join([os.getcwd(), os.environ.get("PYTHONPATH", "")]),
+            },
             capture_output=True,
             text=True,
             check=False,

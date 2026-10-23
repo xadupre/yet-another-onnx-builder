@@ -50,10 +50,9 @@ class TestSklearnUsingSklearnOnnx(ExtTestCase):
             )
             # sklearn chooses the lowest opset equivalent to the current ones
             # given the nodes it contains. We need to overwrite that.
-            del onx.opset_import[:]
-            d = onx.opset_import.add()
-            d.domain = ""
-            d.version = g.main_opset
+            for opset in onx.opset_import:
+                if opset.domain in ("", "ai.onnx"):
+                    opset.version = g.main_opset
             builder = g.__class__(onx)
 
             f_options = FunctionOptions(
