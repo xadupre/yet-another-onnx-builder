@@ -852,6 +852,33 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         self.assertEqual(len(builder.to_onnx(optimize=False).proto.graph.node), 2)
         checker.check_model(artifact.proto)
 
+    def test_native_pattern_report_aggregates_rewrites(self):
+        from yobx.builder.onnxlight import OnnxLightOptimizationOptions
+
+        for constant_folding in (False, True):
+            with self.subTest(constant_folding=constant_folding):
+                builder = self.make_builder(
+                    18,
+                    optimization_options=OnnxLightOptimizationOptions(
+                        ["TransposeTranspose"], constant_folding=constant_folding
+                    ),
+                )
+                for index in range(2):
+                    name = f"X{index}"
+                    builder.make_tensor_input(name, 1, (2, 3))
+                    transposed = builder.op.Transpose(name, perm=[1, 0])
+                    output = builder.op.Transpose(transposed, perm=[1, 0])
+                    builder.make_tensor_output(output)
+                artifact = builder.to_onnx(return_optimize_report=True)
+                self.assertEqual(artifact.report.extra["rewrites"], 2)
+                self.assertEqual(len(artifact.report.stats), 1)
+                row = artifact.report.stats[0]
+                self.assertEqual(row["pattern"], "TransposeTranspose")
+                self.assertEqual(row["added"], 2)
+                self.assertEqual(row["removed"], 4)
+                self.assertGreater(row["time_in"], 0)
+                checker.check_model(artifact.proto)
+
     def test_empty_patterns_are_really_empty(self):
         from yobx.builder.onnxlight import OnnxLightOptimizationOptions
 

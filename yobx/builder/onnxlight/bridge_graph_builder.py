@@ -1553,16 +1553,21 @@ class OnnxLightGraphBuilder:
         report = None
         if native_report is not None:
             if return_optimize_report:
+                stats = {}
+                for rewrite in rewrites.rewrites:
+                    name = str(rewrite.pattern_name)
+                    row = stats.setdefault(
+                        name, {"pattern": name, "added": 0, "removed": 0, "time_in": 0.0}
+                    )
+                    row["added"] += len(rewrite.added_nodes)
+                    row["removed"] += len(rewrite.matched_nodes)
+                for pattern in native_report.patterns:
+                    if pattern.pattern_name in stats:
+                        stats[pattern.pattern_name]["time_in"] += (
+                            pattern.match_time_ns + pattern.apply_time_ns
+                        ) / 1e9
                 report = ExportReport(
-                    stats=[
-                        {
-                            "pattern": str(rewrite.pattern_name),
-                            "added": len(rewrite.added_nodes),
-                            "removed": len(rewrite.matched_nodes),
-                            "time_in": (rewrite.match_time_ns + rewrite.apply_time_ns) / 1e9,
-                        }
-                        for rewrite in rewrites
-                    ],
+                    stats=list(stats.values()),
                     extra={
                         "backend": "onnx-light",
                         **{
