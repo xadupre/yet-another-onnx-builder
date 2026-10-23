@@ -52,16 +52,16 @@ docs = [
 
 # packages
 
-category_encoders = ["scikit-learn>=1.4", "category-encoders>=2.6"]
-imblearn = ["scikit-learn>=1.4", "imbalanced-learn>=0.11"]
+category_encoders = ["scikit-learn>=1.9.1", "category-encoders>=2.6"]
+imblearn = ["scikit-learn>=1.9.1", "imbalanced-learn>=0.11"]
 jax = ["jax[cpu]>=0.10"]
-lightgbm = ["scikit-learn>=1.4", "lightgbm>=3.0"]
+lightgbm = ["scikit-learn>=1.9.1", "lightgbm>=3.0"]
 litert = ["ai-edge-litert"]
-perpetual = ["scikit-learn>=1.4", "perpetual>=2.1.0"]
+perpetual = ["scikit-learn>=1.9.1", "perpetual>=2.1.0"]
 polars = ["polars>=2.0.0"]
-sklearn = ["scikit-learn>=1.4"]
-sksurv = ["scikit-learn>=1.4", "scikit-survival>=0.22"]
-statsmodels = ["scikit-learn>=1.4", "statsmodels"]
+sklearn = ["scikit-learn>=1.9.1"]
+sksurv = ["scikit-learn>=1.9.1", "scikit-survival>=0.22"]
+statsmodels = ["scikit-learn>=1.9.1", "statsmodels"]
 tensorflow = ["jax>=0.10", "tensorflow>=2.20"]
 torch = [
     "accelerate",
@@ -71,10 +71,10 @@ torch = [
 ]
 transformers = [    
     "huggingface_hub",
-    "scikit-learn",  # one function requires it to compute ROC curve
+    "scikit-learn>=1.9.1",  # one function requires it to compute ROC curve
     "transformers>=4.45",
 ]
-xgboost = ["scikit-learn>=1.4", "xgboost>=3.0"]
+xgboost = ["scikit-learn>=1.9.1", "xgboost>=3.0"]
 op-db = ["expecttest"]
 
 [tool.setuptools.packages.find]
