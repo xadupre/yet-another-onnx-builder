@@ -22,7 +22,7 @@ dev = [
     "black==26.10.1",
     "matplotlib",
     "openpyxl",
-    "pandas",
+    "pandas>=3.1.0",
     "pytest>=7",
     "py-cpuinfo",
     "pytest-coverage",
@@ -37,7 +37,7 @@ docs = [
     "mermaid-py",
     "onnx-ir",
     "openpyxl",
-    "pandas",
+    "pandas>=3.1.0",
     "pydata-sphinx-theme",
     "sphinx>=7",
     "sphinxcontrib-mermaid",
@@ -58,7 +58,7 @@ jax = ["jax[cpu]>=0.10"]
 lightgbm = ["scikit-learn>=1.4", "lightgbm>=3.0"]
 litert = ["ai-edge-litert"]
 perpetual = ["scikit-learn>=1.4", "perpetual>=2.1.0"]
-polars = ["polars"]
+polars = ["polars>=2.0.0"]
 sklearn = ["scikit-learn>=1.4"]
 sksurv = ["scikit-learn>=1.4", "scikit-survival>=0.22"]
 statsmodels = ["scikit-learn>=1.4", "statsmodels"]
