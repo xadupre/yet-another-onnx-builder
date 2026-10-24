@@ -11,7 +11,7 @@ class TestVersion(unittest.TestCase):
         """Checks that packaging and package versions match the release."""
         root = pathlib.Path(__file__).resolve().parents[2]
         project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
-        self.assertEqual(project["project"]["version"], "0.2.0")
+        self.assertEqual(project["project"]["version"], "0.2.1")
 
         module = ast.parse((root / "yobx" / "__init__.py").read_text(encoding="utf-8"))
         versions = [
