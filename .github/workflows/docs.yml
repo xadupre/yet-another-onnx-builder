@@ -1,18 +1,9 @@
 name: Documentation
 
 on:
-  push:
-    branches: ["main"]
-    paths:
-      - "docs/**"
-      - "**.md"
-      - "**.rst"
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "docs/**"
-      - "**.md"
-      - "**.rst"
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -54,3 +45,20 @@ jobs:
           (echo "Parallel build failed, retrying sequentially..." && \
           UNITTEST_GOING=1 sphinx-build -b html \
             docs docs/_build/html -W)
+
+  report_failure:
+    needs: docs
+    if: ${{ always() && needs.docs.result == 'failure' }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Open an issue for the failed documentation build
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh issue create \
+            --title "Documentation build failed" \
+            --body "The documentation build failed. See the workflow run for details: ${RUN_URL}"
