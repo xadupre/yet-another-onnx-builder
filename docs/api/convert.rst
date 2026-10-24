@@ -40,7 +40,8 @@ from packages available in the current Python environment instead.
 .. warning::
 
     ``guess_export`` is not thread-safe. Its use of ``runpy.run_path``
-    temporarily modifies process-global state, including ``sys.argv[0]``.
+    temporarily modifies process-global state, including ``sys.argv[0]`` and
+    ``sys.path[0]``.
     Call it sequentially, not concurrently with other executions or changes
     to import state.
 
