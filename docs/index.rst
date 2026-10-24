@@ -168,6 +168,7 @@ the decision path for trees or ensembles in :epkg:`scikit-learn`.
    install
    getting_started
    misc
+   changelog
 
 This package was initially started using :epkg:`vibe coding`.
 AI is able to translate an existing code into another one
