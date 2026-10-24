@@ -3,11 +3,171 @@ Top-level dispatcher that routes a model to the appropriate backend converter.
 """
 
 import os
+import inspect
+import runpy
+import sys
 from typing import Any, Dict, Optional, Sequence, Union
 from onnx_light.onnx.defs import onnx_opset_version
 
 #: Default ONNX opset version targeted by all converters.
 DEFAULT_TARGET_OPSET = onnx_opset_version()
+
+
+def guess_export(
+    filename: Union[str, os.PathLike],
+    model_name: Optional[str] = None,
+    args_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Guesses arguments for :func:`to_onnx` from a trusted Python file.
+
+    Executes the file with :func:`runpy.run_path` (not as ``__main__``).
+    Only module-level objects are inspected; model classes and factory
+    functions are never instantiated or called. The file must therefore
+    create its model and example inputs outside a ``__main__`` guard.
+    The file is executed outside a package context: explicit relative
+    imports such as ``from .foo import bar`` are not supported. Use absolute
+    imports resolvable in the current Python environment instead.
+
+    Prefers a variable named ``model``. Otherwise selects the single
+    supported framework instance or locally defined callable, ignoring
+    private names, imported functions, and classes. SQL strings and TFLite
+    paths/bytes require ``model`` or an explicit *model_name*.
+
+    Looks for inputs named ``args``, ``example_inputs``, or ``inputs``, in
+    that order, then a single ``X`` or ``x``. A single input is wrapped in
+    a tuple; sequences and mappings are preserved. Module-level
+    ``input_names`` and ``dynamic_shapes`` are also included when present.
+
+    .. warning::
+
+        This function executes arbitrary Python code. Only use trusted files.
+        It is not a sandbox, and execution errors propagate unchanged.
+        It is not thread-safe: ``runpy.run_path`` temporarily modifies
+        process-global state, including ``sys.argv[0]`` and import-related
+        state such as ``sys.path[0]``. Call it sequentially, not concurrently
+        with other executions or changes to import state.
+
+    :param filename: path to a Python file.
+    :param model_name: explicit name of the model variable.
+    :param args_name: explicit name of the example-input variable.
+    :raises ValueError: if a model or inputs cannot be identified unambiguously.
+    :raises TypeError: if the selected model is not supported.
+
+    Returns:
+        A dictionary usable as ``to_onnx(**guess_export(filename))``.
+        Backend selection remains the responsibility of :func:`to_onnx`.
+    """
+    namespace = runpy.run_path(os.fspath(filename), run_name="__yobx_guess_export__")
+
+    def is_model(value: Any, explicit: bool = False) -> bool:
+        if inspect.isclass(value):
+            return False
+        if explicit and isinstance(value, (str, bytes, os.PathLike)):
+            return True
+        for module_name, class_name in (
+            ("torch.nn", "Module"),
+            ("sklearn.base", "BaseEstimator"),
+            ("tensorflow", "Module"),
+            ("polars", "LazyFrame"),
+        ):
+            module = sys.modules.get(module_name)
+            if module is not None and isinstance(value, getattr(module, class_name, ())):
+                return True
+        return callable(value) and (
+            explicit or getattr(value, "__module__", None) == namespace["__name__"]
+        )
+
+    if model_name is None:
+        if "model" in namespace:
+            model_name = "model"
+        else:
+            candidates: Dict[int, str] = {}
+            for name, value in namespace.items():
+                if not name.startswith("_") and is_model(value):
+                    candidates.setdefault(id(value), name)
+            if len(candidates) != 1:
+                raise ValueError(
+                    f"Unable to identify one model in {filename!r}: "
+                    f"candidates={list(candidates.values())!r}. Specify model_name."
+                )
+            model_name = next(iter(candidates.values()))
+    if model_name not in namespace:
+        raise ValueError(f"Model variable {model_name!r} was not found in {filename!r}.")
+    model = namespace[model_name]
+    if not is_model(model, explicit=True):
+        raise TypeError(f"Variable {model_name!r} has unsupported model type {type(model)!r}.")
+
+    if args_name is None:
+        args_name = next(
+            (name for name in ("args", "example_inputs", "inputs") if name in namespace), None
+        )
+        if args_name is None:
+            input_candidates = [name for name in ("X", "x") if name in namespace]
+            if len(input_candidates) != 1:
+                raise ValueError(
+                    f"Unable to identify example inputs in {filename!r}: "
+                    f"candidates={input_candidates!r}. Specify args_name."
+                )
+            args_name = input_candidates[0]
+    if args_name not in namespace:
+        raise ValueError(f"Input variable {args_name!r} was not found in {filename!r}.")
+    args = namespace[args_name]
+    if args is None:
+        raise ValueError(
+            f"Input variable {args_name!r} is None; use () for a model with no inputs."
+        )
+    if not isinstance(args, (tuple, list, dict)):
+        args = (args,)
+
+    # Early validation: mapping-style args are only supported for the SQL/DataFrame-style
+    # backends (SQL string, polars LazyFrame, or a tracing callable). For framework
+    # instances (torch/sklearn/tensorflow) or LiteRT/TFLite models, require tuple/list.
+    if isinstance(args, dict):
+        allow_mapping_args = False
+
+        # Tracing callable backends can accept mapping-style args.
+        if callable(model):
+            allow_mapping_args = True
+
+        # polars.LazyFrame backend can accept mapping-style args.
+        module = sys.modules.get("polars")
+        if module is not None and isinstance(model, getattr(module, "LazyFrame", ())):
+            allow_mapping_args = True
+
+        # SQL string backend can accept mapping-style args.
+        if isinstance(model, str) and not model.endswith(".tflite"):
+            allow_mapping_args = True
+
+        # Disallow mapping-style args for framework models and TFLite/LiteRT artifacts.
+        is_framework_model = False
+        for module_name, class_name in (
+            ("torch.nn", "Module"),
+            ("sklearn.base", "BaseEstimator"),
+            ("tensorflow", "Module"),
+        ):
+            module = sys.modules.get(module_name)
+            if module is not None and isinstance(model, getattr(module, class_name, ())):
+                is_framework_model = True
+                break
+
+        is_tflite_artifact = isinstance(model, bytes) or (
+            isinstance(model, (str, os.PathLike)) and str(model).endswith(".tflite")
+        )
+
+        if (is_framework_model or is_tflite_artifact) and not allow_mapping_args:
+            raise ValueError(
+                f"Input variable {args_name!r} is a dict, but the selected model backend "
+                f"does not support mapping-style inputs. Use a tuple/list of example inputs "
+                f"instead (e.g., args=(x,) or args=[x]). If you intended to use a SQL/polars/"
+                f"callable backend, ensure 'model' refers to that object."
+            )
+
+    result = dict(model=model, args=args)
+    for name in ("input_names", "dynamic_shapes"):
+        if name in namespace:
+            result[name] = namespace[name]
+    return result
 
 
 def to_onnx(
