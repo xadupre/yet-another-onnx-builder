@@ -4,7 +4,12 @@ import unittest
 import pandas
 import torch
 from yobx.ext_test_case import ExtTestCase, requires_torch, hide_stdout, ignore_warnings
-from yobx.torch.input_observer import InputCandidate, InputObserver, _infer_dynamic_dimensions
+from yobx.torch.input_observer import (
+    InputCandidate,
+    InputObserver,
+    InputObserverInfo,
+    _infer_dynamic_dimensions,
+)
 from yobx.torch import apply_patches_for_model, to_onnx
 
 
@@ -785,6 +790,23 @@ class TestInputObserver(ExtTestCase):
         self.assertEqual(iargs["y"].shape, (1, 6))
         self.assertEqual(iargs["w"].shape, (1, 0))
         self.assertEqual(iargs["z"].shape, (5, 0))
+
+    def test_infer_arguments_invalid_dynamic_dimension(self):
+        """Reports the tensor shape and position for an invalid dynamic dimension."""
+
+        class InvalidShapeInfo(InputObserverInfo):
+            def infer_dynamic_shapes(self, **kwargs):
+                return ({2: torch.export.Dim.DYNAMIC},)
+
+        info = InvalidShapeInfo(["x"], {}, {}, None, None)
+        info.add_inputs((None,), {})
+        info.add_inputs((torch.ones((2, 3)),), {})
+        with self.assertRaisesRegex(
+            RuntimeError,
+            r"Tensor shape torch.Size\(\[2, 3\]\) does not match "
+            r"the dynamic shape .* at position 0\.",
+        ):
+            info.infer_arguments(0)
 
     def test_io_mixed_args_kwargs_as_dict_1(self):
         class Model(torch.nn.Module):
