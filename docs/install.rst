@@ -6,11 +6,11 @@ Installation
 Requirements
 ------------
 
-**yet-another-onnx-builder** (``yobx``) requires Python 3.10 or later and the
+**yet-another-onnx-builder** (``yobx``) requires Python 3.12 or later and the
 following core dependencies (installed automatically):
 
-* `numpy <https://numpy.org/>`_ ≥ 2.1
-* `onnx <https://onnx.ai/onnx/>`_ ≥ 1.14
+* `numpy <https://numpy.org/>`_ ≥ 2.2
+* `onnx-light <https://github.com/xadupre/onnx-light>`_ == 0.2.0
 * `onnxruntime <https://onnxruntime.ai/>`_ ≥ 1.24
 * `ml_dtypes <https://github.com/jax-ml/ml_dtypes>`_
 * `scipy <https://scipy.org/>`_
@@ -23,6 +23,22 @@ Install the base package from `PyPI <https://pypi.org/project/yet-another-onnx-b
 .. code-block:: bash
 
     pip install yet-another-onnx-builder
+
+Release artifacts
+-----------------
+
+The ``Build Release Wheels`` workflow builds a universal ``py3-none-any`` wheel
+and a source distribution whenever a Git tag is pushed. Since ``yobx`` is a
+pure Python package, the same wheel serves every supported Python version and
+platform; native binaries are provided by its ``onnx-light`` dependency.
+
+The workflow creates the GitHub Release for the tag if necessary and uploads
+both distributions. Rerunning it replaces matching assets without changing
+existing release notes.
+
+To rebuild an existing release, run the workflow manually with its ``tag``
+input (for example, ``0.2.0`` or ``refs/tags/0.2.0``). A manual run without a
+tag only builds and stores workflow artifacts for the selected branch.
 
 Optional dependencies
 ---------------------
