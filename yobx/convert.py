@@ -57,7 +57,7 @@ def guess_export(
         A dictionary usable as ``to_onnx(**guess_export(filename))``.
         Backend selection remains the responsibility of :func:`to_onnx`.
     """
-    namespace = runpy.run_path(os.fspath(filename))
+    namespace = runpy.run_path(os.fspath(filename), run_name="__yobx_guess_export__")
 
     def is_model(value: Any, explicit: bool = False) -> bool:
         if inspect.isclass(value):
