@@ -1,0 +1,77 @@
+name: Build Release Wheels
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing Git tag to build (empty builds the selected branch without publishing)."
+        required: false
+        type: string
+  push:
+    tags:
+      - "*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+      - name: Verify release tag
+        if: github.ref_type == 'tag' || inputs.tag != ''
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          tag="${INPUT_TAG:-${GITHUB_REF_NAME}}"
+          tag="${tag#refs/tags/}"
+          git check-ref-format "refs/tags/${tag}"
+          git show-ref --verify "refs/tags/${tag}"
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - name: Install build
+        run: python -m pip install build
+      - name: Build package
+        run: python -m build
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-dist
+          path: |
+            dist/*.whl
+            dist/*.tar.gz
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    if: github.ref_type == 'tag' || inputs.tag != ''
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-dist
+          path: dist
+      - name: Attach distributions to GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          tag="${INPUT_TAG:-${GITHUB_REF_NAME}}"
+          tag="${tag#refs/tags/}"
+          if ! gh release view -- "${tag}" >/dev/null; then
+            gh release create --verify-tag --title "${tag}" --notes "" -- "${tag}" || \
+              gh release view -- "${tag}" >/dev/null
+          fi
+          gh release upload --clobber -- "${tag}" dist/*.whl dist/*.tar.gz
