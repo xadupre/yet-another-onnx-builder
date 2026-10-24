@@ -1,4 +1,5 @@
 import contextlib
+import functools
 import inspect
 import time
 from typing import Any, Callable, Generator, Sequence
@@ -857,9 +858,12 @@ class InputObserverInfo:
                 dim = max(shape)
                 torch._check(
                     dim < tensor.ndim,
-                    lambda index=index, shape=shape, tshape=tensor.shape: (
-                        f"Tensor shape {tshape} does not match the "
-                        f"dynamic shape {shape} at position {index}."
+                    functools.partial(
+                        str.format,
+                        "Tensor shape {} does not match the dynamic shape {} at position {}.",
+                        tensor.shape,
+                        shape,
+                        index,
                     ),
                 )
                 new_shape = list(tensor.shape)

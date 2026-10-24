@@ -21,8 +21,8 @@ jobs:
         uses: actions/setup-python@v7
         with:
           python-version: "3.12"
-      - name: Install pytorch 2.12
-        run: pip install torch==2.12.1+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
+      - name: Install pytorch 2.14.1
+        run: pip install torch==2.14.1+cpu torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
       - uses: ./.github/actions/install-onnx-light
 
       - name: Install dependencies

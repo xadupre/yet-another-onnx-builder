@@ -1,3 +1,4 @@
+import sys
 import unittest
 from yobx._onnx_shim import onnx
 import torch
@@ -24,6 +25,43 @@ from yobx.xbuilder import OptimizationOptions
 
 
 class TestOptimizationUntrainedTorchModel(ExtTestCase):
+    def _check_attention(self, unique_ops, *, allow_decomposed=False, platform=sys.platform):
+        """Checks attention fusion or the equivalent macOS export representation."""
+        if platform != "darwin":
+            self.assertIn("Attention", unique_ops)
+        elif allow_decomposed and "Softmax" in unique_ops:
+            # macOS fp16 exports may retain the NaN-safe attention decomposition.
+            self.assertTrue({"MatMul", "Where", "IsNaN"}.issubset(unique_ops), unique_ops)
+        else:
+            self.assertInOr(
+                ("Attention", "LocalAttention_to1", "LocalAttention_to10"), unique_ops
+            )
+
+    def test_attention_representations(self):
+        """Accepts macOS attention forms without weakening other platform checks."""
+        for platform in ("darwin", "linux", "win32"):
+            self._check_attention({"Attention"}, platform=platform)
+            for op in ("LocalAttention_to1", "LocalAttention_to10"):
+                with self.subTest(platform=platform, op=op):
+                    if platform == "darwin":
+                        self._check_attention({op}, platform=platform)
+                    else:
+                        with self.assertRaises(AssertionError):
+                            self._check_attention({op}, platform=platform)
+        decomposed = {"MatMul", "Softmax", "Where", "IsNaN"}
+        self._check_attention(decomposed, allow_decomposed=True, platform="darwin")
+        for ops, allow_decomposed, platform in (
+            (decomposed, False, "darwin"),
+            (decomposed, True, "linux"),
+            ({"MatMul", "Softmax"}, True, "darwin"),
+            ({"MatMul"}, True, "darwin"),
+        ):
+            with (
+                self.subTest(ops=ops, allow_decomposed=allow_decomposed, platform=platform),
+                self.assertRaises(AssertionError),
+            ):
+                self._check_attention(ops, allow_decomposed=allow_decomposed, platform=platform)
+
     @classmethod
     def _get_missing_shapes(cls, model_proto):
         """
@@ -188,7 +226,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         # Native 0.2.0 also supports the unfused boolean causal-mask decomposition.
         self.assertInOr(("CausalMask", "LessOrEqual"), unique_ops)
         self.assertNotIn("GroupQueryAttention", unique_ops)
-        self.assertIn("Attention", unique_ops)
+        self._check_attention(unique_ops)
         # not working yet
         # self._chech_shape(onx.get_proto(include_weights=False))
 
@@ -263,7 +301,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertIn("RMSNormalization", unique_ops)
         self.assertNotIn("CausalMaskMulAdd", unique_ops)
         self.assertInOr(("CausalMask", "LessOrEqual"), unique_ops)
-        self.assertIn("Attention", unique_ops)
+        self._check_attention(unique_ops)
         self._chech_shape(onx.get_proto(include_weights=False))
 
     @hide_stdout()
@@ -339,7 +377,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertNotIn("CausalMaskMulAdd", unique_ops)
         self.assertInOr(("CausalMask", "LessOrEqual"), unique_ops)
         self.assertNotIn("GroupQueryAttention", unique_ops)
-        self.assertIn("Attention", unique_ops)
+        self._check_attention(unique_ops)
         self._chech_shape(onx.get_proto(include_weights=False))
 
     def _export_tiny_llm(
@@ -423,8 +461,8 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
     def test_tiny_llm_shape_default_opset_24(self):
         """
         Checks that ``arnir0/Tiny-LLM`` is exported at opset 24 with type/shape
-        information on every node output and standard attention and RMS
-        normalization fusions.
+        information on every node output, attention, and RMS normalization.
+        macOS may preserve attention as a local function.
         """
         proto = self._export_tiny_llm(opset=24, patterns="default")
         missing = self._get_missing_shapes(proto)
@@ -434,7 +472,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             f"Some node outputs are missing shape info at opset 24 / default: {missing}",
         )
         unique_ops = {n.op_type for n in proto.graph.node}
-        self.assertIn("Attention", unique_ops)
+        self._check_attention(unique_ops)
         self.assertIn("RMSNormalization", unique_ops)
 
     @hide_stdout()
@@ -446,8 +484,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         """
         Checks that ``arnir0/Tiny-LLM`` is exported at opset 24 with type/shape
         information on every node output, and that ``patterns="default+onnxruntime"``
-        folds the local attention function into an ORT Attention operator
-        (``Attention`` or ``GroupQueryAttention``).
+        preserves attention as a fused operator or a local function.
         """
         proto = self._export_tiny_llm(opset=24, patterns="default+onnxruntime")
         missing = self._get_missing_shapes(proto)
@@ -464,6 +501,11 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
                 "GroupQueryAttention",
                 "LocalAttentionGQAsQ_to1",
                 "LocalAttentionGQAsQ_to10",
+                *(
+                    ("LocalAttention_to1", "LocalAttention_to10")
+                    if sys.platform == "darwin"
+                    else ()
+                ),
             ),
             unique_ops,
             "default+onnxruntime should produce an Attention op at opset 24",
@@ -648,7 +690,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertIn("RMSNormalization", unique_ops)
         self.assertNotIn("CausalMaskMulAdd", unique_ops)
         self.assertInOr(("CausalMask", "LessOrEqual"), unique_ops)
-        self.assertIn("Attention", unique_ops)
+        self._check_attention(unique_ops)
         self._chech_shape(onx.get_proto(include_weights=False))
 
     @hide_stdout()
@@ -771,7 +813,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             f" {missing}",
         )
         unique_ops = {n.op_type for n in proto.graph.node}
-        self.assertIn("Attention", unique_ops)
+        self._check_attention(unique_ops)
 
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
@@ -790,7 +832,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             f" {missing}",
         )
         unique_ops = {n.op_type for n in proto.graph.node}
-        self.assertIn("Attention", unique_ops)
+        self._check_attention(unique_ops)
 
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
@@ -809,7 +851,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             f" {missing}",
         )
         unique_ops = {n.op_type for n in proto.graph.node}
-        self.assertIn("Attention", unique_ops)
+        self._check_attention(unique_ops, allow_decomposed=True)
 
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
@@ -832,7 +874,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             f" {missing}",
         )
         unique_ops = {n.op_type for n in proto.graph.node}
-        self.assertIn("Attention", unique_ops)
+        self._check_attention(unique_ops, allow_decomposed=True)
 
 
 class TestTinyGraniteMoeHybridModel(ExtTestCase):
