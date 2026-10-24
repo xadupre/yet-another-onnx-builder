@@ -3,11 +3,119 @@ Top-level dispatcher that routes a model to the appropriate backend converter.
 """
 
 import os
+import inspect
+import runpy
+import sys
 from typing import Any, Dict, Optional, Sequence, Union
 from onnx_light.onnx.defs import onnx_opset_version
 
 #: Default ONNX opset version targeted by all converters.
 DEFAULT_TARGET_OPSET = onnx_opset_version()
+
+
+def guess_export(
+    filename: Union[str, os.PathLike],
+    model_name: Optional[str] = None,
+    args_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Guesses arguments for :func:`to_onnx` from a trusted Python file.
+
+    Executes the file with :func:`runpy.run_path` (not as ``__main__``).
+    Only module-level objects are inspected; model classes and factory
+    functions are never instantiated or called. The file must therefore
+    create its model and example inputs outside a ``__main__`` guard.
+
+    Prefers a variable named ``model``. Otherwise selects the single
+    supported framework instance or locally defined callable, ignoring
+    private names, imported functions, and classes. SQL strings and TFLite
+    paths/bytes require ``model`` or an explicit *model_name*.
+
+    Looks for inputs named ``args``, ``example_inputs``, or ``inputs``, in
+    that order, then a single ``X`` or ``x``. A single input is wrapped in
+    a tuple; sequences and mappings are preserved. Module-level
+    ``input_names`` and ``dynamic_shapes`` are also included when present.
+
+    .. warning::
+
+        This function executes arbitrary Python code. Only use trusted files.
+        It is not a sandbox, and execution errors propagate unchanged.
+
+    :param filename: path to a Python file.
+    :param model_name: explicit name of the model variable.
+    :param args_name: explicit name of the example-input variable.
+    :raises ValueError: if a model or inputs cannot be identified unambiguously.
+    :raises TypeError: if the selected model is not supported.
+
+    Returns:
+        A dictionary usable as ``to_onnx(**guess_export(filename))``.
+        Backend selection remains the responsibility of :func:`to_onnx`.
+    """
+    namespace = runpy.run_path(os.fspath(filename))
+
+    def is_model(value: Any, explicit: bool = False) -> bool:
+        if inspect.isclass(value):
+            return False
+        if explicit and isinstance(value, (str, bytes, os.PathLike)):
+            return True
+        for module_name, class_name in (
+            ("torch.nn", "Module"),
+            ("sklearn.base", "BaseEstimator"),
+            ("tensorflow", "Module"),
+            ("polars", "LazyFrame"),
+        ):
+            module = sys.modules.get(module_name)
+            if module is not None and isinstance(value, getattr(module, class_name, ())):
+                return True
+        return callable(value) and (
+            explicit or getattr(value, "__module__", None) == namespace["__name__"]
+        )
+
+    if model_name is None:
+        if "model" in namespace:
+            model_name = "model"
+        else:
+            candidates = {}
+            for name, value in namespace.items():
+                if not name.startswith("_") and is_model(value):
+                    candidates.setdefault(id(value), name)
+            if len(candidates) != 1:
+                raise ValueError(
+                    f"Unable to identify one model in {filename!r}: "
+                    f"candidates={list(candidates.values())!r}. Specify model_name."
+                )
+            model_name = next(iter(candidates.values()))
+    if model_name not in namespace:
+        raise ValueError(f"Model variable {model_name!r} was not found in {filename!r}.")
+    model = namespace[model_name]
+    if not is_model(model, explicit=True):
+        raise TypeError(f"Variable {model_name!r} has unsupported model type {type(model)!r}.")
+
+    if args_name is None:
+        args_name = next(
+            (name for name in ("args", "example_inputs", "inputs") if name in namespace), None
+        )
+        if args_name is None:
+            candidates = [name for name in ("X", "x") if name in namespace]
+            if len(candidates) != 1:
+                raise ValueError(
+                    f"Unable to identify example inputs in {filename!r}. Specify args_name."
+                )
+            args_name = candidates[0]
+    if args_name not in namespace:
+        raise ValueError(f"Input variable {args_name!r} was not found in {filename!r}.")
+    args = namespace[args_name]
+    if args is None:
+        raise ValueError(
+            f"Input variable {args_name!r} is None; use () for a model with no inputs."
+        )
+    if not isinstance(args, (tuple, list, dict)):
+        args = (args,)
+    result = dict(model=model, args=args)
+    for name in ("input_names", "dynamic_shapes"):
+        if name in namespace:
+            result[name] = namespace[name]
+    return result
 
 
 def to_onnx(
