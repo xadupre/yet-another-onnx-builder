@@ -82,7 +82,7 @@ def guess_export(
         if "model" in namespace:
             model_name = "model"
         else:
-            candidates = {}
+            candidates: Dict[int, str] = {}
             for name, value in namespace.items():
                 if not name.startswith("_") and is_model(value):
                     candidates.setdefault(id(value), name)
@@ -103,13 +103,13 @@ def guess_export(
             (name for name in ("args", "example_inputs", "inputs") if name in namespace), None
         )
         if args_name is None:
-            candidates = [name for name in ("X", "x") if name in namespace]
-            if len(candidates) != 1:
+            input_candidates = [name for name in ("X", "x") if name in namespace]
+            if len(input_candidates) != 1:
                 raise ValueError(
                     f"Unable to identify example inputs in {filename!r}: "
-                    f"candidates={candidates!r}. Specify args_name."
+                    f"candidates={input_candidates!r}. Specify args_name."
                 )
-            args_name = candidates[0]
+            args_name = input_candidates[0]
     if args_name not in namespace:
         raise ValueError(f"Input variable {args_name!r} was not found in {filename!r}.")
     args = namespace[args_name]
