@@ -118,6 +118,50 @@ def guess_export(
         )
     if not isinstance(args, (tuple, list, dict)):
         args = (args,)
+
+    # Early validation: mapping-style args are only supported for the SQL/DataFrame-style
+    # backends (SQL string, polars LazyFrame, or a tracing callable). For framework
+    # instances (torch/sklearn/tensorflow) or LiteRT/TFLite models, require tuple/list.
+    if isinstance(args, dict):
+        allow_mapping_args = False
+
+        # Tracing callable backends can accept mapping-style args.
+        if callable(model):
+            allow_mapping_args = True
+
+        # polars.LazyFrame backend can accept mapping-style args.
+        module = sys.modules.get("polars")
+        if module is not None and isinstance(model, getattr(module, "LazyFrame", ())):
+            allow_mapping_args = True
+
+        # SQL string backend can accept mapping-style args.
+        if isinstance(model, str) and not model.endswith(".tflite"):
+            allow_mapping_args = True
+
+        # Disallow mapping-style args for framework models and TFLite/LiteRT artifacts.
+        is_framework_model = False
+        for module_name, class_name in (
+            ("torch.nn", "Module"),
+            ("sklearn.base", "BaseEstimator"),
+            ("tensorflow", "Module"),
+        ):
+            module = sys.modules.get(module_name)
+            if module is not None and isinstance(model, getattr(module, class_name, ())):
+                is_framework_model = True
+                break
+
+        is_tflite_artifact = isinstance(model, bytes) or (
+            isinstance(model, (str, os.PathLike)) and str(model).endswith(".tflite")
+        )
+
+        if (is_framework_model or is_tflite_artifact) and not allow_mapping_args:
+            raise ValueError(
+                f"Input variable {args_name!r} is a dict, but the selected model backend "
+                f"does not support mapping-style inputs. Use a tuple/list of example inputs "
+                f"instead (e.g., args=(x,) or args=[x]). If you intended to use a SQL/polars/"
+                f"callable backend, ensure 'model' refers to that object."
+            )
+
     result = dict(model=model, args=args)
     for name in ("input_names", "dynamic_shapes"):
         if name in namespace:
