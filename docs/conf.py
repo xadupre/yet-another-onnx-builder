@@ -33,6 +33,7 @@ author = "yet-another-onnx-builder contributors"
 release = yobx.__version__
 
 extensions = [
+    "myst_parser",
     "sphinx.ext.autodoc",
     "sphinx.ext.coverage",
     "sphinx.ext.duration",
