@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "yet-another-onnx-builder"
-version = "0.2.0"
+version = "0.2.1"
 description = "Converts models to ONNX format and other things"
 readme = "README.md"
 license = { file = "LICENSE" }

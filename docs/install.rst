@@ -37,7 +37,7 @@ both distributions. Rerunning it replaces matching assets without changing
 existing release notes.
 
 To rebuild an existing release, run the workflow manually with its ``tag``
-input (for example, ``0.2.0`` or ``refs/tags/0.2.0``). A manual run without a
+input (for example, ``0.2.1`` or ``refs/tags/0.2.1``). A manual run without a
 tag only builds and stores workflow artifacts for the selected branch.
 
 Optional dependencies
