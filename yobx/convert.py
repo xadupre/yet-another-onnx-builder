@@ -25,6 +25,9 @@ def guess_export(
     Only module-level objects are inspected; model classes and factory
     functions are never instantiated or called. The file must therefore
     create its model and example inputs outside a ``__main__`` guard.
+    The file is executed outside a package context: explicit relative
+    imports such as ``from .foo import bar`` are not supported. Use absolute
+    imports resolvable in the current Python environment instead.
 
     Prefers a variable named ``model``. Otherwise selects the single
     supported framework instance or locally defined callable, ignoring
@@ -40,6 +43,9 @@ def guess_export(
 
         This function executes arbitrary Python code. Only use trusted files.
         It is not a sandbox, and execution errors propagate unchanged.
+        It is not thread-safe: ``runpy.run_path`` temporarily modifies
+        process-global state, including ``sys.argv[0]``. Call it sequentially,
+        not concurrently with other executions or changes to import state.
 
     :param filename: path to a Python file.
     :param model_name: explicit name of the model variable.
@@ -99,7 +105,8 @@ def guess_export(
             candidates = [name for name in ("X", "x") if name in namespace]
             if len(candidates) != 1:
                 raise ValueError(
-                    f"Unable to identify example inputs in {filename!r}. Specify args_name."
+                    f"Unable to identify example inputs in {filename!r}: "
+                    f"candidates={candidates!r}. Specify args_name."
                 )
             args_name = candidates[0]
     if args_name not in namespace:

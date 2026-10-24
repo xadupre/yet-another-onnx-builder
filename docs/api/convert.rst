@@ -33,6 +33,17 @@ classes, invoke factories, or invent example inputs. Code inside an
 ``if __name__ == "__main__":`` block is not executed. Imports must be resolvable
 in the current Python environment. Errors from the file are not suppressed.
 
+The file is executed outside a package context. Explicit relative imports
+such as ``from .foo import bar`` are not supported; use absolute imports
+from packages available in the current Python environment instead.
+
+.. warning::
+
+    ``guess_export`` is not thread-safe. Its use of ``runpy.run_path``
+    temporarily modifies process-global state, including ``sys.argv[0]``.
+    Call it sequentially, not concurrently with other executions or changes
+    to import state.
+
 .. automodule:: yobx.convert
     :members:
     :no-undoc-members:
