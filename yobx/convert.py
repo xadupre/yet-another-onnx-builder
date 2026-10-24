@@ -44,8 +44,9 @@ def guess_export(
         This function executes arbitrary Python code. Only use trusted files.
         It is not a sandbox, and execution errors propagate unchanged.
         It is not thread-safe: ``runpy.run_path`` temporarily modifies
-        process-global state, including ``sys.argv[0]``. Call it sequentially,
-        not concurrently with other executions or changes to import state.
+        process-global state, including ``sys.argv[0]`` and import-related
+        state such as ``sys.path[0]``. Call it sequentially, not concurrently
+        with other executions or changes to import state.
 
     :param filename: path to a Python file.
     :param model_name: explicit name of the model variable.
