@@ -37,6 +37,24 @@ The file is executed outside a package context. Explicit relative imports
 such as ``from .foo import bar`` are not supported; use absolute imports
 from packages available in the current Python environment instead.
 
+Exporting a pickled model
+-------------------------
+
+``to_onnx`` also accepts a path ending in ``.pkl`` or ``.pickle`` and loads
+the pickled model before selecting its backend. The example inputs must still
+be supplied:
+
+.. code-block:: python
+
+    artifact = to_onnx("model.pkl", (X,))
+
+The pickle must be compatible with the current Python environment, including
+the packages and class definitions needed to deserialize it. Pickle loading
+can execute arbitrary code, so only load trusted files. Checkpoint files that
+contain only model weights (rather than a complete model object) cannot be
+converted without first recreating the corresponding model architecture and
+loading the weights into it.
+
 .. warning::
 
     ``guess_export`` is not thread-safe. Its use of ``runpy.run_path``

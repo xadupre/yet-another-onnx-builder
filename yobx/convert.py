@@ -6,6 +6,7 @@ import os
 import inspect
 import runpy
 import sys
+import pickle
 from typing import Any, Dict, Optional, Sequence, Union
 from onnx_light.onnx.defs import onnx_opset_version
 
@@ -216,7 +217,15 @@ def to_onnx(
       :class:`polars.LazyFrame`.  Delegates to :func:`yobx.sql.to_onnx`.
       Extra *kwargs* include ``custom_functions``, ``builder_cls``, …
 
-    :param model: the model to convert; see dispatch rules above.
+    .. warning::
+
+        Pickle files can execute arbitrary code when loaded. Only load trusted
+        files. A pickle must still be loadable in the current Python environment;
+        framework checkpoint files that contain only weights require rebuilding
+        their model architecture before conversion.
+
+    :param model: the model to convert; see dispatch rules above. A ``.pkl`` or
+        ``.pickle`` path is loaded as a Python pickle before dispatch.
     :param args: input arguments passed to the selected converter.
         For torch this is a sequence of :class:`torch.Tensor` objects.
         For sklearn / tensorflow / litert this is a tuple of
@@ -331,6 +340,22 @@ def to_onnx(
         )
     if graph_backend is not None and "builder_cls" in kwargs:
         raise ValueError("graph_backend and builder_cls cannot be specified together.")
+
+    if isinstance(model, (str, os.PathLike)):
+        extension = os.path.splitext(os.fspath(model))[1].lower()
+        if extension in (".pkl", ".pickle") and (
+            isinstance(model, os.PathLike) or os.path.isfile(model)
+        ):
+            if args is None:
+                raise ValueError(
+                    f"No input information was provided for pickle model {model!r}. "
+                    "Pass args with example inputs or input descriptors "
+                    "(name, dtype, shape). dynamic_shapes can mark dimensions as dynamic, "
+                    "but cannot infer the input dtype, rank, or static dimensions. "
+                    "If the model's input contract is stored separately, provide it explicitly."
+                )
+            with open(model, "rb") as f:
+                model = pickle.load(f)
 
     # Build a dict of the common named arguments so they can be passed to
     # each backend without duplicating keyword logic.

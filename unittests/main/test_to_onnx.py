@@ -2,7 +2,10 @@
 Unit tests for the top-level :func:`yobx.to_onnx` dispatcher.
 """
 
+import pickle
+import tempfile
 import unittest
+from pathlib import Path
 import numpy as np
 from onnx_light.onnx.defs import onnx_opset_version
 from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_torch
@@ -65,6 +68,42 @@ class TestToOnnxDispatcher(ExtTestCase):
                 self.assertEqual(
                     {o.domain: o.version for o in artifact.proto.opset_import}[""], expected
                 )
+
+    @requires_sklearn()
+    def test_dispatch_pickled_sklearn(self):
+        """A trusted pickle path is loaded before sklearn backend dispatch."""
+        from sklearn.linear_model import LinearRegression
+        from yobx import to_onnx
+
+        rng = np.random.default_rng(0)
+        X = rng.standard_normal((20, 4)).astype(np.float32)
+        model = LinearRegression().fit(X, X[:, 0] + X[:, 1])
+
+        with tempfile.TemporaryDirectory() as folder:
+            filename = Path(folder) / "model.pkl"
+            with filename.open("wb") as f:
+                pickle.dump(model, f)
+            artifact = to_onnx(filename, (X,), target_opset=18)
+
+        self.assertTrue(artifact.proto.graph.node)
+
+    @requires_sklearn()
+    def test_pickled_model_requires_input_information(self):
+        """A pickle without input information reports the missing contract."""
+        from sklearn.linear_model import LinearRegression
+        from yobx import to_onnx
+
+        model = LinearRegression().fit(
+            np.zeros((2, 3), dtype=np.float32), np.zeros(2, dtype=np.float32)
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            filename = Path(folder) / "model.pkl"
+            with filename.open("wb") as f:
+                pickle.dump(model, f)
+            with self.assertRaisesRegex(
+                ValueError, "Pass args with example inputs or input descriptors"
+            ):
+                to_onnx(filename)
 
     def test_dispatch_sql_string(self):
         """A plain SQL string is dispatched to yobx.sql.to_onnx."""
