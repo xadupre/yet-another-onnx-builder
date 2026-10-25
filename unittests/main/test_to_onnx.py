@@ -87,6 +87,24 @@ class TestToOnnxDispatcher(ExtTestCase):
 
         self.assertTrue(artifact.proto.graph.node)
 
+    @requires_sklearn()
+    def test_pickled_model_requires_input_information(self):
+        """A pickle without input information reports the missing contract."""
+        from sklearn.linear_model import LinearRegression
+        from yobx import to_onnx
+
+        model = LinearRegression().fit(
+            np.zeros((2, 3), dtype=np.float32), np.zeros(2, dtype=np.float32)
+        )
+        with tempfile.TemporaryDirectory() as folder:
+            filename = Path(folder) / "model.pkl"
+            with filename.open("wb") as f:
+                pickle.dump(model, f)
+            with self.assertRaisesRegex(
+                ValueError, "Pass args with example inputs or input descriptors"
+            ):
+                to_onnx(filename)
+
     def test_dispatch_sql_string(self):
         """A plain SQL string is dispatched to yobx.sql.to_onnx."""
         from yobx import to_onnx

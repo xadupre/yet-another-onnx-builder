@@ -344,6 +344,14 @@ def to_onnx(
     if isinstance(model, (str, os.PathLike)):
         extension = os.path.splitext(os.fspath(model))[1].lower()
         if extension in (".pkl", ".pickle"):
+            if args is None:
+                raise ValueError(
+                    f"No input information was provided for pickle model {model!r}. "
+                    "Pass args with example inputs or input descriptors "
+                    "(name, dtype, shape). dynamic_shapes can mark dimensions as dynamic, "
+                    "but cannot infer the input dtype, rank, or static dimensions. "
+                    "If the model's input contract is stored separately, provide it explicitly."
+                )
             with open(model, "rb") as f:
                 model = pickle.load(f)
 
