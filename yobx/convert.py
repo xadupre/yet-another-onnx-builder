@@ -343,7 +343,9 @@ def to_onnx(
 
     if isinstance(model, (str, os.PathLike)):
         extension = os.path.splitext(os.fspath(model))[1].lower()
-        if extension in (".pkl", ".pickle"):
+        if extension in (".pkl", ".pickle") and (
+            isinstance(model, os.PathLike) or os.path.isfile(model)
+        ):
             if args is None:
                 raise ValueError(
                     f"No input information was provided for pickle model {model!r}. "
