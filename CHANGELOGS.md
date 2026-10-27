@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Documentation & CI
 
 - Bumped the release version to `0.2.1`.
+- Requires `onnx-light>=0.2.1` and installs its published wheel in CI.
 
 ## [0.2.0]
 

@@ -10,7 +10,7 @@ Requirements
 following core dependencies (installed automatically):
 
 * `numpy <https://numpy.org/>`_ ≥ 2.2
-* `onnx-light <https://github.com/xadupre/onnx-light>`_ ≥ 0.2.0
+* `onnx-light <https://github.com/xadupre/onnx-light>`_ ≥ 0.2.1
 * `onnxruntime <https://onnxruntime.ai/>`_ ≥ 1.24
 * `ml_dtypes <https://github.com/jax-ml/ml_dtypes>`_
 * `scipy <https://scipy.org/>`_
