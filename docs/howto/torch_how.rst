@@ -73,11 +73,6 @@ decomposition is handled and when each option is usually the most practical.
       - no explicit decomposition table by default; relies on new-tracing
         rewrites/patches for operator coverage
       - useful for models/operators better captured through dispatch-level tracing
-    * - ``strategy="onnxscript"``
-      - handled by :func:`torch.onnx.export`
-      - official exporter
-      - decomposition behavior follows the official exporter pipeline
-      - use when you want direct parity with :func:`torch.onnx.export`
     * - ``strategy="transformers"``
       - :func:`torch.export.export` via the transformers dynamo preprocessing pipeline
       - yobx converter (via :class:`~yobx.torch.in_transformers.YobxOnnxExporter`)
@@ -130,16 +125,19 @@ You can also use :class:`~yobx.torch.in_transformers.YobxOnnxExporter` directly:
 How to trigger the official exporter
 ------------------------------------
 
-The official exporter path is :func:`torch.onnx.export`. You can trigger it
-through :class:`~yobx.torch.export_options.ExportOptions`:
+The official exporter is :func:`torch.onnx.export` and can be called directly
+outside ``yobx``. The former ``ExportOptions(strategy="onnxscript")`` route
+is no longer supported: it requires the removed reference ``onnx`` dependency
+and raises ``NotImplementedError``.
+
+Use the native onnx-light conversion path instead:
 
 .. code-block:: python
 
     from yobx.torch.export_options import ExportOptions
     from yobx.torch.interpreter import to_onnx
 
-    # direct torch.onnx.export(..., dynamo=True)
-    artifact = to_onnx(model, (x,), export_options=ExportOptions(strategy="onnxscript"))
+    artifact = to_onnx(model, (x,), export_options=ExportOptions(strategy="nostrict"))
 
 ----
 

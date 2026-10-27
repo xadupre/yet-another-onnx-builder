@@ -10,10 +10,15 @@ Requirements
 following core dependencies (installed automatically):
 
 * `numpy <https://numpy.org/>`_ ≥ 2.2
-* `onnx-light <https://github.com/xadupre/onnx-light>`_ == 0.2.0
+* `onnx-light <https://github.com/xadupre/onnx-light>`_ ≥ 0.2.0
 * `onnxruntime <https://onnxruntime.ai/>`_ ≥ 1.24
 * `ml_dtypes <https://github.com/jax-ml/ml_dtypes>`_
 * `scipy <https://scipy.org/>`_
+
+``onnx-light`` supplies the native ONNX protobuf objects, graph builder,
+optimizer, and shape inference engine. The reference ``onnx`` package is
+not required. Use the published onnx-light wheels for your Python version
+and platform.
 
 Basic installation
 ------------------
@@ -89,10 +94,9 @@ Install one or more of them alongside the base package:
 
 **ONNX graph building**
 
-.. code-block:: bash
-
-    # spox back-end for GraphBuilder
-    pip install "yet-another-onnx-builder[spox]"
+The native onnx-light graph builder is included in the base installation;
+no extra is needed. The former ``spox`` extra and the Spox/onnxscript builder
+bridges are no longer supported because they require reference ONNX.
 
 **Multiple extras at once**
 

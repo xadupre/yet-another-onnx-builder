@@ -22,7 +22,7 @@ to [ONNX](https://onnx.ai) format from many libraries. Each converter relies on 
 to build the final ONNX model. The default implementation uses the native
 `onnx-light` graph builder, pattern optimizer and shape inference engine.
 It can also be replaced by an implementation of your own.
-These API are close to `onnx` API, using `NodeProto` for nodes
+These APIs use `onnx-light`'s ONNX-compatible objects, including `NodeProto` for nodes
 and strings for names. This is on purpose: what this API produces is
 what you see in the final ONNX model. You can add your own metadata,
 choose your own names.

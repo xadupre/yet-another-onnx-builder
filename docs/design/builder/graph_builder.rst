@@ -13,21 +13,18 @@ be used standalone to build or transform any ONNX graph from scratch.
 Class Hierarchy
 ===============
 
-:class:`GraphBuilder <yobx.xbuilder.GraphBuilder>` is composed of three
-cooperative base classes:
+:class:`GraphBuilder <yobx.xbuilder.GraphBuilder>` is an alias for
+:class:`~yobx.builder.onnxlight.OnnxLightGraphBuilder`. It delegates graph
+storage and construction to onnx-light's native ``GraphBuilder``, pattern
+optimization to ``GraphGraph``, and symbolic shape inference to
+``ShapesContext``. The former Python graph and shape engines are not used
+as fallbacks.
 
-* :class:`_BuilderRuntime <yobx.xshape._builder_runtime._BuilderRuntime>`
-  — evaluates small constant sub-expressions (e.g. the ``[0, 0, -1]`` passed
-  to a ``Reshape`` node) so the builder can resolve ``-1`` to the correct
-  symbolic formula and fold constants early.
-* :class:`_ShapeRuntime <yobx.xshape._shape_runtime._ShapeRuntime>`
-  — handles *value-as-shape* tracking needed by operators such as ``Shape``,
-  ``Gather``, ``Concat``, and ``Slice`` when their outputs feed directly into
-  a ``Reshape``.
-* :class:`_InferenceRuntime <yobx.xshape._inference_runtime._InferenceRuntime>`
-  — walks the graph node by node, dispatching each node to the matching
-  per-operator handler in :mod:`yobx.xshape.shape_type_compute` so that
-  shapes and types are tracked for every intermediate result.
+The scikit-learn and PyTorch converters use dedicated subclasses,
+``SklearnOnnxLightGraphBuilder`` and ``TorchOnnxLightGraphBuilder``, to
+preserve their converter-specific APIs while sharing the native engine.
+The exported models contain native onnx-light protobufs, not objects from
+the reference ``onnx`` package.
 
 Two helper classes round out the public API:
 

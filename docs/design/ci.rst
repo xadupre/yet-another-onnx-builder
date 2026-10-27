@@ -81,9 +81,9 @@ The core of the library lives in several tightly-coupled sub-packages:
 * ``yobx/xshape/`` — symbolic shape-expression system used internally by
   ``GraphBuilder``.
   See :ref:`l-design-shape`.
-* ``yobx/builder/`` — lightweight builder helpers and the
-  :class:`OnnxScriptGraphBuilder <yobx.builder.onnxscript.OnnxScriptGraphBuilder>`
-  bridge.
+* ``yobx/builder/`` — lightweight builder helpers and the native onnx-light
+  bridge. The former Spox and onnxscript bridges are no longer supported
+  because they require reference ONNX.
 * ``yobx/container/`` — :class:`ModelContainer` for grouping several ONNX
   models that share initializers.
 * ``yobx/helpers/`` — general ONNX and runtime utilities shared by all

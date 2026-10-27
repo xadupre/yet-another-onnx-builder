@@ -144,7 +144,7 @@ Basic usage
 -----------
 
 :class:`~yobx.reference.ExtendedReferenceEvaluator` is a drop-in replacement
-for :class:`onnx.reference.ReferenceEvaluator`.  Any model that runs with the
+for :class:`onnx_light.onnx.reference.ReferenceEvaluator`.  Any model that runs with the
 standard evaluator also runs here.
 
 .. runpython::
@@ -256,7 +256,7 @@ model executes.  This is useful for debugging incorrect outputs or
 understanding how values flow through the graph.
 
 The ``verbose`` parameter maps to the logging levels used internally by
-:class:`onnx.reference.ReferenceEvaluator`:
+:class:`onnx_light.onnx.reference.ReferenceEvaluator`:
 
 * ``verbose=0`` (default) — silent
 * ``verbose=2`` — prints each node as it executes (``NodeOp(inputs) -> outputs``)
@@ -306,7 +306,7 @@ selects the *best* (highest version that does not exceed the model opset)
 implementation from the ``new_ops`` list.
 
 This mirrors the versioning convention used by
-:class:`onnx.reference.ReferenceEvaluator` itself: operator classes whose
+:class:`onnx_light.onnx.reference.ReferenceEvaluator` itself: operator classes whose
 names end in ``_<version>`` (e.g. ``MyOp_13``, ``MyOp_17``) are treated as
 versioned alternatives and the most appropriate one is chosen automatically.
 
@@ -336,7 +336,7 @@ after the run.  This makes the class especially useful for:
 Basic usage
 -----------
 
-The API mirrors :class:`onnx.reference.ReferenceEvaluator`: pass an
+The API mirrors :class:`onnx_light.onnx.reference.ReferenceEvaluator`: pass an
 ``onnx.ModelProto`` (or a filename) and call :meth:`run`.
 
 .. runpython::
