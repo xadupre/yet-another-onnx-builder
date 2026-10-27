@@ -23,7 +23,7 @@ onnx-light:
 The converters return an :class:`~yobx.container.ExportArtifact`; its
 ``proto`` attribute holds the native onnx-light model. Use
 ``artifact.save("model.onnx")`` to save it, or pass
-``artifact.proto.SerializeToString()`` to :epkg:`onnxruntime`.
+``artifact.get_proto().SerializeToString()`` to :epkg:`onnxruntime`.
 The serialized file still uses the standard ONNX format.
 
 The one-line API
