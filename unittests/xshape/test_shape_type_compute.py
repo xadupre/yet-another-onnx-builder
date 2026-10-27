@@ -1588,9 +1588,9 @@ class TestShapeTypeCompute(ExtTestCase):
             opset=12,
         )
         b = _TestShapeBuilder()
-        # The wheel requires the modern axes input even for this older opset.
-        with self.assertRaisesRegex(ValueError, "expects at least 2"):
-            b.run_model(model)
+        b.run_model(model)
+        self.assertEqual(b.get_type("Y"), TFLOAT)
+        self.assertEqual(b.get_shape("Y"), (1, 3, 4))
 
     def test_op_unsqueeze_rank_only(self):
         # When only rank (not shape) is known the output rank is inferred.

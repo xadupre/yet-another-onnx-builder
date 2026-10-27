@@ -30,6 +30,6 @@ jobs:
       - name: Install mbext
         run: |
           pip install --no-deps git+https://github.com/xadupre/mbext.git
-          python -c "import onnx_light; assert onnx_light.__version__ == '0.2.0'"
+          python -c "import onnx_light; from packaging.version import Version; assert Version(onnx_light.__version__) >= Version('0.2.1')"
       - name: Run pyrefly
         run: pyrefly check
