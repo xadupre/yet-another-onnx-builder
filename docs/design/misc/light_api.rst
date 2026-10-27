@@ -165,5 +165,5 @@ a :class:`onnx.GraphProto` in this mode:
     programmatically, which is more feature-rich but lower-level.
 
     :ref:`l-design-translate` — translating an existing ``onnx.ModelProto``
-    back to Python source code using the light API or the ``onnx.helper``
+    back to Python source code using the light API or the ``onnx_light.onnx.helper``
     functions.

@@ -39,15 +39,20 @@ yet-another-onnx-builder documentation
 to `ONNX <https://onnx.ai>`_ format and manipulating ONNX graphs programmatically.
 It can export from many libraries. Each converters relies on a common GraphBuilder API
 (:class:`~yobx.typing.GraphBuilderExtendedProtocol`)
-to build the final ONNX model. One default implementation is provided but
-it can also be replaced by any implementation of your own.
-Any user can implement its own. You can see
-:class:`~yobx.builder.onnxscript.bridge_graph_builder.OnnxScriptGraphBuilder`
-or :class:`~yobx.builder.spox.SpoxGraphBuilder` for a reference.
-These API are close to :epkg:`onnx` API, using `NodeProto` for nodes
+to build the final ONNX model. The default implementation,
+:class:`~yobx.xbuilder.GraphBuilder`, uses :epkg:`onnx-light` for native graph
+construction, pattern optimization, and symbolic shape inference.
+It can also be replaced by an implementation of your own that satisfies
+the protocol and returns native onnx-light protobufs.
+These APIs use onnx-light's ONNX-compatible objects, including ``NodeProto`` for nodes
 and strings for names. This is on purpose: what this API produces is
 what you see in the final ONNX model. You can add your own metadata,
 choose your own names.
+
+``onnx-light`` is a required dependency; the reference ``onnx`` package is not.
+ONNX remains the model format, so exported models can still run with
+:epkg:`onnxruntime`. The historical Spox and onnxscript builder bridges are
+no longer supported because they require the reference ONNX package.
 
 :func:`yobx.to_onnx` is the single entry point for all supported frameworks.
 It inspects the type of *model* at runtime and automatically delegates to
@@ -110,8 +115,8 @@ operations on a DataFrame and compiles them to ONNX directly.
 +---------------------------------------+------------------------------------------+----------------------------------------+
 
 The package is built upon a single :ref:`graph builder API <l-design-graph-builder>`
-for constructing and optimizing ONNX graphs with built-in shape inference
-with can also linked to :epkg:`spox` or :epkg:`onnxscript`/:epkg:`ir-py`.
+for constructing and optimizing ONNX graphs with onnx-light's native shape
+inference.
 Its unique API:
 
 .. code-block:: python

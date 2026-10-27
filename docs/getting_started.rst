@@ -7,6 +7,25 @@ This page walks you through the first steps with
 **yet-another-onnx-builder** (``yobx``).
 See :ref:`l-install` for installation instructions.
 
+ONNX objects and native backend
+------------------------------
+
+``yobx`` uses :epkg:`onnx-light`, not the reference ``onnx`` Python package,
+to construct, optimize, and infer shapes for ONNX models. When working
+directly with the exported protobufs, import the ONNX-compatible API from
+onnx-light:
+
+.. code-block:: python
+
+    from onnx_light import onnx
+    from onnx_light.onnx import helper, numpy_helper
+
+The converters return an :class:`~yobx.container.ExportArtifact`; its
+``proto`` attribute holds the native onnx-light model. Use
+``artifact.save("model.onnx")`` to save it, or pass
+``artifact.proto.SerializeToString()`` to :epkg:`onnxruntime`.
+The serialized file still uses the standard ONNX format.
+
 The one-line API
 ----------------
 
