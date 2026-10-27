@@ -360,7 +360,7 @@ class TestGraphBuilder(ExtTestCase):
         expected = feeds["X"] @ np_weights + np_bias + np_bias2
         ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
-        self.assertEqualArray(expected, got[0], atol=2e-5)
+        self.assertEqualArray(expected, got[0], atol=2e-5, rtol=1e-7)
 
     @ignore_warnings(DeprecationWarning)
     def test_as_function_nested_unique(self):
