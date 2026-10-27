@@ -333,6 +333,24 @@ class TestNumpyArray(ExtTestCase):
     # ORT validation
     # ------------------------------------------------------------------
 
+    def test_ort_normalize_rows(self):
+        from yobx.sql import trace_numpy_to_onnx
+
+        def normalize_rows(X):
+            norms = np.sqrt(np.sum(X**2, axis=1, keepdims=True))
+            norms = np.where(norms < np.float32(1e-8), np.float32(1), norms)
+            return X / norms
+
+        rng = np.random.default_rng(0)
+        sample = rng.standard_normal((10, 4)).astype(np.float32)
+        onx = trace_numpy_to_onnx(normalize_rows, sample, target_opset=21)
+        self.assertEqual(onx.proto.ir_version, 10)
+        sess = self.check_ort(onx)
+        X = rng.standard_normal((5, 4)).astype(np.float32)
+        X[0] = 0
+        got = sess.run(None, {"X": X})[0]
+        self.assertEqualArray(normalize_rows(X), got, atol=1e-5)
+
     def test_ort_sqrt_abs(self):
         from yobx.sql import trace_numpy_to_onnx
 

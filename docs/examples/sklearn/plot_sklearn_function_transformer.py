@@ -54,7 +54,7 @@ def normalize_rows(X):
 rng = np.random.default_rng(0)
 X_sample = rng.standard_normal((10, 4)).astype(np.float32)
 
-onx_standalone = trace_numpy_to_onnx(normalize_rows, X_sample)
+onx_standalone = trace_numpy_to_onnx(normalize_rows, X_sample, target_opset=21)
 
 print("Nodes in the standalone ONNX model:")
 for node in onx_standalone.graph.node:
