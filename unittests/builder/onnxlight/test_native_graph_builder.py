@@ -217,6 +217,36 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
                 actual = ReferenceEvaluator(exported).run(None, {"X": x})[0]
                 numpy.testing.assert_allclose(actual, numpy.sin(x) + x)
 
+    def test_native_local_function_division_by_constant(self):
+        from yobx.xbuilder.function_options import FunctionOptions
+
+        for reciprocal in (False, True):
+            for inline in (False, True):
+                with self.subTest(reciprocal=reciprocal, inline=inline):
+                    function = self.make_builder(18, as_function=True)
+                    function.make_tensor_input("X", onnx.TensorProto.FLOAT, (2,))
+                    constant = numpy.array([2.0], dtype=numpy.float32)
+                    inputs = [constant, "X"] if reciprocal else ["X", constant]
+                    function.op.Div(*inputs, outputs=["Y"])
+                    function.make_tensor_output("Y")
+                    builder = self.make_builder(18)
+                    builder.make_tensor_input("A", onnx.TensorProto.FLOAT, (2,))
+                    _, key = builder.make_local_function(
+                        function,
+                        FunctionOptions(
+                            name="Divide", domain="custom", move_initializer_to_constant=True
+                        ),
+                    )
+                    builder.make_node(key[1], ["A"], ["B"], domain=key[0])
+                    builder.make_tensor_output("B")
+                    model = builder.to_native(inline=inline)
+                    checker.check_model(model)
+                    self.assertEqual(len(model.functions), 0 if inline else 1)
+                    value = numpy.array([4.0, 8.0], dtype=numpy.float32)
+                    actual = ReferenceEvaluator(model).run(None, {"A": value})[0]
+                    expected = constant / value if reciprocal else value / constant
+                    numpy.testing.assert_array_equal(actual, expected)
+
     def test_native_local_function_converter_registration(self):
         from yobx.xbuilder.function_options import FunctionOptions
 

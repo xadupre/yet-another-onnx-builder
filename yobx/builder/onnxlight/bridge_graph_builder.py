@@ -52,6 +52,8 @@ class OnnxLightOptimizationOptions:
             available.discard("CastOpCast")
             # 0.2.0 can merge reshapes whose expanded operands cannot broadcast.
             available.discard("Reshape2Of3")
+            # 0.2.1 reads nonexistent Constant inputs while matching local-function Divs.
+            available.discard("SoftmaxCrossEntropyLossCast")
             return sorted(available)
         names = [self.patterns] if isinstance(self.patterns, str) else list(self.patterns)
         if any(not isinstance(name, str) or name not in available for name in names):

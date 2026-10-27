@@ -212,8 +212,10 @@ registries are no longer supported.
 
 The default selection excludes ``CastOpCast`` to preserve lower-precision
 rounding and ``Reshape2Of3`` because version 0.2.0 can produce incompatible
-broadcasts when merging expanded operands. Explicit pattern names still
-allow opting into either rewrite. Native causal-mask fusion is conditional:
+broadcasts when merging expanded operands. It also excludes
+``SoftmaxCrossEntropyLossCast`` because version 0.2.1 can abort when matching
+division by a constant inside a local function. Explicit pattern names still
+allow opting into these rewrites. Native causal-mask fusion is conditional:
 supported masks may remain as boolean comparisons instead of ``CausalMask``
 local functions.
 
