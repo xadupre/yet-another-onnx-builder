@@ -34,14 +34,26 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
             self.assertTrue({"MatMul", "Where", "IsNaN"}.issubset(unique_ops), unique_ops)
         else:
             self.assertInOr(
-                ("Attention", "LocalAttention_to1", "LocalAttention_to10"), unique_ops
+                (
+                    "Attention",
+                    "LocalAttention_to1",
+                    "LocalAttention_to10",
+                    "LocalAttentionGQAsQ_to1",
+                    "LocalAttentionGQAsQ_to10",
+                ),
+                unique_ops,
             )
 
     def test_attention_representations(self):
         """Accepts macOS attention forms without weakening other platform checks."""
         for platform in ("darwin", "linux", "win32"):
             self._check_attention({"Attention"}, platform=platform)
-            for op in ("LocalAttention_to1", "LocalAttention_to10"):
+            for op in (
+                "LocalAttention_to1",
+                "LocalAttention_to10",
+                "LocalAttentionGQAsQ_to1",
+                "LocalAttentionGQAsQ_to10",
+            ):
                 with self.subTest(platform=platform, op=op):
                     if platform == "darwin":
                         self._check_attention({op}, platform=platform)

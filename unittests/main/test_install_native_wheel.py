@@ -22,10 +22,10 @@ class TestNativeWheelSelection(unittest.TestCase):
         return {"name": filename, "browser_download_url": f"https://example.com/{filename}"}
 
     def test_default_version(self):
-        """Keeps the wheel installer aligned with the minimum supported release."""
+        """Keeps the wheel installer aligned with the pinned release."""
         root = pathlib.Path(__file__).resolve().parents[2]
         project = tomllib.loads((root / "pyproject.toml").read_text())
-        self.assertIn("onnx-light>=0.2.1", project["project"]["dependencies"])
+        self.assertIn("onnx-light==0.2.3", project["project"]["dependencies"])
         script = ast.parse((root / ".github/scripts/install_onnx_light.py").read_text())
         defaults = [
             keyword.value.value
@@ -39,10 +39,10 @@ class TestNativeWheelSelection(unittest.TestCase):
             for keyword in node.keywords
             if keyword.arg == "default"
         ]
-        self.assertEqual(defaults, ["0.2.1"])
+        self.assertEqual(defaults, ["0.2.3"])
 
     def test_supported_versions(self):
-        """Accepts minimum and newer releases without admitting older versions."""
+        """Accepts only the pinned release."""
         root = pathlib.Path(__file__).resolve().parents[2]
         project = tomllib.loads((root / "pyproject.toml").read_text())
         requirements = [
@@ -51,10 +51,8 @@ class TestNativeWheelSelection(unittest.TestCase):
             if Requirement(dependency).name == "onnx-light"
         ]
         self.assertEqual(len(requirements), 1)
-        for version in ("0.2.1", "0.2.2", "0.3.0"):
-            with self.subTest(version=version):
-                self.assertIn(version, requirements[0].specifier)
-        for version in ("0.1.34", "0.2.0"):
+        self.assertIn("0.2.3", requirements[0].specifier)
+        for version in ("0.1.34", "0.2.0", "0.2.1", "0.2.2", "0.2.4", "0.3.0"):
             with self.subTest(version=version):
                 self.assertNotIn(version, requirements[0].specifier)
 
