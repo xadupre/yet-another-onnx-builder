@@ -155,7 +155,7 @@ def to_onnx(
         if "ai.onnx.ml" not in dict_target_opset:
             dict_target_opset["ai.onnx.ml"] = default_ai_onnx_ml(dict_target_opset[""])
     if type(final_estimator).__module__.startswith("perpetual"):
-        dict_target_opset["ai.onnx.ml"] = min(dict_target_opset.get("ai.onnx.ml", 3), 3)
+        dict_target_opset["ai.onnx.ml"] = min(dict_target_opset.get("ai.onnx.ml", 4), 4)
 
     from . import register_sklearn_converters
 

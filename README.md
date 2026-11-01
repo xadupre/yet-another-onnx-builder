@@ -121,13 +121,13 @@ build. For example, from this repository on Linux x86-64 with CPython 3.12:
 ```bash
 python3.12 -m venv .venv
 .venv/bin/python -m pip install --only-binary=:all: \
-  https://github.com/xadupre/onnx-light/releases/download/0.2.1/onnx_light-0.2.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl \
+  https://github.com/xadupre/onnx-light/releases/download/0.2.3/onnx_light-0.2.3-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl \
   numpy ml_dtypes scipy onnxruntime scikit-learn
 export PYTHONPATH="$PWD"
 ```
 
 For another Python version or platform, select the matching full wheel from
-the [onnx-light release](https://github.com/xadupre/onnx-light/releases/tag/0.2.1).
+the [onnx-light release](https://github.com/xadupre/onnx-light/releases/tag/0.2.3).
 The native backend requires Python 3.12 or newer. Restricting `PYTHONPATH`
 to this repository prevents another onnx-light source checkout from shadowing
 the installed wheel.
@@ -221,7 +221,7 @@ Standalone ONNX functions and custom conversion dispatchers are supported.
 Delegation to `torch.onnx.export` through onnxscript and the Spox/onnxscript
 builder bridges are no longer supported.
 
-The project requires a published wheel of **0.2.1 or newer**. Local functions, including nested
+The project requires a published wheel of **0.2.3**. Local functions, including nested
 calls and referenced attributes, are imported directly by the native builder.
 Their result descriptors come from native inference, without a separate Python
 replay of typed function bodies. Unused initializers are removed by native cleanup.

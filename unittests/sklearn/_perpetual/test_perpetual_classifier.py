@@ -1,5 +1,6 @@
 import unittest
 import numpy as np
+from onnx_light import onnx
 from yobx.ext_test_case import ExtTestCase, requires_perpetual, requires_sklearn
 from yobx.reference import ExtendedReferenceEvaluator
 from unittests.sklearn._perpetual._helpers import native_to_onnx
@@ -60,6 +61,26 @@ class TestPerpetualClassifier(ExtTestCase):
                     X, classes[indices]
                 )
                 self.check_predictions(model, np.concatenate([X, X[:7] + 0.05]))
+
+    def test_multiclass_string_labels_opset(self):
+        """Uses ML opset 4 for native string-label encoding."""
+        from perpetual import PerpetualClassifier
+
+        X = np.random.default_rng(6).normal(size=(90, 4)).astype(np.float32)
+        classes = np.array(["blue", "green", "red"])
+        model = PerpetualClassifier(seed=0, budget=0.1, num_threads=1).fit(
+            X, classes[np.argmax(X[:, :3], axis=1)]
+        )
+        onx = native_to_onnx(model, X[:1])
+        nodes = [node.op_type for node in onx.proto.graph.node]
+        self.assertIn("LabelEncoder", nodes)
+        self.assertEqual(
+            {opset.domain: opset.version for opset in onx.proto.opset_import}["ai.onnx.ml"], 4
+        )
+        self.assertEqual(
+            onx.proto.graph.output[0].type.tensor_type.elem_type, onnx.TensorProto.STRING
+        )
+        self.check_predictions(model, np.concatenate([X, X[:7] + 0.05]))
 
     def test_binary_encoded_labels_and_missing(self):
         from perpetual import PerpetualClassifier
