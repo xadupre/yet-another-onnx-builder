@@ -58,9 +58,13 @@ class TestSklearnFunctionOptions(ExtTestCase):
         onx = to_onnx(ss, (self.X,), function_options=self.fopts)
 
         # One local function with the estimator's class name.
-        func_names = [(f.name, f.domain) for f in onx.proto.functions]
-        self.assertEqual(len(func_names), 1)
-        self.assertIn(("StandardScaler", "test_sklearn"), func_names)
+        func_names = [
+            (f.name, f.domain) for f in onx.proto.functions if f.domain != "onnx.light.rewriting"
+        ]
+        self.assertEqual(func_names, [("StandardScaler", "test_sklearn")])
+        for function in onx.proto.functions:
+            if function.domain == "onnx.light.rewriting":
+                self.assertTrue(function.name.startswith("PrepareInitializer"))
 
         # The main graph has a single function-call node.
         graph_ops = [(n.op_type, n.domain) for n in onx.proto.graph.node]
@@ -195,8 +199,19 @@ class TestSklearnFunctionOptions(ExtTestCase):
         )
         onx = to_onnx(ss, (self.X,), function_options=custom_opts)
 
-        self.assertEqual(len(onx.proto.functions), 1)
-        self.assertEqual(onx.proto.functions[0].domain, "acme.corp.v1")
+        functions = [
+            (f.name, f.domain) for f in onx.proto.functions if f.domain != "onnx.light.rewriting"
+        ]
+        self.assertEqual(functions, [("StandardScaler", "acme.corp.v1")])
+        for function in onx.proto.functions:
+            if function.domain == "onnx.light.rewriting":
+                self.assertTrue(function.name.startswith("PrepareInitializer"))
+        self.assertIn(
+            ("StandardScaler", "acme.corp.v1"),
+            [(node.op_type, node.domain) for node in onx.proto.graph.node],
+        )
+        result = ExtendedReferenceEvaluator(onx).run(None, {"X": self.X})[0]
+        self.assertEqualArray(ss.transform(self.X).astype(np.float32), result, atol=1e-5)
 
 
 if __name__ == "__main__":
