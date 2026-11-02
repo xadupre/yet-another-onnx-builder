@@ -20,13 +20,13 @@ def _ort_run(onx, feeds):
 @requires_tensorflow("2.18")
 class TestTensorflowBaseConverters(ExtTestCase):
     def test_dense_linear(self):
-        """Dense layer with no activation (linear) converts to MatMul+Add."""
+        """Converts a linear Dense layer to MatMul+Add or fused Gemm."""
         model = tf.keras.Sequential([tf.keras.layers.Dense(4, input_shape=(3,))])
         X = np.random.rand(5, 3).astype(np.float32)
         onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("MatMul", op_types)
+        self.assertTrue({"MatMul", "Gemm"}.intersection(op_types), op_types)
 
         input_name = onx.graph.input[0].name
         feeds = {input_name: X}
@@ -49,7 +49,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("MatMul", op_types)
+        self.assertTrue({"MatMul", "Gemm"}.intersection(op_types), op_types)
         self.assertIn("Relu", op_types)
 
         input_name = onx.graph.input[0].name
@@ -143,7 +143,7 @@ class TestTensorflowBaseConverters(ExtTestCase):
         onx = to_onnx(model, (X,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("MatMul", op_types)
+        self.assertTrue({"MatMul", "Gemm"}.intersection(op_types), op_types)
         self.assertIn("Relu", op_types)
 
         input_name = onx.graph.input[0].name
@@ -1836,7 +1836,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
     # ------------------------------------------------------------------
 
     def test_keras_dense_tanh(self):
-        """Dense layer with tanh activation → ONNX MatMul + Tanh."""
+        """Converts a tanh Dense layer to MatMul+Add or fused Gemm, then Tanh."""
         model = tf.keras.Sequential(
             [tf.keras.layers.Dense(4, activation="tanh", input_shape=(3,))]
         )
@@ -1845,7 +1845,7 @@ class TestTensorflowKerasLayersFromTFOnnx(ExtTestCase):
 
         onx = to_onnx(model, (X,), target_opset=21)
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("MatMul", op_types)
+        self.assertTrue({"MatMul", "Gemm"}.intersection(op_types), op_types)
         self.assertIn("Tanh", op_types)
 
         input_name = onx.graph.input[0].name

@@ -137,6 +137,13 @@ Selective inlining uses the native graph operation to keep function opsets and
 value-lifetime metadata consistent. Explicit inlining also removes discarded
 imported definitions from the bridge's function registry.
 
+Structural checks distinguish converter functions from native
+``onnx.light.rewriting`` initializer helpers and allow fused ``Gemm`` nodes for
+Dense layers. When independently optimized functions reuse a generated name
+for different bodies, the bridge renames the incoming helper and its calls,
+including calls inside nested subgraphs. Conflicting user-defined nested
+functions still raise an error.
+
 Focused numerical regressions check the native rewrite reports for
 ``FunctionAttention``, ``FunctionHalfRotaryEmbedding`` and ``RotaryEmbedding``,
 including repeated exports and nested function exports. The standard

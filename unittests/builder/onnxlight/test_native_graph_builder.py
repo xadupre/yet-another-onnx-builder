@@ -241,7 +241,14 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
                     builder.make_tensor_output("B")
                     model = builder.to_native(inline=inline)
                     checker.check_model(model)
-                    self.assertEqual(len(model.functions), 0 if inline else 1)
+                    self.assertEqual(
+                        [
+                            (str(f.domain), str(f.name))
+                            for f in model.functions
+                            if f.domain == "custom"
+                        ],
+                        [] if inline else [key],
+                    )
                     value = numpy.array([4.0, 8.0], dtype=numpy.float32)
                     actual = ReferenceEvaluator(model).run(None, {"A": value})[0]
                     expected = constant / value if reciprocal else value / constant
@@ -522,7 +529,10 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
                 with self.subTest(inline=inline, optimize=optimize):
                     model = imported.to_native(optimize=optimize, inline=inline)
                     checker.check_model(model)
-                    self.assertEqual(len(model.functions), 0 if inline else 2)
+                    self.assertEqual(
+                        {str(f.name) for f in model.functions if f.domain == "custom"},
+                        set() if inline else {"Bias", "NegativeBias"},
+                    )
                     actual = ReferenceEvaluator(model).run(None, feeds)
                     numpy.testing.assert_array_equal(actual[0], feeds["X"] + 1)
                     numpy.testing.assert_array_equal(actual[1], feeds["X"] + 2)
@@ -531,6 +541,99 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
                     numpy.testing.assert_array_equal(
                         ReferenceEvaluator(model).run(None, feeds)[0], -(feeds["X"] + 1)
                     )
+
+    def test_native_nested_function_name_collisions(self):
+        """Renames generated functions and their callers without merging distinct constants."""
+        from onnx_light.onnx import helper, numpy_helper
+        from yobx.xbuilder.function_options import FunctionOptions
+
+        for domain in ("onnx.light.rewriting", "custom.nested"):
+            with self.subTest(domain=domain):
+                builder = self.make_builder(18)
+                builder.make_tensor_input("X", onnx.TensorProto.FLOAT, (2, 3))
+                builder.make_tensor_input("C", onnx.TensorProto.BOOL, ())
+                for index in range(2):
+                    constant = helper.make_function(
+                        domain,
+                        "PrepareInitializer_0",
+                        [],
+                        ["B"],
+                        [
+                            helper.make_node(
+                                "Constant",
+                                [],
+                                ["B"],
+                                value=numpy_helper.from_array(
+                                    numpy.full(3, index + 1, dtype=numpy.float32)
+                                ),
+                            )
+                        ],
+                        [helper.make_opsetid("", 18)],
+                    )
+                    wrapper = helper.make_function(
+                        domain,
+                        "PrepareWrapper",
+                        [],
+                        ["B"],
+                        [helper.make_node("PrepareInitializer_0", [], ["B"], domain=domain)],
+                        [helper.make_opsetid(domain, 1)],
+                    )
+                    branch = helper.make_graph(
+                        [
+                            helper.make_node("PrepareWrapper", [], ["B"], domain=domain),
+                            helper.make_node("Add", ["X", "B"], ["Y"]),
+                        ],
+                        "branch",
+                        [],
+                        [helper.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [2, 3])],
+                    )
+                    graph = helper.make_graph(
+                        [
+                            helper.make_node(
+                                "If", ["C"], ["Y"], then_branch=branch, else_branch=branch
+                            )
+                        ],
+                        "function",
+                        [
+                            helper.make_tensor_value_info("X", onnx.TensorProto.FLOAT, [2, 3]),
+                            helper.make_tensor_value_info("C", onnx.TensorProto.BOOL, []),
+                        ],
+                        [helper.make_tensor_value_info("Y", onnx.TensorProto.FLOAT, [2, 3])],
+                    )
+                    function = self.make_builder(
+                        helper.make_model(
+                            graph,
+                            functions=[constant, wrapper],
+                            opset_imports=[
+                                helper.make_opsetid("", 18),
+                                helper.make_opsetid(domain, 1),
+                            ],
+                        ),
+                        as_function=True,
+                    )
+                    options = FunctionOptions(name=f"Bias{index}", domain="custom")
+                    if index and domain == "custom.nested":
+                        before = set(builder.functions)
+                        with self.assertRaisesRegex(ValueError, "Conflicting nested"):
+                            builder.make_local_function(function, options)
+                        self.assertEqual(set(builder.functions), before)
+                        continue
+                    _, key = builder.make_local_function(function, options)
+                    builder.make_node(key[1], ["X", "C"], [f"Y{index}"], domain=key[0])
+                    builder.make_tensor_output(f"Y{index}")
+                if domain == "onnx.light.rewriting":
+                    self.assertIn((domain, "PrepareInitializer_0_2"), builder.functions)
+                    self.assertIn((domain, "PrepareWrapper_2"), builder.functions)
+                feeds = {"X": numpy.zeros((2, 3), dtype=numpy.float32)}
+                for inline in (False, True):
+                    model = builder.to_native(optimize=False, inline=inline)
+                    checker.check_model(model)
+                    for condition in (False, True):
+                        actual = ReferenceEvaluator(model).run(
+                            None, {**feeds, "C": numpy.array(condition)}
+                        )
+                        for index, value in enumerate(actual):
+                            numpy.testing.assert_array_equal(value, feeds["X"] + index + 1)
 
     def test_native_imported_function_referenced_attribute(self):
         from onnx_light.onnx import helper
