@@ -117,7 +117,7 @@ Native fusion coverage and remaining regressions
 -----------------------------------------------
 
 Tests previously skipped pending ``onnx-light 0.1.33`` are exercised with the
-minimum required ``0.2.4.1`` release. Nested conditional functions and dynamic
+required ``0.2.5`` release. Nested conditional functions and dynamic
 grouped matrix multiplication work with that release. The grouped matrix
 multiplication test checks both retained and inlined ``Scan`` functions.
 The reshape/MatMul composition tests run Cast elimination before the fusion
@@ -160,4 +160,4 @@ The native regressions fixed in ``0.1.33`` run without expected failures:
   outputs.
 
 Their conditional ``pytest.mark.xfail`` markers apply only to older releases;
-the minimum required ``0.2.4.1`` release no longer allows these failures.
+the required ``0.2.5`` release no longer allows these failures.
