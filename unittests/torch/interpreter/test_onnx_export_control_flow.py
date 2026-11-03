@@ -16,6 +16,35 @@ from yobx.torch.interpreter import to_onnx
 
 class TestOnnxExportControlFlow(ExtTestCase):
 
+    def assert_conditional_functions(self, onx, expected_functions, expected_ifs=1):
+        """Checks branch functions and conditional structure after wrapper inlining."""
+        functions = {
+            (f.domain, f.name): f for f in onx.functions if f.domain != "onnx.light.rewriting"
+        }
+        self.assertEqual(expected_functions, len(functions))
+        for f in onx.functions:
+            if f.domain == "onnx.light.rewriting":
+                self.assertTrue(f.name.startswith("PrepareInitializer"))
+        calls = set()
+        if_count = 0
+        pending = [onx.graph, *functions.values()]
+        while pending:
+            graph = pending.pop()
+            for node in graph.node:
+                key = (node.domain, node.op_type)
+                if key in functions:
+                    calls.add(key)
+                if node.op_type == "If" and not node.domain:
+                    if_count += 1
+                    self.assertEqual(
+                        {"then_branch", "else_branch"}, {a.name for a in node.attribute}
+                    )
+                for attribute in node.attribute:
+                    if attribute.HasField("g"):
+                        pending.append(attribute.g)
+        self.assertEqual(set(functions), calls)
+        self.assertEqual(expected_ifs, if_count)
+
     @classmethod
     def get_custom_model(cls):
         import torch
@@ -43,7 +72,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         onx = to_onnx(model, (x,), target_opset=21, inline=False)
         co = Counter([n.op_type for n in onx.graph.node])
         self.assertEqual(co, {"ReduceSum": 1, "Greater": 1, "If": 1})
-        self.assertEqual(len(onx.functions), 2)
+        self.assert_conditional_functions(onx, 2)
         ref = ExtendedReferenceEvaluator(onx)
         sess = onnxruntime.InferenceSession(
             onx.SerializeToString(), providers=["CPUExecutionProvider"]
@@ -130,7 +159,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         onx = to_onnx(model, (x,), target_opset=21, inline=False)
         co = Counter([n.op_type for n in onx.graph.node])
         self.assertEqual(co, {"ReduceSum": 1, "Greater": 1, "If": 1})
-        self.assertEqual(len(onx.functions), 2)
+        self.assert_conditional_functions(onx, 2)
         ref = ExtendedReferenceEvaluator(onx)
 
         for _x in (x, -x):
@@ -148,10 +177,9 @@ class TestOnnxExportControlFlow(ExtTestCase):
         cls, x = self.get_custom_model()
         model = cls()
         onx = to_onnx(model, (x,), target_opset=21, inline=True, verbose=2)
-        self.assertEqual(len(onx.functions), 0)
         co = Counter([n.op_type for n in onx.graph.node])
         self.assertEqual(co, {"ReduceSum": 1, "Greater": 1, "If": 1})
-        self.assertEqual(len(onx.functions), 0)
+        self.assert_conditional_functions(onx, 0)
         ref = ExtendedReferenceEvaluator(onx)
 
         for _x in (x, -x):
@@ -179,7 +207,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         onx = to_onnx(model, (x, y), target_opset=21, inline=False)
         co = Counter([n.op_type for n in onx.graph.node])
         self.assertEqual(co, {"ReduceSum": 1, "Greater": 1, "If": 1})
-        self.assertEqual(len(onx.functions), 2)
+        self.assert_conditional_functions(onx, 2)
         ref = ExtendedReferenceEvaluator(onx)
 
         for _x in (x, -x):
@@ -219,7 +247,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         onx = to_onnx(model, (x,), target_opset=21, inline=False)
         co = Counter([n.op_type for n in onx.graph.node])
         self.assertEqual(co, {"ReduceSum": 1, "Greater": 1, "If": 1})
-        self.assertEqual(len(onx.functions), 4)
+        self.assert_conditional_functions(onx, 4, expected_ifs=2)
         ref = ExtendedReferenceEvaluator(onx)
 
         for _x in (x, -x):
@@ -283,7 +311,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
             onx = to_onnx(model, (x,), target_opset=21, inline=False)
         co = Counter([n.op_type for n in onx.graph.node])
         self.assertEqual(co, {"ReduceSum": 1, "Greater": 1, "If": 1})
-        self.assertEqual(len(onx.functions), 2)
+        self.assert_conditional_functions(onx, 2)
         ref = ExtendedReferenceEvaluator(onx)
 
         for _x in (x, -x):
@@ -297,7 +325,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
             onx = to_onnx(model, (x,), target_opset=21, inline=True)
         co = Counter([n.op_type for n in onx.graph.node])
         self.assertEqual(co, {"ReduceSum": 1, "Greater": 1, "If": 1})
-        self.assertEqual(len(onx.functions), 0)
+        self.assert_conditional_functions(onx, 0)
         ref = ExtendedReferenceEvaluator(onx)
 
         for _x in (x, -x):

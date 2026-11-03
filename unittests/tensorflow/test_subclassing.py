@@ -188,7 +188,7 @@ class TestSubclassingModels(ExtTestCase):
         onx = to_onnx(mlp, (np_input,), target_opset=21)
 
         op_types = [n.op_type for n in onx.graph.node]
-        self.assertIn("MatMul", op_types)
+        self.assertTrue({"MatMul", "Gemm"}.intersection(op_types), op_types)
         self.assertIn("Relu", op_types)
 
         expected = mlp(np_input).numpy()

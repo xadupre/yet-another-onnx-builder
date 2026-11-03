@@ -4120,9 +4120,22 @@ class TestOnnxExportAten(ExtTestCase):
                     inline=inline,
                 )
                 check_model(onx.proto)
-                self.assertEqual(0 if inline else 1, len(onx.functions))
-                nodes = onx.graph.node if inline else onx.functions[0].node
-                self.assertIn("Scan", [n.op_type for n in nodes])
+                model_functions = [f for f in onx.functions if f.domain != "onnx.light.rewriting"]
+                self.assertEqual(0 if inline else 1, len(model_functions))
+                for f in onx.functions:
+                    if f.domain == "onnx.light.rewriting":
+                        self.assertTrue(f.name.startswith("PrepareInitializer"))
+                nodes = onx.graph.node if inline else model_functions[0].node
+                self.assertEqual(1, sum(n.op_type == "Scan" for n in nodes))
+                if not inline:
+                    function = model_functions[0]
+                    self.assertEqual(
+                        1,
+                        sum(
+                            (n.domain, n.op_type) == (function.domain, function.name)
+                            for n in onx.graph.node
+                        ),
+                    )
                 self.dump_onnx(
                     f"test_aten_grouped_mm_offsets_no_constant_inline_{inline}.onnx", onx
                 )
@@ -4163,8 +4176,15 @@ class TestOnnxExportAten(ExtTestCase):
             dynamic_shapes=({0: "M", 1: "K"}, {0: "N", 1: "K"}, {}),
         )
         self.dump_onnx("test_aten_grouped_mm_offsets_semi_constant.onnx", onx)
-        self.assertEqual(len(onx.functions), 0)
-        self.assertIn("Split", [n.op_type for n in onx.graph.node])
+        check_model(onx.proto)
+        self.assertEqual(
+            [], [f.name for f in onx.functions if f.domain != "onnx.light.rewriting"]
+        )
+        for f in onx.functions:
+            self.assertTrue(f.name.startswith("PrepareInitializer"))
+        self.assertEqual(2, sum(n.op_type == "Split" for n in onx.graph.node))
+        self.assertEqual(3, sum(n.op_type == "MatMul" for n in onx.graph.node))
+        self.assertNotIn("Scan", [n.op_type for n in onx.graph.node])
         self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b, offs), atol=1e-4)
 
     def test_aten_max_pool3d(self):

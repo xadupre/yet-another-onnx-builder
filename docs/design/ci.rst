@@ -117,7 +117,7 @@ Native fusion coverage and remaining regressions
 -----------------------------------------------
 
 Tests previously skipped pending ``onnx-light 0.1.33`` are exercised with the
-currently required ``0.2.3`` release. Nested conditional functions and dynamic
+minimum required ``0.2.4.1`` release. Nested conditional functions and dynamic
 grouped matrix multiplication work with that release. The grouped matrix
 multiplication test checks both retained and inlined ``Scan`` functions.
 The reshape/MatMul composition tests run Cast elimination before the fusion
@@ -137,6 +137,13 @@ Selective inlining uses the native graph operation to keep function opsets and
 value-lifetime metadata consistent. Explicit inlining also removes discarded
 imported definitions from the bridge's function registry.
 
+Structural checks distinguish converter functions from native
+``onnx.light.rewriting`` initializer helpers and allow fused ``Gemm`` nodes for
+Dense layers. When independently optimized functions reuse a generated name
+for different bodies, the bridge renames the incoming helper and its calls,
+including calls inside nested subgraphs. Conflicting user-defined nested
+functions still raise an error.
+
 Focused numerical regressions check the native rewrite reports for
 ``FunctionAttention``, ``FunctionHalfRotaryEmbedding`` and ``RotaryEmbedding``,
 including repeated exports and nested function exports. The standard
@@ -153,4 +160,4 @@ The native regressions fixed in ``0.1.33`` run without expected failures:
   outputs.
 
 Their conditional ``pytest.mark.xfail`` markers apply only to older releases;
-the required ``0.2.3`` release no longer allows these failures.
+the minimum required ``0.2.4.1`` release no longer allows these failures.

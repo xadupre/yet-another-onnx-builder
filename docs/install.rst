@@ -10,7 +10,7 @@ Requirements
 following core dependencies (installed automatically):
 
 * `numpy <https://numpy.org/>`_ ≥ 2.2
-* `onnx-light <https://github.com/xadupre/onnx-light>`_ == 0.2.3
+* `onnx-light <https://github.com/xadupre/onnx-light>`_ ≥ 0.2.4.1
 * `onnxruntime <https://onnxruntime.ai/>`_ ≥ 1.24
 * `ml_dtypes <https://github.com/jax-ml/ml_dtypes>`_
 * `scipy <https://scipy.org/>`_
@@ -42,7 +42,7 @@ both distributions. Rerunning it replaces matching assets without changing
 existing release notes.
 
 To rebuild an existing release, run the workflow manually with its ``tag``
-input (for example, ``0.2.1`` or ``refs/tags/0.2.1``). A manual run without a
+input (for example, ``0.2.4`` or ``refs/tags/0.2.4``). A manual run without a
 tag only builds and stores workflow artifacts for the selected branch.
 
 Optional dependencies

@@ -186,9 +186,18 @@ class TestOnnxExportAtenAttention(ExtTestCase):
             if node.domain == "aten":
                 keys = {p.key for p in node.metadata_props}
                 self.assertTrue({"aten_name", "args", "kwargs"}.issubset(keys))
-        for f in onx.functions:
+        attention_functions = [f for f in onx.functions if f.domain == "aten"]
+        self.assertEqual(
+            {n.op_type for n in onx.graph.node if n.domain == "aten"},
+            {f.name for f in attention_functions},
+        )
+        for f in attention_functions:
             metadata = {p.key: p.value for p in f.metadata_props}
             self.assertEqual("0", metadata["inline"])
+        for f in onx.functions:
+            if f.domain != "aten":
+                self.assertEqual("onnx.light.rewriting", f.domain)
+                self.assertTrue(f.name.startswith("PrepareInitializer"))
         feeds = dict(zip(["query", "key", "value"], [x.detach().cpu().numpy() for x in inputs]))
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)[0]

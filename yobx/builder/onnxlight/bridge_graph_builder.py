@@ -156,6 +156,19 @@ def _contains_registered_call(graph, registrations):
     return False
 
 
+def _rename_function_calls(graph, renaming):
+    """Renames local-function calls, including calls inside nested subgraphs."""
+    for node in graph.node:
+        key = (str(node.domain), str(node.op_type))
+        if key in renaming:
+            node.op_type = renaming[key]
+        for attribute in node.attribute:
+            if attribute.HasField("g"):
+                _rename_function_calls(attribute.g, renaming)
+            for child in attribute.graphs:
+                _rename_function_calls(child, renaming)
+
+
 def _contains_untyped_tensor_annotation(graph, inputs_only=False):
     """Returns whether a graph contains a tensor annotation without a dtype."""
     annotations = graph.input if inputs_only else [*graph.input, *graph.output, *graph.value_info]
@@ -1137,6 +1150,41 @@ class OnnxLightGraphBuilder:
             (str(nested.domain), str(nested.name)): nested
             for nested in artifact.function.nested_functions
         }
+        renaming = {}
+        occupied = set(functions) | set(nested_functions) | {key}
+        while True:
+            added = False
+            for nested_key, nested in nested_functions.items():
+                if (
+                    nested_key[0] != "onnx.light.rewriting"
+                    or nested_key not in functions
+                    or nested_key in renaming
+                ):
+                    continue
+                candidate = _native_proto(nested, onnx.FunctionProto)
+                _rename_function_calls(candidate, renaming)
+                if self._function_signature(functions[nested_key]) != self._function_signature(
+                    candidate
+                ):
+                    index = 2
+                    while (nested_key[0], f"{nested_key[1]}_{index}") in occupied:
+                        index += 1
+                    name = f"{nested_key[1]}_{index}"
+                    renaming[nested_key] = name
+                    occupied.add((nested_key[0], name))
+                    added = True
+            if not added:
+                break
+        if renaming:
+            _rename_function_calls(function, renaming)
+            for nested_key, nested in nested_functions.items():
+                _rename_function_calls(nested, renaming)
+                if nested_key in renaming:
+                    nested.name = renaming[nested_key]
+            nested_functions = {
+                (str(nested.domain), str(nested.name)): nested
+                for nested in nested_functions.values()
+            }
         for nested_key, nested in nested_functions.items():
             if nested_key in functions and self._function_signature(
                 functions[nested_key]

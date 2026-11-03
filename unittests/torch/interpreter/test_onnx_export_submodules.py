@@ -654,11 +654,26 @@ class TestOnnxExportSubModules(ExtTestCase):
             dynamic_shapes=({0: "batch"},),
         )
         check_model(onx.proto)
-        self.assertEqual(len(onx.functions), 1)
-        self.assertEqual(["<locals>_Level1"], [f.name for f in onx.functions])
+        model_functions = [f for f in onx.functions if f.domain != "onnx.light.rewriting"]
+        self.assertEqual(["<locals>_Level1"], [f.name for f in model_functions])
+        function = model_functions[0]
+        self.assertEqual(
+            1,
+            sum(
+                (node.domain, node.op_type) == (function.domain, function.name)
+                for node in onx.graph.node
+            ),
+        )
+        self.assertIn("Sigmoid", [node.op_type for node in function.node])
+        for f in onx.functions:
+            if f.domain == "onnx.light.rewriting":
+                self.assertTrue(f.name.startswith("PrepareInitializer"))
         ref = ExtendedReferenceEvaluator(onx)
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
+        larger_input = torch.randn(4, 5)
+        got = ref.run(None, {"x": larger_input.numpy()})
+        self.assertEqualArray(model(larger_input), got[0], atol=1e-5)
 
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.6", "owning module is None before that")
