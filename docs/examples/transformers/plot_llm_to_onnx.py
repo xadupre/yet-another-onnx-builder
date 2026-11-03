@@ -228,6 +228,7 @@ print("kwargs:", string_type(kwargs, with_shape=True))
 # and :func:`apply_patches_for_model <yobx.torch.patch.apply_patches_for_model>`
 # must be active during export so that the exporter can correctly handle
 # the KV-cache type and any PyTorch ops that need patching.
+# Opset 21 keeps the exported model compatible with ONNX Runtime.
 
 filename = "plot_llm_to_onnx.onnx"
 
@@ -238,6 +239,7 @@ with (
     to_onnx(
         model,
         (),
+        target_opset=21,
         kwargs=observer.infer_arguments(),
         dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
         filename=filename,

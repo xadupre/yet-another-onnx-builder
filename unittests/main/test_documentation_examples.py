@@ -1,10 +1,12 @@
 import unittest
+import ast
 import importlib.util
 import os
 import sys
 import subprocess
 import time
 import textwrap
+import tempfile
 from contextlib import redirect_stdout
 from io import StringIO
 from pathlib import Path
@@ -16,6 +18,7 @@ from yobx.ext_test_case import (
     requires_matplotlib,
     requires_onnxruntime,
     requires_pandas,
+    requires_torch,
     is_windows,
     ignore_errors,
     has_ipython,
@@ -68,6 +71,51 @@ class TestDocumentationExamples(ExtTestCase):
     def test_expected_api_rst_examples(self):
         output = self.run_rst_examples("design/sklearn/expected_api.rst")
         self.assertIn("Sub(X,", output)
+
+    @requires_torch()
+    @requires_onnxruntime("1.24")
+    def test_llm_gallery_export_runtime_compatibility(self):
+        """Executes the gallery export call with a local decoder and generates tokens."""
+        import torch
+        from yobx.helpers.rt_helper import onnx_generate
+        from yobx.torch import InputObserver, to_onnx
+
+        class Decoder(torch.nn.Module):
+            def __init__(self):
+                super().__init__()
+                self.embedding = torch.nn.Embedding(8, 8)
+                with torch.no_grad():
+                    self.embedding.weight.zero_()
+                    self.embedding.weight[:, 3] = 1
+
+            def forward(self, input_ids):
+                return self.embedding(input_ids)
+
+        path = Path(ROOT) / "docs/examples/transformers/plot_llm_to_onnx.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        export_calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "to_onnx"
+        ]
+        self.assertEqual(len(export_calls), 1)
+        model = Decoder().eval()
+        observer = InputObserver()
+        prompt = torch.tensor([[1, 2]], dtype=torch.int64)
+        with observer(model):
+            model(input_ids=prompt)
+            model(input_ids=torch.tensor([[1, 2, 3]], dtype=torch.int64))
+        with tempfile.TemporaryDirectory() as folder:
+            filename = os.path.join(folder, "decoder.onnx")
+            expression = compile(ast.Expression(export_calls[0]), str(path), "eval")
+            eval(
+                expression,
+                dict(to_onnx=to_onnx, model=model, observer=observer, filename=filename),
+            )
+            tokens = onnx_generate(filename, prompt, max_new_tokens=2)
+        self.assertEqualArray(torch.tensor([[1, 2, 3, 3]]), tokens)
 
     @requires_matplotlib()
     @requires_onnxruntime("1.24")
