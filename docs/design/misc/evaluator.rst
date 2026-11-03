@@ -65,7 +65,7 @@ NumPy callbacks, without requiring a full
 ONNX Runtime installation.
 
 Standard-operator dtype coverage
--------------------------------
+--------------------------------
 
 Explicit NumPy kernels also cover standard operators whose native wheel kernels
 do not support every required dtype: ``ReduceSum``, ``ReduceProd``, ``ReduceL2``, ``Pow``,

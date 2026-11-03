@@ -125,7 +125,7 @@ that execute through ``InputObserver.check_discrepancies`` or
 even when the test does not instantiate a session directly.
 
 Native fusion coverage and remaining regressions
------------------------------------------------
+------------------------------------------------
 
 Tests previously skipped pending ``onnx-light 0.1.33`` are exercised with the
 minimum required ``0.2.5`` release. Nested conditional functions and dynamic
