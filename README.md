@@ -221,7 +221,7 @@ Standalone ONNX functions and custom conversion dispatchers are supported.
 Delegation to `torch.onnx.export` through onnxscript and the Spox/onnxscript
 builder bridges are no longer supported.
 
-The project requires a published wheel of **0.2.5**. Local functions, including nested
+The project requires a published wheel of **0.2.5 or newer**. Local functions, including nested
 calls and referenced attributes, are imported directly by the native builder.
 Their result descriptors come from native inference, without a separate Python
 replay of typed function bodies. Unused initializers are removed by native cleanup.
