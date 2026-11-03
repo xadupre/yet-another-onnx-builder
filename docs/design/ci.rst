@@ -99,6 +99,17 @@ and CI file.
 See :ref:`l-design-env-variables` for a reference of all environment variables
 that can be set to control test execution and enable extra diagnostic output.
 
+Native wheel installation
+-------------------------
+
+The shared ``install-onnx-light`` action reads the ``onnx-light`` requirement
+from ``pyproject.toml`` and downloads the full GitHub release wheel for its
+minimum version. Updating that dependency updates CI's selected release without
+editing workflow version numbers. The installer retains a ``--version`` override
+for explicit release testing. Its ``--check-installed`` option validates the
+installed distribution against the same project requirement after other
+dependencies are installed.
+
 ONNX Runtime compatibility
 --------------------------
 
@@ -117,7 +128,7 @@ Native fusion coverage and remaining regressions
 -----------------------------------------------
 
 Tests previously skipped pending ``onnx-light 0.1.33`` are exercised with the
-minimum required ``0.2.4.1`` release. Nested conditional functions and dynamic
+minimum required ``0.2.5`` release. Nested conditional functions and dynamic
 grouped matrix multiplication work with that release. The grouped matrix
 multiplication test checks both retained and inlined ``Scan`` functions.
 The reshape/MatMul composition tests run Cast elimination before the fusion
@@ -160,4 +171,4 @@ The native regressions fixed in ``0.1.33`` run without expected failures:
   outputs.
 
 Their conditional ``pytest.mark.xfail`` markers apply only to older releases;
-the minimum required ``0.2.4.1`` release no longer allows these failures.
+the minimum required ``0.2.5`` release no longer allows these failures.
