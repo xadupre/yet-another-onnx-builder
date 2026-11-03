@@ -99,6 +99,17 @@ and CI file.
 See :ref:`l-design-env-variables` for a reference of all environment variables
 that can be set to control test execution and enable extra diagnostic output.
 
+Native wheel installation
+-------------------------
+
+The shared ``install-onnx-light`` action reads the ``onnx-light`` requirement
+from ``pyproject.toml`` and downloads the full GitHub release wheel for its
+minimum version. Updating that dependency updates CI's selected release without
+editing workflow version numbers. The installer retains a ``--version`` override
+for explicit release testing. Its ``--check-installed`` option validates the
+installed distribution against the same project requirement after other
+dependencies are installed.
+
 ONNX Runtime compatibility
 --------------------------
 
