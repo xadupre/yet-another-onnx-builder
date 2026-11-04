@@ -4002,6 +4002,10 @@ class TestOnnxExportAten(ExtTestCase):
                 self.assertEqualArray(expected, got[0])
 
     @requires_transformers("5.0")
+    @skipif_ci_windows(
+        "torch bfloat16 CPU grouped_mm crashes with an illegal instruction "
+        "(0xc000001d) on the Windows CI runner"
+    )
     def test_aten_grouped_mm_no_offset(self):
         import torch
 
@@ -4047,6 +4051,10 @@ class TestOnnxExportAten(ExtTestCase):
                     # ORT cannot execute models with bfloat16 inputs on CPU
                     self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-5)
 
+    @skipif_ci_windows(
+        "torch bfloat16 CPU grouped_mm crashes with an illegal instruction "
+        "(0xc000001d) on the Windows CI runner"
+    )
     def test_aten_grouped_mm_offsets(self):
         import torch
 
@@ -4082,6 +4090,10 @@ class TestOnnxExportAten(ExtTestCase):
         self.dump_onnx("test_aten_grouped_mm_offsets.onnx", onx)
         self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b), atol=1e-4)
 
+    @skipif_ci_windows(
+        "torch bfloat16 CPU grouped_mm crashes with an illegal instruction "
+        "(0xc000001d) on the Windows CI runner"
+    )
     def test_aten_grouped_mm_offsets_no_constant(self):
         import torch
 
@@ -4141,6 +4153,10 @@ class TestOnnxExportAten(ExtTestCase):
                 )
                 self.assert_conversion_with_ort_on_cpu(onx, expected, (a, b, offs), atol=1e-4)
 
+    @skipif_ci_windows(
+        "torch bfloat16 CPU grouped_mm crashes with an illegal instruction "
+        "(0xc000001d) on the Windows CI runner"
+    )
     def test_aten_grouped_mm_offsets_semi_constant(self):
         import torch
 

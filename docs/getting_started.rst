@@ -8,7 +8,7 @@ This page walks you through the first steps with
 See :ref:`l-install` for installation instructions.
 
 ONNX objects and native backend
-------------------------------
+-------------------------------
 
 ``yobx`` uses :epkg:`onnx-light`, not the reference ``onnx`` Python package,
 to construct, optimize, and infer shapes for ONNX models. When working

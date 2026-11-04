@@ -2,7 +2,7 @@ yobx.convert
 ============
 
 Export discovery from a Python file
-----------------------------------
+-----------------------------------
 
 ``yobx.guess_export`` executes a **trusted** Python file and finds an existing
 model and example inputs. It returns keyword arguments for ``yobx.to_onnx``,

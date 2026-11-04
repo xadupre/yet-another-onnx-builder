@@ -393,6 +393,7 @@ API reference
 =============
 
 .. autofunction:: yobx.to_onnx
+    :no-index:
 
 See also
 ========

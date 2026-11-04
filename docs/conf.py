@@ -107,7 +107,7 @@ exclude_patterns = ["_build"]
 if int(os.environ.get("UNITTEST_GOING", "0")):
     exclude_patterns.append("commits_per_week.rst")
     exclude_patterns.append("pypi_downloads.rst")
-    exclude_patterns.append("design/torch/case_coverage.rst")
+    exclude_patterns.append("coverage/torch/case_coverage.rst")
 
 # It crashes for some reason.
 exclude_patterns.append("api/torch/in_transformers/classes/llama_attention.rst")
