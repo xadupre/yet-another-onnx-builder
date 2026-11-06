@@ -66,6 +66,7 @@ class TestInferenceSessionTorch(ExtTestCase):
 
         dlp = ortvalue._ortvalue.to_dlpack()
         ortvalue2 = C_OrtValue.from_dlpack(dlp)
+        self.assertEqual(TFLOAT, ortvalue2.element_type())
         self.assertEqual(ptr, ortvalue2.data_ptr())
         new_array = ortvalue2.numpy()
         self.assertEqual(numpy_arr_input.dtype, new_array.dtype)
@@ -73,6 +74,7 @@ class TestInferenceSessionTorch(ExtTestCase):
 
         dlp = ortvalue._ortvalue.__dlpack__()
         ortvalue2 = C_OrtValue.from_dlpack(dlp)
+        self.assertEqual(TFLOAT, ortvalue2.element_type())
         self.assertEqual(ptr, ortvalue2.data_ptr())
         new_array = ortvalue2.numpy()
         self.assertEqual(numpy_arr_input.dtype, new_array.dtype)
@@ -97,6 +99,35 @@ class TestInferenceSessionTorch(ExtTestCase):
         self.assertEqual(tv.shape, shape)
         ptr3 = tv.data_ptr()
         self.assertEqual(ptr, ptr3)
+
+    def test_torch_dlpack_input_types(self):
+        for dtype, onnx_type in (
+            (torch.float32, onnx.TensorProto.FLOAT),
+            (torch.int64, onnx.TensorProto.INT64),
+            (torch.uint8, onnx.TensorProto.UINT8),
+            (torch.bool, onnx.TensorProto.BOOL),
+        ):
+            for shape in ((2, 3), (0, 3)):
+                with self.subTest(dtype=dtype, shape=shape):
+                    model = oh.make_model(
+                        oh.make_graph(
+                            [oh.make_node("Identity", ["x"], ["y"])],
+                            "identity",
+                            [oh.make_tensor_value_info("x", onnx_type, list(shape))],
+                            [oh.make_tensor_value_info("y", onnx_type, list(shape))],
+                        ),
+                        opset_imports=[oh.make_opsetid("", 18)],
+                        ir_version=9,
+                    )
+                    values = torch.arange(np.prod(shape)).reshape(shape).to(dtype)
+                    if dtype == torch.float32:
+                        values.requires_grad_(True)
+                    wrap = InferenceSessionForTorch(
+                        model, providers="cpu", use_training_api=False
+                    )
+                    got = wrap.run(None, {"x": values})[0]
+                    self.assertEqual(got.dtype, dtype)
+                    self.assertEqualArray(values.detach(), got)
 
     def test_torch_guess_cpu(self):
         model, feeds, expected = self._get_model()
