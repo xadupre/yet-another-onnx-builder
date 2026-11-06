@@ -47,7 +47,6 @@ class TestInferenceSession(ExtTestCase):
 
     def test_ort_value_dlpack_numpy(self):
         import onnxruntime as onnxrt
-        from onnxruntime.capi import _pybind_state as C
         from onnxruntime.capi.onnxruntime_pybind11_state import OrtValue as C_OrtValue
 
         numpy_arr_input = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=np.float32)
@@ -56,15 +55,15 @@ class TestInferenceSession(ExtTestCase):
         ptr = ortvalue._ortvalue.data_ptr()
 
         dlp = ortvalue._ortvalue.to_dlpack()
-        self.assertFalse(C.is_dlpack_uint8_tensor(dlp))
-        ortvalue2 = C_OrtValue.from_dlpack(dlp, False)
+        ortvalue2 = C_OrtValue.from_dlpack(dlp)
+        self.assertEqual(TFLOAT, ortvalue2.element_type())
         self.assertEqual(ptr, ortvalue2.data_ptr())
         new_array = ortvalue2.numpy()
         self.assertEqualArray(numpy_arr_input, new_array)
 
         dlp = ortvalue._ortvalue.__dlpack__()
-        self.assertFalse(C.is_dlpack_uint8_tensor(dlp))
-        ortvalue2 = C_OrtValue.from_dlpack(dlp, False)
+        ortvalue2 = C_OrtValue.from_dlpack(dlp)
+        self.assertEqual(TFLOAT, ortvalue2.element_type())
         self.assertEqual(ptr, ortvalue2.data_ptr())
         new_array = ortvalue2.numpy()
         self.assertEqualArray(numpy_arr_input, new_array)
@@ -77,6 +76,15 @@ class TestInferenceSession(ExtTestCase):
         wrap = InferenceSessionForNumpy(model, providers="cpu")
         got = wrap.run(None, feeds)
         self.assertIsInstance(got[0], np.ndarray)
+        self.assertEqualArray(expected[0], got[0])
+
+    @requires_torch()
+    def test_numpy_torch_feeds(self):
+        import torch
+
+        model, feeds, expected = self._get_model()
+        wrap = InferenceSessionForNumpy(model, providers="cpu")
+        got = wrap.run(None, {name: torch.from_numpy(value) for name, value in feeds.items()})
         self.assertEqualArray(expected[0], got[0])
 
     def test_numpy_no_optimization(self):

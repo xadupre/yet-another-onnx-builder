@@ -201,11 +201,12 @@ class InferenceSessionForTorch(_InferenceSession):
             assert hasattr(v, "__dlpack__"), f"class {type(v)} should be serialized"
             if not v.is_contiguous():
                 v = v.contiguous()
-            if v.dtype == torch.bool:
+            if v.dtype == torch.bool and hasattr(ORTC, "is_dlpack_uint8_tensor"):
+                # Older ORT imports boolean tensors as uint8 with an explicit type flag.
                 v = v.to(torch.uint8)
                 v = ORTC.OrtValue.from_dlpack(v.__dlpack__(), True)  # type: ignore
             else:
-                v = ORTC.OrtValue.from_dlpack(v.detach().__dlpack__(), False)  # type: ignore
+                v = ORTC.OrtValue.from_dlpack(v.detach().__dlpack__())  # type: ignore
             input_names.append(k)
             values.push_back(v)
         if self.nvtx:

@@ -100,7 +100,7 @@ class InferenceSessionForNumpy(_InferenceSession):
                     v, onnx.TensorProto.BOOL
                 )
             else:
-                new_feeds[k] = ORTC.OrtValue.from_dlpack(v.__dlpack__(), False)  # type: ignore
+                new_feeds[k] = ORTC.OrtValue.from_dlpack(v.__dlpack__())  # type: ignore
 
         if self.nvtx:
             self.torch.cuda.nvtx.range_push("run_with_ort_values")  # type: ignore
