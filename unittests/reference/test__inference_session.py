@@ -59,6 +59,7 @@ class TestInferenceSession(ExtTestCase):
         self.assertEqual(TFLOAT, ortvalue2.element_type())
         self.assertEqual(ptr, ortvalue2.data_ptr())
         new_array = ortvalue2.numpy()
+        self.assertEqual(numpy_arr_input.dtype, new_array.dtype)
         self.assertEqualArray(numpy_arr_input, new_array)
 
         dlp = ortvalue._ortvalue.__dlpack__()
@@ -66,6 +67,7 @@ class TestInferenceSession(ExtTestCase):
         self.assertEqual(TFLOAT, ortvalue2.element_type())
         self.assertEqual(ptr, ortvalue2.data_ptr())
         new_array = ortvalue2.numpy()
+        self.assertEqual(numpy_arr_input.dtype, new_array.dtype)
         self.assertEqualArray(numpy_arr_input, new_array)
 
         device = ortvalue._ortvalue.__dlpack_device__()

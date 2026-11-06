@@ -202,7 +202,7 @@ class InferenceSessionForTorch(_InferenceSession):
             if not v.is_contiguous():
                 v = v.contiguous()
             if v.dtype == torch.bool and hasattr(ORTC, "is_dlpack_uint8_tensor"):
-                # Older ORT imports boolean tensors as uint8 with an explicit type flag.
+                # Legacy DLPack treats booleans as uint8 and needs an explicit flag.
                 v = v.to(torch.uint8)
                 v = ORTC.OrtValue.from_dlpack(v.__dlpack__(), True)  # type: ignore
             else:
