@@ -55,14 +55,14 @@ class TestInferenceSession(ExtTestCase):
         ptr = ortvalue._ortvalue.data_ptr()
 
         dlp = ortvalue._ortvalue.to_dlpack()
-        ortvalue2 = C_OrtValue.from_dlpack(dlp, False)
+        ortvalue2 = C_OrtValue.from_dlpack(dlp)
         self.assertEqual(ptr, ortvalue2.data_ptr())
         new_array = ortvalue2.numpy()
         self.assertEqual(numpy_arr_input.dtype, new_array.dtype)
         self.assertEqualArray(numpy_arr_input, new_array)
 
         dlp = ortvalue._ortvalue.__dlpack__()
-        ortvalue2 = C_OrtValue.from_dlpack(dlp, False)
+        ortvalue2 = C_OrtValue.from_dlpack(dlp)
         self.assertEqual(ptr, ortvalue2.data_ptr())
         new_array = ortvalue2.numpy()
         self.assertEqual(numpy_arr_input.dtype, new_array.dtype)
