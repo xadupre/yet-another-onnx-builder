@@ -23,7 +23,7 @@ dev = [
     "matplotlib",
     "openpyxl",
     "pandas>=3.1.0",
-    "pytest>=7",
+    "pytest>=9.2.0",
     "py-cpuinfo",
     "pytest-coverage",
     "pytest-subtests",
