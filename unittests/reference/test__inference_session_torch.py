@@ -57,7 +57,6 @@ class TestInferenceSessionTorch(ExtTestCase):
 
     def test_ort_value_dlpack_numpy(self):
         import onnxruntime as onnxrt
-        from onnxruntime.capi import _pybind_state as C
         from onnxruntime.capi.onnxruntime_pybind11_state import OrtValue as C_OrtValue
 
         numpy_arr_input = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]], dtype=np.float32)
@@ -66,17 +65,17 @@ class TestInferenceSessionTorch(ExtTestCase):
         ptr = ortvalue._ortvalue.data_ptr()
 
         dlp = ortvalue._ortvalue.to_dlpack()
-        self.assertFalse(C.is_dlpack_uint8_tensor(dlp))
-        ortvalue2 = C_OrtValue.from_dlpack(dlp, False)
+        ortvalue2 = C_OrtValue.from_dlpack(dlp)
         self.assertEqual(ptr, ortvalue2.data_ptr())
         new_array = ortvalue2.numpy()
+        self.assertEqual(numpy_arr_input.dtype, new_array.dtype)
         self.assertEqualArray(numpy_arr_input, new_array)
 
         dlp = ortvalue._ortvalue.__dlpack__()
-        self.assertFalse(C.is_dlpack_uint8_tensor(dlp))
-        ortvalue2 = C_OrtValue.from_dlpack(dlp, False)
+        ortvalue2 = C_OrtValue.from_dlpack(dlp)
         self.assertEqual(ptr, ortvalue2.data_ptr())
         new_array = ortvalue2.numpy()
+        self.assertEqual(numpy_arr_input.dtype, new_array.dtype)
         self.assertEqualArray(numpy_arr_input, new_array)
 
         device = ortvalue._ortvalue.__dlpack_device__()
@@ -89,7 +88,7 @@ class TestInferenceSessionTorch(ExtTestCase):
         shape = torch_arr_input.shape
         ptr = torch_arr_input.data_ptr()
         dlp = torch_arr_input.__dlpack__()
-        ortvalue = C_OrtValue.from_dlpack(dlp, False)
+        ortvalue = C_OrtValue.from_dlpack(dlp)
         self.assertEqual(shape, tuple(ortvalue.shape()))
         ptr2 = ortvalue.data_ptr()
         self.assertEqual(ptr, ptr2)
@@ -105,6 +104,39 @@ class TestInferenceSessionTorch(ExtTestCase):
         got = wrap.run(None, feeds)
         self.assertIsInstance(got[0], torch.Tensor)
         self.assertEqualArray(expected[0], got[0])
+
+    def test_run_dlpack_input_types(self):
+        for dtype, elem_type in (
+            (torch.float32, onnx.TensorProto.FLOAT),
+            (torch.bool, onnx.TensorProto.BOOL),
+            (torch.uint8, onnx.TensorProto.UINT8),
+        ):
+            model = oh.make_model(
+                oh.make_graph(
+                    [oh.make_node("Identity", ["x"], ["y"])],
+                    "dlpack_identity",
+                    [oh.make_tensor_value_info("x", elem_type, [None, None])],
+                    [oh.make_tensor_value_info("y", elem_type, [None, None])],
+                ),
+                opset_imports=[oh.make_opsetid("", 18)],
+                ir_version=9,
+            )
+            session = InferenceSessionForTorch(model, providers="cpu", use_training_api=False)
+            values = torch.tensor([[0, 1, 0], [1, 0, 1]], dtype=dtype)
+            for value in (values, values.t()):
+                with self.subTest(dtype=dtype, contiguous=value.is_contiguous()):
+                    output = session.run(None, {"x": value})[0]
+                    self.assertEqual(output.dtype, dtype)
+                    self.assertEqualArray(value, output)
+
+    def test_numpy_session_dlpack_tensor_inputs(self):
+        from yobx.reference._inference_session_numpy import InferenceSessionForNumpy
+
+        model, feeds, expected = self._get_model()
+        session = InferenceSessionForNumpy(model, providers="cpu")
+        output = session.run(None, feeds)[0]
+        self.assertEqual(output.dtype, np.float32)
+        self.assertEqualArray(expected[0].numpy(), output)
 
     @requires_onnxruntime_training(True)
     def test_torch_training_cpu(self):

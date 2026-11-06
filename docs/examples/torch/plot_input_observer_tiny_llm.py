@@ -103,6 +103,7 @@ print("kwargs:", string_type(kwargs, with_shape=True))
 
 # %%
 # Let's export.
+# Opset 21 keeps the model compatible with ONNX Runtime.
 
 filenamec = "plot_input_observer_tiny_llm.onnx"
 with (
@@ -112,6 +113,7 @@ with (
     to_onnx(
         model,
         (),
+        target_opset=21,
         kwargs=observer.infer_arguments(),
         dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
         filename=filenamec,
@@ -166,6 +168,7 @@ with (
     to_onnx(
         model,
         (),
+        target_opset=21,
         kwargs=observer.infer_arguments(),
         filename=filename,
         dynamic_shapes=observer.infer_dynamic_shapes(set_batch_dimension_for=True),
