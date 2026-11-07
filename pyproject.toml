@@ -61,7 +61,7 @@ litert = ["ai-edge-litert"]
 perpetual = ["scikit-learn>=1.9.1", "perpetual>=2.1.0"]
 polars = ["polars>=2.0.0"]
 sklearn = ["scikit-learn>=1.9.1"]
-sksurv = ["scikit-learn>=1.9.1", "scikit-survival>=0.22"]
+sksurv = ["scikit-learn>=1.9.1", "scikit-survival>=0.28.0"]
 statsmodels = ["scikit-learn>=1.9.1", "statsmodels"]
 tensorflow = ["jax>=0.12.0.1", "tensorflow>=2.21"]
 torch = [
