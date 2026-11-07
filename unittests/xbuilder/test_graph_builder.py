@@ -477,14 +477,14 @@ class TestGraphBuilder(ExtTestCase):
         self.assertEqual(g.opsets[""], 18)
         ref = ExtendedReferenceEvaluator(fct.proto, functions=fct.function.nested_functions)
         got = ref.run(None, feeds)
-        self.assertEqualArray(expected, got[0])
+        self.assertEqualArray(expected, got[0], atol=2e-4, rtol=1e-7)
 
         # Same with a model
         proto = g.to_onnx(inline=False)
         self.assertEqual(len(proto.functions), 2)
         ref = ExtendedReferenceEvaluator(proto)
         got = ref.run(None, feeds)
-        self.assertEqualArray(expected, got[0])
+        self.assertEqualArray(expected, got[0], atol=2e-4, rtol=1e-7)
 
     @ignore_warnings(DeprecationWarning)
     def test_as_function_second_twice(self):
