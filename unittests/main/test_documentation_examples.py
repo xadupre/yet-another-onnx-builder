@@ -72,6 +72,27 @@ class TestDocumentationExamples(ExtTestCase):
         output = self.run_rst_examples("design/sklearn/expected_api.rst")
         self.assertIn("Sub(X,", output)
 
+    def test_tensorflow_gallery_dense_operators(self):
+        """Accepts both unfused and fused Dense operators in the gallery assertion."""
+        path = Path(ROOT) / "docs/examples/tensorflow/plot_tensorflow_to_onnx.py"
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        assertions = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.Assert)
+            and any(
+                isinstance(value, ast.Constant) and value.value == "MatMul"
+                for value in ast.walk(node.test)
+            )
+        ]
+        self.assertEqual(len(assertions), 1)
+        code = compile(ast.Module(body=assertions, type_ignores=[]), str(path), "exec")
+        for op_types in (["MatMul", "Add", "Relu"], ["Gemm", "Relu"]):
+            with self.subTest(op_types=op_types):
+                exec(code, {"op_types": op_types})
+        with self.assertRaises(AssertionError):
+            exec(code, {"op_types": ["Relu"]})
+
     @requires_torch()
     @requires_onnxruntime("1.24")
     def test_llm_gallery_export_runtime_compatibility(self):
