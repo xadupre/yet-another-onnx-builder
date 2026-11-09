@@ -17,7 +17,7 @@ Supported layers and activations (see :mod:`yobx.tensorflow` for the full
 registry):
 
 * :class:`tf.keras.layers.Dense` — converted to ``MatMul`` (+ ``Add`` when
-  the bias is non-zero after optimisation)
+  the bias is non-zero after optimisation), or fused into ``Gemm``
 * Activations: ``relu``, ``sigmoid``, ``tanh``, ``softmax``, ``relu6``
 * :class:`tf.keras.Sequential` — chains the above step-by-step
 
@@ -52,7 +52,8 @@ except RuntimeError:
 #
 # We start with the simplest possible model: a single
 # :class:`~tf.keras.layers.Dense` layer with no activation function
-# (linear/identity), so the conversion reduces to ``MatMul`` + ``Add``.
+# (linear/identity), so the conversion reduces to ``MatMul`` + ``Add``
+# (or a fused ``Gemm`` after optimisation).
 
 rng = np.random.default_rng(0)
 X = rng.standard_normal((5, 4)).astype(np.float32)
@@ -94,6 +95,7 @@ print("Outputs match ✓")
 #
 # Next we build a deeper :class:`~tf.keras.Sequential` model that exercises
 # the ``Relu``, ``MatMul`` and ``Add`` ONNX converters together.
+# Optimisation may fuse ``MatMul`` and ``Add`` into ``Gemm``.
 
 X_train = rng.standard_normal((80, 8)).astype(np.float32)
 
@@ -110,7 +112,7 @@ onx_mlp = to_onnx(mlp, (X_train[:1],), target_opset=21)
 
 op_types = [n.op_type for n in onx_mlp.graph.node]
 print("\nOp-types in the MLP graph:", op_types)
-assert "MatMul" in op_types
+assert {"MatMul", "Gemm"}.intersection(op_types), op_types
 assert "Relu" in op_types
 
 # %%
