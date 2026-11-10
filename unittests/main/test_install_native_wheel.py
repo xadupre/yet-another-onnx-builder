@@ -73,7 +73,12 @@ class TestNativeWheelSelection(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             metadata = pathlib.Path(directory) / "onnx_light-1.0.dist-info"
             metadata.mkdir()
-            for version, succeeds in (("999.0", True), ("0.0.1", False)):
+            for version, succeeds in (
+                ("999.0", True),
+                ("0.2.7", True),
+                ("0.2.6", False),
+                ("0.0.1", False),
+            ):
                 with self.subTest(version=version):
                     (metadata / "METADATA").write_text(
                         f"Metadata-Version: 2.1\nName: onnx-light\nVersion: {version}\n",
@@ -100,7 +105,7 @@ class TestNativeWheelSelection(unittest.TestCase):
             if Requirement(dependency).name == "onnx-light"
         ]
         self.assertEqual(len(requirements), 1)
-        for version in ("0.2.5", "0.2.5.1", "0.2.6", "0.3.0"):
+        for version in ("0.2.7", "0.2.7.1", "0.2.8", "0.3.0"):
             with self.subTest(version=version):
                 self.assertIn(version, requirements[0].specifier)
         for version in (
@@ -112,6 +117,9 @@ class TestNativeWheelSelection(unittest.TestCase):
             "0.2.4",
             "0.2.4.1",
             "0.2.4.2",
+            "0.2.5",
+            "0.2.5.1",
+            "0.2.6",
         ):
             with self.subTest(version=version):
                 self.assertNotIn(version, requirements[0].specifier)
