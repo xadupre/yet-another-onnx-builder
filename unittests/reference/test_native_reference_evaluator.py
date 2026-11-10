@@ -184,6 +184,22 @@ class TestNativeReferenceEvaluator(unittest.TestCase):
             self.feeds["X"] - np.array([1, -1], dtype=np.float32),
         )
 
+    def test_custom_callback_with_opset(self):
+        for with_opset in (False, True):
+            with self.subTest(with_opset=with_opset):
+                opsets = []
+
+                def add(node, x, b, *, opset=None):
+                    opsets.append(opset)
+                    return x + b
+
+                session = ExtendedReferenceEvaluator(self.make_model())
+                session.register_custom_kernel("", "Add", add, with_opset=with_opset)
+                np.testing.assert_array_equal(
+                    session.run(["sum"], self.feeds)[0], self.expected_sum
+                )
+                self.assertEqual(opsets, [18 if with_opset else None])
+
     def test_custom_callback_removal_before_resolution(self):
         session = ExtendedReferenceEvaluator(self.make_model())
         session.register_custom_kernel("", "Add", lambda node, x, b: x - b)
@@ -327,6 +343,20 @@ class TestNativeReferenceEvaluator(unittest.TestCase):
             None, {"X": self.feeds["X"]}
         )
         np.testing.assert_array_equal(result[0], self.feeds["X"] * 2)
+
+        for with_opset in (False, True):
+            with self.subTest(with_opset=with_opset):
+                opsets = []
+
+                def add(node, x, y, *, opset=None):
+                    opsets.append(opset)
+                    return x - y
+
+                session = ExtendedReferenceEvaluator(outer, functions=[inner])
+                session.register_custom_kernel("", "Add", add, with_opset=with_opset)
+                result = session.run(None, {"X": self.feeds["X"]})
+                np.testing.assert_array_equal(result[0], np.zeros_like(self.feeds["X"]))
+                self.assertEqual(opsets, [18 if with_opset else None])
 
     def test_invalid_kernel_and_input_count(self):
         with self.assertRaisesRegex(TypeError, "NativeOpKernel"):

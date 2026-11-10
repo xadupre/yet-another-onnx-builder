@@ -231,6 +231,8 @@ class TestExportOptions(ExtTestCase):
     @ignore_warnings(UserWarning)
     def test_export_with_jit(self):
         """Export with jit=True using TS2EPConverter."""
+        if not hasattr(torch.jit, "trace"):
+            self.skipTest("torch.jit.trace not available in this torch version")
         try:
             from torch._export.converter import TS2EPConverter  # noqa: F401
         except ImportError:
@@ -248,6 +250,35 @@ class TestExportOptions(ExtTestCase):
             same_signature=True,
         )
         self.assertIsInstance(ep, torch.export.ExportedProgram)
+
+    def test_export_jit_without_trace(self):
+        """Reports unsupported JIT export when torch.jit.trace is unavailable."""
+        has_trace = hasattr(torch.jit, "trace")
+        trace = getattr(torch.jit, "trace", None)
+        if has_trace:
+            del torch.jit.trace
+        try:
+            for options in (
+                {"jit": True},
+                {"strategy": "jit"},
+                {"strategy": "jit-dec"},
+                {"strategy": "jit-decall"},
+            ):
+                with (
+                    self.subTest(options=options),
+                    self.assertRaisesRegex(RuntimeError, r"requires torch\.jit\.trace"),
+                ):
+                    ExportOptions(**options).export(
+                        _Neuron(),
+                        args=(torch.rand(2, 5),),
+                        kwargs=None,
+                        tracing_mode=False,
+                        dynamic_shapes=None,
+                        same_signature=True,
+                    )
+        finally:
+            if has_trace:
+                torch.jit.trace = trace
 
     @ignore_warnings(FutureWarning)
     def test_export_with_decomposition_default(self):
@@ -378,6 +409,8 @@ class TestExportOptions(ExtTestCase):
     @ignore_warnings((UserWarning, FutureWarning))
     def test_export_strategy_jit_dec(self):
         """Strategy 'jit-dec' exports via JIT with default decompositions."""
+        if not hasattr(torch.jit, "trace"):
+            self.skipTest("torch.jit.trace not available in this torch version")
         try:
             from torch._export.converter import TS2EPConverter  # noqa: F401
         except ImportError:
@@ -398,6 +431,8 @@ class TestExportOptions(ExtTestCase):
     @ignore_warnings((UserWarning, FutureWarning))
     def test_export_strategy_jit_decall(self):
         """Strategy 'jit-decall' exports via JIT with all decompositions."""
+        if not hasattr(torch.jit, "trace"):
+            self.skipTest("torch.jit.trace not available in this torch version")
         try:
             from torch._export.converter import TS2EPConverter  # noqa: F401
         except ImportError:

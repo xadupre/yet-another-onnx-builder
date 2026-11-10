@@ -262,7 +262,7 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
                 )
         self._kernel_classes = self.filter_ops(proto, kernels, opsets)
         self._native_options: Dict[str, Any] = {"verbose": verbose, **kwargs}
-        self._registered_callbacks: Dict[tuple[str, str], Callable] = {}
+        self._registered_callbacks: Dict[tuple[str, str], tuple[Callable, bool]] = {}
         self._execution_graph = proto.graph if isinstance(proto, ModelProto) else proto
         # The wheel's initializer cache loses STRING payloads. The native feed
         # path preserves them and supports overriding initializer values.
@@ -283,10 +283,10 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
                 self.register_custom_kernel(*key, kernel(None, {}))
                 registered.add(key)
 
-    def register_custom_kernel(self, domain, op_type, fn):
+    def register_custom_kernel(self, domain, op_type, fn, *, with_opset: bool = False):
         """Registers a callback for future resolutions, not already-resolved nodes."""
-        super().register_custom_kernel(domain, op_type, fn)
-        self._registered_callbacks[domain, op_type] = fn
+        super().register_custom_kernel(domain, op_type, fn, with_opset=with_opset)
+        self._registered_callbacks[domain, op_type] = fn, with_opset
 
     def unregister_custom_kernel(self, domain, op_type):
         """Removes a registration without changing already-resolved kernels."""
@@ -414,8 +414,8 @@ class ExtendedReferenceEvaluator(ReferenceEvaluator):
                 opset_imports=opset_imports,
             )
             evaluator = ReferenceEvaluator(model, **self._native_options)
-            for (domain, op_type), fn in self._registered_callbacks.items():
-                evaluator.register_custom_kernel(domain, op_type, fn)
+            for (domain, op_type), (fn, with_opset) in self._registered_callbacks.items():
+                evaluator.register_custom_kernel(domain, op_type, fn, with_opset=with_opset)
             return evaluator.run(output_names, feed_inputs)
         if intermediate:
             graph = self._execution_graph

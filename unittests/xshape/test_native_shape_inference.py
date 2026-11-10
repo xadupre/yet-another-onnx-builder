@@ -184,6 +184,25 @@ class TestNativeShapeInference(unittest.TestCase):
         literals = {"X": (2, None), "Y": (None, 4), "Z": (2, 4)}
         self.assertIsNone(estimate_node_flops(node, lambda name: None, literals.get))
 
+    def test_gemm_vector_and_batched_cost(self):
+        for a, b, trans_a, trans_b, expected in (
+            ((5,), (7, 5), 0, 1, 77),
+            ((5,), (7, 5), 1, 1, 77),
+            ((5,), (5, 7), 0, 0, 77),
+            ((2, 5), (5, 7), 0, 0, 154),
+            ((5, 2), (7, 5), 1, 1, 154),
+            ((3, 2, 5), (5, 7), 0, 0, 462),
+            ((3, 5, 2), (7, 5), 1, 1, 462),
+            ((), (5, 7), 0, 0, None),
+            ((None,), (5, 7), 0, 0, None),
+        ):
+            with self.subTest(a=a, b=b, trans_a=trans_a, trans_b=trans_b):
+                node = helper.make_node("Gemm", ["A", "B"], ["Y"], transA=trans_a, transB=trans_b)
+                shapes = {"A": a, "B": b}
+                self.assertEqual(
+                    estimate_node_flops(node, shapes.get, lambda name: None), expected
+                )
+
     def test_rank_cost_preserves_unknown_dimensions(self):
         inference = NativeShapeInference()
         inference.set_type("X", onnx.TensorProto.FLOAT)
