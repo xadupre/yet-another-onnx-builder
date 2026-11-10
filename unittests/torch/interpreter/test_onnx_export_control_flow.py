@@ -260,6 +260,9 @@ class TestOnnxExportControlFlow(ExtTestCase):
     def test_controlflow_custom_raw_test(self):
         import torch
 
+        if not hasattr(torch.jit, "trace"):
+            self.skipTest("torch.jit.trace not available in this torch version")
+
         class RawTest(torch.nn.Module):
             def forward(self, x):
                 def true_fn(x):

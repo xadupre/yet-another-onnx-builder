@@ -63,7 +63,8 @@ class ExportOptions:
         (``True`` is equivalent to ``TracingMode.TRACING``, ``False`` is equivalent
         to ``TracingMode.DEFAULT``); ``TracingMode.NEW_TRACING`` uses the
         dispatch-based :class:`~yobx.torch.new_tracing.tracer.GraphTracer`
-    :param jit: use jit to get a graph then converts it into a fx graph
+    :param jit: use jit to get a graph then converts it into a fx graph;
+        requires a PyTorch version providing ``torch.jit.trace``
     :param strategy: to overwrite all the previous parameters with just a value;
         ``'transformers'`` routes the export through
         :class:`~yobx.torch.in_transformers.YobxOnnxExporter` (requires
@@ -461,6 +462,11 @@ class ExportOptions:
             return res  # type: ignore
 
         if self.jit:
+            if not hasattr(torch.jit, "trace"):
+                raise RuntimeError(
+                    "JIT export requires torch.jit.trace, which is not available in this "
+                    "PyTorch version. Use strategy='strict' or 'nostrict' instead."
+                )
             if verbose:
                 print("[ExportOptions.export] torch.jit.trace")
             from torch._export.converter import TS2EPConverter

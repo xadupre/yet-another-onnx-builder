@@ -277,16 +277,20 @@ def _flops_matmul(
 def _flops_gemm(
     node: onnx.NodeProto, shape_fn: _ShapeFn, literal_fn: _LiteralFn
 ) -> Optional[DIM_TYPE]:
-    """2*M*K*N + M*N FLOPs for Gemm (alpha*A@B + beta*C)."""
+    """Estimates 2*M*K*N + M*N FLOPs for matrix, batched, or vector Gemm."""
     if len(node.input) < 2:
         return None
     a = _resolve_shape(node.input[0], shape_fn, literal_fn)
     b = _resolve_shape(node.input[1], shape_fn, literal_fn)
-    if a is None or b is None or len(a) < 2 or len(b) < 2:
+    if a is None or b is None or len(a) < 1 or len(b) < 2:
         return None
     trans_a = int(_get_attribute_value(node, "transA", 0))
     trans_b = int(_get_attribute_value(node, "transB", 0))
-    M, K = (a[1], a[0]) if trans_a else (a[0], a[1])
+    if len(a) == 1:
+        M, K = 1, a[0]
+    else:
+        M, K = (a[-1], a[-2]) if trans_a else (a[-2], a[-1])
+        M = dim_multi_mul(*a[:-2], M)
     _K2, N = (b[1], b[0]) if trans_b else (b[0], b[1])
     return dim_add(dim_multi_mul(2, M, K, N), dim_mul(M, N))
 
