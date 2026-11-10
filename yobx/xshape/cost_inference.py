@@ -286,6 +286,7 @@ def _flops_gemm(
         return None
     trans_a = int(_get_attribute_value(node, "transA", 0))
     trans_b = int(_get_attribute_value(node, "transB", 0))
+    M: DIM_TYPE
     if len(a) == 1:
         M, K = 1, a[0]
     else:
