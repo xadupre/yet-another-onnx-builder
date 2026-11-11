@@ -1,6 +1,8 @@
 yet-another-onnx-builder documentation
 ======================================
 
+Documented version: |release|. Last generated: |today|.
+
 .. image:: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_core.yml/badge.svg
     :target: https://github.com/xadupre/yet-another-onnx-builder/actions/workflows/ci_core.yml
     :alt: core
