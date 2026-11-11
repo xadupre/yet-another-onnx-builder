@@ -73,7 +73,7 @@ torch = [
 transformers = [    
     "huggingface_hub",
     "scikit-learn>=1.9.1",  # one function requires it to compute ROC curve
-    "transformers>=5.20.2",
+    "transformers>=5.22.2",
 ]
 xgboost = ["scikit-learn>=1.9.1", "xgboost>=3.0"]
 op-db = ["expecttest"]
