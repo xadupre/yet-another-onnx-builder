@@ -7,6 +7,7 @@ import onnx_light.onnx.numpy_helper as onh
 from yobx.ext_test_case import ExtTestCase, hide_stdout
 from yobx.helpers._onnx_simple_text_plot import onnx_simple_text_plot
 from yobx.helpers.onnx_helper import (
+    _default_OPSET_TO_IR_VERSION,
     attr_proto_to_python,
     get_hidden_inputs,
     make_model_with_local_functions,
@@ -25,6 +26,12 @@ TINT64 = onnx.TensorProto.INT64
 
 
 class TestOnnxHelper(ExtTestCase):
+    def test_opset_to_ir_version(self):
+        versions = _default_OPSET_TO_IR_VERSION()
+        for opset, ir_version in [(21, 10), (23, 11), (24, 12), (25, 13), (26, 13)]:
+            with self.subTest(opset=opset):
+                self.assertEqual(versions[opset], ir_version)
+
     def _get_model(self):
         model = oh.make_model(
             oh.make_graph(
