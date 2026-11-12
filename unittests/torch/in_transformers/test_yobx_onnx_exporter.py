@@ -12,7 +12,9 @@ Covers:
   symbolic (dynamic) dimensions.
 """
 
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
@@ -115,11 +117,20 @@ class TestYobxOnnxExporterExport(ExtTestCase):
         sample_inputs = {"x": x}
 
         exporter = YobxOnnxExporter()
-        artifact = exporter.export(model, sample_inputs, config=OnnxConfig(dynamic=False))
+        with tempfile.TemporaryDirectory() as folder:
+            for output_type in (None, str, Path):
+                with self.subTest(output_type=output_type):
+                    export_config = OnnxConfig(dynamic=False)
+                    if output_type is not None:
+                        filename = Path(folder) / f"{output_type.__name__}.onnx"
+                        export_config.output_path = output_type(filename)
+                    artifact = exporter.export(model, sample_inputs, config=export_config)
 
-        self.assertIsInstance(artifact, ExportArtifact)
-        # The exported proto must have at least one node (the linear op).
-        self.assertGreater(len(artifact.graph.node), 0)
+                    self.assertIsInstance(artifact, ExportArtifact)
+                    # The exported proto must have at least one node (the linear op).
+                    self.assertGreater(len(artifact.graph.node), 0)
+                    if output_type is not None:
+                        self.assertTrue(filename.is_file())
 
     @requires_transformers("5.12")
     def test_export_with_target_opset(self):

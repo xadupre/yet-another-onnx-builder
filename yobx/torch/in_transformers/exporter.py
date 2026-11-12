@@ -178,7 +178,7 @@ class YobxOnnxExporter(_OnnxExporterBase):  # type: ignore[valid-type]
 
         # Determine the output filename from config.
         filename: Optional[str] = None
-        if isinstance(config, OnnxConfig) and config.output_path is not None:
+        if isinstance(config, OnnxConfig) and getattr(config, "output_path", None) is not None:
             filename = str(config.output_path)
 
         export_kwargs: Dict[str, Any] = dict(self._extra_kwargs)
