@@ -54,7 +54,7 @@ docs = [
 # packages
 
 category_encoders = ["scikit-learn>=1.9.1", "category-encoders>=2.11.2"]
-imblearn = ["scikit-learn>=1.9.1", "imbalanced-learn>=0.11"]
+imblearn = ["scikit-learn>=1.9.1", "imbalanced-learn>=0.14.2"]
 jax = ["jax[cpu]>=0.12.0.1"]
 lightgbm = ["scikit-learn>=1.9.1", "lightgbm>=4.7.0"]
 litert = ["ai-edge-litert"]
