@@ -35,7 +35,7 @@ class TestOptionalDependencies(unittest.TestCase):
         """Requires the latest supported Transformers release."""
         self.assertEqual(
             [dep for dep in self.extras["transformers"] if dep.startswith("transformers")],
-            ["transformers>=5.20.2"],
+            ["transformers>=5.22.2"],
         )
 
     def test_scikit_learn_versions(self):
