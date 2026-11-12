@@ -24,6 +24,24 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
 
         return OnnxLightGraphBuilder(*args, **kwargs)
 
+    def test_runtime_compatible_ir_versions(self):
+        import onnxruntime
+
+        values = numpy.array([1.0, -2.0], dtype=numpy.float32)
+        for opset, ir_version in [(21, 10), (23, 11), (24, 12), (25, 13), (26, 13)]:
+            with self.subTest(opset=opset):
+                builder = self.make_builder(opset)
+                builder.make_tensor_input("X", onnx.TensorProto.FLOAT, [2])
+                builder.op.Identity("X", outputs=["Y"])
+                builder.make_tensor_output("Y")
+                model = builder.to_onnx(optimize=False).proto
+                self.assertEqual(model.ir_version, ir_version)
+                self.assertEqual({o.domain: o.version for o in model.opset_import}, {"": opset})
+                session = onnxruntime.InferenceSession(
+                    model.SerializeToString(), providers=["CPUExecutionProvider"]
+                )
+                numpy.testing.assert_array_equal(session.run(None, {"X": values})[0], values)
+
     def test_import_model_with_anonymous_dimensions(self):
         from onnx_light.onnx import helper
 

@@ -116,9 +116,11 @@ ONNX Runtime compatibility
 Conversion defaults track the latest opset exposed by ``onnx-light``, which can
 be newer than the opset or IR version supported by ONNX Runtime. Execution tests
 and runnable examples therefore request an explicit runtime-compatible opset
-(usually opset 21, which produces IR version 10). Tests of newer operators keep
-their explicit versions. Default-selection tests separately check the latest
-opset without passing those models to ONNX Runtime.
+(opset 26 with IR version 13 for ONNX Runtime 1.31.1, the minimum required
+version). The runtime evaluator and shared parity tests use these versions.
+Tests covering older operators retain their explicit versions.
+Default-selection tests separately check the latest opset without passing
+those models to ONNX Runtime.
 The same explicit version is needed in shared tracing helpers and in tests
 that execute through ``InputObserver.check_discrepancies`` or
 ``validate_model(do_run=True)``. These paths still create ONNX Runtime sessions,
