@@ -13,7 +13,7 @@ dependencies = [
     "ml_dtypes",
     "numpy>=2.2",
     "onnx-light>=0.2.7",
-    "onnxruntime>=1.24",
+    "onnxruntime>=1.31.1",
     "scipy",
 ]
 
