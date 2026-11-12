@@ -11,7 +11,7 @@ license = { file = "LICENSE" }
 requires-python = ">=3.12"
 dependencies = [
     "ml_dtypes",
-    "numpy>=2.2",
+    "numpy>=2.5.4",
     "onnx-light>=0.2.7",
     "onnxruntime>=1.31.1",
     "scipy",
