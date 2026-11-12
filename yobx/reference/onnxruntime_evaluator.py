@@ -93,8 +93,9 @@ class OnnxruntimeEvaluator:
     :param use_training_api: use onnxruntime-training API
     :param verbose: verbosity
     :param local_functions: additional local function
-    :param ir_version: ir version to use when unknown
-    :param opsets: opsets to use when unknown
+    :param ir_version: ir version to use when unknown (default: 13)
+    :param opsets: opsets to use when unknown (default: at most 26,
+        the latest opset officially supported by ONNX Runtime 1.31.1)
     :param whole: if True, do not split node by node
     :param torch_or_numpy: force the use of one of them, True for torch,
         False for numpy, None to let the class choose
@@ -120,7 +121,7 @@ class OnnxruntimeEvaluator:
         local_functions: Optional[
             Dict[Tuple[str, str], Union[Proto, "OnnxruntimeEvaluator"]]
         ] = None,
-        ir_version: int = 10,
+        ir_version: int = 13,
         opsets: Optional[Union[int, Dict[str, int]]] = None,
         whole: bool = False,
         torch_or_numpy: Optional[bool] = None,
@@ -439,7 +440,7 @@ class OnnxruntimeEvaluator:
             else:
                 onx.opset_import.extend([oh.make_opsetid(k, v) for k, v in self.opsets.items()])
         else:
-            onx.opset_import.append(oh.make_opsetid("", onnx_opset_version()))
+            onx.opset_import.append(oh.make_opsetid("", min(26, onnx_opset_version())))
         opsets = {d.domain: d.version for d in onx.opset_import}
         add = {}
         for node in self.enumerate_nodes(onx.graph.node):

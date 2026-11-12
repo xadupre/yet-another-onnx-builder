@@ -117,7 +117,7 @@ def _compatible_ir_version(opsets):
         (23, 11),
         (24, 12),
         (25, 13),
-        (26, 14),
+        (27, 14),
     )
     versions = [3]
     for opset in opsets:
