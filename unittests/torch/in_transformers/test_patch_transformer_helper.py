@@ -45,10 +45,7 @@ class TestPatchTransformerHelper(ExtTestCase):
             apply_patches_for_model(patch_transformers=False, patch_torch=False) as details,
             register_flattening_functions(patch_transformers=True),
         ):
-            dynamic_shapes = use_dyn_not_str(ds)
-            dynamic_shapes["past_key_values"] = [
-                {0: shape[0]} for shape in dynamic_shapes["past_key_values"]
-            ]
+            dynamic_shapes = use_dyn_not_str(ds, default_value=torch.export.Dim.AUTO)
             ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=dynamic_shapes)
             self.assertIsInstance(details, PatchDetails)
             patches = details.patches_involved_in_graph(ep.graph)
@@ -72,10 +69,7 @@ class TestPatchTransformerHelper(ExtTestCase):
             ) as details,
             register_flattening_functions(patch_transformers=True),
         ):
-            dynamic_shapes = use_dyn_not_str(ds)
-            dynamic_shapes["past_key_values"] = [
-                {0: shape[0]} for shape in dynamic_shapes["past_key_values"]
-            ]
+            dynamic_shapes = use_dyn_not_str(ds, default_value=torch.export.Dim.AUTO)
             ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=dynamic_shapes)
             patches = details.patches_involved_in_graph(ep.graph)
             self.assertEqual(len(patches), 1)
@@ -111,10 +105,7 @@ class TestPatchTransformerHelper(ExtTestCase):
             ) as details,
             register_flattening_functions(patch_transformers=True),
         ):
-            dynamic_shapes = use_dyn_not_str(ds)
-            dynamic_shapes["past_key_values"] = [
-                {0: shape[0]} for shape in dynamic_shapes["past_key_values"]
-            ]
+            dynamic_shapes = use_dyn_not_str(ds, default_value=torch.export.Dim.AUTO)
             ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=dynamic_shapes)
             patches = details.patches_involved_in_graph(ep.graph)
             self.assertEqual(len(patches), 1)

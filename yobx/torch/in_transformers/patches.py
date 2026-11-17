@@ -1,5 +1,4 @@
 import contextlib
-import sys
 import warnings
 from typing import Any, Dict, Generator, List, Optional, Tuple
 import torch
@@ -35,9 +34,8 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
 
     .. note::
         The function detects that ``RotaryEmbedding.forward`` is wrapped by checking
-        if can find substring ``transformers/modeling_rope_utils.py`` in
-        ``RotaryEmbedding.forward.__wrapped__``. It does not seem to be the case
-        with Python 3.10.
+        whether ``RotaryEmbedding.forward.__wrapped__`` comes from a Transformers
+        RoPE utility or model module.
     """
     if model is None:
         from transformers.models.llama.modeling_llama import LlamaRotaryEmbedding
@@ -45,35 +43,25 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
         return [_make_patch_info_for_rotary(LlamaRotaryEmbedding)]
     patches = []
     for _name, submodule in model.named_modules():
-        if (
-            hasattr(submodule.forward, "__wrapped__")
-            and hasattr(submodule.forward.__wrapped__, "__code__")
-            and (
-                "transformers/modeling_rope_utils.py"
-                in str(submodule.forward.__wrapped__.__code__)
-                or "transformers\\modeling_rope_utils.py"
-                in str(submodule.forward.__wrapped__.__code__)
-                or "transformers/models/llama/modeling_llama.py"
-                in str(submodule.forward.__wrapped__.__code__)
-                or "transformers\\models\\llama\\modeling_llama.py"
-                in str(submodule.forward.__wrapped__.__code__)
-            )
+        if not hasattr(submodule.forward, "__wrapped__") or not hasattr(
+            submodule.forward.__wrapped__, "__code__"
         ):
-            # RotaryEmbedding is wrapped and this one includes a control-flow.
-            if submodule.__class__.__name__.endswith("RotaryEmbedding"):
-                patch = _make_patch_info_for_rotary(submodule.__class__)
-            elif submodule.__class__.__name__.endswith("RotaryEmbedding") and sys.version_info[
-                :2
-            ] < (3, 11):
-                warnings.warn(
-                    "RotaryEmbedding.forward cannot be patched with python<3.11.", UserWarning
-                )
-                continue
-            else:
+            continue
+        code = submodule.forward.__wrapped__.__code__
+        filename = code.co_filename.replace("\\", "/")
+        is_rotary_embedding = submodule.__class__.__name__.endswith("RotaryEmbedding")
+        if not is_rotary_embedding:
+            if "transformers/modeling_rope_utils.py" in filename:
                 raise NotImplementedError(
                     f"Wrapped {submodule.__class__.__name__} is not implemented yet."
                 )
-            patches.append(patch)
+            continue
+        if (
+            "transformers/modeling_rope_utils.py" not in filename
+            and "transformers/models/" not in filename
+        ):
+            continue
+        patches.append(_make_patch_info_for_rotary(submodule.__class__))
     return patches
 
 
