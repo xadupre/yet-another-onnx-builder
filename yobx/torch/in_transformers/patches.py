@@ -53,6 +53,10 @@ def get_patches_for(model: Optional[torch.nn.Module] = None) -> List[PatchInfo]:
                 in str(submodule.forward.__wrapped__.__code__)
                 or "transformers\\modeling_rope_utils.py"
                 in str(submodule.forward.__wrapped__.__code__)
+                or "transformers/models/llama/modeling_llama.py"
+                in str(submodule.forward.__wrapped__.__code__)
+                or "transformers\\models\\llama\\modeling_llama.py"
+                in str(submodule.forward.__wrapped__.__code__)
             )
         ):
             # RotaryEmbedding is wrapped and this one includes a control-flow.
