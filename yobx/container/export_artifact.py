@@ -591,10 +591,14 @@ class ExportArtifact(ExportArtifactProtocol):
         return self
 
     def save_report(self, onnx_path: str) -> None:
-        """Saves the report as an Excel file alongside *onnx_path* when available."""
+        """Saves an Excel sidecar when a report, pandas and openpyxl are available."""
         if self.report is None:
             return
+        import importlib.util
         import os
+
+        if any(importlib.util.find_spec(name) is None for name in ("pandas", "openpyxl")):
+            return
 
         if not self.report.node_stats and isinstance(self.proto, onnx.ModelProto):
             self.compute_node_stats()

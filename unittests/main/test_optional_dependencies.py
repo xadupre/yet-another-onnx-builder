@@ -10,7 +10,15 @@ class TestOptionalDependencies(unittest.TestCase):
     def setUpClass(cls):
         root = pathlib.Path(__file__).resolve().parents[2]
         project = tomllib.loads((root / "pyproject.toml").read_text())
+        cls.dependencies = project["project"]["dependencies"]
         cls.extras = project["project"]["optional-dependencies"]
+
+    def test_openpyxl_is_optional(self):
+        """Keeps Excel support out of the mandatory dependencies."""
+        self.assertFalse(any(dep.startswith("openpyxl") for dep in self.dependencies))
+        for extra in ("dev", "docs"):
+            with self.subTest(extra=extra):
+                self.assertIn("openpyxl", self.extras[extra])
 
     def test_pandas_versions(self):
         """Requires the updated pandas release in development and documentation extras."""
