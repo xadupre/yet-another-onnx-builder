@@ -18,17 +18,17 @@ class TestOptionalDependencies(unittest.TestCase):
             with self.subTest(extra=extra):
                 self.assertEqual(
                     [dep for dep in self.extras[extra] if dep.startswith("pandas")],
-                    ["pandas>=3.1.0"],
+                    ["pandas>=3.1.1"],
                 )
 
     def test_polars_version(self):
         """Requires the updated polars release in its optional extra."""
-        self.assertEqual(self.extras["polars"], ["polars>=2.0.0"])
+        self.assertEqual(self.extras["polars"], ["polars>=2.1.0"])
 
     def test_torch_version(self):
         """Requires the latest supported PyTorch release."""
         self.assertEqual(
-            [dep for dep in self.extras["torch"] if dep.startswith("torch")], ["torch>=2.14.1"]
+            [dep for dep in self.extras["torch"] if dep.startswith("torch")], ["torch>=2.15.0"]
         )
 
     def test_transformers_version(self):
