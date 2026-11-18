@@ -5,6 +5,7 @@ from yobx.ext_test_case import (
     ExtTestCase,
     requires_python,
     requires_transformers,
+    has_torch,
     has_transformers,
     hide_stdout,
     skipif_ci_windows,
@@ -18,6 +19,11 @@ from yobx.torch import (
 )
 from yobx.torch.torch_helper import torch_deepcopy
 
+skip_guard_name_error = unittest.skipIf(
+    has_torch("2.16.dev0") or has_transformers("5.24.dev0"),
+    reason="NameError 'L' in exported guards, see issue #2475",
+)
+
 
 class TestPatchTransformerHelper(ExtTestCase):
     @requires_python((3, 11), "wraps is not captured the same way in __wrapped__")
@@ -27,11 +33,17 @@ class TestPatchTransformerHelper(ExtTestCase):
         self.assertTrue(hasattr(llama.forward, "__wrapped__"))
         self.assertTrue(hasattr(llama.forward.__wrapped__, "__code__"))
         self.assertInOr(
-            ("transformers/modeling_rope_utils.py", "transformers\\modeling_rope_utils.py"),
+            (
+                "transformers/modeling_rope_utils.py",
+                "transformers\\modeling_rope_utils.py",
+                "transformers/models/llama/modeling_llama.py",
+                "transformers\\models\\llama\\modeling_llama.py",
+            ),
             str(llama.forward.__wrapped__.__code__),
         )
 
     @requires_transformers("4.57")
+    @skip_guard_name_error
     def test_involved_patches_no_patch_applied(self):
         data = get_tiny_model("arnir0/Tiny-LLM")
         model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
@@ -40,7 +52,8 @@ class TestPatchTransformerHelper(ExtTestCase):
             apply_patches_for_model(patch_transformers=False, patch_torch=False) as details,
             register_flattening_functions(patch_transformers=True),
         ):
-            ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=use_dyn_not_str(ds))
+            dynamic_shapes = use_dyn_not_str(ds, default_value=torch.export.Dim.AUTO)
+            ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=dynamic_shapes)
             self.assertIsInstance(details, PatchDetails)
             patches = details.patches_involved_in_graph(ep.graph)
             self.assertEqual(len(patches), 0)
@@ -50,6 +63,7 @@ class TestPatchTransformerHelper(ExtTestCase):
     @skipif_ci_windows("patch did not apply on windows")
     @requires_transformers("4.57")
     @hide_stdout()
+    @skip_guard_name_error
     def test_involved_patches_dynamic_rope(self):
         data = get_tiny_model(
             "arnir0/Tiny-LLM",
@@ -63,7 +77,8 @@ class TestPatchTransformerHelper(ExtTestCase):
             ) as details,
             register_flattening_functions(patch_transformers=True),
         ):
-            ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=use_dyn_not_str(ds))
+            dynamic_shapes = use_dyn_not_str(ds, default_value=torch.export.Dim.AUTO)
+            ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=dynamic_shapes)
             patches = details.patches_involved_in_graph(ep.graph)
             self.assertEqual(len(patches), 1)
             self.assertNotEmpty(patches)
@@ -78,6 +93,7 @@ class TestPatchTransformerHelper(ExtTestCase):
     @skipif_ci_windows("patch did not apply on windows")
     @requires_transformers("4.57")
     @hide_stdout()
+    @skip_guard_name_error
     def test_involved_patches_long_rope(self):
         data = get_tiny_model(
             "arnir0/Tiny-LLM",
@@ -98,7 +114,8 @@ class TestPatchTransformerHelper(ExtTestCase):
             ) as details,
             register_flattening_functions(patch_transformers=True),
         ):
-            ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=use_dyn_not_str(ds))
+            dynamic_shapes = use_dyn_not_str(ds, default_value=torch.export.Dim.AUTO)
+            ep = torch.export.export(model, (), kwargs=inputs, dynamic_shapes=dynamic_shapes)
             patches = details.patches_involved_in_graph(ep.graph)
             self.assertEqual(len(patches), 1)
             self.assertNotEmpty(patches)
