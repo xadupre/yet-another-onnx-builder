@@ -5,6 +5,7 @@ from yobx.ext_test_case import (
     ExtTestCase,
     requires_python,
     requires_transformers,
+    has_torch,
     has_transformers,
     hide_stdout,
     skipif_ci_windows,
@@ -17,6 +18,11 @@ from yobx.torch import (
     get_tiny_model,
 )
 from yobx.torch.torch_helper import torch_deepcopy
+
+skip_guard_name_error = unittest.skipIf(
+    has_torch("2.16.dev0") or has_transformers("5.24.dev0"),
+    reason="NameError 'L' in exported guards, see issue #2475",
+)
 
 
 class TestPatchTransformerHelper(ExtTestCase):
@@ -37,6 +43,7 @@ class TestPatchTransformerHelper(ExtTestCase):
         )
 
     @requires_transformers("4.57")
+    @skip_guard_name_error
     def test_involved_patches_no_patch_applied(self):
         data = get_tiny_model("arnir0/Tiny-LLM")
         model, inputs, ds = data.model, data.export_inputs, data.dynamic_shapes
@@ -56,6 +63,7 @@ class TestPatchTransformerHelper(ExtTestCase):
     @skipif_ci_windows("patch did not apply on windows")
     @requires_transformers("4.57")
     @hide_stdout()
+    @skip_guard_name_error
     def test_involved_patches_dynamic_rope(self):
         data = get_tiny_model(
             "arnir0/Tiny-LLM",
@@ -85,6 +93,7 @@ class TestPatchTransformerHelper(ExtTestCase):
     @skipif_ci_windows("patch did not apply on windows")
     @requires_transformers("4.57")
     @hide_stdout()
+    @skip_guard_name_error
     def test_involved_patches_long_rope(self):
         data = get_tiny_model(
             "arnir0/Tiny-LLM",
