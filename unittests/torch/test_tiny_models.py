@@ -50,6 +50,7 @@ class TestTinyModels(ExtTestCase):
         model_data = get_tiny_model("arnir0/Tiny-LLM")
         expected = model_data.model(**torch_deepcopy(model_data.export_inputs))
         text = self.string_type(expected, with_shape=True)
+        text = text.replace("cache:DynamicCache", "past_key_values:DynamicCache")
         self.assertEqual(
             "CausalLMOutputWithPast(logits:T1s2x3x32000,"
             "past_key_values:DynamicCache(key_cache=#1[T1s2x1x33x96], "
