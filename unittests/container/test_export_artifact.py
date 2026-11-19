@@ -4,7 +4,10 @@ Unit tests for :class:`~yobx.container.ExportArtifact` and
 """
 
 import os
+import subprocess
+import sys
 import tempfile
+import textwrap
 import unittest
 
 import numpy as np
@@ -503,6 +506,45 @@ class TestExportReport(ExtTestCase):
             # A report Excel file should be produced alongside the .onnx file.
             excel_path = os.path.join(tmp, "model.xlsx")
             self.assertTrue(os.path.exists(excel_path))
+
+    def test_save_without_excel_dependencies(self):
+        """Saves and reloads a model without optional Excel dependencies."""
+        code = textwrap.dedent("""
+            import pathlib
+            import sys
+            import tempfile
+
+            sys.modules[sys.argv[1]] = None
+
+            from onnx_light import onnx
+            from onnx_light.onnx import helper
+            from yobx.container import ExportArtifact, ExportReport
+
+            model = helper.make_model(helper.make_graph([], "empty", [], []))
+            report = ExportReport(extra={"time_total": 0.1})
+            artifact = ExportArtifact(proto=model, report=report)
+            with tempfile.TemporaryDirectory() as directory:
+                path = pathlib.Path(directory) / "model.onnx"
+                assert artifact.save(str(path)) is model
+                assert artifact.filename == str(path)
+                assert path.is_file()
+                assert not path.with_suffix(".xlsx").exists()
+                loaded = ExportArtifact.load(str(path))
+                assert isinstance(loaded.proto, onnx.ModelProto)
+                assert loaded.proto.SerializeToString() == model.SerializeToString()
+            assert not report.node_stats
+            assert not report.symbolic_flops
+            """)
+        for dependency in ("openpyxl", "pandas"):
+            with self.subTest(dependency=dependency):
+                result = subprocess.run(
+                    [sys.executable, "-c", code, dependency],
+                    cwd=os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_save_non_model_proto_raises(self):
         """Saving a FunctionProto directly should raise TypeError."""
