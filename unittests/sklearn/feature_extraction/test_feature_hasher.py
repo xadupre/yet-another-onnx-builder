@@ -4,7 +4,7 @@ Unit tests for yobx.sklearn.feature_extraction.FeatureHasher converter.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 
 
 @requires_sklearn("1.4")
@@ -22,6 +22,7 @@ class TestFeatureHasher(ExtTestCase):
     # Basic correctness
     # ------------------------------------------------------------------
 
+    @requires_onnxruntime()
     def test_basic_alternate_sign_true(self):
         """alternate_sign=True: signs match sklearn's murmurhash3_32 sign."""
         from sklearn.feature_extraction import FeatureHasher
@@ -43,6 +44,7 @@ class TestFeatureHasher(ExtTestCase):
         expected = fh.transform(docs).toarray()
         self.assertEqualArray(expected, result, atol=1e-6)
 
+    @requires_onnxruntime()
     def test_basic_alternate_sign_false(self):
         """alternate_sign=False: all contributions are +1."""
         from sklearn.feature_extraction import FeatureHasher
@@ -61,6 +63,7 @@ class TestFeatureHasher(ExtTestCase):
         expected = fh.transform(docs).toarray()
         self.assertEqualArray(expected, result, atol=1e-6)
 
+    @requires_onnxruntime()
     def test_float32_dtype(self):
         """dtype=np.float32 produces a FLOAT output tensor."""
         from sklearn.feature_extraction import FeatureHasher
@@ -81,6 +84,7 @@ class TestFeatureHasher(ExtTestCase):
         expected = fh.transform(docs).toarray().astype(np.float32)
         self.assertEqualArray(expected, result, atol=1e-6)
 
+    @requires_onnxruntime()
     def test_float64_dtype(self):
         """dtype=np.float64 (the sklearn default) produces a DOUBLE output tensor."""
         from sklearn.feature_extraction import FeatureHasher
@@ -105,6 +109,7 @@ class TestFeatureHasher(ExtTestCase):
     # Collision and count tests
     # ------------------------------------------------------------------
 
+    @requires_onnxruntime()
     def test_repeated_tokens_count(self):
         """Repeated tokens in a document are summed, not deduplicated."""
         from sklearn.feature_extraction import FeatureHasher
@@ -122,6 +127,7 @@ class TestFeatureHasher(ExtTestCase):
         expected = fh.transform(docs).toarray()
         self.assertEqualArray(expected, result, atol=1e-6)
 
+    @requires_onnxruntime()
     def test_collision_two_tokens_same_bucket(self):
         """Tokens that hash to the same bucket accumulate correctly."""
         from sklearn.feature_extraction import FeatureHasher
@@ -144,6 +150,7 @@ class TestFeatureHasher(ExtTestCase):
     # Empty documents and padding
     # ------------------------------------------------------------------
 
+    @requires_onnxruntime()
     def test_empty_document(self):
         """A document with no features produces an all-zero feature vector."""
         from sklearn.feature_extraction import FeatureHasher
@@ -162,6 +169,7 @@ class TestFeatureHasher(ExtTestCase):
         expected = fh.transform(docs).toarray()
         self.assertEqualArray(expected, result, atol=1e-6)
 
+    @requires_onnxruntime()
     def test_all_empty_documents(self):
         """All-empty documents produce an all-zero output."""
         from sklearn.feature_extraction import FeatureHasher
@@ -179,6 +187,7 @@ class TestFeatureHasher(ExtTestCase):
         expected = fh.transform(docs).toarray()
         self.assertEqualArray(expected, result, atol=1e-6)
 
+    @requires_onnxruntime()
     def test_single_sample(self):
         """Single-sample batch works correctly."""
         from sklearn.feature_extraction import FeatureHasher
@@ -200,6 +209,7 @@ class TestFeatureHasher(ExtTestCase):
     # n_features variations
     # ------------------------------------------------------------------
 
+    @requires_onnxruntime()
     def test_n_features_power_of_two(self):
         """n_features=1024 (power of 2) works correctly."""
         from sklearn.feature_extraction import FeatureHasher
@@ -217,6 +227,7 @@ class TestFeatureHasher(ExtTestCase):
         expected = fh.transform(docs).toarray()
         self.assertEqualArray(expected, result, atol=1e-6)
 
+    @requires_onnxruntime()
     def test_n_features_non_power_of_two(self):
         """n_features=10 (non-power-of-two) produces correct modular hashing."""
         from sklearn.feature_extraction import FeatureHasher

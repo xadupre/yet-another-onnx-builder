@@ -13,16 +13,13 @@ class TestJaxToOnnx(ExtTestCase):
 
     def _check(self, fn, args, dynamic_shapes=None, input_names=None, atol=1e-5):
         from onnx_light.onnx import ModelProto
-        from onnxruntime import InferenceSession
         from yobx.jax import to_onnx
 
         artifact = to_onnx(
             fn, args, target_opset=21, dynamic_shapes=dynamic_shapes, input_names=input_names
         )
         self.assertIsInstance(artifact.proto, ModelProto)
-        session = InferenceSession(
-            artifact.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        session = self.make_inference_session(artifact)
         names = [value.name for value in session.get_inputs()]
         if input_names is not None:
             self.assertEqual(names, list(input_names))
@@ -56,14 +53,11 @@ class TestJaxToOnnx(ExtTestCase):
 
     def test_tensorflow_entry_point_routes_jax_directly(self):
         import jax.numpy as jnp
-        from onnxruntime import InferenceSession
         from yobx.tensorflow import to_onnx
 
         x = np.ones((4, 3), dtype=np.float32)
         artifact = to_onnx(jnp.sin, (x,), target_opset=21)
-        session = InferenceSession(
-            artifact.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        session = self.make_inference_session(artifact)
         (result,) = session.run(None, {session.get_inputs()[0].name: x})
         self.assertEqualArray(np.asarray(jnp.sin(x)), result, atol=1e-5)
 

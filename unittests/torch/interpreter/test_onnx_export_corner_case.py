@@ -7,7 +7,9 @@ from io import StringIO
 from yobx._onnx_shim import onnx
 from onnx_light.onnx.reference import ReferenceEvaluator
 from yobx.ext_test_case import (
+    requires_onnxruntime,
     ExtTestCase,
+    has_onnxruntime,
     ignore_warnings,
     skipif_ci_windows,
     requires_cuda,
@@ -142,6 +144,8 @@ class TestOnnxExportCornerCase(ExtTestCase):
             self.assertIn("ExportOptions(", s)
 
     def check_model_ort(self, name):
+        if not has_onnxruntime():
+            return
         from onnxruntime import InferenceSession
 
         if isinstance(name, str):
@@ -250,6 +254,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
     @requires_onnxscript()
+    @requires_onnxruntime()
     def test_simple_export_pool(self):
         from onnxruntime import InferenceSession
 
@@ -268,6 +273,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @requires_torch("2.13")
     @requires_onnxscript()
     @hide_stdout()
+    @requires_onnxruntime()
     def test_simple_export_pool_bfloat16(self):
         import torch
         from onnxruntime import InferenceSession
@@ -301,6 +307,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
         self.assertEqualArray(expected, move_to(results[0]))
         self.assertEqualArray(expected, move_to(results[1]))
 
+    @requires_onnxruntime()
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
@@ -342,6 +349,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
     @requires_onnxscript()
+    @requires_onnxruntime()
     def test_simple_export_pool_unused(self):
         from onnxruntime import InferenceSession
 
@@ -356,6 +364,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
             results.append(ref.run(None, {"input": x})[0])
         self.assertEqualArray(results[0], results[1])
 
+    @requires_onnxruntime()
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     @requires_torch("2.12")
@@ -411,6 +420,7 @@ class TestOnnxExportCornerCase(ExtTestCase):
     @requires_torch("2.12")
     @requires_onnxscript()
     @hide_stdout()
+    @requires_onnxruntime()
     def test_simple_export_pool_constant_folding(self):
         from onnxruntime import InferenceSession
 

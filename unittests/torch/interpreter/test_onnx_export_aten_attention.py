@@ -7,6 +7,7 @@ from yobx.torch.interpreter import to_onnx
 
 class TestOnnxExportAtenAttention(ExtTestCase):
 
+    @requires_onnxruntime()
     def test_scaled_dot_product_attention_not_causal(self):
         import torch
 
@@ -45,6 +46,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_scaled_dot_product_attention_causal(self):
         import torch
 
@@ -86,6 +88,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_scaled_dot_product_attention_function_1(self):
         import torch
 
@@ -134,6 +137,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_scaled_dot_product_attention_function_2(self):
         import torch
 
@@ -211,6 +215,7 @@ class TestOnnxExportAtenAttention(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_group_norm_opset_17_21(self):
         import torch
 

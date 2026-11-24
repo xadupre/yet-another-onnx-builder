@@ -13,15 +13,20 @@ Covers Keras subclassed models (TF 2.x only):
 
 import unittest
 import numpy as np
-from onnxruntime import InferenceSession
 import tensorflow as tf
-from yobx.ext_test_case import ExtTestCase, requires_tensorflow
+from yobx.ext_test_case import ExtTestCase, requires_tensorflow, has_onnxruntime
+from yobx.reference.reference_inference_session import ReferenceInferenceSession
 from yobx.tensorflow import to_onnx
 
 
 def _ort_run(onx, feeds):
-    """Run an ONNX model with onnxruntime and return all outputs."""
-    sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+    """Run an ONNX model with onnxruntime (or onnx-light if missing) and return all outputs."""
+    if has_onnxruntime():
+        from onnxruntime import InferenceSession
+
+        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+    else:
+        sess = ReferenceInferenceSession(onx.SerializeToString())
     return sess.run(None, feeds)
 
 

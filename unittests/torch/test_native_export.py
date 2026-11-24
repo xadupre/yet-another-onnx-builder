@@ -14,9 +14,21 @@ from onnx_light import onnx
 from onnx_light.onnx import helper
 
 
+def requires_onnxruntime():
+    """Skips a test when native export validation cannot use ONNX Runtime."""
+    return unittest.skipUnless(
+        importlib.util.find_spec("onnxruntime"), "onnxruntime not installed"
+    )
+
+
 @unittest.skipUnless(importlib.util.find_spec("torch"), "Requires the published torch wheel.")
 class TestNativeTorchExport(unittest.TestCase):
     def session(self, model):
+        if importlib.util.find_spec("onnxruntime") is None:
+            from yobx.reference.reference_inference_session import ReferenceInferenceSession
+
+            return ReferenceInferenceSession(model)
+
         from onnxruntime import InferenceSession, SessionOptions
 
         options = SessionOptions()
@@ -116,6 +128,7 @@ class TestNativeTorchExport(unittest.TestCase):
                     actual, model(x).detach().numpy(), rtol=1e-12, atol=1e-12
                 )
 
+    @requires_onnxruntime()
     def test_exported_input_signature_errors(self):
         """Reports unsupported symbolic arguments and missing parameter targets."""
         import torch
@@ -360,6 +373,7 @@ class TestNativeTorchExport(unittest.TestCase):
         with self.assertRaisesRegex(NotImplementedError, "concrete tensor storage"):
             OnnxLightGraphBuilder(18).make_initializer("meta", torch.empty(2, device="meta"))
 
+    @requires_onnxruntime()
     def test_parameter_names_and_repeated_outputs(self):
         import torch
         from yobx.torch.interpreter.native_export import to_onnx
@@ -398,6 +412,7 @@ class TestNativeTorchExport(unittest.TestCase):
         actual = self.session(artifact.proto).run(None, {"X": x.numpy()})[0]
         numpy.testing.assert_allclose(actual, model(x).detach().numpy(), rtol=1e-5, atol=1e-6)
 
+    @requires_onnxruntime()
     def test_kwargs_scalar_promotion_and_validation(self):
         import torch
         from yobx.torch.interpreter.native_export import to_onnx
@@ -443,7 +458,8 @@ class TestNativeTorchExport(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=".") as directory:
             path = os.path.join(directory, "torch.onnx")
             artifact.save(path)
-            self.assertTrue(os.path.exists(os.path.join(directory, "torch.xlsx")))
+            if all(importlib.util.find_spec(name) for name in ("pandas", "openpyxl")):
+                self.assertTrue(os.path.exists(os.path.join(directory, "torch.xlsx")))
             loaded = ExportArtifact.load(path)
             actual = self.session(loaded.get_proto()).run(None, {"X": x.numpy()})[0]
             numpy.testing.assert_allclose(actual, model(x).detach().numpy(), rtol=1e-5, atol=1e-6)

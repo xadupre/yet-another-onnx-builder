@@ -4,7 +4,7 @@ import numpy as np
 from onnx_light import onnx
 import onnx_light.onnx.helper as oh
 import onnx_light.onnx.numpy_helper as onh
-from yobx.ext_test_case import ExtTestCase, has_onnxruntime_cuda
+from yobx.ext_test_case import ExtTestCase, has_onnxruntime_cuda, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -96,6 +96,7 @@ class TestReferenceOps(ExtTestCase):
         got = ref.run(None, {"X": a, "Y": a})
         self.assertEqualArray(a.T @ a.T, got[0])
 
+    @requires_onnxruntime()
     def test_qlinear_average_pool(self):
         from onnxruntime import InferenceSession
 
@@ -138,6 +139,7 @@ class TestReferenceOps(ExtTestCase):
         expected = sess.run(None, feeds)
         self.assertEqualArray(expected[0], got[0])
 
+    @requires_onnxruntime()
     def test_qlinear_conv(self):
         from onnxruntime import InferenceSession
 
@@ -195,6 +197,7 @@ class TestReferenceOps(ExtTestCase):
         expected = sess.run(None, feeds)
         self.assertEqualArray(expected[0], got[0])
 
+    @requires_onnxruntime()
     def test_qlinear_conv_channels_last(self):
         from onnxruntime import InferenceSession
 
@@ -253,6 +256,7 @@ class TestReferenceOps(ExtTestCase):
         expected = sess.run(None, feeds)
         self.assertEqualArray(expected[0], got[0])
 
+    @requires_onnxruntime()
     def test_qlinear_conv_3d(self):
         from onnxruntime import InferenceSession
 
@@ -310,6 +314,7 @@ class TestReferenceOps(ExtTestCase):
         expected = sess.run(None, feeds)
         self.assertEqualArray(expected[0], got[0])
 
+    @requires_onnxruntime()
     def test_qlinear_conv_channels_last_3d(self):
         from onnxruntime import InferenceSession
 
@@ -387,6 +392,7 @@ class TestReferenceOps(ExtTestCase):
         got = ref.run(None, {"X": a})
         self.assertEqualArray(a, got[0])
 
+    @requires_onnxruntime()
     def test_quick_gelu(self):
         from onnxruntime import InferenceSession
 
@@ -517,6 +523,7 @@ class TestReferenceOps(ExtTestCase):
             got = ref.run(None, {"data": data, "indices": indices, "updates": updates})
             self.assertEqualArray(y, got[0])
 
+    @requires_onnxruntime()
     def test_skip_layer_normalization_nobias(self):
         import onnxruntime
 
@@ -557,6 +564,7 @@ class TestReferenceOps(ExtTestCase):
         self.assertEqual(len(expected), len(got))
         self.assertEqualArrayAny(expected, got, atol=1e-3)
 
+    @requires_onnxruntime()
     def test_skip_layer_normalization_bias(self):
         import onnxruntime
 

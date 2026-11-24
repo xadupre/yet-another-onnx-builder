@@ -5,12 +5,13 @@ import unittest
 import numpy
 from onnx_light import onnx
 
+from yobx.ext_test_case import ExtTestCase, has_onnxruntime
 from yobx.torch.interpreter.graph_builder import TorchOnnxLightGraphBuilder
 from yobx.xbuilder._wrap_dim import WrapDim
 from yobx.xbuilder.function_options import FunctionOptions
 
 
-class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
+class TestTorchOnnxLightGraphBuilder(ExtTestCase):
     """Tests Torch-specific helpers without running a full model export."""
 
     def test_constructor_and_child_builder_preserve_adapter(self):
@@ -180,7 +181,6 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
 
     def test_static_slice_bounds_use_native_inference(self):
         """Preserves constant bounds, including zero ends, with native slice inference."""
-        from onnxruntime import InferenceSession
         from yobx.torch.interpreter._aten_functions import aten_slice_Tensor
 
         x = numpy.arange(12, dtype=numpy.float32).reshape(2, 6)
@@ -196,14 +196,11 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
                     expected = x[:, start:end:step]
                     self.assertEqual(builder.get_shape("Y"), (batch, expected.shape[1]))
                     model = builder.to_onnx(optimize=False)
-                    actual = InferenceSession(
-                        model.SerializeToString(), providers=["CPUExecutionProvider"]
-                    ).run(None, {"X": x})[0]
+                    actual = self.make_inference_session(model).run(None, {"X": x})[0]
                     numpy.testing.assert_array_equal(actual, expected)
 
     def test_flatten_uses_native_output_shape(self):
         """Preserves unflattened axes when native inference handles partial flattening."""
-        from onnxruntime import InferenceSession
         from yobx.torch.interpreter._aten_functions import aten_flatten_using_ints
 
         x = numpy.arange(24, dtype=numpy.float32).reshape(2, 3, 4)
@@ -218,14 +215,11 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
                     builder.make_tensor_output("Y")
                     self.assertEqual(builder.get_rank("Y"), len(shape))
                     model = builder.to_onnx(optimize=False)
-                    actual = InferenceSession(
-                        model.SerializeToString(), providers=["CPUExecutionProvider"]
-                    ).run(None, {"X": x})[0]
+                    actual = self.make_inference_session(model).run(None, {"X": x})[0]
                     numpy.testing.assert_array_equal(actual, x.reshape(shape))
 
     def test_take_preserves_input_and_indices_shapes(self):
         """Keeps the input shape and propagates scalar or multidimensional indices."""
-        from onnxruntime import InferenceSession
         from yobx.reference import ExtendedReferenceEvaluator
         from yobx.torch.interpreter._aten_functions import aten_take
 
@@ -242,19 +236,16 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
                     self.assertEqual(builder.get_shape("X"), (batch, 3))
                     self.assertEqual(builder.get_shape("Y"), indices.shape)
                     artifact = builder.to_onnx()
-                    for evaluator in (
-                        ExtendedReferenceEvaluator(artifact),
-                        InferenceSession(
-                            artifact.SerializeToString(), providers=["CPUExecutionProvider"]
-                        ),
-                    ):
+                    evaluators = [ExtendedReferenceEvaluator(artifact)]
+                    if has_onnxruntime():
+                        evaluators.append(self.make_inference_session(artifact))
+                    for evaluator in evaluators:
                         actual = evaluator.run(None, {"X": x, "indices": indices})[0]
                         numpy.testing.assert_array_equal(actual, numpy.take(x, indices))
 
     def test_legacy_export_symbolic_intermediate_shapes(self):
         """Exports and executes dynamic intermediates with the published native builder."""
         import torch
-        from onnxruntime import InferenceSession
         from yobx.torch.interpreter.onnx_export import to_onnx
 
         model = torch.nn.Sequential(torch.nn.Linear(3, 4), torch.nn.Sigmoid()).eval()
@@ -265,9 +256,7 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
             input_names=["X"],
             dynamic_shapes=({0: torch.export.Dim("batch")},),
         )
-        session = InferenceSession(
-            artifact.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        session = self.make_inference_session(artifact)
         for batch in (1, 2, 5):
             with self.subTest(batch=batch):
                 x = torch.randn(batch, 3)
@@ -279,7 +268,6 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
     def test_tensor_split_registers_data_dependent_output_shapes(self):
         """Exports nested tensor outputs with newly introduced symbolic dimensions."""
         import torch
-        from onnxruntime import InferenceSession
         from yobx.reference import ExtendedReferenceEvaluator
         from yobx.torch.interpreter.onnx_export import to_onnx
 
@@ -290,10 +278,9 @@ class TestTorchOnnxLightGraphBuilder(unittest.TestCase):
         model = Model()
         x = torch.arange(18, dtype=torch.float32).reshape(6, 3)
         artifact = to_onnx(model, (x, torch.tensor([1, 4])), target_opset=21)
-        evaluators = (
-            InferenceSession(artifact.SerializeToString(), providers=["CPUExecutionProvider"]),
-            ExtendedReferenceEvaluator(artifact),
-        )
+        evaluators = [ExtendedReferenceEvaluator(artifact)]
+        if has_onnxruntime():
+            evaluators.append(self.make_inference_session(artifact))
         for indices in (torch.tensor([1, 4]), torch.tensor([0, 6]), torch.tensor([2, 3])):
             with self.subTest(indices=indices.tolist()):
                 expected = model(x, indices)

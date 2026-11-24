@@ -13,7 +13,7 @@ import numpy as np
 from onnx_light import onnx
 from onnx_light.onnx import TensorProto, helper as oh, numpy_helper as onh
 from onnx_light.onnx.reference import ReferenceEvaluator
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_onnxruntime
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
 
 TFLOAT = TensorProto.FLOAT
@@ -73,6 +73,7 @@ class TestGraphPatternOptimizationEasy(ExtTestCase):
             # desired is the second input
             np.testing.assert_allclose(b, a, atol=atol, rtol=rtol)
 
+    @requires_onnxruntime()
     def test_softmax_cross_entropy_loss_cast(self):
         models = [
             oh.make_model(

@@ -4,7 +4,7 @@ Unit tests for yobx.sklearn.neighbors KNeighborsTransformer converter.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -223,6 +223,7 @@ class TestKNeighborsTransformer(ExtTestCase):
                 nonzero_per_row = (output != 0).sum(axis=1)
                 np.testing.assert_array_equal(nonzero_per_row, k)
 
+    @requires_onnxruntime()
     def test_knn_transformer_com_microsoft(self):
         """CDist path (com.microsoft) should produce the same output."""
         from sklearn.neighbors import KNeighborsTransformer

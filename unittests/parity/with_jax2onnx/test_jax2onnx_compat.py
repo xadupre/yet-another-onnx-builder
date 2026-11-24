@@ -13,7 +13,7 @@ models for the same inputs.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_jax, requires_jax2onnx
+from yobx.ext_test_case import ExtTestCase, requires_jax, requires_jax2onnx, requires_onnxruntime
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -56,6 +56,7 @@ def _run_yobx(fn, *arrays, dynamic_shapes=None):
 
 @requires_jax2onnx()
 @requires_jax()
+@requires_onnxruntime()
 class TestJax2OnnxUnaryOpsCompat(ExtTestCase):
     """Unary JAX ops: verify yobx and jax2onnx produce numerically identical results."""
 
@@ -150,6 +151,7 @@ class TestJax2OnnxUnaryOpsCompat(ExtTestCase):
 
 @requires_jax2onnx()
 @requires_jax()
+@requires_onnxruntime()
 class TestJax2OnnxBinaryOpsCompat(ExtTestCase):
     """Binary JAX ops: verify yobx and jax2onnx produce numerically identical results."""
 
@@ -200,6 +202,7 @@ class TestJax2OnnxBinaryOpsCompat(ExtTestCase):
 
 @requires_jax2onnx()
 @requires_jax()
+@requires_onnxruntime()
 class TestJax2OnnxCompositeCompat(ExtTestCase):
     """Composite JAX functions: yobx vs jax2onnx parity for MLP, matmul, layer-norm."""
 

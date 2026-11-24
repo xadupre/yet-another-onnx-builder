@@ -4,7 +4,7 @@ Unit tests for yobx.sklearn.cluster.Birch converter.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -79,6 +79,7 @@ class TestBirch(ExtTestCase):
         expected_labels = model.predict(X).astype(np.int64)
         self.assertEqualArray(expected_labels, labels)
 
+    @requires_onnxruntime()
     def test_birch_com_microsoft_cdist(self):
         from sklearn.cluster import Birch
         from yobx.sklearn import to_onnx

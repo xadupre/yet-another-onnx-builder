@@ -5,15 +5,17 @@ import onnx_light.onnx.helper as oh
 from sklearn.datasets import make_classification, make_regression
 from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge
 from sklearn.model_selection import train_test_split
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_onnxruntime
 from yobx.sklearn.tests_helper import dump_data_and_model
 from yobx.sklearn import to_onnx
 from unittests.parity.with_skl2onnx._common import TARGET_OPSET
-import onnxruntime
 
 
 class TestSklearnLinearModelConverters(ExtTestCase):
+    @requires_onnxruntime()
     def test_model_linear_regression(self):
+        import onnxruntime
+
         X, y = make_regression(n_samples=100, n_features=5, random_state=42)
         X = X.astype(np.float64)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -37,7 +39,10 @@ class TestSklearnLinearModelConverters(ExtTestCase):
         expected = model.predict(X_test)
         np.testing.assert_allclose(ort_pred, expected, rtol=1e-5, atol=1e-5)
 
+    @requires_onnxruntime()
     def test_model_ridge_regression(self):
+        import onnxruntime
+
         X, y = make_regression(n_samples=100, n_features=5, random_state=42)
         X = X.astype(np.float64)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)

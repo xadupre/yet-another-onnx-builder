@@ -8,6 +8,7 @@ from yobx.torch.in_transformers.cache_helper import make_dynamic_cache, CacheKey
 from yobx.torch.flatten import register_flattening_functions
 from yobx.torch.patch import apply_patches_for_model
 from yobx.ext_test_case import (
+    requires_onnxruntime,
     ExtTestCase,
     skipif_ci_windows,
     requires_torch,
@@ -168,6 +169,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             got = sess.run(None, feeds)
             self.assertEqualArray(expected, got[0], atol=atol)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_signature_s1s_r(self):
         class Neuron(torch.nn.Module):
@@ -184,6 +186,7 @@ class TestOnnxExportSignatures(ExtTestCase):
         sname = inspect.currentframe().f_code.co_name
         self._check_exporter(sname, Neuron(), (x,), sig)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_signature_s1d_r(self):
         class Neuron(torch.nn.Module):
@@ -202,6 +205,7 @@ class TestOnnxExportSignatures(ExtTestCase):
         sname = inspect.currentframe().f_code.co_name
         self._check_exporter(sname, Neuron(), (x,), sig, dynamic_shapes=dyn, others=(x2,))
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_signature_s2d_r(self):
         class Neuron(torch.nn.Module):
@@ -229,6 +233,7 @@ class TestOnnxExportSignatures(ExtTestCase):
         sname = inspect.currentframe().f_code.co_name
         self._check_exporter(sname, Neuron(), inputs, sig, dynamic_shapes=dyn, others=inputs2)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_signature_s1d_i_r_v1(self):
         class Neuron(torch.nn.Module):
@@ -261,6 +266,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             others=inputs2,
         )
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_signature_s1d_i_r_v2(self):
         class Neuron(torch.nn.Module):
@@ -280,6 +286,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             sname, Neuron(), inputs, sig, dynamic_shapes=dyn, exporter="custom-tracing"
         )
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_signature_s1d_ls_r_custom(self):
         class Neuron(torch.nn.Module):
@@ -331,6 +338,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             atol=1e-4,
         )
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_signature_s1d_ls_r_yobx(self):
         class Neuron(torch.nn.Module):
@@ -382,6 +390,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             atol=1e-4,
         )
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     @ignore_warnings(UserWarning)
     def test_signature_s1d_ls_r_tracing(self):
@@ -435,6 +444,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             verbose=0,
         )
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_signature_index_s_r(self):
         class Neuron(torch.nn.Module):
@@ -455,6 +465,7 @@ class TestOnnxExportSignatures(ExtTestCase):
         sig_tracing = (("x", 1, (4, 3)), ("y", 1, (4, 2)))
         self._check_exporter(sname, Neuron(), inputs, sig_tracing)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     @ignore_warnings(FutureWarning)
     def test_signature_index_d_r(self):
@@ -489,6 +500,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             exporter=("custom-tracing", "custom"),
         )
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_signature_simple_none(self):
         import torch
@@ -518,6 +530,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             exporter="custom-nostrict",
         )
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_signature_list_none(self):
         import torch
@@ -554,6 +567,7 @@ class TestOnnxExportSignatures(ExtTestCase):
             exporter="custom-nostrict",
         )
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     @requires_torch("2.7")
     @requires_transformers("4.55")
@@ -603,6 +617,7 @@ class TestOnnxExportSignatures(ExtTestCase):
                 exporter="custom-nostrict",
             )
 
+    @requires_onnxruntime()
     @requires_torch("2.8")
     @requires_transformers("4.55")
     @ignore_warnings(FutureWarning)

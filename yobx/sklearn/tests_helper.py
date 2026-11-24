@@ -5,6 +5,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.base import BaseEstimator
 from sklearn.ensemble import RandomForestClassifier
 from ..reference import ExtendedReferenceEvaluator
+from ..ext_test_case import has_onnxruntime
 
 
 def _has_predict_proba(model):
@@ -331,8 +332,8 @@ def dump_data_and_model(
 ):
     """Validate an ONNX model against the original scikit-learn model.
 
-    Runs *data* through both :mod:`onnxruntime` and
-    :class:`~yobx.reference.ExtendedReferenceEvaluator` and compares both
+    Runs *data* through :class:`~yobx.reference.ExtendedReferenceEvaluator`
+    and :mod:`onnxruntime` (when installed) and compares the
     outputs to the predictions produced by *model*:
 
     * If the model has :meth:`predict_proba`, both labels and probabilities
@@ -352,26 +353,22 @@ def dump_data_and_model(
     :raises AssertionError: If any output differs beyond the tolerance defined
         in :func:`_assert_close`.
     """
-    import onnxruntime
-
     feeds = {model_onnx.graph.input[0].name: data}
-    sess = onnxruntime.InferenceSession(
-        model_onnx.SerializeToString(), providers=["CPUExecutionProvider"]
-    )
-    ort_value = sess.run(None, feeds)
-    py_value = ExtendedReferenceEvaluator(model_onnx).run(None, feeds)
+    results = {"py": ExtendedReferenceEvaluator(model_onnx).run(None, feeds)}
+    if has_onnxruntime():
+        import onnxruntime
+
+        sess = onnxruntime.InferenceSession(
+            model_onnx.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+        results["ort"] = sess.run(None, feeds)
     if _has_predict_proba(model):
-        expected_labels = model.predict(data)
-        expected_proba = model.predict_proba(data)
-        _assert_close(expected_proba, ort_value[1], name=f"{basename}/ort1")
-        _assert_close(expected_labels, ort_value[0], name=f"{basename}/ort1")
-        _assert_close(expected_proba, py_value[1], name=f"{basename}/py1")
-        _assert_close(expected_labels, py_value[0], name=f"{basename}/py1")
-    elif _has_transform_model(model):
-        expected = model.transform(data)
-        _assert_close(expected, ort_value[0], name=f"{basename}/ort2")
-        _assert_close(expected, py_value[0], name=f"{basename}/py2")
+        labels = model.predict(data)
+        probabilities = model.predict_proba(data)
+        for prefix, values in results.items():
+            _assert_close(probabilities, values[1], name=f"{basename}/{prefix}1")
+            _assert_close(labels, values[0], name=f"{basename}/{prefix}1")
     else:
-        expected = model.predict(data)
-        _assert_close(expected, ort_value[0], name=f"{basename}/ort2")
-        _assert_close(expected, py_value[0], name=f"{basename}/py2")
+        expected = model.transform(data) if _has_transform_model(model) else model.predict(data)
+        for prefix, values in results.items():
+            _assert_close(expected, values[0], name=f"{basename}/{prefix}2")

@@ -6,7 +6,7 @@ import onnx_light.onnx.helper as oh
 import onnx_light.onnx.numpy_helper as onh
 from onnx_light.onnx.checker import check_model
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings
+from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings, requires_onnxruntime
 from yobx.xbuilder.graph_builder import GraphBuilder, OptimizationOptions
 
 TFLOAT = onnx.TensorProto.FLOAT
@@ -148,6 +148,7 @@ class TestGraphOrderOptimization(ExtTestCase):
         got = opt_ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @hide_stdout()
     def test_order_bigger_model(self):
         _mkv_ = oh.make_tensor_value_info

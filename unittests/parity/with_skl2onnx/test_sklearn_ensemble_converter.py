@@ -1,6 +1,5 @@
 import unittest
 import numpy as np
-import onnxruntime
 from yobx._onnx_shim import onnx
 import onnx_light.onnx.helper as oh
 from sklearn.datasets import make_classification, make_regression
@@ -13,14 +12,17 @@ from sklearn.ensemble import (
     RandomForestRegressor,
 )
 from sklearn.model_selection import train_test_split
-from yobx.ext_test_case import ExtTestCase, requires_onnx_light
+from yobx.ext_test_case import ExtTestCase, requires_onnx_light, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx, ConvertOptions
 from unittests.parity.with_skl2onnx._common import TARGET_OPSET
 
 
+@requires_onnxruntime()
 class TestSklearnEnsembleConverters(ExtTestCase):
     def test_model_random_forest_classifier(self):
+        import onnxruntime
+
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -50,6 +52,8 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         np.testing.assert_allclose(ref_out[1], expected_proba, rtol=1e-5, atol=1e-5)
 
     def test_model_random_forest_regressor(self):
+        import onnxruntime
+
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -76,6 +80,8 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         np.testing.assert_allclose(ref_out, expected, rtol=1e-5, atol=1e-5)
 
     def test_model_gradient_boosting_classifier(self):
+        import onnxruntime
+
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -105,6 +111,8 @@ class TestSklearnEnsembleConverters(ExtTestCase):
         np.testing.assert_allclose(ref_out[1], expected_proba, rtol=1e-5, atol=1e-4)
 
     def test_model_gradient_boosting_regressor(self):
+        import onnxruntime
+
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -133,6 +141,8 @@ class TestSklearnEnsembleConverters(ExtTestCase):
     @requires_onnx_light("0.1.31", "xadupre/onnx-light#5172")
     def test_model_random_forest_classifier_decision_path(self):
         """Check extra decision_path output for RandomForestClassifier."""
+        import onnxruntime
+
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -177,6 +187,8 @@ class TestSklearnEnsembleConverters(ExtTestCase):
 
     @requires_onnx_light("0.1.31", "xadupre/onnx-light#5172")
     def test_model_random_forest_regressor_decision_path(self):
+        import onnxruntime
+
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -214,6 +226,8 @@ class TestSklearnEnsembleConverters(ExtTestCase):
     @requires_onnx_light("0.1.31", "xadupre/onnx-light#5172")
     def test_model_extra_trees_classifier_decision_path(self):
         """Check extra decision_path output for ExtraTreesClassifier."""
+        import onnxruntime
+
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -253,6 +267,8 @@ class TestSklearnEnsembleConverters(ExtTestCase):
     @requires_onnx_light("0.1.31", "xadupre/onnx-light#5172")
     def test_model_extra_trees_regressor_decision_path(self):
         """Check extra decision_path output for ExtraTreesRegressor."""
+        import onnxruntime
+
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)

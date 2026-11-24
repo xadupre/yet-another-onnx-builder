@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import Mock, patch
 import numpy as np
 from yobx import to_onnx
-from yobx.ext_test_case import requires_sklearn
+from yobx.ext_test_case import requires_sklearn, requires_onnxruntime
 
 
 class TestGraphBackendSelection(unittest.TestCase):
@@ -71,6 +71,7 @@ class TestNativeBackendConversion(unittest.TestCase):
         )
         return session.run(None, feeds)
 
+    @requires_onnxruntime()
     def test_sql(self):
         """Converts SQL using the native builder instead of the Python builder."""
         from onnx_light.onnx_core.graph_builder import GraphBuilder
@@ -90,6 +91,7 @@ class TestNativeBackendConversion(unittest.TestCase):
         self.assertEqual(artifact.report.extra["backend"], "onnx-light")
         self.assertGreaterEqual(artifact.report.extra["rewrites"], 0)
 
+    @requires_onnxruntime()
     def test_numpy_callable(self):
         """Propagates the native builder through the NumPy tracing dispatcher."""
 
@@ -101,6 +103,7 @@ class TestNativeBackendConversion(unittest.TestCase):
         actual = self.run_model(artifact, {"X": x})
         np.testing.assert_allclose(actual[0], transform(x), rtol=1e-6)
 
+    @requires_onnxruntime()
     def test_dataframe_report(self):
         """Propagates native reports through parsed DataFrame queries."""
 
@@ -118,6 +121,7 @@ class TestNativeBackendConversion(unittest.TestCase):
         a = np.array([1, 2], dtype=np.float32)
         np.testing.assert_array_equal(self.run_model(artifact, {"a": a, "b": a})[0], 2 * a)
 
+    @requires_onnxruntime()
     def test_litert_report(self):
         """Preserves native reports when finalizing LiteRT conversion."""
         from yobx.builder.onnxlight import OnnxLightGraphBuilder
@@ -153,6 +157,7 @@ class TestNativeBackendConversion(unittest.TestCase):
                 onnx.load(filename).SerializeToString(), artifact.SerializeToString()
             )
 
+    @requires_onnxruntime()
     @requires_sklearn("1.4")
     def test_sklearn(self):
         """Converts a fitted regression and preserves its dynamic batch dimension."""

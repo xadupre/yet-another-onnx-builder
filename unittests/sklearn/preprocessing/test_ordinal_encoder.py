@@ -4,7 +4,7 @@ Unit tests for yobx.sklearn.preprocessing.OrdinalEncoder converter.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -121,6 +121,7 @@ class TestOrdinalEncoder(ExtTestCase):
         expected = pipe.predict(X).astype(np.float32).reshape(-1, 1)
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
+    @requires_onnxruntime()
     def test_ordinal_encoder_string_input(self):
         """OrdinalEncoder with string categorical input (dtype=object)."""
         from sklearn.preprocessing import OrdinalEncoder
@@ -138,6 +139,7 @@ class TestOrdinalEncoder(ExtTestCase):
         ort_result = sess.run(None, {"X": X_test})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-6)
 
+    @requires_onnxruntime()
     def test_ordinal_encoder_string_single_feature(self):
         """OrdinalEncoder with a single string feature column."""
         from sklearn.preprocessing import OrdinalEncoder

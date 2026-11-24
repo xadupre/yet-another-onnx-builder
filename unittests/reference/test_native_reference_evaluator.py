@@ -83,6 +83,16 @@ class TestNativeReferenceEvaluator(unittest.TestCase):
         self.assertEqual(len(session.input_types), 2)
         self.assertEqual(len(session.output_types), 2)
 
+    def test_reference_inference_session(self):
+        from yobx.reference.reference_inference_session import ReferenceInferenceSession
+
+        model = self.make_model()
+        model.graph.input.extend([helper.make_tensor_value_info("B", TensorProto.FLOAT, [2])])
+        session = ReferenceInferenceSession(model.SerializeToString())
+        self.assertEqual([value.name for value in session.get_inputs()], ["X", "W"])
+        self.assertEqual([value.name for value in session.get_outputs()], ["product", "sum"])
+        np.testing.assert_array_equal(session.run(["sum"], self.feeds)[0], self.expected_sum)
+
     def test_model_opset_override_preserves_model(self):
         model = self.make_model()
         original = model.SerializeToString()

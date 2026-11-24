@@ -4,7 +4,7 @@ Unit tests for yobx.sklearn.neighbors RadiusNeighborsTransformer converter.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -174,6 +174,7 @@ class TestRadiusNeighborsTransformer(ExtTestCase):
 
         self.assertTrue(np.all(output >= 0.0))
 
+    @requires_onnxruntime()
     def test_rnn_transformer_com_microsoft(self):
         """CDist path (com.microsoft) should produce the same output."""
         from sklearn.neighbors import RadiusNeighborsTransformer

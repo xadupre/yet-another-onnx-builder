@@ -16,10 +16,13 @@ import warnings
 from contextlib import redirect_stderr, redirect_stdout, contextmanager
 from io import StringIO
 from timeit import Timer
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 import numpy
 from numpy.testing import assert_allclose
 from .pv_version import PvVersion
+
+if TYPE_CHECKING:
+    from .reference.reference_inference_session import ReferenceInferenceSession
 
 BOOLEAN_VALUES = (1, "1", True, "True", "true", "TRUE")
 
@@ -460,6 +463,8 @@ def requires_onnxruntime_cuda(msg: str = ""):
 
 def has_onnxruntime_cuda():
     """Tells whether ONNX Runtime CUDA is available."""
+    if not has_onnxruntime():
+        return False
     import onnxruntime
 
     return "CUDAExecutionProvider" in onnxruntime.get_available_providers()
@@ -1105,21 +1110,21 @@ def requires_tf2onnx(version: str = "", msg: str = "") -> Callable:
     return lambda x: x
 
 
-def requires_onnxruntime(version: str, msg: str = "") -> Callable:
+def requires_onnxruntime(version: str = "", msg: str = "") -> Callable:
     """Skips a unit test if :epkg:`onnxruntime` is not recent enough."""
     try:
         import onnxruntime
     except ImportError:
         return unittest.skip(msg or "onnxruntime not installed")
 
-    if PvVersion(onnxruntime.__version__) < PvVersion(version):
+    if version and PvVersion(onnxruntime.__version__) < PvVersion(version):
         msg = f"onnxruntime version {onnxruntime.__version__} < {version}: {msg}"
         return unittest.skip(msg)
     return lambda x: x
 
 
-def has_onnxruntime(version: str = "") -> Callable:
-    """Skips a unit test if :epkg:`onnxruntime` is not recent enough."""
+def has_onnxruntime(version: str = "") -> bool:
+    """Tells whether the requested version of :epkg:`onnxruntime` is available."""
     try:
         import onnxruntime
     except ImportError:
@@ -1727,14 +1732,20 @@ class ExtTestCase(unittest.TestCase):
 
     def check_ort(
         self, onx: Union["onnx.ModelProto", str]  # noqa: F821
-    ) -> "onnxruntime.InferenceSession":  # noqa: F821
+    ) -> "onnxruntime.InferenceSession | ReferenceInferenceSession":  # noqa: F821
         return self._check_with_ort(onx, cpu=True)
 
     def _check_with_ort(
         self, proto: Union["onnx.ModelProto", str], cpu: bool = False  # noqa: F821
-    ) -> "onnxruntime.InferenceSession":  # noqa: F821
-        from onnxruntime import InferenceSession, get_available_providers
+    ) -> "onnxruntime.InferenceSession | ReferenceInferenceSession":  # noqa: F821
         from .container.export_artifact import ExportArtifact
+
+        if not has_onnxruntime():
+            from .reference.reference_inference_session import ReferenceInferenceSession
+
+            return ReferenceInferenceSession(proto)
+
+        from onnxruntime import InferenceSession, get_available_providers
 
         if isinstance(proto, ExportArtifact):
             proto = proto.proto
@@ -1749,7 +1760,8 @@ class ExtTestCase(unittest.TestCase):
 
     def make_inference_session(
         self, onx: Union["onnx.ModelProto", str], cpu: bool = True  # noqa: F821
-    ) -> "onnxruntime.InferenceSession":  # noqa: F821
+    ) -> "onnxruntime.InferenceSession | ReferenceInferenceSession":  # noqa: F821
+        """Creates an inference session, using onnx-light if ONNX Runtime is absent."""
         return self._check_with_ort(onx, cpu=cpu)
 
     def assertRaise(
@@ -1896,13 +1908,14 @@ class ExtTestCase(unittest.TestCase):
         msg: Optional[Union[Callable[[], str], str]] = None,
         use_python: bool = False,
     ):
-        import onnxruntime
         from .reference import ExtendedReferenceEvaluator
 
-        if use_python:
+        if use_python or not has_onnxruntime():
             sess = ExtendedReferenceEvaluator(onx, verbose=10)
             feeds = dict(zip(sess.input_names, [self.to_numpy(x.detach()) for x in inputs]))
         else:
+            import onnxruntime
+
             sess = onnxruntime.InferenceSession(
                 onx.SerializeToString(), providers=["CPUExecutionProvider"]
             )

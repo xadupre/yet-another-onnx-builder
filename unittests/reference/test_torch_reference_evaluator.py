@@ -6,7 +6,13 @@ from onnx_light import onnx
 import onnx_light.onnx.helper as oh
 import onnx_light.onnx.numpy_helper as onh
 import torch
-from yobx.ext_test_case import ExtTestCase, ignore_warnings, hide_stdout, skipif_ci_windows
+from yobx.ext_test_case import (
+    ExtTestCase,
+    ignore_warnings,
+    hide_stdout,
+    skipif_ci_windows,
+    requires_onnxruntime,
+)
 from yobx.reference import ExtendedReferenceEvaluator, ReportResultComparison
 from yobx.reference.torch_evaluator import get_kernels, TorchReferenceEvaluator
 from yobx.reference.torch_ops import OpRunKernel, OpRunTensor
@@ -872,6 +878,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         onnx.checker.check_model(model)
         self._finalize_test(model, torch.abs(torch.rand(3, 4, dtype=torch.float32)), atol=1e-6)
 
+    @requires_onnxruntime()
     def test_op_split(self):
         model = oh.make_model(
             oh.make_graph(
@@ -890,6 +897,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         self._finalize_test(model, torch.rand(3, 5, dtype=torch.float32), use_ort=True)
         self._finalize_test(model, torch.rand(3, 6, dtype=torch.float32), use_ort=True)
 
+    @requires_onnxruntime()
     def test_op_split_op_sizes(self):
         model = oh.make_model(
             oh.make_graph(
@@ -1197,6 +1205,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
             model, torch.tensor(5, dtype=torch.int64), torch.tensor(1, dtype=torch.bool)
         )
 
+    @requires_onnxruntime()
     def test_conv(self):
         model = oh.make_model(
             oh.make_graph(
@@ -1231,6 +1240,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         B = torch.tensor([0], dtype=torch.float32)
         self._finalize_test(model, X, W, B, use_ort=True)
 
+    @requires_onnxruntime()
     def test_conv_autopad_valid(self):
         model = oh.make_model(
             oh.make_graph(
@@ -1265,6 +1275,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         B = torch.tensor([0], dtype=torch.float32)
         self._finalize_test(model, X, W, B, use_ort=True)
 
+    @requires_onnxruntime()
     def test_conv_autopad_upper(self):
         model = oh.make_model(
             oh.make_graph(
@@ -1299,6 +1310,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         B = torch.tensor([0], dtype=torch.float32)
         self._finalize_test(model, X, W, B, use_ort=True)
 
+    @requires_onnxruntime()
     def test_nonzero(self):
         model = oh.make_model(
             oh.make_graph(
@@ -1315,6 +1327,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
             model, torch.tensor([[1, 0], [1, 1]], dtype=torch.float32), use_ort=True
         )
 
+    @requires_onnxruntime()
     def test_scatternd_2d(self):
         for reduction in ["none", "add", "min", "max", "mul"]:
             with self.subTest(reduction=reduction):
@@ -1412,6 +1425,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
             ),
         )
 
+    @requires_onnxruntime()
     def test_resize_bilinear_size(self):
         model = oh.make_model(
             oh.make_graph(
@@ -1470,6 +1484,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
         got = rt.run(None, {"X": x})
         self.assertEqualAny([expected.numpy()], [g.detach().numpy() for g in got], atol=1e-6)
 
+    @requires_onnxruntime()
     def test_resize_bilinear_scales(self):
         model = oh.make_model(
             oh.make_graph(
@@ -1494,6 +1509,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
             model, torch.rand((1, 2, 4, 4), dtype=torch.float32), atol=1e-5, use_ort=True
         )
 
+    @requires_onnxruntime()
     def test_resize_nearest_axes(self):
         model = oh.make_model(
             oh.make_graph(
@@ -1540,6 +1556,7 @@ class TestTorchReferenceEvaluator(ExtTestCase):
             torch.tensor([2, 2], dtype=torch.int64),
         )
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_custom_kernels(self):
         from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype

@@ -4,7 +4,7 @@ Unit tests for trace_numpy_to_onnx (yobx.sql).
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -457,6 +457,7 @@ class TestNumpyArray(ExtTestCase):
         X = np.abs(np.random.randn(4, 3).astype(np.float32)) + 0.1
         self._run(f, X)
 
+    @requires_onnxruntime()
     def test_modulo_signs_and_dtypes(self):
         """Matches NumPy remainder and fmod for signed inputs and exact multiples."""
         from onnxruntime import InferenceSession

@@ -4,7 +4,7 @@ Unit tests for yobx.sklearn.preprocessing.OneHotEncoder converter.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -152,6 +152,7 @@ class TestOneHotEncoder(ExtTestCase):
         self.assertEqualArray(expected_label, ort_results[0])
         self.assertEqualArray(expected_proba, ort_results[1], atol=1e-5)
 
+    @requires_onnxruntime()
     def test_one_hot_encoder_string_input(self):
         """OneHotEncoder with string categorical input (dtype=object)."""
         from sklearn.preprocessing import OneHotEncoder
@@ -168,6 +169,7 @@ class TestOneHotEncoder(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-6)
 
+    @requires_onnxruntime()
     def test_one_hot_encoder_string_input_float32(self):
         """OneHotEncoder with string input and explicit float32 output dtype."""
         from sklearn.preprocessing import OneHotEncoder
@@ -184,6 +186,7 @@ class TestOneHotEncoder(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-6)
 
+    @requires_onnxruntime()
     def test_one_hot_encoder_string_single_feature(self):
         """OneHotEncoder with a single string feature column."""
         from sklearn.preprocessing import OneHotEncoder

@@ -5,7 +5,10 @@ from unittest.mock import patch
 import numpy
 from onnx_light.onnx import helper
 from onnx_light.onnx.backend import make_test_class
-from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
+from yobx.ext_test_case import has_onnxruntime, requires_onnxruntime
+
+if has_onnxruntime():
+    from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 
 
 def run_model(model, *inputs):
@@ -14,19 +17,21 @@ def run_model(model, *inputs):
     return session.run(None, dict(zip(session.input_names, inputs)))
 
 
-TestGeneratedOnnxruntimeBackend = make_test_class(
-    run_model,
-    include_regex=[
-        r"^test_add(?:_bcast)?$",
-        r"^test_cc_matmul(?:_|$)",
-        r"^test_cc_(scan|loop)_basic_trip_count$",
-        r"^test_cc_loop_zero_trip_count$",
-    ],
-    include_big=False,
-    unload=True,
-)
+if has_onnxruntime():
+    TestGeneratedOnnxruntimeBackend = make_test_class(
+        run_model,
+        include_regex=[
+            r"^test_add(?:_bcast)?$",
+            r"^test_cc_matmul(?:_|$)",
+            r"^test_cc_(scan|loop)_basic_trip_count$",
+            r"^test_cc_loop_zero_trip_count$",
+        ],
+        include_big=False,
+        unload=True,
+    )
 
 
+@requires_onnxruntime()
 class TestOnnxruntimeConstant(unittest.TestCase):
     def test_runtime_compatible_defaults(self):
         node = helper.make_node("Identity", ["X"], ["Y"])

@@ -6,17 +6,27 @@ from onnx_light import onnx
 import onnx_light.onnx.helper as oh
 import onnx_light.onnx.numpy_helper as onh
 import torch
-from yobx.ext_test_case import ExtTestCase, hide_stdout, ignore_warnings, requires_cuda
+from yobx.ext_test_case import (
+    ExtTestCase,
+    has_onnxruntime,
+    hide_stdout,
+    ignore_warnings,
+    requires_cuda,
+    requires_onnxruntime,
+)
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
 from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype
-from yobx.reference._inference_session import _InferenceSession
 from yobx.reference import ExtendedReferenceEvaluator, ReportResultComparison
-from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
+
+if has_onnxruntime():
+    from yobx.reference._inference_session import _InferenceSession
+    from yobx.reference.onnxruntime_evaluator import OnnxruntimeEvaluator
 
 TFLOAT = onnx.TensorProto.FLOAT
 TINT64 = onnx.TensorProto.INT64
 
 
+@requires_onnxruntime()
 class TestTorchOnnxruntimeEvaluator(ExtTestCase):
     def _range(self, *shape, bias: Optional[float] = None):
         n = np.prod(shape)
@@ -60,6 +70,8 @@ class TestTorchOnnxruntimeEvaluator(ExtTestCase):
         inits = [i.name for i in onx.graph.initializer]
         self.assertEqual(inits, ["c_lifted_tensor_0"])
         name = onx.graph.input[0].name
+
+        import onnxruntime
 
         sess = onnxruntime.InferenceSession(
             onx.SerializeToString(), providers=["CPUExecutionProvider"]

@@ -1,7 +1,12 @@
 import inspect
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_torch, requires_transformers
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_torch,
+    requires_transformers,
+    requires_onnxruntime,
+)
 from yobx.helpers import make_hash, string_type, string_sig, string_signature
 from yobx.helpers.helper import flatten_object, size_type
 from yobx.helpers.onnx_helper import (
@@ -624,6 +629,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("'y'", s)
         self.assertIn("('batch', 'seq')", s)
 
+    @requires_onnxruntime()
     @requires_torch("2.9")
     def test_string_type_ort_value(self):
         from onnxruntime import OrtValue
@@ -633,6 +639,7 @@ class TestStringType(ExtTestCase):
         s = string_type(ov)
         self.assertIn("OV", s)
 
+    @requires_onnxruntime()
     @requires_torch("2.9")
     def test_string_type_ort_value_with_shape(self):
         from onnxruntime import OrtValue
@@ -643,6 +650,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("OV", s)
         self.assertIn("2x2", s)
 
+    @requires_onnxruntime()
     @requires_torch("2.9")
     def test_string_type_ort_value_with_device(self):
         from onnxruntime import OrtValue
@@ -654,6 +662,7 @@ class TestStringType(ExtTestCase):
         self.assertIn("C", s)
         self.assertIn("2x2", s)
 
+    @requires_onnxruntime()
     @requires_torch("2.9")
     def test_string_type_ort_value_with_min_max(self):
         from onnxruntime import OrtValue

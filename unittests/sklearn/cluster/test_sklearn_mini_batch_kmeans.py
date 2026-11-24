@@ -4,7 +4,7 @@ Unit tests for yobx.sklearn.cluster.MiniBatchKMeans converter.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -147,6 +147,7 @@ class TestMiniBatchKMeans(ExtTestCase):
     # CDist path (com.microsoft opset)
     # ------------------------------------------------------------------
 
+    @requires_onnxruntime()
     def test_mini_batch_kmeans_cdist_float32(self):
         """Distances computed via com.microsoft.CDist (float32)."""
         from sklearn.cluster import MiniBatchKMeans
@@ -173,6 +174,7 @@ class TestMiniBatchKMeans(ExtTestCase):
         self.assertEqualArray(expected_labels, ort_results[0])
         self.assertEqualArray(expected_distances, ort_results[1], atol=1e-3)
 
+    @requires_onnxruntime()
     def test_mini_batch_kmeans_cdist_float64(self):
         """Distances computed via com.microsoft.CDist (float64)."""
         from sklearn.cluster import MiniBatchKMeans

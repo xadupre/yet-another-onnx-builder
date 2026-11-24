@@ -5,7 +5,12 @@ Unit tests for yobx.sklearn.category_encoders.OrdinalEncoder converter.
 import unittest
 import numpy as np
 import pandas as pd
-from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_category_encoders
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_sklearn,
+    requires_category_encoders,
+    requires_onnxruntime,
+)
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -200,6 +205,7 @@ class TestCEOrdinalEncoder(ExtTestCase):
         expected = pipe.predict(X_df).astype(np.float32).reshape(-1, 1)
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
+    @requires_onnxruntime()
     def test_string_basic(self):
         """Two string categorical columns with OrdinalEncoder."""
         from category_encoders import OrdinalEncoder

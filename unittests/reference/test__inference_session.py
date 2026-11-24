@@ -5,14 +5,23 @@ import ml_dtypes
 from onnx_light import onnx
 import onnx_light.onnx.helper as oh
 import onnx_light.onnx.numpy_helper as onh
-from yobx.ext_test_case import ExtTestCase, hide_stdout, requires_torch
+from yobx.ext_test_case import (
+    ExtTestCase,
+    has_onnxruntime,
+    hide_stdout,
+    requires_onnxruntime,
+    requires_torch,
+)
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
-from yobx.reference._inference_session import investigate_onnxruntime_issue
-from yobx.reference._inference_session_numpy import InferenceSessionForNumpy
+
+if has_onnxruntime():
+    from yobx.reference._inference_session import investigate_onnxruntime_issue
+    from yobx.reference._inference_session_numpy import InferenceSessionForNumpy
 
 TFLOAT = onnx.TensorProto.FLOAT
 
 
+@requires_onnxruntime()
 class TestInferenceSession(ExtTestCase):
     @classmethod
     def _range(cls, *shape, bias: Optional[float] = None):

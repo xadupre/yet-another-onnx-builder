@@ -10,15 +10,22 @@ import unittest
 
 import numpy as np
 import tensorflow as tf
-from onnxruntime import InferenceSession
 
-from yobx.ext_test_case import ExtTestCase, requires_tensorflow, requires_tf2onnx
+from yobx.ext_test_case import ExtTestCase, requires_tensorflow, requires_tf2onnx, has_onnxruntime
+from yobx.reference.reference_inference_session import ReferenceInferenceSession
 from yobx.tensorflow import to_onnx
 
 
 def _ort_run(onnx_model, feeds):
-    """Run an ONNX model through onnxruntime and return all outputs."""
-    sess = InferenceSession(onnx_model.SerializeToString(), providers=["CPUExecutionProvider"])
+    """Run an ONNX model through onnxruntime (or onnx-light if missing) and return all outputs."""
+    if has_onnxruntime():
+        from onnxruntime import InferenceSession
+
+        sess = InferenceSession(
+            onnx_model.SerializeToString(), providers=["CPUExecutionProvider"]
+        )
+    else:
+        sess = ReferenceInferenceSession(onnx_model.SerializeToString())
     return sess.run(None, feeds)
 
 

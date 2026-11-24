@@ -9,7 +9,7 @@ from sklearn.datasets import make_classification, make_regression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC, LinearSVR, NuSVC, NuSVR, SVC, SVR
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.sklearn import to_onnx
 
 
@@ -135,9 +135,11 @@ class TestSklearnSVC(ExtTestCase):
     def test_svc_binary_with_proba(self):
         self._check_svc(self._X_bin, self._y_bin, probability=True)
 
+    @requires_onnxruntime()
     def test_svc_multiclass_no_proba(self):
         self._check_svc(self._X_multi, self._y_multi, probability=False)
 
+    @requires_onnxruntime()
     def test_svc_multiclass_with_proba(self):
         self._check_svc(self._X_multi, self._y_multi, probability=True)
 
@@ -194,9 +196,11 @@ class TestSklearnNuSVC(ExtTestCase):
     def test_nusvc_binary_with_proba(self):
         self._check_nusvc(self._X_bin, self._y_bin, probability=True)
 
+    @requires_onnxruntime()
     def test_nusvc_multiclass_no_proba(self):
         self._check_nusvc(self._X_multi, self._y_multi, probability=False)
 
+    @requires_onnxruntime()
     def test_nusvc_multiclass_with_proba(self):
         self._check_nusvc(self._X_multi, self._y_multi, probability=True)
 
