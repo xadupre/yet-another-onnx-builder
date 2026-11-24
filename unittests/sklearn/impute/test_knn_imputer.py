@@ -4,7 +4,7 @@ Unit tests for yobx.sklearn.preprocessing.KNNImputer converter.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -150,6 +150,7 @@ class TestKNNImputer(ExtTestCase):
         expected = imp.transform(X).astype(np.float32)
         self.assertEqualArray(expected, ort_result, atol=1e-3)
 
+    @requires_onnxruntime()
     def test_knn_imputer_cdist_uniform(self):
         """CDist path: uniform weights, float32."""
         from sklearn.impute import KNNImputer
@@ -170,6 +171,7 @@ class TestKNNImputer(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
+    @requires_onnxruntime()
     def test_knn_imputer_cdist_distance_weights(self):
         """CDist path: distance weights, float32."""
         from sklearn.impute import KNNImputer
@@ -190,6 +192,7 @@ class TestKNNImputer(ExtTestCase):
         ort_result = sess.run(None, {"X": X})[0]
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
+    @requires_onnxruntime()
     def test_knn_imputer_cdist_float64(self):
         """CDist path: float64 input."""
         from sklearn.impute import KNNImputer

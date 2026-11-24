@@ -8,7 +8,7 @@ from sklearn.multiclass import OutputCodeClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 from sklearn.tree import DecisionTreeClassifier
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 
@@ -150,6 +150,7 @@ class TestSklearnOutputCodeClassifier(ExtTestCase):
     # CDist path (com.microsoft opset)
     # ------------------------------------------------------------------
 
+    @requires_onnxruntime()
     def test_cdist_float32(self):
         """Distance computed via com.microsoft.CDist (float32)."""
         clf = OutputCodeClassifier(
@@ -171,6 +172,7 @@ class TestSklearnOutputCodeClassifier(ExtTestCase):
         ort_results = sess.run(None, {"X": self._X_multi})
         self.assertEqualArray(expected_label, ort_results[0])
 
+    @requires_onnxruntime()
     def test_cdist_float64(self):
         """Distance computed via com.microsoft.CDist (float64)."""
         X64 = self._X_multi.astype(np.float64)

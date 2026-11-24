@@ -1,4 +1,5 @@
 import contextlib
+import importlib.util
 import io
 import itertools
 import re
@@ -655,13 +656,18 @@ def _run_exporter_impl(
             res.update(base)
             return res
 
-        import onnxruntime
-
         assert hasattr(onx, "SerializeToString"), f"unexpected type {type(onx)} for onx"
         try:
-            sess = onnxruntime.InferenceSession(
-                onx.SerializeToString(), providers=["CPUExecutionProvider"]
-            )
+            if importlib.util.find_spec("onnxruntime") is not None:
+                import onnxruntime
+
+                sess = onnxruntime.InferenceSession(
+                    onx.SerializeToString(), providers=["CPUExecutionProvider"]
+                )
+            else:
+                from ...reference.reference_inference_session import ReferenceInferenceSession
+
+                sess = ReferenceInferenceSession(onx.SerializeToString())
         except Exception as e:
             if not quiet:
                 raise

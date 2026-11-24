@@ -128,6 +128,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
     # float32 tests                                                        #
     # ------------------------------------------------------------------ #
 
+    @requires_onnxruntime()
     def test_opset22_float32(self):
         """Standard ONNX ops path, float32 — ref evaluator and OnnxRuntime."""
         attn = _make_llama_attention().eval()
@@ -152,6 +153,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
     # float16 tests                                                        #
     # ------------------------------------------------------------------ #
 
+    @requires_onnxruntime()
     def test_opset22_float16(self):
         """Standard ONNX ops path, float16 — ref evaluator and OnnxRuntime."""
         attn = _make_llama_attention().to(torch.float16).eval()
@@ -216,6 +218,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
         "torch bfloat16 CPU matmul crashes with an illegal instruction "
         "(0xc000001d) on the Windows CI runner"
     )
+    @requires_onnxruntime()
     def test_opset22_bfloat16(self):
         """Standard ONNX ops path, bfloat16 — model dtype check + ref/ORT validation."""
         attn = _make_llama_attention().to(torch.bfloat16).eval()
@@ -342,6 +345,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
     # opset 23 (ONNX RotaryEmbedding + plain attention ops)               #
     # ------------------------------------------------------------------ #
 
+    @requires_onnxruntime()
     def test_opset23_float32(self):
         """ONNX RotaryEmbedding op + plain attention (opset 23), float32."""
         attn = _make_llama_attention().eval()
@@ -368,6 +372,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
         got_ort = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got_ort, atol=1e-4)
 
+    @requires_onnxruntime()
     def test_opset23_float16(self):
         """ONNX RotaryEmbedding op + plain attention (opset 23), float16."""
         attn = _make_llama_attention().to(torch.float16).eval()
@@ -520,6 +525,7 @@ class TestLlamaAttentionConverter(ExtTestCase):
     # Attention mask                                                        #
     # ------------------------------------------------------------------ #
 
+    @requires_onnxruntime()
     def test_opset22_with_attention_mask(self):
         """Standard ONNX ops path with an attention_mask input — ref evaluator and OnnxRuntime."""
         attn = _make_llama_attention().eval()

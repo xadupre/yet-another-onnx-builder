@@ -2,7 +2,6 @@ import unittest
 import numpy as np
 from yobx._onnx_shim import onnx
 import onnx_light.onnx.helper as oh
-import onnxruntime
 from sklearn.datasets import make_classification, make_regression
 from sklearn.model_selection import train_test_split
 from sklearn.tree import (
@@ -12,13 +11,16 @@ from sklearn.tree import (
     ExtraTreeRegressor,
 )
 from yobx.sklearn import to_onnx, ConvertOptions
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 from unittests.parity.with_skl2onnx._common import TARGET_OPSET
 
 
+@requires_onnxruntime()
 class TestSklearnTreeConverters(ExtTestCase):
     def test_model_decision_tree_classifier(self):
+        import onnxruntime
+
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -48,6 +50,8 @@ class TestSklearnTreeConverters(ExtTestCase):
         np.testing.assert_allclose(ref_out[1], expected_proba, rtol=1e-5, atol=1e-5)
 
     def test_model_decision_tree_regressor(self):
+        import onnxruntime
+
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -74,6 +78,8 @@ class TestSklearnTreeConverters(ExtTestCase):
         np.testing.assert_allclose(ref_out, expected, rtol=1e-5, atol=1e-5)
 
     def test_model_decision_tree_multiclass(self):
+        import onnxruntime
+
         X, y = make_classification(
             n_samples=300,
             n_features=5,
@@ -111,6 +117,8 @@ class TestSklearnTreeConverters(ExtTestCase):
 
     def test_model_decision_tree_classifier_decision_path(self):
         """Check extra decision_path output for DecisionTreeClassifier."""
+        import onnxruntime
+
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -153,6 +161,8 @@ class TestSklearnTreeConverters(ExtTestCase):
 
     def test_model_decision_tree_classifier_decision_leaf(self):
         """Check extra decision_leaf output for DecisionTreeClassifier."""
+        import onnxruntime
+
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -193,6 +203,8 @@ class TestSklearnTreeConverters(ExtTestCase):
 
     def test_model_decision_tree_regressor_decision_path(self):
         """Check extra decision_path output for DecisionTreeRegressor."""
+        import onnxruntime
+
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -231,6 +243,8 @@ class TestSklearnTreeConverters(ExtTestCase):
 
     def test_model_decision_tree_regressor_decision_leaf(self):
         """Check extra decision_leaf output for DecisionTreeRegressor."""
+        import onnxruntime
+
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -268,6 +282,8 @@ class TestSklearnTreeConverters(ExtTestCase):
 
     def test_model_extra_tree_classifier_decision_path(self):
         """Check extra decision_path output for ExtraTreeClassifier."""
+        import onnxruntime
+
         X, y = make_classification(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)
@@ -309,6 +325,8 @@ class TestSklearnTreeConverters(ExtTestCase):
 
     def test_model_extra_tree_regressor_decision_path(self):
         """Check extra decision_path output for ExtraTreeRegressor."""
+        import onnxruntime
+
         X, y = make_regression(n_samples=200, n_features=5, random_state=42)
         X = X.astype(np.float32)
         X_train, X_test, y_train, _ = train_test_split(X, y, test_size=0.5, random_state=42)

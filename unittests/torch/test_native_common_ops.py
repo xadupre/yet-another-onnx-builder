@@ -5,10 +5,10 @@ import unittest
 import numpy
 import torch
 from onnx_light.onnx import checker
-from onnxruntime import InferenceSession, SessionOptions
 
 from yobx.torch.interpreter.native_export import to_onnx
 from yobx.torch.export_options import ExportOptions
+from yobx.ext_test_case import requires_onnxruntime
 
 
 class TestNativeCommonOps(unittest.TestCase):
@@ -28,6 +28,8 @@ class TestNativeCommonOps(unittest.TestCase):
 
     def check(self, model, args, cases=None, **kwargs):
         """Compares native execution with PyTorch, including output dtypes."""
+        from onnxruntime import InferenceSession, SessionOptions
+
         artifact = self.export(model, args, **kwargs)
         runtime_model = (
             model.module() if isinstance(model, torch.export.ExportedProgram) else model
@@ -57,6 +59,7 @@ class TestNativeCommonOps(unittest.TestCase):
                     )
         return artifact
 
+    @requires_onnxruntime()
     def test_remainder_tensor_and_scalars(self):
         class Model(torch.nn.Module):
             def forward(self, x, y):
@@ -90,6 +93,7 @@ class TestNativeCommonOps(unittest.TestCase):
             (torch.tensor([[-7, 0, 7]], dtype=torch.int32), torch.tensor([[2.5], [-2.5]])),
         )
 
+    @requires_onnxruntime()
     def test_division_square_comparison_and_logic(self):
         class Model(torch.nn.Module):
             def forward(self, x, y):
@@ -120,6 +124,7 @@ class TestNativeCommonOps(unittest.TestCase):
             (torch.tensor([[-5, 0, 7]], dtype=torch.int32), torch.tensor([[2.5], [-3.5]])),
         )
 
+    @requires_onnxruntime()
     def test_bitwise_and(self):
         class Model(torch.nn.Module):
             def forward(self, x, y):
@@ -147,6 +152,7 @@ class TestNativeCommonOps(unittest.TestCase):
         with self.assertRaisesRegex(NotImplementedError, "opset 18"):
             self.export(Model(), (torch.ones(2, dtype=torch.int64),) * 2, target_opset=17)
 
+    @requires_onnxruntime()
     def test_low_precision_operations(self):
         class Model(torch.nn.Module):
             def __init__(self, dtype):
@@ -182,6 +188,7 @@ class TestNativeCommonOps(unittest.TestCase):
                     ),
                 )
 
+    @requires_onnxruntime()
     def test_like_factories_dynamic_nan_and_dtype(self):
         class Model(torch.nn.Module):
             def forward(self, x):
@@ -200,6 +207,7 @@ class TestNativeCommonOps(unittest.TestCase):
         )
         self.check(Model(), (torch.tensor(7, dtype=torch.int64),))
 
+    @requires_onnxruntime()
     def test_broadcast_tensors_dynamic_mixed_dtype(self):
         class Model(torch.nn.Module):
             def forward(self, x, y, z):
@@ -216,6 +224,7 @@ class TestNativeCommonOps(unittest.TestCase):
         )
         self.check(Model(), (torch.tensor(2.0), torch.tensor(3), torch.tensor(False)))
 
+    @requires_onnxruntime()
     def test_metadata_assertions(self):
         class Model(torch.nn.Module):
             def forward(self, x):
@@ -251,6 +260,7 @@ class TestNativeCommonOps(unittest.TestCase):
             "_assert_tensor_metadata", [node.op_type for node in artifact.proto.graph.node]
         )
 
+    @requires_onnxruntime()
     def test_metadata_dtype_assertions(self):
         class Model(torch.nn.Module):
             def __init__(self, dtype):

@@ -2,6 +2,7 @@ import unittest
 import warnings
 from collections import Counter
 from yobx.ext_test_case import (
+    requires_onnxruntime,
     ExtTestCase,
     requires_torch,
     skipif_ci_windows,
@@ -61,6 +62,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
 
         return Bad1Fixed, torch.rand(5, 3)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not yet supported on Windows")
     @requires_torch("2.4")
     @ignore_warnings(UserWarning)
@@ -86,6 +88,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
             got = sess.run(None, {"x": _x.detach().numpy()})[0]
             self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not yet supported on Windows")
     @requires_torch("2.4")
     @ignore_warnings(UserWarning)
@@ -336,6 +339,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
             got = ref.run(None, {"x": _x.detach().numpy()})
             self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not yet supported on Windows")
     def test_nested_cond(self):
         import onnxruntime
@@ -390,6 +394,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
             got = sess.run(None, {"x": _x.detach().numpy()})
             self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not yet supported on Windows")
     @requires_torch("2.4")
     @ignore_warnings((UserWarning, FutureWarning))
@@ -448,6 +453,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
             got = sess.run(None, {"x": _x.detach().numpy()})
             self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     def test_cond_llm_image_embedding(self):
         import torch
 

@@ -14,6 +14,7 @@ from yobx.torch import (
 )
 from yobx.torch.torch_helper import torch_deepcopy
 from yobx.ext_test_case import (
+    requires_onnxruntime,
     ExtTestCase,
     hide_stdout,
     ignore_warnings,
@@ -105,6 +106,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
                 assert "batch//batch" not in s, f"Wrong dimension in {shape=}, name={v.name!r}"
                 assert "batch//s61" not in s, f"Wrong dimension in {shape=}, name={v.name!r}"
 
+    @requires_onnxruntime()
     @hide_stdout()
     @requires_transformers("5.2")
     def test_tiny_llm_to_onnx_24_no_opt(self):
@@ -172,6 +174,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertNotIn("GroupQueryAttention", unique_ops)
         # self._chech_shape(onx.get_proto(include_weights=False))
 
+    @requires_onnxruntime()
     @hide_stdout()
     @requires_transformers("5.2")
     def test_tiny_llm_to_onnx_24_opt(self):
@@ -242,6 +245,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         # not working yet
         # self._chech_shape(onx.get_proto(include_weights=False))
 
+    @requires_onnxruntime()
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")
@@ -316,6 +320,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self._check_attention(unique_ops)
         self._chech_shape(onx.get_proto(include_weights=False))
 
+    @requires_onnxruntime()
     @hide_stdout()
     @requires_transformers("5.2")
     def test_tiny_llm_to_onnx_ort_24(self):
@@ -592,6 +597,7 @@ class TestOptimizationUntrainedTorchModel(ExtTestCase):
         self.assertNotIn("GroupQueryAttention", unique_ops)
         # self._chech_shape(onx.get_proto(include_weights=False))
 
+    @requires_onnxruntime()
     @hide_stdout()
     @skipif_ci_windows("not available on windows")
     @requires_torch("2.10")

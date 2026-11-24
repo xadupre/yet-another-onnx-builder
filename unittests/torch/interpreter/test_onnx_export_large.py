@@ -3,7 +3,12 @@ import unittest
 import warnings
 from typing import Optional
 from onnx_light.onnx.reference import ReferenceEvaluator
-from yobx.ext_test_case import ExtTestCase, ignore_warnings, skipif_ci_windows
+from yobx.ext_test_case import (
+    ExtTestCase,
+    ignore_warnings,
+    skipif_ci_windows,
+    requires_onnxruntime,
+)
 from yobx.xbuilder import OptimizationOptions
 from yobx.torch import ExportOptions
 from yobx.torch.interpreter import to_onnx
@@ -91,6 +96,7 @@ class TestOnnxExportLarge(ExtTestCase):
                 f"onnxruntime cannot load the model due to {e}\n{pretty_onnx(name)}"
             )
 
+    @requires_onnxruntime()
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning))
     def test_export_as_large_model(self):

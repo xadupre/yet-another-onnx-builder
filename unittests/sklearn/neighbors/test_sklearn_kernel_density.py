@@ -4,7 +4,7 @@ Unit tests for yobx.sklearn.neighbors.KernelDensity converter.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -268,6 +268,7 @@ class TestKernelDensity(ExtTestCase):
     # CDist path (com.microsoft opset) — gaussian kernel
     # ------------------------------------------------------------------
 
+    @requires_onnxruntime()
     def test_kernel_density_cdist_float32(self):
         """Squared distances computed via com.microsoft.CDist (float32)."""
         from sklearn.neighbors import KernelDensity
@@ -290,6 +291,7 @@ class TestKernelDensity(ExtTestCase):
         ort_results = sess.run(None, {"X": X_test})
         self.assertEqualArray(expected, ort_results[0], atol=1e-4)
 
+    @requires_onnxruntime()
     def test_kernel_density_cdist_float64(self):
         """Squared distances computed via com.microsoft.CDist (float64)."""
         from sklearn.neighbors import KernelDensity

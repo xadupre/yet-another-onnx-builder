@@ -1,6 +1,5 @@
 import unittest
 import numpy as np
-import onnxruntime
 from yobx.ext_test_case import ExtTestCase
 from yobx.helpers.einsum_helper import (
     decompose_einsum,
@@ -11,11 +10,8 @@ from yobx.helpers.einsum_helper import (
 
 class TestEinsumHelper(ExtTestCase):
     def _run(self, model, inputs: dict) -> np.ndarray:
-        """Runs an ONNX model with onnxruntime and returns the single output."""
-        sess = onnxruntime.InferenceSession(
-            model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
-        return sess.run(None, inputs)[0]
+        """Runs an ONNX model with onnxruntime (or onnx-light) and returns the single output."""
+        return self.make_inference_session(model).run(None, inputs)[0]
 
     def test_decompose_einsum_matmul(self):
         """Tests that ``ij,jk->ik`` decomposes correctly."""
@@ -142,11 +138,8 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
     """Tests for the new independent 2-input einsum ONNX decomposition algorithm."""
 
     def _run(self, model, inputs: dict) -> np.ndarray:
-        """Runs an ONNX model with onnxruntime and returns the single output."""
-        sess = onnxruntime.InferenceSession(
-            model.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
-        return sess.run(None, inputs)[0]
+        """Runs an ONNX model with onnxruntime (or onnx-light) and returns the single output."""
+        return self.make_inference_session(model).run(None, inputs)[0]
 
     def _check(self, equation, sh0, sh1, dtype=np.float32):
         """Helper that builds, runs, and validates a 2-input decomposition."""
@@ -209,9 +202,7 @@ class TestDecomposeEinsum2Inputs(ExtTestCase):
             "bik,bjk->bij", ("B", "I", "K"), ("B", "J", "K"), patterns=[]
         )
         self.assertLessEqual(len(dec.graph.node), len(unoptimized.graph.node))
-        sess = onnxruntime.InferenceSession(
-            dec.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = self.make_inference_session(dec)
         for batch, left, right, contract in [(2, 3, 4, 5), (3, 2, 5, 4)]:
             with self.subTest(batch=batch, left=left, right=right, contract=contract):
                 x0 = np.random.randn(batch, left, contract).astype(np.float32)

@@ -9,6 +9,7 @@ from onnx_light.onnx.checker import check_model
 import torch
 from yobx.ext_test_case import (
     ExtTestCase,
+    has_onnxruntime,
     skipif_ci_windows,
     requires_torch,
     requires_onnxruntime,
@@ -139,6 +140,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("broken")
     def test_aten_index_put_3d_nd_case_1(self):
         import torch
@@ -172,6 +174,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("broken")
     def test_aten_index_put_3d_nd_case_2(self):
         import torch
@@ -205,6 +208,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     def test_aten_interpolate_bilinear(self):
         import torch
 
@@ -234,6 +238,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     def test_aten_interpolate_bilinear_antialias(self):
         import torch
 
@@ -266,6 +271,7 @@ class TestOnnxExportAten(ExtTestCase):
         # implement compatible but not bit-identical antialiased downsampling.
         self.assertEqualArray(expected, got, atol=0.3)
 
+    @requires_onnxruntime()
     def test_aten_interpolate_bicubic_antialias(self):
         import torch
 
@@ -296,6 +302,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=0.3)
 
+    @requires_onnxruntime()
     def test_aten_nn_functional_bilinear(self):
         import torch
 
@@ -329,6 +336,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     def test_aten_nonzero_1(self):
         import torch
 
@@ -356,6 +364,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     def test_aten_nonzero_1_d3(self):
         import torch
 
@@ -383,6 +392,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     def test_aten_nonzero_1_d1(self):
         import torch
 
@@ -410,6 +420,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     def test_aten_nonzero_tuple(self):
         import torch
 
@@ -440,6 +451,7 @@ class TestOnnxExportAten(ExtTestCase):
         for a, b in zip(expected, got):
             self.assertEqualArray(a, b, atol=1e-5)
 
+    @requires_onnxruntime()
     def test_aten_nonzero_tuple_d3(self):
         import torch
 
@@ -470,6 +482,7 @@ class TestOnnxExportAten(ExtTestCase):
         for a, b in zip(expected, got):
             self.assertEqualArray(a, b, atol=1e-5)
 
+    @requires_onnxruntime()
     def test_aten_nonzero_tuple_d1(self):
         import torch
 
@@ -553,6 +566,7 @@ class TestOnnxExportAten(ExtTestCase):
         y = np_as_strided_2(x, shape, strides)
         self.assertEqualArray(expected, y)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_as_strided(self):
         import torch
@@ -581,6 +595,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_as_strided_overlapping(self):
         import torch
@@ -611,6 +626,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_batch_norm_notraining(self):
         import torch
@@ -652,6 +668,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     @requires_torch("2.6", "avoid _native_batch_norm_legit_functional")
     def test_aten_batch_norm_training(self):
@@ -694,6 +711,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     @requires_torch("2.6", "avoid _native_batch_norm_legit_functional")
     def test_aten_batch_norm_training16(self):
@@ -740,6 +758,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-2)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_index_tensor_2_5(self):
         import torch
@@ -774,6 +793,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_index_tensor_2_4(self):
         import torch
@@ -805,6 +825,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_index_tensor_2_4_1_1(self):
         import torch
@@ -835,6 +856,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqualArray(expected.reshape((-1,)), got[0].reshape((-1,)), atol=1e-5)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_index_tensor_1_3(self):
         import torch
@@ -866,6 +888,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_fmod(self):
         import torch
@@ -890,6 +913,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_conv(self):
         import torch
@@ -927,6 +951,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     @hide_stdout()
     def test_aten_clone_index_Tensor(self):
@@ -990,6 +1015,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_index_put_mask_bool_fixed_size(self):
         import torch
@@ -1021,6 +1047,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_index_put_mask_bool_fixed_broadcast_2d(self):
         import torch
@@ -1056,6 +1083,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_index_put_mask_bool_fixed_broadcast_3d(self):
         import torch
@@ -1092,6 +1120,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not working on windows")
     def test_aten_index_put_mask_bool_fixed_broadcast_3d_2(self):
         import torch
@@ -1128,6 +1157,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     def test_aten_take(self):
         import torch
 
@@ -1157,6 +1187,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     def test_aten_index_tensor_2_1_2(self):
         import torch
 
@@ -1187,6 +1218,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @ignore_warnings(FutureWarning)
     def test_aten_index_put_inplace_column_0(self):
         import torch
@@ -1237,6 +1269,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     def test_aten_index_put_inplace_column_1(self):
         import torch
 
@@ -1286,6 +1319,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     def test_aten_batch_norm_momentum(self):
         import torch
 
@@ -1366,7 +1400,7 @@ class TestOnnxExportAten(ExtTestCase):
                 self.assertEqualArray(expected, got, atol=1e-6)
 
                 # checking with onnxruntime as well
-                if stype == "bfloat16":
+                if stype == "bfloat16" or not has_onnxruntime():
                     # not supported
                     continue
                 key = red, include, stype
@@ -1381,6 +1415,7 @@ class TestOnnxExportAten(ExtTestCase):
                 got = sess.run(None, feeds)[0]
                 self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_aten_isin(self):
         import torch
@@ -1415,6 +1450,7 @@ class TestOnnxExportAten(ExtTestCase):
                 got = sess.run(None, feeds)[0]
                 self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_aten_multinomial(self):
         import torch
@@ -1448,6 +1484,7 @@ class TestOnnxExportAten(ExtTestCase):
                 self.assertEqual(expected.shape, got.shape)
                 self.assertEqual(expected.numpy().dtype, got.dtype)
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_aten_masked_scatter(self):
         import torch
@@ -1482,6 +1519,7 @@ class TestOnnxExportAten(ExtTestCase):
                 self.assertEqual(expected.shape, got.shape)
                 self.assertEqual(expected.numpy().dtype, got.dtype)
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_aten_masked_scatter_samedim(self):
         import torch
@@ -1517,6 +1555,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_aten_masked_scatter_notsamedim(self):
         import torch
@@ -1640,6 +1679,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(domains, [""])
         check_model(onx.proto)
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_aten_index_tensor_rk2_rk4_rk4(self):
         import torch
@@ -1672,6 +1712,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_aten_meshgrid(self):
         import torch
@@ -1702,6 +1743,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualAny(expected, tuple(got), atol=1e-5)
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_aten_pow_tensor_scalar(self):
         import torch
@@ -1729,6 +1771,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualAny(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_aten_where_only_condition(self):
         import torch
@@ -1756,6 +1799,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)
         self.assertEqualAny(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_aten_index_put_no_dimension_2_2_0(self):
         import torch
@@ -1788,6 +1832,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualAny(expected.numpy(), got, atol=1e-5)
 
+    @requires_onnxruntime()
     @ignore_warnings(UserWarning)
     def test_aten_index_put_no_dimension_3_2_2(self):
         import torch
@@ -1820,6 +1865,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualAny(expected.numpy(), got, atol=1e-5)
 
+    @requires_onnxruntime()
     def test_getitem_index_put1(self):
         import torch
 
@@ -1851,6 +1897,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_getitem_index_put2(self):
         import torch
 
@@ -1881,6 +1928,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_getitem_index_put3(self):
         import torch
 
@@ -1915,6 +1963,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_index_Tensor_21_2(self):
         import torch
 
@@ -1954,6 +2003,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     @hide_stdout()
     def test_index_Tensor_21_2_oblivious(self):
         import torch
@@ -1991,6 +2041,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_index_put_dynamic(self):
         import torch
 
@@ -2101,6 +2152,7 @@ class TestOnnxExportAten(ExtTestCase):
         self.assertEqual(1, op_types.count("Add"))
         self.assertEqual(2, op_types.count("Cast"))
 
+    @requires_onnxruntime()
     def test_convolution_valid(self):
         import torch
 
@@ -2569,6 +2621,7 @@ class TestOnnxExportAten(ExtTestCase):
             got = ref.run(None, feeds)[0]
             self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_index_add_d1(self):
         import torch
 
@@ -2663,6 +2716,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_expand(self):
         import torch
 
@@ -2698,6 +2752,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_diff(self):
         import torch
 
@@ -2733,6 +2788,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_diff_prepend(self):
         import torch
 
@@ -2771,6 +2827,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-2)
 
+    @requires_onnxruntime()
     def test_diff_dynamic(self):
         import torch
 
@@ -2973,6 +3030,7 @@ class TestOnnxExportAten(ExtTestCase):
             got = sess.run(None, feeds)[0]
             self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("broken")
     def test_aten_index_put_4d_none(self):
         import torch
@@ -3012,6 +3070,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("broken")
     def test_aten_index_put_55_2_25(self):
         import torch
@@ -3046,6 +3105,7 @@ class TestOnnxExportAten(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("broken")
     def test_aten_index_put_55_12_25(self):
         import torch

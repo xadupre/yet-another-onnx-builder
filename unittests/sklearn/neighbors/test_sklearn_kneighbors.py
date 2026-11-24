@@ -4,7 +4,7 @@ Unit tests for yobx.sklearn.neighbors KNN converters.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -159,6 +159,7 @@ class TestKNeighborsClassifier(ExtTestCase):
         ort_results = sess.run(None, {"X": X})
         self.assertEqualArray(expected_labels, ort_results[0])
 
+    @requires_onnxruntime()
     def test_knn_classifier_com_microsoft(self):
         from sklearn.neighbors import KNeighborsClassifier
         from yobx.sklearn import to_onnx
@@ -352,6 +353,7 @@ class TestKNeighborsRegressor(ExtTestCase):
         ort_results = sess.run(None, {"X": X})
         self.assertEqualArray(expected, ort_results[0], atol=1e-5)
 
+    @requires_onnxruntime()
     def test_knn_regressor_com_microsoft(self):
         from sklearn.neighbors import KNeighborsRegressor
         from yobx.sklearn import to_onnx

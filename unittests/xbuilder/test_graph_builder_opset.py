@@ -3,14 +3,14 @@ Unit tests for every ONNX operator created via GraphBuilder / Opset.
 
 Each test builds a minimal ONNX graph using gr.op.<OpType>(...),
 exports it with gr.to_onnx(), and validates the output with
-onnxruntime.
+onnxruntime (or onnx-light when onnxruntime is not installed).
 """
 
 import unittest
 import numpy as np
 from onnx_light.onnx import TensorProto
-from onnxruntime import InferenceSession
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, has_onnxruntime
+from yobx.reference import ExtendedReferenceEvaluator
 from yobx.xbuilder.graph_builder import GraphBuilder
 
 TFLOAT = TensorProto.FLOAT
@@ -19,7 +19,12 @@ TBOOL = TensorProto.BOOL
 
 
 def _run(model, feeds):
-    """Run an ONNX model through onnxruntime and return the first output."""
+    """Runs an ONNX model through onnxruntime (or onnx-light if missing)."""
+    if not has_onnxruntime():
+        return ExtendedReferenceEvaluator(model).run(None, feeds)
+
+    from onnxruntime import InferenceSession
+
     sess = InferenceSession(model.SerializeToString(), providers=["CPUExecutionProvider"])
     return sess.run(None, feeds)
 

@@ -1,7 +1,7 @@
 import unittest
 from typing import Any, List, Optional
 from yobx._onnx_shim import onnx
-from yobx.ext_test_case import ExtTestCase, requires_torch
+from yobx.ext_test_case import ExtTestCase, requires_torch, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch import ExportOptions
 from yobx.torch.interpreter import to_onnx
@@ -87,6 +87,7 @@ class TestOnnxExportShape(ExtTestCase):
                 )
         return filename
 
+    @requires_onnxruntime()
     @requires_torch("2.6", "torch.export.Dim.AUTO")
     def test_shape_AUTO(self):
         import torch
@@ -135,6 +136,7 @@ class TestOnnxExportShape(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     @requires_torch("2.6", "torch.export.Dim.AUTO")
     def test_shape_reshape(self):
         import torch
@@ -176,6 +178,7 @@ class TestOnnxExportShape(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     @requires_torch("2.6", "torch.export.Dim.AUTO")
     def test_output_name(self):
         import torch
@@ -213,6 +216,7 @@ class TestOnnxExportShape(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     @requires_torch("2.6", "torch.export.Dim.AUTO")
     def test_shape_named_dynamic_shapes(self):
         import torch
@@ -257,6 +261,7 @@ class TestOnnxExportShape(ExtTestCase):
         got = sess.run(None, feeds)[0]
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     @requires_torch("2.6", "torch.export.Dim.AUTO")
     def test_backed_size_oblivious_dynamic_shapes(self):
         import torch

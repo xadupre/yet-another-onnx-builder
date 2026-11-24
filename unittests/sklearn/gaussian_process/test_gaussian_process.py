@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.gaussian_process import GaussianProcessClassifier, GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import ConstantKernel, DotProduct, Matern, RBF, WhiteKernel
 
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.sklearn import to_onnx
 
@@ -205,6 +205,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
 
     # ── com.microsoft CDist path ───────────────────────────────────────────────
 
+    @requires_onnxruntime()
     def test_gpr_com_microsoft_cdist(self):
         """GPR uses com.microsoft.CDist when the domain is available."""
         X = self._X.astype(np.float32)
@@ -221,6 +222,7 @@ class TestSklearnGaussianProcess(ExtTestCase):
         expected = gpr.predict(self._X).astype(np.float32)
         self.assertEqualArray(expected, ort_results[0], atol=1e-4)
 
+    @requires_onnxruntime()
     def test_gpc_com_microsoft_cdist(self):
         """GPC uses com.microsoft.CDist when the domain is available."""
         X = self._X.astype(np.float32)

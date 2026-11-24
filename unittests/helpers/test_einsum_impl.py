@@ -4,10 +4,8 @@ import unittest
 from contextlib import redirect_stdout
 
 import numpy
-import onnxruntime
-from onnxruntime import InferenceSession
 
-from yobx.ext_test_case import ExtTestCase
+from yobx.ext_test_case import ExtTestCase, requires_onnxruntime
 from yobx.helpers._einsum.einsum_impl import (
     EinsumSubOp,
     analyse_einsum_equation,
@@ -263,7 +261,10 @@ class TestEinsumImpl(ExtTestCase):
                     )
                 self.assertEqualArray(res1, res2)
 
+    @requires_onnxruntime()
     def test_decompose_einsum_equation_onnx(self):
+        from onnxruntime import InferenceSession
+
         m1 = numpy.arange(0, 24).astype(numpy.float32).reshape((2, 3, 4))
         m2 = numpy.arange(0, 20).astype(numpy.float32).reshape((4, 5))
         verbose = False
@@ -289,7 +290,11 @@ class TestEinsumImpl(ExtTestCase):
                 )
                 self.assertEqualArray(res1, res2)
 
+    @requires_onnxruntime()
     def test_decompose_einsum_equation_onnx2(self):
+        import onnxruntime
+        from onnxruntime import InferenceSession
+
         m1 = numpy.arange(0, 24).astype(numpy.float32).reshape((2, 3, 4))
         m2 = numpy.arange(0, 20).astype(numpy.float32).reshape((4, 5))
         m3 = numpy.arange(0, 77 * 5).astype(numpy.float32).reshape((5, 7, 11))
@@ -401,8 +406,11 @@ class TestEinsumImpl(ExtTestCase):
             with self.subTest(strategy=strat):
                 self._common_test_case_2("abc,cd->abc", strategy=strat, verbose=False)
 
+    @requires_onnxruntime()
     def test_many_2(self):
         """Exhaustive 2-operand equation check (numpy + ONNX via InferenceSession)."""
+        from onnxruntime import InferenceSession
+
         m1 = numpy.arange(2 * 2 * 2).reshape((2, 2, 2)).astype(numpy.float32) + 10
         m2 = numpy.arange(4).reshape((2, 2)).astype(numpy.float32) + 100
 
@@ -490,6 +498,8 @@ class TestEinsumBug(ExtTestCase):
 
     def _common_test_equation_onnx(self, equation, dim1, dim2):
         """Decompose *equation*, run via ONNX, verify numerics."""
+        from onnxruntime import InferenceSession
+
         seq = decompose_einsum_equation(equation, clean=True, strategy="numpy")
         onx = seq.to_onnx("Y", "X1", "X2")
         a = numpy.random.rand(*list((2,) * dim1)).astype(numpy.float32)
@@ -499,9 +509,11 @@ class TestEinsumBug(ExtTestCase):
         expected = numpy.einsum(equation, a, b)
         self.assertEqualArray(expected, got, atol=1e-5)
 
+    @requires_onnxruntime()
     def test_decompose_einsum_abc_cde_abde(self):
         self._common_test_equation_onnx("abc,cde->abde", 3, 3)
 
+    @requires_onnxruntime()
     def test_decompose_einsum_abcd_cde_abe(self):
         self._common_test_equation_onnx("abcd,cde->abe", 4, 3)
 

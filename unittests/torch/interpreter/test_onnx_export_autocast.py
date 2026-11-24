@@ -4,6 +4,7 @@ import unittest
 from onnx_light.onnx import TensorProto
 from onnx_light.onnx.inliner import inline_local_functions
 from yobx.ext_test_case import (
+    requires_onnxruntime,
     ExtTestCase,
     ignore_warnings,
     requires_torch,
@@ -53,6 +54,7 @@ class TestOnnxExportAutocast(ExtTestCase):
         onx = to_onnx(model, inputs, target_opset=21)
         self.assert_conversion_with_ort_on_cpu(onx, expected, inputs, atol=1e-5)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning, FutureWarning))
     def test_autocast_float16_enabled(self):
@@ -86,6 +88,7 @@ class TestOnnxExportAutocast(ExtTestCase):
         got_f32 = got[0].astype(np.float32)
         self.assertEqualArray(expected.detach().numpy(), got_f32, atol=1e-1)
 
+    @requires_onnxruntime()
     @skipif_ci_windows("torch dynamo not supported on windows")
     @ignore_warnings((UserWarning, DeprecationWarning, FutureWarning))
     def test_autocast_linear_float16(self):

@@ -1,5 +1,6 @@
 import unittest
 from yobx.ext_test_case import (
+    requires_onnxruntime,
     ExtTestCase,
     requires_torch,
     requires_transformers,
@@ -358,6 +359,7 @@ class TestValidateModel(ExtTestCase):
         # Export may succeed or fail depending on torch version; both are acceptable.
         self.assertIsNotNone(summary.export)
 
+    @requires_onnxruntime()
     def test_check_discrepancies_verbose_2(self):
         """_check_discrepancies prints per-row detail lines when verbose >= 2."""
         import io
@@ -393,6 +395,7 @@ class TestValidateModel(ExtTestCase):
         if data.discrepancies:
             self.assertIn("[0]", output)
 
+    @requires_onnxruntime()
     def test_check_discrepancies_verbose_3(self):
         """_check_discrepancies prints tensor shapes when verbose >= 3."""
         import io
@@ -452,6 +455,7 @@ class TestValidateModel(ExtTestCase):
             # top_op_types should look like "OpType:N,..." with a colon separator.
             self.assertIn(":", summary.top_op_types)
 
+    @requires_onnxruntime()
     def test_validate_model_discrepancies_in_artifact_report(self):
         """After do_run=True, the artifact report includes the discrepancy rows."""
         import torch
@@ -479,6 +483,7 @@ class TestValidateModel(ExtTestCase):
         if data.discrepancies:
             self.assertEqual(len(data.artifact.report.discrepancies), len(data.discrepancies))
 
+    @requires_onnxruntime()
     def test_validate_model_discrepancies_table_has_atol_rtol(self):
         """Each row in the discrepancies table produced by validate_model has atol and rtol columns."""  # noqa: E501
         import torch
@@ -513,6 +518,7 @@ class TestValidateModel(ExtTestCase):
         self.assertAlmostEqual(summary.discrepancies_atol, custom_atol)
         self.assertAlmostEqual(summary.discrepancies_rtol, custom_rtol)
 
+    @requires_onnxruntime()
     def test_validate_model_default_atol_float32(self):
         """When atol is not given, validate_model defaults to 1e-3 for float32."""
         import torch
@@ -536,6 +542,7 @@ class TestValidateModel(ExtTestCase):
         self.assertAlmostEqual(summary.discrepancies_rtol, 0.1)
 
     @skipif_ci_windows("xlsx file locked by another process on Windows")
+    @requires_onnxruntime()
     def test_validate_model_artifact_xlsx_has_discrepancies_sheet(self):
         """The xlsx saved alongside the ONNX contains a 'discrepancies' sheet."""
         try:
@@ -576,6 +583,7 @@ class TestValidateModel(ExtTestCase):
             if data.discrepancies:
                 self.assertIn("discrepancies", sheets)
 
+    @requires_onnxruntime()
     def test_cmd_validate_tiny_llm_patch_yobx(self):
         """End-to-end CLI invocation equivalent to:
 

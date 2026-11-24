@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from yobx._onnx_shim import onnx
 from onnx_light.onnx import TensorProto
-from yobx.ext_test_case import ExtTestCase, requires_torch
+from yobx.ext_test_case import ExtTestCase, requires_torch, requires_onnxruntime
 from yobx.helpers.rt_helper import make_feeds
 
 
@@ -265,6 +265,7 @@ class TestOnnxGenerate(ExtTestCase):
             ir_version=9,
         )
 
+    @requires_onnxruntime()
     def test_greedy_no_kv_stops_at_eos(self):
         """Without KV cache: generation stops when EOS token is produced."""
         from yobx.helpers.rt_helper import onnx_generate
@@ -276,6 +277,7 @@ class TestOnnxGenerate(ExtTestCase):
         self.assertEqual(tokens.shape, (1, 3))
         self.assertEqual(int(tokens[0, 2]), 3)
 
+    @requires_onnxruntime()
     def test_greedy_no_kv_max_tokens(self):
         """Without KV cache: exactly max_new_tokens tokens appended when no EOS."""
         from yobx.helpers.rt_helper import onnx_generate
@@ -287,6 +289,7 @@ class TestOnnxGenerate(ExtTestCase):
         self.assertEqual(tokens.shape, (1, 6))
         self.assertTrue(np.all(tokens[0, 2:] == 3))
 
+    @requires_onnxruntime()
     def test_greedy_with_kv_stops_at_eos(self):
         """With KV cache: generation stops when EOS token is produced."""
         from yobx.helpers.rt_helper import onnx_generate
@@ -300,6 +303,7 @@ class TestOnnxGenerate(ExtTestCase):
         self.assertEqual(tokens.shape, (1, 3))
         self.assertEqual(int(tokens[0, 2]), 5)
 
+    @requires_onnxruntime()
     def test_greedy_with_kv_max_tokens(self):
         """With KV cache: max_new_tokens are generated when EOS is not reached."""
         from yobx.helpers.rt_helper import onnx_generate
@@ -313,6 +317,7 @@ class TestOnnxGenerate(ExtTestCase):
         self.assertEqual(tokens.shape, (1, 5))
         self.assertTrue(np.all(tokens[0, 2:] == 5))
 
+    @requires_onnxruntime()
     def test_greedy_with_kv_without_attention_mask(self):
         """With KV cache: generation omits an attention mask the model does not accept."""
         from yobx.helpers.rt_helper import onnx_generate
@@ -326,6 +331,7 @@ class TestOnnxGenerate(ExtTestCase):
         self.assertEqual(tokens.shape, (1, 4))
         self.assertTrue(np.all(tokens[0, 2:] == 5))
 
+    @requires_onnxruntime()
     @requires_torch()
     def test_torch_input_ids(self):
         """Torch tensors are accepted as input_ids/attention_mask."""

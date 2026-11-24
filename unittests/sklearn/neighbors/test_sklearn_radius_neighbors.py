@@ -9,7 +9,7 @@ scikit-learn for the scenarios covered there.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 
 
@@ -206,6 +206,7 @@ class TestRadiusNeighborsClassifier(ExtTestCase):
         ort_results = sess.run(None, {"X": X})
         self.assertEqualArray(expected_labels, ort_results[0])
 
+    @requires_onnxruntime()
     def test_rnn_classifier_com_microsoft(self):
         from sklearn.neighbors import RadiusNeighborsClassifier
         from yobx.sklearn import to_onnx
@@ -376,6 +377,7 @@ class TestRadiusNeighborsRegressor(ExtTestCase):
         ort_results = sess.run(None, {"X": X})
         self.assertEqualArray(expected, ort_results[0], atol=1e-5)
 
+    @requires_onnxruntime()
     def test_rnn_regressor_com_microsoft(self):
         from sklearn.neighbors import RadiusNeighborsRegressor
         from yobx.sklearn import to_onnx

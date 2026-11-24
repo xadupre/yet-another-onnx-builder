@@ -17,6 +17,13 @@ from onnx_light.onnx import checker
 from onnx_light.onnx.reference import ReferenceEvaluator
 
 
+def requires_onnxruntime():
+    """Skips a test if :epkg:`onnxruntime` is not installed."""
+    return unittest.skipUnless(
+        importlib.util.find_spec("onnxruntime"), "onnxruntime not installed"
+    )
+
+
 @unittest.skipUnless(importlib.util.find_spec("onnx_light"), "onnx-light wheel is not installed")
 class TestOnnxLightGraphBuilder(unittest.TestCase):
     def make_builder(self, *args, **kwargs):
@@ -24,6 +31,7 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
 
         return OnnxLightGraphBuilder(*args, **kwargs)
 
+    @requires_onnxruntime()
     def test_runtime_compatible_ir_versions(self):
         import onnxruntime
 
@@ -146,6 +154,7 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
                     actual, numpy.array([11, 16], dtype=numpy.float32)
                 )
 
+    @requires_onnxruntime()
     def test_constant_reduce_prod_dtype_support(self):
         import onnxruntime
         from yobx.builder.onnxlight import OnnxLightOptimizationOptions
@@ -1325,6 +1334,7 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
             numpy.from_dlpack(model.graph.initializer[0]), numpy.arange(4, dtype=numpy.float32)
         )
 
+    @requires_onnxruntime()
     def test_requested_node_names_are_unique(self):
         builder = self.make_builder(18, ir_version=8)
         builder.make_tensor_input("X", 1, ("batch", 3))
@@ -1351,6 +1361,7 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         for actual in session.run(None, {"X": x}):
             numpy.testing.assert_array_equal(actual, numpy.maximum((x + 1) * 2, 0))
 
+    @requires_onnxruntime()
     def test_native_optimizer_node_names_are_unique(self):
         from onnxruntime import InferenceSession
         from yobx.builder.onnxlight import OnnxLightOptimizationOptions
@@ -1380,6 +1391,7 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         numpy.testing.assert_array_equal(maximum, x.max(axis=1))
         numpy.testing.assert_array_equal(index, x.argmax(axis=1))
 
+    @requires_onnxruntime()
     def test_export_normalizes_all_node_name_scopes(self):
         from onnxruntime import InferenceSession
 
@@ -1452,6 +1464,7 @@ class TestOnnxLightGraphBuilder(unittest.TestCase):
         "scikit-learn" in importlib.metadata.packages_distributions().get("sklearn", []),
         "scikit-learn is not installed",
     )
+    @requires_onnxruntime()
     def test_sklearn_converter_repeated_node_names(self):
         from sklearn.linear_model import Ridge
         from sklearn.pipeline import make_pipeline

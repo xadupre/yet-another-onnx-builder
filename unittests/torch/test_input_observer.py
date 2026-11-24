@@ -3,7 +3,13 @@ import itertools
 import unittest
 import pandas
 import torch
-from yobx.ext_test_case import ExtTestCase, requires_torch, hide_stdout, ignore_warnings
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_torch,
+    hide_stdout,
+    ignore_warnings,
+    requires_onnxruntime,
+)
 from yobx.torch.input_observer import (
     InputCandidate,
     InputObserver,
@@ -644,6 +650,7 @@ class TestInputObserver(ExtTestCase):
             observer.infer_dynamic_shapes(set_batch_dimension_for={"x", "z"}),
         )
 
+    @requires_onnxruntime()
     @requires_torch("2.10.99")
     def test_io_captured_different_order(self):
         class Model(torch.nn.Module):
@@ -708,6 +715,7 @@ class TestInputObserver(ExtTestCase):
         df = pandas.DataFrame(data)
         self.assertLess(df["abs"].max(), 1e-5)
 
+    @requires_onnxruntime()
     def test_io_check_discrepancies(self):
         class Model(torch.nn.Module):
             def forward(self, x, y):

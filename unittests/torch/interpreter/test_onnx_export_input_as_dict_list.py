@@ -1,5 +1,11 @@
 import unittest
-from yobx.ext_test_case import ExtTestCase, requires_torch, skipif_ci_windows, hide_stdout
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_torch,
+    skipif_ci_windows,
+    hide_stdout,
+    requires_onnxruntime,
+)
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch import ExportOptions
 from yobx.torch.interpreter import to_onnx
@@ -216,6 +222,7 @@ class TestOnnxExportInputDictList(ExtTestCase):
         got = ref.run(None, feeds)
         self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     def test_neuron_tracer(self):
         import torch
 

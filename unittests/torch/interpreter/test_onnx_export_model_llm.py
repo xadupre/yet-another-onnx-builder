@@ -4,7 +4,13 @@ import unittest
 import warnings
 import torch
 from yobx.reference import ExtendedReferenceEvaluator
-from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_torch, skipif_ci_windows
+from yobx.ext_test_case import (
+    ExtTestCase,
+    ignore_warnings,
+    requires_torch,
+    skipif_ci_windows,
+    requires_onnxruntime,
+)
 from yobx.xbuilder import OptimizationOptions
 from yobx.torch.interpreter import to_onnx
 from yobx.helpers.onnx_helper import pretty_onnx
@@ -90,6 +96,7 @@ class TestOnnxExportLlama(ExtTestCase):
                 f"onnxruntime cannot load the model due to {e}\n{pretty_onnx(onx)}"
             )
 
+    @requires_onnxruntime()
     @skipif_ci_windows("not supported yet on Windows")
     @requires_torch("2.4", "Unable to find input 'x' in known results")
     @ignore_warnings(DeprecationWarning)

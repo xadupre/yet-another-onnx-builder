@@ -5,7 +5,12 @@ Unit tests for yobx.sklearn.category_encoders.BaseNEncoder converter.
 import unittest
 import numpy as np
 import pandas as pd
-from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_category_encoders
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_sklearn,
+    requires_category_encoders,
+    requires_onnxruntime,
+)
 
 
 @requires_sklearn("1.4")
@@ -220,6 +225,7 @@ class TestCEBaseNEncoder(ExtTestCase):
         expected = pipe.predict(X_df[:8]).astype(np.float32).reshape(-1, 1)
         self.assertEqualArray(expected, ort_result, atol=1e-4)
 
+    @requires_onnxruntime()
     def test_string_basic(self):
         """Two string categorical columns with BaseNEncoder."""
         from category_encoders import BaseNEncoder

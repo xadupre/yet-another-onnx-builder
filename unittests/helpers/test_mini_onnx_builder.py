@@ -2,7 +2,12 @@ import unittest
 import numpy as np
 import ml_dtypes
 from yobx._onnx_shim import onnx
-from yobx.ext_test_case import ExtTestCase, requires_transformers, requires_torch
+from yobx.ext_test_case import (
+    ExtTestCase,
+    requires_transformers,
+    requires_torch,
+    requires_onnxruntime,
+)
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.helpers.mini_onnx_builder import (
     create_onnx_model_from_input_tensors,
@@ -32,6 +37,7 @@ class TestMiniOnnxBuilder(ExtTestCase):
         got = ref.run(None, {})
         self.assertEqualAny([np.array([6, 7])], got[0])
 
+    @requires_onnxruntime()
     def test_mini_onnx_builder_sequence_ort(self):
         from onnxruntime import InferenceSession
 
@@ -42,6 +48,7 @@ class TestMiniOnnxBuilder(ExtTestCase):
         got = ref.run(None, {})
         self.assertEqualAny([np.array([6, 7])], got[0])
 
+    @requires_onnxruntime()
     def test_mini_onnx_builder_sequence_ort_randomize(self):
         from onnxruntime import InferenceSession
 

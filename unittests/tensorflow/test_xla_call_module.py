@@ -429,11 +429,10 @@ class TestJaxBinaryOpsEndToEnd(ExtTestCase):
 
     def _run_jax_binary_fn(self, jax_fn, x, y):
         """Convert *jax_fn(x, y)* to ONNX and compare with direct JAX output."""
-        from onnxruntime import InferenceSession
         from yobx.tensorflow import to_onnx
 
         onx = to_onnx(jax_fn, (x, y), target_opset=21)
-        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+        sess = self.make_inference_session(onx)
         input_names = [i.name for i in onx.graph.input]
         (result,) = sess.run(None, {input_names[0]: x, input_names[1]: y})
         expected = jax_fn(x, y)
@@ -552,11 +551,10 @@ class TestJaxUnaryOpsEndToEnd(ExtTestCase):
 
     def _run_jax_fn(self, jax_fn, x):
         """Convert *jax_fn* to ONNX and run with ORT; return (expected, result)."""
-        from onnxruntime import InferenceSession
         from yobx.tensorflow import to_onnx
 
         onx = to_onnx(jax_fn, (x,), target_opset=21, dynamic_shapes=({0: "batch"},))
-        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+        sess = self.make_inference_session(onx)
         input_name = onx.graph.input[0].name
         result = sess.run(None, {input_name: x})[0]
         expected = jax_fn(x)
@@ -794,14 +792,13 @@ class TestJaxMlpEndToEnd(ExtTestCase):
     """End-to-end tests for the MLP example from :ref:`l-plot-jax-to-onnx`."""
 
     def _run(self, jax_fn, x, dynamic_shapes=None):
-        from onnxruntime import InferenceSession
         from yobx.tensorflow import to_onnx
 
         kwargs = {}
         if dynamic_shapes is not None:
             kwargs["dynamic_shapes"] = dynamic_shapes
         onx = to_onnx(jax_fn, (x,), target_opset=21, **kwargs)
-        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+        sess = self.make_inference_session(onx)
         input_name = onx.graph.input[0].name
         (result,) = sess.run(None, {input_name: x})
         expected = np.asarray(jax_fn(x))
@@ -849,9 +846,7 @@ class TestJaxMlpEndToEnd(ExtTestCase):
         batch_dim = onx.graph.input[0].type.tensor_type.shape.dim[0]
         self.assertTrue(batch_dim.dim_param, "Expected a named dynamic batch dim")
 
-        from onnxruntime import InferenceSession
-
-        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+        sess = self.make_inference_session(onx)
         iname = onx.graph.input[0].name
         for n in (1, 3, 9):
             Xn = rng.standard_normal((n, 4)).astype(np.float32)
@@ -863,7 +858,6 @@ class TestJaxMlpEndToEnd(ExtTestCase):
         import jax
 
         from yobx.jax import to_onnx
-        from onnxruntime import InferenceSession
 
         def jax_softmax(x):
             return jax.nn.softmax(x, axis=-1)
@@ -871,7 +865,7 @@ class TestJaxMlpEndToEnd(ExtTestCase):
         rng = np.random.default_rng(42)
         X = rng.standard_normal((6, 10)).astype(np.float32)
         onx = to_onnx(jax_softmax, (X,), target_opset=21, dynamic_shapes=({0: "batch"},))
-        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
+        sess = self.make_inference_session(onx)
         (result,) = sess.run(None, {onx.graph.input[0].name: X})
         self.assertEqualArray(np.asarray(jax_softmax(X)), result, atol=1e-5)
 

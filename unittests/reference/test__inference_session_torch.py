@@ -8,19 +8,24 @@ import torch
 from torch._C import _from_dlpack
 from yobx.ext_test_case import (
     ExtTestCase,
+    has_onnxruntime,
     hide_stdout,
+    requires_onnxruntime,
     requires_onnxruntime_training,
     requires_cuda,
     requires_onnxruntime_cuda,
 )
 from yobx.helpers.onnx_helper import tensor_dtype_to_np_dtype
 from yobx.torch.torch_helper import onnx_dtype_to_torch_dtype
-from yobx.reference._inference_session import investigate_onnxruntime_issue
-from yobx.reference._inference_session_torch import InferenceSessionForTorch
+
+if has_onnxruntime():
+    from yobx.reference._inference_session import investigate_onnxruntime_issue
+    from yobx.reference._inference_session_torch import InferenceSessionForTorch
 
 TFLOAT = onnx.TensorProto.FLOAT
 
 
+@requires_onnxruntime()
 class TestInferenceSessionTorch(ExtTestCase):
     @classmethod
     def _range(cls, *shape, bias: Optional[float] = None):

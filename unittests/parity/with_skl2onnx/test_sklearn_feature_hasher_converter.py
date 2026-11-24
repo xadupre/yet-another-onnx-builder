@@ -9,13 +9,14 @@ ONNX domain for the ``MurmurHash3`` operator.
 
 import unittest
 import numpy as np
-from yobx.ext_test_case import ExtTestCase, requires_sklearn
+from yobx.ext_test_case import ExtTestCase, requires_sklearn, requires_onnxruntime
 
 # Sample documents from sklearn-onnx's FeatureHasher test suite
 _CORPUS = ["cat dog bird", "cat cat fish", "dog bird fish bird", "ant bee"]
 
 
 @requires_sklearn("1.4")
+@requires_onnxruntime(msg="MurmurHash3 requires ONNX Runtime")
 class TestSklearnFeatureHasherConverter(ExtTestCase):
     """Parity tests for the FeatureHasher ONNX converter.
 

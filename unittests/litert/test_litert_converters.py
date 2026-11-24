@@ -107,11 +107,7 @@ class TestLiteRTConverterUnits(ExtTestCase):
         return GraphBuilder({"": 18}, optimization_options=OptimizationOptions(patterns=None))
 
     def _run(self, g: GraphBuilder, feeds: dict) -> list:
-        from onnxruntime import InferenceSession
-
-        onx = g.to_onnx()
-        sess = InferenceSession(onx.SerializeToString(), providers=["CPUExecutionProvider"])
-        return sess.run(None, feeds)
+        return self.make_inference_session(g.to_onnx()).run(None, feeds)
 
     def _proxy(self, op_litert, input_names, output_names):
         from yobx.litert.convert import _OpProxy
@@ -293,9 +289,7 @@ class TestLiteRTEndToEnd(ExtTestCase):
         self.assertIn("Relu", op_types)
 
         # Output is numerically correct.
-        from onnxruntime import InferenceSession
-
-        sess = InferenceSession(onx.proto.SerializeToString(), providers=["CPUExecutionProvider"])
+        sess = self.make_inference_session(onx)
         feeds = {onx.proto.graph.input[0].name: X}
         (result,) = sess.run(None, feeds)
         self.assertEqualArray(np.maximum(X, 0), result)
@@ -357,7 +351,6 @@ class TestLiteRTEndToEnd(ExtTestCase):
         from yobx.litert import to_onnx
         from yobx.litert.litert_helper import _make_multi_subgraph_tflite_model
         from yobx.container import ExportArtifact
-        from onnxruntime import InferenceSession
 
         model_bytes = _make_multi_subgraph_tflite_model()
         # Provide per-subgraph dummy inputs.
@@ -380,9 +373,7 @@ class TestLiteRTEndToEnd(ExtTestCase):
         self.assertEqual(len(output_names), 2)
 
         # Verify outputs numerically.
-        sess = InferenceSession(
-            artifact.proto.SerializeToString(), providers=["CPUExecutionProvider"]
-        )
+        sess = self.make_inference_session(artifact)
         feeds = {input_names[0]: X0, input_names[1]: X1}
         out0, out1 = sess.run(None, feeds)
         self.assertEqualArray(np.maximum(X0, 0), out0)

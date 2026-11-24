@@ -23,6 +23,7 @@ from yobx.ext_test_case import (
     ignore_errors,
     has_ipython,
     has_jax,
+    has_onnxruntime,
     has_sklearn,
     has_sksurv,
     has_spox,
@@ -33,6 +34,21 @@ from yobx.ext_test_case import (
 
 VERBOSE = 0
 ROOT = os.path.realpath(os.path.abspath(os.path.join(yobx_file, "..", "..")))
+ONNXRUNTIME_MARKERS = (
+    "import onnxruntime",
+    "from onnxruntime",
+    "OnnxruntimeEvaluator",
+    "InferenceSessionFor",
+    "onnx_generate",
+    'engine="onnxruntime"',
+)
+
+
+def _uses_onnxruntime(filename: str) -> bool:
+    """Tells whether an example requires :epkg:`onnxruntime`."""
+    with open(filename, encoding="utf-8") as f:
+        content = f.read()
+    return any(marker in content for marker in ONNXRUNTIME_MARKERS)
 
 
 class TestDocumentationExamples(ExtTestCase):
@@ -305,6 +321,13 @@ class TestDocumentationExamples(ExtTestCase):
 
             if not reason and importlib.util.find_spec("mermaid") is None and "mermaid" in name:
                 reason = "mermaid-py not installed"
+
+            if (
+                not reason
+                and not has_onnxruntime()
+                and _uses_onnxruntime(os.path.join(fold, name))
+            ):
+                reason = "onnxruntime not installed"
 
             if reason:
 

@@ -1,12 +1,13 @@
 import itertools
 import unittest
-from yobx.ext_test_case import ExtTestCase, ignore_warnings
+from yobx.ext_test_case import ExtTestCase, ignore_warnings, requires_onnxruntime
 from yobx.reference import ExtendedReferenceEvaluator
 from yobx.torch import ExportOptions
 from yobx.torch.interpreter import to_onnx
 
 
 class TestOnnxExportControlFlow(ExtTestCase):
+    @requires_onnxruntime()
     @ignore_warnings((UserWarning, FutureWarning))
     def test_scan_1(self):
         import torch
@@ -59,6 +60,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                     got = sess.run(None, feeds)
                     self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @ignore_warnings((UserWarning, FutureWarning))
     def test_scan_2(self):
         import torch
@@ -116,6 +118,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                     for e, g in zip(expected, got):
                         self.assertEqualArray(e, g, atol=1e-5)
 
+    @requires_onnxruntime()
     @ignore_warnings((UserWarning, FutureWarning))
     def test_scan_2_new_tracing(self):
         import torch
@@ -210,6 +213,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                     got = ref.run(None, feeds)
                     self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @ignore_warnings((UserWarning, FutureWarning))
     def test_scan_cdist_add(self):
         import torch
@@ -309,6 +313,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                     got = ref.run(None, feeds)
                     self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @ignore_warnings((UserWarning, FutureWarning))
     def test_scan_cdist_add_tracing(self):
         import torch
@@ -358,6 +363,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                     got = sess.run(None, feeds)
                     self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     @ignore_warnings((UserWarning, FutureWarning))
     def test_scan_cdist_dynamic(self):
         import torch
@@ -492,6 +498,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
                     got = sess.run(None, feeds)
                     self.assertEqualArray(expected, got[0], atol=1e-5)
 
+    @requires_onnxruntime()
     def test_scan_loop_inplace(self):
         import torch
 
@@ -567,6 +574,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     @ignore_warnings((UserWarning, FutureWarning))
     def test_control_flow_scan_decomposition_tracing(self):
         from yobx.torch.testing._model_eval_cases import ControlFlowScanDecomposition_151564
@@ -592,6 +600,7 @@ class TestOnnxExportControlFlow(ExtTestCase):
         got = ref.run(None, feeds)[0]
         self.assertEqualArray(expected, got)
 
+    @requires_onnxruntime()
     def test_scan_loop_inplace_new_tracing(self):
         import torch
         from yobx.torch.export_options import TracingMode

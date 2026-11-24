@@ -1,12 +1,13 @@
 import unittest
 import pandas
-from yobx.ext_test_case import ExtTestCase, requires_transformers
+from yobx.ext_test_case import ExtTestCase, requires_transformers, requires_onnxruntime
 from yobx.torch import register_flattening_functions, get_tiny_model
 from yobx.torch.input_observer import InputObserver
 from yobx.torch import apply_patches_for_model
 from yobx.torch.interpreter import to_onnx
 
 
+@requires_onnxruntime()
 class TestInputObserverTransformers(ExtTestCase):
     def _common_test(self, drop_inputs, atol=1e-4):
         mid = "arnir0/Tiny-LLM"
